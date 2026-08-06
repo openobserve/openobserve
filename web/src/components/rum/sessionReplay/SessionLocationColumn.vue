@@ -15,24 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:justify-center tw:gap-2 tw:leading-tight tw:min-w-0 tw:h-full">
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0">
+  <div class="flex h-full min-w-0 flex-col justify-center gap-2 leading-tight">
+    <div class="flex min-w-0 flex-nowrap items-center">
       <span
         v-if="column.country_iso_code"
-        :class="`fi fi-${column.country_iso_code} tw:mr-1.5 tw:shrink-0`"
+        :class="`fi fi-${column.country_iso_code} mr-1.5 shrink-0`"
       />
-      <div class="tw:text-xs tw:truncate">{{ column.country || "Unknown" }}</div>
+      <div class="truncate text-xs">{{ column.country || t("common.unknown") }}</div>
     </div>
-    <div class="tw:flex tw:items-center tw:flex-nowrap tw:min-w-0 tw:text-xs tw:text-text-secondary">
+    <div class="text-text-secondary flex min-w-0 flex-nowrap items-center text-xs">
       <template v-for="(part, index) in detailParts" :key="`${index}-${part}`">
         <OIcon
           v-if="index > 0"
           data-test="circle-icon"
           name="circle"
           size="xs"
-          class="tw:mx-1.5 tw:text-gray-400 tw:shrink-0"
+          class="text-icon-color mx-1.5 shrink-0"
         />
-        <span class="tw:truncate">{{ part }}</span>
+        <span class="truncate">{{ part }}</span>
       </template>
     </div>
   </div>
@@ -41,6 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 import "flag-icons/css/flag-icons.min.css";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps({
   column: {

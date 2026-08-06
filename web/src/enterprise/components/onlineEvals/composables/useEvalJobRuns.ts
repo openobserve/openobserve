@@ -25,6 +25,8 @@ export interface JobRunKpis {
 export interface JobRunRow {
   /** Span id from `_evaluator` itself — used as row key. */
   id: string;
+  /** Trace id from `_evaluator` — opens the complete evaluator execution. */
+  evaluatorTraceId: string;
   timestampMs: number;
   status: RunStatus;
   scorerId: string;
@@ -50,6 +52,15 @@ function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
 }
 
+// Each evaluation invocation writes one root/summary `_evaluator` span
+// (`online_eval.evaluate`, `is_root`) with NO `attributes_scorer_id` — plus one
+// child span per scorer that DOES carry it. A "run" here means a single scorer
+// invocation, so restrict every query to scorer-bearing rows. Without this the
+// root/summary spans (and skipped spans, which also lack a scorer id) leak into
+// the table as "(unknown scorer)" rows — score `—`, 0ms latency — and skew the
+// KPIs (inflated run count + success rate, deflated avg latency).
+const SCORER_ROW_FILTER = "attributes_scorer_id IS NOT NULL AND attributes_scorer_id != ''";
+
 function toNumber(v: unknown): number | null {
   if (v == null) return null;
   const n = typeof v === "number" ? v : Number(v);
@@ -69,8 +80,7 @@ function bucketToMs(bucket: unknown): number {
 
 function parseStatus(raw: unknown): RunStatus {
   const s = typeof raw === "string" ? raw.toLowerCase() : "";
-  if (s === "success" || s === "error" || s === "timeout" || s === "skipped")
-    return s;
+  if (s === "success" || s === "error" || s === "timeout" || s === "skipped") return s;
   return "unknown";
 }
 
@@ -129,6 +139,7 @@ interface KpiRow {
 
 interface RawRunRow {
   _timestamp?: string | number;
+  trace_id?: string;
   attributes_status?: string;
   attributes_latency_ms?: number | string | null;
   attributes_scorer_id?: string | null;
@@ -145,8 +156,8 @@ interface RawRunRow {
 function mapRunRow(r: RawRunRow): JobRunRow {
   const score = extractScore(r.attributes_response);
   return {
-    id:
-      r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+    id: r.span_id ?? `${r._timestamp ?? ""}-${r.attributes_target_span_id ?? ""}`,
+    evaluatorTraceId: r.trace_id ?? "",
     timestampMs: bucketToMs(r._timestamp),
     status: parseStatus(r.attributes_status),
     scorerId: r.attributes_scorer_id ?? "",
@@ -191,6 +202,7 @@ export function useEvalJobRuns(
     const where = combineWhere(
       `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      SCORER_ROW_FILTER,
     );
     return [
       "SELECT",
@@ -213,10 +225,12 @@ export function useEvalJobRuns(
     const where = combineWhere(
       `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      SCORER_ROW_FILTER,
     );
     return [
       "SELECT",
       "  span_id,",
+      "  trace_id,",
       "  _timestamp,",
       "  attributes_status,",
       "  attributes_latency_ms,",
@@ -242,11 +256,13 @@ export function useEvalJobRuns(
     const where = combineWhere(
       `CAST(attributes_job_id AS VARCHAR) = '${escapeSqlString(id)}'`,
       buildEvaluatorAgentFilterWhere(agentFilter?.value ?? null),
+      SCORER_ROW_FILTER,
       "attributes_status IN ('error', 'timeout')",
     );
     return [
       "SELECT",
       "  span_id,",
+      "  trace_id,",
       "  _timestamp,",
       "  attributes_status,",
       "  attributes_latency_ms,",
@@ -268,12 +284,7 @@ export function useEvalJobRuns(
     const { startUs, endUs } = dateWindow.value;
     isLoadingKpis.value = true;
     try {
-      const kpiHits = await executeQuery(
-        kpiSql.value,
-        startUs,
-        endUs,
-        "traces",
-      ).catch((err) => {
+      const kpiHits = await executeQuery(kpiSql.value, startUs, endUs, "traces").catch((err) => {
         console.warn("[JobRuns:kpis] failed", err);
         return [] as KpiRow[];
       });
@@ -302,20 +313,16 @@ export function useEvalJobRuns(
     try {
       const [runHits, failureHits] = await Promise.all([
         runsSql.value
-          ? executeQuery(runsSql.value, startUs, endUs, "traces").catch(
-              (err) => {
-                console.warn("[JobRuns:runs] failed", err);
-                return [] as RawRunRow[];
-              },
-            )
+          ? executeQuery(runsSql.value, startUs, endUs, "traces").catch((err) => {
+              console.warn("[JobRuns:runs] failed", err);
+              return [] as RawRunRow[];
+            })
           : Promise.resolve([] as RawRunRow[]),
         failuresSql.value
-          ? executeQuery(failuresSql.value, startUs, endUs, "traces").catch(
-              (err) => {
-                console.warn("[JobRuns:failures] failed", err);
-                return [] as RawRunRow[];
-              },
-            )
+          ? executeQuery(failuresSql.value, startUs, endUs, "traces").catch((err) => {
+              console.warn("[JobRuns:failures] failed", err);
+              return [] as RawRunRow[];
+            })
           : Promise.resolve([] as RawRunRow[]),
       ]);
 

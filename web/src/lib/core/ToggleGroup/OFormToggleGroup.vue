@@ -22,16 +22,14 @@ const props = defineProps<FormToggleGroupProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormToggleGroup] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormToggleGroup] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <div class="tw:flex tw:flex-col tw:gap-1">
+      <div class="flex flex-col gap-1">
         <OToggleGroup
           v-bind="$attrs"
           :type="props.type"
@@ -42,7 +40,7 @@ if (import.meta.env.DEV && !form) {
           :label-position="props.labelPosition"
           :model-value="field.state.value"
           @update:model-value="
-            (v: AcceptableValue | AcceptableValue[]) => {
+            (v: boolean | AcceptableValue | AcceptableValue[]) => {
               field.handleChange(v);
               field.handleBlur();
             }
@@ -53,10 +51,7 @@ if (import.meta.env.DEV && !form) {
           </template>
           <slot />
         </OToggleGroup>
-        <div
-          v-if="field.state.meta.errors.length > 0"
-          class="tw:text-xs tw:text-input-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

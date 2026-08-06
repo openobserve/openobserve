@@ -1,9 +1,8 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import OPagination from "./OPagination.vue";
 
-const factory = (props = {}) =>
-  mount(OPagination, { props: { modelValue: 1, max: 10, ...props } });
+const factory = (props = {}) => mount(OPagination, { props: { modelValue: 1, max: 10, ...props } });
 
 describe("OPagination", () => {
   it("renders a div element with role=navigation", () => {

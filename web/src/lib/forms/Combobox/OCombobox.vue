@@ -14,16 +14,11 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from "reka-ui";
-import {
-  computed,
-  nextTick,
-  ref,
-  useAttrs,
-  useId,
-  useSlots,
-  watch,
-} from "vue";
+import { computed, nextTick, ref, useAttrs, useId, useSlots, watch } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
@@ -32,7 +27,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real control; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -90,9 +85,7 @@ const filteredOptions = computed<ComboboxOption[]>(() => {
   }
 
   const lower = needle.toLowerCase();
-  return (props.items ?? []).filter((opt) =>
-    opt.label.toLowerCase().includes(lower),
-  );
+  return (props.items ?? []).filter((opt) => opt.label.toLowerCase().includes(lower));
 });
 
 // ── Imperative reset ────────────────────────────────────────────────────────
@@ -130,9 +123,24 @@ function onInputChange(val: string) {
   internalValue.value = val;
   if (props.debounce > 0) {
     if (_debounceTimer !== null) clearTimeout(_debounceTimer);
-    _debounceTimer = setTimeout(() => emit("update:modelValue", val), props.debounce);
+    _debounceTimer = setTimeout(() => {
+      _debounceTimer = null;
+      emit("update:modelValue", val);
+    }, props.debounce);
   } else {
     emit("update:modelValue", val);
+  }
+}
+
+function handleBlur() {
+  // Flush any pending debounced emit immediately on blur so that tabbing away —
+  // or clicking Save right after typing — does not lose the typed value. Mirrors
+  // OInput.handleBlur; without this a debounced combobox silently drops the last
+  // typed value when focus leaves before the debounce fires.
+  if (_debounceTimer !== null) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = null;
+    emit("update:modelValue", internalValue.value);
   }
 }
 
@@ -153,20 +161,16 @@ function onSelect(optionValue: string) {
 // ── Sizes ────────────────────────────────────────────────────────────────────
 const heightClass = computed(() => {
   if (props.labelPosition === "inside" && (props.label || slots.label)) {
-    return props.size === "sm" ? "tw:h-10 tw:text-sm tw:pt-4" : "tw:h-10 tw:text-sm tw:pt-4";
+    return props.size === "sm" ? "h-10 text-sm pt-4" : "h-10 text-sm pt-4";
   }
-  return props.size === "sm" ? "tw:h-8 tw:text-sm" : "tw:h-8 tw:text-sm";
+  return props.size === "sm" ? "h-8 text-sm" : "h-8 text-sm";
 });
 
 // ── Error ────────────────────────────────────────────────────────────────────
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
-const hasLabel = computed(
-  () => Boolean(slots.label) || props.label !== undefined,
-);
+const hasLabel = computed(() => Boolean(slots.label) || props.label !== undefined);
 const hasInsideLabel = computed(
   () => props.labelPosition === "inside" && (Boolean(slots.label) || Boolean(props.label)),
 );
@@ -176,7 +180,7 @@ const hasInsideLabel = computed(
   <div
     ref="rootEl"
     v-bind="wrapperAttrs"
-    class="tw:flex tw:flex-col tw:gap-1 tw:w-full"
+    class="flex w-full flex-col gap-1"
     :data-test="parentDataTest"
   >
     <!-- Label (outside) -->
@@ -184,18 +188,22 @@ const hasInsideLabel = computed(
       v-if="(hasLabel || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
-      ><slot name="tooltip" /></OIcon>
+        class="cursor-help"
+        ><slot name="tooltip"
+      /></OIcon>
     </label>
 
     <ComboboxRoot
@@ -206,13 +214,14 @@ const hasInsideLabel = computed(
       :disabled="disabled"
       @update:model-value="onSelect"
     >
-      <ComboboxAnchor class="tw:relative tw:flex tw:items-center tw:w-full">
+      <ComboboxAnchor class="relative flex w-full items-center">
         <!-- Inside label -->
         <span
           v-if="hasInsideLabel"
-          class="tw:absolute tw:top-1 tw:start-3 tw:text-[10px] tw:leading-none tw:text-input-placeholder tw:select-none tw:pointer-events-none tw:z-10"
+          class="text-3xs text-input-placeholder pointer-events-none absolute start-3 top-1 z-10 leading-none select-none"
         >
-          <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+          <slot name="label">{{ label }}</slot
+          ><span v-if="required" aria-hidden="true">&nbsp;*</span>
         </span>
         <ComboboxInput
           :id="inputId"
@@ -222,19 +231,20 @@ const hasInsideLabel = computed(
           :tabindex="inputTabindex"
           auto-complete="off"
           :class="[
-            'tw:w-full tw:rounded-md tw:border tw:ps-3 tw:pe-3',
-            'tw:bg-input-bg tw:text-input-text',
-            'tw:placeholder:text-input-placeholder',
-            'tw:outline-none tw:transition-[border-color,box-shadow] tw:duration-150',
+            'rounded-default w-full border ps-3 pe-3',
+            'bg-input-bg text-input-text',
+            'placeholder:text-input-placeholder',
+            'transition-[border-color,box-shadow] duration-150 outline-none',
             hasError
-              ? 'tw:border-input-border-error'
-              : 'tw:border-input-border tw:hover:border-input-border-hover',
-            'tw:focus:border-input-border-focus tw:focus:ring-2 tw:focus:ring-input-focus-ring',
-            'tw:disabled:bg-input-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:text-input-disabled-text',
+              ? 'border-input-border-error'
+              : 'border-input-border hover:border-input-border-hover',
+            'focus:border-input-border-focus focus:ring-input-focus-ring focus:ring-2',
+            'disabled:bg-input-disabled-bg disabled:text-input-disabled-text disabled:cursor-not-allowed',
             heightClass,
           ]"
           :data-test="parentDataTest ? `${parentDataTest}-input` : undefined"
           @update:model-value="onInputChange"
+          @blur="handleBlur"
         />
       </ComboboxAnchor>
 
@@ -243,25 +253,23 @@ const hasInsideLabel = computed(
           position="popper"
           :side-offset="4"
           :class="[
-            'tw:z-10001 tw:min-w-(--reka-combobox-trigger-width) tw:max-w-(--reka-combobox-trigger-width) tw:w-(--reka-combobox-trigger-width)',
-            'tw:max-h-60 tw:overflow-hidden',
-            'tw:rounded-md tw:border tw:shadow-lg',
-            'tw:bg-select-content-bg tw:border-select-content-border',
-            'tw:p-1',
+            'z-10001 w-(--reka-combobox-trigger-width) max-w-(--reka-combobox-trigger-width) min-w-(--reka-combobox-trigger-width)',
+            'max-h-60 overflow-hidden',
+            'rounded-default border shadow-lg',
+            'bg-select-content-bg border-select-content-border',
+            'p-1',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).
-            'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-            'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
         >
-          <ComboboxViewport class="tw:max-h-56 tw:overflow-y-auto">
-            <ComboboxEmpty
-              class="tw:py-2 tw:px-3 tw:text-sm tw:text-select-placeholder tw:text-center"
-            >
-              No options found
+          <ComboboxViewport class="max-h-56 overflow-y-auto">
+            <ComboboxEmpty class="text-select-placeholder px-3 py-2 text-center text-sm">
+              {{ t("components.combobox.noOptionsFound") }}
             </ComboboxEmpty>
 
             <ComboboxItem
@@ -271,26 +279,28 @@ const hasInsideLabel = computed(
               :data-test-value="option.value"
               :data-test-label="option.label"
               :class="[
-                'tw:relative tw:flex tw:items-start tw:gap-2 tw:w-full',
-                'tw:ps-3 tw:pe-8 tw:py-1.5 tw:text-sm',
-                'tw:text-select-item-text tw:rounded-sm',
-                'tw:cursor-pointer tw:select-none tw:outline-none',
-                'tw:transition-colors tw:duration-100',
-                'tw:data-highlighted:bg-select-item-hover-bg',
-                'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-                'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed',
+                'relative flex w-full items-start gap-2',
+                'py-1.5 ps-3 pe-8 text-sm',
+                'text-select-item-text rounded-default',
+                'cursor-pointer outline-none select-none',
+                'transition-colors duration-100',
+                'data-highlighted:bg-select-item-hover-bg',
+                'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
+                'data-disabled:text-select-item-disabled data-disabled:cursor-not-allowed',
               ]"
               :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
             >
-              <span class="tw:flex-1 tw:wrap-break-word tw:whitespace-normal tw:min-w-0">{{ option.label }}</span>
+              <span class="min-w-0 flex-1 wrap-break-word whitespace-normal">{{
+                option.label
+              }}</span>
               <ComboboxItemIndicator
-                class="tw:absolute tw:end-2 tw:top-1/2 tw:-translate-y-1/2 tw:flex tw:items-center tw:justify-center tw:size-3.5"
+                class="absolute end-2 top-1/2 flex size-3.5 -translate-y-1/2 items-center justify-center"
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 16 16"
                   fill="currentColor"
-                  class="tw:size-3.5"
+                  class="size-3.5"
                   aria-hidden="true"
                 >
                   <path
@@ -309,16 +319,13 @@ const hasInsideLabel = computed(
     <!-- Error message -->
     <span
       v-if="effectiveError && effectiveError.trim()"
-      class="tw:text-xs tw:text-input-error-text tw:leading-none"
+      class="text-input-error-text text-xs leading-none"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span
-      v-else-if="helpText"
-      class="tw:text-xs tw:text-input-help-text tw:leading-none"
-    >
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
       {{ helpText }}
     </span>
   </div>

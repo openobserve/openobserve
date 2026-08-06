@@ -39,7 +39,6 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
     fetchCorrelatedLogs: vi.fn(),
     updateFilter: vi.fn(),
     updateFilters: vi.fn(),
-    resetFilters: vi.fn(),
     refresh: vi.fn(),
     isMatchedDimension: vi.fn(() => false),
     isAdditionalDimension: vi.fn(() => false),
@@ -55,10 +54,10 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   getSemanticGroupsCacheStatus: vi.fn(),
 }));
 
-// Mock TenstackTable component
-vi.mock("@/plugins/logs/TenstackTable.vue", () => ({
+// Mock OTable
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "TenstackTable",
+    name: "OTable",
     template: "<div data-test='tenstack-table'><slot /></div>",
   },
 }));
@@ -77,6 +76,7 @@ const mockTranslations = {
   "search.showHideColumns": "Show/Hide Columns",
   "correlation.logs.filtersLabel": "Filters",
   "correlation.logs.unstableDimension": "Unstable Dimension",
+  "correlation.logs.allValues": "All Values",
   "common.apply": "Apply",
 };
 
@@ -87,7 +87,6 @@ const i18n = createI18n({
     en: mockTranslations,
   },
 });
-
 
 describe("CorrelatedLogsTable.vue", () => {
   let wrapper: any;
@@ -111,23 +110,22 @@ describe("CorrelatedLogsTable.vue", () => {
         ...props,
       },
       global: {
-        plugins: [
-          i18n,
-          store,
-        ],
+        plugins: [i18n, store],
         stubs: {
-          TenstackTable: true,
+          OTable: true,
           DimensionFiltersBar: true,
           // Render ODropdown inline so data-test attrs are findable in tests
           ODropdown: {
             name: "ODropdown",
-            template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+            template:
+              '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
             emits: ["update:open"],
             props: ["open", "side", "align", "sideOffset"],
           },
           ODropdownItem: {
             name: "ODropdownItem",
-            template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+            template:
+              '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
             emits: ["select"],
           },
         },
@@ -169,9 +167,7 @@ describe("CorrelatedLogsTable.vue", () => {
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: {
-          value: [
-            { _timestamp: 1234567890, field1: "value1", field2: "value2" },
-          ],
+          value: [{ _timestamp: 1234567890, field1: "value1", field2: "value2" }],
         },
         hasResults: { value: true },
       });
@@ -200,9 +196,7 @@ describe("CorrelatedLogsTable.vue", () => {
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: {
-          value: [
-            { _timestamp: 1234567890, field1: "value1", field2: "value2" },
-          ],
+          value: [{ _timestamp: 1234567890, field1: "value1", field2: "value2" }],
         },
         hasResults: { value: true },
       });
@@ -231,9 +225,7 @@ describe("CorrelatedLogsTable.vue", () => {
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: {
-          value: [
-            { _timestamp: 1234567890, field1: "value1" },
-          ],
+          value: [{ _timestamp: 1234567890, field1: "value1" }],
         },
         hasResults: { value: true },
       });
@@ -262,9 +254,7 @@ describe("CorrelatedLogsTable.vue", () => {
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: {
-          value: [
-            { _timestamp: 1234567890, field1: "a", field2: "b", field3: "c" },
-          ],
+          value: [{ _timestamp: 1234567890, field1: "a", field2: "b", field3: "c" }],
         },
         hasResults: { value: true },
       });
@@ -291,9 +281,7 @@ describe("CorrelatedLogsTable.vue", () => {
       (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
         ...mockUseCorrelatedLogs.useCorrelatedLogs(),
         searchResults: {
-          value: [
-            { _timestamp: 123, field1: "a", field2: "b" },
-          ],
+          value: [{ _timestamp: 123, field1: "a", field2: "b" }],
         },
         hasResults: { value: true },
       });
@@ -440,9 +428,7 @@ describe("CorrelatedLogsTable.vue", () => {
       wrapper.vm.visibleColumns = new Set(["_timestamp"]);
 
       const columns = wrapper.vm.tableColumns;
-      const timestampColumn = columns.find(
-        (col: any) => col.id === "_timestamp"
-      );
+      const timestampColumn = columns.find((col: any) => col.id === "_timestamp");
 
       expect(timestampColumn).toBeDefined();
       expect(timestampColumn.sortable).toBe(true);
@@ -551,11 +537,7 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
 
       expect(wrapper.emitted("addSearchTerm")).toBeTruthy();
-      expect(wrapper.emitted("addSearchTerm")?.[0]).toEqual([
-        "field1",
-        "value1",
-        "include",
-      ]);
+      expect(wrapper.emitted("addSearchTerm")?.[0]).toEqual(["field1", "value1", "include"]);
     });
   });
 
@@ -610,7 +592,6 @@ describe("CorrelatedLogsTable.vue", () => {
 
     it("should handle copy operation", async () => {
       wrapper = createWrapper();
-      const log = { field: "value" };
 
       // Just ensure the function exists and can be called without throwing
       expect(typeof wrapper.vm.handleCopy).toBe("function");
@@ -882,23 +863,6 @@ describe("CorrelatedLogsTable.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.draggedIndex).toBeNull();
-    });
-  });
-
-  describe("handleResetFilters", () => {
-    it("should call resetFilters from composable", async () => {
-      const mockResetFilters = vi.fn();
-      const mockUseCorrelatedLogs = await import("@/composables/useCorrelatedLogs");
-      (mockUseCorrelatedLogs.useCorrelatedLogs as any).mockReturnValue({
-        ...mockUseCorrelatedLogs.useCorrelatedLogs(),
-        resetFilters: mockResetFilters,
-      });
-
-      wrapper = createWrapper();
-      wrapper.vm.handleResetFilters();
-      await nextTick();
-
-      expect(mockResetFilters).toHaveBeenCalled();
     });
   });
 

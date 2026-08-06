@@ -54,11 +54,7 @@ describe("extractValuesFromHits", () => {
   });
 
   it("deduplicates values across rows", () => {
-    const hits = [
-      { status: "200" },
-      { status: "200" },
-      { status: "200" },
-    ];
+    const hits = [{ status: "200" }, { status: "200" }, { status: "200" }];
     const result = extractValuesFromHits(hits, schemaFields, 50);
     expect(result.status).toEqual(["200"]);
   });
@@ -202,11 +198,7 @@ describe("extractValuesFromHits", () => {
   });
 
   it("handles hits with missing fields gracefully", () => {
-    const hits = [
-      { status: "200" },
-      { env: "prod" },
-      { status: "404", env: "staging" },
-    ];
+    const hits = [{ status: "200" }, { env: "prod" }, { status: "404", env: "staging" }];
     const result = extractValuesFromHits(hits, schemaFields, 50);
     expect(result.status).toEqual(expect.arrayContaining(["200", "404"]));
     expect(result.env).toEqual(expect.arrayContaining(["prod", "staging"]));

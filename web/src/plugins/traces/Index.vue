@@ -16,267 +16,214 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tracePage tw:h-full tw:min-h-full! tw:max-h-full! tw:overflow-hidden!"
+  <div
+    class="rounded-default tracePage h-full max-h-full! min-h-full! overflow-hidden!"
     id="tracePage"
     style="min-height: auto"
   >
-    <div id="tracesSecondLevel" class="tw:h-full">
+    <div id="tracesSecondLevel" class="h-full">
       <OSplitter
-        :class="[
-          'traces-horizontal-splitter tw:h-full',
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'hide-splitter-separator'
-            : '',
-        ]"
+        class="traces-horizontal-splitter h-full"
         v-model="splitterModel"
-        :disable="
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
-        "
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
         :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
-        :before-class="
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'tw:z-auto tw:overflow-visible tw:max-h-[3.125rem]!'
-            : 'tw:z-auto tw:overflow-visible'
-        "
+        before-class="z-auto overflow-visible"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
           <!-- px-1 (4px): the search bar's own 6px internal inset (toolbar p-1.5)
                + 4px = 10px, aligning the bar with the 10px field-list & results
                panels below (matches the Logs page). -->
-          <div
-            class="tw:w-full tw:h-full"
-          >
+          <div class="h-full w-full">
             <!-- Search Bar with Tab Toggle - Always visible to show tabs -->
-            <search-bar
+            <SearchBar
               data-test="logs-search-bar"
               ref="searchBarRef"
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
-              :activeTab="activeTab"
-              class="card-container"
+              class="bg-card-glass-bg"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
-              @update:activeTab="activeTab = $event"
               @error-only-toggled="onErrorOnlyToggled"
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
-              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
-              @services-catalog-refresh="
-                servicesCatalogRef?.loadServicesCatalog()
-              "
             />
           </div>
         </template>
         <template v-slot:after>
-          <div class="tw:h-full tw:overflow-hidden">
-          <!-- Service Graph Tab Content -->
-          <div
-            v-if="
-              activeTab === 'service-graph' && config.isEnterprise == 'true'
-            "
-            class="tw:h-full tw:overflow-hidden"
-          >
-            <service-graph
-              ref="serviceGraphRef"
-              class="tw:h-full"
-              @view-traces="handleServiceGraphViewTraces"
-              @request:stream-change="onChildStreamChangeRequest"
-            />
-          </div>
-
-          <!-- Services Catalog Tab Content -->
-          <div
-            v-if="activeTab === 'services-catalog'"
-            class="tw:h-full tw:overflow-hidden"
-          >
-            <services-catalog
-              ref="servicesCatalogRef"
-              class="tw:h-full"
-              @view-traces="handleServicesCatalogViewTraces"
-              @request:stream-change="onChildStreamChangeRequest"
-            />
-          </div>
-
-          <!-- Search Tab Content -->
-          <div
-            v-if="activeTab === 'search'"
-            id="tracesThirdLevel"
-            class="traces-search-result-container relative-position tw:h-full"
-          >
-            <!-- Note: Splitter max-height to be dynamically calculated with JS -->
-            <OSplitter
-              v-model="searchObj.config.splitterModel"
-              :limits="searchObj.config.splitterLimit"
-              style="width: 100%"
-              separatorClass="tw:w-px"
-              @update:model-value="onSplitterUpdate"
-              class="tw:h-full"
+          <div class="h-full overflow-hidden">
+            <!-- Search results (Spans / Traces) -->
+            <div
+              id="tracesThirdLevel"
+              class="traces-search-result-container relative-position h-full"
             >
-              <template #before>
-                <div class="tw:h-full tw:border-r tw:border-border-default tw:bg-surface-panel">
-                  <index-list
-                    v-show="searchObj.meta.showFields"
-                    ref="indexListRef"
-                    :field-list="searchObj.data.stream.selectedStreamFields"
-                    :active-include-field-values="activeIncludeFilterValues"
-                    :active-exclude-field-values="activeExcludeFilterValues"
-                    data-test="traces-search-index-list"
-                    class="card-container tw:h-full"
-                    :key="searchObj.data.stream.streamLists"
-                    @update:changeStream="onChangeStream"
-                    @update:selectedFields="updateFieldVisibility"
-                  />
-                </div>
-              </template>
-              <template #after>
-                <div class="tw:h-full tw:pb-[0.625rem]">
-                  <!-- No trace streams in org yet -->
-                  <TracesNoDataState
-                    v-if="
-                      !searchObj.loadingStream &&
-                      searchObj.data.stream.streamLists.length === 0 &&
-                      !searchObj.loading
-                    "
-                    :ai-enabled="isAiEnabled"
-                    data-test="traces-no-streams-in-org-text"
-                    @ask-ai="onAskAiSetupTracing"
-                  />
-                  <div
-                    v-else-if="
-                      searchObj.data.errorMsg !== '' &&
-                      parseInt(searchObj.data.errorCode) !== 0 &&
-                      searchObj.loading == false
-                    "
-                    class="card-container tw:h-full"
-                  >
-                    <div class="tw:text-center tw:pt-[2rem]">
-                      <!-- Actual error case -->
-                      <div
-                        data-test="traces-search-error-message"
-                        class="tw:text-[1.3rem] tw:pt-4"
-                      >
-                        {{ t("traces.errorRetrievingTraces") }}
-                        <OButton
-                          v-if="
-                            searchObj.data.errorDetail ||
-                            searchObj?.data?.errorMsg
-                          "
-                          @click="toggleErrorDetails"
-                          variant="outline"
-                          size="sm-action"
-                          data-test="traces-search-error-details-btn"
-                          >{{ t("search.histogramErrorBtnLabel") }}</OButton
-                        >
-                      </div>
-                      <!-- Collapsible error detail — shown below results when toggled -->
-                      <div class="tw:text-center">
-                        <div class="tw:my-none tw:text-[1rem]! tw:px-[2rem]!">
-                          <span v-if="disableMoreErrorDetails">
-                            <SanitizedHtmlRenderer
-                              data-test="traces-search-detail-error-message"
-                              :htmlContent="searchObj?.data?.errorMsg"
-                              class="tw:pt-[1rem]"
-                            />
-                            <div
-                              v-if="searchObj?.data?.errorDetail"
-                              class="error-display__message tw:pt-[1rem]! tw:text-[var(--o2-text-2)]!"
-                            >
-                              {{ searchObj.data.errorDetail }}
-                            </div>
-                          </span>
+              <!-- Note: Splitter max-height to be dynamically calculated with JS -->
+              <OSplitter
+                v-model="searchObj.config.splitterModel"
+                :limits="searchObj.config.splitterLimit"
+                separatorClass="w-px"
+                @update:model-value="onSplitterUpdate"
+                class="h-full w-full"
+              >
+                <template #before>
+                  <div class="border-border-default bg-surface-panel h-full border-r">
+                    <IndexList
+                      v-show="searchObj.meta.showFields"
+                      ref="indexListRef"
+                      :field-list="searchObj.data.stream.selectedStreamFields"
+                      :active-include-field-values="activeIncludeFilterValues"
+                      :active-exclude-field-values="activeExcludeFilterValues"
+                      data-test="traces-search-index-list"
+                      class="h-full"
+                      :key="searchObj.data.stream.streamLists"
+                      @update:changeStream="onChangeStream"
+                      @update:selectedFields="updateFieldVisibility"
+                    />
+                  </div>
+                </template>
+                <template #after>
+                  <div class="h-full pb-2.5">
+                    <!-- No trace streams in org yet -->
+                    <TracesNoDataState
+                      v-if="
+                        !searchObj.loadingStream &&
+                        searchObj.data.stream.streamLists.length === 0 &&
+                        !searchObj.loading
+                      "
+                      :ai-enabled="isAiEnabled"
+                      data-test="traces-no-streams-in-org-text"
+                      @ask-ai="onAskAiSetupTracing"
+                    />
+                    <!-- Stable loading state while streams load / auto-run fires,
+                       so the empties don't flash in between. -->
+                    <div
+                      v-else-if="searchObj.loadingStream"
+                      class="bg-card-glass-bg text-text-secondary flex h-full flex-col items-center justify-center gap-2"
+                      data-test="traces-search-loading"
+                    >
+                      <OSpinner size="lg" />
+                      <span class="text-sm">{{ t("traces.fetchingTraces") }}</span>
+                    </div>
+                    <div
+                      v-else-if="
+                        searchObj.data.errorMsg !== '' &&
+                        parseInt(searchObj.data.errorCode) !== 0 &&
+                        searchObj.loading == false
+                      "
+                      class="bg-card-glass-bg h-full"
+                    >
+                      <div class="pt-8 text-center">
+                        <!-- Actual error case -->
+                        <div data-test="traces-search-error-message" class="pt-4 text-xl">
+                          {{ t("traces.errorRetrievingTraces") }}
+                          <OButton
+                            v-if="searchObj.data.errorDetail || searchObj?.data?.errorMsg"
+                            @click="toggleErrorDetails"
+                            variant="outline"
+                            size="sm-action"
+                            data-test="traces-search-error-details-btn"
+                            >{{ t("search.histogramErrorBtnLabel") }}</OButton
+                          >
                         </div>
-                      </div>
-                      <!-- FTS not configured -->
-                      <div
-                        data-test="traces-search-error-20003"
-                        v-if="parseInt(searchObj.data.errorCode) == 20003"
-                      >
-                        <OButton
-                          variant="primary"
-                          size="sm-action"
-                          :to="
-                            '/streams?dialog=' +
-                            searchObj.data.stream.selectedStream.label
-                          "
-                          as="RouterLink"
-                          >Click here</OButton
+                        <!-- Collapsible error detail — shown below results when toggled -->
+                        <div class="text-center">
+                          <div class="my-none px-8! text-base!">
+                            <span v-if="disableMoreErrorDetails">
+                              <SanitizedHtmlRenderer
+                                data-test="traces-search-detail-error-message"
+                                :htmlContent="searchObj?.data?.errorMsg"
+                                class="pt-4"
+                              />
+                              <div
+                                v-if="searchObj?.data?.errorDetail"
+                                class="error-display__message text-text-secondary! pt-4!"
+                              >
+                                {{ searchObj.data.errorDetail }}
+                              </div>
+                            </span>
+                          </div>
+                        </div>
+                        <!-- FTS not configured -->
+                        <div
+                          data-test="traces-search-error-20003"
+                          v-if="parseInt(searchObj.data.errorCode) == 20003"
                         >
-                        {{ t("traces.configureFullTextSearch") }}
+                          <OButton
+                            variant="primary"
+                            size="sm-action"
+                            :to="'/streams?dialog=' + searchObj.data.stream.selectedStream.label"
+                            as="RouterLink"
+                            >{{ t("traces.index.clickHere") }}</OButton
+                          >
+                          {{ t("traces.configureFullTextSearch") }}
+                        </div>
+                        <span class="text-sm">{{ searchObj.data.additionalErrorMsg }}</span>
                       </div>
-                      <span class="tw:text-sm">{{
-                        searchObj.data.additionalErrorMsg
-                      }}</span>
+                    </div>
+                    <div
+                      v-else-if="
+                        searchObj.data.errorMsg !== '' &&
+                        parseInt(searchObj.data.errorCode) == 0 &&
+                        !searchObj.loading
+                      "
+                      data-test="traces-search-error-text"
+                      class="bg-card-glass-bg h-full py-10 text-center text-xl"
+                    >
+                      <SanitizedHtmlRenderer
+                        data-test="traces-search-detail-error-message"
+                        :htmlContent="searchObj?.data?.errorMsg"
+                        class="pt-4"
+                      />
+                    </div>
+                    <div v-else-if="!isStreamSelected">
+                      <TracesNoStreamState
+                        :org-id="store.state.selectedOrganization?.identifier"
+                        data-test="traces-no-stream-selected-text"
+                        @select-stream="onSelectTracesStream"
+                        @pick-stream="onPickTracesStream"
+                      />
+                    </div>
+                    <div
+                      v-else-if="
+                        isStreamSelected &&
+                        !searchObj.searchApplied &&
+                        !searchObj.data.queryResults?.hits?.length
+                      "
+                    >
+                      <OEmptyState
+                        preset="no-query-applied"
+                        size="hero"
+                        data-test="traces-search-not-started-text"
+                        @action="() => searchData()"
+                      />
+                    </div>
+                    <div v-else data-test="logs-search-search-result" class="h-full!">
+                      <SearchResult
+                        ref="searchResultRef"
+                        :show-error-only="showErrorOnly"
+                        :ai-enabled="isAiEnabled"
+                        :stream-doc-time-range="streamDocTimeRange"
+                        :query-window-us="queryWindowUs"
+                        @update:datetime="setHistogramDate"
+                        @update:scroll="getMoreData"
+                        @update:sort="runQueryOnSort"
+                        @shareLink="(range: any) => copyTracesUrl(t, range)"
+                        @metrics:filters-updated="onMetricsFiltersUpdated"
+                        @run-query="searchData"
+                        @remove-filter="onRemoveTracesFilter"
+                        @jump-to-stream-data="onJumpToTracesStreamData"
+                        @error-only-toggled="onErrorOnlyToggled"
+                        @ask-ai="onAskAiTracing"
+                        @send-to-ai-chat="sendToAiChat"
+                      />
                     </div>
                   </div>
-                  <div
-                    v-else-if="
-                      searchObj.data.errorMsg !== '' &&
-                      parseInt(searchObj.data.errorCode) == 0 &&
-                      !searchObj.loading
-                    "
-                    data-test="traces-search-error-text"
-                    class="tw:text-center tw:py-[40px] tw:text-[20px] card-container tw:h-full"
-                  >
-                    <SanitizedHtmlRenderer
-                      data-test="traces-search-detail-error-message"
-                      :htmlContent="searchObj?.data?.errorMsg"
-                      class="tw:pt-[1rem]"
-                    />
-                  </div>
-                  <div v-else-if="!isStreamSelected">
-                    <TracesNoStreamState
-                      :org-id="store.state.selectedOrganization?.identifier"
-                      data-test="traces-no-stream-selected-text"
-                      @select-stream="onSelectTracesStream"
-                      @pick-stream="onPickTracesStream"
-                    />
-                  </div>
-                  <div
-                    v-else-if="
-                      isStreamSelected &&
-                      !searchObj.searchApplied &&
-                      !searchObj.data.queryResults?.hits?.length
-                    "
-                  >
-                    <OEmptyState
-                      preset="no-query-applied"
-                      size="hero"
-                      data-test="traces-search-not-started-text"
-                    />
-                  </div>
-                  <div
-                    v-else
-                    data-test="logs-search-search-result"
-                    class="tw:h-full!"
-                  >
-                    <search-result
-                      ref="searchResultRef"
-                      :show-error-only="showErrorOnly"
-                      :ai-enabled="isAiEnabled"
-                      :stream-doc-time-range="streamDocTimeRange"
-                      :query-window-us="queryWindowUs"
-                      @update:datetime="setHistogramDate"
-                      @update:scroll="getMoreData"
-                      @update:sort="runQueryOnSort"
-                      @shareLink="copyTracesUrl"
-                      @metrics:filters-updated="onMetricsFiltersUpdated"
-                      @run-query="searchData"
-                      @remove-filter="onRemoveTracesFilter"
-                      @jump-to-stream-data="onJumpToTracesStreamData"
-                      @error-only-toggled="onErrorOnlyToggled"
-                      @ask-ai="onAskAiTracing"
-                      @send-to-ai-chat="sendToAiChat"
-                    />
-                  </div>
-                </div>
-              </template>
-            </OSplitter>
-          </div>
+                </template>
+              </OSplitter>
+            </div>
           </div>
         </template>
       </OSplitter>
@@ -284,20 +231,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       v-model:open="streamChangeDialog.show"
-      title="Change stream?"
+      :title="t('traces.index.changeStreamTitle')"
       size="sm"
-      primary-button-label="Switch stream"
-      secondary-button-label="Cancel"
+      :primary-button-label="t('traces.index.switchStream')"
+      :secondary-button-label="t('traces.index.cancel')"
       @click:primary="applyStreamChange(streamChangeDialog.pendingStream)"
       @click:secondary="streamChangeDialog.show = false"
     >
-      <p>This will also update the stream in the Traces/Spans tab and reset existing query.</p>
+      <p>{{ t("traces.index.changeStreamMessage") }}</p>
     </ODialog>
   </div>
 </template>
 
 <script lang="ts" setup>
 // @ts-nocheck
+import { buildFunctionArgs } from "@/utils/query/sqlCompletion";
 import {
   defineComponent,
   ref,
@@ -312,14 +260,11 @@ import {
 import { subtractRelativeTime } from "@/utils/date";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 
 import useTraces from "@/composables/useTraces";
-import {
-  contextRegistry,
-  createTracesContextProvider,
-} from "@/composables/contextProviders";
+import { contextRegistry, createTracesContextProvider } from "@/composables/contextProviders";
 
 import TransformService from "@/services/jstransform";
 import {
@@ -328,14 +273,15 @@ import {
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
-  escapeSingleQuotes,
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import { logsErrorMessage } from "@/utils/common";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import useNotifications from "@/composables/useNotifications";
 import { getConsumableRelativeTime } from "@/utils/date";
 import { cloneDeep } from "lodash-es";
@@ -363,6 +309,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
@@ -377,20 +324,9 @@ const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
 const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
-const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
-const ServicesCatalog = defineAsyncComponent(
-  () => import("./ServicesCatalog.vue"),
-);
-
 const store = useStore();
-const activeTab = computed(() => {
-  if (searchObj.meta.searchMode === "service-graph") return "service-graph";
-  if (searchObj.meta.searchMode === "services-catalog")
-    return "services-catalog";
-  return "search";
-});
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
 const emit = defineEmits(["sendToAiChat"]);
 const {
@@ -402,6 +338,8 @@ const {
   setServiceColors,
   loadLocalLogFilterField,
   updatedLocalLogFilterField,
+  loadTracesParser,
+  tracesParser,
 } = useTraces();
 const { fnParsedSQL } = logsUtils();
 
@@ -421,10 +359,7 @@ correlationFilters.watchQuery();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
-const serviceGraphRef = ref<any>(null);
-const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
-let parser: any;
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
 const disableMoreErrorDetails = ref(false);
@@ -432,12 +367,10 @@ const toggleErrorDetails = () => {
   disableMoreErrorDetails.value = !disableMoreErrorDetails.value;
 };
 const indexListRef = ref(null);
-const { getStreams, getStream } = useStreams();
-const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
-  useServiceCorrelation();
+const { getStreams, getStream } = useStreams(t);
+const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 const chartRedrawTimeout = ref(null);
-const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-  useHttpStreaming();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 // AI copilot context provider for traces page
 const setupContextProvider = () => {
   const provider = createTracesContextProvider(searchObj, store);
@@ -463,44 +396,22 @@ let builtWhereClause = "";
  * within that partition emits a search_response_hits event.
  * We decide replace vs append using the same pattern as useSearchResponseHandler.
  */
-const tracesPartitionMap: Record<
-  string,
-  { partition: number; chunks: Record<number, number> }
-> = {};
+const tracesPartitionMap: Record<string, { partition: number; chunks: Record<number, number> }> =
+  {};
 
-const selectedStreamName = computed(
-  () => searchObj.data.stream.selectedStream.value,
-);
+const selectedStreamName = computed(() => searchObj.data.stream.selectedStream.value);
 
 const isLLMSpanPresent = ref(false);
-
-const importSqlParser = async () => {
-  const useSqlParser: any = await import("@/composables/useParser");
-  const { sqlParser }: any = useSqlParser.default();
-  parser = await sqlParser();
-};
 
 function getQueryTransform() {
   try {
     searchObj.data.stream.functions = [];
-    TransformService.list(
-      1,
-      100000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier,
-    )
+    TransformService.list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
       .then((res) => {
         res.data.list.map((data: any) => {
-          let args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           let itemObj = {
             name: data.name,
-            args: "(" + args.join(",") + ")",
+            args: buildFunctionArgs(data.num_args),
           };
           if (!data.stream_name) {
             searchObj.data.stream.functions.push(itemObj);
@@ -512,7 +423,7 @@ function getQueryTransform() {
     return;
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while getting functions");
+    showErrorNotification(t("traces.index.errorGettingFunctions"));
   }
 }
 
@@ -548,11 +459,8 @@ async function getStreamList() {
 
         // Restore filter chips from the editor value. The single mount search is
         // owned by loadPageData() (after getStreamList resolves), so we do NOT
-        // trigger a search here — that previously produced a duplicate on load.
-        if (
-          searchObj.data.editorValue &&
-          searchObj.data.stream.selectedStreamFields.length
-        )
+        // trigger a search here.
+        if (searchObj.data.editorValue && searchObj.data.stream.selectedStreamFields.length)
           nextTick(() => {
             restoreFilters(searchObj.data.editorValue);
           });
@@ -561,8 +469,7 @@ async function getStreamList() {
         searchObj.loadingStream = false;
         toast({
           variant: "error",
-          message:
-            "Error while pulling index for selected organization" + e.message,
+          message: t("traces.index.errorPullingIndex", { message: e.message }),
         });
       })
       .finally(() => {
@@ -571,7 +478,7 @@ async function getStreamList() {
   } catch (e) {
     searchObj.loadingStream = false;
     console.error("Error while getting streams", e);
-    showErrorNotification("Error while getting streams");
+    showErrorNotification(t("traces.index.errorGettingStreams"));
   }
 }
 
@@ -636,7 +543,7 @@ function loadStreamLists() {
     }
   } catch (e) {
     searchObj.loading = false;
-    showErrorNotification("Error while loading streams");
+    showErrorNotification(t("traces.index.errorLoadingStreams"));
   }
 }
 
@@ -645,11 +552,9 @@ function getConsumableDateTime() {
     if (searchObj.data.datetime.tab == "relative") {
       let period = "";
       let periodValue = 0;
-      // quasar does not support arithmetic on weeks. convert to days.
+      // arithmetic on weeks is not supported; convert to days.
 
-      if (
-        searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks"
-      ) {
+      if (searchObj.data.datetime.relative.period.label.toLowerCase() == "weeks") {
         period = "days";
         periodValue = searchObj.data.datetime.relative.value * 7;
       } else {
@@ -665,10 +570,7 @@ function getConsumableDateTime() {
         searchObj.data.resultGrid.currentDateTime = endTimeStamp;
       }
 
-      const startTimeStamp = subtractRelativeTime(
-        endTimeStamp,
-        JSON.parse(subtractObject),
-      );
+      const startTimeStamp = subtractRelativeTime(endTimeStamp, JSON.parse(subtractObject));
 
       return {
         start_time: startTimeStamp,
@@ -695,9 +597,7 @@ function getConsumableDateTime() {
         end = new Date();
       } else {
         end = new Date(
-          searchObj.data.datetime.absolute.date.to +
-            " " +
-            searchObj.data.datetime.absolute.endTime,
+          searchObj.data.datetime.absolute.date.to + " " + searchObj.data.datetime.absolute.endTime,
         );
       }
       const rVal = {
@@ -729,9 +629,7 @@ function buildSearch() {
   try {
     let query = searchObj.data.editorValue.trim();
     var req = getDefaultRequest();
-    req.query.from =
-      searchObj.data.resultGrid.currentPage *
-      searchObj.meta.resultGrid.rowsPerPage;
+    req.query.from = searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage;
     req.query.size = parseInt(searchObj.meta.resultGrid.rowsPerPage, 10);
 
     let timestamps: any =
@@ -757,7 +655,7 @@ function buildSearch() {
       // Convert human-readable duration suffixes (e.g. '1.50ms') to raw µs.
       const durationParseResult = parseDurationWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
       if (typeof durationParseResult === "string") {
@@ -767,7 +665,7 @@ function buildSearch() {
       // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
       whereClause = parseSpanKindWhereClause(
         whereClause,
-        parser,
+        tracesParser.value,
         searchObj.data.stream.selectedStream.value,
       );
 
@@ -783,10 +681,7 @@ function buildSearch() {
         .replace(/> =(?=(?:[^"']*"[^"']*"')*[^"']*$)/g, " >=");
 
       builtWhereClause = whereClause;
-      req.query.sql = req.query.sql.replace(
-        "[WHERE_CLAUSE]",
-        " WHERE " + whereClause,
-      );
+      req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", " WHERE " + whereClause);
     } else {
       builtWhereClause = "";
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
@@ -808,9 +703,7 @@ function buildSearch() {
   } catch (e) {
     console.error("Error while constructing the search query", e);
     searchObj.loading = false;
-    showErrorNotification(
-      "An error occurred while constructing the search query.",
-    );
+    showErrorNotification(t("traces.index.errorConstructingQuery"));
   }
 }
 
@@ -856,9 +749,7 @@ function fetchTracesCount() {
       data: (_payload: any, response: any) => {
         const hits: any[] = response.content?.results?.hits || [];
         if (hits.length > 0) {
-          const count = isSpansMode
-            ? (hits[0]?.span_count ?? 0)
-            : (hits[0]?.trace_count ?? 0);
+          const count = isSpansMode ? (hits[0]?.span_count ?? 0) : (hits[0]?.trace_count ?? 0);
           searchObj.data.queryResults.total = count;
           searchObj.data.queryResults.errorCount = hits[0]?.error_count ?? 0;
           searchObj.meta.resultGrid.showPagination = count > 0;
@@ -878,7 +769,9 @@ function fetchTracesCount() {
 
 const showTraceDetailsError = () => {
   showErrorNotification(
-    `Trace ${router.currentRoute.value.query.trace_id} not found`,
+    t("traces.index.traceNotFound", {
+      traceId: router.currentRoute.value.query.trace_id,
+    }),
   );
   const query = cloneDeep(router.currentRoute.value.query);
   delete query.trace_id;
@@ -892,11 +785,7 @@ const showTraceDetailsError = () => {
 };
 
 const updateFieldValues = (data) => {
-  const excludedFields = [
-    store.state.zoConfig.timestamp_column,
-    "_start_time_ns",
-    "_end_time_ns",
-  ];
+  const excludedFields = [store.state.zoConfig.timestamp_column, "_start_time_ns", "_end_time_ns"];
   data.forEach((item) => {
     // Create set for each field values and add values to corresponding set
     Object.keys(item).forEach((key) => {
@@ -915,16 +804,14 @@ const updateFieldValues = (data) => {
   });
 };
 
-async function getQueryData(
-  isPagination: boolean = false,
-  isSort: boolean = false,
-) {
+async function getQueryData(isPagination: boolean = false, isSort: boolean = false) {
   try {
     if (searchObj.data.stream.selectedStream.value == "") {
       return false;
     }
     searchObj.data.errorMsg = "";
     searchObj.data.errorDetail = "";
+    searchObj.data.sqlSyntaxErrorRanges = [];
 
     searchObj.searchApplied = true;
     searchObj.loading = true;
@@ -961,8 +848,7 @@ async function getQueryData(
 
     searchObj.data.errorCode = 0;
     queryReq.query.from =
-      searchObj.data.resultGrid.currentPage *
-      searchObj.meta.resultGrid.rowsPerPage;
+      searchObj.data.resultGrid.currentPage * searchObj.meta.resultGrid.rowsPerPage;
 
     queryReq.query.size = searchObj.meta.resultGrid.rowsPerPage;
 
@@ -970,12 +856,10 @@ async function getQueryData(
     // Mirror buildSearch: split on | so only the WHERE-clause portion (after the pipe)
     // is passed to parseDurationWhereClause, not the query-functions prefix.
     const editorParts = searchObj.data.editorValue.trim().split("|");
-    let filter = (
-      editorParts.length > 1 ? editorParts[1] : editorParts[0]
-    ).trim();
+    let filter = (editorParts.length > 1 ? editorParts[1] : editorParts[0]).trim();
     const filterParseResult = parseDurationWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
     if (typeof filterParseResult === "string") {
@@ -985,7 +869,7 @@ async function getQueryData(
     // Convert span_kind display labels (e.g. 'Server') to numeric OTEL keys (e.g. '2').
     filter = parseSpanKindWhereClause(
       filter,
-      parser,
+      tracesParser.value,
       searchObj.data.stream.selectedStream.value,
     );
 
@@ -995,8 +879,7 @@ async function getQueryData(
 
     // Cancel any in-flight stream before starting a new one
     if (currentSearchTraceId) {
-      if (tracesPartitionMap[currentSearchTraceId])
-        delete tracesPartitionMap[currentSearchTraceId];
+      if (tracesPartitionMap[currentSearchTraceId]) delete tracesPartitionMap[currentSearchTraceId];
 
       cancelStreamQueryBasedOnRequestId({
         trace_id: currentSearchTraceId,
@@ -1012,12 +895,8 @@ async function getQueryData(
 
     const isSpansMode = searchObj.meta.searchMode === "spans";
     const sortCol = searchObj.meta.resultGrid.sortBy || "start_time";
-    const sortOrd = (
-      searchObj.meta.resultGrid.sortOrder || "desc"
-    ).toUpperCase();
-    const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map(
-      (f: any) => f.name,
-    );
+    const sortOrd = (searchObj.meta.resultGrid.sortOrder || "desc").toUpperCase();
+    const schemaFieldNames = searchObj.data.stream.selectedStreamFields.map((f: any) => f.name);
     const validSortCol = (() => {
       if (schemaFieldNames.length === 0) return sortCol;
       return sortCol === "start_time" || schemaFieldNames.includes(sortCol)
@@ -1031,9 +910,7 @@ async function getQueryData(
     // ordering by the timestamp column yields the same visible order while
     // avoiding the costly full re-sort that `ORDER BY start_time` forces.
     const orderByCol =
-      validSortCol === "start_time"
-        ? store.state.zoConfig.timestamp_column
-        : validSortCol;
+      validSortCol === "start_time" ? store.state.zoConfig.timestamp_column : validSortCol;
 
     const spansQueryReq = (() => {
       if (!isSpansMode) return null;
@@ -1116,17 +993,14 @@ async function getQueryData(
             // }
 
             const partition = tracesPartitionMap[searchTraceId]?.partition ?? 1;
-            const chunkCount =
-              tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
+            const chunkCount = tracesPartitionMap[searchTraceId]?.chunks[partition] ?? 0;
             const isChunkedHits = chunkCount > 1;
             // appendResult: true when on a later partition or a later chunk within
             // the current partition (mirrors useSearchResponseHandler logic)
             const appendResult = partition > 1 || isChunkedHits;
 
             const formattedHits =
-              searchObj.meta.searchMode === "traces"
-                ? formatTracesMetaData(rawHits)
-                : rawHits;
+              searchObj.meta.searchMode === "traces" ? formatTracesMetaData(rawHits) : rawHits;
 
             if (searchObj.meta.searchMode === "spans") {
               setServiceColors(rawHits);
@@ -1151,10 +1025,7 @@ async function getQueryData(
             updateFieldValues(rawHits);
 
             // load the field stored in localstorage and rebuild the columns
-            if (
-              searchObj.meta.searchMode === "spans" ||
-              searchObj.meta.searchMode === "traces"
-            ) {
+            if (searchObj.meta.searchMode === "spans" || searchObj.meta.searchMode === "traces") {
               loadLocalLogFilterField(searchObj.meta.searchMode);
               rebuildColumns();
             }
@@ -1166,18 +1037,31 @@ async function getQueryData(
           const errData = err?.content || err;
           const { message, trace_id, code, error_detail } = errData ?? {};
 
-          let errorMsg =
-            message || err?.message || "Error while processing request";
+          let errorMsg = message || err?.message || t("traces.index.errorProcessingRequest");
           if (code) {
             searchObj.data.errorCode = code;
             const customMessage = logsErrorMessage(code);
             if (customMessage) errorMsg = t(customMessage);
           }
           if (trace_id) {
-            errorMsg += ` <br><span class='tw:text-base tw:font-medium'>TraceID: ${trace_id}</span>`;
+            errorMsg += ` <br><span class='text-base font-medium'>TraceID: ${trace_id}</span>`;
           }
           searchObj.data.errorMsg = errorMsg;
           searchObj.data.errorDetail = error_detail || "";
+
+          // Locate the offending token in the query and squiggle it in the
+          // editor (shares the central engine + externalErrors ref with Logs).
+          rangesFromServerError({
+            code,
+            message,
+            errorDetail: error_detail,
+            sqlMode: searchObj.meta.sqlMode,
+            query: searchObj.data.editorValue,
+            streamName: searchObj.data.stream.selectedStream?.value,
+          }).then((ranges) => {
+            searchObj.data.sqlSyntaxErrorRanges = ranges;
+          });
+
           currentSearchTraceId = null;
           delete tracesPartitionMap[searchTraceId];
         },
@@ -1188,9 +1072,7 @@ async function getQueryData(
           if (!isPagination) {
             fetchTracesCount();
           }
-          correlationFilters
-            .save()
-            .catch((e) => console.error("[correlation:save] error:", e));
+          correlationFilters.save().catch((e) => console.error("[correlation:save] error:", e));
         },
         reset: (_payload: any) => {
           searchObj.data.queryResults = {};
@@ -1201,7 +1083,7 @@ async function getQueryData(
   } catch (e: any) {
     console.error("Error while fetching traces", e?.message);
     searchObj.loading = false;
-    searchObj.data.errorMsg = e?.message || "Search request failed";
+    searchObj.data.errorMsg = e?.message || t("traces.index.searchRequestFailed");
     searchObj.data.errorDetail = "";
   }
 }
@@ -1274,11 +1156,7 @@ async function extractFields() {
       ];
       let ftsKeys;
 
-      const stream = await getStream(
-        searchObj.data.stream.selectedStream.value,
-        "traces",
-        true,
-      );
+      const stream = await getStream(searchObj.data.stream.selectedStream.value, "traces", true);
       // Mirror the real stats (doc_time_min/max) into streamResults so that
       // TracesNoEventsState can compute streamDocTimeRange correctly.
       const streamResultEntry = searchObj.data.streamResults.list?.find(
@@ -1291,14 +1169,11 @@ async function extractFields() {
       // state's "jump to latest data" works even if streamResults.list (from
       // the streams name-list) is missing stats. This is the same value the
       // query uses, fetched via getStream(force) above.
-      selectedStreamStats.value =
-        stream?.stats ?? streamResultEntry?.stats ?? null;
+      selectedStreamStats.value = stream?.stats ?? streamResultEntry?.stats ?? null;
       searchObj.data.datetime.queryRangeRestrictionInHour = -1;
       if (
-        (stream.settings.max_query_range > 0 ||
-          store.state.zoConfig.max_query_range > 0) &&
-        (searchObj.data.datetime.queryRangeRestrictionInHour >
-          stream.settings.max_query_range ||
+        (stream.settings.max_query_range > 0 || store.state.zoConfig.max_query_range > 0) &&
+        (searchObj.data.datetime.queryRangeRestrictionInHour > stream.settings.max_query_range ||
           stream.settings.max_query_range == 0 ||
           searchObj.data.datetime.queryRangeRestrictionInHour == -1) &&
         searchObj.data.datetime.queryRangeRestrictionInHour != 0
@@ -1307,15 +1182,12 @@ async function extractFields() {
           stream.settings.max_query_range > 0
             ? stream.settings.max_query_range
             : store.state.zoConfig.max_query_range;
-        searchObj.data.datetime.queryRangeRestrictionMsg = t(
-          "search.queryRangeRestrictionMsg",
-          {
-            range:
-              searchObj.data.datetime.queryRangeRestrictionInHour > 1
-                ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours"
-                : searchObj.data.datetime.queryRangeRestrictionInHour + " hour",
-          },
-        );
+        searchObj.data.datetime.queryRangeRestrictionMsg = t("search.queryRangeRestrictionMsg", {
+          range:
+            searchObj.data.datetime.queryRangeRestrictionInHour > 1
+              ? searchObj.data.datetime.queryRangeRestrictionInHour + " hours"
+              : searchObj.data.datetime.queryRangeRestrictionInHour + " hour",
+        });
       }
       schema.push(...stream.schema);
       ftsKeys = new Set([...stream.settings.full_text_search_keys]);
@@ -1344,9 +1216,7 @@ async function extractFields() {
 
       // Ignoring timestamp as start time is present
       let fields: any = {};
-      const schemaTypeMap = new Map(
-        schema.map((row: any) => [row.name, row.type]),
-      );
+      const schemaTypeMap = new Map(schema.map((row: any) => [row.name, row.type]));
       Object.keys(importantFields).forEach((rowName) => {
         fields[rowName] = {};
         searchObj.data.stream.selectedStreamFields.push({
@@ -1375,31 +1245,23 @@ async function extractFields() {
 
       // Apply field grouping
       try {
-        const isEnterprise =
-          config.isEnterprise === "true" || config.isCloud === "true";
-        const [semanticAliases, keyFieldsConfig, fieldGrouping] =
-          await Promise.all([
-            isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
-            loadKeyFields(),
-            loadFieldGrouping(),
-          ]);
+        const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
+        const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
+          isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
+          loadKeyFields(),
+          loadFieldGrouping(),
+        ]);
         const grouping = (fieldGrouping as FieldGroupingConfig).prefix_aliases
           ? (fieldGrouping as FieldGroupingConfig)
           : null;
         const semanticIndex =
-          semanticAliases.length > 0
-            ? buildSemanticIndex(semanticAliases, grouping)
-            : null;
+          semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
         const keySpec = (keyFieldsConfig as KeyFieldsConfig)["traces"] ?? {
           fields: [],
           groups: [],
         };
-        const keyFieldSet = new Set(
-          keySpec.fields.map((f: string) => f.toLowerCase()),
-        );
-        const keyGroupSet = new Set(
-          keySpec.groups.map((g: string) => g.toLowerCase()),
-        );
+        const keyFieldSet = new Set(keySpec.fields.map((f: string) => f.toLowerCase()));
+        const keyGroupSet = new Set(keySpec.groups.map((g: string) => g.toLowerCase()));
 
         searchObj.data.stream.selectedStreamFields = applyFieldGrouping(
           searchObj.data.stream.selectedStreamFields as FieldObj[],
@@ -1408,10 +1270,7 @@ async function extractFields() {
           keyGroupSet,
         );
       } catch (groupErr) {
-        console.warn(
-          "Field grouping failed for traces, using flat list",
-          groupErr,
-        );
+        console.warn("Field grouping failed for traces, using flat list", groupErr);
       }
     }
   } catch (e) {
@@ -1501,7 +1360,7 @@ function generateHistogramData() {
       text: "",
       font: {
         size: 12,
-        color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+        color: chartColor("--color-text-heading"),
       },
     },
     margin: {
@@ -1512,23 +1371,20 @@ function generateHistogramData() {
     },
     font: {
       size: 12,
-      color: store.state.theme === "dark" ? "#fff" : "#181a1b",
+      color: chartColor("--color-text-heading"),
     },
     xaxis: { type: "date" },
     yaxis: { ticksuffix: "ms" },
     scattergap: 0.7,
     height: 150,
-    paper_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
-    plot_bgcolor: store.state.theme === "dark" ? "#181a1b" : "#fff",
+    paper_bgcolor: chartColor("--color-surface-base"),
+    plot_bgcolor: chartColor("--color-surface-base"),
     autosize: true,
   };
 
   if (searchObj.data?.queryResults?.hits?.length) {
     searchObj.data.queryResults.hits.forEach(
-      (bucket: {
-        zo_sql_timestamp: string | number | Date;
-        duration: number | Date;
-      }) => {
+      (bucket: { zo_sql_timestamp: string | number | Date; duration: number | Date }) => {
         unparsed_x_data.push(bucket.zo_sql_timestamp);
         let histDate = new Date(Math.floor(bucket.zo_sql_timestamp / 1000));
         xData.push(Math.floor(histDate.getTime()));
@@ -1549,12 +1405,10 @@ function generateHistogramData() {
 
 async function loadPageData() {
   searchObj.loadingStream = true;
-  if (!searchObj.data?.queryResults?.hits?.length)
-    searchObj.data.resultGrid.currentPage = 0;
+  if (!searchObj.data?.queryResults?.hits?.length) searchObj.data.resultGrid.currentPage = 0;
 
   // resetSearchObj();
-  searchObj.organizationIdentifier =
-    store.state.selectedOrganization.identifier;
+  searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
 
   searchObj.data.errorMsg = "";
 
@@ -1568,14 +1422,16 @@ async function loadPageData() {
 onBeforeMount(async () => {
   if (
     searchObj.organizationIdentifier &&
-    searchObj.organizationIdentifier !==
-      store.state.selectedOrganization.identifier
+    searchObj.organizationIdentifier !== store.state.selectedOrganization.identifier
   ) {
     resetSearchObj();
   }
   setupContextProvider();
   restoreUrlQueryParams();
-  await importSqlParser();
+  // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
+  // carries a prebuilt filter; apply it before the first query runs.
+  applyHandoffFilter();
+  await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
   }
@@ -1604,13 +1460,22 @@ onActivated(async () => {
     await loadPageData();
   }
 
-  if (
-    searchObj.organizationIdentifier !=
-    store.state.selectedOrganization.identifier
-  ) {
+  if (searchObj.organizationIdentifier != store.state.selectedOrganization.identifier) {
     resetSearchObj();
     restoreUrlQueryParams();
     await loadPageData();
+  }
+
+  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
+  // a handoff navigation re-activates it without remounting. Apply the incoming
+  // stream/time/filter and run the query.
+  if (typeof params.filter === "string" && params.filter) {
+    restoreUrlQueryParams();
+    if (applyHandoffFilter()) {
+      await loadPageData();
+      await nextTick();
+      runQueryFn();
+    }
   }
 });
 
@@ -1644,21 +1509,14 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
+  // Service Graph / Services Catalog are their own routes now; the only tab
+  // values this page still owns are its two search granularities.
   const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
-  if (
-    tab !== undefined &&
-    (
-      ["service-graph", "traces", "spans", "services-catalog"] as const
-    ).includes(tab as "service-graph" | "traces" | "spans" | "services-catalog")
-  ) {
-    if (tab === "service-graph" && config.isEnterprise !== "true") return;
+  if (tab === "traces" || tab === "spans") {
     searchObj.meta.searchMode = tab as TraceSearchMode;
   }
 
-  if (
-    queryParams.stream &&
-    searchObj.data.stream.selectedStream.value !== queryParams.stream
-  ) {
+  if (queryParams.stream && searchObj.data.stream.selectedStream.value !== queryParams.stream) {
     searchObj.data.stream.selectedStream = {
       label: queryParams.stream,
       value: queryParams.stream,
@@ -1683,23 +1541,15 @@ const restoreFiltersFromQuery = (node: any) => {
     if (node.left.column) {
       let values = [];
       if (node.operator === "IN") {
-        values = node.right.value.map(
-          (_value: { value: string }) => _value.value,
-        );
+        values = node.right.value.map((_value: { value: string }) => _value.value);
       }
-      if (
-        searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues
-      )
-        searchObj.data.stream.fieldValues[node.left.column].selectedValues =
-          values;
+      if (searchObj.data.stream.fieldValues?.[node?.left?.column]?.selectedValues)
+        searchObj.data.stream.fieldValues[node.left.column].selectedValues = values;
     }
   }
 
   // Recurse through AND/OR expressions
-  if (
-    node.type === "binary_expr" &&
-    (node.operator === "AND" || node.operator === "OR")
-  ) {
+  if (node.type === "binary_expr" && (node.operator === "AND" || node.operator === "OR")) {
     restoreFiltersFromQuery(node.left);
     restoreFiltersFromQuery(node.right);
   }
@@ -1710,7 +1560,7 @@ const restoreFilters = (query: string) => {
 
   const defaultQuery = `SELECT * FROM "${selectedStreamName.value}" WHERE `;
 
-  const parsedQuery = parser.astify(defaultQuery + query);
+  const parsedQuery = tracesParser.value.astify(defaultQuery + query);
 
   restoreFiltersFromQuery(parsedQuery.where);
 };
@@ -1725,10 +1575,7 @@ const setHistogramDate = async (date: any) => {
 const onMetricsFiltersUpdated = (filters: string[]) => {
   const allFilters = [...filters];
   // Add error filter only if span_status='ERROR' is currently active and not already present
-  if (
-    showErrorOnly.value &&
-    !allFilters.includes("span_status = 'ERROR'")
-  ) {
+  if (showErrorOnly.value && !allFilters.includes("span_status = 'ERROR'")) {
     allFilters.push("span_status = 'ERROR'");
   }
   // Apply each filter term independently so replace-or-append works per field.
@@ -1753,12 +1600,9 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
-const onSearchModeChange = (
-  mode: "traces" | "spans" | "service-graph" | "services-catalog",
-) => {
+// Handler for the Spans / Traces granularity toggle
+const onSearchModeChange = (mode: "traces" | "spans") => {
   searchObj.meta.searchMode = mode;
-  if (mode === "service-graph" || mode === "services-catalog") return;
   if (
     mode === "traces" &&
     searchObj.meta.resultGrid.sortBy !== "start_time" &&
@@ -1804,6 +1648,17 @@ const onJumpToTracesStreamData = (fromUs: number, toUs: number) => {
   runQueryFn();
 };
 
+// Jump handler for the service-graph / services-catalog empty states. Mirrors
+// the datetime + picker sync above, but does not run the traces query — each
+// panel reloads itself from its own watch on the shared datetime.
+const onJumpToPanelStreamData = (fromUs: number, toUs: number) => {
+  searchBarRef.value?.dateTimeRef?.setAbsoluteTime(fromUs, toUs);
+  searchObj.data.datetime.startTime = fromUs;
+  searchObj.data.datetime.endTime = toUs;
+  searchObj.data.datetime.type = "absolute";
+  searchObj.data.datetime.relativeTimePeriod = null;
+};
+
 const onSelectTracesStream = () => {
   const trigger = document.querySelector<HTMLElement>(
     '[data-test="log-search-index-list-select-stream"] button',
@@ -1834,9 +1689,7 @@ const selectedStreamStats = ref<{
   doc_time_max: number;
 } | null>(null);
 
-const streamDocTimeRange = computed<
-  { min: number; max: number } | undefined
->(() => {
+const streamDocTimeRange = computed<{ min: number; max: number } | undefined>(() => {
   const selected = searchObj.data?.stream?.selectedStream?.value;
   if (!selected) return undefined;
 
@@ -1863,19 +1716,17 @@ const streamDocTimeRange = computed<
   return { min, max };
 });
 
-const queryWindowUs = computed<{ start: number; end: number } | undefined>(
-  () => {
-    const dt = searchObj.data.datetime;
-    if (dt?.type === "absolute" && dt.startTime && dt.endTime) {
-      return { start: Number(dt.startTime), end: Number(dt.endTime) };
-    }
-    if (dt?.type === "relative" && dt.relativeTimePeriod) {
-      const r = getConsumableRelativeTime(dt.relativeTimePeriod);
-      if (r) return { start: r.startTime, end: r.endTime };
-    }
-    return undefined;
-  },
-);
+const queryWindowUs = computed<{ start: number; end: number } | undefined>(() => {
+  const dt = searchObj.data.datetime;
+  if (dt?.type === "absolute" && dt.startTime && dt.endTime) {
+    return { start: Number(dt.startTime), end: Number(dt.endTime) };
+  }
+  if (dt?.type === "relative" && dt.relativeTimePeriod) {
+    const r = getConsumableRelativeTime(dt.relativeTimePeriod);
+    if (r) return { start: r.startTime, end: r.endTime };
+  }
+  return undefined;
+});
 
 // Relay AI-chat requests from row cell actions (carrying an explicit message)
 // straight up to MainLayout's O2AIChat panel.
@@ -2054,20 +1905,9 @@ const showErrorOnly = computed(
 );
 
 const searchData = () => {
-  if (
-    !(
-      searchObj.data.stream.streamLists.length &&
-      searchObj.data.stream.selectedStream?.label
-    )
-  ) {
+  if (!(searchObj.data.stream.streamLists.length && searchObj.data.stream.selectedStream?.label)) {
     return;
   }
-
-  if (
-    activeTab.value === "service-graph" ||
-    activeTab.value === "services-catalog"
-  )
-    return;
 
   // Clear brush selections when running query
   // The filters are now part of the query, so brush selections should be cleared
@@ -2152,10 +1992,7 @@ const changeStream = computed(() => {
   return searchObj.data.stream.selectedStream;
 });
 const changeRelativeDate = computed(() => {
-  return (
-    searchObj.data.datetime.relative.value +
-    searchObj.data.datetime.relative.period.value
-  );
+  return searchObj.data.datetime.relative.value + searchObj.data.datetime.relative.period.value;
 });
 // const updateSelectedColumns = computed(() => {
 //   return searchObj.data.stream.selectedFields.length;
@@ -2168,10 +2005,7 @@ watch(
   () => searchObj.data.stream.selectedStream.value,
   (streamValue: string) => {
     if (store.state.zoConfig?.auto_query_enabled && streamValue) {
-      saveTracesStream(
-        store.state.selectedOrganization.identifier,
-        streamValue,
-      );
+      saveTracesStream(store.state.selectedOrganization.identifier, streamValue);
     }
   },
 );
@@ -2225,104 +2059,28 @@ watch(
   { immediate: true },
 );
 
-// NOTE: auto-run in live mode is driven by explicit triggers at each user-intent
-// handler (filter add/remove, manual date change, redirect, metrics brush) — not
-// by watching `searchObj.data.query`. A query watcher duplicated those explicit
-// triggers (every writer of `data.query` also runs a search), so it was removed.
-
-// Handler for service graph view traces event
-const handleServiceGraphViewTraces = (data: any) => {
-  // Switch to search tab
-  searchObj.meta.searchMode = data.mode;
-
-  // Set the selected stream in dropdown
-  if (data.stream) {
-    searchObj.data.stream.selectedStream = {
-      label: data.stream,
-      value: data.stream,
-    };
-  }
-
-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
-  if (data.serviceName) {
-    const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
-    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
-    if (data.operationName) {
-      const escapedOpName = escapeSingleQuotes(data.operationName);
-      filterQuery += ` AND operation_name = '${escapedOpName}'`;
-    }
-    if (data.nodeName) {
-      const escapedNodeName = escapeSingleQuotes(data.nodeName);
-      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
-    }
-    if (data.podName) {
-      const escapedPodName = escapeSingleQuotes(data.podName);
-      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
-    }
-    if (data.callerService) {
-      const escapedCaller = escapeSingleQuotes(data.callerService);
-      filterQuery += ` AND service_name = '${escapedCaller}'`;
-    }
-    if (data.resourceFilter?.value) {
-      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      if (data.resourceFilter.fields?.length) {
-        // Fallback chain: (field1 = 'val' OR field2 = 'val')
-        const clauses = data.resourceFilter.fields
-          .map((f: string) => `${f} = '${escapedValue}'`)
-          .join(" OR ");
-        filterQuery += ` AND (${clauses})`;
-      } else if (data.resourceFilter.field) {
-        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
-      }
-    }
-    if (data.errorsOnly) {
-      filterQuery += ` AND span_status = 'ERROR'`;
-    }
-    if (data.minDurationMicros && data.minDurationMicros > 0) {
-      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
-    }
-    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
-      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
-    }
-    searchObj.data.editorValue = filterQuery;
-    searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
-  }
-
-  // Set the time range
-  if (data.timeRange) {
-    searchObj.data.datetime = {
-      startTime: data.timeRange.startTime,
-      endTime: data.timeRange.endTime,
-      relativeTimePeriod: null,
-      type: "absolute",
-    };
-  }
-
-  // Run the query
-  nextTick(() => {
-    runQueryFn();
-  });
-};
+// Auto-run in live mode is driven by explicit triggers at each user-intent
+// handler (filter add/remove, manual date change, redirect, metrics brush), not
+// by watching `searchObj.data.query`.
 
 /**
- * Handler for the services catalog `view-traces` event.
+ * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
  *
- * Normalizes the payload (which may be a plain service name string for backward
- * compatibility, or a full object with `serviceName`, `serviceType`,
- * `resourceFilter`, etc.) and delegates to {@link handleServiceGraphViewTraces}
- * to populate the search bar and run the filtered traces query.
+ * Those views navigate here with the filter, stream, mode and time range as
+ * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
+ * mutating the shared search state from inside a sibling tab. Applying them
+ * here keeps the handoff URL bookmarkable and reload-safe.
  *
- * @param data - Service name string (legacy) or structured filter object.
- *               Structured objects may include `serviceName`, `serviceType`,
- *               `operationName`, `nodeName`, `podName`, `callerService`,
- *               `resourceFilter`, `errorsOnly`, `minDurationMicros`,
- *               `maxDurationMicros`, `mode`, and `stream`.
+ * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
+ * this only adds the prebuilt filter and re-runs the query.
  */
-const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
-  // Normalize plain string to object then delegate to the full handler
-  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
-  handleServiceGraphViewTraces(payload);
+const applyHandoffFilter = (): boolean => {
+  const filter = router.currentRoute.value.query.filter;
+  if (typeof filter !== "string" || !filter) return false;
+
+  searchObj.data.editorValue = filter;
+  searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+  return true;
 };
 
 // watch(updateSelectedColumns, () => {
@@ -2364,44 +2122,41 @@ useShortcuts([
     handler: () => {
       // The traces query editor is Monaco — focus its inner textarea.
       const el = document.querySelector<HTMLElement>(
-        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea, [data-test="logs-search-bar"] .cm-editor',
+        '[data-test="logs-search-bar"] .monaco-editor textarea, [data-test="logs-search-bar"] textarea',
       );
       el?.focus();
     },
   },
   {
     id: "tracesCopyUrl",
-    handler: () => copyTracesUrl(),
+    handler: () => copyTracesUrl(t),
   },
 ]);
 </script>
 
-<style>
-
-.tracePage .index-table :hover::-webkit-scrollbar,
-.tracePage #tracesSearchGridComponent:hover::-webkit-scrollbar {
-  height: 13px;
-  width: 13px;
+<style scoped>
+/* keep(scrollbar): native ::-webkit-scrollbar sizing/shadows on the child field-list
+   & result-grid scrollers, plus a field-label font-size override on child FieldRow
+   DOM — all reached through child components, so not expressible as utilities here. */
+.tracePage :deep(.index-table :hover::-webkit-scrollbar),
+.tracePage :deep(#tracesSearchGridComponent:hover::-webkit-scrollbar) {
+  height: 0.8125rem;
+  width: 0.8125rem;
 }
 
-.tracePage .index-table ::-webkit-scrollbar-track,
-.tracePage #tracesSearchGridComponent::-webkit-scrollbar-track {
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+.tracePage :deep(.index-table ::-webkit-scrollbar-track),
+.tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-track) {
+  -webkit-box-shadow: inset 0 0 0.375rem color-mix(in srgb, var(--color-black) 30%, transparent);
+  border-radius: 0.625rem;
 }
 
-.tracePage .index-table ::-webkit-scrollbar-thumb,
-.tracePage #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-  border-radius: 10px;
-  -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
+.tracePage :deep(.index-table ::-webkit-scrollbar-thumb),
+.tracePage :deep(#tracesSearchGridComponent::-webkit-scrollbar-thumb) {
+  border-radius: 0.625rem;
+  -webkit-box-shadow: inset 0 0 0.375rem color-mix(in srgb, var(--color-black) 50%, transparent);
 }
 
-
-.tracePage .index-menu .field_list .field_overlay .field_label {
-  font-size: 12px !important;
-}
-.tracePage .traces-horizontal-splitter.hide-splitter-separator > .o-splitter__separator {
-  background: transparent !important;
-  border: none !important;
+.tracePage :deep(.index-menu .field_list .field_overlay .field_label) {
+  font-size: var(--text-xs) !important;
 }
 </style>

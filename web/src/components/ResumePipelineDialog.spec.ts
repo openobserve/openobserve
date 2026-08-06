@@ -4,9 +4,8 @@ import ResumePipelineDialog from "@/components/ResumePipelineDialog.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 vi.mock("@/utils/zincutils", () => ({
-  convertUnixToQuasarFormat: vi.fn(() => "2023-01-01 10:00:00"),
+  convertUnixToDateFormat: vi.fn(() => "2023-01-01 10:00:00"),
 }));
 
 const ODialogStub = {
@@ -52,12 +51,6 @@ const buildWrapper = (overrideProps: Record<string, any> = {}) =>
       provide: { store },
       stubs: {
         ODialog: ODialogStub,
-        "q-radio": {
-          template:
-            '<div class="q-radio-stub" @click="$emit(\'update:modelValue\', val)"><slot /></div>',
-          props: ["modelValue", "val"],
-          emits: ["update:modelValue"],
-        },
       },
     },
   });
@@ -106,7 +99,7 @@ describe("ResumePipelineDialog", () => {
   it("should expose necessary functions from setup", () => {
     expect(typeof wrapper.vm.onCancel).toBe("function");
     expect(typeof wrapper.vm.onConfirm).toBe("function");
-    expect(typeof wrapper.vm.convertUnixToQuasarFormat).toBe("function");
+    expect(typeof wrapper.vm.convertUnixToDateFormat).toBe("function");
   });
 
   it("should emit update:cancel and update:modelValue=false when onCancel is called", () => {
@@ -188,7 +181,7 @@ describe("ResumePipelineDialog", () => {
       global: {
         plugins: [i18n],
         provide: { store },
-        stubs: { ODialog: ODialogStub, "q-radio": true },
+        stubs: { ODialog: ODialogStub },
       },
     });
     const dialog = localWrapper.findComponent(ODialogStub);

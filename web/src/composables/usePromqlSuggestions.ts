@@ -1,5 +1,22 @@
-import searchService from "@/services/search";
+import streamService from "@/services/stream";
+import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
+import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
+import { SORT_LANE } from "@/utils/query/sqlCompletion";
+
+// Columns a metrics stream carries that are not labels. `value` is the sample,
+// `_timestamp` the clock, `__hash__` internal, and `__name__` the metric the
+// user has already typed — none of them belong inside `{`.
+const NON_LABEL_COLUMNS = new Set(["value", "_timestamp", "__hash__", "__name__"]);
+
+// One schema per metric per page, shared by every editor. A metrics stream is
+// named for its metric, so this is also the label list.
+//
+// Keyed by ORGANISATION and metric, because organisations are switched in place
+// in this SPA and metric names are not unique across them — the field-value
+// cache is scoped the same way, for the same reason.
+const metricLabelCache = new Map<string, string[]>();
+const metricLabelCacheKey = (org: string, metric: string) => `${org}|${metric}`;
 import { useStore } from "vuex";
 
 const usePromqlSuggestions = () => {
@@ -10,8 +27,8 @@ const usePromqlSuggestions = () => {
       cursorIndex: 0,
     },
     popup: {
-      open: (val: string) => {},
-      close: (val: string) => {},
+      open: (_val: string) => {},
+      close: (_val: string) => {},
     },
     dateTime: {
       startTime: new Date().getTime() * 1000,
@@ -19,7 +36,15 @@ const usePromqlSuggestions = () => {
     },
   });
   const store = useStore();
-  const autoCompletePromqlKeywords: any = ref([]);
+  // Seeded, not empty: this list is otherwise only filled by getSuggestions,
+  // which runs on a query update — so Ctrl+Space on a freshly opened PromQL
+  // editor offered nothing at all until the user typed a character.
+  const autoCompletePromqlKeywords: any = ref([...PROMQL_CATALOG]);
+
+  // True while the list belongs to a label or value position. Metrics arriving
+  // in the background must not replace such a list, and an empty result in one
+  // means "nothing matches here" — not "show me the language".
+  let contextualSuggestions = false;
   const metricKeywords: any = ref([]);
 
   const parsePromQlQuery = (query: string) => {
@@ -45,9 +70,7 @@ const usePromqlSuggestions = () => {
       // Get start and end position from regex return object
       meta.label.position.start = curlyBracesRegexMatch.index || 0;
       meta.label.position.end =
-        (curlyBracesRegexMatch.index || 0) +
-        curlyBracesRegexMatch[1].length +
-        1;
+        (curlyBracesRegexMatch.index || 0) + curlyBracesRegexMatch[1].length + 1;
     }
     // Extract labels
     const labelsMatch = query.match(/\{(.+?)\}/);
@@ -58,9 +81,7 @@ const usePromqlSuggestions = () => {
       if (labelPairs?.length)
         labelPairs.forEach((pair) => {
           const matchResult = pair.match(/(\w+)="([^"]*)"/);
-          const [key, value] = matchResult
-            ? matchResult.slice(1)
-            : [null, null];
+          const [key, value] = matchResult ? matchResult.slice(1) : [null, null];
           if (key && value) labels[key] = value;
         });
     }
@@ -90,8 +111,8 @@ const usePromqlSuggestions = () => {
       labelMeta.hasLabels = true;
       labelMeta.isEmpty = !hasCurlyBraces[1].length;
       labelMeta.isFocused =
-        hasCurlyBraces.index <= (cursorIndex) &&
-        hasCurlyBraces.index + hasCurlyBraces[1].length >= (cursorIndex);
+        hasCurlyBraces.index <= cursorIndex &&
+        hasCurlyBraces.index + hasCurlyBraces[1].length >= cursorIndex;
     }
 
     if (hasCurlyBraces) {
@@ -115,18 +136,14 @@ const usePromqlSuggestions = () => {
     // Extract labels
     let match;
     while (hasCurlyBraces && (match = keyValuePairRegex.exec(query)) !== null) {
-      const [fullMatch, key, val, value] = match;
+      const [fullMatch, key, , value] = match;
       const start = match.index;
       const end = start + fullMatch.length;
       // Detect cursor position for labels and values
       if (start <= cursorIndex && cursorIndex <= end) {
         if (cursorIndex - start < key.length) {
           labelMeta["focusOn"] = "label";
-        } else if (
-          key &&
-          value &&
-          cursorIndex - start < key.length + value.length
-        ) {
+        } else if (key && value && cursorIndex - start < key.length + value.length) {
           labelMeta["focusOn"] = "value";
         }
 
@@ -165,16 +182,27 @@ const usePromqlSuggestions = () => {
     return labelMeta;
   }
 
+  // Bumped by every suggestion pass. A lookup that finishes after a newer one
+  // started has been overtaken and must not publish: values are a network call
+  // with a ten-second ceiling, so `{service="` can easily answer after the user
+  // has moved on to `{region="`.
+  let suggestionGeneration = 0;
+
   const getSuggestions = async () => {
+    const generation = ++suggestionGeneration;
+    const isCurrent = () => generation === suggestionGeneration;
     try {
       const parsedQuery: any = parsePromQlQuery(autoCompleteData.value.query);
       const metricName = parsedQuery?.metricName || "";
       const labels = parsedQuery?.label?.labels || {};
 
-      autoCompletePromqlKeywords.value = [];
-      const startISOTimestamp: any = autoCompleteData.value.dateTime.startTime;
-      const endISOTimestamp: any = autoCompleteData.value.dateTime.endTime;
-      // import search service and call search.get_promql_series
+      // The list is NOT cleared here. Two of the branches below return without
+      // refilling it, and an empty list is never the better answer: the catalog
+      // is the floor.
+      //
+      // The dateTime range went with the series call. The lookups that replaced
+      // it carry their own windows — the schema has none to carry, and the
+      // value fetch uses its own recent-values window.
       if (metricName) labels["__name__"] = metricName;
 
       const formattedLabels = Object.keys(labels).map((key) => {
@@ -183,10 +211,7 @@ const usePromqlSuggestions = () => {
 
       const cursorIndex = autoCompleteData.value.position.cursorIndex;
 
-      const labelFocus: any = analyzeLabelFocus(
-        autoCompleteData.value.query,
-        cursorIndex
-      );
+      const labelFocus: any = analyzeLabelFocus(autoCompleteData.value.query, cursorIndex);
 
       if (cursorIndex === -1) return;
 
@@ -195,41 +220,102 @@ const usePromqlSuggestions = () => {
         return;
       }
 
+      if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label")) return;
+      // Both lookups are scoped to one metric; without a metric name there is
+      // no stream to read and nothing honest to offer.
+      if (!metricName) return;
 
-      if (!(labelFocus.focusOn === "value" || labelFocus.focusOn === "label"))
-        return;
+      const org = store.state.selectedOrganization.identifier;
+      const streamCtx = { org, streamType: "metrics", streamName: metricName };
 
-      let labelSuggestions: any;
-
-      autoCompletePromqlKeywords.value.push({
-        label: "...Loading",
-        insertText: "",
-        kind: "Text",
-      });
-
+      autoCompletePromqlKeywords.value = [
+        {
+          label: "...Loading",
+          insertText: "",
+          kind: "Text",
+        },
+      ];
       autoCompleteData.value.popup.open(autoCompleteData.value.text);
 
-      searchService
-        .get_promql_series({
-          org_identifier: store.state.selectedOrganization.identifier,
-          labels: `{${formattedLabels.join(",")}}`,
-          start_time: startISOTimestamp,
-          end_time: endISOTimestamp,
-        })
-        .then((response: any) => {
-          labelSuggestions = getLabelSuggestions(
-            response.data.data,
-            labelFocus,
-            formattedLabels.join(",")
-          );
-        })
-        .finally(() => {
-          if (labelSuggestions) updatePromqlKeywords(labelSuggestions);
-          else {
-            autoCompletePromqlKeywords.value = [];
-            autoCompleteData.value.popup.close("");
+      if (labelFocus.focusOn === "label") {
+        // The SCHEMA, not the series. `/series` returns every matching series
+        // with all of its labels for the client to dedupe — 5903 bytes where
+        // the schema answers in 1699, and it is metadata, so no scan at all.
+        try {
+          const cacheKey = metricLabelCacheKey(org, metricName);
+          let labels = metricLabelCache.get(cacheKey);
+          if (!labels) {
+            const response: any = await streamService.schema(org, metricName, "metrics");
+            const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
+            labels = columns
+              .map((column: any) => column?.name)
+              .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));
+            metricLabelCache.set(cacheKey, labels as string[]);
           }
-        });
+
+          if (!isCurrent()) return;
+
+          const alreadyFiltered = formattedLabels.join(",");
+          updatePromqlKeywords(
+            (labels as string[])
+              .filter((name) => alreadyFiltered.indexOf(`${name}=`) === -1)
+              .map((name) => ({
+                label: name,
+                kind: "Variable",
+                // The bare name, without an `=`.
+                //
+                // Appending the operator reads like a convenience, but the
+                // habit it collides with is typing `=` yourself: accepting
+                // `environment` and then typing `=` gives `environment==`,
+                // which matches nothing and offers nothing. Monaco does not
+                // dedupe the operator, so the safe insert is the name alone.
+                insertText: name,
+              })),
+            { contextual: true },
+          );
+        } catch {
+          // The labels are unavailable; the language is not.
+          if (!isCurrent()) return;
+          updatePromqlKeywords([]);
+          autoCompleteData.value.popup.close("");
+        }
+        return;
+      }
+
+      // Label VALUES are field values of the metric's stream — the same cache,
+      // the same key, the same on-demand fetch the SQL editors use.
+      const labelName = labelFocus.meta.label;
+      let values: string[] = [];
+      try {
+        values = await getFieldValuesForSuggestion(streamCtx, labelName);
+        if (!values.length) values = await requestFieldValues(streamCtx, labelName);
+      } catch {
+        values = [];
+      }
+
+      if (!isCurrent()) return;
+
+      // Quoting, decided from what is actually around the cursor. Monaco
+      // auto-closes `"`, so the model is `service=""` with the cursor between
+      // them; inserting a fully quoted value there produced
+      // `service=""api-gateway""`.
+      const textBeforeCursor = autoCompleteData.value.query.slice(0, cursorIndex + 1);
+      const textAfterCursor = autoCompleteData.value.query.slice(cursorIndex + 1);
+      const hasOpeningQuote = /"[^"]*$/.test(textBeforeCursor);
+      const hasClosingQuote = textAfterCursor.startsWith('"');
+
+      updatePromqlKeywords(
+        values.map((value) => ({
+          label: value,
+          kind: "Variable",
+          insertText: hasOpeningQuote ? (hasClosingQuote ? value : `${value}"`) : `"${value}"`,
+        })),
+        { contextual: true },
+      );
+      // Nothing matched: take the widget away rather than leaving an empty box
+      // hanging over the query.
+      if (!values.length) autoCompleteData.value.popup.close("");
+      return;
     } catch (e) {
       console.log(e);
     }
@@ -250,10 +336,7 @@ const usePromqlSuggestions = () => {
 
     if (meta.focusOn === "value")
       labels.forEach((label: any) => {
-        if (
-          label[meta.meta.label] &&
-          keywordLabels.indexOf(label[meta.meta.label]) === -1
-        ) {
+        if (label[meta.meta.label] && keywordLabels.indexOf(label[meta.meta.label]) === -1) {
           keywordLabels.push(label[meta.meta.label]);
           keywords.push({
             label: label[meta.meta.label],
@@ -265,28 +348,28 @@ const usePromqlSuggestions = () => {
     return keywords;
   };
 
-  const updatePromqlKeywords = async (data: any[]) => {
-    autoCompletePromqlKeywords.value = [];
-    const functions = [
-      "sum",
-      "avg_over_time",
-      "rate",
-      "avg",
-      "max",
-      "topk",
-      "histogram_quantile",
-    ];
-    if (!data.length) {
-      functions.forEach((fun) => {
-        autoCompletePromqlKeywords.value.push({
-          label: fun,
-          kind: "Function",
-          insertText: fun,
-        });
-      });
-      autoCompletePromqlKeywords.value.push(...metricKeywords.value);
+  /** The default list: the language, plus this org's metrics above it. */
+  const rebuildBaseSuggestions = () => {
+    autoCompletePromqlKeywords.value = [...PROMQL_CATALOG, ...metricKeywords.value];
+    contextualSuggestions = false;
+  };
+
+  const updatePromqlKeywords = async (
+    data: any[],
+    { contextual = false }: { contextual?: boolean } = {},
+  ) => {
+    if (contextual) {
+      // Verbatim, INCLUDING an empty list. A label lookup that matched nothing
+      // and a plain request for the catalog both arrive as [], and treating
+      // them the same put 97 function names inside `up{instance="`, where not
+      // one of them can be typed.
+      autoCompletePromqlKeywords.value = [...data];
+      contextualSuggestions = true;
+    } else if (data.length) {
+      autoCompletePromqlKeywords.value = [...data];
+      contextualSuggestions = true;
     } else {
-      autoCompletePromqlKeywords.value.push(...data);
+      rebuildBaseSuggestions();
     }
 
     await nextTick();
@@ -300,8 +383,18 @@ const usePromqlSuggestions = () => {
         label: metric.label + (metric.type ? `(${metric.type})` : ""),
         kind: "Variable",
         insertText: metric.label,
+        // The field lane. A metric is what the user came to type; behind 107
+        // catalog entries is the same as not offering it.
+        sortText: SORT_LANE.field + metric.label,
       });
     });
+
+    // Rebuild what is on offer, because these arrive from a watcher AFTER the
+    // list was seeded — without this a freshly opened editor showed the whole
+    // catalog and not one metric name until the user edited the query. Not
+    // while a label or value list is showing, and never by opening the widget:
+    // this is a refresh, not an invitation.
+    if (!contextualSuggestions) rebuildBaseSuggestions();
   };
 
   return {

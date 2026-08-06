@@ -1,9 +1,6 @@
 import { describe, it, expect } from "vitest";
-import {
-  normalizeScorerInput,
-  prepareScorerImport,
-  validateScorer,
-} from "./importScorer";
+import { gt } from "@/types/i18n";
+import { normalizeScorerInput, prepareScorerImport, validateScorer } from "./importScorer";
 import type { Provider, ScoreConfig } from "@/services/online-evals.service";
 
 const sc = (over: Partial<ScoreConfig> = {}): ScoreConfig =>
@@ -33,6 +30,7 @@ const baseCtx = {
   nameCounts: new Map<string, number>(),
   scoreConfigs: [] as ScoreConfig[],
   providers: [] as Provider[],
+  t: gt,
 };
 
 describe("normalizeScorerInput", () => {
@@ -197,7 +195,10 @@ describe("validateScorer — score config resolution", () => {
 
   it("flags fixable error when neither ref is provided", () => {
     const res = validateScorer(
-      { name: "j", scorer: { type: "llm_judge", template: "t", params: { provider_id: "prov-id" } } },
+      {
+        name: "j",
+        scorer: { type: "llm_judge", template: "t", params: { provider_id: "prov-id" } },
+      },
       { ...baseCtx, scoreConfigs: [sc()], providers: [prov()] },
     );
     expect(res.errors.find((e) => e.field === "scoreConfigRef")).toBeDefined();
@@ -363,6 +364,7 @@ describe("prepareScorerImport", () => {
         existingScorerNames: [],
         scoreConfigs: [sc()],
         providers: [prov()],
+        t: gt,
       },
     );
 
@@ -379,13 +381,12 @@ describe("prepareScorerImport", () => {
   });
 
   it("aggregates errors across multiple items", () => {
-    const result = prepareScorerImport(
-      [
-        { scorer: { type: "llm_judge" } },
-        { name: "x" },
-      ],
-      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()] },
-    );
+    const result = prepareScorerImport([{ scorer: { type: "llm_judge" } }, { name: "x" }], {
+      existingScorerNames: [],
+      scoreConfigs: [sc()],
+      providers: [prov()],
+      t: gt,
+    });
     expect(result.hasErrors).toBe(true);
     expect(result.errors.length).toBeGreaterThan(1);
   });
@@ -412,7 +413,7 @@ describe("prepareScorerImport", () => {
           },
         },
       ],
-      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()] },
+      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()], t: gt },
     );
     expect(result.errors.filter((e) => e.field === "duplicate")).toHaveLength(2);
   });
@@ -430,7 +431,7 @@ describe("prepareScorerImport", () => {
           },
         },
       ],
-      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()] },
+      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()], t: gt },
     );
     const params = result.items[0].payload?.scorer.params;
     expect(params).not.toHaveProperty("providerName");

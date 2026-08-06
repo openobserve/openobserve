@@ -15,61 +15,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
-      :title="t('iam.roles')"
-      icon="shield"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-    >
-      <template #subtitle>
-        <span data-test="iam-roles-subtitle">
-          {{ t('iam.rolesPage.subtitle') }}
-        </span>
-      </template>
-      <template #actions>
-        <OButton
-          data-test="alert-list-add-alert-btn"
-          variant="primary"
-          size="sm"
-          @click="addRole"
-        >
-          {{ t('iam.addRole') }}
-        </OButton>
-      </template>
-    </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
+  <OPageLayout :title="t('iam.roles')" icon="shield" bleed>
+    <template #subtitle>
+      <span data-test="iam-roles-subtitle">
+        {{ t("iam.rolesPage.subtitle") }}
+      </span>
+    </template>
+    <template #actions>
+      <OButton data-test="iam-roles-add-role-btn" variant="primary" size="sm" @click="addRole">
+        {{ t("iam.addRole") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
         <RoleTable
           data-test="iam-roles-table-section"
           :data="rows"
           :loading="loading"
+          :action-loading="bulkDeleteLoading"
           v-model:global-filter="filterQuery"
           :selected-ids="selectedRoleNames"
           @update:selected-ids="onSelectionChange"
           @edit="editRole"
           @delete="showConfirmDialog"
           @bulk-delete="openBulkDeleteDialog"
-        />
+          @create="addRole"
+        >
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="iam-roles-refresh-btn"
+              @click="setupRoles"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamRolesRefresh"
+              />
+            </OButton>
+          </template>
+        </RoleTable>
       </div>
     </div>
-  </div>
-  <AddRole
-    v-model:open="showAddGroup"
-    @added:role="onRoleAdded"
-  />
+  </OPageLayout>
+  <AddRole v-model:open="showAddGroup" @added:role="onRoleAdded" />
   <ConfirmDialog
-    title="Delete Role"
-    :message="`Are you sure you want to delete '${deleteConformDialog?.data?.role_name as string}' role?`"
+    :title="t('iam.appRoles.deleteRole')"
+    :message="t('iam.appRoles.deleteConfirm', { roleName: deleteConformDialog?.data?.role_name })"
     :warning-message="deleteImpactMessage"
     @update:ok="_deleteRole"
     @update:cancel="deleteConformDialog.show = false"
     v-model="deleteConformDialog.show"
   />
   <ConfirmDialog
-    title="Bulk Delete Roles"
-    :message="`Are you sure you want to delete ${selectedRoleNames.length} role(s)?`"
+    :title="t('iam.appRoles.bulkDeleteRoles')"
+    :message="t('iam.appRoles.bulkDeleteConfirm', { count: selectedRoleNames.length })"
     :warning-message="bulkDeleteImpactMessage"
     @update:ok="bulkDeleteUserRoles"
     @update:cancel="confirmBulkDelete = false"
@@ -81,11 +84,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { onBeforeMount, ref } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { useI18n } from "vue-i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import usersService from "@/services/users";
+import config from "@/aws-exports";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -94,9 +100,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
-
-
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { track } = useReo();
 
@@ -110,17 +114,17 @@ const router = useRouter();
 
 const store = useStore();
 
-
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
 });
 
 const selectedRoleNames = ref<string[]>([]);
-const onSelectionChange = (ids: string[]) => { selectedRoleNames.value = ids; };
+const onSelectionChange = (ids: string[]) => {
+  selectedRoleNames.value = ids;
+};
 const confirmBulkDelete = ref(false);
-
-
+const bulkDeleteLoading = ref(false);
 
 const { rolesState } = usePermissions();
 
@@ -129,17 +133,13 @@ onBeforeMount(() => {
 });
 
 const updateTable = () => {
-   let counter = 1;
-  rows.value = rolesState.roles.map((role: { role_name: string }, index: number) => ({
-      ...role,
-      "#": counter <= 9 ? `0${counter++}` : counter++,
-    }));
+  rows.value = rolesState.roles;
 };
 
 const addRole = () => {
   track("Button Click", {
     button: "Add Role",
-    page: "Roles"
+    page: "Roles",
   });
   showAddGroup.value = true;
 };
@@ -173,21 +173,65 @@ const editRole = (role: any) => {
     params: {
       role_name: role.role_name,
     },
-    query:{
-      org_identifier: store.state.selectedOrganization.identifier
-    }
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
   });
 };
 
 const loading = ref(false);
+
+// `GET /roles` returns role NAMES only, so a role row has nothing to show beyond
+// its name. The one fact worth surfacing — is anyone actually in this role — comes
+// from the batched user→roles map (a single request for the whole org), not from N
+// per-role lookups. Enterprise-only endpoint: on the community edition it 403s and
+// we simply render no member counts.
+const roleUserCounts = ref<Record<string, number> | null>(null);
+
+const loadRoleUserCounts = async () => {
+  if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
+  try {
+    const res = await usersService.getAllUserRoles(store.state.selectedOrganization.identifier);
+    const counts: Record<string, number> = {};
+    // Response is a map of user email -> role list.
+    Object.values(res.data ?? {}).forEach((roles: any) => {
+      (Array.isArray(roles) ? roles : []).forEach((role: any) => {
+        const key = String(role ?? "").trim();
+        if (!key) return;
+        counts[key] = (counts[key] ?? 0) + 1;
+      });
+    });
+    roleUserCounts.value = counts;
+  } catch {
+    // Silent: member counts are context. The list stays fully usable without them.
+    roleUserCounts.value = null;
+  }
+};
+
+// Patch the counts onto rows already on screen. null (not 0) while the map is
+// unavailable, so "unknown" and "nobody holds this role" stay distinguishable.
+const applyRoleUserCounts = () => {
+  const counts = roleUserCounts.value;
+  rolesState.roles = rolesState.roles.map((role: any) => ({
+    ...role,
+    user_count: counts ? (counts[role.role_name] ?? 0) : null,
+  }));
+  updateTable();
+};
+
 const setupRoles = async () => {
   loading.value = true;
   await getRoles(store.state.selectedOrganization.identifier)
     .then((res) => {
       rolesState.roles = res.data.map((role: string) => ({
         role_name: role,
+        user_count: null,
       }));
       updateTable();
+      // Fire-and-forget: the roles list renders immediately and the member counts
+      // (a second request) fill in when they land. Awaiting here would hold the
+      // whole table hostage to a secondary, enterprise-only endpoint.
+      void loadRoleUserCounts().then(applyRoleUserCounts);
     })
     .catch((err) => {
       console.log(err);
@@ -197,15 +241,11 @@ const setupRoles = async () => {
     });
 };
 
-const hideForm = () => {
-  showAddGroup.value = false;
-};
-
 const deleteUserRole = (role: any) => {
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
-        message: "Role deleted successfully!",
+        message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
       });
       setupRoles();
@@ -213,7 +253,7 @@ const deleteUserRole = (role: any) => {
     .catch((error: any) => {
       if (error.response.status != 403) {
         toast({
-          message: "Error while deleting role!",
+          message: t("iam.appRoles.roleDeleteError"),
           variant: "error",
         });
       }
@@ -232,10 +272,7 @@ const showConfirmDialog = async (row: any) => {
   deleteImpactMessage.value = t("iam.rolesPage.delete.impact", { count: 0 });
 
   try {
-    const res = await getRoleUsers(
-      row.role_name,
-      store.state.selectedOrganization.identifier,
-    );
+    const res = await getRoleUsers(row.role_name, store.state.selectedOrganization.identifier);
     const userCount = Array.isArray(res.data) ? res.data.length : 0;
     deleteImpactMessage.value = t("iam.rolesPage.delete.impact", {
       count: userCount,
@@ -283,6 +320,7 @@ const openBulkDeleteDialog = async () => {
 
 const bulkDeleteUserRoles = async () => {
   const roleNames = selectedRoleNames.value;
+  bulkDeleteLoading.value = true;
 
   try {
     const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
@@ -297,17 +335,20 @@ const bulkDeleteUserRoles = async () => {
 
     if (successful.length > 0 && unsuccessful.length === 0) {
       toast({
-        message: `Successfully deleted ${successful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeleteSuccess", { count: successful.length }),
         variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
       toast({
-        message: `Deleted ${successful.length} role(s). Failed to delete ${unsuccessful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeletePartial", {
+          count: successful.length,
+          unsuccessful: unsuccessful.length,
+        }),
         variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
       toast({
-        message: `Failed to delete ${unsuccessful.length} role(s)`,
+        message: t("iam.appRoles.bulkDeleteFailed", { count: unsuccessful.length }),
         variant: "error",
       });
     }
@@ -318,11 +359,14 @@ const bulkDeleteUserRoles = async () => {
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
       toast({
-        message: error.response?.data?.message || error?.message || "Error while deleting roles",
+        message:
+          error.response?.data?.message || error?.message || t("iam.appRoles.bulkDeleteRolesError"),
         variant: "error",
       });
     }
     confirmBulkDelete.value = false;
+  } finally {
+    bulkDeleteLoading.value = false;
   }
 };
 
@@ -330,11 +374,15 @@ const bulkDeleteUserRoles = async () => {
 useShortcuts([
   {
     id: "iamRolesAdd",
-    handler: () => { if (!isInputFocused()) addRole(); },
+    handler: () => {
+      if (!isInputFocused()) addRole();
+    },
   },
   {
     id: "iamRolesRefresh",
-    handler: () => { if (!isInputFocused()) setupRoles(); },
+    handler: () => {
+      if (!isInputFocused()) setupRoles();
+    },
   },
   {
     id: "iamRolesFocusSearch",
@@ -343,5 +391,4 @@ useShortcuts([
     },
   },
 ]);
-
 </script>

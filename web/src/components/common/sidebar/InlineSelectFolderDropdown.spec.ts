@@ -20,7 +20,6 @@ import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelect
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("vue-router", () => ({
@@ -128,7 +127,7 @@ const globalConfig = {
     ODrawer: ODrawerStub,
     AddFolder: AddFolderStub,
     OButton: OButtonStub,
-    "OSelect": {
+    OSelect: {
       template: `
         <div class="o-select-stub" :data-disable="String(disabled)">
           <select
@@ -145,7 +144,7 @@ const globalConfig = {
       props: ["modelValue", "options", "disabled"],
       emits: ["update:modelValue"],
     },
-    "OIcon": { template: '<i :class="name" />', props: ["name", "size"] },
+    OIcon: { template: '<i :class="name" />', props: ["name", "size"] },
   },
 };
 
@@ -183,7 +182,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(wrapper.vm.$options.name).toBe("InlineSelectFolderDropdown");
     });
 
-    it("renders the q-select", () => {
+    it("renders the select", () => {
       wrapper = createWrapper();
       expect(wrapper.find(".o-select-stub").exists()).toBe(true);
     });
@@ -236,13 +235,13 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(wrapper.find('[data-test="o-button-stub"]').exists()).toBe(false);
     });
 
-    it("forwards disable=true to q-select stub", () => {
+    it("forwards disable=true to the select stub", () => {
       wrapper = createWrapper({ disable: true });
       const select = wrapper.find(".o-select-stub");
       expect(select.attributes("data-disable")).toBe("true");
     });
 
-    it("forwards disable=false to q-select stub by default", () => {
+    it("forwards disable=false to the select stub by default", () => {
       wrapper = createWrapper();
       const select = wrapper.find(".o-select-stub");
       expect(select.attributes("data-disable")).toBe("false");
@@ -315,7 +314,6 @@ describe("InlineSelectFolderDropdown.vue", () => {
   });
 
   // ─── ODrawer prop forwarding ────────────────────────────────────────────────
-
 
   // ─── Drawer slot content (AddFolder) ────────────────────────────────────────
 
@@ -434,10 +432,10 @@ describe("InlineSelectFolderDropdown.vue", () => {
     });
   });
 
-  // ─── Emit: update:modelValue from q-select ──────────────────────────────────
+  // ─── Emit: update:modelValue from the select ──────────────────────────────────
 
-  describe("q-select model value", () => {
-    it("emits 'update:modelValue' when q-select updates", async () => {
+  describe("select model value", () => {
+    it("emits 'update:modelValue' when the select updates", async () => {
       wrapper = createWrapper();
 
       const select = wrapper.find(".o-select-stub select");
@@ -450,7 +448,7 @@ describe("InlineSelectFolderDropdown.vue", () => {
       expect(emitted![0]).toEqual(["folder-1"]);
     });
 
-    it("passes the modelValue prop down to q-select", () => {
+    it("passes the modelValue prop down to the select", () => {
       wrapper = createWrapper({ modelValue: "folder-2" });
       const select = wrapper.find(".o-select-stub select");
       expect((select.element as HTMLSelectElement).value).toBe("folder-2");

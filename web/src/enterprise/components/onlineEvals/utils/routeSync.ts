@@ -6,12 +6,7 @@
 // computeViewState() returns what the page should be showing. The component
 // is just a thin applier of that state.
 
-import type {
-  EvalJob,
-  ScoreConfig,
-  Scorer,
-  ScorerType,
-} from "@/services/online-evals.service";
+import type { EvalJob, ScoreConfig, Scorer, ScorerType } from "@/services/online-evals.service";
 import { entityId } from "./evalEntity";
 
 export type ActiveTab = "quality" | "jobs" | "scorers" | "scoreConfigs";
@@ -35,11 +30,7 @@ export function rowIdOf(row: AnyRow, tab: ActiveTab): string {
 export type RowTab = Exclude<ActiveTab, "quality">;
 export type RowsByTab = Record<RowTab, AnyRow[]>;
 
-export function findRowById(
-  tab: ActiveTab,
-  id: string,
-  rowsByTab: RowsByTab,
-): AnyRow | null {
+export function findRowById(tab: ActiveTab, id: string, rowsByTab: RowsByTab): AnyRow | null {
   if (tab === "quality") return null;
   const rows = rowsByTab[tab];
   if (tab === "jobs") {
@@ -71,10 +62,7 @@ export interface RouteQuery {
   scorer_type?: unknown;
 }
 
-export function computeViewState(
-  query: RouteQuery,
-  rowsByTab: RowsByTab,
-): ViewState {
+export function computeViewState(query: RouteQuery, rowsByTab: RowsByTab): ViewState {
   const tab = parseTabFromRoute(query.tab);
   const action = query.action;
   const id = query.id;

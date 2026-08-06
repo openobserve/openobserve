@@ -8,11 +8,11 @@ import Jumpcloud from "@/components/ingestion/security/Jumpcloud.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: { jumpcloud: "https://docs.example.com/jumpcloud" },
   })),
 }));
-
 
 describe("Jumpcloud.vue", () => {
   let store: any;
@@ -24,7 +24,12 @@ describe("Jumpcloud.vue", () => {
     return mount(Jumpcloud, {
       global: {
         plugins: [store],
-        stubs: { CopyContent: { template: '<div data-test="copy-content-stub">{{ content }}</div>', props: ["content"] } },
+        stubs: {
+          CopyContent: {
+            template: '<div data-test="copy-content-stub">{{ content }}</div>',
+            props: ["content"],
+          },
+        },
       },
     });
   };

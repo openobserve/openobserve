@@ -15,243 +15,293 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="org-storage-settings ">
-      <template v-if="currentAction === 'list'">
-          <AppPageHeader
-            :title="t('storage_settings.title')"
-            icon="cloud"
-            :subtitle="'Per-organization storage configuration'"
-            class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-          />
-
-    <!-- Loading state -->
-    <div v-if="loading" class="tw:flex tw:justify-center tw:items-center" style="min-height: calc(100vh - var(--navbar-height) - 120px)">
-      <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
-    </div>
-
-    <!-- Cloud: storage not enabled -->
-    <div
-      v-else-if="isCloud && !orgStorageEnabled"
-      class="tw:text-sm tw:text-gray-500 tw:py-3"
+  <div class="org-storage-settings h-full">
+    <OPageLayout
+      v-if="currentAction === 'list'"
+      :title="t('storage_settings.title')"
+      icon="cloud"
+      :subtitle="t('settings.orgStorageSettings.subtitle')"
+      bleed
+      scroll
     >
-      {{ t('storage_settings.notEnabled') }}
-    </div>
+      <!-- Loading state -->
+      <div
+        v-if="loading"
+        class="flex min-h-[calc(100vh-var(--navbar-height)-7.5rem)] items-center justify-center"
+      >
+        <OSpinner size="md" data-test="org-storage-settings-loading-indicator" />
+      </div>
 
-    <!-- ========== NOT CONFIGURED: cloud hero ========== -->
-    <div
-      v-else-if="!isConfigured && isCloud"
-      class="hero-page tw:flex tw:flex-col"
-      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 100px)' }"
-      :class="store.state.theme === 'dark' ? 'hero-page--dark' : ''"
-    >
-      <div class="hero-page__body tw:flex tw:items-center tw:justify-between tw:flex-1 tw:py-[72px] tw:px-[80px]" style="gap: 56px;">
-        <!-- left -->
-        <div class="hero-page__left tw:flex-1 tw:max-w-[480px]">
+      <!-- Cloud: storage not enabled -->
+      <div v-else-if="isCloud && !orgStorageEnabled" class="text-text-secondary py-3 text-sm">
+        {{ t("storage_settings.notEnabled") }}
+      </div>
 
-          <div class="hero-page__headline tw:font-bold tw:leading-tight tw:mb-[18px] tw:text-[#111827]" :class="store.state.theme === 'dark' ? 'tw:text-[#f1f1f5]' : ''" style="font-size: 2.6rem; letter-spacing: -0.6px; line-height: 1.2;">
-            {{ t("storage_settings.heroHeadline") }} <span class="hero-page__brand-text tw:text-(--q-primary)">OpenObserve.</span>
-          </div>
-
-          <div class="hero-page__sub tw:leading-[1.7] tw:text-[#6b7280] tw:mb-9 tw:max-w-[400px]" :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : ''" style="font-size: 0.97rem;">
-            {{ t("storage_settings.heroSub") }}
-          </div>
-
-          <div class="hero-page__actions tw:mb-7">
-            <OButton
-              data-test="storage-settings-configure-btn"
-              variant="primary"
-              class="no-border o2-primary-button hero-cta-btn tw:h-11 tw:px-7 tw:font-semibold" style="font-size: 0.95rem;"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              @click="navigateToCreate"
+      <!-- ========== NOT CONFIGURED: cloud hero ========== -->
+      <div
+        v-else-if="!isConfigured && isCloud"
+        class="hero-page flex min-h-[calc(100vh-var(--navbar-height)-6.25rem)] flex-col"
+      >
+        <div class="hero-page__body flex flex-1 items-center justify-between gap-14 px-20 py-18">
+          <!-- left -->
+          <div class="hero-page__left max-w-120 flex-1">
+            <div
+              class="hero-page__headline text-text-heading mb-4.5 text-4xl leading-tight font-bold tracking-tight"
             >
-              {{ t("storage_settings.configureStorage") }}
-            </OButton>
-          </div>
+              {{ t("storage_settings.heroHeadline") }}
+              <span class="hero-page__brand-text text-theme-accent">{{
+                t("storage_settings.heroBrand")
+              }}</span>
+            </div>
 
-          <!-- supported infrastructure -->
-          <div class="hero-page__inline-providers tw:flex tw:items-center tw:gap-3">
-            <span class="hero-page__inline-label tw:font-medium tw:whitespace-nowrap tw:text-[#aaa]" :class="store.state.theme === 'dark' ? 'tw:text-[#666]' : ''" style="font-size: 0.8rem; letter-spacing: 0px;">{{ t("storage_settings.supportedProviders") }}</span>
-            <div class="hero-page__inline-logos tw:flex tw:items-center" style="gap: 10px;">
-              <div
-                v-for="p in availableProviders"
-                :key="p.value"
-                class="hero-page__inline-logo-wrap tw:w-7 tw:h-7 tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:cursor-default tw:opacity-70 tw:transition-opacity tw:duration-150"
+            <div class="hero-page__sub text-text-secondary mb-9 max-w-100 text-base leading-[1.7]">
+              {{ t("storage_settings.heroSub") }}
+            </div>
+
+            <div class="hero-page__actions mb-7">
+              <OButton
+                data-test="storage-settings-configure-btn"
+                variant="primary"
+                class="no-border o2-primary-button hero-cta-btn h-11 px-7 text-base font-semibold"
+                @click="navigateToCreate"
               >
-                <img :src="p.image" :alt="p.label" class="hero-page__inline-logo tw:w-7 tw:h-7 tw:max-w-[28px] tw:max-h-[28px] tw:object-contain tw:block" />
-                <OTooltip :content="p.label" />
+                {{ t("storage_settings.configureStorage") }}
+              </OButton>
+            </div>
+
+            <!-- supported infrastructure -->
+            <div class="hero-page__inline-providers flex items-center gap-3">
+              <span
+                class="hero-page__inline-label text-text-muted text-compact font-medium whitespace-nowrap"
+                >{{ t("storage_settings.supportedProviders") }}</span
+              >
+              <div class="hero-page__inline-logos flex items-center gap-2.5">
+                <div
+                  v-for="p in availableProviders"
+                  :key="p.value"
+                  class="hero-page__inline-logo-wrap flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-70 transition-opacity duration-150 hover:opacity-100"
+                >
+                  <img
+                    :src="p.image"
+                    :alt="p.label"
+                    class="hero-page__inline-logo block h-7 max-h-7 w-7 max-w-7 object-contain"
+                  />
+                  <OTooltip :content="p.label" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- right: feature cards -->
+          <div class="hero-page__right flex w-85 shrink-0 flex-col gap-3.5">
+            <div
+              v-for="feature in features"
+              :key="feature.title"
+              class="feature-card rounded-default border-border-default bg-surface-base flex items-start gap-4 border px-5.5 py-5 shadow-md transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
+            >
+              <div
+                class="feature-card__icon-box rounded-default flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_8%,transparent)]"
+              >
+                <OIcon
+                  :name="feature.icon"
+                  size="md"
+                  class="feature-card__icon text-theme-accent opacity-85"
+                />
+              </div>
+              <div class="feature-card__content flex-1 pt-0.5">
+                <div class="feature-card__title text-text-heading mb-1.25 text-sm font-bold">
+                  {{ feature.title }}
+                </div>
+                <div class="feature-card__desc text-text-secondary text-compact leading-[1.55]">
+                  {{ feature.desc }}
+                </div>
               </div>
             </div>
           </div>
         </div>
-
-        <!-- right: feature cards -->
-        <div class="hero-page__right tw:w-[340px] tw:shrink-0 tw:flex tw:flex-col" style="gap: 14px;">
-          <div
-            v-for="feature in features"
-            :key="feature.title"
-            class="feature-card tw:flex tw:items-start tw:rounded-[16px] tw:border tw:border-[rgba(0,0,0,0.07)] tw:bg-white tw:transition-all tw:duration-200" style="gap: 16px; padding: 20px 22px; box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);"
-            :class="store.state.theme === 'dark' ? 'feature-card--dark tw:bg-[rgba(255,255,255,0.05)] tw:border-[rgba(255,255,255,0.08)] tw:[box-shadow:0_2px_12px_rgba(0,0,0,0.3)]' : ''"
-          >
-            <div class="feature-card__icon-box tw:w-10 tw:h-10 tw:rounded-[10px] tw:bg-[rgba(66,133,244,0.08)] tw:flex tw:items-center tw:justify-center tw:shrink-0" :class="store.state.theme === 'dark' ? 'feature-card__icon-box--dark tw:bg-[rgba(66,133,244,0.15)]' : ''">
-              <OIcon :name="feature.icon" size="md" class="feature-card__icon tw:text-(--q-primary) tw:opacity-85" />
-            </div>
-            <div class="feature-card__content tw:pt-[2px] tw:flex-1">
-              <div class="feature-card__title tw:font-bold tw:text-[#111827] tw:mb-[5px]" :class="store.state.theme === 'dark' ? 'tw:text-[#f3f4f6]' : ''" style="font-size: 0.92rem;">{{ feature.title }}</div>
-              <div class="feature-card__desc tw:text-[#6b7280] tw:leading-[1.55]" :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : ''" style="font-size: 0.8rem;">{{ feature.desc }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
-    <div
-      v-else-if="!isConfigured && !isCloud"
-      class="ent-empty tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:py-12 tw:px-6"
-      :style="{ minHeight: 'calc(100vh - var(--navbar-height) - 160px)' }"
-      :class="store.state.theme === 'dark' ? 'ent-empty--dark' : ''"
-    >
-      <!-- double-ring icon -->
-      <div class="ent-empty__icon-outer tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[rgba(66,133,244,0.25)] tw:flex tw:items-center tw:justify-center tw:mb-7" :class="store.state.theme === 'dark' ? 'tw:border-[rgba(66,133,244,0.3)]' : ''">
-        <div class="ent-empty__icon-inner tw:w-[68px] tw:h-[68px] tw:rounded-full tw:bg-[rgba(66,133,244,0.09)] tw:flex tw:items-center tw:justify-center" style="border: 1.5px solid rgba(66,133,244,0.22);" :class="store.state.theme === 'dark' ? 'ent-empty__icon-inner--dark tw:bg-[rgba(66,133,244,0.18)] tw:border-[rgba(66,133,244,0.35)]' : ''">
-          <OIcon name="cloud-upload" size="lg" class="ent-empty__icon tw:text-(--q-primary) tw:opacity-85" />
-        </div>
       </div>
 
-      <div class="ent-empty__title tw:font-bold tw:text-[#111827] tw:mb-[10px]" :class="store.state.theme === 'dark' ? 'tw:text-[#f1f1f5]' : ''" style="font-size: 1.2rem; letter-spacing: -0.2px;">{{ t("storage_settings.noStorageConfigured") }}</div>
-
-      <div class="ent-empty__desc tw:text-[#6b7280] tw:leading-[1.65] tw:max-w-[400px] tw:mb-6" :class="store.state.theme === 'dark' ? 'tw:text-[#9ca3af]' : ''" style="font-size: 0.88rem;">
-        {{ t("storage_settings.routeDataDesc") }}
-      </div>
-
-      <!-- key fact chips -->
-      <div class="ent-empty__chips tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
-        <span class="ent-empty__chip tw:inline-flex tw:items-center tw:font-medium tw:text-[#6b7280] tw:bg-[#f3f4f6] tw:border tw:border-[#e5e7eb] tw:rounded-[20px] tw:py-1 tw:px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark tw:text-[#9ca3af] tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]' : ''">
-          <OIcon name="corporate-fare" size="xs" />
-          {{ t("storage_settings.perOrgIsolation") }}
-        </span>
-        <span class="ent-empty__chip tw:inline-flex tw:items-center tw:font-medium tw:text-[#6b7280] tw:bg-[#f3f4f6] tw:border tw:border-[#e5e7eb] tw:rounded-[20px] tw:py-1 tw:px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark tw:text-[#9ca3af] tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]' : ''">
-          <OIcon name="bolt" size="xs" />
-          {{ t("storage_settings.appliesImmediately") }}
-        </span>
-        <span class="ent-empty__chip tw:inline-flex tw:items-center tw:font-medium tw:text-[#6b7280] tw:bg-[#f3f4f6] tw:border tw:border-[#e5e7eb] tw:rounded-[20px] tw:py-1 tw:px-3" style="gap: 5px; font-size: 0.75rem;" :class="store.state.theme === 'dark' ? 'ent-empty__chip--dark tw:text-[#9ca3af] tw:bg-[rgba(255,255,255,0.06)] tw:border-[rgba(255,255,255,0.1)]' : ''">
-          <OIcon name="lock" size="xs" />
-          {{ t("storage_settings.usesOrgCredentials") }}
-        </span>
-      </div>
-
-      <OButton
-        data-test="storage-settings-configure-btn"
-        variant="primary"
-        class="no-border o2-primary-button ent-empty__btn tw:h-10 tw:font-semibold tw:mb-9 tw:px-6" style="font-size: 0.92rem;"
-        :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-        @click="navigateToCreate"
+      <!-- ========== NOT CONFIGURED: enterprise empty state ========== -->
+      <div
+        v-else-if="!isConfigured && !isCloud"
+        class="min-h-[calc(100vh-var(--navbar-height)-10rem)] w-full"
       >
-        {{ t("storage_settings.configureStorage") }}
-      </OButton>
+        <OEmptyState
+          size="hero"
+          preset="no-storage-config"
+          data-test="org-storage-settings-empty-state"
+          @action="(id) => id === 'configure' && navigateToCreate()"
+        >
+          <template #extra>
+            <!-- key fact chips -->
+            <div class="flex flex-wrap items-center justify-center gap-2">
+              <span
+                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+              >
+                <OIcon name="corporate-fare" size="xs" />
+                {{ t("storage_settings.perOrgIsolation") }}
+              </span>
+              <span
+                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+              >
+                <OIcon name="bolt" size="xs" />
+                {{ t("storage_settings.appliesImmediately") }}
+              </span>
+              <span
+                class="text-text-secondary bg-surface-subtle border-border-default inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
+              >
+                <OIcon name="lock" size="xs" />
+                {{ t("storage_settings.usesOrgCredentials") }}
+              </span>
+            </div>
 
-      <div class="ent-empty__providers tw:flex tw:items-center tw:gap-3">
-        <span class="ent-empty__providers-label tw:font-medium tw:whitespace-nowrap tw:text-[#aaa]" :class="store.state.theme === 'dark' ? 'tw:text-[#666]' : ''" style="font-size: 0.78rem;">{{ t("storage_settings.supportedProviders") }}</span>
-        <div class="ent-empty__providers-logos tw:flex tw:items-center" style="gap: 10px;">
-          <div
-            v-for="p in providerDefinitions"
-            :key="p.value"
-            class="ent-empty__logo-wrap tw:w-7 tw:h-7 tw:flex tw:items-center tw:justify-center tw:shrink-0 tw:cursor-default tw:opacity-[0.65] tw:transition-opacity tw:duration-150"
-          >
-            <img :src="p.image" :alt="p.label" class="ent-empty__logo tw:w-7 tw:h-7 tw:max-w-[28px] tw:max-h-[28px] tw:object-contain tw:block" />
-            <OTooltip :content="p.label" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========== CONFIGURED ========== -->
-    <div v-else>
-
-      <div class="tw:p-3">
-      <OCard
-        class="storage-card tw:rounded-xl"
-        :class="store.state.theme === 'dark' ? 'storage-card--dark tw:bg-[#1e1e1e]' : ''"
-        style="max-width: 680px;"
-      >
-        <!-- Card header: logo + name + badge | update button -->
-        <OCardSection role="header">
-          <div class="tw:flex tw:items-center tw:flex-nowrap tw:flex-1" style="gap: 14px;">
-            <img
-              :src="configuredProviderImage"
-              :alt="configuredProviderLabel"
-              style="width: 44px; height: 44px; object-fit: contain; flex-shrink: 0;"
-            />
-            <div>
-              <div class="tw:text-base tw:font-medium" style="font-weight: 700; line-height: 1.3;">
-                {{ configuredProviderLabel }}
+            <!-- supported providers -->
+            <div class="flex items-center gap-3">
+              <span class="text-text-disabled text-xs font-medium whitespace-nowrap">{{
+                t("storage_settings.supportedProviders")
+              }}</span>
+              <div class="flex items-center gap-2.5">
+                <div
+                  v-for="p in providerDefinitions"
+                  :key="p.value"
+                  class="flex h-7 w-7 shrink-0 cursor-default items-center justify-center opacity-65 transition-opacity duration-150 hover:opacity-100"
+                >
+                  <img
+                    :src="p.image"
+                    :alt="p.label"
+                    class="block h-7 max-h-7 w-7 max-w-7 object-contain"
+                  />
+                  <OTooltip :content="p.label" />
+                </div>
               </div>
-              <OTag type="activeFlag" class="tw:mt-1" />
             </div>
-          </div>
-          <OButton
-            data-test="storage-settings-update-btn"
-            variant="primary"
-            size="sm"
-            class="no-border o2-primary-button"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click="navigateToEdit"
-          >
-            {{ t("storage_settings.updateStorage") }}
-          </OButton>
-        </OCardSection>
-
-        <OSeparator />
-
-        <!-- Field grid -->
-        <OCardSection role="body">
-          <div class="storage-detail-grid tw:grid tw:gap-x-8 tw:gap-y-5" style="grid-template-columns: repeat(2, 1fr);">
-            <div v-if="storageData.bucket_name" class="storage-field">
-              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.bucketName") }}</div>
-              <div class="storage-field__value tw:text-[#6b7280] tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.bucket_name }}</div>
-            </div>
-            <div v-if="storageData.region" class="storage-field">
-              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.region") }}</div>
-              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.region }}</div>
-            </div>
-            <div v-if="storageData.server_url && !isCloud" class="storage-field">
-              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.serverUrl") }}</div>
-              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.server_url }}</div>
-            </div>
-            <div v-if="storageData.access_key" class="storage-field">
-              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.accessKey") }}</div>
-              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.access_key }}</div>
-            </div>
-            <div v-if="storageData.secret_key" class="storage-field">
-              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.secretKey") }}</div>
-              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary);">{{ storageData.secret_key }}</div>
-            </div>
-            <div v-if="storageData.role_arn" class="storage-field">
-              <div class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:mb-[3px] tw:font-medium">{{ t("storage_settings.roleArn") }}</div>
-              <div class="storage-field__value tw:break-all" style="font-size: 0.9rem; color: var(--o2-text-primary); word-break: break-all;">{{ storageData.role_arn }}</div>
-            </div>
-          </div>
-        </OCardSection>
-
-        <OSeparator v-if="configTimestamps" />
-
-        <!-- Timestamps -->
-        <OCardSection v-if="configTimestamps">
-          <div class="tw:flex" style="gap: 40px;">
-            <div v-if="configTimestamps.created_at" class="tw:flex tw:items-center" style="gap: 6px;">
-              <span class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:font-medium" style="margin-bottom: 0;">{{ t("storage_settings.createdAt") }}</span>
-              <span class="tw:text-sm">{{ configTimestamps.created_at }}</span>
-            </div>
-            <div v-if="configTimestamps.updated_at" class="tw:flex tw:items-center" style="gap: 6px;">
-              <span class="storage-field__label tw:text-xs tw:text-[#6b7280] tw:capitalize tw:font-medium" style="margin-bottom: 0;">{{ t("storage_settings.updatedAt") }}</span>
-              <span class="tw:text-sm">{{ configTimestamps.updated_at }}</span>
-            </div>
-          </div>
-        </OCardSection>
-      </OCard>
+          </template>
+        </OEmptyState>
       </div>
-    </div>
-    </template>
+
+      <!-- ========== CONFIGURED ========== -->
+      <div v-else>
+        <div class="p-3">
+          <OCard class="storage-card rounded-default bg-surface-base max-w-170">
+            <!-- Card header: logo + name + badge | update button -->
+            <OCardSection role="header">
+              <div class="flex flex-1 flex-nowrap items-center gap-3.5">
+                <img
+                  :src="configuredProviderImage"
+                  :alt="configuredProviderLabel"
+                  class="h-11 w-11 shrink-0 object-contain"
+                />
+                <div>
+                  <div class="text-base leading-tight font-bold">
+                    {{ configuredProviderLabel }}
+                  </div>
+                  <OTag type="activeFlag" class="mt-1" />
+                </div>
+              </div>
+              <OButton
+                data-test="storage-settings-update-btn"
+                variant="primary"
+                size="sm"
+                class="no-border o2-primary-button"
+                @click="navigateToEdit"
+              >
+                {{ t("storage_settings.updateStorage") }}
+              </OButton>
+            </OCardSection>
+
+            <OSeparator />
+
+            <!-- Field grid -->
+            <OCardSection role="body">
+              <div class="storage-detail-grid grid grid-cols-2 gap-x-8 gap-y-5">
+                <div v-if="storageData.bucket_name" class="storage-field">
+                  <div
+                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                  >
+                    {{ t("storage_settings.bucketName") }}
+                  </div>
+                  <div class="storage-field__value text-text-body text-sm break-all">
+                    {{ storageData.bucket_name }}
+                  </div>
+                </div>
+                <div v-if="storageData.region" class="storage-field">
+                  <div
+                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                  >
+                    {{ t("storage_settings.region") }}
+                  </div>
+                  <div class="storage-field__value text-text-body text-sm break-all">
+                    {{ storageData.region }}
+                  </div>
+                </div>
+                <div v-if="storageData.server_url && !isCloud" class="storage-field">
+                  <div
+                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                  >
+                    {{ t("storage_settings.serverUrl") }}
+                  </div>
+                  <div class="storage-field__value text-text-body text-sm break-all">
+                    {{ storageData.server_url }}
+                  </div>
+                </div>
+                <div v-if="storageData.access_key" class="storage-field">
+                  <div
+                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                  >
+                    {{ t("storage_settings.accessKey") }}
+                  </div>
+                  <div class="storage-field__value text-text-body text-sm break-all">
+                    {{ storageData.access_key }}
+                  </div>
+                </div>
+                <div v-if="storageData.secret_key" class="storage-field">
+                  <div
+                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                  >
+                    {{ t("storage_settings.secretKey") }}
+                  </div>
+                  <div class="storage-field__value text-text-body text-sm break-all">
+                    {{ storageData.secret_key }}
+                  </div>
+                </div>
+                <div v-if="storageData.role_arn" class="storage-field">
+                  <div
+                    class="storage-field__label text-text-label mb-0.75 text-xs font-medium capitalize"
+                  >
+                    {{ t("storage_settings.roleArn") }}
+                  </div>
+                  <div class="storage-field__value text-text-body text-sm break-all">
+                    {{ storageData.role_arn }}
+                  </div>
+                </div>
+              </div>
+            </OCardSection>
+
+            <OSeparator v-if="configTimestamps" />
+
+            <!-- Timestamps -->
+            <OCardSection v-if="configTimestamps">
+              <div class="flex gap-10">
+                <div v-if="configTimestamps.created_at" class="flex items-center gap-1.5">
+                  <span
+                    class="storage-field__label text-text-label mb-0 text-xs font-medium capitalize"
+                    >{{ t("storage_settings.createdAt") }}</span
+                  >
+                  <span class="text-sm">{{ configTimestamps.created_at }}</span>
+                </div>
+                <div v-if="configTimestamps.updated_at" class="flex items-center gap-1.5">
+                  <span
+                    class="storage-field__label text-text-label mb-0 text-xs font-medium capitalize"
+                    >{{ t("storage_settings.updatedAt") }}</span
+                  >
+                  <span class="text-sm">{{ configTimestamps.updated_at }}</span>
+                </div>
+              </div>
+            </OCardSection>
+          </OCard>
+        </div>
+      </div>
+    </OPageLayout>
     <OrgStorageEditor
       v-else
       :action="currentAction"
@@ -263,10 +313,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, computed, onMounted } from "vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
@@ -276,11 +326,12 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OrgStorageEditor from "./OrgStorageEditor.vue";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const features = [
   {
@@ -299,14 +350,10 @@ const loading = ref(true);
 const existingConfig = ref<any>(null);
 const currentAction = ref<"list" | "add" | "edit">("list");
 
-
 const isCloud = computed(() => config.isCloud === "true");
 
 const orgStorageEnabled = computed(() => {
-  return (
-    !isCloud.value ||
-    (store.state as any).zoConfig?.org_storage_enabled !== false
-  );
+  return !isCloud.value || (store.state as any).zoConfig?.org_storage_enabled !== false;
 });
 
 const isConfigured = computed(() => existingConfig.value?.provider != null);
@@ -315,16 +362,12 @@ const isConfigured = computed(() => existingConfig.value?.provider != null);
 const storageData = computed(() => existingConfig.value?.data || {});
 
 const configuredProviderLabel = computed(() => {
-  const found = providerDefinitions.find(
-    (p) => p.value === existingConfig.value?.provider
-  );
+  const found = providerDefinitions.find((p) => p.value === existingConfig.value?.provider);
   return found?.label || existingConfig.value?.provider || "";
 });
 
 const configuredProviderImage = computed(() => {
-  const found = providerDefinitions.find(
-    (p) => p.value === existingConfig.value?.provider
-  );
+  const found = providerDefinitions.find((p) => p.value === existingConfig.value?.provider);
   return found?.image || "";
 });
 
@@ -341,15 +384,14 @@ const configTimestamps = computed(() => {
   };
 });
 
-
 const providerDefinitions = [
   {
-    label: "AWS Credentials",
+    label: t("settings.orgStorageSettings.awsCredentials"),
     value: "AwsCredentials",
     image: getImageURL("images/org_storage/aws_plain_without_bg.png"),
   },
   {
-    label: "Azure Credentials",
+    label: t("settings.orgStorageSettings.azureCredentials"),
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
@@ -359,12 +401,11 @@ const providerDefinitions = [
   //   image: getImageURL("images/org_storage/gcp.png"),
   // },
   {
-    label: "AWS Role ARN",
+    label: t("settings.orgStorageSettings.awsRoleArn"),
     value: "AwsRoleArn",
     image: getImageURL("images/org_storage/aws_iam.png"),
   },
 ];
-
 
 const cloudProviders = computed(() => {
   const raw = (store.state as any).zoConfig?.org_storage_providers;
@@ -375,9 +416,7 @@ const cloudProviders = computed(() => {
 const availableProviders = computed(() => {
   let providers = [...providerDefinitions];
   if (isCloud.value && cloudProviders.value) {
-    providers = providers.filter((p) =>
-      cloudProviders.value!.includes(p.value)
-    );
+    providers = providers.filter((p) => cloudProviders.value!.includes(p.value));
   }
   return providers;
 });
@@ -411,18 +450,3 @@ onMounted(() => {
   fetchExistingConfig();
 });
 </script>
-
-<style>
-.hero-page__inline-logo-wrap:hover {
-  opacity: 1;
-}
-
-.feature-card:hover {
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1);
-  transform: translateY(-1px);
-}
-
-.ent-empty__logo-wrap:hover {
-  opacity: 1;
-}
-</style>

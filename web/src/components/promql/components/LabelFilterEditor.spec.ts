@@ -19,12 +19,17 @@ import LabelFilterEditor from "./LabelFilterEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock useDashboardPanelData composable
+// ONE set of spies, not a fresh pair per call: a mock that returns new
+// functions each time can be called correctly and still be unassertable.
+const panelApi = vi.hoisted(() => ({
+  fetchPromQLLabels: vi.fn().mockResolvedValue(undefined),
+  // Values are fetched per label now, on demand. Omitting this from the mock
+  // made every mount throw the moment the component started asking for them.
+  fetchPromQLLabelValues: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
-  default: vi.fn(() => ({
-    fetchPromQLLabels: vi.fn().mockResolvedValue(undefined),
-  })),
+  default: vi.fn(() => panelApi),
 }));
 
 describe("LabelFilterEditor", () => {
@@ -84,6 +89,63 @@ describe("LabelFilterEditor", () => {
     });
   };
 
+  // ── What the builder asks for, and when (tmp/code.md D11) ─────────────────
+  describe("label sources", () => {
+    beforeEach(() => {
+      panelApi.fetchPromQLLabels.mockClear();
+      panelApi.fetchPromQLLabelValues.mockClear();
+    });
+
+    it("asks for the values of a label the user has chosen", async () => {
+      // The wiring half. fetchPromQLLabelValues can be perfectly correct and
+      // never called — which is how three prop gaps shipped in this workstream.
+      wrapper = createWrapper({ labels: [{ label: "service", op: "=", value: "" }] });
+      await flushPromises();
+      expect(panelApi.fetchPromQLLabelValues).toHaveBeenCalledWith(
+        "http_requests_total",
+        "service",
+      );
+    });
+
+    it("asks for nothing when the filter row has no label yet", async () => {
+      wrapper = createWrapper({ labels: [{ label: "", op: "=", value: "" }] });
+      await flushPromises();
+      expect(panelApi.fetchPromQLLabelValues).not.toHaveBeenCalled();
+    });
+
+    it("does not re-read the label list when only the time range changes", async () => {
+      // The label list comes from the stream SCHEMA now, which has no time
+      // range — so watching the panel's dateTime buys a request per range
+      // change and changes nothing about the answer.
+      wrapper = createWrapper();
+      await flushPromises();
+      const afterMount = panelApi.fetchPromQLLabels.mock.calls.length;
+
+      await wrapper.setProps({
+        dashboardPanelData: {
+          meta: {
+            ...mockDashboardData.meta,
+            dateTime: { start_time: new Date("2026-01-01"), end_time: new Date("2026-01-08") },
+          },
+        },
+      });
+      await flushPromises();
+
+      expect(panelApi.fetchPromQLLabels.mock.calls.length).toBe(afterMount);
+    });
+
+    it("still re-reads them when the metric changes", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+      panelApi.fetchPromQLLabels.mockClear();
+
+      await wrapper.setProps({ metric: "node_cpu_seconds_total" });
+      await flushPromises();
+
+      expect(panelApi.fetchPromQLLabels).toHaveBeenCalledWith("node_cpu_seconds_total");
+    });
+  });
+
   describe("Component Rendering", () => {
     it("should render label filter editor", () => {
       wrapper = createWrapper();
@@ -92,9 +154,9 @@ describe("LabelFilterEditor", () => {
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="promql-labelfilter-editor-label"]').text(),
-      ).toBe("Label Filters");
+      expect(wrapper.find('[data-test="promql-labelfilter-editor-label"]').text()).toBe(
+        "Label Filters",
+      );
     });
 
     it("should render label filter items", () => {
@@ -112,8 +174,10 @@ describe("LabelFilterEditor", () => {
     it("should display correct label text for each filter", () => {
       wrapper = createWrapper();
       const text = wrapper.text();
-      expect(text).toContain("method = GET");
-      expect(text).toContain("status = 200");
+      // Chip label now renders structured spans (field / op / value) with the
+      // operator spacing supplied via CSS padding rather than literal spaces.
+      expect(text).toContain("method=GET");
+      expect(text).toContain("status=200");
     });
   });
 
@@ -140,9 +204,7 @@ describe("LabelFilterEditor", () => {
       const labels = [...mockLabels];
       wrapper = createWrapper({ labels });
 
-      const removeButton = wrapper.find(
-        '[data-test="promql-label-filter-remove-0"]',
-      );
+      const removeButton = wrapper.find('[data-test="promql-label-filter-remove-0"]');
       await removeButton.trigger("click");
 
       // Check that update:labels event was emitted with removed label
@@ -195,8 +257,10 @@ describe("LabelFilterEditor", () => {
 
       // Act / Assert
       const text = wrapper.text();
-      expect(text).toContain("method = GET");
-      expect(text).toContain("status = 200");
+      // Chip label now renders structured spans (field / op / value) with the
+      // operator spacing supplied via CSS padding rather than literal spaces.
+      expect(text).toContain("method=GET");
+      expect(text).toContain("status=200");
     });
 
     it("emits the full updated list when a new empty filter is added, preserving existing selections", () => {
@@ -345,9 +409,7 @@ describe("LabelFilterEditor", () => {
       await wrapper.setProps({ metric: "" });
       await flushPromises();
 
-      expect(
-        wrapper.props("dashboardData").meta.promql.availableLabels,
-      ).toBeDefined();
+      expect(wrapper.props("dashboardData").meta.promql.availableLabels).toBeDefined();
     });
   });
 
@@ -355,22 +417,15 @@ describe("LabelFilterEditor", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-add-label-filter"]').exists(),
-      ).toBe(true);
-      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(
-        true,
-      );
-      expect(
-        wrapper.find('[data-test="promql-label-filter-remove-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-add-label-filter"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-label-filter-remove-0"]').exists()).toBe(true);
     });
 
     it("should have tooltips on buttons", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-label-filter"]');
-      // QTooltip was replaced by OTooltip in the migration.
       expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });

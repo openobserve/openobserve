@@ -23,7 +23,6 @@ vi.mock("@/utils/zincutils", () => ({
 
 import AttributeValueCell from "./AttributeValueCell.vue";
 
-
 describe("AttributeValueCell", () => {
   let wrapper: VueWrapper;
 
@@ -60,9 +59,7 @@ describe("AttributeValueCell", () => {
     });
 
     it("should NOT render the dropdown button", () => {
-      expect(
-        wrapper.find('[data-test="attribute-value-cell-dropdown-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="attribute-value-cell-dropdown-btn"]').exists()).toBe(false);
     });
   });
 
@@ -77,9 +74,7 @@ describe("AttributeValueCell", () => {
     });
 
     it("should render the dropdown button", () => {
-      expect(
-        wrapper.find('[data-test="attribute-value-cell-dropdown-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="attribute-value-cell-dropdown-btn"]').exists()).toBe(true);
     });
 
     it("should pass field and value as slot props to the dropdown slot", () => {

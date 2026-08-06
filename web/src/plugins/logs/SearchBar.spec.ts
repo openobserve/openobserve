@@ -17,8 +17,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { queryIndexSplit } from "@/utils/zincutils";
 import { isSqlQuery } from "@/utils/query/sqlUtils";
 
-const quoteSqlIdentifierForTest = (field: string) =>
-  field === "user" ? `"${field}"` : field;
+const quoteSqlIdentifierForTest = (field: string) => (field === "user" ? `"${field}"` : field);
 
 const getFieldFromExpressionForTest = (expression: string): string | null => {
   const cleaned = expression.trim().replace(/^\(\s*/, "");
@@ -40,10 +39,7 @@ const replaceExistingFieldConditionForTest = (
   const fieldPat = `(?:"${esc}"|${esc})`;
   const condPat = `(?:"[^"]+"\\.)?${fieldPat}\\s*${opPat}\\s*${valPat}`;
 
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
+  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, newExpression);
   }
@@ -108,7 +104,7 @@ describe("SearchBar.vue Methods", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Create a mock instance with the methods we want to test
     searchBarInstance = {
       // Mock data
@@ -174,20 +170,21 @@ describe("SearchBar.vue Methods", () => {
         loadingHistogram: false,
         organizationIdentifier: "test-org",
       },
-      
+
       // Mock refs
       functionModel: null,
       functionOptions: [],
       savedViewDropdownModel: false,
       downloadCustomRange: 100,
       downloadCustomInitialNumber: 1,
-      
+
       // Mock methods
       handleRunQueryFn: vi.fn(),
       downloadRangeData: vi.fn(() => {
-        searchBarInstance.searchObj.data.customDownloadQueryObj.query.from = 
-          (searchBarInstance.downloadCustomInitialNumber - 1) * searchBarInstance.downloadCustomRange;
-        searchBarInstance.searchObj.data.customDownloadQueryObj.query.size = 
+        searchBarInstance.searchObj.data.customDownloadQueryObj.query.from =
+          (searchBarInstance.downloadCustomInitialNumber - 1) *
+          searchBarInstance.downloadCustomRange;
+        searchBarInstance.searchObj.data.customDownloadQueryObj.query.size =
           searchBarInstance.downloadCustomRange;
       }),
       handleKeyDown: vi.fn((event: any) => {
@@ -225,7 +222,8 @@ describe("SearchBar.vue Methods", () => {
         searchBarInstance.searchObj.meta.sqlMode = mode === "sql";
       }),
       toggleHistogram: vi.fn(() => {
-        searchBarInstance.searchObj.meta.showHistogram = !searchBarInstance.searchObj.meta.showHistogram;
+        searchBarInstance.searchObj.meta.showHistogram =
+          !searchBarInstance.searchObj.meta.showHistogram;
       }),
       refreshHistogram: vi.fn(() => {
         searchBarInstance.searchObj.meta.refreshHistogram = true;
@@ -340,9 +338,9 @@ describe("SearchBar.vue Methods", () => {
   it("should set correct from and size for download", () => {
     searchBarInstance.downloadCustomInitialNumber = 2;
     searchBarInstance.downloadCustomRange = 50;
-    
+
     searchBarInstance.downloadRangeData();
-    
+
     expect(searchBarInstance.searchObj.data.customDownloadQueryObj.query.from).toBe(50);
     expect(searchBarInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(50);
   });
@@ -350,27 +348,27 @@ describe("SearchBar.vue Methods", () => {
   // Test 14: handleKeyDown with Ctrl+Enter
   it("should trigger handleRunQueryFn on Ctrl+Enter", () => {
     const event = { ctrlKey: true, key: "Enter" };
-    
+
     searchBarInstance.handleKeyDown(event);
-    
+
     expect(searchBarInstance.handleRunQueryFn).toHaveBeenCalled();
   });
 
   // Test 15: handleKeyDown with Meta+Enter
   it("should trigger handleRunQueryFn on Meta+Enter", () => {
     const event = { metaKey: true, key: "Enter" };
-    
+
     searchBarInstance.handleKeyDown(event);
-    
+
     expect(searchBarInstance.handleRunQueryFn).toHaveBeenCalled();
   });
 
   // Test 16: handleKeyDown with other keys
   it("should not trigger handleRunQueryFn on other key combinations", () => {
     const event = { key: "Enter" };
-    
+
     searchBarInstance.handleKeyDown(event);
-    
+
     expect(searchBarInstance.handleRunQueryFn).not.toHaveBeenCalled();
   });
 
@@ -453,7 +451,7 @@ describe("SearchBar.vue Reactive Properties", () => {
   // Test 22: Query mode validation
   it("should validate query mode state", () => {
     expect(instance.searchObj.meta.sqlMode).toBe(false);
-    
+
     instance.searchObj.meta.sqlMode = true;
     expect(instance.searchObj.meta.sqlMode).toBe(true);
   });
@@ -475,7 +473,7 @@ describe("SearchBar.vue Reactive Properties", () => {
   // Test 25: Loading state management
   it("should manage loading state correctly", () => {
     expect(instance.searchObj.loading).toBe(false);
-    
+
     instance.searchObj.loading = true;
     expect(instance.searchObj.loading).toBe(true);
   });
@@ -500,12 +498,14 @@ describe("SearchBar.vue Data Transformation", () => {
           },
         },
       },
-      
+
       // Mock transformation methods
       validateQuery: vi.fn((query: string) => query.trim().length > 0),
       formatQuery: vi.fn((query: string) => query.trim()),
-      parseTransforms: vi.fn((transforms: any[]) => transforms.filter(t => t.name && t.content)),
-      validateTransform: vi.fn((transform: any) => !!(transform && transform.name && transform.content)),
+      parseTransforms: vi.fn((transforms: any[]) => transforms.filter((t) => t.name && t.content)),
+      validateTransform: vi.fn(
+        (transform: any) => !!(transform && transform.name && transform.content),
+      ),
       buildQueryObject: vi.fn((baseQuery: any) => ({
         ...baseQuery,
         transforms: transformInstance.searchObj.data.transforms,
@@ -533,7 +533,7 @@ describe("SearchBar.vue Data Transformation", () => {
       { name: "valid2", content: "content2" },
       { name: "invalid", content: "" },
     ];
-    
+
     const result = transformInstance.parseTransforms(transforms);
     expect(result).toHaveLength(2);
     expect(result[0].name).toBe("valid1");
@@ -550,13 +550,11 @@ describe("SearchBar.vue Data Transformation", () => {
 
   // Test 30: Query object building
   it("should build query object with transforms", () => {
-    transformInstance.searchObj.data.transforms = [
-      { name: "transform1", content: "content1" }
-    ];
-    
+    transformInstance.searchObj.data.transforms = [{ name: "transform1", content: "content1" }];
+
     const baseQuery = { query: "base query", from: 0, size: 100 };
     const result = transformInstance.buildQueryObject(baseQuery);
-    
+
     expect(result.query).toBe("base query");
     expect(result.transforms).toHaveLength(1);
     expect(result.transforms[0].name).toBe("transform1");
@@ -578,7 +576,7 @@ describe("SearchBar.vue Event Handling", () => {
           showSearchScheduler: false,
         },
       },
-      
+
       // Mock event handlers
       handleSearchClick: vi.fn(() => {
         eventInstance.searchObj.loading = true;
@@ -587,13 +585,17 @@ describe("SearchBar.vue Event Handling", () => {
         eventInstance.searchObj.meta.refreshHistogram = true;
       }),
       handleSaveView: vi.fn((viewName: string) => {
-        eventInstance.searchObj.data.savedViews.push({ name: viewName, query: eventInstance.searchObj.data.query });
+        eventInstance.searchObj.data.savedViews.push({
+          name: viewName,
+          query: eventInstance.searchObj.data.query,
+        });
       }),
       handleLoadView: vi.fn((view: any) => {
         eventInstance.searchObj.data.query = view.query;
       }),
       handleSchedulerToggle: vi.fn(() => {
-        eventInstance.searchObj.meta.showSearchScheduler = !eventInstance.searchObj.meta.showSearchScheduler;
+        eventInstance.searchObj.meta.showSearchScheduler =
+          !eventInstance.searchObj.meta.showSearchScheduler;
       }),
     };
   });
@@ -614,7 +616,7 @@ describe("SearchBar.vue Event Handling", () => {
   it("should handle save view event", () => {
     eventInstance.searchObj.data.query = "test query";
     eventInstance.handleSaveView("My View");
-    
+
     expect(eventInstance.searchObj.data.savedViews).toHaveLength(1);
     expect(eventInstance.searchObj.data.savedViews[0].name).toBe("My View");
     expect(eventInstance.searchObj.data.savedViews[0].query).toBe("test query");
@@ -624,7 +626,7 @@ describe("SearchBar.vue Event Handling", () => {
   it("should handle load view event", () => {
     const view = { name: "Test View", query: "loaded query" };
     eventInstance.handleLoadView(view);
-    
+
     expect(eventInstance.searchObj.data.query).toBe("loaded query");
   });
 
@@ -632,7 +634,7 @@ describe("SearchBar.vue Event Handling", () => {
   it("should handle scheduler toggle event", () => {
     const initialState = eventInstance.searchObj.meta.showSearchScheduler;
     eventInstance.handleSchedulerToggle();
-    
+
     expect(eventInstance.searchObj.meta.showSearchScheduler).toBe(!initialState);
   });
 });
@@ -658,7 +660,7 @@ describe("SearchBar.vue Configuration", () => {
           refreshInterval: 0,
         },
       },
-      
+
       // Mock configuration methods
       setRefreshInterval: vi.fn((interval: number) => {
         configInstance.searchObj.meta.refreshInterval = interval;
@@ -700,7 +702,7 @@ describe("SearchBar.vue Configuration", () => {
   it("should validate configuration ranges", () => {
     const isValidSplitter = (value: number) => value >= 0 && value <= 100;
     const isValidRefreshInterval = (value: number) => value >= 0;
-    
+
     expect(isValidSplitter(configInstance.searchObj.config.fnSplitterModel)).toBe(true);
     expect(isValidRefreshInterval(configInstance.searchObj.meta.refreshInterval)).toBe(true);
   });
@@ -720,24 +722,24 @@ describe("SearchBar.vue Utilities", () => {
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
       }),
-      
+
       formatDuration: vi.fn((ms: number) => {
         if (ms < 1000) return ms + "ms";
         if (ms < 60000) return (ms / 1000).toFixed(1) + "s";
         return (ms / 60000).toFixed(1) + "m";
       }),
-      
+
       parseTimeRange: vi.fn((range: string) => {
         const unit = range.slice(-1);
         const value = parseInt(range.slice(0, -1));
         const multipliers = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
         return value * (multipliers[unit as keyof typeof multipliers] || 1);
       }),
-      
+
       validateEmail: vi.fn((email: string) => {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       }),
-      
+
       generateId: vi.fn(() => {
         return Math.random().toString(36).substr(2, 9);
       }),
@@ -776,7 +778,7 @@ describe("SearchBar.vue Utilities", () => {
   it("should generate unique IDs", () => {
     const id1 = utilInstance.generateId();
     const id2 = utilInstance.generateId();
-    
+
     expect(id1).toBeDefined();
     expect(id2).toBeDefined();
     expect(id1).not.toBe(id2);
@@ -791,7 +793,7 @@ describe("SearchBar.vue Error Handling", () => {
   beforeEach(() => {
     errorInstance = {
       errors: [],
-      
+
       // Mock error handling methods
       handleError: vi.fn((error: any) => {
         errorInstance.errors.push({
@@ -800,11 +802,11 @@ describe("SearchBar.vue Error Handling", () => {
           type: error.type || "error",
         });
       }),
-      
+
       clearErrors: vi.fn(() => {
         errorInstance.errors = [];
       }),
-      
+
       validateInput: vi.fn((input: any) => {
         if (!input) {
           errorInstance.handleError({ message: "Input is required", type: "validation" });
@@ -812,7 +814,7 @@ describe("SearchBar.vue Error Handling", () => {
         }
         return true;
       }),
-      
+
       handleApiError: vi.fn((response: any) => {
         if (response.status >= 400) {
           errorInstance.handleError({
@@ -828,7 +830,7 @@ describe("SearchBar.vue Error Handling", () => {
   it("should handle errors correctly", () => {
     const error = { message: "Test error", type: "test" };
     errorInstance.handleError(error);
-    
+
     expect(errorInstance.errors).toHaveLength(1);
     expect(errorInstance.errors[0].message).toBe("Test error");
     expect(errorInstance.errors[0].type).toBe("test");
@@ -839,7 +841,7 @@ describe("SearchBar.vue Error Handling", () => {
     errorInstance.handleError({ message: "Error 1" });
     errorInstance.handleError({ message: "Error 2" });
     expect(errorInstance.errors).toHaveLength(2);
-    
+
     errorInstance.clearErrors();
     expect(errorInstance.errors).toHaveLength(0);
   });
@@ -848,7 +850,7 @@ describe("SearchBar.vue Error Handling", () => {
   it("should validate input and handle errors", () => {
     expect(errorInstance.validateInput("valid input")).toBe(true);
     expect(errorInstance.errors).toHaveLength(0);
-    
+
     expect(errorInstance.validateInput(null)).toBe(false);
     expect(errorInstance.errors).toHaveLength(1);
     expect(errorInstance.errors[0].message).toBe("Input is required");
@@ -857,7 +859,7 @@ describe("SearchBar.vue Error Handling", () => {
   // Test 49: API error handling
   it("should handle API errors", () => {
     errorInstance.handleApiError({ status: 404 });
-    
+
     expect(errorInstance.errors).toHaveLength(1);
     expect(errorInstance.errors[0].message).toBe("API Error: 404");
     expect(errorInstance.errors[0].type).toBe("api");
@@ -868,7 +870,7 @@ describe("SearchBar.vue Error Handling", () => {
     errorInstance.handleError({ message: "Validation error", type: "validation" });
     errorInstance.handleError({ message: "Network error", type: "network" });
     errorInstance.handleError({ message: "Unknown error" });
-    
+
     expect(errorInstance.errors).toHaveLength(3);
     expect(errorInstance.errors[0].type).toBe("validation");
     expect(errorInstance.errors[1].type).toBe("network");
@@ -887,27 +889,27 @@ describe("SearchBar.vue Performance", () => {
         renderTime: 0,
         memoryUsage: 0,
       },
-      
+
       // Mock performance methods
       startTimer: vi.fn((name: string) => {
         perfInstance.metrics[name + "Start"] = performance.now();
       }),
-      
+
       endTimer: vi.fn((name: string) => {
         const startTime = perfInstance.metrics[name + "Start"];
         if (startTime) {
           perfInstance.metrics[name] = performance.now() - startTime;
         }
       }),
-      
+
       measureMemory: vi.fn(() => {
         perfInstance.metrics.memoryUsage = Math.random() * 1000000;
       }),
-      
+
       optimizeQuery: vi.fn((query: string) => {
         return query.trim().replace(/\s+/g, " ");
       }),
-      
+
       debounce: vi.fn((func: Function, wait: number) => {
         let timeout: NodeJS.Timeout;
         return (...args: any[]) => {
@@ -922,7 +924,7 @@ describe("SearchBar.vue Performance", () => {
   it("should measure execution time", () => {
     perfInstance.startTimer("test");
     perfInstance.endTimer("test");
-    
+
     expect(perfInstance.metrics.testStart).toBeDefined();
     expect(perfInstance.metrics.test).toBeGreaterThanOrEqual(0);
   });
@@ -943,7 +945,7 @@ describe("SearchBar.vue Performance", () => {
   it("should create debounced functions", () => {
     const mockFn = vi.fn();
     const debouncedFn = perfInstance.debounce(mockFn, 100);
-    
+
     expect(typeof debouncedFn).toBe("function");
   });
 
@@ -969,22 +971,22 @@ describe("SearchBar.vue Integration", () => {
         },
         loading: false,
       },
-      
+
       // Mock integration methods
-      executeSearch: vi.fn(async (query: string) => {
+      executeSearch: vi.fn(async () => {
         integrationInstance.searchObj.loading = true;
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         integrationInstance.searchObj.data.results = [
           { id: 1, content: "Result 1" },
           { id: 2, content: "Result 2" },
         ];
         integrationInstance.searchObj.loading = false;
       }),
-      
+
       applyTransforms: vi.fn((results: any[], transforms: any[]) => {
         return results.filter(() => transforms.length > 0);
       }),
-      
+
       exportResults: vi.fn((format: string) => {
         const data = integrationInstance.searchObj.data.results;
         return {
@@ -999,7 +1001,7 @@ describe("SearchBar.vue Integration", () => {
   // Test 56: Search execution integration
   it("should execute search and update results", async () => {
     await integrationInstance.executeSearch("test query");
-    
+
     expect(integrationInstance.searchObj.data.results).toHaveLength(2);
     expect(integrationInstance.searchObj.loading).toBe(false);
   });
@@ -1008,7 +1010,7 @@ describe("SearchBar.vue Integration", () => {
   it("should apply transforms to results", () => {
     const results = [{ id: 1 }, { id: 2 }, { id: 3 }];
     const transforms = [{ name: "filter" }];
-    
+
     const filtered = integrationInstance.applyTransforms(results, transforms);
     expect(filtered).toHaveLength(3);
   });
@@ -1016,7 +1018,7 @@ describe("SearchBar.vue Integration", () => {
   // Test 58: Results export
   it("should export results in specified format", () => {
     integrationInstance.searchObj.data.results = [{ id: 1 }, { id: 2 }];
-    
+
     const exported = integrationInstance.exportResults("json");
     expect(exported.format).toBe("json");
     expect(exported.count).toBe(2);
@@ -1026,7 +1028,7 @@ describe("SearchBar.vue Integration", () => {
   it("should manage loading state during operations", async () => {
     const searchPromise = integrationInstance.executeSearch("test");
     expect(integrationInstance.searchObj.loading).toBe(true);
-    
+
     await searchPromise;
     expect(integrationInstance.searchObj.loading).toBe(false);
   });
@@ -1035,19 +1037,19 @@ describe("SearchBar.vue Integration", () => {
   it("should handle complete search workflow", async () => {
     // Start with empty state
     expect(integrationInstance.searchObj.data.results).toHaveLength(0);
-    
+
     // Execute search
     await integrationInstance.executeSearch("workflow test");
     expect(integrationInstance.searchObj.data.results).toHaveLength(2);
-    
+
     // Apply transforms
     integrationInstance.searchObj.data.transforms = [{ name: "sort" }];
     const transformed = integrationInstance.applyTransforms(
       integrationInstance.searchObj.data.results,
-      integrationInstance.searchObj.data.transforms
+      integrationInstance.searchObj.data.transforms,
     );
     expect(transformed).toHaveLength(2);
-    
+
     // Export results
     const exported = integrationInstance.exportResults("csv");
     expect(exported.format).toBe("csv");
@@ -1064,21 +1066,24 @@ describe("SearchBar.vue Additional Features", () => {
       // Mock additional feature methods
       autoComplete: vi.fn((input: string) => {
         const suggestions = ["SELECT", "FROM", "WHERE", "GROUP BY"];
-        return suggestions.filter(s => s.startsWith(input.toUpperCase()));
+        return suggestions.filter((s) => s.startsWith(input.toUpperCase()));
       }),
-      
+
       syntaxHighlight: vi.fn((query: string) => {
-        return query.replace(/SELECT|FROM|WHERE/g, (match) => `<span class="keyword">${match}</span>`);
+        return query.replace(
+          /SELECT|FROM|WHERE/g,
+          (match) => `<span class="keyword">${match}</span>`,
+        );
       }),
-      
+
       validateSyntax: vi.fn((query: string) => {
         return query.includes("SELECT") && query.includes("FROM");
       }),
-      
+
       formatQuery: vi.fn((query: string) => {
         return query.replace(/\s+/g, " ").trim();
       }),
-      
+
       getQueryHistory: vi.fn(() => {
         return ["SELECT * FROM logs", "SELECT count(*) FROM metrics"];
       }),
@@ -1129,7 +1134,7 @@ describe("SearchBar.vue Additional Features", () => {
   it("should handle complex syntax highlighting", () => {
     const query = "SELECT field FROM table WHERE condition";
     const highlighted = featureInstance.syntaxHighlight(query);
-    
+
     expect(highlighted).toContain("SELECT");
     expect(highlighted).toContain("FROM");
     expect(highlighted).toContain("WHERE");
@@ -1152,16 +1157,16 @@ describe("SearchBar.vue Additional Features", () => {
   // Test 70: Feature integration
   it("should integrate multiple features", () => {
     const query = "  SELECT   *   FROM   logs  ";
-    
+
     // Format first
     const formatted = featureInstance.formatQuery(query);
-    
+
     // Validate syntax
     const isValid = featureInstance.validateSyntax(formatted);
-    
+
     // Apply highlighting
     const highlighted = featureInstance.syntaxHighlight(formatted);
-    
+
     expect(formatted).toBe("SELECT * FROM logs");
     expect(isValid).toBe(true);
     expect(highlighted).toContain('<span class="keyword">SELECT</span>');
@@ -1171,9 +1176,9 @@ describe("SearchBar.vue Additional Features", () => {
   it("should handle performance with many suggestions", () => {
     const largeSuggestionSet = Array.from({ length: 1000 }, (_, i) => `SUGGESTION_${i}`);
     featureInstance.autoComplete = vi.fn((input: string) => {
-      return largeSuggestionSet.filter(s => s.includes(input.toUpperCase()));
+      return largeSuggestionSet.filter((s) => s.includes(input.toUpperCase()));
     });
-    
+
     const results = featureInstance.autoComplete("SUGGESTION_1");
     expect(results.length).toBeGreaterThan(0);
   });
@@ -1184,7 +1189,7 @@ describe("SearchBar.vue Additional Features", () => {
       featureInstance.queryHistory = [];
       featureInstance.suggestions = [];
     });
-    
+
     cleanup();
     expect(cleanup).toHaveBeenCalled();
   });
@@ -1196,11 +1201,11 @@ describe("SearchBar.vue Additional Features", () => {
       onResultsUpdate: vi.fn(),
       onError: vi.fn(),
     };
-    
+
     eventHandlers.onQueryChange("new query");
     eventHandlers.onResultsUpdate([{ id: 1 }]);
     eventHandlers.onError(new Error("test error"));
-    
+
     expect(eventHandlers.onQueryChange).toHaveBeenCalledWith("new query");
     expect(eventHandlers.onResultsUpdate).toHaveBeenCalledWith([{ id: 1 }]);
     expect(eventHandlers.onError).toHaveBeenCalled();
@@ -1210,17 +1215,17 @@ describe("SearchBar.vue Additional Features", () => {
   it("should handle state persistence", () => {
     const statePersistence = {
       saveState: vi.fn((state: any) => {
-        localStorage.setItem('searchBarState', JSON.stringify(state));
+        localStorage.setItem("searchBarState", JSON.stringify(state));
       }),
       loadState: vi.fn(() => {
-        const saved = localStorage.getItem('searchBarState');
+        const saved = localStorage.getItem("searchBarState");
         return saved ? JSON.parse(saved) : {};
       }),
     };
-    
+
     const testState = { query: "test", filters: [] };
     statePersistence.saveState(testState);
-    
+
     expect(statePersistence.saveState).toHaveBeenCalledWith(testState);
   });
 
@@ -1233,23 +1238,26 @@ describe("SearchBar.vue Additional Features", () => {
       loading: false,
       errors: [],
     };
-    
+
     // Simulate user interactions
     state.query = "SELECT * FROM logs WHERE level = 'error'";
     state.loading = true;
-    
+
     // Validate the query
     const isValid = featureInstance.validateSyntax(state.query);
     expect(isValid).toBe(true);
-    
+
     // Format the query
     const formatted = featureInstance.formatQuery(state.query);
     expect(formatted).toBe(state.query.trim());
-    
+
     // Simulate results
-    state.results = [{ id: 1, level: "error" }, { id: 2, level: "error" }];
+    state.results = [
+      { id: 1, level: "error" },
+      { id: 2, level: "error" },
+    ];
     state.loading = false;
-    
+
     // Verify final state
     expect(state.results).toHaveLength(2);
     expect(state.loading).toBe(false);
@@ -1328,7 +1336,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
         organizationIdentifier: "test-org",
         shouldIgnoreWatcher: false,
       },
-      
+
       // Mock refs and reactive properties
       functionModel: null,
       functionOptions: [{ name: "func1", function: "content1" }],
@@ -1349,46 +1357,45 @@ describe("SearchBar.vue Actual Component Methods", () => {
       regionFilter: "",
       favoriteViews: [],
       localSavedViews: [],
-      
-      // Mock Quasar
-      $q: {
-        notify: vi.fn(),
-      },
-      
+
+      notify: vi.fn(),
+
       // Mock emit
       $emit: vi.fn(),
-      
+
       // Mock methods from component
       searchData: vi.fn(() => {
         if (!componentInstance.searchObj.loading) {
           componentInstance.$emit("searchdata");
         }
       }),
-      
-      changeFunctionName: vi.fn((value) => {
+
+      changeFunctionName: vi.fn(() => {
         // Mock function name change logic
       }),
-      
+
       createNewValue: vi.fn((inputValue, doneFn) => {
         doneFn(inputValue);
       }),
-      
+
       updateSelectedValue: vi.fn(() => {
-        if (componentInstance.functionModel && 
-            !componentInstance.functionOptions.includes(componentInstance.functionModel)) {
+        if (
+          componentInstance.functionModel &&
+          !componentInstance.functionOptions.includes(componentInstance.functionModel)
+        ) {
           componentInstance.functionOptions.push(componentInstance.functionModel);
         }
       }),
-      
+
       handleDeleteSavedView: vi.fn((item) => {
         componentInstance.savedViewDropdownModel = false;
         componentInstance.deleteViewID = item.view_id;
         componentInstance.confirmDelete = true;
       }),
-      
+
       handleUpdateSavedView: vi.fn((item) => {
         if (componentInstance.searchObj.data.stream.selectedStream.length === 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No stream available to update save view.",
           });
@@ -1398,26 +1405,26 @@ describe("SearchBar.vue Actual Component Methods", () => {
         componentInstance.updateViewObj = item;
         componentInstance.confirmUpdate = true;
       }),
-      
+
       confirmDeleteSavedViews: vi.fn(() => {
         componentInstance.deleteSavedViews();
       }),
-      
+
       toggleCustomDownloadDialog: vi.fn(() => {
         componentInstance.customDownloadDialog = true;
       }),
-      
+
       confirmUpdateSavedViews: vi.fn(() => {
         componentInstance.updateSavedViews(
           componentInstance.updateViewObj.view_id,
-          componentInstance.updateViewObj.view_name
+          componentInstance.updateViewObj.view_name,
         );
       }),
-      
+
       downloadRangeData: vi.fn(() => {
         let initNumber = parseInt(componentInstance.downloadCustomInitialNumber);
         if (initNumber < 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "Initial number must be positive number.",
             color: "negative",
             position: "bottom",
@@ -1425,18 +1432,18 @@ describe("SearchBar.vue Actual Component Methods", () => {
           });
           return;
         }
-        componentInstance.searchObj.data.customDownloadQueryObj.query.from = 
+        componentInstance.searchObj.data.customDownloadQueryObj.query.from =
           initNumber === 0 ? 0 : initNumber - 1;
-        componentInstance.searchObj.data.customDownloadQueryObj.query.size = 
+        componentInstance.searchObj.data.customDownloadQueryObj.query.size =
           componentInstance.downloadCustomRange;
       }),
-      
+
       handleKeyDown: vi.fn((e) => {
         if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           componentInstance.handleRunQueryFn();
         }
       }),
-      
+
       updateQueryValue: vi.fn((value) => {
         componentInstance.searchObj.data.editorValue = value;
 
@@ -1462,36 +1469,39 @@ describe("SearchBar.vue Actual Component Methods", () => {
         }
 
         // Matches real guard logic in SearchBar.vue — auto-enable SQL mode
-        if (componentInstance.searchObj.meta.sqlMode === false &&
-            componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
-            value.toLowerCase().includes("select") &&
-            value.toLowerCase().includes("from")) {
+        if (
+          componentInstance.searchObj.meta.sqlMode === false &&
+          componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
+          value.toLowerCase().includes("select") &&
+          value.toLowerCase().includes("from")
+        ) {
           componentInstance.searchObj.meta.sqlMode = true;
           componentInstance.searchObj.meta.sqlModeManualTrigger = true;
         }
       }),
-      
+
       handleEscKey: vi.fn((event) => {
         if (event.key === "Escape") {
           componentInstance.isFocused = false;
         }
       }),
-      
+
       updateDateTime: vi.fn(async (value) => {
         componentInstance.searchObj.data.datetime = {
           startTime: value.startTime,
           endTime: value.endTime,
-          relativeTimePeriod: value.relativeTimePeriod || 
+          relativeTimePeriod:
+            value.relativeTimePeriod ||
             componentInstance.searchObj.data.datetime.relativeTimePeriod,
           type: value.relativeTimePeriod ? "relative" : "absolute",
           selectedDate: value.selectedDate,
           selectedTime: value.selectedTime,
-          queryRangeRestrictionMsg: 
+          queryRangeRestrictionMsg:
             componentInstance.searchObj.data.datetime.queryRangeRestrictionMsg || "",
-          queryRangeRestrictionInHour: 
+          queryRangeRestrictionInHour:
             componentInstance.searchObj.data.datetime.queryRangeRestrictionInHour || 0,
         };
-        
+
         if (
           componentInstance.searchObj.loading === false &&
           componentInstance.searchObj.data.stream.selectedStream.length > 0
@@ -1499,19 +1509,19 @@ describe("SearchBar.vue Actual Component Methods", () => {
           componentInstance.searchObj.loading = true;
           componentInstance.searchObj.runQuery = true;
         }
-        
+
         if (value.valueType === "relative") {
           componentInstance.$emit("searchdata");
         }
       }),
-      
+
       updateTimezone: vi.fn(() => {
         componentInstance.$emit("onChangeTimezone");
       }),
-      
-      downloadLogs: vi.fn(async (data, format) => {
+
+      downloadLogs: vi.fn(async (data) => {
         if (data.length === 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No data available to download.",
           });
@@ -1520,43 +1530,44 @@ describe("SearchBar.vue Actual Component Methods", () => {
         // Mock download logic
         return Promise.resolve();
       }),
-      
+
       saveFunction: vi.fn(() => {
         const content = componentInstance.searchObj.data.tempFunctionContent;
-        let fnName = componentInstance.isSavedFunctionAction === "create" 
-          ? componentInstance.savedFunctionName 
-          : componentInstance.savedFunctionSelectedName.name;
-          
+        let fnName =
+          componentInstance.isSavedFunctionAction === "create"
+            ? componentInstance.savedFunctionName
+            : componentInstance.savedFunctionSelectedName.name;
+
         if (content.trim() === "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "warning",
             message: "The function field must contain a value and cannot be left empty.",
           });
           return;
         }
-        
+
         const pattern = /^[a-zA-Z][a-zA-Z0-9_]*$/;
         if (!pattern.test(fnName)) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "Function name is not valid.",
           });
           return;
         }
       }),
-      
+
       resetFunctionContent: vi.fn(() => {
         componentInstance.isSavedFunctionAction = "create";
         componentInstance.savedFunctionName = "";
       }),
-      
+
       resetEditorLayout: vi.fn(() => {
         // Mock reset editor layout
       }),
-      
+
       populateFunctionImplementation: vi.fn((fnValue, flag = false) => {
         if (flag) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "positive",
             message: `${fnValue.name} function applied successfully.`,
             timeout: 3000,
@@ -1565,37 +1576,37 @@ describe("SearchBar.vue Actual Component Methods", () => {
         componentInstance.searchObj.data.tempFunctionName = fnValue.name;
         componentInstance.searchObj.data.tempFunctionContent = fnValue.function;
       }),
-      
+
       fnSavedFunctionDialog: vi.fn(() => {
         const content = componentInstance.searchObj.data.tempFunctionContent;
         if (content === "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No function definition found.",
           });
           return;
         }
       }),
-      
+
       showConfirmDialog: vi.fn((callback) => {
         componentInstance.confirmCallback = callback;
       }),
-      
+
       showSavedViewConfirmDialog: vi.fn((callback) => {
         componentInstance.confirmCallback = callback;
       }),
-      
+
       cancelConfirmDialog: vi.fn(() => {
         componentInstance.confirmCallback = null;
       }),
-      
+
       confirmDialogOK: vi.fn(() => {
         if (componentInstance.confirmCallback) {
           componentInstance.confirmCallback();
         }
         componentInstance.confirmCallback = null;
       }),
-      
+
       filterFn: vi.fn((val, update) => {
         update(() => {
           if (val === "") {
@@ -1603,19 +1614,19 @@ describe("SearchBar.vue Actual Component Methods", () => {
           } else {
             const needle = val.toLowerCase();
             componentInstance.functionOptions = componentInstance.searchObj.data.transforms.filter(
-              (v) => v.name?.toLowerCase().indexOf(needle) > -1
+              (v) => v.name?.toLowerCase().indexOf(needle) > -1,
             );
           }
         });
       }),
-      
+
       onRefreshIntervalUpdate: vi.fn(() => {
         componentInstance.$emit("onChangeInterval");
       }),
-      
+
       fnSavedView: vi.fn(() => {
         if (componentInstance.searchObj.data.stream.selectedStream.length === 0) {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "No stream available to save view.",
           });
@@ -1624,22 +1635,24 @@ describe("SearchBar.vue Actual Component Methods", () => {
         componentInstance.isSavedViewAction = "create";
         componentInstance.savedViewName = "";
       }),
-      
+
       applySavedView: vi.fn(async (item) => {
         // Mock apply saved view logic
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: `${item.view_name} view applied successfully.`,
           color: "positive",
           position: "bottom",
           timeout: 1000,
         });
       }),
-      
+
       handleSavedView: vi.fn(() => {
         if (componentInstance.isSavedViewAction === "create") {
-          if (componentInstance.savedViewName === "" || 
-              !/^[A-Za-z0-9 \-\_]+$/.test(componentInstance.savedViewName)) {
-            componentInstance.$q.notify({
+          if (
+            componentInstance.savedViewName === "" ||
+            !/^[A-Za-z0-9 \-_]+$/.test(componentInstance.savedViewName)
+          ) {
+            componentInstance.notify({
               message: "Please provide valid view name.",
               color: "negative",
               position: "bottom",
@@ -1650,16 +1663,16 @@ describe("SearchBar.vue Actual Component Methods", () => {
           }
         }
       }),
-      
+
       deleteSavedViews: vi.fn(async () => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: "View deleted successfully.",
           color: "positive",
           position: "bottom",
           timeout: 1000,
         });
       }),
-      
+
       getSearchObj: vi.fn(() => {
         let savedSearchObj = JSON.parse(JSON.stringify(componentInstance.searchObj));
         delete savedSearchObj.data.queryResults;
@@ -1667,10 +1680,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
         delete savedSearchObj.data.sortedQueryResults;
         return savedSearchObj;
       }),
-      
+
       createSavedViews: vi.fn((viewName) => {
         if (viewName.trim() === "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "Please provide valid view name.",
             color: "negative",
             position: "bottom",
@@ -1678,42 +1691,42 @@ describe("SearchBar.vue Actual Component Methods", () => {
           });
           return;
         }
-        
-        componentInstance.$q.notify({
+
+        componentInstance.notify({
           message: "View created successfully.",
           color: "positive",
           position: "bottom",
           timeout: 1000,
         });
       }),
-      
-      updateSavedViews: vi.fn((viewID, viewName) => {
-        componentInstance.$q.notify({
+
+      updateSavedViews: vi.fn(() => {
+        componentInstance.notify({
           message: "View updated successfully.",
           color: "positive",
           position: "bottom",
           timeout: 1000,
         });
       }),
-      
+
       shareLink: vi.fn(async () => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           type: "positive",
           message: "Link Copied Successfully!",
           timeout: 5000,
         });
       }),
-      
+
       showSearchHistoryfn: vi.fn(() => {
         componentInstance.$emit("showSearchHistory");
       }),
-      
-      getFieldList: vi.fn((stream, streamFields, interestingFields, isQuickMode) => {
+
+      getFieldList: vi.fn((stream, streamFields, interestingFields) => {
         return streamFields
           .filter((item) => interestingFields.includes(item.name))
           .map((item) => item.name);
       }),
-      
+
       buildStreamQuery: vi.fn((stream, fieldList, isQuickMode) => {
         const template = 'SELECT [FIELD_LIST] FROM "[STREAM_NAME]"';
         return template
@@ -1721,28 +1734,29 @@ describe("SearchBar.vue Actual Component Methods", () => {
           .replace(
             "[FIELD_LIST]",
             fieldList && fieldList.length > 0 && isQuickMode
-              ? fieldList
-                  .map((field: string) => quoteSqlIdentifierForTest(field))
-                  .join(",")
+              ? fieldList.map((field: string) => quoteSqlIdentifierForTest(field)).join(",")
               : "*",
           );
       }),
-      
+
       resetFilters: vi.fn(() => {
         componentInstance.searchObj.data.query = "";
         componentInstance.searchObj.data.editorValue = "";
       }),
-      
+
       loadSavedView: vi.fn(() => {
-        if (componentInstance.searchObj.data.savedViews && componentInstance.searchObj.data.savedViews.length === 0) {
+        if (
+          componentInstance.searchObj.data.savedViews &&
+          componentInstance.searchObj.data.savedViews.length === 0
+        ) {
           // Mock getSavedViews call
         }
       }),
-      
+
       handleFavoriteSavedView: vi.fn((row, flag) => {
         if (!flag) {
           if (componentInstance.favoriteViews.length >= 10) {
-            componentInstance.$q.notify({
+            componentInstance.notify({
               message: "You can only save 10 views.",
               color: "info",
               position: "bottom",
@@ -1751,7 +1765,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
             return;
           }
           componentInstance.favoriteViews.push(row.view_id);
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "View added to favorites.",
             color: "positive",
             position: "bottom",
@@ -1762,7 +1776,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
           if (index > -1) {
             componentInstance.favoriteViews.splice(index, 1);
           }
-          componentInstance.$q.notify({
+          componentInstance.notify({
             message: "View removed from favorites.",
             color: "positive",
             position: "bottom",
@@ -1770,22 +1784,22 @@ describe("SearchBar.vue Actual Component Methods", () => {
           });
         }
       }),
-      
+
       filterSavedViewFn: vi.fn((rows, terms) => {
         if (terms === "") return [];
         terms = terms.toLowerCase();
-        return rows.filter(row => row.view_name.toLowerCase().includes(terms));
+        return rows.filter((row) => row.view_name.toLowerCase().includes(terms));
       }),
-      
+
       regionFilterMethod: vi.fn((node, filter) => {
         const filt = filter.toLowerCase();
         return (node && node.label && node.label.toLowerCase().indexOf(filt) > -1) || false;
       }),
-      
+
       resetRegionFilter: vi.fn(() => {
         componentInstance.regionFilter = "";
       }),
-      
+
       handleRegionsSelection: vi.fn((item, isSelected) => {
         if (isSelected) {
           const index = componentInstance.searchObj.meta.regions.indexOf(item);
@@ -1796,15 +1810,15 @@ describe("SearchBar.vue Actual Component Methods", () => {
           componentInstance.searchObj.meta.regions.push(item);
         }
       }),
-      
+
       handleQuickMode: vi.fn(() => {
         componentInstance.$emit("handleQuickModeChange");
       }),
-      
+
       handleHistogramMode: vi.fn(() => {
         // Mock histogram mode logic (toggle is on toolbar, not in menu)
       }),
-      
+
       handleRunQueryFn: vi.fn(() => {
         if (componentInstance.searchObj.meta.logsVisualizeToggle === "visualize") {
           componentInstance.$emit("handleRunQueryFn");
@@ -1812,12 +1826,14 @@ describe("SearchBar.vue Actual Component Methods", () => {
           // Mock handleRunQuery call
         }
       }),
-      
+
       onLogsVisualizeToggleUpdate: vi.fn((value) => {
-        if (value === "visualize" && 
-            !componentInstance.searchObj.meta.sqlMode && 
-            componentInstance.searchObj.data.stream.selectedStream.length > 1) {
-          componentInstance.$q.notify({
+        if (
+          value === "visualize" &&
+          !componentInstance.searchObj.meta.sqlMode &&
+          componentInstance.searchObj.data.stream.selectedStream.length > 1
+        ) {
+          componentInstance.notify({
             type: "negative",
             message: "Please enable SQL mode or select a single stream to use timechart",
           });
@@ -1825,20 +1841,22 @@ describe("SearchBar.vue Actual Component Methods", () => {
         }
         componentInstance.searchObj.meta.logsVisualizeToggle = value;
       }),
-      
+
       addJobScheduler: vi.fn(async () => {
         if (componentInstance.searchObj.meta.jobId !== "") {
-          componentInstance.$q.notify({
+          componentInstance.notify({
             type: "negative",
             message: "Job Already Scheduled , please change some parameters to schedule new job",
             timeout: 3000,
           });
           return;
         }
-        
-        if (componentInstance.searchObj.meta.jobRecords > 100000 || 
-            componentInstance.searchObj.meta.jobRecords <= 0) {
-          componentInstance.$q.notify({
+
+        if (
+          componentInstance.searchObj.meta.jobRecords > 100000 ||
+          componentInstance.searchObj.meta.jobRecords <= 0
+        ) {
+          componentInstance.notify({
             type: "negative",
             message: "Job Scheduler should be between 1 and 100000",
             timeout: 3000,
@@ -1846,32 +1864,32 @@ describe("SearchBar.vue Actual Component Methods", () => {
           return;
         }
       }),
-      
+
       createScheduleJob: vi.fn(() => {
         componentInstance.searchObj.meta.jobRecords = 100;
       }),
-      
+
       checkQuery: vi.fn((query) => {
         return query === "expected_query";
       }),
-      
+
       checkFnQuery: vi.fn((fnQuery) => {
         return fnQuery === "expected_function";
       }),
-      
+
       updateTransforms: vi.fn(() => {
         // Mock update transforms logic
       }),
-      
+
       selectTransform: vi.fn((item, isSelected) => {
         if (componentInstance.searchObj.data.transformType === "function" && item) {
           componentInstance.populateFunctionImplementation(item, isSelected);
         }
-        
+
         if (componentInstance.searchObj.data.transformType === "action" && item) {
           componentInstance.updateActionSelection(item);
         }
-        
+
         if (typeof item === "object" && item !== null) {
           componentInstance.searchObj.data.selectedTransform = {
             ...item,
@@ -1879,15 +1897,15 @@ describe("SearchBar.vue Actual Component Methods", () => {
           };
         }
       }),
-      
+
       updateActionSelection: vi.fn((item) => {
-        componentInstance.$q.notify({
+        componentInstance.notify({
           message: `${item?.name} action applied successfully`,
           timeout: 3000,
           color: "secondary",
         });
       }),
-      
+
       updateEditorWidth: vi.fn(() => {
         if (componentInstance.searchObj.data.transformType) {
           if (componentInstance.searchObj.meta.showTransformEditor) {
@@ -1925,9 +1943,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should add function to options when not included", () => {
     componentInstance.functionModel = { name: "newFunc", function: "content" };
     componentInstance.functionOptions = [];
-    
+
     componentInstance.updateSelectedValue();
-    
+
     expect(componentInstance.functionOptions).toContain(componentInstance.functionModel);
   });
 
@@ -1935,7 +1953,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set up delete confirmation", () => {
     const item = { view_id: "view123", view_name: "Test View" };
     componentInstance.handleDeleteSavedView(item);
-    
+
     expect(componentInstance.savedViewDropdownModel).toBe(false);
     expect(componentInstance.deleteViewID).toBe("view123");
     expect(componentInstance.confirmDelete).toBe(true);
@@ -1945,10 +1963,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify when no streams available for update", () => {
     componentInstance.searchObj.data.stream.selectedStream = [];
     const item = { view_id: "view123", view_name: "Test View" };
-    
+
     componentInstance.handleUpdateSavedView(item);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No stream available to update save view.",
     });
@@ -1958,9 +1976,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set up update confirmation when streams available", () => {
     componentInstance.searchObj.data.stream.selectedStream = ["test-stream"];
     const item = { view_id: "view123", view_name: "Test View" };
-    
+
     componentInstance.handleUpdateSavedView(item);
-    
+
     expect(componentInstance.savedViewDropdownModel).toBe(false);
     expect(componentInstance.updateViewObj).toEqual(item);
     expect(componentInstance.confirmUpdate).toBe(true);
@@ -1976,9 +1994,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set correct query parameters for download", () => {
     componentInstance.downloadCustomInitialNumber = 5;
     componentInstance.downloadCustomRange = 50;
-    
+
     componentInstance.downloadRangeData();
-    
+
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.from).toBe(4);
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(50);
   });
@@ -1986,10 +2004,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 85: downloadRangeData with negative number
   it("should notify error for negative initial number", () => {
     componentInstance.downloadCustomInitialNumber = -1;
-    
+
     componentInstance.downloadRangeData();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Initial number must be positive number.",
       color: "negative",
       position: "bottom",
@@ -2000,7 +2018,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 86: updateQueryValue with SQL query
   it("should enable SQL mode for SELECT queries", () => {
     componentInstance.updateQueryValue("SELECT * FROM logs");
-    
+
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
     expect(componentInstance.searchObj.meta.sqlModeManualTrigger).toBe(true);
     expect(componentInstance.searchObj.data.editorValue).toBe("SELECT * FROM logs");
@@ -2016,9 +2034,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       selectedDate: { from: "2024-01-01" },
       selectedTime: { startTime: "00:00" },
     };
-    
+
     await componentInstance.updateDateTime(newDateTime);
-    
+
     expect(componentInstance.searchObj.data.datetime.startTime).toBe(123456789);
     expect(componentInstance.searchObj.data.datetime.endTime).toBe(987654321);
     expect(componentInstance.searchObj.data.datetime.type).toBe("relative");
@@ -2034,8 +2052,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 89: downloadLogs with no data
   it.skip("should notify when no data to download", async () => {
     await componentInstance.downloadLogs([], "csv");
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No data available to download.",
     });
@@ -2045,8 +2063,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify warning for empty function content", () => {
     componentInstance.searchObj.data.tempFunctionContent = "";
     componentInstance.saveFunction();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "warning",
       message: "The function field must contain a value and cannot be left empty.",
     });
@@ -2057,8 +2075,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.tempFunctionContent = "test content";
     componentInstance.savedFunctionName = "123invalid";
     componentInstance.saveFunction();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Function name is not valid.",
     });
@@ -2068,8 +2086,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify success when flag is true", () => {
     const fnValue = { name: "testFunc", function: "content" };
     componentInstance.populateFunctionImplementation(fnValue, true);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
       message: "testFunc function applied successfully.",
       timeout: 3000,
@@ -2081,8 +2099,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error when no function definition", () => {
     componentInstance.searchObj.data.tempFunctionContent = "";
     componentInstance.fnSavedFunctionDialog();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No function definition found.",
     });
@@ -2096,9 +2114,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       { name: "anotherFunction" },
       { name: "helper" },
     ];
-    
+
     componentInstance.filterFn("test", update);
-    
+
     expect(componentInstance.functionOptions).toHaveLength(1);
     expect(componentInstance.functionOptions[0].name).toBe("testFunction");
   });
@@ -2113,8 +2131,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error when no streams for saving view", () => {
     componentInstance.searchObj.data.stream.selectedStream = [];
     componentInstance.fnSavedView();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "No stream available to save view.",
     });
@@ -2124,8 +2142,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error for invalid view name", () => {
     componentInstance.savedViewName = "invalid@name!";
     componentInstance.handleSavedView();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Please provide valid view name.",
       color: "negative",
       position: "bottom",
@@ -2136,7 +2154,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 98: getSearchObj method
   it("should return cleaned search object", () => {
     const result = componentInstance.getSearchObj();
-    
+
     expect(result).not.toHaveProperty("data.queryResults");
     expect(result).not.toHaveProperty("data.histogram");
     expect(result).toHaveProperty("data.stream");
@@ -2145,10 +2163,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 99: handleFavoriteSavedView with limit exceeded
   it("should notify when favorite limit exceeded", () => {
     componentInstance.favoriteViews = Array.from({ length: 10 }, (_, i) => `view${i}`);
-    
+
     componentInstance.handleFavoriteSavedView({ view_id: "new_view" }, false);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "You can only save 10 views.",
       color: "info",
       position: "bottom",
@@ -2163,9 +2181,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       { view_name: "Production Logs" },
       { view_name: "Test Results" },
     ];
-    
+
     const filtered = componentInstance.filterSavedViewFn(rows, "test");
-    
+
     expect(filtered).toHaveLength(2);
     expect(filtered[0].view_name).toBe("My Test View");
     expect(filtered[1].view_name).toBe("Test Results");
@@ -2175,9 +2193,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should filter regions by label", () => {
     const node = { label: "US East" };
     const result = componentInstance.regionFilterMethod(node, "east");
-    
+
     expect(result).toBe(true);
-    
+
     const noMatch = componentInstance.regionFilterMethod(node, "west");
     expect(noMatch).toBe(false);
   });
@@ -2186,7 +2204,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should add region when not selected", () => {
     componentInstance.searchObj.meta.regions = [];
     componentInstance.handleRegionsSelection("us-east", false);
-    
+
     expect(componentInstance.searchObj.meta.regions).toContain("us-east");
   });
 
@@ -2194,7 +2212,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should remove region when selected", () => {
     componentInstance.searchObj.meta.regions = ["us-east", "us-west"];
     componentInstance.handleRegionsSelection("us-east", true);
-    
+
     expect(componentInstance.searchObj.meta.regions).not.toContain("us-east");
     expect(componentInstance.searchObj.meta.regions).toContain("us-west");
   });
@@ -2209,10 +2227,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error for invalid visualize state", () => {
     componentInstance.searchObj.meta.sqlMode = false;
     componentInstance.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
-    
+
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Please enable SQL mode or select a single stream to use timechart",
     });
@@ -2221,10 +2239,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 106: addJobScheduler with existing job
   it("should notify error when job already scheduled", async () => {
     componentInstance.searchObj.meta.jobId = "existing_job";
-    
+
     await componentInstance.addJobScheduler();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Already Scheduled , please change some parameters to schedule new job",
       timeout: 3000,
@@ -2235,10 +2253,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error for invalid job record count", async () => {
     componentInstance.searchObj.meta.jobId = "";
     componentInstance.searchObj.meta.jobRecords = 200000;
-    
+
     await componentInstance.addJobScheduler();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Scheduler should be between 1 and 100000",
       timeout: 3000,
@@ -2267,9 +2285,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should populate function implementation for function transform", () => {
     componentInstance.searchObj.data.transformType = "function";
     const item = { name: "testFunc", function: "content" };
-    
+
     componentInstance.selectTransform(item, true);
-    
+
     expect(componentInstance.populateFunctionImplementation).toHaveBeenCalledWith(item, true);
     expect(componentInstance.searchObj.data.selectedTransform).toEqual({
       ...item,
@@ -2281,9 +2299,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should update action selection for action transform", () => {
     componentInstance.searchObj.data.transformType = "action";
     const item = { name: "testAction", id: "1" };
-    
+
     componentInstance.selectTransform(item, false);
-    
+
     expect(componentInstance.updateActionSelection).toHaveBeenCalledWith(item);
     expect(componentInstance.searchObj.data.selectedTransform).toEqual({
       ...item,
@@ -2295,8 +2313,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify success for action selection", () => {
     const item = { name: "testAction" };
     componentInstance.updateActionSelection(item);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "testAction action applied successfully",
       timeout: 3000,
       color: "secondary",
@@ -2307,9 +2325,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set correct width when transform editor is shown", () => {
     componentInstance.searchObj.data.transformType = "function";
     componentInstance.searchObj.meta.showTransformEditor = true;
-    
+
     componentInstance.updateEditorWidth();
-    
+
     expect(componentInstance.searchObj.config.fnSplitterModel).toBe(60);
   });
 
@@ -2317,30 +2335,26 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set correct width when transform editor is hidden", () => {
     componentInstance.searchObj.data.transformType = "function";
     componentInstance.searchObj.meta.showTransformEditor = false;
-    
+
     componentInstance.updateEditorWidth();
-    
+
     expect(componentInstance.searchObj.config.fnSplitterModel).toBe(99.5);
   });
 
   // Test 116: getFieldList method
   it("should return filtered field names", () => {
-    const streamFields = [
-      { name: "field1" },
-      { name: "field2" },
-      { name: "field3" },
-    ];
+    const streamFields = [{ name: "field1" }, { name: "field2" }, { name: "field3" }];
     const interestingFields = ["field1", "field3"];
-    
+
     const result = componentInstance.getFieldList("stream", streamFields, interestingFields, true);
-    
+
     expect(result).toEqual(["field1", "field3"]);
   });
 
   // Test 117: buildStreamQuery method with fields
   it("should build correct stream query with field list", () => {
     const result = componentInstance.buildStreamQuery("logs", ["field1", "field2"], true);
-    
+
     expect(result).toBe('SELECT field1,field2 FROM "logs"');
   });
 
@@ -2399,7 +2413,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 118: buildStreamQuery method with no fields
   it("should build correct stream query with wildcard", () => {
     const result = componentInstance.buildStreamQuery("logs", [], false);
-    
+
     expect(result).toBe('SELECT * FROM "logs"');
   });
 
@@ -2407,9 +2421,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should reset query and editor value", () => {
     componentInstance.searchObj.data.query = "existing query";
     componentInstance.searchObj.data.editorValue = "existing value";
-    
+
     componentInstance.resetFilters();
-    
+
     expect(componentInstance.searchObj.data.query).toBe("");
     expect(componentInstance.searchObj.data.editorValue).toBe("");
   });
@@ -2424,9 +2438,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set isFocused to false on Escape key", () => {
     componentInstance.isFocused = true;
     const event = { key: "Escape" };
-    
+
     componentInstance.handleEscKey(event);
-    
+
     expect(componentInstance.isFocused).toBe(false);
   });
 
@@ -2434,9 +2448,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should not change isFocused for other keys", () => {
     componentInstance.isFocused = true;
     const event = { key: "Enter" };
-    
+
     componentInstance.handleEscKey(event);
-    
+
     expect(componentInstance.isFocused).toBe(true);
   });
 
@@ -2444,15 +2458,15 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should process download for valid data", async () => {
     const data = [{ id: 1, log: "test log" }];
     const result = await componentInstance.downloadLogs(data, "json");
-    
+
     expect(result).toBeUndefined();
   });
 
   // Test 124: createSavedViews with empty name after trim
   it("should notify error for empty view name after trim", () => {
     componentInstance.createSavedViews("   ");
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Please provide valid view name.",
       color: "negative",
       position: "bottom",
@@ -2463,8 +2477,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 125: createSavedViews with valid name
   it("should create view with valid name", () => {
     componentInstance.createSavedViews("Valid View Name");
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View created successfully.",
       color: "positive",
       position: "bottom",
@@ -2475,8 +2489,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 126: shareLink method
   it("should show success notification on link copy", async () => {
     await componentInstance.shareLink();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
       message: "Link Copied Successfully!",
       timeout: 5000,
@@ -2486,10 +2500,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 127: applySavedView method
   it("should apply saved view and show success notification", async () => {
     const item = { view_name: "Test View", view_id: "123" };
-    
+
     await componentInstance.applySavedView(item);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Test View view applied successfully.",
       color: "positive",
       position: "bottom",
@@ -2501,9 +2515,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should reset function action and name", () => {
     componentInstance.isSavedFunctionAction = "update";
     componentInstance.savedFunctionName = "TestFunction";
-    
+
     componentInstance.resetFunctionContent();
-    
+
     expect(componentInstance.isSavedFunctionAction).toBe("create");
     expect(componentInstance.savedFunctionName).toBe("");
   });
@@ -2512,8 +2526,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should populate function without notification", () => {
     const fnValue = { name: "testFunc", function: "content" };
     componentInstance.populateFunctionImplementation(fnValue, false);
-    
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+
+    expect(componentInstance.notify).not.toHaveBeenCalled();
     expect(componentInstance.searchObj.data.tempFunctionName).toBe("testFunc");
     expect(componentInstance.searchObj.data.tempFunctionContent).toBe("content");
   });
@@ -2522,9 +2536,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should execute callback on confirm dialog OK", () => {
     const mockCallback = vi.fn();
     componentInstance.confirmCallback = mockCallback;
-    
+
     componentInstance.confirmDialogOK();
-    
+
     expect(mockCallback).toHaveBeenCalled();
     expect(componentInstance.confirmCallback).toBeNull();
   });
@@ -2532,57 +2546,57 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 131: confirmDialogOK without callback
   it("should handle confirm dialog OK without callback", () => {
     componentInstance.confirmCallback = null;
-    
+
     componentInstance.confirmDialogOK();
-    
+
     expect(componentInstance.confirmCallback).toBeNull();
   });
 
   // Test 132: showConfirmDialog method
   it("should set confirm callback", () => {
     const mockCallback = vi.fn();
-    
+
     componentInstance.showConfirmDialog(mockCallback);
-    
+
     expect(componentInstance.confirmCallback).toBe(mockCallback);
   });
 
   // Test 133: showSavedViewConfirmDialog method
   it("should set saved view confirm callback", () => {
     const mockCallback = vi.fn();
-    
+
     componentInstance.showSavedViewConfirmDialog(mockCallback);
-    
+
     expect(componentInstance.confirmCallback).toBe(mockCallback);
   });
 
   // Test 134: cancelConfirmDialog method
   it("should clear confirm callback", () => {
     componentInstance.confirmCallback = vi.fn();
-    
+
     componentInstance.cancelConfirmDialog();
-    
+
     expect(componentInstance.confirmCallback).toBeNull();
   });
 
   // Test 135: fnSavedView with available streams
   it("should prepare saved view creation with streams", () => {
     componentInstance.searchObj.data.stream.selectedStream = ["test-stream"];
-    
+
     componentInstance.fnSavedView();
-    
+
     expect(componentInstance.isSavedViewAction).toBe("create");
     expect(componentInstance.savedViewName).toBe("");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 136: handleSavedView with valid name
   it("should create saved view with valid name", () => {
     componentInstance.savedViewName = "Valid_View_Name";
     componentInstance.isSavedViewAction = "create";
-    
+
     componentInstance.handleSavedView();
-    
+
     expect(componentInstance.createSavedViews).toHaveBeenCalledWith("Valid_View_Name");
   });
 
@@ -2590,10 +2604,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should notify error for empty saved view name", () => {
     componentInstance.savedViewName = "";
     componentInstance.isSavedViewAction = "create";
-    
+
     componentInstance.handleSavedView();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "Please provide valid view name.",
       color: "negative",
       position: "bottom",
@@ -2604,9 +2618,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 138: loadSavedView with empty saved views
   it("should handle load saved view with empty views", () => {
     componentInstance.searchObj.data.savedViews = [];
-    
+
     componentInstance.loadSavedView();
-    
+
     // Should not throw any errors
     expect(componentInstance.searchObj.data.savedViews).toEqual([]);
   });
@@ -2614,9 +2628,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 139: loadSavedView with existing saved views
   it("should handle load saved view with existing views", () => {
     componentInstance.searchObj.data.savedViews = [{ id: 1, name: "View 1" }];
-    
+
     componentInstance.loadSavedView();
-    
+
     expect(componentInstance.searchObj.data.savedViews).toHaveLength(1);
   });
 
@@ -2624,11 +2638,11 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should add view to favorites when flag is false", () => {
     componentInstance.favoriteViews = [];
     const row = { view_id: "view123" };
-    
+
     componentInstance.handleFavoriteSavedView(row, false);
-    
+
     expect(componentInstance.favoriteViews).toContain("view123");
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View added to favorites.",
       color: "positive",
       position: "bottom",
@@ -2640,12 +2654,12 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should remove view from favorites when flag is true", () => {
     componentInstance.favoriteViews = ["view123", "view456"];
     const row = { view_id: "view123" };
-    
+
     componentInstance.handleFavoriteSavedView(row, true);
-    
+
     expect(componentInstance.favoriteViews).not.toContain("view123");
     expect(componentInstance.favoriteViews).toContain("view456");
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View removed from favorites.",
       color: "positive",
       position: "bottom",
@@ -2656,57 +2670,54 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 142: filterSavedViewFn with empty search terms
   it("should return empty array for empty search terms", () => {
     const rows = [{ view_name: "Test View" }];
-    
+
     const result = componentInstance.filterSavedViewFn(rows, "");
-    
+
     expect(result).toEqual([]);
   });
 
   // Test 143: filterSavedViewFn with no matches
   it("should return empty array when no views match", () => {
-    const rows = [
-      { view_name: "Production Logs" },
-      { view_name: "Error Tracking" },
-    ];
-    
+    const rows = [{ view_name: "Production Logs" }, { view_name: "Error Tracking" }];
+
     const result = componentInstance.filterSavedViewFn(rows, "development");
-    
+
     expect(result).toEqual([]);
   });
 
   // Test 144: resetRegionFilter method
   it("should reset region filter to empty string", () => {
     componentInstance.regionFilter = "us-east";
-    
+
     componentInstance.resetRegionFilter();
-    
+
     expect(componentInstance.regionFilter).toBe("");
   });
 
   // Test 145: regionFilterMethod with no label
   it("should return false when node has no label", () => {
     const node = {};
-    
+
     const result = componentInstance.regionFilterMethod(node, "test");
-    
+
     expect(result).toBe(false);
   });
 
   // Test 146: regionFilterMethod with case insensitive match
   it("should match case insensitively", () => {
     const node = { label: "US-EAST" };
-    
+
     const result = componentInstance.regionFilterMethod(node, "us-east");
-    
+
     expect(result).toBe(true);
   });
 
   // Test 147: handleRegionsSelection with empty regions array
   it("should initialize regions array when empty", () => {
     componentInstance.searchObj.meta.regions = [];
-    
+
     componentInstance.handleRegionsSelection("new-region", false);
-    
+
     expect(componentInstance.searchObj.meta.regions).toEqual(["new-region"]);
   });
 
@@ -2714,21 +2725,21 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should update visualize toggle for valid state", () => {
     componentInstance.searchObj.meta.sqlMode = true;
     componentInstance.searchObj.data.stream.selectedStream = ["single-stream"];
-    
+
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
-    
+
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 149: addJobScheduler with zero job records
   it("should notify error for zero job records", async () => {
     componentInstance.searchObj.meta.jobId = "";
     componentInstance.searchObj.meta.jobRecords = 0;
-    
+
     await componentInstance.addJobScheduler();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Scheduler should be between 1 and 100000",
       timeout: 3000,
@@ -2739,37 +2750,37 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should proceed with valid job scheduler parameters", async () => {
     componentInstance.searchObj.meta.jobId = "";
     componentInstance.searchObj.meta.jobRecords = 500;
-    
+
     await componentInstance.addJobScheduler();
-    
+
     // Should not show any error notifications
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 151: selectTransform with null item
   it("should not set selected transform for null item", () => {
     componentInstance.searchObj.data.transformType = "function";
-    
+
     componentInstance.selectTransform(null, false);
-    
+
     expect(componentInstance.searchObj.data.selectedTransform).toBeNull();
   });
 
   // Test 152: selectTransform with string item
   it("should not set selected transform for string item", () => {
     componentInstance.searchObj.data.transformType = "function";
-    
+
     componentInstance.selectTransform("string-item", false);
-    
+
     expect(componentInstance.searchObj.data.selectedTransform).toBeNull();
   });
 
   // Test 153: updateEditorWidth with no transform type
   it("should set default width when no transform type", () => {
     componentInstance.searchObj.data.transformType = null;
-    
+
     componentInstance.updateEditorWidth();
-    
+
     expect(componentInstance.searchObj.config.fnSplitterModel).toBe(99.5);
   });
 
@@ -2777,9 +2788,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should return empty array for empty interesting fields", () => {
     const streamFields = [{ name: "field1" }, { name: "field2" }];
     const interestingFields = [];
-    
+
     const result = componentInstance.getFieldList("stream", streamFields, interestingFields, true);
-    
+
     expect(result).toEqual([]);
   });
 
@@ -2787,32 +2798,32 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should return empty array when no fields match", () => {
     const streamFields = [{ name: "field1" }, { name: "field2" }];
     const interestingFields = ["field3", "field4"];
-    
+
     const result = componentInstance.getFieldList("stream", streamFields, interestingFields, true);
-    
+
     expect(result).toEqual([]);
   });
 
   // Test 156: buildStreamQuery with empty field list in quick mode
   it("should use wildcard for empty field list in quick mode", () => {
     const result = componentInstance.buildStreamQuery("logs", [], true);
-    
+
     expect(result).toBe('SELECT * FROM "logs"');
   });
 
   // Test 157: buildStreamQuery with fields in non-quick mode
   it("should use wildcard for non-quick mode regardless of fields", () => {
     const result = componentInstance.buildStreamQuery("logs", ["field1", "field2"], false);
-    
+
     expect(result).toBe('SELECT * FROM "logs"');
   });
 
   // Test 158: updateQueryValue with non-SQL query
   it("should not enable SQL mode for non-SQL queries", () => {
     componentInstance.searchObj.meta.sqlMode = false;
-    
+
     componentInstance.updateQueryValue("filter logs by level");
-    
+
     expect(componentInstance.searchObj.meta.sqlMode).toBe(false);
     expect(componentInstance.searchObj.data.editorValue).toBe("filter logs by level");
   });
@@ -2820,7 +2831,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 159: updateQueryValue with empty query
   it("should handle empty query value", () => {
     componentInstance.updateQueryValue("");
-    
+
     expect(componentInstance.searchObj.data.editorValue).toBe("");
     expect(componentInstance.searchObj.meta.sqlMode).toBe(false);
   });
@@ -2833,9 +2844,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       selectedDate: { from: "2024-01-01" },
       selectedTime: { startTime: "00:00" },
     };
-    
+
     await componentInstance.updateDateTime(dateTime);
-    
+
     expect(componentInstance.searchObj.data.datetime.type).toBe("absolute");
     expect(componentInstance.$emit).not.toHaveBeenCalledWith("searchdata");
   });
@@ -2845,44 +2856,38 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.tempFunctionContent = "valid content";
     componentInstance.savedFunctionName = "validFunction";
     componentInstance.isSavedFunctionAction = "create";
-    
+
     componentInstance.saveFunction();
-    
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 162: fnSavedFunctionDialog with content
   it("should not notify error when function content exists", () => {
     componentInstance.searchObj.data.tempFunctionContent = "function content";
-    
+
     componentInstance.fnSavedFunctionDialog();
-    
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 163: filterFn with empty search value
   it("should show all transforms for empty search", () => {
     const update = vi.fn((callback) => callback());
-    componentInstance.searchObj.data.transforms = [
-      { name: "func1" },
-      { name: "func2" },
-    ];
-    
+    componentInstance.searchObj.data.transforms = [{ name: "func1" }, { name: "func2" }];
+
     componentInstance.filterFn("", update);
-    
+
     expect(componentInstance.functionOptions).toEqual(componentInstance.searchObj.data.transforms);
   });
 
   // Test 164: filterFn with no matching functions
   it("should show empty array when no functions match", () => {
     const update = vi.fn((callback) => callback());
-    componentInstance.searchObj.data.transforms = [
-      { name: "helper" },
-      { name: "utility" },
-    ];
-    
+    componentInstance.searchObj.data.transforms = [{ name: "helper" }, { name: "utility" }];
+
     componentInstance.filterFn("missing", update);
-    
+
     expect(componentInstance.functionOptions).toEqual([]);
   });
 
@@ -2890,9 +2895,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should set from to 0 for zero initial number", () => {
     componentInstance.downloadCustomInitialNumber = 0;
     componentInstance.downloadCustomRange = 100;
-    
+
     componentInstance.downloadRangeData();
-    
+
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.from).toBe(0);
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(100);
   });
@@ -2900,32 +2905,32 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 166: confirmUpdateSavedViews method
   it("should call updateSavedViews with correct parameters", () => {
     componentInstance.updateViewObj = { view_id: "123", view_name: "Test View" };
-    
+
     componentInstance.confirmUpdateSavedViews();
-    
+
     expect(componentInstance.updateSavedViews).toHaveBeenCalledWith("123", "Test View");
   });
 
   // Test 167: confirmDeleteSavedViews method
   it("should call deleteSavedViews", () => {
     componentInstance.confirmDeleteSavedViews();
-    
+
     expect(componentInstance.deleteSavedViews).toHaveBeenCalled();
   });
 
   // Test 168: Complex search object state management
   it("should maintain complex search object state", () => {
     const initialState = JSON.parse(JSON.stringify(componentInstance.searchObj));
-    
+
     // Modify various parts of the search object
     componentInstance.searchObj.loading = true;
     componentInstance.searchObj.data.query = "new query";
     componentInstance.searchObj.meta.sqlMode = true;
-    
+
     expect(componentInstance.searchObj.loading).toBe(true);
     expect(componentInstance.searchObj.data.query).toBe("new query");
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
-    
+
     // Verify initial state was different
     expect(initialState.loading).toBe(false);
     expect(initialState.data.query).toBe("");
@@ -2938,7 +2943,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.handleQuickMode();
     componentInstance.updateTimezone();
     componentInstance.onRefreshIntervalUpdate();
-    
+
     expect(componentInstance.$emit).toHaveBeenCalledTimes(4);
     expect(componentInstance.$emit).toHaveBeenNthCalledWith(1, "showSearchHistory");
     expect(componentInstance.$emit).toHaveBeenNthCalledWith(2, "handleQuickModeChange");
@@ -2951,61 +2956,61 @@ describe("SearchBar.vue Actual Component Methods", () => {
     const existingFunction = { name: "existingFunc", function: "content" };
     componentInstance.functionModel = existingFunction;
     componentInstance.functionOptions = [existingFunction];
-    
+
     componentInstance.updateSelectedValue();
-    
+
     expect(componentInstance.functionOptions).toHaveLength(1);
   });
 
   // Test 171: changeFunctionName method
   it("should handle function name changes", () => {
     componentInstance.changeFunctionName("newFunctionName");
-    
+
     expect(componentInstance.changeFunctionName).toHaveBeenCalledWith("newFunctionName");
   });
 
   // Test 172: handleKeyDown with Ctrl+Enter
   it("should trigger query execution on Ctrl+Enter", () => {
     const event = { ctrlKey: true, key: "Enter" };
-    
+
     componentInstance.handleKeyDown(event);
-    
+
     expect(componentInstance.handleRunQueryFn).toHaveBeenCalled();
   });
 
   // Test 173: handleKeyDown with Meta+Enter (Mac)
   it("should trigger query execution on Meta+Enter", () => {
     const event = { metaKey: true, key: "Enter" };
-    
+
     componentInstance.handleKeyDown(event);
-    
+
     expect(componentInstance.handleRunQueryFn).toHaveBeenCalled();
   });
 
   // Test 174: handleKeyDown with only Ctrl (no Enter)
   it("should not trigger query execution without Enter key", () => {
     const event = { ctrlKey: true, key: "Tab" };
-    
+
     componentInstance.handleKeyDown(event);
-    
+
     expect(componentInstance.handleRunQueryFn).not.toHaveBeenCalled();
   });
 
   // Test 175: toggleCustomDownloadDialog state change
   it("should toggle custom download dialog state", () => {
     expect(componentInstance.customDownloadDialog).toBe(false);
-    
+
     componentInstance.toggleCustomDownloadDialog();
-    
+
     expect(componentInstance.customDownloadDialog).toBe(true);
   });
 
   // Test 176: updateQueryValue with complex SQL query
   it("should detect SQL mode for complex queries", () => {
     const complexQuery = "SELECT field1, field2 FROM logs WHERE level = 'error'";
-    
+
     componentInstance.updateQueryValue(complexQuery);
-    
+
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
     expect(componentInstance.searchObj.meta.sqlModeManualTrigger).toBe(true);
   });
@@ -3013,9 +3018,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 177: updateQueryValue with partial SQL keywords
   it("should not enable SQL mode for partial keywords", () => {
     const partialQuery = "search for select keyword";
-    
+
     componentInstance.updateQueryValue(partialQuery);
-    
+
     expect(componentInstance.searchObj.meta.sqlMode).toBe(false);
   });
 
@@ -3061,9 +3066,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       startTime: 123456789,
       endTime: 987654321,
     };
-    
+
     await componentInstance.updateDateTime(dateTime);
-    
+
     expect(componentInstance.searchObj.loading).toBe(true);
   });
 
@@ -3071,9 +3076,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should parse string initial number correctly", () => {
     componentInstance.downloadCustomInitialNumber = "10";
     componentInstance.downloadCustomRange = 50;
-    
+
     componentInstance.downloadRangeData();
-    
+
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.from).toBe(9);
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(50);
   });
@@ -3081,7 +3086,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 181: resetEditorLayout method
   it("should call resetEditorLayout", () => {
     componentInstance.resetEditorLayout();
-    
+
     expect(componentInstance.resetEditorLayout).toHaveBeenCalled();
   });
 
@@ -3089,9 +3094,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should reset function creation state", () => {
     componentInstance.isSavedFunctionAction = "update";
     componentInstance.savedFunctionName = "TestFunction";
-    
+
     componentInstance.resetFunctionContent();
-    
+
     expect(componentInstance.isSavedFunctionAction).toBe("create");
     expect(componentInstance.savedFunctionName).toBe("");
   });
@@ -3101,19 +3106,19 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.tempFunctionContent = "test content";
     componentInstance.isSavedFunctionAction = "update";
     componentInstance.savedFunctionSelectedName = { name: "updateFunc" };
-    
+
     componentInstance.saveFunction();
-    
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 184: saveFunction with whitespace-only content
   it("should notify error for whitespace-only function content", () => {
     componentInstance.searchObj.data.tempFunctionContent = "   \n\t   ";
-    
+
     componentInstance.saveFunction();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "warning",
       message: "The function field must contain a value and cannot be left empty.",
     });
@@ -3122,21 +3127,18 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 185: fnSavedFunctionDialog with valid content
   it("should proceed with valid function content in dialog", () => {
     componentInstance.searchObj.data.tempFunctionContent = "valid function content";
-    
+
     componentInstance.fnSavedFunctionDialog();
-    
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 186: Complex search object manipulation
   it("should handle complex search object updates", () => {
-    const originalQuery = componentInstance.searchObj.data.query;
-    const originalMode = componentInstance.searchObj.meta.sqlMode;
-    
     componentInstance.searchObj.data.query = "SELECT * FROM new_stream";
     componentInstance.searchObj.meta.sqlMode = true;
     componentInstance.searchObj.meta.quickMode = false;
-    
+
     expect(componentInstance.searchObj.data.query).toBe("SELECT * FROM new_stream");
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
     expect(componentInstance.searchObj.meta.quickMode).toBe(false);
@@ -3145,10 +3147,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 187: Multiple region selections
   it("should handle multiple region selections", () => {
     componentInstance.searchObj.meta.regions = ["us-east"];
-    
+
     componentInstance.handleRegionsSelection("us-west", false);
     componentInstance.handleRegionsSelection("eu-central", false);
-    
+
     expect(componentInstance.searchObj.meta.regions).toContain("us-east");
     expect(componentInstance.searchObj.meta.regions).toContain("us-west");
     expect(componentInstance.searchObj.meta.regions).toContain("eu-central");
@@ -3158,16 +3160,20 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 188: Region deselection from middle of array
   it("should remove region from middle of array", () => {
     componentInstance.searchObj.meta.regions = ["us-east", "us-west", "eu-central"];
-    
+
     componentInstance.handleRegionsSelection("us-west", true);
-    
+
     expect(componentInstance.searchObj.meta.regions).toEqual(["us-east", "eu-central"]);
   });
 
   // Test 189: buildStreamQuery with special characters in stream name
   it("should handle special characters in stream name", () => {
-    const result = componentInstance.buildStreamQuery("logs-with-dashes_and_underscores", ["field1"], true);
-    
+    const result = componentInstance.buildStreamQuery(
+      "logs-with-dashes_and_underscores",
+      ["field1"],
+      true,
+    );
+
     expect(result).toBe('SELECT field1 FROM "logs-with-dashes_and_underscores"');
   });
 
@@ -3179,9 +3185,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       { name: "field3", type: "object", indexed: true },
     ];
     const interestingFields = ["field1", "field3"];
-    
+
     const result = componentInstance.getFieldList("stream", streamFields, interestingFields, true);
-    
+
     expect(result).toEqual(["field1", "field3"]);
   });
 
@@ -3193,9 +3199,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       { name: "myOtherFunction" },
       { name: "helper" },
     ];
-    
+
     componentInstance.filterFn("MY", update);
-    
+
     expect(componentInstance.functionOptions).toHaveLength(2);
     expect(componentInstance.functionOptions[0].name).toBe("MyFunction");
     expect(componentInstance.functionOptions[1].name).toBe("myOtherFunction");
@@ -3205,10 +3211,10 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should validate job records at upper boundary", async () => {
     componentInstance.searchObj.meta.jobId = "";
     componentInstance.searchObj.meta.jobRecords = 100001;
-    
+
     await componentInstance.addJobScheduler();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "negative",
       message: "Job Scheduler should be between 1 and 100000",
       timeout: 3000,
@@ -3219,32 +3225,32 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should accept job records at exact boundary", async () => {
     componentInstance.searchObj.meta.jobId = "";
     componentInstance.searchObj.meta.jobRecords = 100000;
-    
+
     await componentInstance.addJobScheduler();
-    
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 194: onLogsVisualizeToggleUpdate with SQL mode enabled
   it("should allow visualization with SQL mode enabled", () => {
     componentInstance.searchObj.meta.sqlMode = true;
     componentInstance.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
-    
+
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
-    
+
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 195: onLogsVisualizeToggleUpdate with single stream
   it("should allow visualization with single stream", () => {
     componentInstance.searchObj.meta.sqlMode = false;
     componentInstance.searchObj.data.stream.selectedStream = ["single-stream"];
-    
+
     componentInstance.onLogsVisualizeToggleUpdate("visualize");
-    
+
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test: onLogsVisualizeToggleUpdate from build mode to visualize mode (PR #10758)
@@ -3257,7 +3263,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
     // PR #10758: simplified condition allows switching to visualize from any mode
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test: onLogsVisualizeToggleUpdate from patterns mode to visualize mode (PR #10758)
@@ -3270,32 +3276,32 @@ describe("SearchBar.vue Actual Component Methods", () => {
 
     // PR #10758: simplified condition allows switching to visualize from any mode
     expect(componentInstance.searchObj.meta.logsVisualizeToggle).toBe("visualize");
-    expect(componentInstance.$q.notify).not.toHaveBeenCalled();
+    expect(componentInstance.notify).not.toHaveBeenCalled();
   });
 
   // Test 196: handleRunQueryFn with logs mode
   it("should handle run query in logs mode", () => {
     componentInstance.searchObj.meta.logsVisualizeToggle = "logs";
-    
+
     componentInstance.handleRunQueryFn();
-    
+
     expect(componentInstance.$emit).not.toHaveBeenCalledWith("handleRunQueryFn");
   });
 
   // Test 197: handleRunQueryFn with visualize mode
   it("should emit handleRunQueryFn in visualize mode", () => {
     componentInstance.searchObj.meta.logsVisualizeToggle = "visualize";
-    
+
     componentInstance.handleRunQueryFn();
-    
+
     expect(componentInstance.$emit).toHaveBeenCalledWith("handleRunQueryFn");
   });
 
   // Test 198: updateActionSelection with null item
   it("should handle null item in action selection", () => {
     componentInstance.updateActionSelection(null);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "undefined action applied successfully",
       timeout: 3000,
       color: "secondary",
@@ -3306,8 +3312,8 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should handle action item without name", () => {
     const item = { id: "123" };
     componentInstance.updateActionSelection(item);
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "undefined action applied successfully",
       timeout: 3000,
       color: "secondary",
@@ -3318,9 +3324,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should update editor width for action transform", () => {
     componentInstance.searchObj.data.transformType = "action";
     componentInstance.searchObj.meta.showTransformEditor = true;
-    
+
     componentInstance.updateEditorWidth();
-    
+
     expect(componentInstance.searchObj.config.fnSplitterModel).toBe(60);
   });
 
@@ -3328,9 +3334,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should handle action transform without selection", () => {
     componentInstance.searchObj.data.transformType = "action";
     const item = { name: "actionItem", id: "action1" };
-    
+
     componentInstance.selectTransform(item, false);
-    
+
     expect(componentInstance.updateActionSelection).toHaveBeenCalledWith(item);
     expect(componentInstance.searchObj.data.selectedTransform).toEqual({
       ...item,
@@ -3341,9 +3347,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 202: createScheduleJob with different record values
   it("should set job records to 100", () => {
     componentInstance.searchObj.meta.jobRecords = 500;
-    
+
     componentInstance.createScheduleJob();
-    
+
     expect(componentInstance.searchObj.meta.jobRecords).toBe(100);
   });
 
@@ -3365,7 +3371,7 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 205: updateTransforms method call
   it("should call updateTransforms method", () => {
     componentInstance.updateTransforms();
-    
+
     expect(componentInstance.updateTransforms).toHaveBeenCalled();
   });
 
@@ -3374,19 +3380,19 @@ describe("SearchBar.vue Actual Component Methods", () => {
     // Initial state
     expect(componentInstance.searchObj.loading).toBe(false);
     expect(componentInstance.searchObj.meta.sqlMode).toBe(false);
-    
+
     // State transition 1
     componentInstance.searchObj.loading = true;
     componentInstance.searchObj.meta.sqlMode = true;
     componentInstance.searchObj.data.editorValue = "SELECT * FROM logs";
-    
+
     expect(componentInstance.searchObj.loading).toBe(true);
     expect(componentInstance.searchObj.meta.sqlMode).toBe(true);
-    
+
     // State transition 2
     componentInstance.searchObj.loading = false;
     componentInstance.searchObj.data.query = "completed query";
-    
+
     expect(componentInstance.searchObj.loading).toBe(false);
     expect(componentInstance.searchObj.data.query).toBe("completed query");
   });
@@ -3395,9 +3401,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should handle non-numeric initial number", () => {
     componentInstance.downloadCustomInitialNumber = "invalid";
     componentInstance.downloadCustomRange = 100;
-    
+
     componentInstance.downloadRangeData();
-    
+
     // parseInt("invalid") returns NaN, which should be handled
     expect(componentInstance.searchObj.data.customDownloadQueryObj.query.size).toBe(100);
   });
@@ -3409,9 +3415,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       { view_name: "Production@Logs" },
       { view_name: "Dev Environment" },
     ];
-    
+
     const result = componentInstance.filterSavedViewFn(rows, "-");
-    
+
     expect(result).toHaveLength(1);
     expect(result[0].view_name).toBe("Test-View_123");
   });
@@ -3419,20 +3425,20 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 209: regionFilterMethod with empty filter
   it("should handle empty filter in region method", () => {
     const node = { label: "US East" };
-    
+
     const result = componentInstance.regionFilterMethod(node, "");
-    
+
     expect(result).toBe(true);
   });
 
   // Test 210: handleFavoriteSavedView with exactly 10 favorites
   it("should allow adding when exactly at limit", () => {
     componentInstance.favoriteViews = Array.from({ length: 9 }, (_, i) => `view${i}`);
-    
+
     componentInstance.handleFavoriteSavedView({ view_id: "view10" }, false);
-    
+
     expect(componentInstance.favoriteViews).toHaveLength(10);
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View added to favorites.",
       color: "positive",
       position: "bottom",
@@ -3443,11 +3449,11 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 211: handleFavoriteSavedView removing non-existent view
   it("should handle removing non-existent view from favorites", () => {
     componentInstance.favoriteViews = ["view1", "view2"];
-    
+
     componentInstance.handleFavoriteSavedView({ view_id: "nonexistent" }, true);
-    
+
     expect(componentInstance.favoriteViews).toEqual(["view1", "view2"]);
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       message: "View removed from favorites.",
       color: "positive",
       position: "bottom",
@@ -3461,9 +3467,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
     componentInstance.searchObj.data.histogram = { data: "test" };
     componentInstance.searchObj.data.sortedQueryResults = [1, 2, 3];
     componentInstance.searchObj.data.customProperty = "keep this";
-    
+
     const result = componentInstance.getSearchObj();
-    
+
     expect(result.data).not.toHaveProperty("queryResults");
     expect(result.data).not.toHaveProperty("histogram");
     expect(result.data).not.toHaveProperty("sortedQueryResults");
@@ -3480,9 +3486,9 @@ describe("SearchBar.vue Actual Component Methods", () => {
       timezone: "UTC",
       valueType: "absolute",
     };
-    
+
     await componentInstance.updateDateTime(complexDateTime);
-    
+
     expect(componentInstance.searchObj.data.datetime.type).toBe("absolute");
     expect(componentInstance.searchObj.data.datetime.selectedDate).toEqual({
       from: "2024-01-01",
@@ -3493,33 +3499,33 @@ describe("SearchBar.vue Actual Component Methods", () => {
   // Test 214: Multiple notification scenarios
   it("should handle multiple notification scenarios", () => {
     // Clear any previous calls and reset state
-    componentInstance.$q.notify.mockClear();
+    componentInstance.notify.mockClear();
     componentInstance.searchObj.data.tempFunctionContent = "";
     componentInstance.savedFunctionName = "";
     componentInstance.isSavedFunctionAction = "create";
-    
+
     // First call - empty content should trigger warning
     componentInstance.saveFunction();
-    
+
     // Second call - valid content but invalid name should trigger error
     componentInstance.searchObj.data.tempFunctionContent = "valid content";
     componentInstance.savedFunctionName = "123invalid";
     componentInstance.saveFunction();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledTimes(2);
+
+    expect(componentInstance.notify).toHaveBeenCalledTimes(2);
   });
 
   // Test 215: Edge case for buildStreamQuery with undefined values
   it("should handle undefined values in buildStreamQuery", () => {
     const result = componentInstance.buildStreamQuery(undefined, undefined, true);
-    
+
     expect(result).toBe('SELECT * FROM "undefined"');
   });
 
   // Test 216: loadSavedView with non-array saved views
   it("should handle non-array saved views", () => {
     componentInstance.searchObj.data.savedViews = null;
-    
+
     expect(() => componentInstance.loadSavedView()).not.toThrow();
   });
 
@@ -3527,18 +3533,18 @@ describe("SearchBar.vue Actual Component Methods", () => {
   it("should clear existing filter values", () => {
     componentInstance.searchObj.data.query = "existing complex query with filters";
     componentInstance.searchObj.data.editorValue = "existing editor content";
-    
+
     componentInstance.resetFilters();
-    
+
     expect(componentInstance.searchObj.data.query).toBe("");
     expect(componentInstance.searchObj.data.editorValue).toBe("");
   });
 
   // Test 218: shareLink error handling
   it("should handle shareLink method execution", async () => {
-    const result = await componentInstance.shareLink();
-    
-    expect(componentInstance.$q.notify).toHaveBeenCalledWith({
+    await componentInstance.shareLink();
+
+    expect(componentInstance.notify).toHaveBeenCalledWith({
       type: "positive",
       message: "Link Copied Successfully!",
       timeout: 5000,
@@ -3553,12 +3559,12 @@ describe("SearchBar.vue Actual Component Methods", () => {
       parameters: ["param1", "param2"],
       description: "A complex function",
     };
-    
+
     componentInstance.functionModel = complexFunction;
     componentInstance.functionOptions = [];
-    
+
     componentInstance.updateSelectedValue();
-    
+
     expect(componentInstance.functionOptions).toContain(complexFunction);
   });
 
@@ -3639,7 +3645,9 @@ describe("SearchBar.vue VRL Visualization Support", () => {
       // User can now edit VRL function in visualize mode
       vrlInstance.searchObj.data.tempFunctionContent = ".parsed = parse_json!(.message)";
 
-      expect(vrlInstance.searchObj.data.tempFunctionContent).toBe(".parsed = parse_json!(.message)");
+      expect(vrlInstance.searchObj.data.tempFunctionContent).toBe(
+        ".parsed = parse_json!(.message)",
+      );
     });
 
     it("should allow editing VRL function content in search mode (unchanged)", () => {
@@ -3676,8 +3684,6 @@ describe("SearchBar.vue VRL Visualization Support", () => {
 
     it("should NOT display 'VRL Function Editor is not supported in visualize mode' message", () => {
       // This message was inside the removed banner
-      const warningMessage = "VRL Function Editor is not supported in visualize mode.";
-
       // The message is no longer rendered since the banner was removed
       // Simulating that the banner render condition no longer exists
       const bannerRendered = false;
@@ -3771,7 +3777,10 @@ describe("SearchBar.vue Build Query Toggle Support", () => {
           buildInstance.searchObj.meta.logsVisualizeToggle === "patterns" ||
           buildInstance.searchObj.meta.logsVisualizeToggle === "build"
         ) {
-          buildInstance.emit("handleRunQueryFn", typeof clear_cache === "boolean" ? clear_cache : false);
+          buildInstance.emit(
+            "handleRunQueryFn",
+            typeof clear_cache === "boolean" ? clear_cache : false,
+          );
         }
       }),
     };
@@ -3790,7 +3799,7 @@ describe("SearchBar.vue Build Query Toggle Support", () => {
     it("should support all toggle values: logs, visualize, build, patterns", () => {
       const validToggleValues = ["logs", "visualize", "build", "patterns"];
 
-      validToggleValues.forEach(value => {
+      validToggleValues.forEach((value) => {
         buildInstance.onLogsVisualizeToggleUpdate(value);
         expect(buildInstance.searchObj.meta.logsVisualizeToggle).toBe(value);
       });
@@ -3960,10 +3969,12 @@ describe("SearchBar.vue SQL mode auto-detection guard", () => {
         }
 
         // Auto-enable SQL mode when query starts with SELECT/WITH
-        if (componentInstance.searchObj.meta.sqlMode === false &&
-            componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
-            value.toLowerCase().includes("select") &&
-            value.toLowerCase().includes("from")) {
+        if (
+          componentInstance.searchObj.meta.sqlMode === false &&
+          componentInstance.searchObj.meta.logsVisualizeToggle !== "build" &&
+          value.toLowerCase().includes("select") &&
+          value.toLowerCase().includes("from")
+        ) {
           componentInstance.searchObj.meta.sqlMode = true;
           componentInstance.searchObj.meta.sqlModeManualTrigger = true;
         }
@@ -4038,11 +4049,7 @@ describe("SearchBar.vue SQL mode → filter expression transition", () => {
           instance.searchObj.meta.sqlMode = false;
         }
 
-        if (
-          value.trim() !== "" &&
-          instance.searchObj.meta.sqlMode === true &&
-          !isSqlQuery(value)
-        ) {
+        if (value.trim() !== "" && instance.searchObj.meta.sqlMode === true && !isSqlQuery(value)) {
           instance.searchObj.meta.sqlModeEditTransition = true;
           instance.searchObj.meta.sqlMode = false;
         }
@@ -4503,10 +4510,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
 
     it("should maintain logs data when switching from patterns to logs with existing data", () => {
       // Setup: logs exist
-      testInstance.searchObj.data.queryResults.hits = [
-        { message: "log1" },
-        { message: "log2" },
-      ];
+      testInstance.searchObj.data.queryResults.hits = [{ message: "log1" }, { message: "log2" }];
       testInstance.searchObj.meta.logsVisualizeToggle = "patterns";
 
       // Switch back to logs
@@ -4623,11 +4627,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
         if (query.toLowerCase().includes("where")) {
           const fieldName = getFieldFromExpression(effectiveFilter);
           if (fieldName && hasFieldCondition(query, fieldName)) {
-            return replaceExistingFieldCondition(
-              query,
-              fieldName,
-              effectiveFilter,
-            );
+            return replaceExistingFieldCondition(query, fieldName, effectiveFilter);
           }
           // AND insertion before earliest terminating clause
           const clauses = ["group by", "having", "order by", "limit"];
@@ -4643,14 +4643,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           }
           if (firstClause) {
             const [before, after] = queryIndexSplit(query, firstClause);
-            return (
-              before.trim() +
-              " AND " +
-              effectiveFilter +
-              " " +
-              firstClause +
-              after
-            );
+            return before.trim() + " AND " + effectiveFilter + " " + firstClause + after;
           }
           return query + " AND " + effectiveFilter;
         }
@@ -4668,29 +4661,16 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
         }
         if (firstClause) {
           const [before, after] = queryIndexSplit(query, firstClause);
-          return (
-            before.trim() +
-            " where " +
-            effectiveFilter +
-            " " +
-            firstClause +
-            after
-          );
+          return before.trim() + " where " + effectiveFilter + " " + firstClause + after;
         }
         return query + " where " + effectiveFilter;
       }
       // Non-SQL mode
       const fieldName = getFieldFromExpression(effectiveFilter);
       if (fieldName && hasFieldCondition(query, fieldName)) {
-        return replaceExistingFieldCondition(
-          query,
-          fieldName,
-          effectiveFilter,
-        );
+        return replaceExistingFieldCondition(query, fieldName, effectiveFilter);
       }
-      return query.length === 0
-        ? effectiveFilter
-        : query + " and " + effectiveFilter;
+      return query.length === 0 ? effectiveFilter : query + " and " + effectiveFilter;
     };
 
     // ── SQL mode: no existing WHERE (the bug-fix path) ─────────────
@@ -4701,9 +4681,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           'SELECT count(*) FROM "logs" GROUP BY level',
           "status = 200",
         );
-        expect(result).toBe(
-          'SELECT count(*) FROM "logs" where status = 200 group by level',
-        );
+        expect(result).toBe('SELECT count(*) FROM "logs" where status = 200 group by level');
       });
 
       it("should insert WHERE before GROUP BY, not ORDER BY, when both are present (BUG FIX)", () => {
@@ -4723,19 +4701,12 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           'SELECT * FROM "logs" ORDER BY timestamp DESC',
           "level = 'error'",
         );
-        expect(result).toBe(
-          'SELECT * FROM "logs" where level = \'error\' order by timestamp DESC',
-        );
+        expect(result).toBe("SELECT * FROM \"logs\" where level = 'error' order by timestamp DESC");
       });
 
       it("should insert WHERE before LIMIT when no GROUP BY or ORDER BY", () => {
-        const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs" LIMIT 100',
-          "status = 200",
-        );
-        expect(result).toBe(
-          'SELECT * FROM "logs" where status = 200 limit 100',
-        );
+        const result = applyFilterToQueryPart('SELECT * FROM "logs" LIMIT 100', "status = 200");
+        expect(result).toBe('SELECT * FROM "logs" where status = 200 limit 100');
       });
 
       it("should insert WHERE before GROUP BY when all 4 clauses present", () => {
@@ -4759,10 +4730,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       });
 
       it("should append WHERE at end when no terminating clauses exist", () => {
-        const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs"',
-          "status = 200",
-        );
+        const result = applyFilterToQueryPart('SELECT * FROM "logs"', "status = 200");
         expect(result).toBe('SELECT * FROM "logs" where status = 200');
       });
 
@@ -4782,52 +4750,46 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
     describe("SQL mode — inserting AND into query with existing WHERE", () => {
       it("should insert AND before GROUP BY", () => {
         const result = applyFilterToQueryPart(
-          'SELECT count(*) FROM "logs" WHERE level = \'error\' GROUP BY status',
+          "SELECT count(*) FROM \"logs\" WHERE level = 'error' GROUP BY status",
           "code = 500",
         );
         expect(result).toBe(
-          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 group by status',
+          "SELECT count(*) FROM \"logs\" WHERE level = 'error' AND code = 500 group by status",
         );
       });
 
       it("should insert AND before GROUP BY with multiple trailing clauses", () => {
         const result = applyFilterToQueryPart(
-          'SELECT count(*) FROM "logs" WHERE level = \'error\' GROUP BY status ORDER BY count(*) DESC LIMIT 50',
+          "SELECT count(*) FROM \"logs\" WHERE level = 'error' GROUP BY status ORDER BY count(*) DESC LIMIT 50",
           "code = 500",
         );
         expect(result).toBe(
-          'SELECT count(*) FROM "logs" WHERE level = \'error\' AND code = 500 group by status ORDER BY count(*) DESC LIMIT 50',
+          "SELECT count(*) FROM \"logs\" WHERE level = 'error' AND code = 500 group by status ORDER BY count(*) DESC LIMIT 50",
         );
       });
 
       it("should append AND when WHERE exists but no terminating clauses follow", () => {
         const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs" WHERE level = \'error\'',
+          "SELECT * FROM \"logs\" WHERE level = 'error'",
           "status = 200",
         );
-        expect(result).toBe(
-          'SELECT * FROM "logs" WHERE level = \'error\' AND status = 200',
-        );
+        expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'error' AND status = 200");
       });
 
       it("should replace existing field condition instead of appending AND", () => {
         const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs" WHERE level = \'error\' GROUP BY status',
+          "SELECT * FROM \"logs\" WHERE level = 'error' GROUP BY status",
           "level = 'warn'",
         );
-        expect(result).toBe(
-          'SELECT * FROM "logs" WHERE level = \'warn\' GROUP BY status',
-        );
+        expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'warn' GROUP BY status");
       });
 
       it("should replace existing field condition when no terminating clauses follow", () => {
         const result = applyFilterToQueryPart(
-          'SELECT * FROM "logs" WHERE level = \'error\'',
+          "SELECT * FROM \"logs\" WHERE level = 'error'",
           "level = 'warn'",
         );
-        expect(result).toBe(
-          'SELECT * FROM "logs" WHERE level = \'warn\'',
-        );
+        expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'warn'");
       });
     });
 
@@ -4843,9 +4805,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
         // The production regex replaces = with " is " (with surrounding spaces),
         // and the original filter already has spaces around =, producing double
         // spaces. SQL ignores extra whitespace so this is functionally correct.
-        expect(result).toMatch(
-          /SELECT \* FROM "logs" where field\s+is\s+null group by level/i,
-        );
+        expect(result).toMatch(/SELECT \* FROM "logs" where field\s+is\s+null group by level/i);
       });
 
       it("should convert != 'null' to is not null in SQL mode", () => {
@@ -4854,26 +4814,22 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "field != 'null'",
           { isNullFilter: true },
         );
-        expect(result).toMatch(
-          /SELECT \* FROM "logs" where field\s+is not\s+null group by level/i,
-        );
+        expect(result).toMatch(/SELECT \* FROM "logs" where field\s+is not\s+null group by level/i);
       });
 
       it("should convert = 'null' to is null in non-SQL mode", () => {
-        const result = applyFilterToQueryPart(
-          "existing query text",
-          "field = 'null'",
-          { sqlMode: false, isNullFilter: true },
-        );
+        const result = applyFilterToQueryPart("existing query text", "field = 'null'", {
+          sqlMode: false,
+          isNullFilter: true,
+        });
         expect(result).toMatch(/existing query text and field\s+is\s+null/);
       });
 
       it("should convert != 'null' to is not null in non-SQL mode", () => {
-        const result = applyFilterToQueryPart(
-          "existing query text",
-          "field != 'null'",
-          { sqlMode: false, isNullFilter: true },
-        );
+        const result = applyFilterToQueryPart("existing query text", "field != 'null'", {
+          sqlMode: false,
+          isNullFilter: true,
+        });
         expect(result).toMatch(/existing query text and field\s+is not\s+null/);
       });
     });
@@ -4882,11 +4838,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
 
     describe("non-SQL mode filter insertion", () => {
       it("should append filter with 'and' when query is non-empty", () => {
-        const result = applyFilterToQueryPart(
-          "existing query",
-          "status = 200",
-          { sqlMode: false },
-        );
+        const result = applyFilterToQueryPart("existing query", "status = 200", { sqlMode: false });
         expect(result).toBe("existing query and status = 200");
       });
 
@@ -4907,11 +4859,9 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
       });
 
       it("should replace when field is the only condition", () => {
-        const result = applyFilterToQueryPart(
-          "level = 'error'",
-          "level = 'warn'",
-          { sqlMode: false },
-        );
+        const result = applyFilterToQueryPart("level = 'error'", "level = 'warn'", {
+          sqlMode: false,
+        });
         expect(result).toBe("level = 'warn'");
       });
     });
@@ -4932,17 +4882,11 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
         const unionMatch = query.match(unionRegex);
         let unionType = "";
         if (unionMatch) {
-          unionType = unionMatch[0].toUpperCase() === "UNION ALL"
-            ? "UNION ALL"
-            : "UNION";
+          unionType = unionMatch[0].toUpperCase() === "UNION ALL" ? "UNION ALL" : "UNION";
         }
         const parts = query.split(unionRegex);
-        const processed = parts.map((part) =>
-          applyFilterToQueryPart(part.trim(), filter, options),
-        );
-        return unionType
-          ? processed.join(` ${unionType} `)
-          : processed.join("");
+        const processed = parts.map((part) => applyFilterToQueryPart(part.trim(), filter, options));
+        return unionType ? processed.join(` ${unionType} `) : processed.join("");
       };
 
       it("should apply filter to each part of a UNION query", () => {
@@ -5001,7 +4945,7 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
           "message = 'error: 500 - internal'",
         );
         expect(result).toBe(
-          'SELECT * FROM "logs" where message = \'error: 500 - internal\' group by level',
+          "SELECT * FROM \"logs\" where message = 'error: 500 - internal' group by level",
         );
       });
 
@@ -5027,14 +4971,14 @@ describe("SearchBar.vue VRL Editor Disabled for Non-Table Charts", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 // ODialog migration contract tests
 //
-// SearchBar.vue was migrated from q-dialog/q-card markup to <ODialog> for three
+// SearchBar.vue was migrated to <ODialog> for three
 // confirmation/utility dialogs:
 //   1. confirmDialog            — v-model:open="confirmDialogVisible"
 //   2. confirmSavedViewDialog   — v-model:open="confirmSavedViewDialogVisible"
 //   3. customDownloadDialog     — v-model:open="customDownloadDialog"
 //
 // Each dialog now emits update:open / click:primary / click:secondary instead
-// of relying on internal q-btn clicks to close itself. This block asserts the
+// of relying on internal button clicks to close itself. This block asserts the
 // new contract using a lightweight harness component that mirrors SearchBar's
 // exact template binding for each dialog, plus an ODialogStub registered via
 // the `stubs` mounting option (mirroring the pattern in
@@ -5209,9 +5153,7 @@ describe("ODialog Migration", () => {
       wrapper.vm.confirmDialogVisible = true;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="confirm-dialog"]').attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="confirm-dialog"]').attributes("data-open")).toBe("true");
     });
 
     it("invokes cancelConfirmDialog and clears state on click:secondary", async () => {
@@ -5250,20 +5192,16 @@ describe("ODialog Migration", () => {
   describe("confirmSavedViewDialog", () => {
     it("propagates confirmSavedViewDialogVisible to ODialog open prop", async () => {
       const wrapper = mountHarness();
-      const dialog = wrapper.find(
-        '[data-test="confirm-saved-view-dialog"]',
-      );
+      const dialog = wrapper.find('[data-test="confirm-saved-view-dialog"]');
       expect(dialog.exists()).toBe(true);
       expect(dialog.attributes("data-open")).toBe("false");
 
       wrapper.vm.confirmSavedViewDialogVisible = true;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="confirm-saved-view-dialog"]')
-          .attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="confirm-saved-view-dialog"]').attributes("data-open")).toBe(
+        "true",
+      );
     });
 
     it("clears confirmSavedViewDialogVisible on click:secondary via cancelConfirmDialog", async () => {
@@ -5308,11 +5246,9 @@ describe("ODialog Migration", () => {
       wrapper.vm.customDownloadDialog = true;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="custom-download-dialog"]')
-          .attributes("data-open"),
-      ).toBe("true");
+      expect(wrapper.find('[data-test="custom-download-dialog"]').attributes("data-open")).toBe(
+        "true",
+      );
     });
 
     it("closes customDownloadDialog on click:secondary (inline handler)", async () => {

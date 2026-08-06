@@ -15,23 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="hasValidContent" class="llm-content-renderer tw:w-full tw:h-full">
+  <div v-if="hasValidContent" class="llm-content-renderer h-full w-full">
     <!-- Tool-specific rendering -->
-    <div v-if="isToolObservation && toolContent !== null" class="tool-content tw:flex tw:flex-col tw:h-full">
-      <div v-if="toolMetadata" class="tw:flex tw:items-center tw:flex-wrap tw:gap-2 tw:mb-2">
-        <OTag
-          v-if="toolMetadata.name"
-          type="toolMeta"
-          value="tool"
-          class="tw:mr-2"
-        >{{ `Tool: ${toolMetadata.name}` }}</OTag>
-        <OTag
-          v-if="toolMetadata.callId"
-          type="toolMeta"
-          value="callid"
-        >{{ `Call ID: ${toolMetadata.callId}` }}</OTag>
+    <div v-if="isToolObservation && toolContent !== null" class="tool-content flex h-full flex-col">
+      <div v-if="toolMetadata" class="mb-2 flex flex-wrap items-center gap-2">
+        <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="mr-2">{{
+          t("traces.lLMContentRenderer.tool", { name: toolMetadata.name })
+        }}</OTag>
+        <OTag v-if="toolMetadata.callId" type="toolMeta" value="callid">{{
+          t("traces.lLMContentRenderer.callId", { callId: toolMetadata.callId })
+        }}</OTag>
       </div>
-      <div class="tool-data tw:flex-1">
+      <div class="tool-data flex-1">
         <CodeQueryEditor
           :editor-id="`${editorIdPrefix}tool-json-viewer-${span?.llm_tool_call_id || 'unknown'}`"
           :query="toolContentJson"
@@ -40,60 +35,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-auto-complete="false"
           :show-line-numbers="false"
           :sticky-scroll="false"
-          class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+          class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
         />
       </div>
     </div>
 
     <!-- Regular content rendering -->
-    <div
-      v-else
-      class="content-wrapper"
-      :class="
-        props.viewMode === 'formatted' &&
-        !shouldRenderAsMessages &&
-        !isPlainText &&
-        'tw:h-full'
-      "
-    >
+    <div v-else class="content-wrapper" :class="shouldFillFormattedContent && 'h-full'">
       <!-- Truncated view -->
       <div
         v-if="!isExpanded && contentStats.shouldTruncate"
-        :class="
-          props.viewMode === 'formatted' &&
-          !shouldRenderAsMessages &&
-          !isPlainText &&
-          'tw:h-full'
-        "
+        :class="shouldFillFormattedContent && 'h-full'"
       >
         <!-- Formatted mode -->
-        <div
-          v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
-        >
-          <div v-if="shouldRenderAsMessages" class="messages-view">
+        <div v-if="props.viewMode === 'formatted'" :class="shouldFillFormattedContent && 'h-full'">
+          <div
+            v-if="shouldRenderAsMessages"
+            class="messages-view"
+            :class="shouldFillSingleJsonMessage && 'h-full'"
+          >
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
-              class="message-item tw:mb-2 tw:h-full"
+              class="message-item mb-2"
+              :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
+                class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json tw:p-2 tw:h-full tw:text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content-json text-compact bg-code-bg min-h-0 flex-1 p-2"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-${idx}`"
@@ -103,19 +85,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+                  class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content markdown-body bg-code-bg max-w-full min-w-0 overflow-x-auto p-2 wrap-anywhere"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content tw:m-0 tw:p-2 tw:whitespace-pre-wrap tw:wrap-break-word tw:font-mono tw:text-[13px] tw:leading-normal tw:bg-(--o2-code-bg) tw:rounded tw:overflow-x-auto">{{ contentStats.previewText }}</pre>
+            <pre
+              class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
+              >{{ contentStats.previewText }}</pre
+            >
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -126,13 +110,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+              class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
             />
           </div>
         </div>
 
         <!-- JSON mode -->
-        <div v-else class="json-content tw:h-full!">
+        <div v-else class="json-content h-full!">
           <CodeQueryEditor
             :editor-id="`truncated-json-mode-viewer-${editorIdPrefix}`"
             :query="parsedContentJson"
@@ -141,60 +125,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+            class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
           />
         </div>
 
-        <div class="tw:text-center tw:mt-2">
+        <div class="mt-2 text-center">
           <OButton
             variant="ghost-primary"
             size="sm"
             data-test="traces-llm-content-renderer-expand-btn"
             @click="isExpanded = true"
           >
-            ...expand ({{ contentStats.remainingChars }} more characters)
+            {{ t("traces.lLMContentRenderer.expandMore", { count: contentStats.remainingChars }) }}
           </OButton>
         </div>
       </div>
 
       <!-- Full content view -->
-      <div
-        v-else
-        :class="
-          props.viewMode === 'formatted' &&
-          !shouldRenderAsMessages &&
-          !isPlainText &&
-          'tw:h-full'
-        "
-      >
+      <div v-else :class="shouldFillFormattedContent && 'h-full'">
         <!-- Formatted mode -->
-        <div
-          v-if="props.viewMode === 'formatted'"
-          :class="!shouldRenderAsMessages && !isPlainText && 'tw:h-full'"
-        >
-          <div v-if="shouldRenderAsMessages" class="messages-view">
+        <div v-if="props.viewMode === 'formatted'" :class="shouldFillFormattedContent && 'h-full'">
+          <div
+            v-if="shouldRenderAsMessages"
+            class="messages-view"
+            :class="shouldFillSingleJsonMessage && 'h-full'"
+          >
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
-              class="message-item tw:mb-2 tw:h-full"
+              class="message-item mb-2"
+              :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
               :style="{
-                border: '1px solid var(--o2-border)',
+                border: '1px solid var(--color-border-default)',
                 borderRadius: '8px',
               }"
             >
               <div
-                class="message-role tw:text-xs tw:font-bold tw:p-2 tw:capitalize"
+                class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
                   backgroundColor: roleColor(msg.role),
-                  borderBottom: '1px solid var(--o2-border)',
+                  borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
                 {{ roleLabel(msg.role) }}
               </div>
               <div
                 v-if="isMessageJson(msg.content)"
-                class="message-content-json tw:p-2 tw:h-full tw:text-[13px]"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content-json text-compact bg-code-bg min-h-0 flex-1 p-2"
               >
                 <CodeQueryEditor
                   :editor-id="`${editorIdPrefix}msg-json-editor-full-${idx}`"
@@ -204,21 +181,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :show-auto-complete="false"
                   :show-line-numbers="false"
                   :sticky-scroll="false"
-                  class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full!"
+                  class="rounded-default h-full! max-h-full! min-h-25 w-full overflow-hidden"
                 />
               </div>
               <div
                 v-else
-                class="message-content markdown-body tw:p-2 tw:overflow-x-auto"
-                style="background-color: var(--o2-code-bg)"
+                class="message-content markdown-body bg-code-bg max-w-full min-w-0 overflow-x-auto p-2 wrap-anywhere"
                 v-html="renderMarkdown(msg.content)"
               />
             </div>
           </div>
           <div v-else-if="isPlainText" class="text-content">
-            <pre class="plain-text-content tw:m-0 tw:p-2 tw:whitespace-pre-wrap tw:wrap-break-word tw:font-mono tw:text-[13px] tw:leading-normal tw:bg-(--o2-code-bg) tw:rounded tw:overflow-x-auto">{{ fullText }}</pre>
+            <pre
+              class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
+              >{{ fullText }}</pre
+            >
           </div>
-          <div v-else class="json-content tw:h-full">
+          <div v-else class="json-content h-full">
             <CodeQueryEditor
               :editor-id="`full-formatted-json-viewer-${editorIdPrefix}`"
               :query="parsedContentJson"
@@ -227,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :show-auto-complete="false"
               :show-line-numbers="false"
               :sticky-scroll="false"
-              class="tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden tw:max-h-full! tw:h-full"
+              class="rounded-default h-full max-h-full! min-h-25 w-full overflow-hidden"
             />
           </div>
         </div>
@@ -242,17 +221,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :show-auto-complete="false"
             :show-line-numbers="false"
             :sticky-scroll="false"
-            class="tw:h-full tw:max-h-full tw:min-h-25 tw:w-full tw:rounded tw:overflow-hidden"
+            class="rounded-default h-full max-h-full min-h-25 w-full overflow-hidden"
           />
         </div>
 
-        <div v-if="contentStats.shouldTruncate" class="tw:text-center tw:mt-2">
-          <OButton
-            variant="ghost-primary"
-            size="sm"
-            @click="isExpanded = false"
-          >
-            Collapse
+        <div v-if="contentStats.shouldTruncate" class="mt-2 text-center">
+          <OButton variant="ghost-primary" size="sm" @click="isExpanded = false">
+            {{ t("traces.lLMContentRenderer.collapse") }}
           </OButton>
         </div>
       </div>
@@ -262,14 +237,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
-const CodeQueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
-import OButton from '@/lib/core/Button/OButton.vue';
-import OTag from '@/lib/core/Badge/OTag.vue';
+const { t } = useI18nTyped();
+
+const CodeQueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 const INITIAL_LINE_LIMIT = 15;
 
@@ -300,9 +276,7 @@ const props = defineProps({
   },
 });
 
-const editorIdPrefix = computed(() =>
-  props.instanceId ? `${props.instanceId}-` : "",
-);
+const editorIdPrefix = computed(() => (props.instanceId ? `${props.instanceId}-` : ""));
 
 const isExpanded = ref(false);
 
@@ -353,11 +327,7 @@ const toolContent = computed(() => {
   // Handle nested content structure: {content: [{type: "text", text: "..."}]}
   if (content && typeof content === "object") {
     // Check if it has the Anthropic content format
-    if (
-      content.content &&
-      Array.isArray(content.content) &&
-      content.content.length > 0
-    ) {
+    if (content.content && Array.isArray(content.content) && content.content.length > 0) {
       const firstContent = content.content[0];
       if (firstContent.type === "text" && firstContent.text) {
         // Try to parse the inner text as JSON
@@ -414,13 +384,15 @@ const parsedContent = computed(() => {
 
     // Handle nested content structure: {content: [{type: "text", text: "..."}]}
     if (props.content && typeof props.content === "object") {
+      // Arrays fall through this branch; the cast only widens for the key lookup.
+      const contentObj = props.content as Record<string, any>;
       // Check if it has the Anthropic content format
       if (
-        props.content.content &&
-        Array.isArray(props.content.content) &&
-        props.content.content.length > 0
+        contentObj.content &&
+        Array.isArray(contentObj.content) &&
+        contentObj.content.length > 0
       ) {
-        const firstContent = props.content.content[0];
+        const firstContent = contentObj.content[0];
         if (firstContent.type === "text" && firstContent.text) {
           // Try to parse the inner text as JSON
           try {
@@ -446,9 +418,7 @@ const isMessagesArray = computed(() => {
   return (
     Array.isArray(parsedContent.value) &&
     parsedContent.value.length > 0 &&
-    parsedContent.value.every(
-      (item: any) => item && typeof item === "object" && "role" in item,
-    )
+    parsedContent.value.every((item: any) => item && typeof item === "object" && "role" in item)
   );
 });
 
@@ -473,18 +443,14 @@ const isContentPartsArray = computed(() => {
         item &&
         typeof item === "object" &&
         "type" in item &&
-        (item.type === "text" ||
-          item.type === "image_url" ||
-          item.type === "image"),
+        (item.type === "text" || item.type === "image_url" || item.type === "image"),
     )
   );
 });
 
 // Check if content should be rendered as messages (any format)
 const shouldRenderAsMessages = computed(() => {
-  return (
-    isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value
-  );
+  return isMessagesArray.value || isSingleMessage.value || isContentPartsArray.value;
 });
 
 const isPlainText = computed(() => {
@@ -534,8 +500,7 @@ const toolContentJson = computed(() => {
 });
 
 const parsedContentJson = computed(() => {
-  if (parsedContent.value === null || parsedContent.value === undefined)
-    return "";
+  if (parsedContent.value === null || parsedContent.value === undefined) return "";
   return JSON.stringify(parsedContent.value, null, 2);
 });
 
@@ -590,9 +555,7 @@ const contentStats = computed(() => {
 
   if (shouldRenderAsMessages.value) {
     // For messages, concatenate all message contents
-    text = parsedMessages.value
-      .map((m: any) => `${m.role}: ${m.content}`)
-      .join("\n");
+    text = parsedMessages.value.map((m: any) => `${m.role}: ${m.content}`).join("\n");
   } else {
     text = fullText.value;
   }
@@ -626,10 +589,7 @@ const previewMessages = computed(() => {
       // Include partial message if possible
       const remainingLines = INITIAL_LINE_LIMIT - lineCount;
       if (remainingLines > 0) {
-        const truncatedContent = msg.content
-          .split("\n")
-          .slice(0, remainingLines)
-          .join("\n");
+        const truncatedContent = msg.content.split("\n").slice(0, remainingLines).join("\n");
         preview.push({
           ...msg,
           content: truncatedContent + "...",
@@ -644,7 +604,7 @@ const previewMessages = computed(() => {
   return preview;
 });
 
-// Message item helpers (was previously in MessageItem render function)
+// Message item helpers
 const roleColor = (role: string) => {
   const colors: Record<string, string> = {
     user: "rgba(25, 118, 210, 0.1)",
@@ -657,10 +617,10 @@ const roleColor = (role: string) => {
 
 const roleLabel = (role: string) => {
   const labels: Record<string, string> = {
-    user: "User",
-    assistant: "Assistant",
-    system: "System",
-    tool: "Tool",
+    user: t("traces.lLMContentRenderer.roleUser"),
+    assistant: t("traces.lLMContentRenderer.roleAssistant"),
+    system: t("traces.lLMContentRenderer.roleSystem"),
+    tool: t("traces.lLMContentRenderer.roleTool"),
   };
   return labels[role] || role;
 };
@@ -682,122 +642,135 @@ const stringifyMessageContent = (content: string): string => {
   return JSON.stringify(JSON.parse(content), null, 2);
 };
 
+const shouldFillSingleJsonMessage = computed(() => {
+  return parsedMessages.value.length === 1 && isMessageJson(parsedMessages.value[0].content);
+});
+
+const shouldFillFormattedContent = computed(() => {
+  return (
+    props.viewMode === "formatted" &&
+    ((!shouldRenderAsMessages.value && !isPlainText.value) || shouldFillSingleJsonMessage.value)
+  );
+});
+
 const renderMarkdown = (content: string): string => {
   const markdownContent = toMarkdown(content);
   return DOMPurify.sanitize(marked.parse(markdownContent) as string);
 };
 </script>
 
-<style>
+<style scoped>
+/* keep(generated-content): styles the markdown DOM injected via v-html into
+   .message-content, which never receives the scope attribute — reached with
+   :deep(). Tailwind cannot target these runtime-generated nodes. */
 .messages-view .message-item .message-content {
-  font-size: 13px;
+  font-size: var(--text-compact);
   line-height: 1.6;
 }
 
-.messages-view .message-item .message-content p {
-  margin: 0 0 8px 0;
+.messages-view .message-item .message-content :deep(p) {
+  margin: 0 0 0.5rem 0;
 }
 
-.messages-view .message-item .message-content p:last-child {
+.messages-view .message-item .message-content :deep(p:last-child) {
   margin-bottom: 0;
 }
 
-.messages-view .message-item .message-content img {
+.messages-view .message-item .message-content :deep(img) {
   max-width: 50%;
-  max-height: 400px;
+  max-height: 25rem;
   object-fit: contain;
   display: block;
-  margin: 8px 0;
-  border-radius: 4px;
+  margin: 0.5rem 0;
+  border-radius: 0.25rem;
 }
 
-.messages-view .message-item .message-content pre {
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 8px;
-  border-radius: 4px;
+.messages-view .message-item .message-content :deep(pre) {
+  background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
   overflow-x: auto;
-  margin: 8px 0;
+  margin: 0.5rem 0;
 }
 
-.messages-view .message-item .message-content code {
-  font-family: monospace;
-  font-size: 12px;
-  background-color: rgba(0, 0, 0, 0.05);
-  padding: 2px 4px;
-  border-radius: 3px;
+.messages-view .message-item .message-content :deep(code) {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.1875rem;
 }
 
-.messages-view .message-item .message-content pre code {
+.messages-view .message-item .message-content :deep(pre code) {
   background-color: transparent;
   padding: 0;
 }
 
-.messages-view .message-item .message-content ul,
-.messages-view .message-item .message-content ol {
-  margin: 8px 0;
-  padding-left: 24px;
+.messages-view .message-item .message-content :deep(ul),
+.messages-view .message-item .message-content :deep(ol) {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
 }
 
-.messages-view .message-item .message-content li {
-  margin: 4px 0;
+.messages-view .message-item .message-content :deep(li) {
+  margin: 0.25rem 0;
 }
 
-.messages-view .message-item .message-content a {
-  color: var(--q-primary);
+.messages-view .message-item .message-content :deep(a) {
+  color: var(--color-theme-accent);
   text-decoration: none;
 }
 
-.messages-view .message-item .message-content a:hover {
+.messages-view .message-item .message-content :deep(a:hover) {
   text-decoration: underline;
 }
 
-.messages-view .message-item .message-content blockquote {
-  border-left: 3px solid var(--o2-border-color);
-  margin: 8px 0;
-  padding-left: 12px;
-  color: var(--o2-text-secondary);
+.messages-view .message-item .message-content :deep(blockquote) {
+  border-left: 0.1875rem solid var(--color-border-default);
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  color: var(--color-text-secondary);
 }
 
-.messages-view .message-item .message-content table {
+.messages-view .message-item .message-content :deep(table) {
   border-collapse: collapse;
   width: 100%;
-  margin: 8px 0;
+  margin: 0.5rem 0;
 }
 
-.messages-view .message-item .message-content table th,
-.messages-view .message-item .message-content table td {
-  border: 1px solid var(--o2-border-color);
-  padding: 6px 8px;
+.messages-view .message-item .message-content :deep(table th),
+.messages-view .message-item .message-content :deep(table td) {
+  border: 1px solid var(--color-border-default);
+  padding: 0.375rem 0.5rem;
   text-align: left;
 }
 
-.messages-view .message-item .message-content table th {
-  background-color: rgba(0, 0, 0, 0.05);
+.messages-view .message-item .message-content :deep(table th) {
+  background-color: color-mix(in srgb, var(--color-black) 5%, transparent);
 }
 
-/* Unscoped — needed because innerHTML-injected nodes don't get the scoped attribute */
-.llm-content-renderer .messages-view .message-item .message-content h1,
-.llm-content-renderer .messages-view .message-item .message-content h2,
-.llm-content-renderer .messages-view .message-item .message-content h3,
-.llm-content-renderer .messages-view .message-item .message-content h4 {
+.messages-view .message-item .message-content :deep(h1),
+.messages-view .message-item .message-content :deep(h2),
+.messages-view .message-item .message-content :deep(h3),
+.messages-view .message-item .message-content :deep(h4) {
   font-weight: 600;
-  margin: 10px 0 6px 0;
+  margin: 0.625rem 0 0.375rem 0;
   line-height: 1.4;
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h1 {
-  font-size: 1.15rem;
+.messages-view .message-item .message-content :deep(h1) {
+  font-size: var(--text-lg);
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h2 {
-  font-size: 1.05rem;
+.messages-view .message-item .message-content :deep(h2) {
+  font-size: var(--text-base);
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h3 {
-  font-size: 0.95rem;
+.messages-view .message-item .message-content :deep(h3) {
+  font-size: var(--text-base);
 }
 
-.llm-content-renderer .messages-view .message-item .message-content h4 {
-  font-size: 0.875rem;
+.messages-view .message-item .message-content :deep(h4) {
+  font-size: var(--text-sm);
 }
 </style>

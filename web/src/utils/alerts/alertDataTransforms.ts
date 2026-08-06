@@ -1,6 +1,5 @@
 /**
  * Alert Data Transformation Utilities
- * Extracted from AddAlert.vue to reduce file complexity
  *
  * VERSION SUPPORT:
  * - Version 1: Old structure with {and: [...]} or {or: [...]} format
@@ -143,6 +142,21 @@ export const removeConditionGroup = (
   const itemsArray = groupToProcess?.conditions || groupToProcess?.items;
   if (!itemsArray || !Array.isArray(itemsArray)) return;
 
+  // If the target IS this group, it can't be spliced out of a parent — at the
+  // root there is no parent, and FilterGroup at depth 0 emits remove-group with
+  // the root's own id. Empty it instead: that's what the confirm dialog promises
+  // ("will remove the entire condition group"). Mirrors the root check in
+  // updateConditionGroup above. Guarded on a truthy id so an id-less group can
+  // never match and wipe the whole tree.
+  if (targetGroupId && groupToProcess.groupId === targetGroupId) {
+    if (groupToProcess.conditions) {
+      groupToProcess.conditions = [];
+    } else {
+      groupToProcess.items = [];
+    }
+    return;
+  }
+
   const filterEmptyGroups = (items: any[]): any[] => {
     return items.filter((item: any) => {
       if (item.groupId === targetGroupId) {
@@ -266,7 +280,11 @@ export const detectConditionsVersion = (conditions: any): 0 | 1 | 2 => {
   if (!conditions) return 0;
 
   // Check for V2 structure (newest)
-  if (conditions.filterType === "group" && conditions.conditions && Array.isArray(conditions.conditions)) {
+  if (
+    conditions.filterType === "group" &&
+    conditions.conditions &&
+    Array.isArray(conditions.conditions)
+  ) {
     return 2;
   }
 
@@ -302,7 +320,7 @@ export const convertV0ToV2 = (v0Data: any[]): V2Group => {
   }
 
   // Convert each flat condition to V2 format
-  const conditions: V2Condition[] = v0Data.map((item: any, index: number) => {
+  const conditions: V2Condition[] = v0Data.map((item: any) => {
     const condition: V2Condition = {
       filterType: "condition",
       column: item.column || "",
@@ -329,7 +347,7 @@ export const convertV0ToV2 = (v0Data: any[]): V2Group => {
  * V1: {groupId, label: "and", items: [...]}
  * V2: {filterType: "group", logicalOperator: "AND", conditions: [...]}
  */
-export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Group => {
+export const convertV1ToV2 = (v1Data: any): V2Group => {
   if (!v1Data) {
     return {
       filterType: "group",
@@ -348,12 +366,12 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
   const label = v1Data.label || "and";
   const logicalOperator = label.toUpperCase() as "AND" | "OR";
 
-  const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
+  const conditions: (V2Condition | V2Group)[] = items.map((item: any) => {
     // Check if it's a nested group
     // V1 groups have 'items' array (and optionally 'label' and 'groupId')
     if (item.items && Array.isArray(item.items)) {
       // It's a V1 group, convert recursively
-      return convertV1ToV2(item, false);
+      return convertV1ToV2(item);
     }
 
     // It's a condition
@@ -397,7 +415,7 @@ export const convertV1ToV2 = (v1Data: any, isFirstGroup: boolean = true): V2Grou
  * In V2: Each condition has operator that determines how it connects to the NEXT item
  */
 export const convertV1BEToV2 = (v1BEData: any): V2Group => {
-  // we will check if v1bedata is there or not 
+  // we will check if v1bedata is there or not
   // if not we will return empty v2 format
   if (!v1BEData) {
     return {
@@ -416,8 +434,8 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   }
 
   // Get the operator key (and/or)
-  // here we will get the toplevel operator like or / and 
-  // becuase based on that only v1 got built for example 
+  // here we will get the toplevel operator like or / and
+  // becuase based on that only v1 got built for example
   // {
   //   "or":[
   //     "cond1",
@@ -439,7 +457,7 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   //      "c1"
   //   ]
   // }
-  // 
+  //
   // here also if we dont have that key we will return empty list
   const keys = Object.keys(v1BEData); //or / and
   if (keys.length === 0) {
@@ -452,7 +470,7 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
 
   const operatorKey = keys[0]; // "and" or "or" ["or"]
   // here we will get operator key and based on that we will extract all the condition and groups
-  // items will be after extracting 
+  // items will be after extracting
   // ["cond1", "cond2", "group1", "cond3", "group2"]
   //if only group is there
   // ["group1"]
@@ -461,9 +479,9 @@ export const convertV1BEToV2 = (v1BEData: any): V2Group => {
   //in recursive call
   //the current logicalOperator will be and
 
-  const conditions: (V2Condition | V2Group)[] = items.map((item: any, index: number) => {
+  const conditions: (V2Condition | V2Group)[] = items.map((item: any) => {
     // Check if it's a nested group
-    // here we will map all the items one by one and if we find any group 
+    // here we will map all the items one by one and if we find any group
     // then we will again send that to conversion recursively and whatever operator we had for this particualr group before we send
     // we will assign it to that nested group logicalOperator
     if (item.and || item.or) {

@@ -15,103 +15,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OPageLayout
     data-test="alert-history-page"
-    class="tw:p-0 tw:flex"
+    :title="t('alerts.history')"
+    title-data-test="alerts-history-title"
+    :back="{ label: t('alerts.header'), onClick: goBack, dataTest: 'alert-history-back-btn' }"
+    bleed
   >
-    <div class="tw:w-full tw:h-full tw:px-2.5 tw:pt-[0.325rem]">
-      <div class="card-container tw:mb-2.5">
-        <div
-          class="tw:flex tw:justify-between tw:w-full tw:h-17 tw:px-2 tw:py-3"
-        >
-          <div class="tw:flex tw:items-center">
-            <OButton
-              padding="xs"
-              variant="outline"
-              size="icon-sm"
-              icon-left="arrow-back-ios-new"
-              @click="goBack"
-              data-test="alert-history-back-btn"
-            />
-            <div
-              class="tw:text-xl tw:tracking-[0.005em] tw:font-semibold tw:ml-2"
-              data-test="alerts-history-title"
-            >
-              {{ t(`alerts.history`) }}
-            </div>
+    <template #actions>
+      <DateTime
+        ref="dateTimeRef"
+        auto-apply
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: absoluteTime.startTime,
+          endTime: absoluteTime.endTime,
+        }"
+        :default-relative-time="relativeTime"
+        data-test="alert-history-date-picker"
+        @on:date-change="updateDateTime"
+      />
+      <OSelect
+        v-model="selectedAlert"
+        :options="filteredAlertOptions"
+        labelKey="label"
+        valueKey="value"
+        @update:model-value="onAlertSelected"
+        :placeholder="t('alerts.searcHistory')"
+        data-test="alert-history-search-select"
+        class="o2-search-input min-w-62.5"
+        clearable
+        @clear="clearSearch"
+      >
+        <template #icon-left>
+          <OIcon class="o2-search-input-icon" name="search" size="sm" />
+        </template>
+        <template #empty>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
           </div>
-          <div class="tw:flex tw:ml-auto tw:items-center">
-            <div class="tw:mr-2">
-              <DateTime
-                ref="dateTimeRef"
-                auto-apply
-                :default-type="dateTimeType"
-                :default-absolute-time="{
-                  startTime: absoluteTime.startTime,
-                  endTime: absoluteTime.endTime,
-                }"
-                :default-relative-time="relativeTime"
-                data-test="alert-history-date-picker"
-                @on:date-change="updateDateTime"
-              />
-            </div>
-            <OSelect
-              v-model="selectedAlert"
-              :options="filteredAlertOptions"
-              labelKey="label"
-              valueKey="value"
-              @update:model-value="onAlertSelected"
-              :placeholder="t(`alerts.searcHistory`) || 'Select or search alert...'"
-              data-test="alert-history-search-select"
-              class="o2-search-input tw:mr-2"
-              style="min-width: 250px"
-              clearable
-              @clear="clearSearch"
-            >
-              <template #icon-left>
-                <OIcon
-                  class="o2-search-input-icon"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-search-input-icon-dark'
-                      : 'o2-search-input-icon-light'
-                  "
-                  name="search" size="sm"
-                />
-              </template>
-              <template #empty>
-                <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
-                  No alerts found
-                </div>
-              </template>
-            </OSelect>
-            <OButton
-              variant="ghost"
-              icon-left="search"
-              size="icon-sm"
-              @click="manualSearch"
-              data-test="alert-history-manual-search-btn"
-              :disabled="loading"
-              class="tw:mr-2"
-            >
-              <OTooltip :content="t('common.search') || 'Search'" />
-            </OButton>
-            <OButton
-              variant="ghost"
-              size="icon-sm"
-              icon-left="refresh"
-              @click="refreshData"
-              data-test="alert-history-refresh-btn"
-              :loading="loading"
-            >
-              <OTooltip :content="t('common.refresh') || 'Refresh'" />
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="tw:w-full tw:h-full tw:px-2.5">
-      <div class="alert-history-table card-container tw:h-[calc(100vh-130px)]">
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        icon-left="search"
+        size="icon-sm"
+        @click="manualSearch"
+        data-test="alert-history-manual-search-btn"
+        :disabled="loading"
+      >
+        <OTooltip :content="t('common.search')" />
+      </OButton>
+      <OButton
+        variant="ghost"
+        size="icon-sm"
+        icon-left="refresh"
+        @click="refreshData"
+        data-test="alert-history-refresh-btn"
+        :loading="loading"
+      >
+        <OTooltip :content="t('common.refresh')" />
+      </OButton>
+    </template>
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -126,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :sort-by="sortBy"
           :sort-order="sortOrder"
           :loading="loading"
+          show-index
           :show-global-filter="false"
           :default-columns="false"
           width="100%"
@@ -134,44 +102,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @sort-change="onSortChange"
         >
           <template #empty>
-            <div class="tw:h-screen tw:w-full">
-              <no-data />
+            <div class="h-screen w-full">
+              <NoData />
             </div>
           </template>
 
           <template #cell-timestamp="{ value }">
-            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
+            <OTimeCell
+              :value="value"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="raw('—')"
+            />
           </template>
 
           <template #cell-start_time="{ value }">
-            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
+            <OTimeCell
+              :value="value"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="raw('—')"
+            />
           </template>
 
           <template #cell-end_time="{ value }">
-            <OTimeCell :value="value" unit="us" mode="absolute" :timezone="store.state.timezone" empty-label="—" />
+            <OTimeCell
+              :value="value"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="raw('—')"
+            />
           </template>
 
           <template #cell-status="{ value }">
             <OTag type="alertState" :value="value" data-test="alert-history-status-badge" />
           </template>
 
+          <!-- T-10: what was observed, against what, and the level it
+               classified to. Pre-change rows (no actual_value) render "—". -->
+          <template #cell-condition="{ row }">
+            <div class="flex min-w-0 items-center gap-1.5">
+              <span class="text-compact whitespace-nowrap tabular-nums">
+                {{ conditionSummary(row) }}
+              </span>
+              <template v-if="row.level">
+                <span class="text-text-secondary text-2xs shrink-0">→</span>
+                <OTag type="alertLevel" :value="row.level" class="shrink-0" />
+              </template>
+              <span
+                v-if="row.group_label"
+                class="text-2xs text-text-secondary min-w-0 truncate"
+                data-test="alert-history-group-label"
+              >
+                {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
+                <OTooltip :content="row.group_label" :max-width="'300px'" />
+              </span>
+            </div>
+          </template>
+
           <template #cell-is_realtime="{ value }">
             <OIcon
               :name="value ? 'check-circle' : 'schedule'"
-              :class="value ? 'tw:text-(--o2-positive)' : 'tw:text-text-primary'"
+              :class="value ? 'text-status-positive' : 'text-text-body'"
               size="xs"
             >
-              <OTooltip :content="value ? 'Real-time' : 'Scheduled'" />
+              <OTooltip :content="value ? t('common.realTime') : t('alerts.scheduled')" />
             </OIcon>
           </template>
 
           <template #cell-is_silenced="{ value }">
             <OIcon
               :name="value ? 'volume-off' : 'volume-up'"
-              :class="value ? 'tw:text-text-primary' : 'tw:text-(--o2-positive)'"
+              :class="value ? 'text-text-body' : 'text-status-positive'"
               size="md"
             >
-              <OTooltip :content="value ? 'Silenced' : 'Not Silenced'" />
+              <OTooltip
+                :content="value ? t('alerts.insights.filters.silenced') : t('common.notSilenced')"
+              />
             </OIcon>
           </template>
 
@@ -180,42 +190,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-dedup="{ row }">
-            <span v-if="!row.dedup_enabled" class="tw:text-text-primary">-</span>
-            <div v-else-if="row.dedup_suppressed" class="tw:text-red-500">
+            <span v-if="!row.dedup_enabled" class="text-text-secondary">-</span>
+            <div v-else-if="row.dedup_suppressed" class="text-status-error-text">
               <OIcon name="block" size="sm">
                 <OTooltip>
                   <template #content>
-                    Suppressed by deduplication
+                    {{ t("alerts.suppressedByDeduplication") }}
                     <div v-if="row.dedup_count">
-                      {{ row.dedup_count }} occurrence{{ row.dedup_count > 1 ? 's' : '' }}
+                      {{ t("alerts.occurrence", { count: row.dedup_count }, row.dedup_count) }}
                     </div>
                   </template>
                 </OTooltip>
               </OIcon>
             </div>
-            <div v-else-if="row.grouped" class="text-primary tw:flex tw:items-center tw:justify-center">
+            <div v-else-if="row.grouped" class="text-primary flex items-center justify-center">
               <OIcon name="group-work" size="md">
                 <OTooltip>
                   <template #content>
-                    Grouped notification
-                    <div>{{ row.group_size }} alerts batched together</div>
+                    {{ t("alerts.groupedNotification") }}
+                    <div>{{ row.group_size }} {{ t("alerts.alertsBatchedTogether") }}</div>
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="tw:text-xs tw:ml-1">×{{ row.group_size || 1 }}</span>
+              <span class="ml-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
-            <div v-else class="tw:text-green-500 tw:flex tw:items-center tw:justify-center">
+            <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
                 <OTooltip>
                   <template #content>
-                    Notification sent
+                    {{ t("alerts.notificationSent") }}
                     <div v-if="row.dedup_count && row.dedup_count > 1">
-                      {{ row.dedup_count }} occurrences deduplicated
+                      {{ row.dedup_count }} {{ t("alerts.occurrencesDeduplicated") }}
                     </div>
                   </template>
                 </OTooltip>
               </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="tw:text-xs tw:ml-1">
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="ml-1 text-xs">
                 ×{{ row.dedup_count }}
               </span>
             </div>
@@ -229,7 +239,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
-              <OTooltip content="View Details" />
+              <OTooltip :content="t('alerts.viewDetails')" />
             </OButton>
             <OButton
               v-if="row.error"
@@ -239,7 +249,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="error"
               @click.stop="showErrorDialog(row)"
             >
-              <OTooltip :content="`Last error: ${new Date(row.timestamp / 1000).toLocaleString()}`" />
+              <OTooltip
+                :content="
+                  t('common.lastErrorAt', { time: new Date(row.timestamp / 1000).toLocaleString() })
+                "
+              />
             </OButton>
           </template>
         </OTable>
@@ -247,230 +261,216 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Details Dialog -->
-    <ODialog data-test="alert-history-details-dialog"
+    <ODialog
+      data-test="alert-history-details-dialog"
       v-model:open="detailsDialog"
       :width="55"
-      title="Alert Execution Details"
-      primary-button-label="Close"
+      :title="t('alerts.alertExecutionDetails')"
+      :primary-button-label="t('common.close')"
       @click:primary="detailsDialog = false"
     >
-      <div v-if="selectedRow" class="tw:gap-2">
-            <!-- Basic Information -->
-            <div class="tw:py-1 tw:px-0">
-              <div class="tw:flex tw:gap-3">
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Alert Name</div>
-                  <div class="tw:text-sm tw:font-medium">
-                    {{ selectedRow.alert_name }}
-                  </div>
-                </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Status</div>
-                  <OTag type="alertState" :value="selectedRow.status" />
-                </div>
+      <div v-if="selectedRow" class="gap-2">
+        <!-- Basic Information -->
+        <div class="px-0 py-1">
+          <div class="flex gap-3">
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.alertName") }}</div>
+              <div class="text-sm font-medium">
+                {{ selectedRow.alert_name }}
               </div>
             </div>
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.status") }}</div>
+              <OTag type="alertState" :value="selectedRow.status" />
+            </div>
+          </div>
+        </div>
 
-            <OSeparator class="tw:my-2" />
+        <OSeparator class="my-2" />
 
-            <!-- Time Information -->
-            <div class="tw:py-1 tw:px-0">
-              <div class="tw:flex tw:gap-3">
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Timestamp</div>
-                  <div class="tw:text-sm">
-                    {{ formatDate(selectedRow.timestamp) }}
-                  </div>
-                </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Duration</div>
-                  <div class="tw:text-sm">
-                    {{
-                      formatDuration(
-                        selectedRow.end_time - selectedRow.start_time,
-                      )
-                    }}
-                  </div>
-                </div>
+        <!-- Time Information -->
+        <div class="px-0 py-1">
+          <div class="flex gap-3">
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.timestamp") }}</div>
+              <div class="text-sm">
+                {{ formatHistoryDate(selectedRow.timestamp) }}
               </div>
             </div>
-
-            <OSeparator class="tw:my-2" />
-
-            <!-- Alert Configuration -->
-            <div class="tw:py-1 tw:px-0">
-              <div class="tw:flex tw:gap-3">
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Type</div>
-                  <div class="tw:text-sm">
-                    <OIcon
-                      :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                      class="tw:mr-1"
-                      size="xs"
-                    />
-                    {{ selectedRow.is_realtime ? "Real-time" : "Scheduled" }}
-                  </div>
-                </div>
-                <div class="tw:w-1/2">
-                  <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Silenced</div>
-                  <div class="tw:text-sm">
-                    <OIcon
-                      v-if="selectedRow.is_silenced"
-                      name="volume-off"
-                      size="xs"
-                      class="tw:mr-1"
-                    />
-                    <OIcon
-                      v-else
-                      name="volume-up"
-                      size="xs"
-                      class="tw:mr-1"
-                    />
-                    {{ selectedRow.is_silenced ? "Yes" : "No" }}
-                  </div>
-                </div>
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.duration") }}</div>
+              <div class="text-sm">
+                {{ formatDuration(selectedRow.end_time - selectedRow.start_time) }}
               </div>
             </div>
+          </div>
+        </div>
 
-            <!-- Performance Metrics (if available) -->
-            <template
-              v-if="
-                selectedRow.evaluation_took_in_secs ||
-                selectedRow.query_took ||
-                selectedRow.retries > 0
-              "
+        <OSeparator class="my-2" />
+
+        <!-- Alert Configuration -->
+        <div class="px-0 py-1">
+          <div class="flex gap-3">
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">{{ t("common.type") }}</div>
+              <div class="text-sm">
+                <OIcon
+                  :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
+                  class="mr-1"
+                  size="xs"
+                />
+                {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
+              </div>
+            </div>
+            <div class="w-1/2">
+              <div class="text-text-secondary mb-1 text-xs">
+                {{ t("alerts.insights.filters.silenced") }}
+              </div>
+              <div class="text-sm">
+                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
+                <OIcon v-else name="volume-up" size="xs" class="mr-1" />
+                {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Performance Metrics (if available) -->
+        <template
+          v-if="
+            selectedRow.evaluation_took_in_secs || selectedRow.query_took || selectedRow.retries > 0
+          "
+        >
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="flex gap-3">
+              <div v-if="selectedRow.evaluation_took_in_secs" class="w-1/3">
+                <div class="text-text-secondary mb-1 text-xs">
+                  {{ t("alerts.evaluationTime") }}
+                </div>
+                <div class="text-sm">{{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s</div>
+              </div>
+              <div v-if="selectedRow.query_took" class="w-1/3">
+                <div class="text-text-secondary mb-1 text-xs">
+                  {{ t("alerts.queryTime") }}
+                </div>
+                <div class="text-sm">{{ (selectedRow.query_took / 1000).toFixed(2) }}ms</div>
+              </div>
+              <div v-if="selectedRow.retries > 0" class="w-1/3">
+                <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.retries") }}</div>
+                <div class="text-sm">{{ selectedRow.retries }}</div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Source Node (if available) -->
+        <template v-if="selectedRow.source_node">
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">{{ t("alerts.sourceNode") }}</div>
+            <div class="font-mono text-sm">
+              {{ selectedRow.source_node }}
+            </div>
+          </div>
+        </template>
+
+        <!-- Error Details (if available) -->
+        <template v-if="selectedRow.error">
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">
+              <OIcon name="error" size="xs" class="mr-1" />
+              {{ t("alerts.errorDetails") }}
+            </div>
+            <div
+              class="rounded-default border-negative/30 bg-status-error-bg mt-2 border border-solid p-2"
             >
-              <OSeparator class="tw:my-2" />
-              <div class="tw:py-1 tw:px-0">
-                <div class="tw:flex tw:gap-3">
-                  <div v-if="selectedRow.evaluation_took_in_secs" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
-                      Evaluation Time
-                    </div>
-                    <div class="tw:text-sm">
-                      {{ selectedRow.evaluation_took_in_secs.toFixed(2) }}s
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.query_took" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
-                      Query Time
-                    </div>
-                    <div class="tw:text-sm">
-                      {{ (selectedRow.query_took / 1000).toFixed(2) }}ms
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.retries > 0" class="tw:w-1/3">
-                    <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Retries</div>
-                    <div class="tw:text-sm">{{ selectedRow.retries }}</div>
-                  </div>
-                </div>
-              </div>
-            </template>
+              <pre
+                class="text-sm"
+                style="
+                  white-space: pre-wrap;
+                  word-break: break-word;
+                  margin: 0;
+                  font-family: var(--font-mono);
+                  font-size: var(--text-xs);
+                "
+                >{{ selectedRow.error }}</pre
+              >
+            </div>
+          </div>
+        </template>
 
-            <!-- Source Node (if available) -->
-            <template v-if="selectedRow.source_node">
-              <OSeparator class="tw:my-2" />
-              <div class="tw:py-1 tw:px-0">
-                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">Source Node</div>
-                <div class="tw:text-sm tw:font-mono">
-                  {{ selectedRow.source_node }}
-                </div>
-              </div>
-            </template>
-
-            <!-- Error Details (if available) -->
-            <template v-if="selectedRow.error">
-              <OSeparator class="tw:my-2" />
-              <div class="tw:py-1 tw:px-0">
-                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
-                  <OIcon
-                    name="error"
-                    size="xs"
-                    class="tw:mr-1"
-                  />
-                  Error Details
-                </div>
-                <div class="tw:rounded tw:border tw:border-solid tw:border-negative/30 tw:p-2 tw:mt-2 tw:bg-red-500/5">
-                  <pre
-                    class="tw:text-sm"
-                    style="
-                      white-space: pre-wrap;
-                      word-break: break-word;
-                      margin: 0;
-                      font-family: 'Courier New', monospace;
-                      font-size: 12px;
-                    "
-                    >{{ selectedRow.error }}</pre
-                  >
-                </div>
-              </div>
-            </template>
-
-            <!-- Success Response (if available) -->
-            <template v-if="selectedRow.success_response">
-              <OSeparator class="tw:my-2" />
-              <div class="tw:py-1 tw:px-0">
-                <div class="tw:text-xs tw:text-text-secondary tw:mb-1">
-                  <OIcon
-                    name="check-circle"
-                    size="xs"
-                    class="tw:mr-1"
-                  />
-                  Response
-                </div>
-                <div class="tw:rounded tw:border tw:border-solid tw:border-positive/30 tw:p-2 tw:mt-2 tw:bg-green-500/5">
-                  <pre
-                    class="tw:text-sm"
-                    style="
-                      white-space: pre-wrap;
-                      word-break: break-word;
-                      margin: 0;
-                      font-family: 'Courier New', monospace;
-                      font-size: 12px;
-                    "
-                    >{{ selectedRow.success_response }}</pre
-                  >
-                </div>
-              </div>
-            </template>
+        <!-- Success Response (if available) -->
+        <template v-if="selectedRow.success_response">
+          <OSeparator class="my-2" />
+          <div class="px-0 py-1">
+            <div class="text-text-secondary mb-1 text-xs">
+              <OIcon name="check-circle" size="xs" class="mr-1" />
+              {{ t("alerts.response") }}
+            </div>
+            <div
+              class="rounded-default border-positive/30 bg-status-success-bg mt-2 border border-solid p-2"
+            >
+              <pre
+                class="text-sm"
+                style="
+                  white-space: pre-wrap;
+                  word-break: break-word;
+                  margin: 0;
+                  font-family: var(--font-mono);
+                  font-size: var(--text-xs);
+                "
+                >{{ selectedRow.success_response }}</pre
+              >
+            </div>
+          </div>
+        </template>
       </div>
     </ODialog>
 
     <!-- Error Dialog -->
-    <ODialog data-test="alert-history-error-dialog"
+    <ODialog
+      data-test="alert-history-error-dialog"
       v-model:open="errorDialog"
       size="md"
       :title="errorMessage.alert_name"
-      primary-button-label="Close"
+      :primary-button-label="t('common.close')"
       @click:primary="closeErrorDialog"
     >
       <template #header-left>
-        <OIcon name="error" size="sm" class="tw:text-red-500" />
+        <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="tw:flex tw:items-center tw:text-[13px] tw:opacity-70 tw:ml-9 tw:text-xs">
-          <span class="tw:mr-1">Last error:</span>
-          <OIcon name="schedule" size="xs" class="tw:mr-1" />
-          {{ errorMessage.last_error_timestamp && new Date(errorMessage.last_error_timestamp / 1000).toLocaleString() }}
+        <div class="text-compact ml-9 flex items-center text-xs opacity-70">
+          <span class="mr-1">{{ t("alerts.lastError") }}</span>
+          <OIcon name="schedule" size="xs" class="mr-1" />
+          {{
+            errorMessage.last_error_timestamp &&
+            new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()
+          }}
         </div>
       </template>
 
-      <div class="tw:mb-4">
-        <div class="tw:text-sm tw:font-semibold tw:tracking-[0.02em] tw:opacity-80 tw:mb-2">Error Summary</div>
-        <div class="tw:p-4 tw:rounded-lg tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:bg-[rgba(239,68,68,0.08)] tw:border tw:border-solid tw:border-[rgba(239,68,68,0.2)] tw:text-[#dc2626]">
+      <div class="mb-4">
+        <div class="mb-2 text-sm font-semibold tracking-[0.02em] opacity-80">
+          {{ t("alerts.errorSummary") }}
+        </div>
+        <div
+          class="rounded-default text-compact bg-status-error-bg border-status-negative text-status-error-text border border-solid p-4 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
+        >
           {{ errorMessage.error }}
         </div>
       </div>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
-
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -478,17 +478,19 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import alertsService from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
+import { conditionSummary } from "@/utils/alerts/runOutcome";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -530,14 +532,14 @@ const dateTimeValues = ref({
 const detailsDialog = ref(false);
 const errorDialog = ref(false);
 const selectedRow = ref<any>(null);
-const errorMessage = ref("");
+// Holds the clicked history row (or ""/null when cleared) — see showErrorDialog.
+const errorMessage = ref<any>("");
 
 // Table columns
 const columns = ref<OTableColumnDef[]>([
-  { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, minSize: TABLE_INDEX_COL_SIZE, maxSize: TABLE_INDEX_COL_SIZE, sortable: false, meta: { align: "left" } },
   {
     id: "alert_name",
-    header: t("alerts.alertName") || "Alert Name",
+    header: t("alerts.alertName"),
     accessorKey: "alert_name",
     sortable: true,
     size: COL.name,
@@ -545,7 +547,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_realtime",
-    header: t("alerts.type") || "Type",
+    header: t("alerts.type"),
     accessorKey: "is_realtime",
     sortable: true,
     size: 37,
@@ -556,7 +558,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "is_silenced",
-    header: t("alerts.isSilenced") || "Is Silenced",
+    header: t("alerts.isSilenced"),
     accessorKey: "is_silenced",
     sortable: true,
     size: 37,
@@ -567,7 +569,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "timestamp",
-    header: t("alerts.timestamp") || "Timestamp",
+    header: t("alerts.timestamp"),
     accessorKey: "timestamp",
     sortable: true,
     size: COL.dateAbsolute,
@@ -577,7 +579,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "start_time",
-    header: t("alerts.startTime") || "Start Time",
+    header: t("alerts.startTime"),
     accessorKey: "start_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -587,7 +589,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "end_time",
-    header: t("alerts.endTime") || "End Time",
+    header: t("alerts.endTime"),
     accessorKey: "end_time",
     sortable: true,
     size: COL.dateAbsolute,
@@ -597,7 +599,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "duration",
-    header: t("alerts.duration") || "Duration",
+    header: t("alerts.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: false,
     size: COL.duration,
@@ -607,7 +609,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "status",
-    header: t("alerts.status") || "Status",
+    header: t("alerts.status"),
     accessorKey: "status",
     sortable: true,
     size: COL.status,
@@ -616,8 +618,18 @@ const columns = ref<OTableColumnDef[]>([
     meta: { align: "left" },
   },
   {
+    // T-10 value context: "actual operator threshold → level" per run.
+    id: "condition",
+    header: t("alerts.historyTable.condition"),
+    accessorKey: "actual_value",
+    sortable: false,
+    size: 220,
+    cell: " ",
+    meta: { align: "left" },
+  },
+  {
     id: "retries",
-    header: t("alerts.retries") || "Retries",
+    header: t("alerts.retries"),
     accessorKey: "retries",
     sortable: true,
     size: 64,
@@ -626,7 +638,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "dedup",
-    header: t("alerts.dedup") || "Dedup",
+    header: t("alerts.dedup"),
     sortable: false,
     size: 80,
     maxSize: 80,
@@ -635,7 +647,7 @@ const columns = ref<OTableColumnDef[]>([
   },
   {
     id: "actions",
-    header: t("common.actions") || "Actions",
+    header: t("common.actions"),
     isAction: true,
     pinned: "right",
     size: 80,
@@ -647,11 +659,6 @@ const columns = ref<OTableColumnDef[]>([
 ]);
 
 // Computed
-const filteredRows = computed(() => {
-  // Removed client-side filtering as we're using server-side pagination
-  return rows.value;
-});
-
 // Methods
 const fetchAlertsList = async () => {
   try {
@@ -676,7 +683,7 @@ const fetchAlertsList = async () => {
           label: alert.name,
           value: alert.alert_id,
         }))
-        .sort((a, b) => a.label.localeCompare(b.label));
+        .sort((a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label));
       filteredAlertOptions.value = [...allAlerts.value];
     }
   } catch (error: any) {
@@ -685,21 +692,12 @@ const fetchAlertsList = async () => {
   }
 };
 
-const filterAlertOptions = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    filteredAlertOptions.value = allAlerts.value.filter((v) =>
-      v.label.toLowerCase().includes(needle),
-    );
-  });
-};
-
 const onAlertSelected = (val: any) => {
   if (val) {
     // Extract the alert_id from the selected object
-    if (typeof val === 'object' && val.value) {
+    if (typeof val === "object" && val.value) {
       searchQuery.value = val.value;
-    } else if (typeof val === 'string') {
+    } else if (typeof val === "string") {
       searchQuery.value = val;
     }
   }
@@ -746,7 +744,6 @@ const fetchAlertHistory = async () => {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
         id: `${hit.timestamp}_${index}`,
-        "#": (index + 1) + (currentPage.value - 1) * pageSize.value,
       }));
 
       totalCount.value = historyData.total || 0;
@@ -760,10 +757,7 @@ const fetchAlertHistory = async () => {
     console.error("Error response:", error.response);
     toast({
       variant: "error",
-      message:
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to fetch alert history",
+      message: error.response?.data?.message || error.message || "Failed to fetch alert history",
     });
   } finally {
     loading.value = false;
@@ -809,7 +803,7 @@ const refreshData = () => {
   fetchAlertHistory();
 };
 
-const formatDate = (timestamp: number) => {
+const formatHistoryDate = (timestamp: number) => {
   if (!timestamp) return "-";
   // Convert microseconds to milliseconds
   const dateObj = new Date(timestamp / 1000);
@@ -848,7 +842,10 @@ const closeErrorDialog = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 // Lifecycle
@@ -872,13 +869,3 @@ watch(
   },
 );
 </script>
-
-<style>
-.alert-history-table :deep(table) {
-  width: 100%;
-}
-
-.alert-history-table :deep(table) td {
-  vertical-align: middle;
-}
-</style>

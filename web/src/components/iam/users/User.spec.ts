@@ -13,27 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  vi,
-  afterEach,
-  beforeAll,
-  afterAll,
-} from "vitest";
+import { describe, expect, it, beforeEach, vi, afterEach, beforeAll, afterAll } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import User from "@/components/iam/users/User.vue";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import usersService from "@/services/users";
 import organizationsService from "@/services/organizations";
 import { getRoles } from "@/services/iam";
 import segment from "@/services/segment_analytics";
-
 
 // Create i18n instance with comprehensive translations for CI/CD compatibility
 const i18n = createI18n({
@@ -139,7 +129,7 @@ const ODialogStub = {
 };
 
 // Lightweight stubs for embedded child dialogs / table helpers so the
-// component renders without trying to set up the real Quasar table.
+// component renders without trying to set up the real table.
 const UpdateUserRoleStub = {
   name: "UpdateUserRole",
   props: ["open", "modelValue"],
@@ -166,11 +156,11 @@ const NoDataStub = {
   template: `<div class="no-data-stub" />`,
 };
 
-const QTablePaginationStub = {
-  name: "QTablePagination",
+const PaginationStub = {
+  name: "Pagination",
   props: ["scope", "resultTotal", "perPageOptions", "position"],
   emits: ["update:changeRecordPerPage"],
-  template: `<div class="q-table-pagination-stub" />`,
+  template: `<div class="table-pagination-stub" />`,
 };
 
 const mountUser = () =>
@@ -184,28 +174,8 @@ const mountUser = () =>
         AddUser: AddUserStub,
         MemberInvitation: MemberInvitationStub,
         NoData: NoDataStub,
-        QTablePagination: QTablePaginationStub,
-        // Keep Quasar components shallow so we don't depend on real
-        // table internals; we still render their slots.
-        "q-page": { template: "<div><slot /></div>" },
-        "q-table": {
-          props: ["rows", "columns", "selected"],
-          template: '<div class="q-table-stub"><slot /></div>',
-        },
-        "q-input": {
-          props: ["modelValue"],
-          template: '<div class="q-input-stub"><slot name="prepend" /></div>',
-          emits: ["update:modelValue"],
-        },
-        "OIcon": { template: "<i />" },
-        "q-td": { template: "<div><slot /></div>" },
-        "q-th": { template: "<div><slot /></div>" },
-        "q-tr": { template: "<div><slot /></div>" },
-        "q-checkbox": {
-          props: ["modelValue"],
-          template: '<div class="q-checkbox-stub" />',
-          emits: ["update:modelValue"],
-        },
+        Pagination: PaginationStub,
+        OIcon: { template: "<i />" },
         OButton: {
           props: ["variant", "size", "disabled", "loading"],
           template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
@@ -392,7 +362,8 @@ describe("User Component", () => {
   describe("Confirm Revoke ODialog", () => {
     it("opens when confirmRevokeAction is invoked", async () => {
       wrapper.vm.confirmRevokeAction({
-        email: "pending@example.com", token: "tok-123",
+        email: "pending@example.com",
+        token: "tok-123",
       });
       await flushPromises();
       expect(wrapper.vm.confirmRevoke).toBe(true);
@@ -424,7 +395,8 @@ describe("User Component", () => {
 
     it("invokes revokeInvite when primary is clicked", async () => {
       wrapper.vm.confirmRevokeAction({
-        email: "pending@example.com", token: "tok-123",
+        email: "pending@example.com",
+        token: "tok-123",
       });
       await flushPromises();
       const dialog = wrapper
@@ -722,9 +694,9 @@ describe("User Component", () => {
   describe("shouldAllowChangeRole", () => {
     it("should not allow role change for root users", () => {
       wrapper.vm.currentUserRole = "admin";
-      expect(
-        wrapper.vm.shouldAllowChangeRole({ email: "root@example.com", role: "root" }),
-      ).toBe(false);
+      expect(wrapper.vm.shouldAllowChangeRole({ email: "root@example.com", role: "root" })).toBe(
+        false,
+      );
     });
 
     it("should allow role change for non-root users when current user is admin", () => {
@@ -749,9 +721,7 @@ describe("User Component", () => {
   describe("shouldAllowDelete", () => {
     it("should not allow deleting root users", () => {
       wrapper.vm.currentUserRole = "admin";
-      expect(wrapper.vm.shouldAllowDelete({ email: "root@example.com", role: "root" })).toBe(
-        false,
-      );
+      expect(wrapper.vm.shouldAllowDelete({ email: "root@example.com", role: "root" })).toBe(false);
     });
 
     it("should not allow users to delete themselves", () => {
@@ -768,9 +738,7 @@ describe("User Component", () => {
 
     it("should allow admin to delete non-root users", () => {
       wrapper.vm.currentUserRole = "admin";
-      expect(wrapper.vm.shouldAllowDelete({ email: "m@example.com", role: "member" })).toBe(
-        true,
-      );
+      expect(wrapper.vm.shouldAllowDelete({ email: "m@example.com", role: "member" })).toBe(true);
     });
   });
 
@@ -916,9 +884,7 @@ describe("User Component", () => {
 
   describe("hideForm", () => {
     it("should hide add user dialog and navigate", () => {
-      const replaceSpy = vi
-        .spyOn(router, "replace")
-        .mockImplementation(() => Promise.resolve());
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
       wrapper.vm.showAddUserDialog = true;
 
       wrapper.vm.hideForm();
@@ -934,9 +900,7 @@ describe("User Component", () => {
   describe("addMember", () => {
     it("should handle successful user creation", async () => {
       const pushSpy = vi.spyOn(router, "push").mockImplementation(() => Promise.resolve());
-      const replaceSpy = vi
-        .spyOn(router, "replace")
-        .mockImplementation(() => Promise.resolve());
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
 
       await wrapper.vm.addMember(
         { code: 200 },
@@ -962,15 +926,9 @@ describe("User Component", () => {
     });
 
     it("should handle unsuccessful response", async () => {
-      const replaceSpy = vi
-        .spyOn(router, "replace")
-        .mockImplementation(() => Promise.resolve());
+      const replaceSpy = vi.spyOn(router, "replace").mockImplementation(() => Promise.resolve());
 
-      await wrapper.vm.addMember(
-        { code: 400 },
-        { email: "failed@example.com" },
-        "created",
-      );
+      await wrapper.vm.addMember({ code: 400 }, { email: "failed@example.com" }, "created");
 
       expect(wrapper.vm.showAddUserDialog).toBe(false);
       expect(replaceSpy).toHaveBeenCalled();

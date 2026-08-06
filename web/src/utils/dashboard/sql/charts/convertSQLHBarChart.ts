@@ -20,7 +20,7 @@ import { type SQLContext } from "../shared/types";
 /**
  * Applies chart-specific options for: h-bar
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyHBarChart(ctx: SQLContext): void {
   const {
@@ -50,28 +50,18 @@ export function applyHBarChart(ctx: SQLContext): void {
   if (!panelSchema.config.trellis?.layout) {
     const xAxisMaxLabel =
       calculateWidthText(
-        xAxisKeys.reduce(
-          (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
-          "",
-        ),
+        xAxisKeys.reduce((str: any, it: any) => largestLabel(getAxisDataFromKey(it)), ""),
       ) + 16;
 
     // breakDownKeys will be 0 or 1
     const breakDownMaxLabel =
       calculateWidthText(
-        breakDownKeys.reduce(
-          (str: any, it: any) => largestLabel(getAxisDataFromKey(it)),
-          "",
-        ),
+        breakDownKeys.reduce((str: any, it: any) => largestLabel(getAxisDataFromKey(it)), ""),
       ) + 16;
 
     options.yAxis.forEach((it: any) => {
       it.axisLabel.overflow = "truncate";
-      it.nameGap =
-        Math.min(
-          Math.max(xAxisMaxLabel, breakDownMaxLabel),
-          it.axisLabel.width,
-        ) + 10;
+      it.nameGap = Math.min(Math.max(xAxisMaxLabel, breakDownMaxLabel), it.axisLabel.width) + 10;
     });
 
     options.xAxis.name =

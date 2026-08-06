@@ -1,52 +1,78 @@
 <template>
   <div data-test="promql-labelfilter-editor">
-    <div style="display: flex; flex-direction: row" class="tw:pl-2">
+    <div class="flex flex-row pl-2">
       <div
         data-test="promql-labelfilter-editor-label"
-        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-21.5"
-      >{{ t("panel.labelFilters") }}</div>
-      <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
-      <div class="tw:m-0.5 tw:flex tw:gap-2 tw:flex-wrap tw:items-center scroll">
+        class="flex min-w-24 items-center whitespace-nowrap"
+      >
+        <span
+          class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
+        {{ t("panel.labelFilters") }}
+      </div>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+      <div class="scroll m-0.5 flex min-h-8 flex-wrap items-center gap-2">
         <!-- Label Filter Items -->
         <div
           v-for="(label, index) in props.labels"
           :key="index"
           data-test="promql-labelfilter-item"
-          class="tw:flex tw:items-center"
+          class="flex items-center"
         >
-          <OButtonGroup class="axis-field" radius="sm">
+          <OButtonGroup
+            class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+            radius="sm"
+            :divided="true"
+          >
             <ODropdown>
               <template #trigger>
                 <OButton
-                  variant="primary"
-                  size="chip"
-                  class="tw:!text-[12px]"
+                  variant="ghost"
+                  size="chip-12"
+                  class="!ps-1 !pe-1"
                   :data-test="`promql-label-filter-${index}`"
                 >
-                  {{ computedLabel(label) }}
+                  <span class="leading-normal font-normal whitespace-nowrap">
+                    <template v-if="!label.label">
+                      <span class="text-text-secondary">{{ computedLabel(label) }}</span>
+                    </template>
+                    <!-- PromQL editor colours: maroon labels, string/number values -->
+                    <template v-else>
+                      <span class="text-promql-label">{{ label.label }}</span>
+                      <template v-if="label.value">
+                        <span class="text-text-secondary px-1">{{ label.op }}</span>
+                        <span
+                          :class="
+                            /^-?[\d.]+$/.test(String(label.value).trim())
+                              ? 'text-promql-number'
+                              : 'text-promql-string'
+                          "
+                          >{{ label.value }}</span
+                        >
+                      </template>
+                    </template>
+                  </span>
                   <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
                 </OButton>
               </template>
-              <div
-                class="tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
-                :data-test="`promql-label-filter-${index}-menu`"
-              >
-                <div style="width: 350px">
+              <div class="p-3" :data-test="`promql-label-filter-${index}-menu`">
+                <div class="w-86 [&_.o-input-label]:text-xs [&_.o-input-label]:font-normal">
                   <!-- Label Selection -->
                   <OSelect
                     v-model="label.label"
                     :options="availableLabelOptions"
-                    label="Label"
-                    class="label-filter-label-select showLabelOnTop tw:normal-case! tw:mb-2"
+                    :label="t('metrics.labelFilterEditor.label')"
+                    class="label-filter-label-select showLabelOnTop mb-1.5 normal-case!"
                     searchable
                     clearable
                     data-test="promql-label-select"
                   >
                     <template #empty>
-                      <span class="tw:text-text-secondary tw:px-3 tw:py-2">{{
+                      <span class="text-text-secondary px-3 py-2">{{
                         loadingLabels
-                          ? "Loading labels..."
-                          : "No labels found"
+                          ? t("metrics.labelFilterEditor.loadingLabels")
+                          : t("metrics.labelFilterEditor.noLabelsFound")
                       }}</span>
                     </template>
                   </OSelect>
@@ -55,8 +81,8 @@
                   <OSelect
                     v-model="label.op"
                     :options="operatorOptions"
-                    label="Operator"
-                    class="label-filter-operator-select showLabelOnTop tw:mb-2"
+                    :label="t('metrics.labelFilterEditor.operator')"
+                    class="label-filter-operator-select showLabelOnTop mb-1.5"
                     data-test="promql-operator-select"
                   />
 
@@ -64,7 +90,7 @@
                   <OSelect
                     v-model="label.value"
                     :options="getLabelValueOptions(label.label)"
-                    label="Value"
+                    :label="t('metrics.labelFilterEditor.value')"
                     class="label-filter-value-select showLabelOnTop"
                     :value-key="'value'"
                     :label-key="'label'"
@@ -74,10 +100,10 @@
                     data-test="promql-value-select"
                   >
                     <template #empty>
-                      <span class="tw:text-text-secondary tw:px-3 tw:py-2">{{
+                      <span class="text-text-secondary px-3 py-2">{{
                         !label.label
-                          ? 'Select a label first'
-                          : 'No values found'
+                          ? t("metrics.labelFilterEditor.selectLabelFirst")
+                          : t("metrics.labelFilterEditor.noValuesFound")
                       }}</span>
                     </template>
                   </OSelect>
@@ -85,25 +111,26 @@
               </div>
             </ODropdown>
             <OButton
-              variant="outline"
+              variant="ghost"
               size="icon-chip"
+              class="!w-4"
               @click="removeLabel(index)"
               :data-test="`promql-label-filter-remove-${index}`"
-              icon-left="close"
             >
+              <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
             </OButton>
           </OButtonGroup>
         </div>
 
         <!-- Add Button -->
         <OButton
-          variant="ghost-primary"
-          size="sm"
+          variant="outline"
+          size="icon-chip"
           @click="addLabel"
           data-test="promql-add-label-filter"
         >
           <OIcon name="add" size="sm" />
-          <OTooltip content="Add label filter" side="top" />
+          <OTooltip :content="t('metrics.labelFilterEditor.addLabelFilter')" side="top" />
         </OButton>
       </div>
     </div>
@@ -118,31 +145,31 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import { useI18n } from "vue-i18n";
-import { QueryBuilderLabelFilter } from "@/components/promql/types";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { PromqlLabelMatcher } from "@/components/promql/types";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 const props = defineProps<{
-  labels: QueryBuilderLabelFilter[];
+  labels: PromqlLabelMatcher[];
   metric?: string;
   dashboardData?: any; // Dashboard data containing variables
   dashboardPanelData?: any;
 }>();
 
 const emit = defineEmits<{
-  "update:labels": [value: QueryBuilderLabelFilter[]];
+  "update:labels": [value: PromqlLabelMatcher[]];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Get fetchPromQLLabels from composable
-const dashboardPanelDataPageKey = inject(
-  "dashboardPanelDataPageKey",
-  "dashboard",
+const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+const { fetchPromQLLabels, fetchPromQLLabelValues } = useDashboardPanelData(
+  dashboardPanelDataPageKey,
+  t,
 );
-const { fetchPromQLLabels } = useDashboardPanelData(dashboardPanelDataPageKey);
 
-const availableLabels = computed(
+const availableLabels = computed<string[]>(
   () => props.dashboardPanelData?.meta?.promql?.availableLabels || [],
 );
 
@@ -157,15 +184,13 @@ const operatorOptions = ["=", "!=", "=~", "!~"];
 
 // Computed: available labels minus ones already selected in other rows
 const availableLabelOptions = computed(() => {
-  const selectedLabels = props.labels.map((l) => l.label);
-  return availableLabels.value.filter(
-    (label) => !selectedLabels.includes(label),
-  );
+  const selectedLabels: string[] = props.labels.map((l) => l.label);
+  return availableLabels.value.filter((label) => !selectedLabels.includes(label));
 });
 
-const computedLabel = (label: QueryBuilderLabelFilter): string => {
+const computedLabel = (label: PromqlLabelMatcher): string => {
   if (!label.label) {
-    return "Select label";
+    return t("metrics.labelFilterEditor.selectLabel");
   }
   if (!label.value) {
     return label.label;
@@ -173,13 +198,13 @@ const computedLabel = (label: QueryBuilderLabelFilter): string => {
   return `${label.label} ${label.op} ${label.value}`;
 };
 
-// Watch for metric OR selected time range changes to (re)fetch available labels.
+// Watch the metric, and only the metric. The label list is read from the
+// stream SCHEMA, which has no time dimension, so the panel's selected range
+// cannot change the answer — watching it bought a request per range change and
+// nothing else. The range mattered when labels were derived from the series in
+// that window; see tmp/code.md D11 for what changed and what it costs.
 watch(
-  () => [
-    props.metric,
-    props.dashboardPanelData?.meta?.dateTime?.start_time,
-    props.dashboardPanelData?.meta?.dateTime?.end_time,
-  ],
+  () => props.metric,
   async () => {
     if (props.metric) {
       await fetchPromQLLabels(props.metric);
@@ -190,11 +215,30 @@ watch(
   { immediate: true },
 );
 
+// Values are fetched for the labels a user has actually chosen, one at a time.
+// They used to arrive with the label NAMES, derived from every series of the
+// metric; asking for all of them up front costs a distinct-value aggregation
+// per label, for labels most queries never filter on.
+watch(
+  () => props.labels.map((label) => label.label).join(","),
+  () => {
+    // Read into a local: the narrowing from the guard does not survive into the
+    // callback, where TypeScript has to assume the prop may have changed.
+    const metric = props.metric;
+    if (!metric) return;
+    props.labels
+      .map((label) => label.label)
+      .filter(Boolean)
+      .forEach((label) => void fetchPromQLLabelValues(metric, label));
+  },
+  { immediate: true },
+);
+
 const addLabel = () => {
-  const newLabels: QueryBuilderLabelFilter[] = [
+  const newLabels: PromqlLabelMatcher[] = [
     ...props.labels,
     {
-      label: "",
+      label: raw(""),
       op: "=",
       value: "",
     },
@@ -230,7 +274,7 @@ const getLabelValueOptions = (labelKey: string) => {
   const actualValues = labelValuesMap.value.get(labelKey) || [];
   actualValues.forEach((value: string) => {
     options.push({
-      label: value,
+      label: raw(value),
       value: value,
       isVariable: false,
     });
@@ -242,13 +286,13 @@ const getLabelValueOptions = (labelKey: string) => {
 const getOperatorHint = (op: string): string => {
   switch (op) {
     case "=":
-      return "Exact match";
+      return t("metrics.labelFilterEditor.exactMatch");
     case "!=":
-      return "Not equal to";
+      return t("metrics.labelFilterEditor.notEqualTo");
     case "=~":
-      return "Regex pattern (e.g., prod.*)";
+      return t("metrics.labelFilterEditor.regexPattern");
     case "!~":
-      return "Regex not matching (e.g., test.*)";
+      return t("metrics.labelFilterEditor.regexNotMatching");
     default:
       return "";
   }

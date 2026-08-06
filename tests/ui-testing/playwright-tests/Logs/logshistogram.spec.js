@@ -64,6 +64,11 @@ test.describe("Logs Histogram testcases", () => {
     // Step 1: FTS mode — match_all with no-results string
     await pm.logsPage.ensureFTSMode();
     await pm.logsPage.clearAndFillQueryEditor("match_all('asdukiabnfnsajkn')");
+    // clearAndFillQueryEditor only fills the Monaco input; the value reaches the Vue
+    // store on a debounce. Without waiting, clickRefresh() below can run the PREVIOUS
+    // (valid) query, which returns results instead of the no-events state, so
+    // clickErrorMessage() finds no error/no-results element and throws (flaky in CI).
+    await pm.logsPage.waitForQueryEditorValue("match_all('asdukiabnfnsajkn')");
     await pm.logsPage.setDateTimeFilter();
     const ftsResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
@@ -75,6 +80,9 @@ test.describe("Logs Histogram testcases", () => {
     // code > 99999 is impossible for any HTTP status code so results are always 0.
     await pm.logsPage.ensureSQLMode();
     await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
+    // Ensure the new SQL query has propagated to the store before running, otherwise
+    // the prior query may execute and clickNoDataFound() won't find the empty state.
+    await pm.logsPage.waitForQueryEditorValue('code > 99999');
     const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await sqlResponse;
@@ -103,6 +111,11 @@ test.describe("Logs Histogram testcases", () => {
     // Step 1: FTS mode — match_all with no-results string, histogram OFF
     await pm.logsPage.ensureFTSMode();
     await pm.logsPage.clearAndFillQueryEditor("match_all('asdukiabnfnsajkn')");
+    // clearAndFillQueryEditor only fills the Monaco input; the value reaches the Vue
+    // store on a debounce. Without waiting, clickRefresh() below can run the PREVIOUS
+    // (valid) query, which returns results instead of the no-events state, so
+    // clickErrorMessage() finds no error/no-results element and throws (flaky in CI).
+    await pm.logsPage.waitForQueryEditorValue("match_all('asdukiabnfnsajkn')");
     await pm.logsPage.setDateTimeFilter();
     const ftsResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
@@ -117,6 +130,9 @@ test.describe("Logs Histogram testcases", () => {
     // code > 99999 is impossible for any HTTP status code so results are always 0.
     await pm.logsPage.ensureSQLMode();
     await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
+    // Ensure the new SQL query has propagated to the store before running, otherwise
+    // the prior query may execute and clickNoDataFound() won't find the empty state.
+    await pm.logsPage.waitForQueryEditorValue('code > 99999');
     const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     await sqlResponse;

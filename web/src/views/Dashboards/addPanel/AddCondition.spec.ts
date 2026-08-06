@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { shallowMount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
@@ -39,7 +39,7 @@ vi.mock("../../../composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-// Mock DOM methods to prevent Quasar errors
+// Mock DOM methods to prevent errors from missing DOM APIs
 Object.defineProperty(Element.prototype, "removeAttribute", {
   writable: true,
   value: vi.fn(),
@@ -47,7 +47,6 @@ Object.defineProperty(Element.prototype, "removeAttribute", {
 
 describe("AddCondition.vue", () => {
   let wrapper: any;
-  let mockLoadFilterItem: any;
 
   const defaultProps = {
     condition: {
@@ -108,29 +107,13 @@ describe("AddCondition.vue", () => {
       props: { ...defaultProps, ...props },
       global: {
         plugins: [i18n],
-        stubs: [
-          "q-select",
-          "q-btn",
-          "q-btn-group",
-          "q-menu",
-          "q-tabs",
-          "q-tab",
-          "q-tab-panels",
-          "q-tab-panel",
-          "q-separator",
-          "q-item",
-          "q-item-section",
-          "q-checkbox",
-          "CommonAutoComplete",
-          "SanitizedHtmlRenderer",
-        ],
+        stubs: ["CommonAutoComplete", "SanitizedHtmlRenderer"],
       },
       ...mountOptions,
     });
   };
 
   beforeEach(() => {
-    mockLoadFilterItem = vi.fn();
     vi.clearAllMocks();
   });
 
@@ -466,13 +449,7 @@ describe("AddCondition.vue", () => {
 
       const options = wrapper.vm.sortedFilteredListOptions;
       expect(Array.isArray(options)).toBe(true);
-      expect(options).toEqual([
-        "alpha",
-        "option1",
-        "option2",
-        "option3",
-        "zebra",
-      ]); // Sorted alphabetically
+      expect(options).toEqual(["alpha", "option1", "option2", "option3", "zebra"]); // Sorted alphabetically
     });
 
     it("should filter list options based on search term", async () => {

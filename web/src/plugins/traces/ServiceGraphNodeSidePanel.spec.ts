@@ -43,13 +43,11 @@ vi.mock("@/services/service_streams", () => ({
     },
   }),
   getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
-  getDimensionAnalytics: vi
-    .fn()
-    .mockResolvedValue({ data: { available_groups: [] } }),
+  getDimensionAnalytics: vi.fn().mockResolvedValue({ data: { available_groups: [] } }),
   buildChipDimensionsFromFilters: vi.fn().mockReturnValue({}),
 }));
 
-// resolveStreamSchema calls useStreams().getStream() to fetch and cache the
+// resolveStreamSchema calls useStreams(t).getStream() to fetch and cache the
 // stream schema. Mock it so those calls complete instantly instead of making
 // real HTTP requests that hang in tests.
 const { getStreamMock } = vi.hoisted(() => ({
@@ -67,11 +65,28 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((d: any) => d),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
+vi.mock("vue-i18n", async () => {
+  // Resolve keys against the real English locale so migrated t("...") calls
+  // render the actual translated text (badges, caller column, "No operations
+  // found", etc.), instead of the raw key paths the old identity mock returned.
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default;
+  // A few tests assert on the raw i18n key (locale-independent), matching the
+  // original identity-mock behavior. Keep those keys mapping to themselves so
+  // those assertions still hold.
+  const identityKeys = new Set<string>(["traces.noLogsAvailableForService"]);
+  const resolve = (key: string): string => {
+    if (identityKeys.has(key)) return key;
+    const val = key
+      .split(".")
+      .reduce<any>((acc, part) => (acc == null ? undefined : acc[part]), enLocaleFull);
+    return typeof val === "string" ? val : key;
+  };
+  return {
+    useI18n: vi.fn(() => ({
+      t: (key: string) => resolve(key),
+    })),
+  };
+});
 
 vi.mock("vue-router", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -90,22 +105,13 @@ vi.mock("vue-router", async (importOriginal) => {
   };
 });
 
-vi.mock("quasar", () => ({
-  useQuasar: () => ({
-    notify: notifyMock,
-    dialog: vi.fn(),
-  }),
-}));
-
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: toastMock,
 }));
 
 import ServiceGraphNodeSidePanel from "./ServiceGraphNodeSidePanel.vue";
 import searchService from "@/services/search";
-import useStreams from "@/composables/useStreams";
 import { correlate as correlateStreams } from "@/services/service_streams";
-
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -188,15 +194,13 @@ const ODrawerStub = {
   `,
 };
 
-function mountPanel(
-  props: Partial<InstanceType<typeof ServiceGraphNodeSidePanel>["$props"]> = {},
-) {
+function mountPanel(props: Partial<InstanceType<typeof ServiceGraphNodeSidePanel>["$props"]> = {}) {
   return mount(ServiceGraphNodeSidePanel, {
     global: {
       plugins: [store],
       stubs: {
         RenderDashboardCharts: { template: '<div data-test="stub-charts" />' },
-        TenstackTable: { template: '<div data-test="stub-table" />' },
+        OTable: { template: '<div data-test="stub-table" />' },
         TelemetryCorrelationDashboard: {
           template: '<div data-test="stub-telemetry" />',
         },
@@ -204,13 +208,15 @@ function mountPanel(
         // Render ODropdown content inline so data-test items are always queryable
         ODropdown: {
           name: "ODropdown",
-          template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+          template:
+            '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
           emits: ["update:open"],
           props: ["open", "side", "align", "sideOffset"],
         },
         ODropdownItem: {
           name: "ODropdownItem",
-          template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
+          template:
+            '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
           emits: ["select"],
         },
         // OTabs stub — Reka UI-based, needs stub to avoid context errors
@@ -222,7 +228,8 @@ function mountPanel(
         },
         OTab: {
           name: "OTab",
-          template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+          template:
+            '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
           props: ["name", "label", "style"],
         },
         // OTabPanels: provide reactive context via setup()
@@ -288,24 +295,17 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should render the panel when visible is true", () => {
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
     });
 
     it("should not render the panel when visible is false", () => {
       wrapper = mountPanel({ visible: false });
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
     });
 
     it("should render the close button", () => {
-      expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(true);
     });
-
   });
 
   // -------------------------------------------------------------------------
@@ -392,21 +392,15 @@ describe("ServiceGraphNodeSidePanel", () => {
     it("should render the red-charts section when streamFilter is not 'all'", async () => {
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-red-charts"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel-red-charts"]').exists()).toBe(true);
     });
 
     it("should NOT render the red-charts section when streamFilter is 'all'", async () => {
       wrapper = mountPanel({ streamFilter: "all" });
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-red-charts"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel-red-charts"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -421,29 +415,19 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should render the tabs when streamFilter is not 'all'", async () => {
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tabs"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(true);
     });
 
     it("should NOT render the tabs when streamFilter is 'all'", async () => {
       wrapper = mountPanel({ streamFilter: "all" });
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tabs"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(false);
     });
 
     it("should default to the operations tab panel", async () => {
       await flushPromises();
       expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-recent-operations"]')
-          .exists(),
+        wrapper.find('[data-test="service-graph-side-panel-recent-operations"]').exists(),
       ).toBe(true);
     });
   });
@@ -477,69 +461,49 @@ describe("ServiceGraphNodeSidePanel", () => {
 
     it("should render the metrics tab", async () => {
       await flushPromises();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tab-metrics"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show loading state when metricsCorrelationLoading is true", async () => {
       // Delay the correlate response so the loading state is visible
-      vi.mocked(correlateStreams).mockImplementationOnce(
-        () => new Promise(() => {}),
-      );
+      vi.mocked(correlateStreams).mockImplementationOnce(() => new Promise(() => {}));
 
       // Activate the metrics tab to trigger fetchMetricsCorrelation
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
       await metricsTab.trigger("click");
       await flushPromises();
 
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-metrics-loading"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel-metrics-loading"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show error state when metricsCorrelationError is set", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Network failure"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
       await metricsTab.trigger("click");
       await flushPromises();
 
-      const errorEl = wrapper.find(
-        '[data-test="service-graph-side-panel-metrics-error"]',
-      );
+      const errorEl = wrapper.find('[data-test="service-graph-side-panel-metrics-error"]');
       expect(errorEl.exists()).toBe(true);
       expect(errorEl.text()).toContain("Network failure");
     });
 
     it("should call fetchMetricsCorrelation with true when retry button is clicked", async () => {
       // First call fails to put the component into error state
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Server error"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Server error"));
 
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
       await metricsTab.trigger("click");
       await flushPromises();
 
-      const retryBtn = wrapper.find(
-        '[data-test="service-graph-side-panel-metrics-retry-btn"]',
-      );
+      const retryBtn = wrapper.find('[data-test="service-graph-side-panel-metrics-retry-btn"]');
       expect(retryBtn.exists()).toBe(true);
 
       // Second call succeeds
@@ -556,11 +520,9 @@ describe("ServiceGraphNodeSidePanel", () => {
       await flushPromises();
 
       // After retry succeeds the error state should be gone
-      expect(
-        wrapper
-          .find('[data-test="service-graph-side-panel-metrics-error"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel-metrics-error"]').exists()).toBe(
+        false,
+      );
     });
   });
 
@@ -600,11 +562,56 @@ describe("ServiceGraphNodeSidePanel", () => {
       } as any);
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
-      const panel = wrapper.find(
-        '[data-test="service-graph-side-panel-recent-operations"]',
-      );
+      const panel = wrapper.find('[data-test="service-graph-side-panel-recent-operations"]');
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No operations found");
+    });
+
+    // A tool node's caller is its OWNING AGENT, which sits on an ancestor span —
+    // the operations query must climb the parent chain (COALESCE + chained LEFT
+    // JOINs) exactly like the graph edge, so the panel and the graph agree. The
+    // bug: it used raw service_name, showing the host app as the caller while the
+    // graph correctly showed the agent.
+    it("climbs the parent chain for a TOOL node's caller (matches the graph)", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [] },
+      } as any);
+      wrapper = mountPanel({
+        streamFilter: "sre_agent_v2",
+        selectedNode: { ...baseNode, name: "load_skill", service_type: "tool" },
+      });
+      await flushPromises();
+      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      // Nearest-ancestor-agent caller, not raw service_name.
+      expect(sql).toContain("COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name");
+      expect(sql).toContain("c.service_name)");
+      // Chained ancestor joins, one per level, keyed on parent span + trace.
+      expect(sql).toContain(
+        'LEFT JOIN "sre_agent_v2" AS p1 ON c.reference_parent_span_id = p1.span_id',
+      );
+      expect(sql).toContain("p1.reference_parent_span_id = p2.span_id");
+      expect((sql.match(/LEFT JOIN/g) || []).length).toBe(4);
+      // Filters the tool's own spans (child-qualified identity field).
+      expect(sql).toContain("c.gen_ai_tool_name = 'load_skill'");
+      // NOT the old raw-service_name caller.
+      expect(sql).not.toContain("service_name as caller_service");
+    });
+
+    it("keeps raw service_name as caller for an INFERRED dependency node", async () => {
+      vi.mocked(searchService.search).mockClear();
+      vi.mocked(searchService.search).mockResolvedValue({
+        data: { hits: [] },
+      } as any);
+      wrapper = mountPanel({
+        streamFilter: "default",
+        selectedNode: { ...baseNode, name: "postgres", service_type: "database" },
+      });
+      await flushPromises();
+      const sql = vi.mocked(searchService.search).mock.calls[0][0].query.query.sql;
+      // Inferred deps genuinely have the caller on service_name — no agent climb.
+      expect(sql).toContain("service_name as caller_service");
+      expect(sql).not.toContain("LEFT JOIN");
     });
   });
 
@@ -617,17 +624,14 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel({ streamFilter: "default" });
       await flushPromises();
 
-      const initialCallCount = vi.mocked(searchService.search).mock.calls
-        .length;
+      const initialCallCount = vi.mocked(searchService.search).mock.calls.length;
 
       await wrapper.setProps({
         selectedNode: { ...baseNode, id: "new-service", name: "new-service" },
       });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
-        initialCallCount,
-      );
+      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(initialCallCount);
     });
   });
 
@@ -669,9 +673,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should show a warning notification when correlate throws an error", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Network failure"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
       const viewRelatedLogsBtn = wrapper.find(
         '[data-test="service-graph-node-panel-view-related-logs-btn"]',
@@ -689,9 +691,7 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should NOT navigate to /logs when correlate throws an error", async () => {
-      vi.mocked(correlateStreams).mockRejectedValueOnce(
-        new Error("Network failure"),
-      );
+      vi.mocked(correlateStreams).mockRejectedValueOnce(new Error("Network failure"));
 
       const viewRelatedLogsBtn = wrapper.find(
         '[data-test="service-graph-node-panel-view-related-logs-btn"]',
@@ -718,36 +718,21 @@ describe("ServiceGraphNodeSidePanel", () => {
     });
 
     it("should have top-level IDs in order: pods, nodes", () => {
-      const ids = wrapper.vm.metricGroupResources.map(
-        (g: { id: string }) => g.id,
-      );
+      const ids = wrapper.vm.metricGroupResources.map((g: { id: string }) => g.id);
       expect(ids).toEqual(["pods", "nodes"]);
     });
 
     it("should have the expected id and label for each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      expect(groups[0]).toMatchObject({ id: "pods", label: "Pods" });
-      expect(groups[1]).toMatchObject({ id: "nodes", label: "Nodes" });
+      expect(groups[0]).toMatchObject({ id: "pods", labelKey: "metrics.groups.pods" });
+      expect(groups[1]).toMatchObject({ id: "nodes", labelKey: "metrics.groups.nodes" });
     });
 
     it("should nest compute/memory/network/storage/others under each top-level group", () => {
       const groups = wrapper.vm.metricGroupResources;
-      const childIds = (g: { children?: { id: string }[] }) =>
-        (g.children ?? []).map((c) => c.id);
-      expect(childIds(groups[0])).toEqual([
-        "compute",
-        "memory",
-        "network",
-        "storage",
-        "others",
-      ]);
-      expect(childIds(groups[1])).toEqual([
-        "compute",
-        "memory",
-        "network",
-        "storage",
-        "others",
-      ]);
+      const childIds = (g: { children?: { id: string }[] }) => (g.children ?? []).map((c) => c.id);
+      expect(childIds(groups[0])).toEqual(["compute", "memory", "network", "storage", "others"]);
+      expect(childIds(groups[1])).toEqual(["compute", "memory", "network", "storage", "others"]);
     });
   });
 
@@ -786,10 +771,29 @@ describe("ServiceGraphNodeSidePanel", () => {
           path: "/logs",
           query: expect.objectContaining({
             stream_type: "logs",
-            stream_value: "k8s-logs",
+            // `stream` (not `stream_value`) — restoreUrlQueryParams only reads `stream`,
+            // and `type` routes the Logs page through its trace-explorer restore branch.
+            stream: "k8s-logs",
+            type: "trace_explorer",
           }),
         }),
       );
+    });
+
+    it("should clear the logs isInitialized flag so the URL params win over the previous session", async () => {
+      const dispatchSpy = vi.spyOn(store, "dispatch");
+
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      // Without this the Logs page restores its stored session and silently drops
+      // the stream, time range and filter carried in the pushed URL.
+      expect(dispatchSpy).toHaveBeenCalledWith("logs/setIsInitialized", false);
+
+      dispatchSpy.mockRestore();
     });
 
     it("should NOT show a warning notification when a valid log stream is found", async () => {
@@ -800,9 +804,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       await viewRelatedLogsBtn.trigger("click");
       await flushPromises();
 
-      expect(notifyMock).not.toHaveBeenCalledWith(
-        expect.objectContaining({ type: "warning" }),
-      );
+      expect(notifyMock).not.toHaveBeenCalledWith(expect.objectContaining({ type: "warning" }));
     });
   });
 
@@ -871,26 +873,43 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel();
     });
 
-    it("should set sortBy to the provided field when called with asc order", () => {
-      wrapper.vm.handleSortChange("p99", "asc");
+    it("should set sortBy to the field and sortOrder to asc on first click", () => {
+      wrapper.vm.handleSortChange("p99");
       expect(wrapper.vm.sortBy).toBe("p99");
       expect(wrapper.vm.sortOrder).toBe("asc");
     });
 
-    it("should set sortOrder to desc when provided", () => {
-      wrapper.vm.handleSortChange("requests", "desc");
+    it("should toggle sortOrder to desc when the same field is clicked twice", () => {
+      wrapper.vm.handleSortChange("requests");
+      expect(wrapper.vm.sortBy).toBe("requests");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+
+      wrapper.vm.handleSortChange("requests");
       expect(wrapper.vm.sortBy).toBe("requests");
       expect(wrapper.vm.sortOrder).toBe("desc");
     });
 
-    it("should update both sortBy and sortOrder when called multiple times", () => {
-      wrapper.vm.handleSortChange("operation", "asc");
-      expect(wrapper.vm.sortBy).toBe("operation");
+    it("should clear sorting on the third click of the same field", () => {
+      wrapper.vm.handleSortChange("operation");
       expect(wrapper.vm.sortOrder).toBe("asc");
 
-      wrapper.vm.handleSortChange("p95", "desc");
-      expect(wrapper.vm.sortBy).toBe("p95");
+      wrapper.vm.handleSortChange("operation");
       expect(wrapper.vm.sortOrder).toBe("desc");
+
+      wrapper.vm.handleSortChange("operation");
+      expect(wrapper.vm.sortBy).toBe("");
+      expect(wrapper.vm.sortOrder).toBe("");
+    });
+
+    it("should reset sortOrder to asc when switching to a different field", () => {
+      wrapper.vm.handleSortChange("operation");
+      wrapper.vm.handleSortChange("operation");
+      expect(wrapper.vm.sortBy).toBe("operation");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+
+      wrapper.vm.handleSortChange("p95");
+      expect(wrapper.vm.sortBy).toBe("p95");
+      expect(wrapper.vm.sortOrder).toBe("asc");
     });
   });
 
@@ -947,7 +966,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by p99 ascending when sortBy is p99 and sortOrder is asc", () => {
-        wrapper.vm.handleSortChange("p99", "asc");
+        wrapper.vm.handleSortChange("p99");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].p99).toBe(80000);
         expect(rows[1].p99).toBe(120000);
@@ -955,7 +974,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by p99 descending when sortBy is p99 and sortOrder is desc", () => {
-        wrapper.vm.handleSortChange("p99", "desc");
+        wrapper.vm.handleSortChange("p99"); // asc
+        wrapper.vm.handleSortChange("p99"); // toggle to desc
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].p99).toBe(150000);
         expect(rows[1].p99).toBe(120000);
@@ -963,7 +983,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by operation alphabetically ascending", () => {
-        wrapper.vm.handleSortChange("operation", "asc");
+        wrapper.vm.handleSortChange("operation");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].operation).toBe("GET /api/products");
         expect(rows[1].operation).toBe("GET /api/users");
@@ -971,7 +991,8 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by requests numerically descending", () => {
-        wrapper.vm.handleSortChange("requests", "desc");
+        wrapper.vm.handleSortChange("requests"); // asc
+        wrapper.vm.handleSortChange("requests"); // toggle to desc
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].requests).toBe(200);
         expect(rows[1].requests).toBe(100);
@@ -979,7 +1000,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should sort by errors numerically ascending", () => {
-        wrapper.vm.handleSortChange("errors", "asc");
+        wrapper.vm.handleSortChange("errors");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows[0].errors).toBe(0);
         expect(rows[1].errors).toBe(5);
@@ -997,7 +1018,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       });
 
       it("should return an empty array without error when sortBy is set", () => {
-        wrapper.vm.handleSortChange("p99", "asc");
+        wrapper.vm.handleSortChange("p99");
         const rows = wrapper.vm.sortedOperationsTableRows;
         expect(rows).toHaveLength(0);
       });
@@ -1035,6 +1056,79 @@ describe("ServiceGraphNodeSidePanel", () => {
         });
         expect(wrapper.vm.isInferred).toBe(true);
       }
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // serviceNameField — column the panel filters on, per node family
+  // ---------------------------------------------------------------------------
+
+  describe("serviceNameField", () => {
+    it("uses service_name for an instrumented service (no service_type)", () => {
+      wrapper = mountPanel({ selectedNode: baseNode });
+      expect(wrapper.vm.serviceNameField).toBe("service_name");
+    });
+
+    it("uses infer_service_name for inferred dependency kinds", () => {
+      for (const st of ["database", "queue", "rpc", "external"]) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        expect(wrapper.vm.serviceNameField).toBe("infer_service_name");
+      }
+    });
+
+    it("uses the gen_ai_* column for agent and tool kinds (not infer_service_name)", () => {
+      for (const [st, col] of Object.entries({
+        agent: "gen_ai_agent_name",
+        tool: "gen_ai_tool_name",
+      })) {
+        wrapper = mountPanel({
+          selectedNode: { ...baseNode, service_type: st },
+        });
+        // regression: previously returned "infer_service_name" → "field not found"
+        expect(wrapper.vm.serviceNameField).toBe(col);
+      }
+    });
+
+    it("model defaults to gen_ai_request_model before schema resolves", () => {
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+      });
+      // streamFieldSet is empty until the schema fetch settles
+      expect(wrapper.vm.serviceNameField).toBe("gen_ai_request_model");
+    });
+
+    it("model COALESCEs request/response when the schema has both", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [
+          { name: "gen_ai_request_model", type: "keyword" },
+          { name: "gen_ai_response_model", type: "keyword" },
+        ],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      expect(wrapper.vm.serviceNameField).toBe(
+        "COALESCE(gen_ai_request_model, gen_ai_response_model)",
+      );
+    });
+
+    it("model falls back to response_model when the schema has only that (Langfuse/OpenInference)", async () => {
+      getStreamMock.mockResolvedValueOnce({
+        schema: [{ name: "gen_ai_response_model", type: "keyword" }],
+      });
+      wrapper = mountPanel({
+        selectedNode: { ...baseNode, service_type: "model" },
+        streamFilter: "default",
+      });
+      await flushPromises();
+      await flushPromises();
+      // regression: response-only vendors would otherwise hit "field not found"
+      expect(wrapper.vm.serviceNameField).toBe("gen_ai_response_model");
     });
   });
 
@@ -1233,9 +1327,7 @@ describe("ServiceGraphNodeSidePanel", () => {
   describe("metrics tab visibility for inferred services", () => {
     it("should render metrics tab for regular (non-inferred) services", () => {
       wrapper = mountPanel({ selectedNode: baseNode });
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(true);
     });
 
@@ -1243,9 +1335,7 @@ describe("ServiceGraphNodeSidePanel", () => {
       wrapper = mountPanel({
         selectedNode: { ...baseNode, service_type: "database" },
       });
-      const metricsTab = wrapper.find(
-        '[data-test="service-graph-node-panel-tab-metrics"]',
-      );
+      const metricsTab = wrapper.find('[data-test="service-graph-node-panel-tab-metrics"]');
       expect(metricsTab.exists()).toBe(false);
     });
   });

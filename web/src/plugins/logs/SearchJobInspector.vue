@@ -15,99 +15,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:bg-(--q-background)">
-    <div class="tw:w-full tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
-      <!-- Header Card -->
-      <div class="card-container tw:mb-[0.625rem] tw:mt-[0.325rem] tw:mx-2.5 tw:shrink-0">
-        <div class="tw:flex tw:justify-between tw:w-full tw:py-3 tw:px-4 tw:items-center">
-          <div class="tw:flex tw:items-center tw:gap-3">
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600]" data-test="inspector-title">
-              Search Job Inspector
-            </div>
-            <div
-              v-if="profileData && !hasNoData"
-              :class="[
-                'tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:border',
-                store.state.theme === 'dark'
-                  ? 'tw:bg-gray-800/50 tw:border-gray-600'
-                  : 'tw:bg-gray-50 tw:border-gray-200'
-              ]"
-            >
-              <svg class="tw:w-[14px] tw:h-[14px] tw:opacity-70" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="6" width="18" height="14" rx="2" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2"/>
-                <path d="M3 10h18M8 3v4M16 3v4" :stroke="store.state.theme === 'dark' ? '#9CA3AF' : '#6B7280'" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              <div class="tw:flex tw:items-center tw:gap-1.5">
-                <span
-                  :class="[
-                    'tw:text-[10px] tw:font-small tw:px-1.5 tw:py-0.5 tw:rounded',
-                    store.state.theme === 'dark'
-                      ? 'tw:text-gray-300 tw:bg-gray-700/50'
-                      : 'tw:text-gray-600 tw:bg-gray-100'
-                  ]"
-                >
-                  {{ store.state.timezone || 'UTC' }}
-                </span>
-                <div
-                  :class="[
-                    'tw:text-xs tw:font-semibold',
-                    store.state.theme === 'dark' ? 'tw:text-gray-200' : 'tw:text-gray-800'
-                  ]"
-                >
-                  {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="tw:flex tw:items-center">
-            <OButton
-              icon-left="close"
-              variant="ghost"
-              size="icon-sm"
-              @click="goBack"
-              data-test="inspector-close-button"
-            >
-              <OTooltip content="Close" />
-            </OButton>
+  <OPageLayout
+    class="bg-surface-base"
+    :title="t('logs.searchJobInspector.title')"
+    :back="{
+      label: t('logs.searchJobInspector.title'),
+      onClick: goBack,
+      dataTest: 'inspector-close-button',
+    }"
+    bleed
+  >
+    <template #title>
+      <span data-test="inspector-title">{{ t("logs.searchJobInspector.title") }}</span>
+    </template>
+    <template #actions>
+      <div
+        v-if="profileData && !hasNoData"
+        class="rounded-default bg-surface-panel border-border-default flex items-center gap-1.5 border px-2 py-1"
+      >
+        <svg
+          class="text-icon-color h-3.5 w-3.5 opacity-70"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <rect x="3" y="6" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2" />
+          <path
+            d="M3 10h18M8 3v4M16 3v4"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <div class="flex items-center gap-1.5">
+          <span
+            class="text-3xs font-small rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5"
+          >
+            {{ store.state.timezone || "UTC" }}
+          </span>
+          <div class="text-text-body text-xs font-semibold">
+            {{ formatTimeRange(profileData.start_time, profileData.end_time) }}
           </div>
         </div>
       </div>
-
+    </template>
+    <div class="flex min-h-0 w-full flex-1 flex-col overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
-      <div v-if="!loading" class="tw:mb-[0.625rem] tw:mx-2.5 tw:shrink-0">
-        <div class="tw:grid tw:gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr;">
+      <div v-if="!loading" class="mx-2.5 mb-2.5 shrink-0">
+        <div class="grid gap-3" style="grid-template-columns: 1fr 1fr 1fr 1.6fr 0.9fr">
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
-                <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                >
-                  Results
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
+                  {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
-                  style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  style="
+                    background: rgba(57, 126, 246, 0.2);
+                    border-color: rgba(57, 126, 246, 0.35);
+                  "
                 >
-                  <img src="@/assets/images/home/records.svg" alt="Results Icon" class="tw:h-6 tw:w-6" />
+                  <img
+                    src="@/assets/images/home/records.svg"
+                    :alt="t('logs.searchJobInspector.resultsIconAlt')"
+                    class="h-6 w-6"
+                  />
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
-                <div
-                  class="tw:text-2xl tw:font-bold"
-                  :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
-                >
-                  {{ hasNoData ? 'NA' : (profileData?.data_records || 0).toLocaleString() }}
+              <div class="flex flex-col gap-1">
+                <div class="text-text-body text-2xl font-bold">
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : (profileData?.data_records || 0).toLocaleString()
+                  }}
                 </div>
-                <div
-                  class="tw:text-[10px]"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
-                >
-                  Returned from query
+                <div class="text-3xs text-text-secondary">
+                  {{ t("logs.searchJobInspector.returnedFromQuery") }}
                 </div>
               </div>
             </div>
@@ -116,35 +104,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
-                <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                >
-                  Scanned Events
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
+                  {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
-                  style="background: rgba(57, 126, 246, 0.2); border-color: rgba(57, 126, 246, 0.35);"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  style="
+                    background: rgba(57, 126, 246, 0.2);
+                    border-color: rgba(57, 126, 246, 0.35);
+                  "
                 >
-                  <img src="@/assets/images/home/streams.svg" alt="Events Icon" class="tw:h-6 tw:w-6" />
+                  <img
+                    src="@/assets/images/home/streams.svg"
+                    :alt="t('logs.searchJobInspector.eventsIconAlt')"
+                    class="h-6 w-6"
+                  />
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
-                <div
-                  class="tw:text-2xl tw:font-bold"
-                  :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
-                >
-                  {{ hasNoData ? 'NA' : (profileData?.scan_records || 0).toLocaleString() }}
+              <div class="flex flex-col gap-1">
+                <div class="text-text-body text-2xl font-bold">
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : (profileData?.scan_records || 0).toLocaleString()
+                  }}
                 </div>
-                <div
-                  class="tw:text-[10px]"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400'"
-                >
-                  Scanned events for this query
+                <div class="text-3xs text-text-secondary">
+                  {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
                 </div>
               </div>
             </div>
@@ -153,38 +142,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
-                <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                >
-                  Time Taken
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
+                  {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
-                  style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35);"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35)"
                 >
-                  <svg class="tw:h-6 tw:w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="9" :stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'" stroke-width="2"/>
-                    <path d="M12 6v6l4 2" :stroke="store.state.theme === 'dark' ? '#10B981' : '#059669'" stroke-width="2" stroke-linecap="round"/>
+                  <svg
+                    class="text-status-positive h-6 w-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2" />
+                    <path
+                      d="M12 6v6l4 2"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
                   </svg>
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
-                <div
-                  class="tw:text-2xl tw:font-bold"
-                  :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-gray-900'"
-                >
-                  {{ hasNoData ? 'NA' : formatDuration(profileData?.time_taken || profileData?.total_duration) }}
+              <div class="flex flex-col gap-1">
+                <div class="text-text-body text-2xl font-bold">
+                  {{
+                    hasNoData
+                      ? t("common.notAvailableShort")
+                      : formatDuration(profileData?.time_taken || profileData?.total_duration)
+                  }}
                 </div>
                 <div
-                  class="tw:text-[10px]"
-                  :class="hasNoData ? (store.state.theme === 'dark' ? 'tw:text-gray-500' : 'tw:text-gray-400') : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).colorClass"
+                  class="text-3xs"
+                  :class="
+                    hasNoData
+                      ? 'text-text-secondary'
+                      : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration)
+                          .colorClass
+                  "
                 >
-                  {{ hasNoData ? 'No data' : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration).text }}
+                  {{
+                    hasNoData
+                      ? t("logs.searchJobInspector.noData")
+                      : getResponseTimeLabel(profileData?.time_taken || profileData?.total_duration)
+                          .text
+                  }}
                 </div>
               </div>
             </div>
@@ -193,33 +199,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:justify-between"
-              :class="store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200'"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
             >
-              <div class="tw:flex tw:justify-between tw:items-start">
-                <div
-                  class="tw:text-base tw:font-small"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500'"
-                >
-                  Trace ID
+              <div class="flex items-start justify-between">
+                <div class="font-small text-text-label text-base">
+                  {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
-                  class="tw:w-10 tw:h-10 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border"
-                  style="background: rgba(242, 220, 245, 0.25); border-color: rgba(242, 220, 245, 0.45);"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  style="
+                    background: rgba(242, 220, 245, 0.25);
+                    border-color: rgba(242, 220, 245, 0.45);
+                  "
                 >
-                  <svg class="tw:h-6 tw:w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M7 8h10M7 12h10M7 16h6" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2" stroke-linecap="round"/>
-                    <rect x="3" y="4" width="18" height="16" rx="2" :stroke="store.state.theme === 'dark' ? '#E9D5FD' : '#A855F7'" stroke-width="2"/>
+                  <svg
+                    class="h-6 w-6"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M7 8h10M7 12h10M7 16h6"
+                      :stroke="isDark ? '#E9D5FD' : '#A855F7'"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                    <rect
+                      x="3"
+                      y="4"
+                      width="18"
+                      height="16"
+                      rx="2"
+                      :stroke="isDark ? '#E9D5FD' : '#A855F7'"
+                      stroke-width="2"
+                    />
                   </svg>
                 </div>
               </div>
-              <div class="tw:flex tw:flex-col tw:gap-1">
+              <div class="flex flex-col gap-1">
                 <div
-                  class="tw:text-sm tw:font-mono tw:truncate tw:font-semibold tw:leading-tight tw:overflow-hidden"
-                  :class="hasNoData ? (store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-500') : (store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600')"
+                  class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold"
+                  :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
-                  {{ hasNoData ? 'NA' : traceId }}
-                  <OTooltip v-if="!hasNoData" :content="traceId" />
+                  {{ hasNoData ? t("common.notAvailableShort") : traceId }}
+                  <OTooltip v-if="!hasNoData" :content="raw(traceId)" />
                 </div>
               </div>
             </div>
@@ -228,26 +251,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="tw:rounded-lg tw:p-3 tw:border tw:shadow-sm tw:h-28 tw:flex tw:flex-col tw:items-center tw:justify-center tw:transition-all"
-              :class="[
-                store.state.theme === 'dark' ? 'tw:bg-[#181A1B] tw:border-gray-700' : 'tw:bg-white tw:border-gray-200',
-                hasNoData ? 'tw:opacity-50 tw:cursor-not-allowed' : 'tw:cursor-pointer tw:hover:border-primary tw:hover:shadow-lg'
-              ]"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col items-center justify-center border p-3 transition-all"
+              :class="
+                hasNoData
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'hover:border-primary cursor-pointer hover:shadow-lg'
+              "
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
-                class="tw:w-12 tw:h-12 tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:border tw:mb-2"
-                style="background: rgba(245, 235, 147, 0.25); border-color: rgba(245, 235, 147, 0.45);"
+                class="rounded-default mb-2 flex h-12 w-12 items-center justify-center border"
+                style="
+                  background: rgba(245, 235, 147, 0.25);
+                  border-color: rgba(245, 235, 147, 0.45);
+                "
               >
-                <svg class="tw:h-7 tw:w-7" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" :stroke="store.state.theme === 'dark' ? '#FDE68A' : '#CA8A04'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <svg
+                  class="text-status-warning-text h-7 w-7"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M9 4H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-5M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
                 </svg>
               </div>
-              <div
-                class="tw:text-sm tw:font-semibold"
-                :class="store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'"
-              >
-                View Query
+              <div class="text-text-link text-sm font-semibold">
+                {{ t("logs.searchJobInspector.viewQuery") }}
               </div>
             </div>
           </div>
@@ -259,14 +294,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="errorMessage"
         variant="error"
         icon="error"
-        :content="errorMessage"
-        class="tw:mb-[0.625rem] tw:shrink-0"
+        :content="raw(errorMessage)"
+        class="mb-2.5 shrink-0"
         data-test="inspector-error-banner"
       />
 
       <!-- Profile Data Table (OTable handles loading skeleton) -->
-      <div v-if="loading || (profileData && profileData.events)" class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
+      <div
+        v-if="loading || (profileData && profileData.events)"
+        class="min-h-0 w-full flex-1 overflow-hidden"
+      >
+        <div class="bg-card-glass-bg h-full">
           <OTable
             :data="hierarchicalEvents"
             :columns="columns"
@@ -280,24 +318,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :enable-column-resize="true"
             :persist-columns="true"
             table-id="logs-search-job-inspector"
-            style="width: 100%;"
-            class="o2-table o2-row-md o2-table-header-sticky"
+            class="o2-table o2-row-md o2-table-header-sticky w-full"
             data-test="inspector-events-table"
           >
             <template #cell-index="{ row }">
-              <span class="tw:inline-block">{{ row.index }}</span>
+              <span class="inline-block">{{ row.index }}</span>
             </template>
 
             <template #cell-duration="{ row }">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-[150px]">
+              <div class="flex min-w-37.5 items-center gap-2">
                 <div
-                  class="tw:h-5 tw:rounded-[3px] tw:min-w-[4px] tw:transition-[width] tw:duration-300 tw:ease-in-out"
+                  class="rounded-default h-5 min-w-1 transition-[width] duration-300 ease-in-out"
                   :style="{
                     width: calculateBarWidth(row.duration) + '%',
                     backgroundColor: getDurationColor(row.duration),
                   }"
                 ></div>
-                <span class="tw:text-[13px] tw:whitespace-nowrap tw:min-w-[50px]">{{ formatDuration(row.duration) }}</span>
+                <span class="text-compact min-w-12.5 whitespace-nowrap">{{
+                  formatDuration(row.duration)
+                }}</span>
               </div>
             </template>
 
@@ -306,11 +345,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-desc="{ row }">
-              <span class="tw:text-xs" :title="row.desc || '-'">{{ row.desc || '-' }}</span>
+              <span class="text-xs" :title="row.desc || '-'">{{ row.desc || "-" }}</span>
             </template>
 
             <template #empty>
-              <no-data />
+              <NoData />
             </template>
           </OTable>
         </div>
@@ -318,71 +357,85 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- SQL Query Dialog -->
-    <ODrawer data-test="search-job-inspector-sql-drawer" v-model:open="showSqlDialog" size="lg" title="SQL Query">
+    <ODrawer
+      data-test="search-job-inspector-sql-drawer"
+      bleed
+      v-model:open="showSqlDialog"
+      size="lg"
+      :title="t('logs.searchJobInspector.sqlQuery')"
+    >
       <template #header-right>
         <OButton
           v-if="profileData?.sql"
           variant="ghost"
           size="icon-sm"
           :class="[
-                'tw:border',
-                copiedSql ? 'tw:text-green-600 tw:border-green-400' : 'tw:border-gray-300'
-              ]"
+            'border',
+            copiedSql ? 'text-status-positive border-status-positive' : 'border-border-default',
+          ]"
           @click="copySql"
           data-test="inspector-copy-sql-btn"
         >
           <OIcon name="content-copy" size="sm" v-if="!copiedSql" />
-              <OIcon name="check" size="sm" v-else />
-          <OTooltip :content="copiedSql ? 'Copied!' : 'SQL'" />
+          <OIcon name="check" size="sm" v-else />
+          <OTooltip
+            :content="
+              copiedSql ? t('logs.searchJobInspector.copied') : t('logs.searchJobInspector.sql')
+            "
+          />
         </OButton>
       </template>
-      <div
-        class="tw:rounded tw:p-4 tw:max-h-[calc(100vh-150px)] tw:overflow-auto"
-        :class="store.state.theme === 'dark' ? 'tw:bg-[#1e1e1e]' : 'tw:bg-[#f5f5f5]'"
-      >
+      <div class="rounded-default bg-surface-subtle max-h-[calc(100vh-150px)] overflow-auto p-4">
         <pre
-          class="tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:m-0 tw:whitespace-pre-wrap tw:break-words"
+          class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
           data-test="inspector-sql-query-content"
-        >{{ profileData?.sql || 'No SQL query available' }}</pre>
+          >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre
+        >
       </div>
     </ODrawer>
 
     <!-- Trace ID Dialog -->
-    <ODialog data-test="search-job-inspector-trace-id-dialog" v-model:open="showTraceIdDialog" size="sm" title="Full Trace ID">
-      <div class="tw:flex tw:items-center tw:gap-3">
-        <div class="tw:flex-1 tw:font-mono tw:text-sm tw:break-all tw:p-3 tw:rounded tw:border"
-             :class="store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-gray-700 tw:text-blue-400' : 'tw:bg-gray-50 tw:border-gray-200 tw:text-blue-600'">
+    <ODialog
+      data-test="search-job-inspector-trace-id-dialog"
+      v-model:open="showTraceIdDialog"
+      size="sm"
+      :title="t('logs.searchJobInspector.fullTraceId')"
+    >
+      <div class="flex items-center gap-3">
+        <div
+          class="rounded-default bg-surface-panel border-border-default text-text-link flex-1 border p-3 font-mono text-sm break-all"
+        >
           {{ traceId }}
         </div>
-        <OButton
-          variant="primary"
-          size="sm-action"
-          @click="copyTraceId"
-        ><OIcon name="content-copy" size="sm"  class="tw:mr-1" /></OButton>
+        <OButton variant="primary" size="sm-action" @click="copyTraceId"
+          ><OIcon name="content-copy" size="sm" class="mr-1"
+        /></OButton>
       </div>
     </ODialog>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
+import { chartColor } from "@/utils/chartTheme";
 import NoData from "@/components/shared/grid/NoData.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useTheme } from "@/composables/useTheme";
 
 interface ProfileEvent {
   timestamp: string;
@@ -421,18 +474,21 @@ export default defineComponent({
   name: "SearchJobInspector",
   components: {
     NoData,
+    OPageLayout,
     OButton,
     ODrawer,
     ODialog,
-    OSpinner,
+    OBanner,
     OTooltip,
     OIcon,
     OTable,
-},
+  },
   setup() {
     const router = useRouter();
     const route = useRoute();
     const store = useStore();
+    const { isDark } = useTheme();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const errorMessage = ref("");
@@ -443,50 +499,54 @@ export default defineComponent({
 
     const traceId = computed(() => route.query.trace_id as string);
     const orgIdentifier = computed(
-      () => route.query.org_identifier as string || store.state.selectedOrganization?.identifier
+      () => (route.query.org_identifier as string) || store.state.selectedOrganization?.identifier,
     );
-    const startTime = computed(() => route.query.start_time ? parseInt(route.query.start_time as string) : undefined);
-    const endTime = computed(() => route.query.end_time ? parseInt(route.query.end_time as string) : undefined);
+    const startTime = computed(() =>
+      route.query.start_time ? parseInt(route.query.start_time as string) : undefined,
+    );
+    const endTime = computed(() =>
+      route.query.end_time ? parseInt(route.query.end_time as string) : undefined,
+    );
 
     const columns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         meta: { align: "left" },
         size: indexColumnWidth.value,
       },
       {
         id: "duration",
-        header: "Duration",
+        header: t("logs.searchJobInspector.columnDuration"),
         accessorKey: "duration",
         meta: { align: "left" },
         size: 200,
       },
       {
         id: "node_name",
-        header: "Node Name",
+        header: t("logs.searchJobInspector.columnNodeName"),
         accessorKey: "node_name",
         meta: { align: "left" },
         size: 280,
       },
       {
         id: "search_role",
-        header: "Role",
+        header: t("logs.searchJobInspector.columnRole"),
         accessorKey: "search_role",
         meta: { align: "left" },
         size: COL.role,
       },
       {
         id: "component",
-        header: "Operation",
+        header: t("logs.searchJobInspector.columnOperation"),
         accessorKey: "component",
         meta: { align: "left" },
         size: 340,
       },
       {
         id: "desc",
-        header: "Description",
+        header: t("logs.searchJobInspector.columnDescription"),
         accessorKey: "desc",
         meta: { align: "left", autoWidth: true },
         size: COL.description,
@@ -495,7 +555,7 @@ export default defineComponent({
 
     const fetchProfileData = async () => {
       if (!traceId.value || !orgIdentifier.value) {
-        errorMessage.value = "Missing required parameters";
+        errorMessage.value = t("logs.searchJobInspector.missingParameters");
         return;
       }
 
@@ -507,7 +567,7 @@ export default defineComponent({
           orgIdentifier.value,
           traceId.value,
           startTime.value,
-          endTime.value
+          endTime.value,
         );
         profileData.value = response.data;
       } catch (error: any) {
@@ -515,7 +575,7 @@ export default defineComponent({
         errorMessage.value =
           error.response?.data?.message ||
           error.message ||
-          "Failed to fetch profile data";
+          t("logs.searchJobInspector.failedToFetch");
       } finally {
         loading.value = false;
       }
@@ -530,7 +590,7 @@ export default defineComponent({
         event: ProfileEvent,
         parentIndex: string,
         level: number,
-        isLast: boolean = false
+        isLast: boolean = false,
       ): HierarchicalEvent => {
         const hierarchicalEvent: HierarchicalEvent = {
           ...event,
@@ -607,10 +667,10 @@ export default defineComponent({
 
     const getDurationColor = (duration: number) => {
       const percentage = (duration / maxDuration.value) * 100;
-      if (percentage > 75) return "#f44336"; // red
-      if (percentage > 50) return "#ff9800"; // orange
-      if (percentage > 25) return "#ffc107"; // yellow
-      return "#4caf50"; // green
+      if (percentage > 75) return chartColor("--color-service-health-critical");
+      if (percentage > 50) return chartColor("--color-service-health-degraded");
+      if (percentage > 25) return chartColor("--color-service-health-warning");
+      return chartColor("--color-service-health-healthy");
     };
 
     const formatDuration = (ms: number | undefined) => {
@@ -622,11 +682,11 @@ export default defineComponent({
     const formatTimeRange = (start: string, end: string) => {
       if (!start || !end) return "-";
       try {
-        const timeZone = store.state.timezone || 'UTC';
+        const timeZone = store.state.timezone || "UTC";
         const startMs = parseInt(start) / 1000; // Convert microseconds to milliseconds
         const endMs = parseInt(end) / 1000;
-        const startDate = new Date(startMs).toLocaleString('en-US', { timeZone });
-        const endDate = new Date(endMs).toLocaleString('en-US', { timeZone });
+        const startDate = new Date(startMs).toLocaleString("en-US", { timeZone });
+        const endDate = new Date(endMs).toLocaleString("en-US", { timeZone });
         return `${startDate} - ${endDate}`;
       } catch {
         return "-";
@@ -634,38 +694,41 @@ export default defineComponent({
     };
 
     const getResponseTimeLabel = (ms: number | undefined) => {
-      if (!ms) return { text: "No data", colorClass: "tw:text-gray-400" };
+      if (!ms)
+        return { text: t("logs.searchJobInspector.noData"), colorClass: "text-text-secondary" };
 
       if (ms < 50) {
         return {
-          text: "Ultra-fast response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'
+          text: t("logs.searchJobInspector.ultraFastResponse"),
+          colorClass: "text-status-positive",
         };
       } else if (ms < 200) {
         return {
-          text: "Fast response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-green-400' : 'tw:text-green-600'
+          text: t("logs.searchJobInspector.fastResponse"),
+          colorClass: "text-status-positive",
         };
       } else if (ms < 500) {
         return {
-          text: "Good response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-blue-400' : 'tw:text-blue-600'
+          text: t("logs.searchJobInspector.goodResponse"),
+          colorClass: "text-text-link",
         };
       } else if (ms < 1000) {
         return {
-          text: "Moderate response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-yellow-400' : 'tw:text-yellow-600'
+          text: t("logs.searchJobInspector.moderateResponse"),
+          colorClass: "text-status-warning-text",
         };
       } else {
         return {
-          text: "Slow response",
-          colorClass: store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-600'
+          text: t("logs.searchJobInspector.slowResponse"),
+          colorClass: "text-status-error-text",
         };
       }
     };
 
     const hasNoData = computed(() => {
-      return !profileData.value || !profileData.value.events || profileData.value.events.length === 0;
+      return (
+        !profileData.value || !profileData.value.events || profileData.value.events.length === 0
+      );
     });
 
     watch(
@@ -686,8 +749,8 @@ export default defineComponent({
     };
 
     const copyTraceId = () => {
-      copyToClipboard(traceId.value, {
-        errorMessage: 'Failed to copy trace ID to clipboard',
+      copyToClipboard(traceId.value, t, {
+        errorMessage: t("logs.searchJobInspector.failedToCopyTraceId"),
       }).then((success) => {
         if (success) {
           copiedTraceId.value = true;
@@ -700,8 +763,8 @@ export default defineComponent({
 
     const copiedSql = ref(false);
     const copySql = () => {
-      copyToClipboard(profileData.value?.sql || "", {
-        errorMessage: 'Failed to copy SQL to clipboard',
+      copyToClipboard(profileData.value?.sql || "", t, {
+        errorMessage: t("logs.searchJobInspector.failedToCopySql"),
       }).then((success) => {
         if (success) {
           copiedSql.value = true;
@@ -717,6 +780,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       loading,
       errorMessage,
       profileData,
@@ -738,6 +802,8 @@ export default defineComponent({
       copySql,
       store,
       hasNoData,
+      isDark,
+      t,
     };
   },
 });

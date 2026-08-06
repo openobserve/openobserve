@@ -31,17 +31,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ConstrainedPage size="lg" class="o2-section-hub" data-test="section-hub">
     <div>
-      <header v-if="title || description" class="tw:mb-6">
-        <h1
-          v-if="title"
-          class="tw:text-xl! tw:font-semibold! tw:text-text-primary"
-        >
+      <header v-if="title || description" class="mb-6">
+        <h1 v-if="title" class="text-text-heading text-xl! font-semibold!">
           {{ title }}
         </h1>
-        <p
-          v-if="description"
-          class="tw:text-sm tw:text-text-secondary tw:mt-1"
-        >
+        <p v-if="description" class="text-text-secondary mt-1 text-sm">
           {{ description }}
         </p>
       </header>
@@ -49,46 +43,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <section
         v-for="group in visibleGroups"
         :key="group.label || '_'"
-        class="tw:mb-8"
+        class="mb-8"
         :data-test="`section-hub-group-${group.label}`"
       >
-        <h2
-          v-if="group.label"
-          class="tw:text-sm! tw:font-semibold! tw:text-text-primary tw:mb-3"
-        >
+        <h2 v-if="group.label" class="text-text-heading mb-3 text-sm! font-semibold!">
           {{ group.label }}
         </h2>
-        <div
-          class="tw:grid tw:grid-cols-1 tw:sm:grid-cols-2 tw:lg:grid-cols-3 tw:gap-4"
-        >
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <button
             v-for="item in group.items"
             :key="item.key"
             type="button"
-            class="o2-hub-card tw:group tw:flex tw:items-start tw:gap-3 tw:text-left tw:p-4 tw:rounded-lg tw:border tw:border-border-default tw:bg-surface-panel tw:transition-colors tw:hover:border-primary-500 tw:hover:bg-surface-subtle tw:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500"
+            class="o2-hub-card group rounded-default border-border-default bg-surface-panel hover:border-accent hover:bg-surface-subtle focus-visible:ring-accent flex items-start gap-3 border p-4 text-left transition-colors outline-none focus-visible:ring-2"
             :data-test="item.dataTest || `section-hub-card-${item.key}`"
             @click="router.push(item.to)"
           >
             <span
-              class="tw:shrink-0 tw:mt-0.5 tw:inline-flex tw:items-center tw:justify-center tw:w-8 tw:h-8 tw:rounded-md tw:bg-surface-subtle tw:text-text-secondary tw:transition-colors tw:group-hover:bg-primary-50 tw:group-hover:text-primary-600"
+              class="rounded-default bg-surface-subtle text-text-secondary group-hover:bg-tabs-hover-bg group-hover:text-accent mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center transition-colors"
             >
               <img
                 v-if="item.icon && isImg(item.icon)"
                 :src="item.icon.slice(4)"
-                class="tw:h-4 tw:w-4 tw:object-contain"
+                class="h-4 w-4 object-contain"
                 aria-hidden="true"
                 alt=""
               />
               <OIcon v-else-if="item.icon" :name="item.icon as any" size="sm" />
             </span>
-            <span class="tw:flex tw:flex-col tw:min-w-0">
+            <span class="flex min-w-0 flex-col">
               <span
-                class="tw:text-sm tw:font-semibold tw:text-text-primary tw:transition-colors tw:group-hover:text-primary-600"
+                class="text-text-heading group-hover:text-accent text-sm font-semibold transition-colors"
                 >{{ item.label }}</span
               >
               <span
                 v-if="item.description"
-                class="tw:text-xs tw:text-text-secondary tw:mt-0.5 tw:leading-snug"
+                class="text-text-secondary mt-0.5 text-xs leading-snug"
                 >{{ item.description }}</span
               >
             </span>
@@ -100,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -109,8 +99,8 @@ const router = useRouter();
 
 export interface SectionHubItem {
   key: string;
-  label: string;
-  description?: string;
+  label: I18nText;
+  description?: I18nText;
   icon?: string;
   to: RouteLocationRaw;
   visible?: boolean;
@@ -118,14 +108,14 @@ export interface SectionHubItem {
 }
 
 export interface SectionHubGroup {
-  label: string;
+  label: I18nText;
   items: SectionHubItem[];
 }
 
 const props = defineProps<{
-  title?: string;
+  title?: I18nText;
   /** Optional one-line description shown under the hub title. */
-  description?: string;
+  description?: I18nText;
   groups: SectionHubGroup[];
 }>();
 

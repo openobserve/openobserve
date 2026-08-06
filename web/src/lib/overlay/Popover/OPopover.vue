@@ -13,6 +13,7 @@
   Slots: trigger | default
 -->
 <script lang="ts">
+import type { I18nText } from "@/types/i18n";
 // True when the last document interaction was pointer-based (shared across
 // instances). Lets a mouse-close avoid leaving a :focus-visible ring on the
 // trigger, while keyboard closes keep it for a11y.
@@ -20,18 +21,25 @@ let lastWasPointer = false;
 const _oPopKey = "__oPopoverListenersRegistered__";
 if (typeof document !== "undefined" && !(globalThis as any)[_oPopKey]) {
   (globalThis as any)[_oPopKey] = true;
-  document.addEventListener("pointerdown", () => { lastWasPointer = true; }, true);
-  document.addEventListener("keydown", () => { lastWasPointer = false; }, true);
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      lastWasPointer = true;
+    },
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    () => {
+      lastWasPointer = false;
+    },
+    true,
+  );
 }
 </script>
 
 <script setup lang="ts">
-import {
-  PopoverRoot,
-  PopoverTrigger,
-  PopoverPortal,
-  PopoverContent,
-} from "reka-ui";
+import { PopoverRoot, PopoverTrigger, PopoverPortal, PopoverContent } from "reka-ui";
 import { inject, onBeforeUnmount, provide, ref, watch, type Ref } from "vue";
 import {
   O_DROPDOWN_NESTED_KEY,
@@ -50,8 +58,8 @@ const props = withDefaults(
     sideOffset?: number;
     /** Hide the content when the trigger scrolls out of view (Floating UI). */
     hideWhenDetached?: boolean;
-    ariaLabel?: string;
-    /** Content stacking order. Default sits above the Quasar header/drawer (2000/3000). */
+    ariaLabel?: I18nText;
+    /** Content stacking order. Default sits above the app header/drawer (2000/3000). */
     zIndex?: number;
     /** Extra classes merged onto the content surface. */
     contentClass?: string;
@@ -90,17 +98,20 @@ function handleOpenChange(v: boolean) {
     const el = document.activeElement;
     if (el instanceof HTMLElement) {
       el.dataset.noFocusVisible = "true";
-      el.addEventListener("blur", () => { delete el.dataset.noFocusVisible; }, { once: true });
+      el.addEventListener(
+        "blur",
+        () => {
+          delete el.dataset.noFocusVisible;
+        },
+        { once: true },
+      );
     }
   }
 }
 
 // ── Nested-overlay coordination (shared with ODropdown) ─────────────────────
 // Register with an ancestor overlay so it ignores our portal's pointer events.
-const parentRegistry = inject<DropdownNestedRegistry | null>(
-  O_DROPDOWN_NESTED_KEY,
-  null,
-);
+const parentRegistry = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
 let closeNestedRegistration: (() => void) | null = null;
 watch(internalOpen, (open) => {
   if (!parentRegistry) return;
@@ -217,14 +228,14 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          'tw:outline-none',
+          'outline-none',
           // Surface
-          'tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md',
+          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Open/close reveal animation (matches ODropdown)
-          'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-          'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           contentClass,
         ]"
       >

@@ -16,70 +16,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div
-    :class="position === 'bottom' ? 'tw:py-2' : 'tw:pt-2'"
-    class="tw:w-full tw:flex tw:justify-between"
-  >
+  <div :class="position === 'bottom' ? 'py-2' : 'pt-2'" class="flex w-full justify-between">
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="tw:flex tw:items-center tw:whitespace-nowrap tw:w-50 tw:justify-center"
-      style="justify-content: start"
+      class="flex w-50 items-center justify-center justify-start whitespace-nowrap"
     >
-      <span class="tw:mr-4 tw:text-xs tw:font-semibold">{{ t("search.maxRecords") }}</span>
-      <OInput
-        v-model="maxRecords"
-        @blur="changeMaxRecordToReturn"
-      />
+      <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
+      <OInput v-model="maxRecords" @blur="changeMaxRecordToReturn" />
     </div>
-    <div
-      v-if="position === 'top' && pageTitle"
-      class="tw:font-bold tw:flex tw:items-center"
-    >
+    <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
       <OButton
-        v-if="
-          collapsibleIcon === 'show' &&
-          searchCollapseImage == 'collapse_sidebar_icon'
-        "
+        v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
         variant="ghost"
         size="icon"
-        class="tw:mr-2"
+        class="mr-2"
         @click="toggleSidePanel"
       >
-        <img
-          :src="getImageURL('images/common/collapse_sidebar_icon.svg')"
-          width="16"
-          height="16"
-        />
+        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
       </OButton>
       <OButton
-        v-if="
-          collapsibleIcon === 'show' &&
-          searchCollapseImage == 'expand_sidebar_icon'
-        "
+        v-if="collapsibleIcon === 'show' && searchCollapseImage == 'expand_sidebar_icon'"
         variant="ghost"
         size="icon"
-        class="tw:mr-2"
+        class="mr-2"
         @click="toggleSidePanel"
       >
-        <img
-          :src="getImageURL('images/common/expand_sidebar_icon.svg')"
-          width="16"
-          height="16"
-        />
+        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
       </OButton>
-      <div class="tw:ml-1">
+      <div class="ml-1">
         {{ resultTotal }}
-        {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
+        {{ countedPageTitle }}
       </div>
     </div>
-    <div class="tw:ml-auto">
-      <span class="tw:mr-4 tw:text-xs tw:font-semibold">
+    <div class="ml-auto">
+      <span class="mr-4 text-xs font-semibold">
         {{ t("search.showing") }}
-        {{
-          resultTotal > 0
-            ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1
-            : 0
-        }}
+        {{ resultTotal > 0 ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }}
         -
         {{
           scope.pagination.page * scope.pagination.rowsPerPage >= resultTotal
@@ -94,15 +66,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         of {{ resultTotal }} -->
       </span>
 
-      <div v-if="position === 'bottom'" class="tw:flex tw:items-center">
-        <OSeparator vertical class="tw:my-2 tw:mr-4" />
+      <div v-if="position === 'bottom'" class="flex items-center">
+        <OSeparator vertical class="my-2 mr-4" />
 
-        <span class="tw:mr-4 tw:text-xs tw:font-semibold">
+        <span class="mr-4 text-xs font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
         <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="tw:mr-3"
+          class="mr-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />
@@ -132,20 +104,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
-  name: "QTablePagination",
-  components: { OSeparator, OButtonGroup, OButton },
+  name: "Pagination",
+  components: { OSeparator, OButtonGroup, OButton, OInput, OSelect },
 
   props: [
     "scope",
@@ -159,7 +131,7 @@ export default defineComponent({
   ] as string[],
   emits: ["update", "update:maxRecordToReturn", "update:changeRecordPerPage"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const maxRecords = ref(props.maxRecordToReturn);
     const store = useStore();
@@ -174,17 +146,23 @@ export default defineComponent({
     };
 
     const toggleSidePanel = () => {
-      store.dispatch(
-        "setSearchCollapseToggle",
-        store.state.searchCollapsibleSection == 0 ? 20 : 0,
-      );
+      store.dispatch("setSearchCollapseToggle", store.state.searchCollapsibleSection == 0 ? 20 : 0);
     };
+
+    // `pageTitle` arrives already translated and normally plural ("Dashboards"):
+    // singularize it for one row rather than appending an untranslatable "(s)".
+    const countedPageTitle = computed(() => {
+      const title: string = props.pageTitle ?? "";
+      if (props.resultTotal === 1 && title.slice(-1) === "s") return title.slice(0, -1);
+      return title;
+    });
 
     return {
       t,
       store,
       router,
       maxRecords,
+      countedPageTitle,
       toggleSidePanel,
       searchCollapseImage,
       changePagination,
@@ -210,4 +188,3 @@ export default defineComponent({
   },
 });
 </script>
-

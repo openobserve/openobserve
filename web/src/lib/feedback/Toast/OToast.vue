@@ -15,104 +15,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import type { ToastProps, ToastEmits } from "./OToast.types"
-import { computed, ref, onUnmounted } from "vue"
-import OIcon from "@/lib/core/Icon/OIcon.vue"
-import OTag from "@/lib/core/Badge/OTag.vue"
-import { pauseTimer, resumeTimer, isPageVisible } from "./useToast"
-import {
-  ToastRoot,
-  ToastTitle,
-  ToastDescription,
-  ToastClose,
-} from "reka-ui"
+import type { ToastProps, ToastEmits } from "./OToast.types";
+import { computed, ref, onUnmounted } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { pauseTimer, resumeTimer, isPageVisible } from "./useToast";
+import { ToastRoot, ToastTitle, ToastDescription, ToastClose } from "reka-ui";
+import { useI18nTyped } from "@/types/i18n";
 
-defineOptions({ inheritAttrs: false })
+const { t } = useI18nTyped();
+
+defineOptions({ inheritAttrs: false });
 
 const props = withDefaults(defineProps<ToastProps>(), {
   variant: "default",
   position: "bottom-right",
   open: true,
   count: 1,
-})
+});
 
-const emit = defineEmits<ToastEmits>()
+const emit = defineEmits<ToastEmits>();
 
 // ── Variant class maps ───────────────────────────────────────────────────────
 
 const variantClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: [
-    "tw:bg-toast-success-bg tw:border tw:border-toast-success-border",
-    "tw:text-toast-fg",
-  ].join(" "),
-  error: [
-    "tw:bg-toast-error-bg tw:border tw:border-toast-error-border",
-    "tw:text-toast-fg",
-  ].join(" "),
-  warning: [
-    "tw:bg-toast-warning-bg tw:border tw:border-toast-warning-border",
-    "tw:text-toast-fg",
-  ].join(" "),
-  info: [
-    "tw:bg-toast-info-bg tw:border tw:border-toast-info-border",
-    "tw:text-toast-fg",
-  ].join(" "),
-  loading: [
-    "tw:bg-toast-loading-bg tw:border tw:border-toast-loading-border",
-    "tw:text-toast-fg",
-  ].join(" "),
-  default: [
-    "tw:bg-toast-default-bg tw:border tw:border-toast-default-border",
-    "tw:text-toast-fg",
-  ].join(" "),
-}
+  success: ["bg-toast-success-bg border border-toast-success-border", "text-toast-fg"].join(" "),
+  error: ["bg-toast-error-bg border border-toast-error-border", "text-toast-fg"].join(" "),
+  warning: ["bg-toast-warning-bg border border-toast-warning-border", "text-toast-fg"].join(" "),
+  info: ["bg-toast-info-bg border border-toast-info-border", "text-toast-fg"].join(" "),
+  loading: ["bg-toast-loading-bg border border-toast-loading-border", "text-toast-fg"].join(" "),
+  default: ["bg-toast-default-bg border border-toast-default-border", "text-toast-fg"].join(" "),
+};
 
 const iconColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: "tw:text-toast-success-icon",
-  error: "tw:text-toast-error-icon",
-  warning: "tw:text-toast-warning-icon",
-  info: "tw:text-toast-info-icon",
-  loading: "tw:text-toast-loading-icon",
-  default: "tw:text-toast-fg",
-}
+  success: "text-toast-success-icon",
+  error: "text-toast-error-icon",
+  warning: "text-toast-warning-icon",
+  info: "text-toast-info-icon",
+  loading: "text-toast-loading-icon",
+  default: "text-toast-fg",
+};
 
 const badgeColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: "tw:bg-toast-success-icon tw:text-white",
-  error: "tw:bg-toast-error-icon tw:text-white",
-  warning: "tw:bg-toast-warning-icon tw:text-white",
-  info: "tw:bg-toast-info-icon tw:text-white",
-  loading: "tw:bg-toast-loading-icon tw:text-white",
-  default: "tw:bg-toast-default-border tw:text-toast-fg",
-}
+  success: "bg-toast-success-icon text-white",
+  error: "bg-toast-error-icon text-white",
+  warning: "bg-toast-warning-icon text-white",
+  info: "bg-toast-info-icon text-white",
+  loading: "bg-toast-loading-icon text-white",
+  default: "bg-toast-default-border text-toast-fg",
+};
 
 const progressBarColorClasses: Record<NonNullable<ToastProps["variant"]>, string> = {
-  success: "tw:bg-toast-success-icon",
-  error: "tw:bg-toast-error-icon",
-  warning: "tw:bg-toast-warning-icon",
-  info: "tw:bg-toast-info-icon",
-  loading: "tw:bg-toast-loading-icon",
-  default: "tw:bg-toast-default-border",
-}
+  success: "bg-toast-success-icon",
+  error: "bg-toast-error-icon",
+  warning: "bg-toast-warning-icon",
+  info: "bg-toast-info-icon",
+  loading: "bg-toast-loading-icon",
+  default: "bg-toast-default-border",
+};
 
-const isHovered = ref(false)
+const isHovered = ref(false);
 
 // isPaused drives the CSS progress-bar animation. It is a computed so it is
 // always derived from the two independent pause sources: hover AND page
 // visibility. A plain ref could fall out of sync; a computed never can.
-const isPaused = computed(() => isHovered.value || !isPageVisible.value)
+const isPaused = computed(() => isHovered.value || !isPageVisible.value);
 
 function onMouseEnter() {
-  isHovered.value = true
-  pauseTimer(props.id)
+  isHovered.value = true;
+  pauseTimer(props.id);
 }
 
 function onMouseLeave() {
-  isHovered.value = false
+  isHovered.value = false;
   // Only resume if the page is actually visible right now; if the user somehow
   // triggered mouseleave while the tab was backgrounded (unlikely but safe),
   // we must not restart the timer.
   if (isPageVisible.value) {
-    resumeTimer(props.id)
+    resumeTimer(props.id);
   }
 }
 
@@ -120,39 +100,35 @@ function onMouseLeave() {
 
 const rootRole = computed<"alert" | "status">(() =>
   props.variant === "error" || props.variant === "warning" ? "alert" : "status",
-)
+);
 
-const hasIcon = computed(() => props.variant !== "default")
+const hasIcon = computed(() => props.variant !== "default");
 
-const screenReaderTitle = computed(() =>
-  props.title ? props.title : props.message,
-)
+const screenReaderTitle = computed(() => (props.title ? props.title : props.message));
 
-const isTopPosition = computed(() =>
-  props.position.startsWith("top-"),
-)
+const isTopPosition = computed(() => props.position.startsWith("top-"));
 
-const detailsExpanded = ref(false)
+const detailsExpanded = ref(false);
 
 // Temporary success state for the action button (e.g. "Copied!")
-const actionSucceeded = ref(false)
-let actionResetTimer: ReturnType<typeof setTimeout> | undefined
+const actionSucceeded = ref(false);
+let actionResetTimer: ReturnType<typeof setTimeout> | undefined;
 
 function handleActionClick() {
-  if (!props.action) return
-  props.action.handler()
+  if (!props.action) return;
+  props.action.handler();
   if (props.action.successLabel) {
-    actionSucceeded.value = true
-    clearTimeout(actionResetTimer)
+    actionSucceeded.value = true;
+    clearTimeout(actionResetTimer);
     actionResetTimer = setTimeout(() => {
-      actionSucceeded.value = false
-    }, 2000)
+      actionSucceeded.value = false;
+    }, 2000);
   }
 }
 
 onUnmounted(() => {
-  clearTimeout(actionResetTimer)
-})
+  clearTimeout(actionResetTimer);
+});
 </script>
 
 <template>
@@ -160,13 +136,17 @@ onUnmounted(() => {
     :open="open"
     :duration="0"
     :class="[
-      'tw:relative tw:pointer-events-auto',
-      details && details.length > 0 ? 'tw:w-[28rem]' : 'tw:w-[22rem]',
-      'tw:max-w-[calc(100vw-2rem)]',
-      'tw:data-[state=open]:animate-in tw:data-[state=open]:fade-in-0',
-      isTopPosition ? 'tw:data-[state=open]:slide-in-from-top-4' : 'tw:data-[state=open]:slide-in-from-bottom-4',
-      'tw:data-[state=closed]:animate-out tw:data-[state=closed]:fade-out-0',
-      isTopPosition ? 'tw:data-[state=closed]:slide-out-to-top-4' : 'tw:data-[state=closed]:slide-out-to-bottom-4',
+      'pointer-events-auto relative',
+      details && details.length > 0 ? 'w-[28rem]' : 'w-[22rem]',
+      'max-w-[calc(100vw-2rem)]',
+      'data-[state=open]:animate-in data-[state=open]:fade-in-0',
+      isTopPosition
+        ? 'data-[state=open]:slide-in-from-top-4'
+        : 'data-[state=open]:slide-in-from-bottom-4',
+      'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
+      isTopPosition
+        ? 'data-[state=closed]:slide-out-to-top-4'
+        : 'data-[state=closed]:slide-out-to-bottom-4',
     ]"
     :role="rootRole"
     :data-test="`o-toast-${id}`"
@@ -180,71 +160,57 @@ onUnmounted(() => {
     <span
       v-if="count > 1"
       :class="[
-        'tw:absolute tw:-top-2 tw:-right-2 tw:z-10 tw:flex tw:items-center tw:justify-center',
-        'tw:min-w-5 tw:h-5 tw:px-1.5 tw:rounded-full tw:text-xs tw:font-semibold tw:shadow',
+        'absolute -top-2 -right-2 z-10 flex items-center justify-center',
+        'h-5 min-w-5 rounded-full px-1.5 text-xs font-semibold shadow',
         badgeColorClasses[variant ?? 'default'],
       ]"
       :data-test="`o-toast-count-${count}`"
       aria-hidden="true"
-    >{{ count > 99 ? "99+" : count }}</span>
+      >{{ count > 99 ? "99+" : count }}</span
+    >
 
     <!-- Inner shell: carries all visual styling + overflow-hidden to clip the progress bar -->
     <div
       :class="[
-        'tw:relative tw:flex tw:gap-2 tw:rounded-lg tw:overflow-hidden tw:p-3 tw:shadow-toast tw:w-full',
-        title ? 'tw:items-start' : 'tw:items-center',
+        'rounded-default shadow-toast relative flex w-full gap-2 overflow-hidden p-3',
+        title ? 'items-start' : 'items-center',
         variantClasses[variant ?? 'default'],
       ]"
     >
       <!-- Icon -->
       <div
         v-if="hasIcon"
-        :class="['tw:shrink-0 tw:flex tw:items-center', iconColorClasses[variant ?? 'default']]"
+        :class="['flex shrink-0 items-center', iconColorClasses[variant ?? 'default']]"
         aria-hidden="true"
       >
-        <OIcon name="autorenew" size="sm" v-if="variant === 'loading'"
-          class="tw:size-5 tw:animate-spin" />
-        <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'"
-          class="tw:size-5" />
-        <OIcon name="cancel" size="sm" v-else-if="variant === 'error'"
-          class="tw:size-5" />
-        <OIcon name="warning" size="sm" v-else-if="variant === 'warning'"
-          class="tw:size-5" />
-        <OIcon name="info" size="sm" v-else-if="variant === 'info'"
-          class="tw:size-5" />
+        <OIcon
+          name="autorenew"
+          size="sm"
+          v-if="variant === 'loading'"
+          class="size-5 animate-spin"
+        />
+        <OIcon name="check-circle" size="sm" v-else-if="variant === 'success'" class="size-5" />
+        <OIcon name="cancel" size="sm" v-else-if="variant === 'error'" class="size-5" />
+        <OIcon name="warning" size="sm" v-else-if="variant === 'warning'" class="size-5" />
+        <OIcon name="info" size="sm" v-else-if="variant === 'info'" class="size-5" />
       </div>
 
       <!-- Content -->
-      <div class="tw:flex-1 tw:min-w-0">
+      <div class="min-w-0 flex-1">
         <!-- Title row: text + optional count badge side-by-side -->
-        <div
-          :class="[
-            'tw:flex tw:items-center tw:gap-2',
-            !title ? 'tw:sr-only' : '',
-          ]"
-        >
-          <ToastTitle class="tw:text-sm tw:font-semibold tw:text-toast-fg tw:leading-snug">
+        <div :class="['flex items-center gap-2', !title ? 'sr-only' : '']">
+          <ToastTitle class="text-toast-fg text-sm leading-snug font-semibold">
             {{ title ?? screenReaderTitle }}
           </ToastTitle>
-          <OTag
-            v-if="title && titleCount !== undefined"
-            type="countChip"
-            value="errorstrong"
-          >{{ titleCount }}</OTag>
+          <OTag v-if="title && titleCount !== undefined" type="countChip" value="errorstrong">{{
+            titleCount
+          }}</OTag>
         </div>
 
         <!-- Message + inline action -->
-        <div
-          :class="[
-            'tw:flex tw:flex-wrap tw:items-start tw:gap-x-3 tw:gap-y-1.5',
-            title ? 'tw:mt-1' : '',
-          ]"
-        >
+        <div :class="['flex flex-wrap items-start gap-x-3 gap-y-1.5', title ? 'mt-1' : '']">
           <ToastDescription
-            :class="[
-              'tw:text-sm tw:leading-snug',
-              title ? 'tw:text-toast-fg-secondary' : 'tw:text-toast-fg',
-            ]"
+            :class="['text-sm leading-snug', title ? 'text-toast-fg-secondary' : 'text-toast-fg']"
             data-test="o-toast-message"
           >
             {{ message }}
@@ -258,27 +224,29 @@ onUnmounted(() => {
             v-if="action"
             type="button"
             :class="[
-              'tw:inline-flex tw:items-center tw:gap-1 tw:justify-center tw:rounded tw:px-2.5 tw:py-0.5 tw:text-xs tw:font-semibold tw:shadow-sm tw:transition-all tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-offset-1',
+              'rounded-default inline-flex items-center justify-center gap-1 px-2.5 py-0.5 text-xs font-semibold transition-all focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
               actionSucceeded
-                ? 'tw:bg-toast-success-icon tw:text-white tw:focus-visible:ring-toast-success-icon'
-                : 'tw:bg-toast-action-text tw:text-white tw:hover:bg-toast-action-hover tw:focus-visible:ring-toast-action-text',
+                ? 'bg-toast-success-icon focus-visible:ring-toast-success-icon text-white'
+                : 'bg-toast-action-text hover:bg-toast-action-hover focus-visible:ring-toast-action-text text-white',
             ]"
             @click.stop="handleActionClick"
           >
-            <OIcon v-if="actionSucceeded" name="check" size="sm" class="tw:size-3.5" aria-hidden="true" />
+            <OIcon
+              v-if="actionSucceeded"
+              name="check"
+              size="sm"
+              class="size-3.5"
+              aria-hidden="true"
+            />
             {{ actionSucceeded && action.successLabel ? action.successLabel : action.label }}
           </button>
         </div>
 
         <!-- Expandable affected-sections list -->
-        <div
-          v-if="details && details.length > 0"
-          class="tw:mt-2 tw:w-full"
-          data-test="o-toast-details"
-        >
+        <div v-if="details && details.length > 0" class="mt-2 w-full" data-test="o-toast-details">
           <button
             type="button"
-            class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:transition-colors tw:cursor-pointer"
+            class="text-toast-fg-secondary hover:text-toast-fg flex cursor-pointer items-center gap-1 text-xs font-semibold tracking-wide uppercase transition-colors"
             :aria-expanded="detailsExpanded"
             data-test="o-toast-details-toggle"
             @click.stop="detailsExpanded = !detailsExpanded"
@@ -286,26 +254,23 @@ onUnmounted(() => {
             <OIcon
               :name="detailsExpanded ? 'expand-less' : 'expand-more'"
               size="sm"
-              class="tw:size-3.5"
+              class="size-3.5"
               aria-hidden="true"
             />
-            Affected Sections
+            {{ t("components.toast.affectedSections") }}
           </button>
-          <ul
-            v-if="detailsExpanded"
-            class="tw:mt-1.5 tw:space-y-1.5"
-            data-test="o-toast-details-list"
-          >
+          <ul v-if="detailsExpanded" class="mt-1.5 space-y-1.5" data-test="o-toast-details-list">
             <li
               v-for="detail in details"
               :key="detail.url"
-              class="tw:flex tw:items-baseline tw:justify-between tw:gap-2 tw:text-xs"
+              class="flex items-baseline justify-between gap-2 text-xs"
             >
-              <span class="tw:font-medium tw:text-toast-fg tw:shrink-0">{{ detail.label }}</span>
+              <span class="text-toast-fg shrink-0 font-medium">{{ detail.label }}</span>
               <span
-                class="tw:text-toast-fg-secondary tw:truncate tw:font-mono tw:text-right"
+                class="text-toast-fg-secondary truncate text-right font-mono"
                 :title="detail.url"
-              >{{ detail.url }}</span>
+                >{{ detail.url }}</span
+              >
             </li>
           </ul>
         </div>
@@ -313,23 +278,29 @@ onUnmounted(() => {
 
       <!-- Dismiss button -->
       <ToastClose
-        :class="['tw:shrink-0 tw:flex tw:items-center tw:rounded tw:p-0.5 tw:text-toast-fg-secondary tw:hover:text-toast-fg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-toast-info-border', title ? 'tw:self-start' : 'tw:self-center']"
-        aria-label="Dismiss notification"
+        :class="[
+          'rounded-default text-toast-fg-secondary hover:text-toast-fg focus-visible:ring-toast-info-border flex shrink-0 items-center p-0.5 focus-visible:ring-2 focus-visible:outline-none',
+          title ? 'self-start' : 'self-center',
+        ]"
+        :aria-label="t('components.toast.dismissNotification')"
       >
-        <OIcon name="close" size="sm" class="tw:size-4" aria-hidden="true" />
+        <OIcon name="close" size="sm" class="size-4" aria-hidden="true" />
       </ToastClose>
 
-      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-lg.
+      <!-- Timeout progress bar — clipped by parent overflow-hidden + rounded-default.
            :key on the outer div ensures Vue remounts it (restarting the CSS animation)
            whenever timerKey increments (i.e. a duplicate toast resets the timer). -->
       <div
-        v-if="timeout > 0"
+        v-if="(timeout ?? 0) > 0"
         :key="timerKey"
-        class="tw:absolute tw:bottom-0 tw:left-0 tw:right-0 tw:h-0.5"
+        class="absolute right-0 bottom-0 left-0 h-0.5"
         aria-hidden="true"
       >
         <div
-          :class="['tw:h-full tw:w-full tw:origin-left tw:[animation:toast-shrink_linear_forwards]', progressBarColorClasses[variant ?? 'default']]"
+          :class="[
+            'toast-progress-bar h-full w-full origin-left',
+            progressBarColorClasses[variant ?? 'default'],
+          ]"
           :style="{
             animationDuration: `${timeout}ms`,
             animationPlayState: isPaused ? 'paused' : 'running',
@@ -340,8 +311,18 @@ onUnmounted(() => {
   </ToastRoot>
 </template>
 
-<style>
-@keyframes toast-shrink {
+<style scoped>
+/* keep(keyframes): the auto-dismiss progress bar is used only by this toast. The
+   `animation` shorthand is declared here, not as a template `[animation:…]`
+   utility, so Vue's scoped compiler renames the keyframe and this reference
+   together. Duration and play-state stay as inline `:style` longhands because
+   they are runtime values (per-toast timeout, pause-on-hover) — inline longhands
+   override this shorthand's initial values, so the pairing is intentional. */
+.toast-progress-bar {
+  animation: shrink linear forwards;
+}
+
+@keyframes shrink {
   from {
     transform: scaleX(1);
   }

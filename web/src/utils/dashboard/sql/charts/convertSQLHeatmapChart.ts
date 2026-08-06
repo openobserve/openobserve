@@ -17,12 +17,20 @@ import { toZonedTime } from "date-fns-tz";
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { formatDate, isTimeSeries } from "../../dateTimeUtils";
 import { getDataValue } from "../../aliasUtils";
+import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
+import {
+  HEATMAP_SPLIT_AREA,
+  HEATMAP_VISUAL_MAP_COLORS,
+  heatmapCellItemStyle,
+  heatmapLargeGridDefaults,
+  heatmapValueLabel,
+} from "@/utils/dashboard/heatmapDefaults";
 
 /**
  * Applies chart-specific options for: heatmap
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyHeatmapChart(ctx: SQLContext): void {
   const {
@@ -60,7 +68,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     const xAxisValue = getDataValue(row, key0);
     const compositeKey = `${yAxisValue}||${xAxisValue}`;
 
-    // Only set if NOT already present (keeps FIRST occurrence, matching original nested .find() behavior)
+    // Only set if NOT already present (keeps FIRST occurrence)
     if (!heatmapLookupMap.has(compositeKey)) {
       heatmapLookupMap.set(compositeKey, row);
     }
@@ -75,6 +83,15 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     });
   });
 
+  // Flattened ONCE: the series needs it as `data`, and the label/render guards
+  // need its length. Rebuilding it for the count would double the work on
+  // exactly the grids that are already too big.
+  const heatmapCells: any[] = zValues
+    .map((it: any, index: any) =>
+      xAxisZerothPositionUniqueValue.map((_i: any, j: number) => [j, index, it[j]]),
+    )
+    .flat();
+
   ((options.visualMap = {
     min: 0,
     max: zValues.reduce(
@@ -88,50 +105,51 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     calculable: true,
     orient: "horizontal",
     left: "center",
+    // Shared heatmap defaults (heatmapDefaults.ts): the same Spectral ramp every
+    // other heatmap in the app uses, instead of ECharts' stock colours.
+    inRange: {
+      color: HEATMAP_VISUAL_MAP_COLORS,
+    },
   }),
     (options.series = [
       {
         ...defaultSeriesProps,
         name: panelSchema?.queries[0]?.fields?.z[0].label,
+        // Without a cell border a dense heatmap collapses into solid bands.
+        itemStyle: heatmapCellItemStyle(store),
 
-        data: zValues
-          .map((it: any, index: any) => {
-            return xAxisZerothPositionUniqueValue.map((i: any, j: number) => {
-              return [j, index, it[j]];
-            });
-          })
-          .flat(),
-        label: {
-          show: true,
-          fontSize: 12,
-          formatter: (params: any) => {
-            try {
-              return (
-                formatUnitValue(
-                  getUnitValue(
-                    params?.value?.[2],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                ) || params?.value?.[2]
-              );
-            } catch (error) {
-              return params?.value?.[2]?.toString() ?? "";
-            }
-          },
-        },
+        data: heatmapCells,
+        // Per-cell labels only while the grid is small enough to read them, and
+        // chunked rendering when it is not — a text element plus a unit
+        // formatter per cell is what hangs the tab on a big grid. See
+        // heatmapDefaults.
+        ...heatmapLargeGridDefaults(heatmapCells.length),
+        label: heatmapValueLabel(heatmapCells.length, (params: any) => {
+          try {
+            return (
+              formatUnitValue(
+                getUnitValue(
+                  params?.value?.[2],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                ),
+              ) || params?.value?.[2]
+            );
+          } catch (error) {
+            return params?.value?.[2]?.toString() ?? "";
+          }
+        }),
       },
     ]));
   // option.yAxis.data=xAxisFirstPositionUniqueValue;
   ((options.tooltip = {
     position: "top",
     textStyle: {
-      color: store.state.theme === "dark" ? "#fff" : "#000",
+      color: chartColor("--color-tooltip-text"),
       fontSize: 12,
     },
-    backgroundColor:
-      store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+    backgroundColor: chartColor("--color-tooltip-bg"),
     formatter: (params: any) => {
       try {
         // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -165,7 +183,7 @@ export function applyHeatmapChart(ctx: SQLContext): void {
       label: {
         fontsize: 12,
         precision: panelSchema.config?.decimals,
-        backgroundColor: store.state.theme === "dark" ? "#333" : "",
+        backgroundColor: chartColor("--color-chart-crosshair-bg"),
       },
     }));
   // if auto sql
@@ -181,11 +199,9 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     // if histogram
     if (field) {
       // convert time string to selected timezone
-      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
-        (it: any) => {
-          return formatDate(toZonedTime(it + "Z", store.state.timezone));
-        },
-      );
+      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
+        return formatDate(toZonedTime(it + "Z", store.state.timezone));
+      });
     }
     // else custom sql
   } else {
@@ -197,11 +213,9 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     // if timeseries
     if (isTimeSeries(sample)) {
       // convert time string to selected timezone
-      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map(
-        (it: any) => {
-          return formatDate(toZonedTime(it + "Z", store.state.timezone));
-        },
-      );
+      xAxisZerothPositionUniqueValue = xAxisZerothPositionUniqueValue.map((it: any) => {
+        return formatDate(toZonedTime(it + "Z", store.state.timezone));
+      });
     }
   }
 
@@ -210,18 +224,14 @@ export function applyHeatmapChart(ctx: SQLContext): void {
     {
       type: "category",
       data: xAxisZerothPositionUniqueValue,
-      splitArea: {
-        show: true,
-      },
+      splitArea: HEATMAP_SPLIT_AREA,
     },
   ]),
     [
       (options.yAxis = {
         type: "category",
         data: xAxisFirstPositionUniqueValue,
-        splitArea: {
-          show: true,
-        },
+        splitArea: HEATMAP_SPLIT_AREA,
       }),
     ]);
   options.legend.show = false;

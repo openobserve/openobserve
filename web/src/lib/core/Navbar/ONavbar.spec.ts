@@ -21,7 +21,7 @@ const mockLinks: NavItem[] = [
 
 const menuLinkStub = {
   template:
-    '<a class="q-item" :data-test="\'menu-link-\' + linkName + \'-item\'" @mouseenter="$emit(\'menu-hover\', link)"><slot /></a>',
+    "<a :data-test=\"'menu-link-' + linkName + '-item'\" @mouseenter=\"$emit('menu-hover', link)\"><slot /></a>",
   props: ["linkName", "mini", "title", "icon", "link", "name", "exact", "display", "hide"],
   emits: ["menu-hover"],
   inheritAttrs: true,
@@ -32,7 +32,7 @@ const menuLinkStub = {
 // wires entries correctly without a vuex store or the real flyout machinery.
 const navGroupStub = {
   template:
-    '<div :data-test="\'nav-group-\' + groupKey" :data-children="children.map(c => c.name).join(\',\')" :data-mode="parentItem ? \'link\' : \'group\'" />',
+    "<div :data-test=\"'nav-group-' + groupKey\" :data-children=\"children.map(c => c.name).join(',')\" :data-mode=\"parentItem ? 'link' : 'group'\" />",
   props: ["groupKey", "title", "icon", "children", "parentItem"],
 };
 
@@ -125,7 +125,7 @@ describe("ONavbar", () => {
       );
     });
 
-    it("keeps Alerts and Reports as separate top-level links", () => {
+    it("collapses Alerts into Reliability and leaves Reports a separate link", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
@@ -134,9 +134,15 @@ describe("ONavbar", () => {
         ],
       });
 
-      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
+      // Alerts brings Destinations/Templates with it, so it is a group tile
+      // rather than a bare link; Dashboards is absent so Reports stays a link.
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
+      const reliability = wrapper.find('[data-test="nav-group-reliability"]');
+      expect(reliability.exists()).toBe(true);
+      expect(reliability.attributes("data-children")).toBe(
+        "alertList,alertDestinations,alertTemplates",
+      );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nav-group-monitoring"]').exists()).toBe(false);
     });
 
     it("renders IAM / Management / AI as plain links (no submenu)", () => {
@@ -176,7 +182,9 @@ describe("ONavbar", () => {
       focusSpy = vi.spyOn(HTMLElement.prototype, "focus").mockImplementation(function () {
         activeEl = this as unknown as Element;
       });
-      activeElementSpy = vi.spyOn(document, "activeElement", "get").mockImplementation(() => activeEl as Element);
+      activeElementSpy = vi
+        .spyOn(document, "activeElement", "get")
+        .mockImplementation(() => activeEl as Element);
     });
 
     afterEach(() => {

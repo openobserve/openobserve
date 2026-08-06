@@ -70,6 +70,7 @@ pub trait Scheduler: Sync + Send + 'static {
         concurrency: i64,
         alert_timeout: i64,
         report_timeout: i64,
+        module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>>;
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
@@ -162,14 +163,19 @@ pub async fn keep_alive(ids: &[i64], alert_timeout: i64, report_timeout: i64) ->
 /// `concurrency` - Defines the maximum number of jobs to pull at a time.
 /// `timeout` - Used to set the maximum time duration the job execution can take.
 ///     This is used to calculate the `end_time` of the trigger.
+/// `module` - When `Some(m)`, pull only jobs for that module (per-module pullers, A3); the
+///     postgres backend also takes a per-module advisory lock so modules don't serialize
+///     against each other. When `None`, pull across all modules under a single global lock
+///     (legacy behavior).
 #[inline]
 pub async fn pull(
     concurrency: i64,
     alert_timeout: i64,
     report_timeout: i64,
+    module: Option<TriggerModule>,
 ) -> Result<Vec<Trigger>> {
     CLIENT
-        .pull(concurrency, alert_timeout, report_timeout)
+        .pull(concurrency, alert_timeout, report_timeout, module)
         .await
 }
 

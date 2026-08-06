@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,12 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import { z } from "zod";
 import CompareWithPast from "./CompareWithPast.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
 import i18n from "@/locales";
-
 
 // Mock getUUID
 vi.mock("@/utils/zincutils", () => ({
@@ -79,7 +82,7 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should render with correct theme class (light mode)", () => {
-      expect(wrapper.classes()).toContain("light-mode");
+      expect(wrapper.classes()).not.toContain("light-mode"); // token-driven theming: no legacy theme root class
     });
 
     it("should render with correct theme class (dark mode)", () => {
@@ -97,7 +100,7 @@ describe("CompareWithPast.vue", () => {
           selectedTab: "sql",
         },
       });
-      expect(wrapper.classes()).toContain("dark-mode");
+      expect(wrapper.classes()).not.toContain("dark-mode"); // token-driven theming: no legacy theme root class
     });
 
     it("should initialize with empty multiTimeRange", () => {
@@ -242,31 +245,31 @@ describe("CompareWithPast.vue", () => {
 
   describe("Get Display Value", () => {
     it("should convert seconds correctly", () => {
-      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 Second(s)");
-      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 Second(s)");
+      expect(wrapper.vm.getDisplayValue("30s")).toBe("30 Seconds");
+      expect(wrapper.vm.getDisplayValue("1s")).toBe("1 Second");
     });
 
     it("should convert minutes correctly", () => {
-      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 Minute(s)");
-      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 Minute(s)");
+      expect(wrapper.vm.getDisplayValue("15m")).toBe("15 Minutes");
+      expect(wrapper.vm.getDisplayValue("1m")).toBe("1 Minute");
     });
 
     it("should convert hours correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 Hour(s)");
-      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 Hour(s)");
+      expect(wrapper.vm.getDisplayValue("2h")).toBe("2 Hours");
+      expect(wrapper.vm.getDisplayValue("24h")).toBe("24 Hours");
     });
 
     it("should convert days correctly", () => {
-      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 Day(s)");
-      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 Day(s)");
+      expect(wrapper.vm.getDisplayValue("7d")).toBe("7 Days");
+      expect(wrapper.vm.getDisplayValue("1d")).toBe("1 Day");
     });
 
     it("should convert weeks correctly", () => {
-      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 Week(s)");
+      expect(wrapper.vm.getDisplayValue("2w")).toBe("2 Weeks");
     });
 
     it("should convert months correctly", () => {
-      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 Month(s)");
+      expect(wrapper.vm.getDisplayValue("3M")).toBe("3 Months");
     });
 
     it("should return original value for invalid format", () => {
@@ -327,12 +330,16 @@ describe("CompareWithPast.vue", () => {
 
     it("should show correct tooltip for custom tab", async () => {
       await wrapper.setProps({ selectedTab: "custom" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain(
+        "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
+      );
     });
 
     it("should show correct tooltip for promql tab", async () => {
       await wrapper.setProps({ selectedTab: "promql" });
-      expect(wrapper.vm.comparisonDisabledTooltip).toContain("Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.");
+      expect(wrapper.vm.comparisonDisabledTooltip).toContain(
+        "Comparison windows are only supported in SQL mode. Switch to SQL in the Alert Rules tab.",
+      );
     });
 
     it("should show empty tooltip for sql tab", async () => {
@@ -442,7 +449,7 @@ describe("CompareWithPast.vue", () => {
     });
 
     it("should handle very large time values", () => {
-      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 Day(s)");
+      expect(wrapper.vm.getDisplayValue("999d")).toBe("999 Days");
       expect(wrapper.vm.convertMinutesToDisplayValue(999999)).toBe("23 Months");
     });
 
@@ -538,7 +545,7 @@ describe("CompareWithPast.vue", () => {
 
   describe("Theme Switching", () => {
     it("should apply light mode theme", () => {
-      expect(wrapper.classes()).toContain("light-mode");
+      expect(wrapper.classes()).not.toContain("light-mode"); // token-driven theming: no legacy theme root class
     });
 
     it("should apply dark mode theme", () => {
@@ -556,7 +563,7 @@ describe("CompareWithPast.vue", () => {
           selectedTab: "sql",
         },
       });
-      expect(darkWrapper.classes()).toContain("dark-mode");
+      expect(darkWrapper.classes()).not.toContain("dark-mode"); // token-driven theming: no legacy theme root class
     });
   });
 
@@ -588,5 +595,98 @@ describe("CompareWithPast.vue", () => {
       expect(emitted![0][0][0]).toHaveProperty("offSet");
       expect(emitted![0][0][0]).toHaveProperty("uuid");
     });
+  });
+});
+
+// ── DESCENDANT mode: bridged into an ancestor AddAlert-like <OForm> ──────────
+// CustomDateTimePicker is a genuine NON-form widget (kept bare), so the
+// multi_time_range array is BRIDGED into the ONE form via setFieldValue (no
+// emit). An owner host mirrors AddAlert: it owns the form and feeds the row
+// array back down as the prop so the round-trip closes.
+describe("CompareWithPast — descendant (bridged into ancestor OForm) mode", () => {
+  const dtStore = () => ({
+    state: { theme: "light" },
+    dispatch: vi.fn(),
+    commit: vi.fn(),
+  });
+
+  function makeHost(initialRows: any[] = []) {
+    return defineComponent({
+      components: { OForm, CompareWithPast },
+      setup() {
+        const form = useOForm({
+          defaultValues: {
+            query_condition: { multi_time_range: initialRows },
+          },
+          schema: z.looseObject({
+            query_condition: z.looseObject({}).optional(),
+          }),
+          onSubmit: () => {},
+        });
+        // Feed the form's array back down as the prop (mirrors AddAlert's
+        // :multiTimeRange="formData.query_condition.multi_time_range").
+        const rows = form.useStore((s: any) => s.values.query_condition.multi_time_range);
+        return { form, rows };
+      },
+      template: `
+        <OForm :form="form">
+          <CompareWithPast
+            :multi-time-range="rows"
+            :selected-tab="'sql'"
+            :period="10"
+            :frequency="10"
+          />
+        </OForm>
+      `,
+    });
+  }
+
+  function mountHost(initialRows: any[] = []) {
+    return mount(makeHost(initialRows), {
+      global: {
+        mocks: { $store: dtStore() },
+        provide: { store: dtStore() },
+        plugins: [i18n],
+      },
+    });
+  }
+
+  it("does NOT render its own <OForm> and writes adds into the PARENT form (no emit)", async () => {
+    const host = mountHost();
+    expect(host.findAllComponents({ name: "OForm" }).length).toBe(1);
+    const parentForm = (host.vm as any).form;
+
+    host.findComponent(CompareWithPast).vm.addTimeShift();
+    await flushPromises();
+
+    expect(parentForm.state.values.query_condition.multi_time_range.length).toBe(1);
+    expect(parentForm.state.values.query_condition.multi_time_range[0].offSet).toBe("15m");
+    // form-owned in descendant mode → the bare-mode emit does NOT fire
+    expect(host.findComponent(CompareWithPast).emitted("update:multiTimeRange")).toBeFalsy();
+  });
+
+  it("deleting a NON-last window leaves the PARENT form + rendered pickers correct", async () => {
+    const host = mountHost([
+      { offSet: "15m", uuid: "u1" },
+      { offSet: "30m", uuid: "u2" },
+      { offSet: "45m", uuid: "u3" },
+    ]);
+    const parentForm = (host.vm as any).form;
+
+    const renderedOffsets = () =>
+      host
+        .findAllComponents({ name: "CustomDateTimePicker" })
+        .map((c: any) => c.props("picker").offSet);
+
+    expect(renderedOffsets()).toEqual(["15m", "30m", "45m"]);
+
+    // delete the MIDDLE window
+    host.findComponent(CompareWithPast).vm.removeTimeShift(1);
+    await flushPromises();
+
+    expect(
+      parentForm.state.values.query_condition.multi_time_range.map((r: any) => r.offSet),
+    ).toEqual(["15m", "45m"]);
+    expect(renderedOffsets()).toEqual(["15m", "45m"]);
   });
 });

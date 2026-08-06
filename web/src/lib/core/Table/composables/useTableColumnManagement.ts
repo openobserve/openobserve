@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { ref, watch, computed, type Ref } from "vue";
+import { ref, computed, type Ref } from "vue";
 
 /**
  * Manages column resize, drag-reorder, and visibility state.
@@ -36,7 +36,7 @@ export function useTableColumnManagement(
     }, 100);
   }
 
-  function onDragStart(event: any) {
+  function onDragStart() {
     isDragging.value = true;
     // state tracking only — event flows through header emit
   }
@@ -50,9 +50,7 @@ export function useTableColumnManagement(
       props.columnOrder.value.includes(props.pinnedFirstColumn) &&
       props.columnOrder.value[0] !== props.pinnedFirstColumn
     ) {
-      const newOrder = props.columnOrder.value.filter(
-        (id) => id !== props.pinnedFirstColumn,
-      );
+      const newOrder = props.columnOrder.value.filter((id) => id !== props.pinnedFirstColumn);
       newOrder.unshift(props.pinnedFirstColumn);
       props.columnOrder.value = [...newOrder];
     }
@@ -67,9 +65,7 @@ export function useTableColumnManagement(
   }
 
   const visibleColumnCount = computed(() => {
-    return props.columnOrder.value.filter(
-      (id) => props.columnVisibility?.[id] !== false,
-    ).length;
+    return props.columnOrder.value.filter((id) => props.columnVisibility?.[id] !== false).length;
   });
 
   return {

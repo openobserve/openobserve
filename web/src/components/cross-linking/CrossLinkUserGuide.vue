@@ -1,72 +1,79 @@
 ﻿<template>
-  <ODropdown
-    v-model:open="showUserGuide"
-    side="left"
-    align="start"
-    :side-offset="8"
-  >
+  <ODropdown v-model:open="showUserGuide" side="left" align="start" :side-offset="8">
     <template #trigger>
-      <OButton
-        variant="ghost"
-        size="icon-sm"
-        class="tw:ml-2"
-        data-test="cross-link-help-btn"
-      >
-        <OIcon name="help" size="sm" class="tw:size-4" />
-        <OTooltip content="User Guide" side="bottom" align="center" />
+      <OButton variant="ghost" size="icon-sm" class="ml-2" data-test="cross-link-help-btn">
+        <OIcon name="help" size="sm" class="size-4" />
+        <OTooltip :content="t('crossLinks.userGuide')" side="bottom" align="center" />
       </OButton>
     </template>
 
     <div
-      class="user-guide-body tw:w-125 tw:max-h-[60vh] tw:overflow-y-auto tw:overflow-x-hidden tw:py-3 tw:px-4 tw:text-sm tw:leading-[1.4]"
-      :class="
-        store.state.theme == 'dark'
-          ? 'theme-dark tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]'
-          : 'theme-light tw:bg-white'
-      "
+      class="user-guide-body bg-surface-base max-h-[60vh] w-125 overflow-x-hidden overflow-y-auto px-4 py-3 text-sm leading-[1.4]"
     >
-      <p>{{ t("crossLinks.guideIntro") }}</p>
+      <p class="mt-1 mb-2">{{ t("crossLinks.guideIntro") }}</p>
 
-      <div class="header tw:font-semibold tw:mt-3 tw:mb-1">{{ t("crossLinks.guideFieldHeader") }}</div>
-      <p>{{ t("crossLinks.guideFieldDesc") }}</p>
-      <ul>
-        <li>
-          <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">${field.__name}</span> – {{ t("crossLinks.guideFieldName") }}
+      <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideFieldHeader") }}</div>
+      <p class="mt-1 mb-2">{{ t("crossLinks.guideFieldDesc") }}</p>
+      <ul class="mt-1 mb-3 ml-5 p-0">
+        <li class="my-1">
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+            raw("${field.__name}")
+          }}</span>
+          – {{ t("crossLinks.guideFieldName") }}
         </li>
-        <li>
-          <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">${field.__value}</span> – {{ t("crossLinks.guideFieldValue") }}
+        <li class="my-1">
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+            raw("${field.__value}")
+          }}</span>
+          – {{ t("crossLinks.guideFieldValue") }}
         </li>
       </ul>
 
-      <div class="header tw:font-semibold tw:mt-3 tw:mb-1">{{ t("crossLinks.guideTimeHeader") }}</div>
-      <p>{{ t("crossLinks.guideTimeDesc") }}</p>
-      <ul>
-        <li>
-          <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">${start_time}</span> – {{ t("crossLinks.guideStartTime") }}
+      <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideTimeHeader") }}</div>
+      <p class="mt-1 mb-2">{{ t("crossLinks.guideTimeDesc") }}</p>
+      <ul class="mt-1 mb-3 ml-5 p-0">
+        <li class="my-1">
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+            raw("${start_time}")
+          }}</span>
+          – {{ t("crossLinks.guideStartTime") }}
         </li>
-        <li>
-          <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">${end_time}</span> – {{ t("crossLinks.guideEndTime") }}
+        <li class="my-1">
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+            raw("${end_time}")
+          }}</span>
+          – {{ t("crossLinks.guideEndTime") }}
         </li>
       </ul>
-      <p>
+      <p class="mt-1 mb-2">
         {{ t("crossLinks.guideTimeExample") }}
-        <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">from=${start_time}&amp;to=${end_time}</span>
+        <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          raw("from=${start_time}&to=${end_time}")
+        }}</span>
       </p>
 
-      <div class="header tw:font-semibold tw:mt-3 tw:mb-1">{{ t("crossLinks.guideQueryHeader") }}</div>
-      <p>{{ t("crossLinks.guideQueryDesc") }}</p>
-      <ul>
-        <li><span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">${query}</span> – {{ t("crossLinks.guideQuery") }}</li>
-        <li>
-          <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]">${query_encoded}</span> – {{ t("crossLinks.guideQueryEncoded") }}
+      <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideQueryHeader") }}</div>
+      <p class="mt-1 mb-2">{{ t("crossLinks.guideQueryDesc") }}</p>
+      <ul class="mt-1 mb-3 ml-5 p-0">
+        <li class="my-1">
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+            raw("${query}")
+          }}</span>
+          – {{ t("crossLinks.guideQuery") }}
+        </li>
+        <li class="my-1">
+          <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+            raw("${query_encoded}")
+          }}</span>
+          – {{ t("crossLinks.guideQueryEncoded") }}
         </li>
       </ul>
 
-      <div class="header tw:font-semibold tw:mt-3 tw:mb-1">{{ t("crossLinks.guideExampleHeader") }}</div>
-      <p>
-        <span class="bg-highlight tw:bg-(--o2-code-bg,#f1f5f9) tw:py-px tw:px-1 tw:rounded tw:font-mono tw:text-[0.85em]"
-          >https://example.com/trace/${field.__value}?from=${start_time}&amp;to=${end_time}</span
-        >
+      <div class="header mt-3 mb-1 font-semibold">{{ t("crossLinks.guideExampleHeader") }}</div>
+      <p class="mt-1 mb-2">
+        <span class="bg-highlight-bg rounded-default px-1.25 py-px font-mono text-[0.85em]">{{
+          raw("https://example.com/trace/${field.__value}?from=${start_time}&to=${end_time}")
+        }}</span>
       </p>
     </div>
   </ODropdown>
@@ -75,7 +82,7 @@
 <script lang="ts">
 import { ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -86,29 +93,15 @@ export default {
   components: { OButton, OTooltip, OIcon, ODropdown },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showUserGuide = ref(false);
 
     return {
       t,
+      raw,
       store,
       showUserGuide,
     };
   },
 };
 </script>
-
-<style>
-.user-guide-body p {
-  margin: 0.25rem 0 0.5rem 0;
-}
-
-.user-guide-body ul {
-  margin: 0.25rem 0 0.75rem 1.25rem;
-  padding: 0;
-}
-
-.user-guide-body ul li {
-  margin: 0.25rem 0;
-}
-</style>

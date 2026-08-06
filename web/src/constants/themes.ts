@@ -31,8 +31,6 @@ import type { SemanticColors } from "@/utils/theme";
 export interface ThemeModeColors {
   // Hex color used for buttons/toggles/borders and to derive the primary palette
   themeColor: string;
-  // Opacity on a 1-10 scale (10 = fully opaque). Kept for backwards-compat.
-  themeColorOpacity?: number;
   // Optional multi-color semantic palette (errors/success/secondary button, etc.)
   semanticColors?: SemanticColors;
 }
@@ -68,24 +66,16 @@ export const THEME_STORAGE_KEYS = {
   },
 } as const;
 
-/**
- * Predefined themes with both light and dark mode colors.
- * Update a theme's color codes here and every user who selected it by name
- * (or who is on the default) will pick up the change on next load.
- */
+/** Predefined themes with both light and dark mode colors. */
 export const PREDEFINED_THEMES: PredefinedTheme[] = [
-  // Theme names are intentionally color-agnostic (observability/product terms),
-  // so a theme's accent colors can change in any release without the name going stale.
   {
     id: 10,
     name: "O2 Signature",
     light: {
       themeColor: "#6B76E3",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#8B8DF0",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -93,11 +83,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Pulse",
     light: {
       themeColor: "#3F7994",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#3F7994",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -105,11 +93,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Horizon",
     light: {
       themeColor: "#077A7F",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#588CF3",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -117,11 +103,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Beacon",
     light: {
       themeColor: "#3369D6",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#6EA8FE",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -129,11 +113,9 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Lens",
     light: {
       themeColor: "#4682FA",
-      themeColorOpacity: 10,
     },
     dark: {
       themeColor: "#E56D17",
-      themeColorOpacity: 10,
     },
   },
   {
@@ -141,7 +123,6 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     name: "O2 Crimson Ink",
     light: {
       themeColor: "#E11D48",
-      themeColorOpacity: 10,
       semanticColors: {
         error: "#F97316",
         errorBg: "#FFF7ED",
@@ -159,7 +140,6 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
     },
     dark: {
       themeColor: "#FB7185",
-      themeColorOpacity: 10,
       semanticColors: {
         error: "#FB923C",
         errorBg: "#3A1A08",
@@ -179,15 +159,11 @@ export const PREDEFINED_THEMES: PredefinedTheme[] = [
 ];
 
 /** Find a predefined theme by its stable name. */
-export const getThemeByName = (
-  name: string | null | undefined,
-): PredefinedTheme | undefined =>
+export const getThemeByName = (name: string | null | undefined): PredefinedTheme | undefined =>
   name ? PREDEFINED_THEMES.find((t) => t.name === name) : undefined;
 
 /** Find a predefined theme by its legacy numeric id. */
-export const getThemeById = (
-  id: number | null | undefined,
-): PredefinedTheme | undefined =>
+export const getThemeById = (id: number | null | undefined): PredefinedTheme | undefined =>
   id == null ? undefined : PREDEFINED_THEMES.find((t) => t.id === id);
 
 /** The default/fallback theme (O2 Signature), with a safe fallback to the first theme. */
@@ -195,8 +171,7 @@ export const getDefaultTheme = (): PredefinedTheme =>
   getThemeByName(DEFAULT_THEME_NAME) ?? PREDEFINED_THEMES[0];
 
 /** Slugify a theme name into kebab-case for data-test attributes ("O2 Pulse" -> "o2-pulse"). */
-export const themeNameSlug = (name: string): string =>
-  name.toLowerCase().replace(/\s+/g, "-");
+export const themeNameSlug = (name: string): string => name.toLowerCase().replace(/\s+/g, "-");
 
 /**
  * User-facing label for a theme. The stored `name` is the persisted selection key
@@ -294,9 +269,7 @@ export const resolveThemeForMode = (input: ResolveThemeInput): ResolvedTheme => 
  *   - new `appliedLightThemeName` / `appliedDarkThemeName` hold a theme name or CUSTOM_THEME_NAME.
  * Safe to call repeatedly; it only acts when a legacy key is present and the new key is absent.
  */
-export const migrateLegacyThemeStorage = (
-  storage: Storage = localStorage,
-): void => {
+export const migrateLegacyThemeStorage = (storage: Storage = localStorage): void => {
   (["light", "dark"] as const).forEach((mode) => {
     const keys = THEME_STORAGE_KEYS[mode];
     const legacy = storage.getItem(keys.legacyApplied);

@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import CustomMarkdownEditor from "@/components/dashboards/addPanel/CustomMarkdownEditor.vue";
 import i18n from "@/locales";
 
-
 describe("CustomMarkdownEditor", () => {
   let wrapper: any;
 
@@ -26,8 +25,8 @@ describe("CustomMarkdownEditor", () => {
     modelValue: "# Test Markdown\n\nThis is a test.",
     initialVariableValues: {
       user: "admin",
-      region: "us-east-1"
-    }
+      region: "us-east-1",
+    },
   };
 
   beforeEach(() => {
@@ -44,23 +43,18 @@ describe("CustomMarkdownEditor", () => {
     return mount(CustomMarkdownEditor, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n],
         stubs: {
-          'CodeQueryEditor': true,
-          'MarkdownRenderer': true,
-          'q-splitter': {
-            template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
-          },
+          CodeQueryEditor: true,
+          MarkdownRenderer: true,
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -68,18 +62,20 @@ describe("CustomMarkdownEditor", () => {
     it("should render markdown editor container", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]').exists(),
+      ).toBe(true);
     });
 
     it("should render editor container with correct styling", () => {
       wrapper = createWrapper();
 
       const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
-      const style = container.element.getAttribute('style');
 
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: hidden');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain("w-full");
+      expect(container.classes()).toContain("h-full");
+      expect(container.classes()).toContain("overflow-hidden");
     });
 
     it("should render inner container with correct dimensions", () => {
@@ -87,9 +83,9 @@ describe("CustomMarkdownEditor", () => {
 
       const innerContainer = wrapper.find('[data-test="dashboard-custom-markdown-editor-inner"]');
       expect(innerContainer.exists()).toBe(true);
-      const style = innerContainer.attributes('style');
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(innerContainer.classes()).toContain("w-full");
+      expect(innerContainer.classes()).toContain("h-full");
     });
 
     it("should render splitter component", () => {
@@ -127,7 +123,7 @@ describe("CustomMarkdownEditor", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('CustomMarkdownEditor');
+      expect(wrapper.vm.$options.name).toBe("CustomMarkdownEditor");
     });
 
     it("should register CodeQueryEditor as async component", () => {
@@ -161,29 +157,24 @@ describe("CustomMarkdownEditor", () => {
       const createWrapperOverride = () => {
         return mount(CustomMarkdownEditor, {
           props: {
-            initialVariableValues: {}
+            initialVariableValues: {},
           },
           global: {
             plugins: [i18n],
             stubs: {
-              'CodeQueryEditor': true,
-              'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
+              CodeQueryEditor: true,
+              MarkdownRenderer: true,
             },
             mocks: {
-              $t: (key: string) => key
-            }
-          }
+              $t: (key: string) => key,
+            },
+          },
         });
       };
 
       wrapper = createWrapperOverride();
 
-      expect(wrapper.props('modelValue')).toBe("");
+      expect(wrapper.props("modelValue")).toBe("");
       expect(wrapper.vm.markdownContent).toBe("");
     });
 
@@ -191,19 +182,19 @@ describe("CustomMarkdownEditor", () => {
       const variables = { user: "test", env: "dev" };
       wrapper = createWrapper({ initialVariableValues: variables });
 
-      expect(wrapper.props('initialVariableValues')).toEqual(variables);
+      expect(wrapper.props("initialVariableValues")).toEqual(variables);
     });
 
     it("should handle empty initialVariableValues", () => {
       wrapper = createWrapper({ initialVariableValues: {} });
 
-      expect(wrapper.props('initialVariableValues')).toEqual({});
+      expect(wrapper.props("initialVariableValues")).toEqual({});
     });
 
     it("should handle null initialVariableValues", () => {
       wrapper = createWrapper({ initialVariableValues: null });
 
-      expect(wrapper.props('initialVariableValues')).toBe(null);
+      expect(wrapper.props("initialVariableValues")).toBe(null);
     });
 
     it("should handle undefined initialVariableValues", () => {
@@ -211,30 +202,25 @@ describe("CustomMarkdownEditor", () => {
         return mount(CustomMarkdownEditor, {
           props: {
             modelValue: "test",
-            initialVariableValues: undefined
+            initialVariableValues: undefined,
           },
           global: {
             plugins: [i18n],
             stubs: {
-              'CodeQueryEditor': true,
-              'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
+              CodeQueryEditor: true,
+              MarkdownRenderer: true,
             },
             mocks: {
-              $t: (key: string) => key
-            }
-          }
+              $t: (key: string) => key,
+            },
+          },
         });
       };
 
       wrapper = createWrapperOverride();
 
       // The component prop should use default value when undefined is passed
-      expect(wrapper.props('initialVariableValues')).toEqual({});
+      expect(wrapper.props("initialVariableValues")).toEqual({});
     });
   });
 
@@ -268,17 +254,17 @@ describe("CustomMarkdownEditor", () => {
       it("should exist and be a function", () => {
         wrapper = createWrapper();
 
-        expect(typeof wrapper.vm.layoutSplitterUpdated).toBe('function');
+        expect(typeof wrapper.vm.layoutSplitterUpdated).toBe("function");
       });
 
       it("should dispatch resize event", () => {
         wrapper = createWrapper();
 
-        const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+        const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
         wrapper.vm.layoutSplitterUpdated();
 
         expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
-        expect(dispatchEventSpy.mock.calls[0][0].type).toBe('resize');
+        expect(dispatchEventSpy.mock.calls[0][0].type).toBe("resize");
 
         dispatchEventSpy.mockRestore();
       });
@@ -286,8 +272,8 @@ describe("CustomMarkdownEditor", () => {
       it("should be called when splitter model updates", async () => {
         wrapper = createWrapper();
 
-        const layoutSplitterUpdatedSpy = vi.spyOn(wrapper.vm, 'layoutSplitterUpdated');
-        const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+        const layoutSplitterUpdatedSpy = vi.spyOn(wrapper.vm, "layoutSplitterUpdated");
+        const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
 
         // Manually call the method since component is stubbed
         wrapper.vm.layoutSplitterUpdated();
@@ -304,7 +290,7 @@ describe("CustomMarkdownEditor", () => {
       it("should exist and be a function", () => {
         wrapper = createWrapper();
 
-        expect(typeof wrapper.vm.onEditorValueChange).toBe('function');
+        expect(typeof wrapper.vm.onEditorValueChange).toBe("function");
       });
 
       it("should update markdownContent", () => {
@@ -322,8 +308,8 @@ describe("CustomMarkdownEditor", () => {
         const newValue = "# Updated Markdown\n\nUpdated content.";
         wrapper.vm.onEditorValueChange(newValue);
 
-        expect(wrapper.emitted('update:modelValue')).toBeTruthy();
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([newValue]);
+        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([newValue]);
       });
 
       it("should handle empty string value", () => {
@@ -332,7 +318,7 @@ describe("CustomMarkdownEditor", () => {
         wrapper.vm.onEditorValueChange("");
 
         expect(wrapper.vm.markdownContent).toBe("");
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([""]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([""]);
       });
 
       it("should handle null value", () => {
@@ -341,7 +327,7 @@ describe("CustomMarkdownEditor", () => {
         wrapper.vm.onEditorValueChange(null);
 
         expect(wrapper.vm.markdownContent).toBe(null);
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([null]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([null]);
       });
 
       it("should handle undefined value", () => {
@@ -350,7 +336,7 @@ describe("CustomMarkdownEditor", () => {
         wrapper.vm.onEditorValueChange(undefined);
 
         expect(wrapper.vm.markdownContent).toBe(undefined);
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([undefined]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([undefined]);
       });
 
       it("should handle complex markdown content", () => {
@@ -379,7 +365,7 @@ console.log('Hello World');
         wrapper.vm.onEditorValueChange(complexMarkdown);
 
         expect(wrapper.vm.markdownContent).toBe(complexMarkdown);
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([complexMarkdown]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([complexMarkdown]);
       });
     });
   });
@@ -404,7 +390,7 @@ console.log('Hello World');
       wrapper = createWrapper();
 
       expect(wrapper.vm.splitterModel).toBe(50);
-      
+
       // Since we're using a stub, check the component data instead
       const splitter = wrapper.find('[data-test="dashboard-markdown-editor-splitter"]');
       expect(splitter.exists()).toBe(true);
@@ -414,10 +400,9 @@ console.log('Hello World');
       wrapper = createWrapper();
 
       const splitter = wrapper.find('[data-test="dashboard-markdown-editor-splitter"]');
-      const style = splitter.attributes('style');
-      
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
+      // Sizing moved from an inline style to Tailwind utilities.
+      expect(splitter.classes()).toContain("w-full");
+      expect(splitter.classes()).toContain("h-full!");
     });
   });
 
@@ -426,14 +411,14 @@ console.log('Hello World');
       wrapper = createWrapper();
 
       const codeEditor = wrapper.find('[data-test="dashboard-markdown-editor"]');
-      expect(codeEditor.attributes('language')).toBe('markdown');
+      expect(codeEditor.attributes("language")).toBe("markdown");
     });
 
     it("should configure CodeQueryEditor with debounce time", () => {
       wrapper = createWrapper();
 
       const codeEditor = wrapper.find('[data-test="dashboard-markdown-editor"]');
-      expect(codeEditor.attributes('debouncetime')).toBe('500');
+      expect(codeEditor.attributes("debouncetime")).toBe("500");
     });
 
     it("should bind markdownContent to CodeQueryEditor", () => {
@@ -446,10 +431,10 @@ console.log('Hello World');
       wrapper = createWrapper();
 
       const newMarkdown = "# Editor Update\n\nContent updated from editor.";
-      const codeEditor = wrapper.findComponent({ name: 'CodeQueryEditor' });
-      
+      const codeEditor = wrapper.findComponent({ name: "CodeQueryEditor" });
+
       if (codeEditor.exists()) {
-        await codeEditor.vm.$emit('update:query', newMarkdown);
+        await codeEditor.vm.$emit("update:query", newMarkdown);
         expect(wrapper.vm.markdownContent).toBe(newMarkdown);
       } else {
         // Test the method directly since component is stubbed
@@ -463,9 +448,9 @@ console.log('Hello World');
 
       const flexCol = wrapper.find('[data-test="dashboard-custom-markdown-editor-flex-col"]');
       expect(flexCol.exists()).toBe(true);
-      const style = flexCol.attributes('style');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('flex-direction: column');
+      // Sizing/direction moved from an inline style to Tailwind utilities.
+      expect(flexCol.classes()).toContain("h-full");
+      expect(flexCol.classes()).toContain("flex-col");
     });
   });
 
@@ -474,9 +459,9 @@ console.log('Hello World');
       const markdownContent = "# Renderer Test\n\nTest content for renderer.";
       wrapper = createWrapper({ modelValue: markdownContent });
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('markdownContent')).toBe(markdownContent);
+        expect(markdownRenderer.props("markdownContent")).toBe(markdownContent);
       }
     });
 
@@ -484,9 +469,9 @@ console.log('Hello World');
       const variables = { test: "value", num: 123 };
       wrapper = createWrapper({ initialVariableValues: variables });
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('variablesData')).toEqual(variables);
+        expect(markdownRenderer.props("variablesData")).toEqual(variables);
       }
     });
 
@@ -497,9 +482,9 @@ console.log('Hello World');
       wrapper.vm.markdownContent = newMarkdown;
       await wrapper.vm.$nextTick();
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('markdownContent')).toBe(newMarkdown);
+        expect(markdownRenderer.props("markdownContent")).toBe(newMarkdown);
       }
     });
 
@@ -515,7 +500,9 @@ console.log('Hello World');
     it("should render splitter separator", () => {
       wrapper = createWrapper();
 
-      const separator = wrapper.find('[data-test="dashboard-custom-markdown-editor-splitter-separator"]');
+      const separator = wrapper.find(
+        '[data-test="dashboard-custom-markdown-editor-splitter-separator"]',
+      );
       expect(separator.exists()).toBe(true);
     });
 
@@ -536,8 +523,8 @@ console.log('Hello World');
     it("should handle splitter updates", () => {
       wrapper = createWrapper();
 
-      const mockDispatchEvent = vi.spyOn(window, 'dispatchEvent');
-      
+      const mockDispatchEvent = vi.spyOn(window, "dispatchEvent");
+
       wrapper.vm.layoutSplitterUpdated();
 
       expect(mockDispatchEvent).toHaveBeenCalled();
@@ -551,25 +538,21 @@ console.log('Hello World');
       wrapper.vm.onEditorValueChange(newContent);
 
       expect(wrapper.vm.markdownContent).toBe(newContent);
-      expect(wrapper.emitted('update:modelValue')).toBeTruthy();
-      expect(wrapper.emitted('update:modelValue')[0]).toEqual([newContent]);
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")[0]).toEqual([newContent]);
     });
 
     it("should handle multiple rapid updates", () => {
       wrapper = createWrapper();
 
-      const updates = [
-        "# Update 1",
-        "# Update 2", 
-        "# Update 3"
-      ];
+      const updates = ["# Update 1", "# Update 2", "# Update 3"];
 
-      updates.forEach(update => {
+      updates.forEach((update) => {
         wrapper.vm.onEditorValueChange(update);
       });
 
       expect(wrapper.vm.markdownContent).toBe(updates[2]);
-      expect(wrapper.emitted('update:modelValue')).toHaveLength(3);
+      expect(wrapper.emitted("update:modelValue")).toHaveLength(3);
     });
   });
 
@@ -600,28 +583,27 @@ console.log('Hello World');
 
       const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
 
-      // Check the actual style attribute
-      const style = container.element.getAttribute('style');
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: hidden');
+      // Sizing/overflow moved from an inline style to Tailwind utilities.
+      expect(container.classes()).toContain("w-full");
+      expect(container.classes()).toContain("h-full");
+      expect(container.classes()).toContain("overflow-hidden");
     });
 
     it("should apply splitter classes correctly", () => {
       wrapper = createWrapper();
 
-      const separator = wrapper.find('[data-test="dashboard-custom-markdown-editor-splitter-separator"]');
+      const separator = wrapper.find(
+        '[data-test="dashboard-custom-markdown-editor-splitter-separator"]',
+      );
       expect(separator.exists()).toBe(true);
     });
 
-    it("should render the editor container with card-container class", () => {
+    it("should render the editor container with bg-card-glass-bg class", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find(
-        '[data-test="dashboard-custom-markdown-editor-container"]',
-      );
+      const container = wrapper.find('[data-test="dashboard-custom-markdown-editor-container"]');
       expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain('card-container');
+      expect(container.classes()).toContain("bg-card-glass-bg");
     });
   });
 
@@ -640,7 +622,8 @@ console.log('Hello World');
     });
 
     it("should handle special markdown characters", () => {
-      const specialMarkdown = "# Title with `code`\n\n**Bold** and *italic* and [link](https://example.com)";
+      const specialMarkdown =
+        "# Title with `code`\n\n**Bold** and *italic* and [link](https://example.com)";
       wrapper = createWrapper({ modelValue: specialMarkdown });
 
       expect(wrapper.vm.markdownContent).toBe(specialMarkdown);
@@ -655,7 +638,7 @@ console.log('Hello World');
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
     });
@@ -675,7 +658,7 @@ function test() {
 
 And some more content.
 `;
-      
+
       wrapper = createWrapper({ modelValue: multilineMarkdown });
 
       expect(wrapper.vm.markdownContent).toBe(multilineMarkdown);
@@ -687,26 +670,26 @@ And some more content.
       const complexVariables = {
         user: {
           name: "John Doe",
-          id: 123
+          id: 123,
         },
         settings: ["option1", "option2"],
-        isActive: true
+        isActive: true,
       };
 
       wrapper = createWrapper({ initialVariableValues: complexVariables });
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('variablesData')).toEqual(complexVariables);
+        expect(markdownRenderer.props("variablesData")).toEqual(complexVariables);
       }
     });
 
     it("should handle null variables", () => {
       wrapper = createWrapper({ initialVariableValues: null });
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('variablesData')).toBe(null);
+        expect(markdownRenderer.props("variablesData")).toBe(null);
       }
     });
 
@@ -716,9 +699,9 @@ And some more content.
 
       wrapper.vm.onEditorValueChange("# New content");
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('variablesData')).toEqual(variables);
+        expect(markdownRenderer.props("variablesData")).toEqual(variables);
       }
     });
   });
@@ -731,7 +714,7 @@ And some more content.
       await wrapper.setProps({ modelValue: newMarkdown });
 
       // Component initializes from props but doesn't watch for changes
-      expect(wrapper.props('modelValue')).toBe(newMarkdown);
+      expect(wrapper.props("modelValue")).toBe(newMarkdown);
     });
 
     it("should react to initialVariableValues prop changes", async () => {
@@ -740,9 +723,9 @@ And some more content.
       const newVariables = { newVar: "newValue" };
       await wrapper.setProps({ initialVariableValues: newVariables });
 
-      const markdownRenderer = wrapper.findComponent({ name: 'MarkdownRenderer' });
+      const markdownRenderer = wrapper.findComponent({ name: "MarkdownRenderer" });
       if (markdownRenderer.exists()) {
-        expect(markdownRenderer.props('variablesData')).toEqual(newVariables);
+        expect(markdownRenderer.props("variablesData")).toEqual(newVariables);
       }
     });
 
@@ -750,7 +733,7 @@ And some more content.
       wrapper = createWrapper();
 
       const originalSplitter = wrapper.vm.splitterModel;
-      
+
       await wrapper.setProps({ modelValue: "# Updated" });
 
       expect(wrapper.vm.splitterModel).toBe(originalSplitter);
@@ -762,13 +745,13 @@ And some more content.
       wrapper = createWrapper();
 
       const updates = ["# 1", "# 2", "# 3", "# 4", "# 5"];
-      
-      updates.forEach(content => {
+
+      updates.forEach((content) => {
         wrapper.vm.onEditorValueChange(content);
       });
 
       expect(wrapper.vm.markdownContent).toBe("# 5");
-      expect(wrapper.emitted('update:modelValue')).toHaveLength(5);
+      expect(wrapper.emitted("update:modelValue")).toHaveLength(5);
     });
 
     it("should use async loading for CodeQueryEditor", () => {
@@ -782,7 +765,7 @@ And some more content.
       wrapper = createWrapper();
 
       const codeEditor = wrapper.find('[data-test="dashboard-markdown-editor"]');
-      expect(codeEditor.attributes('debouncetime')).toBe('500');
+      expect(codeEditor.attributes("debouncetime")).toBe("500");
     });
   });
 
@@ -797,7 +780,7 @@ And some more content.
       wrapper.vm.onEditorValueChange(updatedMarkdown);
 
       expect(wrapper.vm.markdownContent).toBe(updatedMarkdown);
-      expect(wrapper.emitted('update:modelValue')).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
 
       wrapper.vm.splitterModel = 70;
       wrapper.vm.layoutSplitterUpdated();
@@ -808,7 +791,7 @@ And some more content.
     it("should handle concurrent editor and splitter updates", async () => {
       wrapper = createWrapper();
 
-      const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+      const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
 
       wrapper.vm.onEditorValueChange("# Concurrent Update");
       wrapper.vm.splitterModel = 60;
@@ -843,39 +826,34 @@ And some more content.
           global: {
             plugins: [i18n],
             stubs: {
-              'CodeQueryEditor': true,
-              'MarkdownRenderer': true,
-              'q-splitter': {
-                template: '<div data-test="q-splitter-stub"><slot name="before"></slot><slot name="separator"></slot><slot name="after"></slot></div>',
-                props: ['modelValue'],
-                emits: ['update:modelValue']
-              },
+              CodeQueryEditor: true,
+              MarkdownRenderer: true,
             },
             mocks: {
-              $t: (key: string) => key
-            }
-          }
+              $t: (key: string) => key,
+            },
+          },
         });
       };
 
       wrapper = createWrapperMinimal();
 
-      expect(wrapper.props('modelValue')).toBe("");
-      expect(wrapper.props('initialVariableValues')).toEqual({});
+      expect(wrapper.props("modelValue")).toBe("");
+      expect(wrapper.props("initialVariableValues")).toEqual({});
     });
 
     it("should accept string modelValue", () => {
       const stringValue = "# Custom markdown content";
       wrapper = createWrapper({ modelValue: stringValue });
 
-      expect(wrapper.props('modelValue')).toBe(stringValue);
+      expect(wrapper.props("modelValue")).toBe(stringValue);
     });
 
     it("should accept object initialVariableValues", () => {
       const variables = { key: "value", number: 42 };
       wrapper = createWrapper({ initialVariableValues: variables });
 
-      expect(wrapper.props('initialVariableValues')).toEqual(variables);
+      expect(wrapper.props("initialVariableValues")).toEqual(variables);
     });
 
     it("should handle prop updates", async () => {
@@ -884,7 +862,7 @@ And some more content.
       const newValue = "# Updated via props";
       await wrapper.setProps({ modelValue: newValue });
 
-      expect(wrapper.props('modelValue')).toBe(newValue);
+      expect(wrapper.props("modelValue")).toBe(newValue);
     });
   });
 });

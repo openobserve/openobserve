@@ -17,48 +17,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div>
     <div>
-      <div class="tw:pt-2 tw:pb-1 tw:flex tw:justify-start">
-        <div
-          data-test="back-button"
-          class="tw:flex tw:justify-center tw:items-center tw:mr-3 tw:cursor-pointer tw:hover:text-[var(--o2-primary-btn-bg)]"
-          style="
-            border: 1.5px solid;
-            border-radius: 50%;
-            width: 22px;
-            height: 22px;
-          "
-          title="Go Back"
-          @click="router.back()"
-        >
-          <OIcon name="arrow-back-ios-new" size="xs" />
-        </div>
-        <span class="tw:font-bold">{{ t("rum.eventID") }}:</span>
-        <span
-          data-test="error-id"
-          :title="error.error_id"
-          class="tw:pl-1 tw:cursor-pointer"
-          >{{ error.error_id }}
-          <OIcon
-            size="xs"
-            name="content-copy"
-            class="tw:hover:text-[var(--o2-primary-btn-bg)]"
-            @click="copyErrorId(error.error_id)"
-        /></span>
-        <span class="tw:ml-4">{{ error.timestamp }}</span>
+      <OPageHeader :back="{ onClick: () => router.back(), dataTest: 'back-button' }">
+        <template #title>
+          <span class="font-bold">{{ t("rum.eventID") }}:</span>
+          <span data-test="error-id" :title="error.error_id" class="cursor-pointer pl-1"
+            >{{ error.error_id }}
+            <OIcon
+              size="xs"
+              name="content-copy"
+              class="hover:text-button-primary"
+              @click="copyErrorId(error.error_id)"
+          /></span>
+        </template>
+        <template #actions>
+          <span>{{ error.timestamp }}</span>
+        </template>
+      </OPageHeader>
+      <div class="my-1 flex flex-nowrap items-center">
+        <div data-test="error-header-error-type" class="text-2xl font-bold">{{ error.type }}</div>
       </div>
-      <div class="tw:flex tw:items-center tw:flex-nowrap tw:my-1">
-        <div
-          data-test="error-header-error-type"
-          class="tw:text-[22px] tw:font-bold"
-        >{{ error.type }}</div>
-      </div>
-      <div class="tw:text-base tw:pt-1 tw:flex tw:items-center">
+      <div class="flex items-center pt-1 text-base">
         <div
           v-if="error.error_handling === 'unhandled'"
           data-test="error-header-unhandled-badge"
           :class="
             error.error_handling === 'unhandled'
-              ? 'text-red-6 tw:border tw:border-[rgb(246,68,68)] tw:rounded tw:text-sm tw:px-1 tw:mr-2'
+              ? 'text-status-error-text border-status-negative rounded-default mr-2 border px-1 text-sm'
               : ''
           "
         >
@@ -71,15 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { defineProps } from "vue";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
-const props = defineProps({
+defineProps({
   error: {
     type: Object,
     required: true,
@@ -87,8 +71,8 @@ const props = defineProps({
 });
 
 const copyErrorId = (id: string) => {
-  copyToClipboard(id, {
-    successMessage: "Copied to clipboard",
+  copyToClipboard(id, t, {
+    successMessage: t("rum.copiedToClipboard"),
     timeout: 1500,
   });
 };

@@ -21,32 +21,55 @@ use std::{
     sync::Arc,
 };
 
-#[cfg(feature = "vortex")]
 use arrow::{
     array::StructArray,
     datatypes::{DataType, Field},
+    error::ArrowError,
+    record_batch::RecordBatch,
 };
-use arrow::{error::ArrowError, record_batch::RecordBatch};
 use arrow_schema::Schema;
-#[cfg(feature = "vortex")]
-use futures::StreamExt;
-use futures::{Stream, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use parquet::{
     arrow::{AsyncArrowWriter, ParquetRecordBatchStreamBuilder, arrow_reader::ArrowReaderMetadata},
     basic::{Compression, Encoding},
     file::{metadata::KeyValue, properties::WriterProperties},
 };
-#[cfg(feature = "vortex")]
+use serde::{Deserialize, Serialize};
 use vortex::{
     VortexSessionDefault,
-    array::{ArrayRef, VortexSessionExecute, arrow::ArrowSessionExt},
+    array::{ArrayRef, VortexSessionExecute},
+    arrow::{ArrowSessionExt, ToArrowType},
     buffer::Buffer,
     file::OpenOptionsSessionExt,
     io::session::RuntimeSessionExt,
     session::VortexSession,
 };
 
-use crate::{FileFormat, config::*, ider, meta::stream::FileMeta};
+use crate::{FileFormat, config::*, ider, meta::stream::FileMeta, utils::json};
+
+/// Key of the vortex metadata segment carrying the o2 [`FileMeta`].
+pub const VORTEX_FILE_META_KEY: &str = "o2_file_meta";
+
+/// Same four fields [`new_parquet_writer`] writes into the parquet footer.
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct VortexFileMeta {
+    min_ts: i64,
+    max_ts: i64,
+    records: i64,
+    original_size: i64,
+}
+
+/// Encode `metadata` for the [`VORTEX_FILE_META_KEY`] segment.
+pub fn encode_vortex_file_meta(metadata: &FileMeta) -> Vec<u8> {
+    json::to_vec(&VortexFileMeta {
+        min_ts: metadata.min_ts,
+        max_ts: metadata.max_ts,
+        records: metadata.records,
+        original_size: metadata.original_size,
+    })
+    .expect("file meta is always serializable")
+}
 
 pub fn new_parquet_writer<'a>(
     buf: &'a mut Vec<u8>,
@@ -145,7 +168,6 @@ pub fn parse_file_key_columns(key: &str) -> Result<(String, String, String), any
 pub type RecordBatchStream = Pin<Box<dyn Stream<Item = Result<RecordBatch, ArrowError>> + Send>>;
 
 /// Convert a single vortex [`ArrayRef`] to an Arrow [`RecordBatch`].
-#[cfg(feature = "vortex")]
 pub fn vortex_array_to_record_batch(
     session: &VortexSession,
     array: ArrayRef,
@@ -178,7 +200,6 @@ pub async fn get_recordbatch_reader_from_bytes(
             let stream: RecordBatchStream = Box::pin(reader.map_err(ArrowError::from));
             Ok((schema, stream))
         }
-        #[cfg(feature = "vortex")]
         FileFormat::Vortex => {
             // Read vortex file from bytes and convert to record batches
             let session = VortexSession::default().with_tokio();
@@ -204,10 +225,6 @@ pub async fn get_recordbatch_reader_from_bytes(
             let stream: RecordBatchStream = Box::pin(stream);
             Ok((schema, stream))
         }
-        #[cfg(not(feature = "vortex"))]
-        FileFormat::Vortex => Err(anyhow::anyhow!(
-            "Vortex file format requires the vortex feature"
-        )),
     }
 }
 
@@ -227,7 +244,6 @@ pub async fn read_schema_from_file(path: &PathBuf) -> Result<Arc<Schema>, anyhow
     let format = FileFormat::from_extension(path_str);
 
     match format {
-        #[cfg(feature = "vortex")]
         Some(FileFormat::Vortex) => {
             // Read vortex file
             let session = VortexSession::default().with_tokio();
@@ -255,17 +271,12 @@ pub async fn read_schema_from_bytes(
             let arrow_reader = ParquetRecordBatchStreamBuilder::new(schema_reader).await?;
             Ok(arrow_reader.schema().clone())
         }
-        #[cfg(feature = "vortex")]
         FileFormat::Vortex => {
             let session = VortexSession::default().with_tokio();
             let buf = Buffer::from(data.to_vec());
             let vxf = session.open_options().open_buffer(buf)?;
             let schema = Arc::new(vxf.dtype().to_arrow_schema()?);
             Ok(schema)
-        }
-        #[cfg(not(feature = "vortex"))]
-        FileFormat::Vortex => {
-            anyhow::bail!("Vortex file format requires the vortex feature to be enabled")
         }
     }
 }
@@ -508,6 +519,31 @@ mod tests {
         assert_eq!(read_metadata.max_ts, metadata.max_ts);
         assert_eq!(read_metadata.records, metadata.records);
         assert_eq!(read_metadata.original_size, metadata.original_size);
+    }
+
+    #[test]
+    fn test_encode_decode_vortex_file_meta() {
+        let metadata = FileMeta {
+            min_ts: -1,
+            max_ts: i64::MAX,
+            records: 7,
+            original_size: 8,
+            compressed_size: 9,
+            index_size: 10,
+            bloom_ver: 11,
+            flattened: true,
+        };
+        let decoded: VortexFileMeta =
+            json::from_slice(&encode_vortex_file_meta(&metadata)).unwrap();
+        assert_eq!(decoded.min_ts, metadata.min_ts);
+        assert_eq!(decoded.max_ts, metadata.max_ts);
+        assert_eq!(decoded.records, metadata.records);
+        assert_eq!(decoded.original_size, metadata.original_size);
+
+        // unknown and missing keys are tolerated
+        let decoded: VortexFileMeta = json::from_slice(br#"{"min_ts":5,"future":true}"#).unwrap();
+        assert_eq!(decoded.min_ts, 5);
+        assert_eq!(decoded.max_ts, 0);
     }
 
     #[test]

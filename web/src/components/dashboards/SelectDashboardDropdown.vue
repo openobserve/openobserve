@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-end tw:gap-2">
+  <div class="flex items-end gap-2">
     <!-- select new dashboard -->
     <OSelect
       v-model="selectedDashboard"
@@ -23,14 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="dashboardList"
       data-test="dashboard-dropdown-dashboard-selection"
       labelKey="label"
-      class="tw:flex-1"
+      class="flex-1"
     />
 
     <OButton
       data-test="dashboard-dashboard-new-add"
       variant="outline"
       size="icon-xs-sq"
-      class="tw:h-8! tw:w-8!"
+      class="h-8! w-8!"
       @click="
         () => {
           showAddDashboardDialog = true;
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODialog
     v-model:open="showAddDashboardDialog"
     size="sm"
-    title="New dashboard"
+    :title="t('dashboard.selectDashboardDropdown.newDashboard')"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('dashboard.save')"
     form-id="add-dashboard-form"
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -93,10 +93,10 @@ export default defineComponent({
 
     //dropdown selected dashboard id (primitive string for OSelect)
     const selectedDashboard = ref<string | null>(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // on add dashboard, select added dashboard
-    const updateDashboardList = async (dashboardId: any, folderId: any) => {
+    const updateDashboardList = async (dashboardId: any) => {
       showAddDashboardDialog.value = false;
       await getDashboardList.execute();
       selectedDashboard.value = dashboardId ?? null;
@@ -106,17 +106,12 @@ export default defineComponent({
     const getDashboardList = useLoading(async () => {
       if (!props.folderId) return;
 
-      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(
-        store,
-        props.folderId,
-      );
+      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(store, props.folderId);
 
-      dashboardList.value = allDashboardDataByFolderId?.map(
-        (dashboard: any) => ({
-          label: dashboard.title,
-          value: dashboard.dashboardId,
-        }),
-      );
+      dashboardList.value = allDashboardDataByFolderId?.map((dashboard: any) => ({
+        label: dashboard.title,
+        value: dashboard.dashboardId,
+      }));
 
       // select first dashboard
       if (dashboardList.value.length > 0) {
@@ -147,11 +142,12 @@ export default defineComponent({
     watch(
       () => selectedDashboard.value,
       (dashboardId) => {
-        const dashboard = dashboardList.value.find(
-          (d: any) => d.value === dashboardId,
-        );
+        const dashboard = dashboardList.value.find((d: any) => d.value === dashboardId);
         // emit {label, value} for backward compatibility with parents
-        emit("dashboard-selected", dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null));
+        emit(
+          "dashboard-selected",
+          dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null),
+        );
       },
     );
 

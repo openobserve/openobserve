@@ -1,45 +1,28 @@
 <template>
   <ODrawer
+    bleed
     :open="open"
     side="right"
     :width="70"
-    :title="t('onlineEvals.job.detail.eyebrow')"
+    :title="raw(row?.name)"
+    :title-data-test="'eval-job-detail-name-badge'"
+    :sub-title="t('onlineEvals.job.detail.eyebrow')"
     data-test="eval-job-detail"
     @update:open="handleOpenChange"
   >
-    <!-- Header: module label as the title + the job name as a blue chip,
-         mirroring the Alert History drawer. -->
-    <template #header-left>
-      <span
-        v-if="row.name"
-        :class="[
-          'tw:font-semibold tw:text-[1.125rem] tw:px-2 tw:py-1 tw:rounded-md tw:ml-2 tw:min-w-0 tw:truncate',
-          store.state.theme === 'dark'
-            ? 'tw:text-blue-400 tw:bg-blue-900/50'
-            : 'tw:text-blue-600 tw:bg-blue-50',
-        ]"
-        data-test="eval-job-detail-name-badge"
-      >
-        {{ row.name }}
-        <OTooltip v-if="row.name" :content="row.name" />
-      </span>
-    </template>
-
     <!-- Body: the KPI strip + tab bar stay pinned; only the tab content scrolls. -->
-    <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+    <div class="flex h-full min-h-0 flex-col">
       <!-- ── Global window control ── -->
       <!-- A single date picker drives the WHOLE detail view — the KPI strip
            and both the Runs and Failures tables share this one window. Placed
            above the cards (right-aligned) so it reads as a page-level control,
            not a per-tab filter. Refresh re-queries everything. -->
-      <div
-        class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:px-5 tw:pt-3"
-      >
+      <div class="flex items-center justify-end gap-2 px-5 pt-3">
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
           :auto-apply-dashboard="true"
-          class="tw:flex-none"
+          class="flex-none"
           data-test="eval-job-detail-window"
         />
         <OButton
@@ -59,7 +42,7 @@
            consistent. Pinned band (shrink-0) with a bottom divider; the cards
            below carry their own chrome via Tailwind. -->
       <section
-        class="tw:flex-shrink-0 tw:grid tw:grid-cols-4 tw:gap-[0.625rem] tw:px-5 tw:py-4 tw:border-b tw:border-b-[var(--color-dialog-header-border,var(--o2-border))]"
+        class="border-b-dialog-header-border grid flex-shrink-0 grid-cols-4 gap-2.5 border-b px-5 py-4"
       >
         <!-- While the KPI query is in flight, show skeleton tiles in place of
              the cards (matches the LLM Insights dashboard pattern). -->
@@ -68,23 +51,16 @@
           v-for="card in kpiCards"
           v-else
           :key="card.label"
-          class="tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.25rem] tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_0.0625rem_0.375rem_rgba(0,0,0,0.08)]"
+          class="rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_0.0625rem_0.375rem_color-mix(in_srgb,var(--color-black)_8%,transparent)]"
         >
-          <div
-            class="kpi-label tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:mb-[0.25rem]"
-          >
+          <div class="kpi-label text-2xs text-text-secondary mb-1 leading-normal font-semibold">
             {{ card.label }}
           </div>
-          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-            <span
-              class="tw:text-[1.4rem] tw:font-bold tw:leading-none tw:text-[var(--o2-text-primary)]"
-            >
+          <div class="flex items-baseline gap-[0.2rem]">
+            <span class="text-text-secondary text-2xl leading-none font-bold">
               {{ card.value }}
             </span>
-            <span
-              v-if="card.unit"
-              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
-            >
+            <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
               {{ card.unit }}
             </span>
           </div>
@@ -95,7 +71,7 @@
       <OTabs
         :model-value="activeTab"
         bordered
-        class="tw:flex-shrink-0 tw:px-5"
+        class="flex-shrink-0 px-5"
         data-test="eval-job-detail-tabs"
         @update:model-value="activeTab = $event as TabId"
       >
@@ -114,24 +90,21 @@
            edge-to-edge column headers. Bottom padding is opt-in for the
            Configuration (form) tab; the table tabs stay flush to the bottom. -->
       <div
-        class="tw:flex-1 tw:overflow-auto tw:flex tw:flex-col tw:gap-[1.125rem] tw:min-h-0 tw:pt-[1.125rem]"
-        :class="{ 'tw:pb-[1.125rem]': activeTab === 'configuration' }"
+        class="flex min-h-0 flex-1 flex-col gap-[1.125rem] overflow-auto pt-[1.125rem]"
+        :class="{ 'pb-[1.125rem]': activeTab === 'configuration' }"
       >
         <!-- Shared Runs/Failures filter row — agent filter (both tabs),
              right-aligned. The date picker + refresh live in the global
              toolbar above the cards, so they're not duplicated here. Rendered
              once with v-show (not v-if) so it never remounts on tab switch. -->
-        <div
-          v-show="tableEnabled"
-          class="tw:flex tw:items-center tw:justify-end tw:gap-2 tw:flex-wrap tw:px-5"
-        >
-          <div class="tw:w-[14rem] tw:flex-shrink-0">
+        <div v-show="tableEnabled" class="flex flex-wrap items-center justify-end gap-2 px-5">
+          <div class="w-56 flex-shrink-0">
             <OSelect
               v-model="agentKey"
               :options="agentOptions"
               labelKey="label"
               valueKey="value"
-              class="tw:w-full tw:rounded"
+              class="rounded-default w-full"
               data-test="eval-job-detail-runs-agent-filter"
             />
           </div>
@@ -140,25 +113,58 @@
         <!-- Configuration -->
         <template v-if="activeTab === 'configuration'">
           <!-- Target -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.targetSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.streamLabel") }}</dt>
-              <dd>{{ row.stream }}</dd>
+            <dl class="m-0 grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("onlineEvals.job.detail.streamLabel") }}
+              </dt>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">{{ row.stream }}</dd>
 
-              <dt>{{ t("onlineEvals.job.detail.streamTypeLabel") }}</dt>
-              <dd>{{ streamType }}</dd>
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("onlineEvals.job.detail.streamTypeLabel") }}
+              </dt>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">{{ streamType }}</dd>
+
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("onlineEvals.job.detail.targetScopeLabel") }}
+              </dt>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ targetScopeLabel }}
+              </dd>
+
+              <template v-if="completionWindow">
+                <dt class="text-text-secondary text-xs font-semibold">
+                  {{ t("onlineEvals.job.detail.idleWindowLabel") }}
+                </dt>
+                <dd class="text-compact text-text-body m-0 wrap-break-word">
+                  {{ completionWindow.idleWindowSecs
+                  }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
+                </dd>
+
+                <dt class="text-text-secondary text-xs font-semibold">
+                  {{ t("onlineEvals.job.detail.maxAgeLabel") }}
+                </dt>
+                <dd class="text-compact text-text-body m-0 wrap-break-word">
+                  {{ completionWindow.maxAgeSecs }}{{ t("onlineEvals.job.detail.secondsSuffix") }}
+                </dd>
+              </template>
             </dl>
 
             <!-- Filter rendered as a code block with a header bar + copy action,
                  matching the Alert History condition view. -->
-            <div class="jd-codeblock" data-test="eval-job-detail-filter">
-              <div class="jd-codeblock__header">
-                <span class="jd-codeblock__label">{{
+            <div
+              class="border-dialog-header-border rounded-default overflow-hidden border bg-[color-mix(in_srgb,var(--color-text-secondary)_4%,var(--color-card-bg))]"
+              data-test="eval-job-detail-filter"
+            >
+              <div
+                class="border-b-dialog-header-border flex items-center justify-between border-b bg-[color-mix(in_srgb,var(--color-text-secondary)_6%,var(--color-card-bg))] px-2.5 py-1.5"
+              >
+                <span class="text-2xs text-text-secondary font-medium">{{
                   t("onlineEvals.job.detail.filterLabel")
                 }}</span>
                 <OButton
@@ -167,7 +173,7 @@
                   size="icon-xs-sq"
                   data-test="eval-job-detail-filter-copy-btn"
                   @click="
-                    copyToClipboard(filterText, {
+                    copyToClipboard(filterText, t, {
                       successMessage: t('common.copySuccess'),
                     })
                   "
@@ -176,16 +182,18 @@
                   <OTooltip :content="t('common.copy')" />
                 </OButton>
               </div>
-              <pre class="jd-codeblock__content">{{
-                filterText || t("onlineEvals.job.detail.filterEmpty")
-              }}</pre>
+              <!-- Hard cap the filter condition height; longer conditions scroll. -->
+              <pre
+                class="text-compact text-text-body m-0 max-h-50 overflow-x-auto overflow-y-auto px-3.5 py-2.5 font-mono leading-[1.6] whitespace-pre-wrap"
+                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre
+              >
             </div>
           </section>
 
           <!-- Scorers -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.scorersSection") }}
               <OTag type="fieldTag" value="soft">{{ resolvedScorers.length }}</OTag>
@@ -196,79 +204,89 @@
               :title="t('onlineEvals.job.detail.scorersEmpty')"
               data-test="eval-job-detail-scorers-empty"
             />
-            <ul v-else class="jd-scorers">
+            <!-- Show ~3 scorer cards; the rest scroll. The small extra lets the
+                 4th card peek as a scroll affordance. padding-right keeps the
+                 scrollbar off the card edges. -->
+            <ul
+              v-else
+              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pt-2.5 pr-1"
+            >
               <li v-for="item in resolvedScorers" :key="item.id">
+                <!-- `group` drives the card's hover affordances on the CTA /
+                     chevron below. The chain is hover-AND-enabled, so the group
+                     variant carries :not(:disabled) with it — a disabled card
+                     must not light up on hover. -->
                 <button
                   type="button"
-                  class="jd-scorers__card"
+                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
                 >
                   <span
-                    class="jd-scorers__icon"
-                    :class="`jd-scorers__icon--${item.scorerType}`"
+                    class="rounded-default inline-flex size-8.5 shrink-0 items-center justify-center"
+                    :class="{
+                      'bg-badge-indigo-soft-bg text-badge-indigo-soft-text':
+                        item.scorerType === 'llm_judge',
+                      'bg-badge-orange-soft-bg text-badge-orange-soft-text':
+                        item.scorerType === 'remote',
+                      'text-text-secondary bg-[color-mix(in_srgb,var(--color-text-secondary)_14%,transparent)]':
+                        item.scorerType === 'unknown',
+                    }"
                   >
-                    <OIcon
-                      :name="
-                        item.scorerType === 'remote' ? 'cloud' : 'smart-toy'
-                      "
-                      size="sm"
-                    />
+                    <OIcon :name="item.scorerType === 'remote' ? 'cloud' : 'smart-toy'" size="sm" />
                   </span>
-                  <div class="jd-scorers__main">
-                    <div class="jd-scorers__row">
-                      <span class="jd-scorers__name">{{
-                        item.name
-                      }}</span>
+                  <div class="flex min-w-0 flex-1 flex-col gap-1.25">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <span class="text-text-heading text-sm font-bold">{{ item.name }}</span>
                       <OTag
                         v-if="item.scorerTypeLabel"
                         type="scorerType"
                         :value="item.scorerType"
                       />
-                      <span class="jd-scorers__version"
-                        >v{{ item.version }}</span
+                      <span class="text-2xs text-text-secondary"
+                        >{{ t("onlineEvals.job.detail.versionPrefix") }}{{ item.version }}</span
                       >
                     </div>
                     <div
                       v-if="item.scoreConfigName"
-                      class="jd-scorers__produces"
+                      class="text-text-secondary flex flex-wrap items-center gap-1.5 text-xs"
                     >
                       <OIcon
                         name="rule"
                         size="xs"
-                        class="jd-scorers__produces-icon"
+                        class="text-text-secondary shrink-0 opacity-70"
                       />
-                      <span class="jd-scorers__produces-prefix">
+                      <span class="font-medium">
                         {{ t("onlineEvals.job.detail.producesPrefix") }}
                       </span>
-                      <span class="jd-scorers__produces-name">{{
-                        item.scoreConfigName
-                      }}</span>
+                      <span class="text-text-body font-bold">{{ item.scoreConfigName }}</span>
                       <template v-if="item.scoreConfigDataType">
-                        <span class="jd-scorers__sep">·</span>
-                        <span class="jd-scorers__produces-type">
+                        <span class="text-text-secondary opacity-50">·</span>
+                        <span class="text-text-secondary">
                           {{ item.scoreConfigDataType }}
                         </span>
                       </template>
                       <template v-if="item.scoreConfigRangeText">
-                        <span class="jd-scorers__sep">·</span>
-                        <span class="jd-scorers__produces-range">
+                        <span class="text-text-secondary opacity-50">·</span>
+                        <span class="text-text-secondary">
                           {{ item.scoreConfigRangeText }}
                         </span>
                       </template>
                     </div>
                   </div>
                   <span
-                    class="jd-scorers__cta tw:text-[0.6875rem] tw:font-semibold"
+                    class="text-text-secondary text-2xs group-[:hover:not(:disabled)]:text-accent inline-flex shrink-0 items-center gap-1 font-semibold"
                   >
-                    <span class="jd-scorers__cta-label">
+                    <span
+                      class="opacity-0 transition-opacity duration-150 group-[:hover:not(:disabled)]:opacity-100"
+                    >
                       {{ t("onlineEvals.job.detail.viewScorerHint") }}
                     </span>
                     <OIcon
                       name="chevron-right"
                       size="sm"
-                      class="jd-scorers__chevron"
+                      class="shrink-0 opacity-50 transition-[opacity,transform] duration-150 group-[:hover:not(:disabled)]:translate-x-0.5 group-[:hover:not(:disabled)]:opacity-100"
                     />
                   </span>
                 </button>
@@ -277,49 +295,62 @@
           </section>
 
           <!-- Sampling -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.samplingSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.samplingModeLabel") }}</dt>
-              <dd>{{ samplingModeLabel }}</dd>
+            <dl class="m-0 grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("onlineEvals.job.detail.samplingModeLabel") }}
+              </dt>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ samplingModeLabel }}
+              </dd>
 
-              <dt v-if="samplingValue != null">
+              <dt v-if="samplingValue != null" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.samplingValueLabel") }}
               </dt>
-              <dd v-if="samplingValue != null">
+              <dd
+                v-if="samplingValue != null"
+                class="text-compact text-text-body m-0 wrap-break-word"
+              >
                 {{ samplingValue }}
               </dd>
             </dl>
           </section>
 
           <!-- Metadata -->
-          <section class="tw:flex tw:flex-col tw:gap-2 tw:px-5">
+          <section class="flex flex-col gap-2 px-5">
             <h4
-              class="tw:m-0 tw:pb-[0.375rem] tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.8125rem] tw:font-semibold tw:leading-[1.5] tw:text-[var(--color-text-primary)] tw:border-b tw:border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)]"
+              class="text-compact text-text-heading m-0 inline-flex items-center gap-1.5 border-b border-b-[color-mix(in_srgb,var(--color-text-secondary)_12%,transparent)] pb-1.5 leading-[1.5] font-semibold"
             >
               {{ t("onlineEvals.job.detail.metadataSection") }}
             </h4>
-            <dl class="jd-kv">
-              <dt>{{ t("onlineEvals.job.detail.versionLabel") }}</dt>
-              <dd>v{{ row.version }}</dd>
-              <dt v-if="pipelineId">
+            <dl class="m-0 grid grid-cols-[8.125rem_1fr] gap-x-3.5 gap-y-1.5">
+              <dt class="text-text-secondary text-xs font-semibold">
+                {{ t("onlineEvals.job.detail.versionLabel") }}
+              </dt>
+              <dd class="text-compact text-text-body m-0 wrap-break-word">
+                {{ t("onlineEvals.job.detail.versionPrefix") }}{{ row.version }}
+              </dd>
+              <dt v-if="pipelineId" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.pipelineLabel") }}
               </dt>
-              <dd v-if="pipelineId">{{ pipelineId }}</dd>
-              <dt v-if="createdAt">
+              <dd v-if="pipelineId" class="text-compact text-text-body m-0 wrap-break-word">
+                {{ pipelineId }}
+              </dd>
+              <dt v-if="createdAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.createdLabel") }}
               </dt>
-              <dd v-if="createdAt">
+              <dd v-if="createdAt" class="text-compact text-text-body m-0 wrap-break-word">
                 {{ formatTimestamp(createdAt) }}
               </dd>
-              <dt v-if="updatedAt">
+              <dt v-if="updatedAt" class="text-text-secondary text-xs font-semibold">
                 {{ t("onlineEvals.job.detail.updatedLabel") }}
               </dt>
-              <dd v-if="updatedAt">
+              <dd v-if="updatedAt" class="text-compact text-text-body m-0 wrap-break-word">
                 {{ formatTimestamp(updatedAt) }}
               </dd>
             </dl>
@@ -345,41 +376,32 @@
             :footer-title="t('onlineEvals.job.detail.tabs.runs')"
             show-index
             width="100%"
-            class="tw:w-full"
+            class="w-full"
+            @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="tw:text-[var(--color-text-secondary)]">{{
-                relativeTime(row.timestampMs)
-              }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span
-                v-if="row.targetSpanId"
-                class="tw:block tw:truncate"
-                :title="row.targetSpanId"
-                >{{ row.targetSpanId }}</span
-              >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
+                row.targetSpanId
+              }}</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span
-                v-if="row.targetTraceId"
-                class="tw:block tw:truncate"
-                :title="row.targetTraceId"
-                >{{ row.targetTraceId }}</span
-              >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
+                row.targetTraceId
+              }}</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span>{{
-                row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
-              }}</span>
+              <span>{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
               <OTag type="evalRunStatus" :value="row.status" />
@@ -407,41 +429,32 @@
             :footer-title="t('onlineEvals.job.detail.tabs.failures')"
             show-index
             width="100%"
-            class="tw:w-full"
+            class="w-full"
+            @row-click="openEvaluationRun"
           >
             <template #cell-timestampMs="{ row }">
-              <span class="tw:text-[var(--color-text-secondary)]">{{
-                relativeTime(row.timestampMs)
-              }}</span>
+              <span class="text-text-secondary">{{ relativeTime(row.timestampMs) }}</span>
             </template>
             <template #cell-scorerId="{ row }">
               <span>{{ scorerNameFor(row.scorerId) }}</span>
             </template>
             <template #cell-targetSpanId="{ row }">
-              <span
-                v-if="row.targetSpanId"
-                class="tw:block tw:truncate"
-                :title="row.targetSpanId"
-                >{{ row.targetSpanId }}</span
-              >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-if="row.targetSpanId" class="block truncate" :title="row.targetSpanId">{{
+                row.targetSpanId
+              }}</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-targetTraceId="{ row }">
-              <span
-                v-if="row.targetTraceId"
-                class="tw:block tw:truncate"
-                :title="row.targetTraceId"
-                >{{ row.targetTraceId }}</span
-              >
-              <span v-else class="tw:text-[var(--color-text-secondary)]">—</span>
+              <span v-if="row.targetTraceId" class="block truncate" :title="row.targetTraceId">{{
+                row.targetTraceId
+              }}</span>
+              <span v-else class="text-text-secondary">—</span>
             </template>
             <template #cell-scoreDisplay="{ row }">
               <span>{{ row.scoreDisplay }}</span>
             </template>
             <template #cell-latencyMs="{ row }">
-              <span>{{
-                row.latencyMs != null ? formatLatency(row.latencyMs) : "—"
-              }}</span>
+              <span>{{ row.latencyMs != null ? formatLatency(row.latencyMs) : "—" }}</span>
             </template>
             <template #cell-status="{ row }">
               <OTag type="evalRunStatus" :value="row.status" />
@@ -455,7 +468,8 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -473,16 +487,15 @@ import { copyToClipboard } from "@/utils/clipboard";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import type {
   EvalJob,
+  EvalTargetScope,
   Scorer,
   ScoreConfig,
 } from "@/services/online-evals.service";
-import { entityId } from "../utils/evalEntity";
+import { entityId, targetScopeOf } from "../utils/evalEntity";
 import { normalizeJobFilterCondition } from "../utils/jobFilter";
 import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
-import {
-  useEvalJobRuns,
-  type JobRunsWindow,
-} from "../composables/useEvalJobRuns";
+import { useEvalJobRuns, type JobRunRow, type JobRunsWindow } from "../composables/useEvalJobRuns";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import {
   ALL_AGENTS_VALUE,
   agentFilterKey,
@@ -511,20 +524,15 @@ function handleOpenChange(value: boolean) {
   if (!value) emit("close");
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const router = useRouter();
 const store = useStore();
-const orgId = computed(
-  () => store.state.selectedOrganization?.identifier ?? "default",
-);
+const orgId = computed(() => store.state.selectedOrganization?.identifier ?? "default");
 
 type TabId = "configuration" | "runs" | "failures";
 const activeTab = ref<TabId>("configuration");
 
-function valueOf<T = any>(
-  row: any,
-  camel: string,
-  snake: string,
-): T | undefined {
+function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined {
   if (row == null) return undefined;
   return row[camel] ?? row[snake];
 }
@@ -532,6 +540,26 @@ function valueOf<T = any>(
 const streamType = computed<string>(
   () => valueOf<string>(props.row, "streamType", "stream_type") ?? "traces",
 );
+
+const targetScope = computed<EvalTargetScope>(() => targetScopeOf(props.row));
+const targetScopeLabel = computed(() => t(`onlineEvals.job.targetScopes.${targetScope.value}`));
+
+const completionWindow = computed<{
+  idleWindowSecs: number;
+  maxAgeSecs: number;
+} | null>(() => {
+  const cfg =
+    targetScope.value === "trace"
+      ? valueOf<any>(props.row, "traceConfig", "trace_config")
+      : targetScope.value === "session"
+        ? valueOf<any>(props.row, "sessionConfig", "session_config")
+        : null;
+  if (!cfg) return null;
+  return {
+    idleWindowSecs: Number(valueOf<any>(cfg, "idleWindowSecs", "idle_window_secs") ?? 0),
+    maxAgeSecs: Number(valueOf<any>(cfg, "maxAgeSecs", "max_age_secs") ?? 0),
+  };
+});
 
 const normalizedFilter = computed(() => {
   const raw = valueOf<any>(props.row, "filterCondition", "filter_condition");
@@ -556,23 +584,15 @@ const filterText = computed<string>(() => {
   return body ? `if ${body}` : "";
 });
 
-const statusLabel = computed(() =>
-  t(`onlineEvals.jobStatus.${props.row.status}`, props.row.status),
-);
-
 const samplingMode = computed(
   () => valueOf<string>(props.row, "samplingMode", "sampling_mode") ?? "all",
 );
 
-const samplingValue = computed(() =>
-  valueOf<any>(props.row, "samplingValue", "sampling_value"),
-);
+const samplingValue = computed(() => valueOf<any>(props.row, "samplingValue", "sampling_value"));
 
 const samplingModeLabel = computed(() => {
-  if (samplingMode.value === "rate")
-    return t("onlineEvals.job.detail.samplingRate");
-  if (samplingMode.value === "count")
-    return t("onlineEvals.job.detail.samplingCount");
+  if (samplingMode.value === "rate") return t("onlineEvals.job.detail.samplingRate");
+  if (samplingMode.value === "count") return t("onlineEvals.job.detail.samplingCount");
   return t("onlineEvals.job.detail.samplingAll");
 });
 
@@ -601,9 +621,7 @@ function describeScoreConfig(cfg: ScoreConfig | null): {
     return { dataType, rangeText: "" };
   }
   if (dataType === "categorical") {
-    const cats: string[] = Array.isArray((cfg as any).categories)
-      ? (cfg as any).categories
-      : [];
+    const cats: string[] = Array.isArray((cfg as any).categories) ? (cfg as any).categories : [];
     const text =
       cats.length > 0
         ? cats.length <= 3
@@ -636,19 +654,11 @@ const resolvedScorers = computed<ResolvedScorer[]>(() => {
         scorerTypeLabel: "",
       };
     }
-    const cfgId = valueOf<string>(
-      found,
-      "producesScoreConfigId",
-      "produces_score_config_id",
-    );
-    const cfg = cfgId
-      ? (props.scoreConfigs.find((c) => entityId(c) === cfgId) ?? null)
-      : null;
+    const cfgId = valueOf<string>(found, "producesScoreConfigId", "produces_score_config_id");
+    const cfg = cfgId ? (props.scoreConfigs.find((c) => entityId(c) === cfgId) ?? null) : null;
     const cfgMeta = describeScoreConfig(cfg);
-    const rawType =
-      valueOf<string>(found, "scorerType", "scorer_type") ?? "llm_judge";
-    const scorerType: ResolvedScorer["scorerType"] =
-      rawType === "remote" ? "remote" : "llm_judge";
+    const rawType = valueOf<string>(found, "scorerType", "scorer_type") ?? "llm_judge";
+    const scorerType: ResolvedScorer["scorerType"] = rawType === "remote" ? "remote" : "llm_judge";
     return {
       // Use the resolved scorer's stable entity_id so downstream lookups
       // (findScorerById, onScorerClick) consistently match against
@@ -737,29 +747,22 @@ const agents = ref<AgentFilterSelection[]>([]);
 const agentKey = ref(ALL_AGENTS_VALUE);
 
 const agentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("traces.allAgents"), value: ALL_AGENTS_VALUE },
   ...agents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
 
 const selectedAgent = computed<AgentFilterSelection | null>(() => {
   if (agentKey.value === ALL_AGENTS_VALUE) return null;
-  return (
-    agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ??
-    null
-  );
+  return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
 async function loadAgents() {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(
-      orgId.value,
-      startUs,
-      endUs,
-    );
+    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -778,11 +781,7 @@ function syncDateWindow() {
   const picker = dateTimePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (
-    dt &&
-    typeof dt.startTime === "number" &&
-    typeof dt.endTime === "number"
-  ) {
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
     dateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
@@ -802,9 +801,7 @@ watch(orgId, () => {
   void loadAgents();
 });
 
-const tableEnabled = computed(
-  () => activeTab.value === "runs" || activeTab.value === "failures",
-);
+const tableEnabled = computed(() => activeTab.value === "runs" || activeTab.value === "failures");
 const jobIdRef = computed(() => String(props.row.id ?? ""));
 
 const {
@@ -816,6 +813,24 @@ const {
   refresh: refreshRunsData,
 } = useEvalJobRuns(jobIdRef, dateWindow, tableEnabled, selectedAgent);
 
+function openEvaluationRun(run: JobRunRow) {
+  if (!run.evaluatorTraceId) return;
+  const timestampUs = run.timestampMs > 0 ? run.timestampMs * 1000 : 0;
+  router
+    .push({
+      name: "traceDetails",
+      query: {
+        stream: "_evaluator",
+        trace_id: run.evaluatorTraceId,
+        span_id: run.id,
+        from: timestampUs ? Math.max(0, timestampUs - 60_000_000) : dateWindow.value.startUs,
+        to: timestampUs ? timestampUs + 3_600_000_000 : dateWindow.value.endUs,
+        org_identifier: orgId.value,
+      },
+    })
+    .catch(() => {});
+}
+
 // Global refresh — re-syncs the shared window then re-queries everything
 // (KPI strip + Runs + Failures), since one picker drives the whole view.
 async function refreshAll() {
@@ -826,35 +841,33 @@ async function refreshAll() {
 // — KPI strip cards —
 // value/unit split mirrors the SessionDetails KPI cards (big value + small
 // trailing unit) so the AI module's detail pages read identically.
-const kpiCards = computed<{ label: string; value: string; unit: string }[]>(
-  () => {
-    const k = kpis.value;
-    return [
-      {
-        label: t("onlineEvals.job.detail.kpis.totalRuns"),
-        value: formatCount(k.totalRuns),
-        unit: "",
-      },
-      {
-        label: t("onlineEvals.job.detail.kpis.successRate"),
-        value: k.successRate == null ? "—" : k.successRate.toFixed(1),
-        unit: k.successRate == null ? "" : "%",
-      },
-      {
-        label: t("onlineEvals.job.detail.kpis.avgLatency"),
-        ...splitLatency(k.avgLatencyMs),
-      },
-      {
-        label: t("onlineEvals.job.detail.kpis.scorers"),
-        value: String(resolvedScorers.value.length),
-        unit: "",
-      },
-    ];
-  },
-);
+const kpiCards = computed<{ label: I18nText; value: string; unit: string }[]>(() => {
+  const k = kpis.value;
+  return [
+    {
+      label: t("onlineEvals.job.detail.kpis.totalRuns"),
+      value: formatCount(k.totalRuns),
+      unit: "",
+    },
+    {
+      label: t("onlineEvals.job.detail.kpis.successRate"),
+      value: k.successRate == null ? "—" : k.successRate.toFixed(1),
+      unit: k.successRate == null ? "" : "%",
+    },
+    {
+      label: t("onlineEvals.job.detail.kpis.avgLatency"),
+      ...splitLatency(k.avgLatencyMs),
+    },
+    {
+      label: t("onlineEvals.job.detail.kpis.scorers"),
+      value: String(resolvedScorers.value.length),
+      unit: "",
+    },
+  ];
+});
 
 // — OTable column definitions —
-const runColumns = computed(() => [
+const runColumns = computed<OTableColumnDef<JobRunRow>[]>(() => [
   {
     id: "timestampMs",
     header: t("onlineEvals.job.detail.runs.col.time"),
@@ -919,7 +932,6 @@ const runColumns = computed(() => [
   },
 ]);
 
-
 // — Helpers —
 function formatTimestamp(microsOrMs: number): string {
   const ms = microsOrMs > 1e14 ? Math.round(microsOrMs / 1000) : microsOrMs;
@@ -964,301 +976,3 @@ function relativeTime(timestampMs: number): string {
   return `${day}d ago`;
 }
 </script>
-
-<style lang="scss">
-// Page layout, spacing, colors, and text styling are Tailwind utilities in the
-// template (matching SessionDetails.vue). Only cohesive blocks that rely on
-// descendant/element selectors or hover state remain here. Font-family is never
-// set per component — it inherits the global --font-sans.
-
-/* — Key/value description lists — */
-.jd-kv {
-  display: grid;
-  grid-template-columns: 8.125rem 1fr;
-  gap: 0.375rem 0.875rem;
-  margin: 0;
-}
-
-// Field labels follow the alert form convention (AddAlert.vue's
-// `.alert-v3-inline-label`): 12px / 600, in the muted-secondary color so the
-// label reads as a strong caption while the value below stays primary.
-.jd-kv dt {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-kv dd {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-primary, currentColor);
-  word-break: break-word;
-}
-
-// Filter code block — mirrors the Alert History condition view (rounded,
-// bordered, neutral surface + header bar) so condition rendering is consistent
-// across drawers.
-.jd-codeblock {
-  border: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
-  border-radius: 0.5rem;
-  overflow: hidden;
-  background: color-mix(
-    in srgb,
-    var(--color-text-secondary) 4%,
-    var(--color-card-bg)
-  );
-}
-
-.jd-codeblock__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.375rem 0.625rem;
-  border-bottom: 0.0625rem solid var(--color-dialog-header-border, var(--o2-border));
-  background: color-mix(
-    in srgb,
-    var(--color-text-secondary) 6%,
-    var(--color-card-bg)
-  );
-}
-
-.jd-codeblock__label {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-codeblock__content {
-  margin: 0;
-  padding: 0.625rem 0.875rem;
-  font-family: var(--font-mono);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  color: var(--color-text-primary, currentColor);
-  white-space: pre-wrap;
-  overflow-x: auto;
-  // Hard cap the filter condition height; longer conditions scroll.
-  max-height: 12.5rem;
-  overflow-y: auto;
-}
-
-.jd-scorers {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  // Show ~3 scorer cards (~65px each + 10px gap); the rest scroll. The small
-  // extra lets the 4th card peek as a scroll affordance. padding-right keeps
-  // the scrollbar off the card edges.
-  max-height: 25rem;
-  overflow-y: auto;
-  padding-right: 0.25rem;
-  padding-top:0.625rem
-}
-
-.jd-scorers__card {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 0.875rem 1rem;
-  background: var(--color-card-bg);
-  border: 0.0625rem solid
-    color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
-  border-radius: 0.5rem;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    background 0.15s,
-    box-shadow 0.15s,
-    transform 0.15s;
-}
-
-.jd-scorers__card:hover:not(:disabled) {
-  border-color: color-mix(
-    in srgb,
-    var(--color-primary-600, #3f7994) 45%,
-    transparent
-  );
-  background: color-mix(
-    in srgb,
-    var(--color-primary-600, #3f7994) 4%,
-    var(--color-card-bg)
-  );
-  box-shadow: 0 0.0625rem 0.1875rem
-    color-mix(in srgb, var(--color-primary-600, #3f7994) 12%, transparent);
-  transform: translateY(-0.0625rem);
-}
-
-.jd-scorers__card:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.jd-scorers__icon {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.125rem;
-  height: 2.125rem;
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.jd-scorers__icon--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.jd-scorers__icon--unknown {
-  background: color-mix(in srgb, var(--color-text-secondary) 14%, transparent);
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.3125rem;
-}
-
-.jd-scorers__row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.jd-scorers__name {
-  font-weight: 700;
-  font-size: 0.875rem;
-  color: var(--color-text-primary, currentColor);
-}
-
-.jd-scorers__type {
-  display: inline-flex;
-  padding: 0.0625rem 0.4375rem;
-  border-radius: 0.1875rem;
-  background: color-mix(in srgb, #6b76e3 14%, transparent);
-  color: #4f5bcf;
-}
-
-.jd-scorers__type--remote {
-  background: color-mix(in srgb, #b25400 14%, transparent);
-  color: #b25400;
-}
-
-.jd-scorers__version {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__produces {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  flex-wrap: wrap;
-}
-
-.jd-scorers__produces-icon {
-  flex-shrink: 0;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.7;
-}
-
-.jd-scorers__produces-prefix {
-  font-weight: 500;
-}
-
-.jd-scorers__produces-name {
-  color: var(--color-text-primary, currentColor);
-  font-weight: 700;
-}
-
-.jd-scorers__produces-type,
-.jd-scorers__produces-range {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__sep {
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-  opacity: 0.5;
-}
-
-.jd-scorers__cta {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-scorers__cta-label {
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.jd-scorers__card:hover:not(:disabled) .jd-scorers__cta {
-  color: var(--color-primary-600, #3f7994);
-}
-
-.jd-scorers__card:hover:not(:disabled) .jd-scorers__cta-label {
-  opacity: 1;
-}
-
-.jd-scorers__chevron {
-  flex-shrink: 0;
-  opacity: 0.5;
-  transition:
-    opacity 0.15s,
-    transform 0.15s;
-}
-
-.jd-scorers__card:hover:not(:disabled) .jd-scorers__chevron {
-  opacity: 1;
-  transform: translateX(0.125rem);
-}
-
-/* — Runs / Failures status cell — */
-.jd-status-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3125rem;
-  color: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell__dot {
-  width: 0.375rem;
-  height: 0.375rem;
-  border-radius: 50%;
-  background: var(--color-text-secondary, var(--o2-text-secondary));
-}
-
-.jd-status-cell--success {
-  color: var(--o2-status-success-text, #2e7d32);
-}
-.jd-status-cell--success .jd-status-cell__dot {
-  background: var(--o2-status-success-text, #2e7d32);
-}
-
-.jd-status-cell--error,
-.jd-status-cell--timeout {
-  color: var(--o2-status-error-text, #c62828);
-}
-.jd-status-cell--error .jd-status-cell__dot,
-.jd-status-cell--timeout .jd-status-cell__dot {
-  background: var(--o2-status-error-text, #c62828);
-}
-
-.jd-status-cell--skipped .jd-status-cell__dot {
-  background: color-mix(in srgb, var(--color-text-secondary) 60%, transparent);
-}
-</style>

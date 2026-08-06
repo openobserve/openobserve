@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="tw:rounded-md">
+  <div class="rounded-default">
     <SearchBar
       ref="searchBarRef"
       :query-data="queryData"
@@ -10,10 +10,10 @@
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
     />
-    <div class="tw:h-[calc(100vh-197px)]">
+    <div class="h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"
-        class="tw:h-full"
+        class="h-full"
         :data="rows"
         :columns="tableColumns"
         row-key="_rowKey"
@@ -30,7 +30,7 @@
         @pagination-change="onPaginationChange"
       >
         <template #empty>
-          <no-data />
+          <NoData />
         </template>
       </OTable>
     </div>
@@ -38,10 +38,10 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeMount, onMounted, ref, type Ref } from "vue";
+import { onBeforeMount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 
 import SearchBar from "@/components/logstream/explore/SearchBar.vue";
@@ -54,13 +54,12 @@ import { logsErrorMessage } from "@/utils/common";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { getConsumableRelativeTime } from "@/utils/date";
 import type { IDateTime } from "@/ts/interfaces";
-import { toast } from "@/lib/feedback/Toast/useToast";
 
 type SearchBarInstance = InstanceType<typeof SearchBar>;
 
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const streamData = ref<any>(null);
 const searchBarRef = ref<SearchBarInstance | null>(null);
@@ -119,15 +118,6 @@ function onPaginationChange(params: { page: number; size: number }) {
   currentPage.value = params.page;
   pageSize.value = params.size;
   getQueryData();
-}
-
-function ErrorException(message: string) {
-  isLoading.value = false;
-  toast({
-    variant: "error",
-    message,
-    timeout: 10000,
-  });
 }
 
 function getQueryData() {
@@ -192,15 +182,12 @@ function buildSearch() {
       },
     };
 
-    var timestamps:
-      | {
-          startTime: number;
-          endTime: number;
-        }
-      | null =
+    var timestamps: {
+      startTime: number;
+      endTime: number;
+    } | null =
       queryData.value.dateTime.type === "relative"
-        ? getConsumableRelativeTime(queryData.value.dateTime.relativeTimePeriod) ||
-          null
+        ? getConsumableRelativeTime(queryData.value.dateTime.relativeTimePeriod) || null
         : cloneDeep(queryData.value.dateTime);
 
     if (streamData?.value?.stream_type === "enrichment_tables") {

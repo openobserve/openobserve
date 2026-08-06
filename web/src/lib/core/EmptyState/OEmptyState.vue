@@ -34,7 +34,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     :class="[
-      'o2-empty-state tw:relative tw:flex tw:flex-col tw:items-center tw:justify-center tw:overflow-hidden',
+      'o2-empty-state relative flex flex-col items-center justify-center overflow-hidden',
+      '[--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]',
       sizeClass.root,
       { 'o2-empty-state--hero': size === 'hero' },
     ]"
@@ -44,13 +45,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="showBackdrop"
       aria-hidden="true"
-      class="tw:absolute tw:inset-0 tw:pointer-events-none"
+      class="pointer-events-none absolute inset-0"
       :style="dotGridStyle"
     />
 
-    <div :class="['tw:relative tw:flex tw:flex-col tw:items-center tw:text-center', sizeClass.stack]">
+    <div :class="['relative flex flex-col items-center text-center', sizeClass.stack]">
       <!-- illustration (hero/block) — preset/illustration prop or slot -->
-      <div v-if="hasIllustration" class="tw:shrink-0">
+      <div v-if="hasIllustration" class="shrink-0">
         <slot name="illustration">
           <component
             :is="illustrationComponent"
@@ -64,21 +65,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- inline size shows a compact icon instead of a full illustration -->
       <span
         v-else-if="inlineIcon"
-        :class="['o2-empty-state__inline-icon tw:inline-flex tw:items-center tw:justify-center tw:rounded-full', sizeClass.iconWrap]"
+        :class="[
+          'o2-empty-state__inline-icon inline-flex items-center justify-center rounded-full',
+          sizeClass.iconWrap,
+        ]"
       >
         <OIcon :name="inlineIcon" :size="size === 'inline' ? 'lg' : 'xl'" />
       </span>
 
-      <div :class="['tw:flex tw:flex-col tw:max-w-xl', sizeClass.copy]">
+      <div :class="['flex max-w-xl flex-col', sizeClass.copy]">
         <component
           :is="size === 'inline' ? 'p' : 'h2'"
-          :class="['tw:font-medium tw:text-text-primary tw:tracking-[-0.01em]', sizeClass.title]"
+          :class="['text-text-heading font-medium tracking-[-0.01em]', sizeClass.title]"
         >
           <slot name="title">{{ resolvedTitle }}</slot>
         </component>
         <p
           v-if="resolvedDescription || $slots.description"
-          :class="['tw:text-text-secondary tw:leading-relaxed', sizeClass.description]"
+          :class="['text-text-secondary leading-relaxed', sizeClass.description]"
         >
           <slot name="description">{{ resolvedDescription }}</slot>
         </p>
@@ -88,7 +92,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            (+ optional secondary) button(s) from preset/props -->
       <div
         v-if="$slots.actions || showCards || resolvedActionLabel || secondaryActionLabel"
-        :class="['tw:flex tw:flex-wrap tw:items-center tw:justify-center', sizeClass.actions]"
+        :class="[
+          props.columns
+            ? 'flex flex-wrap justify-center'
+            : 'flex flex-nowrap items-stretch justify-center',
+          sizeClass.actions,
+        ]"
       >
         <slot name="actions">
           <template v-if="showCards">
@@ -132,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, useSlots } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -144,6 +153,7 @@ import {
   emptyStatePresets,
   presetNouns,
   type EmptyStateAction,
+  type EmptyStatePreset,
   type EmptyStatePresetName,
   type EmptyStateVariant,
 } from "./presets";
@@ -163,17 +173,22 @@ const props = withDefaults(
     /** Icon for the compact `inline` size (when no illustration). */
     icon?: IconName;
     /** Copy — overrides preset i18n when provided. */
-    title?: string;
-    description?: string;
+    title?: I18nText;
+    description?: I18nText;
     /** Rich action cards; overrides the preset's actions when provided. */
     actions?: EmptyStateAction[];
     /** Simple primary button (used instead of cards); emits `action` on click. */
-    actionLabel?: string;
+    actionLabel?: I18nText;
     actionIcon?: IconName;
     /** Secondary action; emits `secondaryAction` on click. */
     secondaryActionLabel?: string;
     /** Suppress the preset's actions (e.g. table empties with no CTA). */
     hideAction?: boolean;
+    /**
+     * Whether to wrap action cards onto multiple rows (flex-wrap) instead of
+     * forcing a single row (flex-nowrap). Use when you have more than 2-3 cards.
+     */
+    columns?: boolean;
     /**
      * The underlying list HAS items but the current filter/search matched none.
      * Switches to a "no results" treatment (magnifier + "No {noun} found" +
@@ -193,9 +208,11 @@ const emit = defineEmits<{
 }>();
 
 const slots = useSlots();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-const preset = computed(() =>
+// Widen to the interface: the `satisfies` map keeps per-key literal types,
+// and unioning 25 literals breaks `?.actions` on entries without actions.
+const preset = computed<EmptyStatePreset | undefined>(() =>
   props.preset ? emptyStatePresets[props.preset] : undefined,
 );
 
@@ -218,14 +235,12 @@ const FILTERED_ACTION: EmptyStateAction = {
 // --- copy resolution: filtered > explicit prop > preset i18n key ------------
 const resolvedTitle = computed(() => {
   if (props.title) return props.title;
-  if (isFiltered.value)
-    return t("emptyState.filtered.title", { noun: noun.value });
+  if (isFiltered.value) return t("emptyState.filtered.title", { noun: noun.value });
   return preset.value ? t(preset.value.titleKey) : "";
 });
 const resolvedDescription = computed(() => {
   if (props.description) return props.description;
-  if (isFiltered.value)
-    return t("emptyState.filtered.description", { noun: noun.value });
+  if (isFiltered.value) return t("emptyState.filtered.description", { noun: noun.value });
   const key = preset.value?.descriptionKey;
   return key ? t(key) : "";
 });
@@ -236,43 +251,29 @@ const resolvedActions = computed<EmptyStateAction[]>(() => {
   if (isFiltered.value) return [FILTERED_ACTION];
   return props.actions ?? preset.value?.actions ?? [];
 });
-const showCards = computed(
-  () => size.value !== "inline" && resolvedActions.value.length > 0,
-);
+const showCards = computed(() => size.value !== "inline" && resolvedActions.value.length > 0);
 
 // Simple button fallback (only when a call site passes actionLabel directly and
 // there are no cards).
-const resolvedActionLabel = computed(() =>
-  props.hideAction ? "" : (props.actionLabel ?? ""),
-);
-const resolvedActionIcon = computed<IconName | undefined>(
-  () => props.actionIcon,
-);
+const resolvedActionLabel = computed(() => (props.hideAction ? "" : (props.actionLabel ?? "")));
+const resolvedActionIcon = computed<IconName | undefined>(() => props.actionIcon);
 
 // --- variant / illustration -------------------------------------------------
 const variant = computed<EmptyStateVariant>(() =>
-  isFiltered.value
-    ? "no-results"
-    : (props.variant ?? preset.value?.variant ?? "neutral"),
+  isFiltered.value ? "no-results" : (props.variant ?? preset.value?.variant ?? "neutral"),
 );
-const actionVariant = computed(() =>
-  variant.value === "error" ? "outline" : "primary",
-);
+const actionVariant = computed(() => (variant.value === "error" ? "outline" : "primary"));
 
 // Filtered always uses the magnifier so it reads as "search found nothing".
 const illustrationName = computed<IllustrationName | undefined>(() =>
-  isFiltered.value
-    ? "no-results"
-    : (props.illustration ?? preset.value?.illustration),
+  isFiltered.value ? "no-results" : (props.illustration ?? preset.value?.illustration),
 );
 const illustrationComponent = computed(() =>
   illustrationName.value ? illustrations[illustrationName.value] : undefined,
 );
 // inline never shows the full illustration — it uses a compact icon instead.
 const hasIllustration = computed(
-  () =>
-    size.value !== "inline" &&
-    (!!slots.illustration || !!illustrationComponent.value),
+  () => size.value !== "inline" && (!!slots.illustration || !!illustrationComponent.value),
 );
 const inlineIcon = computed<IconName | undefined>(() => {
   if (size.value !== "inline") return undefined;
@@ -297,9 +298,7 @@ onMounted(() => {
 onBeforeUnmount(() => mq?.removeEventListener?.("change", syncMotion));
 
 // --- backdrop ---------------------------------------------------------------
-const showBackdrop = computed(() =>
-  props.backdrop ?? size.value !== "inline",
-);
+const showBackdrop = computed(() => props.backdrop ?? size.value !== "inline");
 const dotGridStyle =
   "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
   "background-size: 30px 30px;" +
@@ -317,52 +316,45 @@ const SIZE_MAP: Record<
     copy: string;
     actions: string;
     extra: string;
-    title: string;
-    description: string;
+    title: I18nText;
+    description: I18nText;
     illustrationWidth: number;
     iconWrap: string;
   }
 > = {
   hero: {
-    root: "tw:w-full tw:h-full tw:min-h-[320px] tw:px-6 tw:py-12",
-    stack: "tw:gap-7",
-    copy: "tw:gap-2.5",
-    actions: "tw:gap-3 tw:pt-1",
-    extra: "tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-3 tw:pt-2",
-    title: "tw:text-2xl!",
-    description: "tw:text-base",
+    root: "w-full h-full min-h-80 px-6 py-12",
+    stack: "gap-7",
+    copy: "gap-2.5",
+    actions: "gap-3 pt-1",
+    extra: "w-full flex flex-col items-center gap-3 pt-2",
+    title: raw("text-2xl!"),
+    description: raw("text-base"),
     illustrationWidth: 300,
     iconWrap: "",
   },
   block: {
-    root: "tw:w-full tw:min-h-[260px] tw:px-6 tw:py-10",
-    stack: "tw:gap-5",
-    copy: "tw:gap-2",
-    actions: "tw:gap-2.5 tw:pt-0.5",
-    extra: "tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-2 tw:pt-1",
-    title: "tw:text-lg!",
-    description: "tw:text-sm",
+    root: "w-full min-h-65 px-6 py-10",
+    stack: "gap-5",
+    copy: "gap-2",
+    actions: "gap-2.5 pt-0.5",
+    extra: "w-full flex flex-col items-center gap-2 pt-1",
+    title: raw("text-lg!"),
+    description: raw("text-sm"),
     illustrationWidth: 150,
     iconWrap: "",
   },
   inline: {
-    root: "tw:w-full tw:min-h-[160px] tw:px-4 tw:py-8",
-    stack: "tw:gap-3",
-    copy: "tw:gap-1",
-    actions: "tw:gap-2 tw:pt-1",
-    extra: "tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-1.5 tw:pt-1",
-    title: "tw:text-sm!",
-    description: "tw:text-xs",
+    root: "w-full min-h-40 px-4 py-8",
+    stack: "gap-3",
+    copy: "gap-1",
+    actions: "gap-2 pt-1",
+    extra: "w-full flex flex-col items-center gap-1.5 pt-1",
+    title: raw("text-sm!"),
+    description: raw("text-xs"),
     illustrationWidth: 0,
-    iconWrap:
-      "tw:w-12 tw:h-12 tw:bg-surface-subtle tw:text-text-secondary tw:mb-0.5",
+    iconWrap: "w-12 h-12 bg-surface-subtle text-text-secondary mb-0.5",
   },
 };
 const sizeClass = computed(() => SIZE_MAP[size.value]);
 </script>
-
-<style>
-/* CSS custom property for the dot-grid backdrop; dark mode overrides it. */
-.o2-empty-state { --empty-dot: var(--color-grey-300); }
-.dark .o2-empty-state { --empty-dot: var(--color-grey-800); }
-</style>

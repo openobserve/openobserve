@@ -16,50 +16,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:bg-surface-panel tw:relative tw:h-full tw:min-h-0 tw:flex tw:flex-col"
-    :class="isOpen ? 'tw:w-75' : 'tw:w-12.5'"
+    class="bg-surface-panel relative flex h-full min-h-0 flex-col"
+    :class="isOpen ? 'w-75' : 'w-12.5'"
     data-test="panel-sidebar-root"
   >
     <div
       v-if="!isOpen"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-start tw:w-12.5 tw:h-full tw:overflow-y-auto tw:cursor-pointer"
+      class="flex h-full w-12.5 cursor-pointer flex-col items-center justify-start overflow-y-auto"
       data-test="panel-sidebar-header-collapsed"
       @click="toggleSidebar"
     >
-      <!-- <div class="tw:mt-[10px] tw:text-[20px]">+</div> -->
+      <!-- <div class="mt-2.5 text-xl">+</div> -->
       <OIcon
-        name="expand-all" size="sm"
-        class="tw:mt-[10px] tw:text-[20px] rotate-90"
+        name="expand-all"
+        size="sm"
+        class="mt-2.5 rotate-90 text-xl"
         data-test="dashboard-sidebar"
       />
       <div
-        class="tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold"
+        class="font-bold [text-orientation:mixed] [writing-mode:vertical-rl]"
         data-test="panel-sidebar-collapsed-title"
-      >{{ title }}</div>
+      >
+        {{ title }}
+      </div>
     </div>
     <div
       v-else
-      class="tw:flex tw:items-center tw:justify-between tw:h-[60px] tw:px-[10px] tw:shrink-0"
+      class="flex h-11 shrink-0 items-center justify-between px-3"
       data-test="panel-sidebar-header-expanded"
     >
-      <div
-        class="tw:font-bold"
-        data-test="panel-sidebar-expanded-title"
-      >{{ title }}</div>
+      <div class="text-text-heading text-sm font-semibold" data-test="panel-sidebar-expanded-title">
+        {{ title }}
+      </div>
       <OButton
         variant="outline"
         size="icon-xs-sq"
-        class="tw:rotate-90"
+        class="rotate-90"
         @click="toggleSidebar"
         data-test="dashboard-sidebar-collapse-btn"
         icon-left="unfold-less"
       >
       </OButton>
     </div>
-    <OSeparator class="tw:-mt-px tw:shrink-0" data-test="panel-sidebar-separator" />
+    <OSeparator class="-mt-px shrink-0" data-test="panel-sidebar-separator" />
     <div
-      class="scroll"
-      style="height: calc(100vh - 176px); overflow-y: auto;"
+      class="scroll h-[calc(100vh_-_11rem)] overflow-y-auto"
       data-test="panel-sidebar-content"
       v-if="isOpen"
       @scroll.passive="onSidebarScroll"
@@ -70,18 +71,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, provide } from "vue";
+import { type I18nText } from "@/types/i18n";
+import { defineComponent, ref, watch, provide, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
-  components: { OSeparator, OButton,
-    OIcon,
-},
+  components: { OSeparator, OButton, OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     modelValue: {
@@ -93,7 +93,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const isOpen = ref(props.modelValue);
     const sidebarScrollTick = ref(0);
-    provide('sidebarScrollTick', sidebarScrollTick);
+    provide("sidebarScrollTick", sidebarScrollTick);
 
     const toggleSidebar = () => {
       isOpen.value = !isOpen.value;
@@ -119,4 +119,3 @@ export default defineComponent({
   },
 });
 </script>
-

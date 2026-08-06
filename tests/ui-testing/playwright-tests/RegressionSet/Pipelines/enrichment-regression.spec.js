@@ -51,13 +51,13 @@ test.describe("Enrichment Table Regression Bugs", () => {
       testLogger.info('✓ Enrichment table UI is visible');
 
       // Verify table is rendered - using POM method
-      const tableVisible = await pm.enrichmentPage.isQuasarTableVisible();
+      const tableVisible = await pm.enrichmentPage.isTableVisible();
 
       if (tableVisible) {
         testLogger.info('✓ Enrichment table rendered successfully');
 
         // Get table bounding box to verify it's displayed properly - using POM method
-        const tableBox = await pm.enrichmentPage.getQuasarTableDimensions();
+        const tableBox = await pm.enrichmentPage.getTableDimensions();
         if (tableBox) {
           expect(tableBox.width).toBeGreaterThan(100);
           expect(tableBox.height).toBeGreaterThan(50);
@@ -65,7 +65,7 @@ test.describe("Enrichment Table Regression Bugs", () => {
         }
 
         // Take screenshot for visual verification of contrast - using POM method
-        await pm.enrichmentPage.screenshotQuasarTable('enrichment-table-contrast.png');
+        await pm.enrichmentPage.screenshotTable('enrichment-table-contrast.png');
         testLogger.info('Screenshot saved for manual contrast verification');
 
         testLogger.info('✓ PRIMARY CHECK PASSED: Enrichment table displays with proper layout');

@@ -15,13 +15,11 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-const { mockUpdateGroupedFields, mockMakeAutoSQLQuery, state } = vi.hoisted(
-  () => ({
-    mockUpdateGroupedFields: vi.fn(),
-    mockMakeAutoSQLQuery: vi.fn(),
-    state: { panel: null as any },
-  }),
-);
+const { mockUpdateGroupedFields, mockMakeAutoSQLQuery, state } = vi.hoisted(() => ({
+  mockUpdateGroupedFields: vi.fn(),
+  mockMakeAutoSQLQuery: vi.fn(),
+  state: { panel: null as any },
+}));
 
 vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: () => ({
@@ -32,8 +30,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     isAddXAxisNotAllowed: {
       get value() {
         const t = state.panel?.data?.type;
-        const xlen =
-          state.panel?.data?.queries?.[0]?.fields?.x?.length ?? 0;
+        const xlen = state.panel?.data?.queries?.[0]?.fields?.x?.length ?? 0;
         if (t === "metric") return xlen >= 0; // metric: x never allowed
         if (t === "gauge" || t === "pie" || t === "donut") return xlen >= 1;
         if (t === "table") return false;
@@ -42,8 +39,7 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
     },
     isAddYAxisNotAllowed: {
       get value() {
-        const ylen =
-          state.panel?.data?.queries?.[0]?.fields?.y?.length ?? 0;
+        const ylen = state.panel?.data?.queries?.[0]?.fields?.y?.length ?? 0;
         const t = state.panel?.data?.type;
         if (["pie", "donut", "gauge", "metric"].includes(t)) return ylen >= 1;
         return false;
@@ -105,6 +101,46 @@ describe("useDefaultPanelFields", () => {
       expect(currentQuery().fields.x).toEqual([]);
       expect(mockUpdateGroupedFields).not.toHaveBeenCalled();
       expect(mockMakeAutoSQLQuery).not.toHaveBeenCalled();
+    });
+
+    it("does not re-seed a slot the user has built in", async () => {
+      // The Builder toggle comes back through here on a panel the user has been
+      // building in; seeding it again replaced their filters and operations.
+      setPanel({
+        queryType: "promql",
+        stream: "mystream",
+        query: 'rate(mystream{env="dev"}[5m])',
+        customQuery: true,
+      });
+      currentQuery().fields.promql_labels = [{ label: "env", op: "=", value: "dev" }];
+      currentQuery().fields.promql_operations = [{ id: "rate" }];
+
+      const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().query).toBe('rate(mystream{env="dev"}[5m])');
+      expect(currentQuery().fields.promql_labels).toEqual([
+        { label: "env", op: "=", value: "dev" },
+      ]);
+      expect(currentQuery().fields.promql_operations).toEqual([{ id: "rate" }]);
+      // The toggle still lands them in Builder mode.
+      expect(currentQuery().customQuery).toBe(false);
+    });
+
+    it("keeps a label row the user added but has not filled in", async () => {
+      // It renders to nothing, so the query text alone still looks auto-seeded.
+      setPanel({
+        queryType: "promql",
+        stream: "mystream",
+        query: "mystream{}",
+        customQuery: true,
+      });
+      currentQuery().fields.promql_labels = [{ label: "", op: "=", value: "" }];
+
+      const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      await applyDefaultPanelFields();
+
+      expect(currentQuery().fields.promql_labels).toEqual([{ label: "", op: "=", value: "" }]);
     });
 
     it("leaves the query empty when no stream is selected", async () => {

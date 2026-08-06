@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelSQLExecutor } from "./usePanelSQLExecutor";
 
@@ -53,14 +53,16 @@ const makeStore = () => ({
   },
 });
 
-const makePanelSchema = (queries: any[] = [
-  {
-    query: "SELECT * FROM logs",
-    vrlFunctionQuery: "",
-    fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
-    config: { time_shift: [] },
-  },
-]) =>
+const makePanelSchema = (
+  queries: any[] = [
+    {
+      query: "SELECT * FROM logs",
+      vrlFunctionQuery: "",
+      fields: { stream: "logs", stream_type: "logs", x: [{ alias: "ts" }] },
+      config: { time_shift: [] },
+    },
+  ],
+) =>
   ref({
     id: "panel-sql-1",
     title: "SQL Panel",
@@ -151,12 +153,7 @@ describe("usePanelSQLExecutor", () => {
       await executeSQL(0, 300_000_000, null);
 
       expect(replaceQueryValue).toHaveBeenCalledTimes(1);
-      expect(replaceQueryValue).toHaveBeenCalledWith(
-        "SELECT * FROM logs",
-        0,
-        300_000_000,
-        "sql",
-      );
+      expect(replaceQueryValue).toHaveBeenCalledWith("SELECT * FROM logs", 0, 300_000_000, "sql");
     });
 
     it("calls applyDynamicVariables after replaceQueryValue", async () => {
@@ -219,7 +216,7 @@ describe("usePanelSQLExecutor", () => {
 
       // Re-import after mock override
       const { usePanelSQLExecutor: freshFn } = await import("./usePanelSQLExecutor");
-      const { ctx, fetchQueryDataWithHttpStream, state } = makeCtx();
+      const { ctx, state } = makeCtx();
 
       const { executeSQL } = freshFn(ctx);
       await executeSQL(0, 300_000_000, null);
@@ -293,9 +290,7 @@ describe("usePanelSQLExecutor", () => {
       await executeSQL(100, 200, null);
 
       const rmd = state.resultMetaData[0]?.[0];
-      expect(rmd.converted_histogram_query).toBe(
-        "SELECT histogram(_timestamp) FROM default",
-      );
+      expect(rmd.converted_histogram_query).toBe("SELECT histogram(_timestamp) FROM default");
       expect(rmd.order_by).toBe("asc");
       expect(rmd.some_other_field).toBe("preserved");
       // And time_offset is overridden with the executor's arguments
@@ -303,7 +298,7 @@ describe("usePanelSQLExecutor", () => {
     });
 
     it("skips fetch and sets partial data flag when abort signal is aborted", async () => {
-      const { ctx, fetchQueryDataWithHttpStream, state } = makeCtx();
+      const { ctx, state } = makeCtx();
       const abortController = new AbortController();
 
       // Set up fetchQueryDataWithHttpStream to abort before call

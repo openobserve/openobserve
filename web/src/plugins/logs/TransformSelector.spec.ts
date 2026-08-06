@@ -14,15 +14,31 @@
 
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ref, computed } from "vue";
+import { ref } from "vue";
 import TransformSelector from "./TransformSelector.vue";
 
 // ── Mock vue-i18n ──────────────────────────────────────────────────────────────
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => key,
-  }),
-}));
+// Existing tests assert on translation KEY paths (the mock echoes keys). The i18n
+// migration moved two previously-hardcoded literals into the `logs.transformSelector.*`
+// namespace, and those tests assert on the real rendered copy (incl. `{name}`
+// interpolation). Resolve that migrated namespace from the real en.json messages so
+// those assertions pass, while continuing to echo keys everywhere else.
+vi.mock("vue-i18n", async () => {
+  const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<string, any>;
+  const resolve = (key: string, params?: Record<string, unknown>): string => {
+    const msg = key.split(".").reduce<any>((o, k) => (o == null ? o : o[k]), enLocale);
+    if (typeof msg !== "string") return key;
+    return msg.replace(/\{(\w+)\}/g, (_m: string, name: string) =>
+      params && name in params ? String(params[name]) : `{${name}}`,
+    );
+  };
+  return {
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) =>
+        key.startsWith("logs.transformSelector.") ? resolve(key, params) : key,
+    }),
+  };
+});
 
 // ── Shared searchObj state ─────────────────────────────────────────────────────
 const mockSearchObj = {
@@ -90,20 +106,7 @@ const functionOptions = [
 const mountComponent = (propsOverrides = {}) =>
   mount(TransformSelector, {
     global: {
-      stubs: {
-        QBtnGroup: { template: '<div><slot /></div>' },
-        QToggle: { template: '<input type="checkbox" />' },
-        QTooltip: true,
-        QBtnDropdown: { template: '<div data-test="btn-dropdown"><slot /><slot name="default" /></div>' },
-        QList: { template: '<ul><slot /></ul>' },
-        QSelect: { template: '<select />' },
-        QInput: { template: '<input />' },
-        QIcon: { template: '<span />' },
-        QItem: { template: '<li><slot /></li>' },
-        QItemSection: { template: '<div><slot /></div>' },
-        QItemLabel: { template: '<span><slot /></span>' },
-        QBtn: { template: '<button :disabled="$attrs.disable" @click="$attrs.onClick?.($event)"><slot /></button>' },
-      },
+      stubs: {},
     },
     props: {
       functionOptions,
@@ -420,7 +423,7 @@ describe("TransformSelector", () => {
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "testAction action applied successfully",
-        })
+        }),
       );
     });
 
@@ -485,7 +488,7 @@ describe("TransformSelector", () => {
   describe("Save button disabled state", () => {
     it("save button is enabled when transformType is 'function'", async () => {
       mockSearchObj.data.transformType = "function";
-      const wrapper = mountComponent();
+      mountComponent();
       await flushPromises();
       // The save button uses :disable="searchObj.data.transformType !== 'function'"
       // transformType is 'function' so disabled = false
@@ -496,46 +499,14 @@ describe("TransformSelector", () => {
 
     it("save button is disabled when transformType is 'action'", () => {
       mockSearchObj.data.transformType = "action";
-      const wrapper = mountComponent();
+      mountComponent();
       expect(mockSearchObj.data.transformType !== "function").toBe(true);
     });
 
     it("save button is disabled when no transformType", () => {
       mockSearchObj.data.transformType = null;
-      const wrapper = mountComponent();
+      mountComponent();
       expect(mockSearchObj.data.transformType !== "function").toBe(true);
-    });
-  });
-
-  // ── functionToggleIcon ───────────────────────────────────────────────────────
-  describe("functionToggleIcon computed", () => {
-    it("returns dark function icon when toggleFunction is true", () => {
-      mockSearchObj.meta.toggleFunction = true;
-      const wrapper = mountComponent();
-      expect(wrapper.vm.functionToggleIcon).toContain("function_dark.svg");
-    });
-
-    it("returns light function icon when toggleFunction is false", () => {
-      mockSearchObj.meta.toggleFunction = false;
-      const wrapper = mountComponent();
-      expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
-      expect(wrapper.vm.functionToggleIcon).not.toContain("function_dark.svg");
-    });
-  });
-
-  // ── iconRight ────────────────────────────────────────────────────────────────
-  describe("iconRight computed", () => {
-    it("returns dark function icon in dark theme", () => {
-      mockStore.state.theme = "dark";
-      const wrapper = mountComponent();
-      expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-    });
-
-    it("returns light function icon in light theme", () => {
-      mockStore.state.theme = "light";
-      const wrapper = mountComponent();
-      expect(wrapper.vm.iconRight).toContain("function.svg");
-      expect(wrapper.vm.iconRight).not.toContain("function_dark.svg");
     });
   });
 
@@ -564,7 +535,9 @@ describe("TransformSelector", () => {
       await flushPromises();
       const result = wrapper.vm.filteredFunctionOptions;
       expect(result.some((o: { name: string }) => o.name === "parseJSON")).toBe(true);
-      expect(result.every((o: { name: string }) => o.name.toLowerCase().includes("parse"))).toBe(true);
+      expect(result.every((o: { name: string }) => o.name.toLowerCase().includes("parse"))).toBe(
+        true,
+      );
     });
   });
 });

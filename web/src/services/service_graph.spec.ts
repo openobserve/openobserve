@@ -50,7 +50,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -63,7 +63,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: { stream_name: "my-stream" } }
+        { params: { stream_name: "my-stream" } },
       );
     });
 
@@ -76,7 +76,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -89,7 +89,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: { start_time: 1700000000 } }
+        { params: { start_time: 1700000000 } },
       );
     });
 
@@ -102,7 +102,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/topology/current",
-        { params: { end_time: 1700003600 } }
+        { params: { end_time: 1700003600 } },
       );
     });
 
@@ -123,8 +123,99 @@ describe("service_graph service", () => {
             start_time: 1700000000,
             end_time: 1700003600,
           },
-        }
+        },
       );
+    });
+
+    it("should include agent_id param when agentId is provided", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: "agent-123",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: { agent_id: "agent-123" } },
+      );
+    });
+
+    it("should include agent_name param when agentName is provided", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentName: "my-agent",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: { agent_name: "my-agent" } },
+      );
+    });
+
+    it("should include agent_env param when agentEnv is provided", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentEnv: "production",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: { agent_env: "production" } },
+      );
+    });
+
+    it("should include all agent params together (id, name, env)", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: "agent-123",
+        agentName: "my-agent",
+        agentEnv: "production",
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        {
+          params: {
+            agent_id: "agent-123",
+            agent_name: "my-agent",
+            agent_env: "production",
+          },
+        },
+      );
+    });
+
+    it("should NOT include agent params when they are null", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: null,
+        agentName: null,
+        agentEnv: null,
+      });
+
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/service_graph/topology/current",
+        { params: {} },
+      );
+    });
+
+    it("should NEVER send agent_version to the backend (topology is version-agnostic)", async () => {
+      mockHttpInstance.get.mockResolvedValue({ data: {} });
+
+      // Pass an agentVersion-like key; it must never surface as a param.
+      await serviceGraphService.getCurrentTopology("test-org", {
+        agentId: "agent-123",
+        agentEnv: "production",
+        // @ts-expect-error agentVersion is intentionally not part of ServiceGraphParams
+        agentVersion: "v2.0.0",
+      });
+
+      const callArgs = mockHttpInstance.get.mock.calls[0][1];
+      expect(callArgs.params.agent_version).toBeUndefined();
+      expect(callArgs.params).not.toHaveProperty("agent_version");
     });
 
     it("should handle different org identifiers", async () => {
@@ -135,7 +226,7 @@ describe("service_graph service", () => {
         await serviceGraphService.getCurrentTopology(org);
         expect(mockHttpInstance.get).toHaveBeenCalledWith(
           `/api/${org}/traces/service_graph/topology/current`,
-          { params: {} }
+          { params: {} },
         );
       }
     });
@@ -143,9 +234,9 @@ describe("service_graph service", () => {
     it("should propagate errors", async () => {
       mockHttpInstance.get.mockRejectedValue(new Error("Service unavailable"));
 
-      await expect(
-        serviceGraphService.getCurrentTopology("test-org")
-      ).rejects.toThrow("Service unavailable");
+      await expect(serviceGraphService.getCurrentTopology("test-org")).rejects.toThrow(
+        "Service unavailable",
+      );
     });
   });
 
@@ -157,7 +248,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -170,7 +261,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { client_service: "frontend" } }
+        { params: { client_service: "frontend" } },
       );
     });
 
@@ -183,7 +274,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { server_service: "backend-api" } }
+        { params: { server_service: "backend-api" } },
       );
     });
 
@@ -196,7 +287,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { start_time: 1700000000 } }
+        { params: { start_time: 1700000000 } },
       );
     });
 
@@ -209,7 +300,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { end_time: 1700003600 } }
+        { params: { end_time: 1700003600 } },
       );
     });
 
@@ -222,7 +313,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: { stream_name: "traces-stream" } }
+        { params: { stream_name: "traces-stream" } },
       );
     });
 
@@ -235,7 +326,7 @@ describe("service_graph service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         "/api/test-org/traces/service_graph/edge/history",
-        { params: {} }
+        { params: {} },
       );
     });
 
@@ -260,7 +351,7 @@ describe("service_graph service", () => {
             end_time: 1700003600,
             stream_name: "default-traces",
           },
-        }
+        },
       );
     });
 
@@ -271,7 +362,7 @@ describe("service_graph service", () => {
         serviceGraphService.getEdgeHistory("test-org", {
           client_service: "svc-a",
           server_service: "svc-b",
-        })
+        }),
       ).rejects.toThrow("Not found");
     });
   });
@@ -287,10 +378,10 @@ describe("service_graph service", () => {
         })
         .mockResolvedValueOnce({ data: { history: [{ ts: 1700000100 }] } });
 
-      const topology = await serviceGraphService.getCurrentTopology(
-        "test-org",
-        { startTime: 1700000000, endTime: 1700003600 }
-      );
+      const topology = await serviceGraphService.getCurrentTopology("test-org", {
+        startTime: 1700000000,
+        endTime: 1700003600,
+      });
       const edgeHistory = await serviceGraphService.getEdgeHistory("test-org", {
         client_service: "svc-a",
         server_service: "svc-b",

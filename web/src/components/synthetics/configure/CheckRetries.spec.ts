@@ -1,0 +1,190 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import type { BrowserCheck } from "@/types/synthetics";
+import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
+
+// ── Stubs ────────────────────────────────────────────────────────────────────
+
+const OInputStub = {
+  props: ["modelValue", "type", "placeholder", "class"],
+  emits: ["update:modelValue"],
+  template: `<input v-bind="$attrs" :value="modelValue" :type="type" @input="$emit('update:modelValue', $event.target.value)" />`,
+};
+
+const STUBS = {
+  OInput: OInputStub,
+};
+
+// ── Mocks ────────────────────────────────────────────────────────────────────
+
+vi.mock("vue-i18n", () => ({
+  useI18n: vi.fn(() => ({ t: (key: string) => key })),
+}));
+
+// ── SUT import (after mocks) ────────────────────────────────────────────────
+
+import CheckRetries from "./CheckRetries.vue";
+
+// ── Mount factory ────────────────────────────────────────────────────────────
+
+function mountCheckRetries(
+  checkOverrides: Partial<BrowserCheck> = {},
+  validationErrors?: Record<string, string>,
+) {
+  const check = { ...mockMonitorHttp, ...checkOverrides } as BrowserCheck;
+  return mount(CheckRetries, {
+    props: { check, validationErrors },
+    global: {
+      stubs: STUBS,
+    },
+  }) as VueWrapper;
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+describe("CheckRetries", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  describe("initial render", () => {
+    it("renders the retries section heading using i18n key", () => {
+      wrapper = mountCheckRetries(mockMonitorHttp);
+
+      expect(wrapper.find("h3").text()).toBe("synthetics.scheduleAlert.retries");
+    });
+
+    it("renders the retries input with value from check.retries", () => {
+      wrapper = mountCheckRetries({ retries: 3 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      expect(input.exists()).toBe(true);
+      expect(input.attributes("value")).toBe("3");
+    });
+
+    it("renders the retry delay input with value from check.waitBeforeRetrySecs", () => {
+      wrapper = mountCheckRetries({ waitBeforeRetrySecs: 15 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-delay-input"]');
+      expect(input.exists()).toBe(true);
+      expect(input.attributes("value")).toBe("15");
+    });
+
+    it("renders default values (0) when check fields are undefined", () => {
+      wrapper = mountCheckRetries({
+        retries: undefined,
+        waitBeforeRetrySecs: undefined,
+      } as Partial<BrowserCheck> as any);
+
+      const retriesInput = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      const delayInput = wrapper.find('[data-test="synthetics-check-retries-delay-input"]');
+
+      expect(retriesInput.attributes("value")).toBe("0");
+      expect(delayInput.attributes("value")).toBe("0");
+    });
+
+    it("does not render the validation error element when validationErrors.retries is not set", () => {
+      wrapper = mountCheckRetries(mockMonitorHttp);
+
+      const error = wrapper.find('[data-test="synthetics-check-retries-error"]');
+      expect(error.exists()).toBe(false);
+    });
+  });
+
+  describe("retries input", () => {
+    const lastRetries = (w: VueWrapper) => {
+      const emitted = w.emitted("update:check");
+      expect(emitted).toBeTruthy();
+      return (emitted![emitted!.length - 1][0] as BrowserCheck).retries;
+    };
+
+    it("emits update:check with updated retries when retries input changes", async () => {
+      wrapper = mountCheckRetries({ retries: 0 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      await input.setValue("2");
+
+      expect(lastRetries(wrapper)).toBe(2);
+    });
+
+    it("clamps a browser check to the 2-retry ceiling", async () => {
+      // Typing bypasses the input's `max`, and the server would reject it on
+      // save. A browser run is devices x attempts x journey_budget, so a third
+      // retry can outrun the probe's function timeout and report a failure the
+      // target never had.
+      wrapper = mountCheckRetries({ retries: 0 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      await input.setValue("5");
+
+      expect(lastRetries(wrapper)).toBe(2);
+    });
+
+    it("clamps a negative value to zero", async () => {
+      wrapper = mountCheckRetries({ retries: 1 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      await input.setValue("-3");
+
+      expect(lastRetries(wrapper)).toBe(0);
+    });
+
+    it("caps the input and explains the browser ceiling", () => {
+      wrapper = mountCheckRetries({ retries: 0 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-count-input"]');
+      expect(input.attributes("max")).toBe("2");
+
+      // The hint has to say *why*, or the next person raises the cap. The i18n
+      // mock returns keys, so assert the browser-specific key is the one used —
+      // the generic one would not explain the device/attempt multiplication.
+      const hint = wrapper.find('[data-test="synthetics-check-retries-max-hint"]');
+      expect(hint.exists()).toBe(true);
+      expect(hint.text()).toContain("retriesMaxBrowserHint");
+    });
+  });
+
+  describe("retry delay input", () => {
+    it("emits update:check with updated waitBeforeRetrySecs when delay input changes", async () => {
+      wrapper = mountCheckRetries({ waitBeforeRetrySecs: 10 });
+
+      const input = wrapper.find('[data-test="synthetics-check-retries-delay-input"]');
+      await input.setValue("30");
+
+      const emitted = wrapper.emitted("update:check");
+      expect(emitted).toBeTruthy();
+      const lastEmit = emitted![emitted!.length - 1][0] as BrowserCheck;
+      expect(lastEmit.waitBeforeRetrySecs).toBe(30);
+    });
+  });
+
+  describe("validation error", () => {
+    it("shows the validation error message when validationErrors.retries is set", () => {
+      wrapper = mountCheckRetries(mockMonitorHttp, {
+        retries: "Retries must be between 0 and 10",
+      });
+
+      const error = wrapper.find('[data-test="synthetics-check-retries-error"]');
+      expect(error.exists()).toBe(true);
+      expect(error.text()).toBe("Retries must be between 0 and 10");
+    });
+  });
+});

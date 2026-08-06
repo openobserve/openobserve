@@ -7,20 +7,15 @@ defineSlots<TimelineSlots>();
 </script>
 
 <template>
-  <ol
-    class="tw:relative tw:list-none tw:m-0 tw:p-0"
-    v-bind="$attrs"
-  >
+  <ol class="o-timeline relative m-0 list-none p-0" v-bind="$attrs">
     <slot />
   </ol>
 </template>
 
-<style>
-/*
- * Hide the connecting line for the last OTimelineItem.
- * Targets the .timeline-connector div rendered inside OTimelineItem.
- */
-li:last-child .timeline-connector {
+<style scoped>
+/* keep(complex-state): :last-child structural rule hiding the connector line that
+   OTimelineItem renders inside the final item (child DOM → :deep). */
+.o-timeline > li:last-child :deep(.timeline-connector) {
   display: none;
 }
 </style>

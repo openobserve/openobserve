@@ -22,6 +22,50 @@ use utoipa::ToSchema;
 
 const MAX_AGENT_MAPPING_FIELDS: usize = 10;
 const MAX_AGENT_MAPPING_FIELD_LEN: usize = 256;
+
+// ---------------------------------------------------------------------------
+// Built-in agent-discovery field lists — the SINGLE SOURCE OF TRUTH.
+//
+// Both the OTel span extractor (OSS `core/traces/otel/extractors/agent.rs`) and
+// the Gen-AI agent registry (enterprise `agent_registry.rs`) reference these so
+// the "known" fields are defined in exactly one place. Spec-canonical fields
+// (`gen_ai.agent.name`, `gen_ai.agent.id`, `gen_ai.agent.version`,
+// `deployment.environment.name`) are the always-tried standard tier and are NOT
+// duplicated here — these are the framework/legacy fallbacks. The resolver tries
+// each in raw, dot-flattened, and `service_`-prefixed resource forms.
+// ---------------------------------------------------------------------------
+
+/// Framework agent-name conventions: Google ADK (`gcp.vertex.agent.name`),
+/// CrewAI (`crewai.task.agent`), OpenInference/generic (`agent.name`,
+/// `llm.agent.name`).
+pub const BUILTIN_AGENT_NAME_FIELDS: &[&str] = &[
+    "agent.name",
+    "llm.agent.name",
+    "gcp.vertex.agent.name",
+    "crewai.task.agent",
+];
+
+/// Framework agent-id conventions.
+pub const BUILTIN_AGENT_ID_FIELDS: &[&str] =
+    &["agent.id", "agent_id", "llm.agent.id", "llm.agent_id"];
+
+/// Environment fallbacks. `deployment.environment.name` (current OTel semconv)
+/// is the standard tier (tried by the resolver first, not listed here). These
+/// built-ins cover the legacy OTel key plus the highest-frequency non-standard
+/// conventions: bare `env`/`environment` (ad-hoc instrumentation) and
+/// `k8s.namespace.name` (teams that use prod/staging namespaces AS the env).
+pub const BUILTIN_ENV_FIELDS: &[&str] = &[
+    "deployment.environment",
+    "env",
+    "environment",
+    "k8s.namespace.name",
+];
+
+/// Version fallbacks. `gen_ai.agent.version` (agent-specific) is the standard
+/// tier (tried first, not listed here). These built-ins cover the service-wide
+/// OTel version plus common non-standard conventions: `app.version` and
+/// `git.commit.sha` (git-SHA-as-version, i.e. deployment/canary tracking).
+pub const BUILTIN_VERSION_FIELDS: &[&str] = &["service.version", "app.version", "git.commit.sha"];
 const TARGET_AGENT_FIELDS: &[&str] = &[
     "target_agent_name",
     "target_agent_id",
@@ -41,9 +85,28 @@ pub struct GenAiAgentMappingConfig {
     /// Incoming telemetry attribute names to use as fallbacks for `gen_ai.agent.id`.
     #[serde(default)]
     pub agent_id_fields: Vec<String>,
+
+    /// Incoming telemetry attribute names to use as fallbacks for the agent's environment.
+    #[serde(default)]
+    pub env_fields: Vec<String>,
+
+    /// Incoming telemetry attribute names to use as fallbacks for the agent's version.
+    #[serde(default)]
+    pub version_fields: Vec<String>,
 }
 
 impl GenAiAgentMappingConfig {
+    /// True when every configured fallback list is empty — i.e. the org has no
+    /// meaningful custom mapping. Used to decide precedence (a saved-but-empty
+    /// org config falls through to fetched/embedded defaults), mirroring how
+    /// semantic field groups treat `!groups.is_empty()`.
+    pub fn is_all_empty(&self) -> bool {
+        self.agent_name_fields.is_empty()
+            && self.agent_id_fields.is_empty()
+            && self.env_fields.is_empty()
+            && self.version_fields.is_empty()
+    }
+
     /// Trim configured field names on save and validate the public API contract.
     pub fn normalize_and_validate(mut self) -> Result<Self, String> {
         self.agent_name_fields = normalize_fields(self.agent_name_fields);
@@ -55,6 +118,20 @@ impl GenAiAgentMappingConfig {
             "gen_ai.agent.name",
         )?;
         validate_fields("agent_id_fields", &self.agent_id_fields, "gen_ai.agent.id")?;
+
+        self.env_fields = normalize_fields(self.env_fields);
+        self.version_fields = normalize_fields(self.version_fields);
+
+        validate_fields(
+            "env_fields",
+            &self.env_fields,
+            "deployment.environment.name",
+        )?;
+        validate_fields(
+            "version_fields",
+            &self.version_fields,
+            "gen_ai.agent.version",
+        )?;
 
         Ok(self)
     }
@@ -124,10 +201,72 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_is_all_empty() {
+        assert!(GenAiAgentMappingConfig::default().is_all_empty());
+        assert!(
+            !GenAiAgentMappingConfig {
+                agent_name_fields: vec!["x".to_string()],
+                ..Default::default()
+            }
+            .is_all_empty()
+        );
+        assert!(
+            !GenAiAgentMappingConfig {
+                version_fields: vec!["v".to_string()],
+                ..Default::default()
+            }
+            .is_all_empty()
+        );
+    }
+
+    #[test]
+    fn test_builtin_field_consts_present() {
+        assert!(BUILTIN_AGENT_NAME_FIELDS.contains(&"gcp.vertex.agent.name"));
+        assert!(BUILTIN_AGENT_NAME_FIELDS.contains(&"crewai.task.agent"));
+        assert!(BUILTIN_AGENT_ID_FIELDS.contains(&"llm.agent.id"));
+        assert!(BUILTIN_ENV_FIELDS.contains(&"deployment.environment"));
+        // Broadened built-in env coverage: bare env keys + k8s namespace.
+        assert!(BUILTIN_ENV_FIELDS.contains(&"env"));
+        assert!(BUILTIN_ENV_FIELDS.contains(&"environment"));
+        assert!(BUILTIN_ENV_FIELDS.contains(&"k8s.namespace.name"));
+        assert!(BUILTIN_VERSION_FIELDS.contains(&"service.version"));
+        // Broadened built-in version coverage: app version + git SHA.
+        assert!(BUILTIN_VERSION_FIELDS.contains(&"app.version"));
+        assert!(BUILTIN_VERSION_FIELDS.contains(&"git.commit.sha"));
+    }
+
+    #[test]
+    fn test_agent_mapping_normalizes_env_and_version_fields() {
+        let config = GenAiAgentMappingConfig {
+            agent_name_fields: vec![],
+            agent_id_fields: vec![],
+            env_fields: vec!["  custom.env  ".to_string()],
+            version_fields: vec!["app.build\t".to_string()],
+        }
+        .normalize_and_validate()
+        .unwrap();
+
+        assert_eq!(config.env_fields, vec!["custom.env"]);
+        assert_eq!(config.version_fields, vec!["app.build"]);
+    }
+
+    #[test]
+    fn test_agent_mapping_rejects_redundant_env_version_targets() {
+        let err = GenAiAgentMappingConfig {
+            env_fields: vec!["deployment.environment.name".to_string()],
+            ..Default::default()
+        }
+        .normalize_and_validate()
+        .unwrap_err();
+        assert!(err.contains("redundant target"));
+    }
+
+    #[test]
     fn test_agent_mapping_normalizes_field_names() {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["  agent.name  ".to_string()],
             agent_id_fields: vec!["agent.id\t".to_string()],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap();
@@ -141,6 +280,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent".to_string(), "agent".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -153,6 +293,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["   ".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -165,6 +306,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent.name;DROP".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -177,6 +319,7 @@ mod tests {
         let config = GenAiAgentMappingConfig {
             agent_name_fields: vec!["agent".to_string()],
             agent_id_fields: vec!["agent".to_string()],
+            ..Default::default()
         };
 
         assert!(config.normalize_and_validate().is_ok());
@@ -187,6 +330,7 @@ mod tests {
         let err = GenAiAgentMappingConfig {
             agent_name_fields: vec!["gen_ai.agent.name".to_string()],
             agent_id_fields: vec![],
+            ..Default::default()
         }
         .normalize_and_validate()
         .unwrap_err();
@@ -200,6 +344,7 @@ mod tests {
             let err = GenAiAgentMappingConfig {
                 agent_name_fields: vec![field.to_string()],
                 agent_id_fields: vec![],
+                ..Default::default()
             }
             .normalize_and_validate()
             .unwrap_err();

@@ -13,13 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest"
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import serviceStreams, {
   getSemanticGroups,
   correlate,
   getDimensionAnalytics,
-} from "@/services/service_streams"
-import http from "@/services/http"
+} from "@/services/service_streams";
+import http from "@/services/http";
 
 vi.mock("@/services/http", () => ({
   default: vi.fn(() => ({
@@ -29,104 +29,102 @@ vi.mock("@/services/http", () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   })),
-}))
+}));
 
-const ORG = "test-org"
+const ORG = "test-org";
 
 describe("service_streams service", () => {
   let mockHttpInstance: {
-    get: ReturnType<typeof vi.fn>
-    post: ReturnType<typeof vi.fn>
-    put: ReturnType<typeof vi.fn>
-    patch: ReturnType<typeof vi.fn>
-    delete: ReturnType<typeof vi.fn>
-  }
+    get: ReturnType<typeof vi.fn>;
+    post: ReturnType<typeof vi.fn>;
+    put: ReturnType<typeof vi.fn>;
+    patch: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.clearAllMocks();
     mockHttpInstance = {
       get: vi.fn(),
       post: vi.fn(),
       put: vi.fn(),
       patch: vi.fn(),
       delete: vi.fn(),
-    }
-    ;(http as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
-      mockHttpInstance
-    )
-  })
+    };
+    (http as unknown as ReturnType<typeof vi.fn>).mockReturnValue(mockHttpInstance);
+  });
 
   // -------------------------------------------------------------------------
   describe("module export", () => {
     it("exports a default object", () => {
-      expect(serviceStreams).toBeDefined()
-      expect(typeof serviceStreams).toBe("object")
-    })
+      expect(serviceStreams).toBeDefined();
+      expect(typeof serviceStreams).toBe("object");
+    });
 
     it("default export includes getSemanticGroups", () => {
-      expect(typeof serviceStreams.getSemanticGroups).toBe("function")
-    })
+      expect(typeof serviceStreams.getSemanticGroups).toBe("function");
+    });
 
     it("default export includes correlate", () => {
-      expect(typeof serviceStreams.correlate).toBe("function")
-    })
+      expect(typeof serviceStreams.correlate).toBe("function");
+    });
 
     it("default export includes getDimensionAnalytics", () => {
-      expect(typeof serviceStreams.getDimensionAnalytics).toBe("function")
-    })
+      expect(typeof serviceStreams.getDimensionAnalytics).toBe("function");
+    });
 
     it("also exports getSemanticGroups as a named export", () => {
-      expect(typeof getSemanticGroups).toBe("function")
-    })
+      expect(typeof getSemanticGroups).toBe("function");
+    });
 
     it("also exports correlate as a named export", () => {
-      expect(typeof correlate).toBe("function")
-    })
+      expect(typeof correlate).toBe("function");
+    });
 
     it("also exports getDimensionAnalytics as a named export", () => {
-      expect(typeof getDimensionAnalytics).toBe("function")
-    })
-  })
+      expect(typeof getDimensionAnalytics).toBe("function");
+    });
+  });
 
   // -------------------------------------------------------------------------
   describe("getSemanticGroups", () => {
     it("calls GET /api/{org}/alerts/deduplication/semantic-groups", () => {
-      getSemanticGroups(ORG)
+      getSemanticGroups(ORG);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${ORG}/alerts/deduplication/semantic-groups`
-      )
-    })
+        `/api/${ORG}/alerts/deduplication/semantic-groups`,
+      );
+    });
 
     it("calls GET exactly once", () => {
-      getSemanticGroups(ORG)
+      getSemanticGroups(ORG);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledTimes(1)
-    })
+      expect(mockHttpInstance.get).toHaveBeenCalledTimes(1);
+    });
 
     it("returns the promise from http().get", () => {
-      const expected = Promise.resolve({ data: [] })
-      mockHttpInstance.get.mockReturnValue(expected)
+      const expected = Promise.resolve({ data: [] });
+      mockHttpInstance.get.mockReturnValue(expected);
 
-      const result = getSemanticGroups(ORG)
+      const result = getSemanticGroups(ORG);
 
-      expect(result).toBe(expected)
-    })
+      expect(result).toBe(expected);
+    });
 
     it("propagates rejection from http().get", async () => {
-      mockHttpInstance.get.mockRejectedValue(new Error("not found"))
+      mockHttpInstance.get.mockRejectedValue(new Error("not found"));
 
-      await expect(getSemanticGroups(ORG)).rejects.toThrow("not found")
-    })
+      await expect(getSemanticGroups(ORG)).rejects.toThrow("not found");
+    });
 
     it("works when called via the default export", () => {
-      serviceStreams.getSemanticGroups(ORG)
+      serviceStreams.getSemanticGroups(ORG);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${ORG}/alerts/deduplication/semantic-groups`
-      )
-    })
-  })
+        `/api/${ORG}/alerts/deduplication/semantic-groups`,
+      );
+    });
+  });
 
   // -------------------------------------------------------------------------
   describe("correlate", () => {
@@ -134,132 +132,128 @@ describe("service_streams service", () => {
       source_stream: "my-stream",
       source_type: "logs",
       available_dimensions: { cluster: "prod", namespace: "default" },
-    }
+    };
 
     it("calls POST /api/{org}/service_streams/_correlate", () => {
-      correlate(ORG, request)
+      correlate(ORG, request);
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${ORG}/service_streams/_correlate`,
-        request
-      )
-    })
+        request,
+      );
+    });
 
     it("calls POST exactly once", () => {
-      correlate(ORG, request)
+      correlate(ORG, request);
 
-      expect(mockHttpInstance.post).toHaveBeenCalledTimes(1)
-    })
+      expect(mockHttpInstance.post).toHaveBeenCalledTimes(1);
+    });
 
     it("passes the full request body verbatim", () => {
       const body = {
         source_stream: "traces-stream",
         source_type: "traces",
         available_dimensions: { pod: "my-pod-123" },
-      }
-      correlate(ORG, body)
+      };
+      correlate(ORG, body);
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${ORG}/service_streams/_correlate`,
-        body
-      )
-    })
+        body,
+      );
+    });
 
     it("returns the promise from http().post", () => {
-      const expected = Promise.resolve({ data: {} })
-      mockHttpInstance.post.mockReturnValue(expected)
+      const expected = Promise.resolve({ data: {} });
+      mockHttpInstance.post.mockReturnValue(expected);
 
-      const result = correlate(ORG, request)
+      const result = correlate(ORG, request);
 
-      expect(result).toBe(expected)
-    })
+      expect(result).toBe(expected);
+    });
 
     it("propagates rejection from http().post", async () => {
-      mockHttpInstance.post.mockRejectedValue(new Error("bad request"))
+      mockHttpInstance.post.mockRejectedValue(new Error("bad request"));
 
-      await expect(correlate(ORG, request)).rejects.toThrow("bad request")
-    })
+      await expect(correlate(ORG, request)).rejects.toThrow("bad request");
+    });
 
     it("works when called via the default export", () => {
-      serviceStreams.correlate(ORG, request)
+      serviceStreams.correlate(ORG, request);
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         `/api/${ORG}/service_streams/_correlate`,
-        request
-      )
-    })
-  })
+        request,
+      );
+    });
+  });
 
   // -------------------------------------------------------------------------
   describe("getDimensionAnalytics", () => {
     it("calls GET /api/{org}/service_streams/_analytics", () => {
-      getDimensionAnalytics(ORG)
+      getDimensionAnalytics(ORG);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${ORG}/service_streams/_analytics`
-      )
-    })
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${ORG}/service_streams/_analytics`);
+    });
 
     it("calls GET exactly once", () => {
-      getDimensionAnalytics(ORG)
+      getDimensionAnalytics(ORG);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledTimes(1)
-    })
+      expect(mockHttpInstance.get).toHaveBeenCalledTimes(1);
+    });
 
     it("returns the promise from http().get", () => {
-      const expected = Promise.resolve({ data: {} })
-      mockHttpInstance.get.mockReturnValue(expected)
+      const expected = Promise.resolve({ data: {} });
+      mockHttpInstance.get.mockReturnValue(expected);
 
-      const result = getDimensionAnalytics(ORG)
+      const result = getDimensionAnalytics(ORG);
 
-      expect(result).toBe(expected)
-    })
+      expect(result).toBe(expected);
+    });
 
     it("propagates rejection from http().get", async () => {
-      mockHttpInstance.get.mockRejectedValue(new Error("server error"))
+      mockHttpInstance.get.mockRejectedValue(new Error("server error"));
 
-      await expect(getDimensionAnalytics(ORG)).rejects.toThrow("server error")
-    })
+      await expect(getDimensionAnalytics(ORG)).rejects.toThrow("server error");
+    });
 
     it("works when called via the default export", () => {
-      serviceStreams.getDimensionAnalytics(ORG)
+      serviceStreams.getDimensionAnalytics(ORG);
 
-      expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/${ORG}/service_streams/_analytics`
-      )
-    })
-  })
+      expect(mockHttpInstance.get).toHaveBeenCalledWith(`/api/${ORG}/service_streams/_analytics`);
+    });
+  });
 
   // -------------------------------------------------------------------------
   describe("org_identifier scoping", () => {
     it("getSemanticGroups uses the provided org in the URL", () => {
-      getSemanticGroups("acme-corp")
+      getSemanticGroups("acme-corp");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/acme-corp/alerts/deduplication/semantic-groups"
-      )
-    })
+        "/api/acme-corp/alerts/deduplication/semantic-groups",
+      );
+    });
 
     it("correlate uses the provided org in the URL", () => {
       const req = {
         source_stream: "s",
         source_type: "logs",
         available_dimensions: {},
-      }
-      correlate("acme-corp", req)
+      };
+      correlate("acme-corp", req);
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(
         "/api/acme-corp/service_streams/_correlate",
-        req
-      )
-    })
+        req,
+      );
+    });
 
     it("getDimensionAnalytics uses the provided org in the URL", () => {
-      getDimensionAnalytics("acme-corp")
+      getDimensionAnalytics("acme-corp");
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        "/api/acme-corp/service_streams/_analytics"
-      )
-    })
-  })
-})
+        "/api/acme-corp/service_streams/_analytics",
+      );
+    });
+  });
+});

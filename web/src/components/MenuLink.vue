@@ -18,41 +18,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
        and submenu-group triggers (<button>, used by ONavGroup) all share the
        exact same tile markup and styling — a group tile is literally a MenuLink. -->
-  <component
-    :is="rootComponent"
-    v-bind="rootProps"
-    :class="rootClass"
-    @click="onRootClick"
-  >
-    <div class="nav-menu-item-avatar tw:flex tw:flex-col tw:items-center tw:gap-0.5 tw:w-full">
+  <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
+    <div class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5">
       <div
-        class="icon-wrapper tw:relative tw:inline-flex tw:items-center tw:justify-center tw:rounded-lg tw:p-0.5 tw:transition-colors tw:duration-250"
-        :class="isActive
-          ? activeIconClass
-          : 'tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
+        class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
+        :class="isActive ? activeIconClass : 'text-tabs-inactive-text group-hover:text-accent'"
       >
         <!-- Rail icons are a hair smaller than the md (24px) default. -->
-        <OIcon v-if="icon" :name="icon" size="md" class="tw:size-5.5!" />
-        <component
-          v-else-if="hasIconComponent"
-          :is="iconComponent"
-          class="o-icon tw:size-5.5"
-        />
+        <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
+        <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge tw:absolute tw:-top-1 tw:-right-2 tw:min-w-4 tw:h-4 tw:px-1 tw:bg-[linear-gradient(135deg,#ef4444_0%,#ec4899_100%)] tw:border-2 tw:border-[#0f172a] tw:rounded-full tw:text-[9px] tw:font-bold tw:text-white tw:flex tw:items-center tw:justify-center tw:leading-none tw:shadow-[0_4px_8px_rgba(239,68,68,0.5)] tw:animate-pulse tw:z-1"
+          class="menu-badge text-3xs text-text-inverse absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 border-[var(--color-grey-900)] bg-[image:var(--color-gradient-notification)] px-1 leading-none font-bold shadow-[0_4px_8px_rgba(239,68,68,0.5)]"
           aria-live="polite"
-          :aria-label="`${badge} notifications`"
+          :aria-label="t('common.notificationsCount', { count: badge })"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
       <div
-        class="nav-menu-item-label tw:text-[0.71875rem] tw:tracking-[0.01em] tw:transition-colors tw:duration-250 tw:w-full tw:text-center tw:leading-tight tw:line-clamp-2 tw:wrap-normal tw:break-normal tw:[hyphens:none]"
-        :class="isActive
-          ? activeLabelClass
-          : 'tw:font-medium tw:text-tabs-inactive-text tw:group-hover:text-primary-600'"
-      >{{ title }}</div>
+        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250"
+        :class="
+          isActive
+            ? activeLabelClass
+            : 'text-tabs-inactive-text group-hover:text-accent font-medium'
+        "
+      >
+        {{ title }}
+      </div>
     </div>
 
     <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
@@ -60,10 +53,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          hover, or stays lit while the flyout is open / the section is active. -->
     <span
       v-if="asTrigger || submenu"
-      class="tw:absolute tw:right-1 tw:top-3 tw:transition-opacity tw:duration-150"
-      :class="isActive || expanded
-        ? 'tw:opacity-100 tw:text-primary-600'
-        : 'tw:opacity-70 tw:group-hover:opacity-100 tw:text-tabs-inactive-text'"
+      class="absolute top-3 right-1 transition-opacity duration-150"
+      :class="
+        isActive || expanded
+          ? 'text-accent opacity-100'
+          : 'text-tabs-inactive-text opacity-70 group-hover:opacity-100'
+      "
       aria-hidden="true"
     >
       <OIcon name="chevron-right" size="xs" />
@@ -72,23 +67,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, inject, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
   components: { OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
 
     caption: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
 
     link: {
@@ -121,7 +119,6 @@ export default defineComponent({
       default: false,
     },
 
-    // Phase 4: Badge support
     badge: {
       type: Number,
       default: 0,
@@ -152,6 +149,7 @@ export default defineComponent({
   },
   emits: ["trigger"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
 
@@ -180,22 +178,35 @@ export default defineComponent({
     // with primary-coloured text/icon; DARK uses the tinted "selected" pill
     // (matching the dashboard-folder selection) with white text/icon — because
     // surface-base is black in dark mode, a white pill there would vanish.
-    const isDark = computed(() => store.state.theme === "dark");
-    const activePillClass = computed(() =>
-      isDark.value
-        ? "tw:text-tabs-active-text tw:bg-tabs-active-bg tw:shadow-sm tw:border-l-2 tw:border-primary-400"
-        : "tw:text-primary-700 tw:bg-surface-base tw:shadow-sm tw:border-l-2 tw:border-primary-600",
-    );
+    const { isDark } = useTheme();
+
+    // When the rail draws a single sliding pill (ONavbar provides this), an active
+    // tile defers its fill (background + coloured left accent) to that pill and
+    // keeps only its active text colour — the transparent left border stays so
+    // there is no width shift between states. Falls back to the self-painted pill
+    // when the indicator isn't active (default `false` off the rail, or before it
+    // is positioned), so the nav always shows a selection.
+    const railIndicatorActive = inject(RailIndicatorActiveKey, undefined);
+    const slideActive = computed(() => Boolean(railIndicatorActive?.value));
+
+    const activePillClass = computed(() => {
+      if (slideActive.value) {
+        return isDark.value
+          ? "text-tabs-active-text border-l-2 border-transparent"
+          : "text-accent border-l-2 border-transparent";
+      }
+      return isDark.value
+        ? "text-tabs-active-text bg-tabs-active-bg border-l-2 border-accent"
+        : "text-accent bg-surface-base border-l-2 border-accent";
+    });
     const activeIconClass = computed(() =>
-      isDark.value ? "tw:text-tabs-active-text!" : "tw:text-primary-700!",
+      isDark.value ? "text-tabs-active-text!" : "text-accent!",
     );
     const activeLabelClass = computed(() =>
-      isDark.value
-        ? "tw:font-semibold tw:text-tabs-active-text!"
-        : "tw:font-semibold tw:text-primary-600!",
+      isDark.value ? "font-semibold text-tabs-active-text!" : "font-semibold text-accent!",
     );
 
-    // Phase 5: Accessibility - compute ARIA label with fallback
+    // Compute ARIA label with fallback
     const ariaLabel = computed(() => {
       let label = props.title || "Navigation link";
       if (props.badge && props.badge > 0) {
@@ -255,10 +266,12 @@ export default defineComponent({
 
     const rootClass = computed(() => [
       "nav-menu-item",
-      "tw:group tw:relative tw:block tw:[text-decoration:none]! tw:text-inherit tw:shrink-0 tw:mx-1 tw:px-0 tw:py-1 tw:min-h-0 tw:rounded-lg tw:transition-colors tw:duration-150 tw:ease-out tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-500 tw:focus-visible:ring-offset-1",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+      // Sit above the rail's sliding pill so icon/label stay readable.
+      slideActive.value ? "z-10" : "",
       isActive.value
         ? activePillClass.value
-        : "tw:text-tabs-inactive-text tw:border-l-2 tw:border-transparent tw:bg-transparent tw:hover:bg-tabs-hover-bg",
+        : "text-tabs-inactive-text border-l-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
       isActive.value ? "nav-menu-item--active" : "",
       props.title === "Functions" ? "menu-link-function" : "",
       // Reset native <button> chrome so the trigger looks EXACTLY like a link.
@@ -267,7 +280,7 @@ export default defineComponent({
       // `bg-transparent` here would override the active pill and break the
       // selected-state highlight. `font:inherit` keeps the label font identical.
       props.asTrigger
-        ? "tw:w-full tw:appearance-none tw:border-0 tw:cursor-pointer tw:text-left tw:[font-family:inherit] tw:[font-size:inherit] tw:[line-height:inherit] tw:[letter-spacing:inherit]"
+        ? "w-full appearance-none border-0 cursor-pointer text-left [font-family:inherit] [font-size:inherit] [line-height:inherit] [letter-spacing:inherit]"
         : "",
     ]);
 
@@ -283,6 +296,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       router,
       openWebPage,

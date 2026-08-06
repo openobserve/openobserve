@@ -30,24 +30,17 @@ import { getCountryName } from "../countryMappings";
 export class MapsConverter implements PromQLChartConverter {
   supportedTypes = ["maps"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const config: MapsConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
 
     // Get label names for location name
-    const nameLabel =
-      config.name_label || "name" || "location" || "country" || "region";
+    const nameLabel = config.name_label || "name";
 
     const locationValueMap = new Map<string, number[]>();
     const errors: string[] = [];
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         const rawLocationName = seriesData.metric[nameLabel] || seriesData.name;
 
         if (!rawLocationName) {
@@ -100,13 +93,9 @@ export class MapsConverter implements PromQLChartConverter {
     // Calculate min/max values from data (matching SQL implementation)
     const numericValues = mapData
       .map((item: any) => item.value)
-      .filter(
-        (value: any): value is number =>
-          typeof value === "number" && !Number.isNaN(value),
-      );
+      .filter((value: any): value is number => typeof value === "number" && !Number.isNaN(value));
 
-    const minValue =
-      numericValues.length === 1 ? 0 : Math.min(...numericValues);
+    const minValue = numericValues.length === 1 ? 0 : Math.min(...numericValues);
     const maxValue = Math.max(...numericValues);
 
     // Return map chart configuration

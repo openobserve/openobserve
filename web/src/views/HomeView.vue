@@ -14,10 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
-    class="tw:rounded-md tw:overflow-hidden tw:min-h-0 tw:h-full tw:flex tw:flex-col"
-    data-test="home-page"
-  >
+  <div class="rounded-default flex h-full min-h-0 flex-col overflow-hidden" data-test="home-page">
     <!-- No card-container here: the page already renders inside MainLayout's
          bordered content card, so an inner panel border would double-frame the
          home page. Keep only the layout classes.
@@ -26,8 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom divider reaches the card edges (like Data Sources / Pipelines) —
          a padded root insets the header and makes it read as a floating bar.
          Padding is reintroduced on the body wrapper below the header instead. -->
-    <div
-      class="tw:h-full tw:overflow-hidden tw:flex tw:flex-col tw:min-h-0"
+    <OPageLayout
+      :title="t('menu.home')"
+      :subtitle="t('home.subtitle')"
+      icon="home"
+      :tabs-below="tabOrder.length > 1"
+      bleed
     >
       <!-- Top-level page header: module icon + "Home" title, with the home tabs
            rendered as a full-width strip below (tabsBelow). The header owns its
@@ -35,77 +36,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            exists we hand-draw the border so the header still reads as a header.
            The tab bar keeps its drag-to-reorder behavior (OTabs `reorderable`);
            OTabs draws the active underline flush with the header's divider. -->
-      <AppPageHeader
-        :title="t('menu.home')"
-        :subtitle="t('home.subtitle')"
-        icon="home"
-        :tabs-below="tabOrder.length > 1"
-        class="tw:shrink-0 tw:px-4"
-        :class="
-          tabOrder.length > 1 ? '' : 'tw:border-b tw:border-border-default'
-        "
-      >
-        <template v-if="tabOrder.length > 1" #tabs>
-          <OTabs
-            v-model="activeHomeTab"
-            align="left"
-            reorderable
-            data-test="home-tab-bar"
-            @reorder="onTabReorder"
+      <template v-if="tabOrder.length > 1" #header-tabs>
+        <OTabs
+          v-model="activeHomeTab"
+          align="left"
+          reorderable
+          data-test="home-tab-bar"
+          @reorder="onTabReorder"
+        >
+          <OTab
+            v-for="tab in tabOrder"
+            :key="tab.id"
+            :name="tab.id"
+            :data-test="`home-tab-${tab.id}`"
           >
-            <OTab
-              v-for="tab in tabOrder"
-              :key="tab.id"
-              :name="tab.id"
-              :label="tab.label"
-              :data-test="`home-tab-${tab.id}`"
+            <span class="o-tab__label truncate">{{ tab.label }}</span>
+            <button
+              v-if="tab.id.startsWith('dash:')"
+              type="button"
+              class="rounded-default text-text-secondary hover:bg-surface-subtle-hover hover:text-text-body ml-1 inline-flex h-4 w-4 cursor-pointer items-center justify-center border-none bg-transparent text-sm leading-none opacity-60 transition-all duration-200 ease-[ease] hover:opacity-100"
+              :data-test="`home-tab-close-${tab.id}`"
+              :aria-label="t('home.removeHomeDashboard')"
+              @mousedown.stop.prevent
+              @pointerdown.stop.prevent
+              @click.stop.prevent="onCloseTab(tab.id)"
+            >
+              {{ "×" }}
+            </button>
+            <OTooltip
+              v-if="tab.id.startsWith('dash:')"
+              side="bottom"
+              :content="t('home.removeHomeDashboard')"
             />
-          </OTabs>
-        </template>
-      </AppPageHeader>
+          </OTab>
+        </OTabs>
+      </template>
 
       <!-- Body: padded wrapper that holds the active tab panel. Padding lives
-           here (not on the root) so the header above stays full-bleed. -->
-      <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:pt-px tw:px-2.5 tw:pb-2.5">
+           here (not on the root) so the header above stays full-bleed. The
+           pinned dashboard tab opts out: its actions row draws a full-bleed
+           divider (like the header's) and the dashboard grid pads itself. -->
+      <div
+        class="flex min-h-0 flex-1 flex-col"
+        :class="activeHomeTab.startsWith('dash:') ? '' : 'px-2.5 pt-px pb-2.5'"
+      >
         <!-- O2 AI Assistant tab -->
-        <div v-if="activeHomeTab === 'ai'" class="home-ai-panel tw:flex-1 tw:min-h-0 tw:flex tw:flex-row tw:overflow-hidden">
+        <div
+          v-if="activeHomeTab === 'ai'"
+          class="home-ai-panel flex min-h-0 flex-1 flex-row overflow-hidden"
+        >
           <HomeChatHistory @load-chat="onLoadChat" @new-chat="onNewChat" />
-          <O2AIChat
-            ref="homeChat"
-            :is-open="true"
-            :header-height="0"
-            :centered-start="true"
-          />
+          <O2AIChat ref="homeChat" :is-open="true" :header-height="0" :centered-start="true" />
         </div>
 
         <!-- Overview tab (no inner card-container — the outer section panel
              already provides the border; avoids a double-bordered card). -->
-        <div
-          v-if="activeHomeTab === 'overview'"
-          class="tw:flex-1 tw:min-h-0 tw:overflow-hidden"
-        >
+        <div v-if="activeHomeTab === 'overview'" class="min-h-0 flex-1 overflow-hidden">
           <OverviewTab />
         </div>
 
         <!-- Usage tab -->
-        <div v-if="activeHomeTab === 'usage'" class="tw:flex-1 tw:min-h-0 tw:overflow-hidden tw:-mr-2.5">
+        <div v-if="activeHomeTab === 'usage'" class="-mx-2.5 min-h-0 flex-1 overflow-hidden">
           <UsageTab />
         </div>
+
+        <!-- Pinned dashboard tab -->
+        <div v-else-if="activeHomeTab.startsWith('dash:')" class="min-h-0 flex-1 overflow-hidden">
+          <PinnedDashboardTab
+            :key="activeHomeTab"
+            :dashboard-id="parsePinnedTabId(activeHomeTab).dashboardId"
+            :folder-id="parsePinnedTabId(activeHomeTab).folderId"
+            @update-label="(l) => onPinnedLabel(parsePinnedTabId(activeHomeTab).dashboardId, l)"
+            @unavailable="onPinnedUnavailable"
+          />
+        </div>
       </div>
-    </div>
+    </OPageLayout>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  ref,
-  watch,
-  onMounted,
-  onUnmounted,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, ref, watch, onMounted, onUnmounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "../aws-exports";
 import OverviewTab from "@/views/OverviewTab.vue";
@@ -114,22 +126,27 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import HomeChatHistory from "@/views/HomeChatHistory.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import PinnedDashboardTab from "@/views/PinnedDashboardTab.vue";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageHome",
 
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const LS_TAB_ORDER_KEY = "o2_home_tab_order";
     const LS_ACTIVE_TAB_KEY = "o2_home_active_tab";
 
-    const isEnterpriseOrCloud =
-      config.isEnterprise === "true" || config.isCloud === "true";
+    const isEnterpriseOrCloud = config.isEnterprise === "true" || config.isCloud === "true";
+
+    const { homeDashboard, clearHomeDashboard, updateLabel } = useHomeDashboard();
 
     const DEFAULT_TABS = computed(() => {
-      const tabs: { id: string; label: string }[] = [];
+      const tabs: { id: string; label: string; closable?: boolean }[] = [];
       if (isEnterpriseOrCloud && store.state.zoConfig.ai_enabled) {
         tabs.push({ id: "ai", label: t("home.tabAiAssistant") });
       }
@@ -137,8 +154,54 @@ export default defineComponent({
         tabs.push({ id: "overview", label: t("home.tabOverview") });
       }
       tabs.push({ id: "usage", label: t("home.tabUsage") });
+      // Append the org home dashboard as a single tab (if set).
+      if (homeDashboard.value) {
+        tabs.push({
+          id: `dash:${homeDashboard.value.folderId}:${homeDashboard.value.dashboardId}`,
+          label: homeDashboard.value.label,
+          closable: true,
+        });
+      }
       return tabs;
     });
+
+    // "dash:default:abc" -> { folderId: "default", dashboardId: "abc" }
+    function parsePinnedTabId(id: string) {
+      const rest = id.slice("dash:".length);
+      const sep = rest.indexOf(":");
+      return { folderId: rest.slice(0, sep), dashboardId: rest.slice(sep + 1) };
+    }
+
+    function onPinnedLabel(dashboardId: string, label: string) {
+      updateLabel(store.state.selectedOrganization?.identifier, dashboardId, label);
+    }
+
+    // Remove the pin and recover the active tab. Shared by the "dashboard is
+    // gone" path (onPinnedUnavailable) and the deliberate close (onCloseTab).
+    function removeHomePin() {
+      const org = store.state.selectedOrganization?.identifier;
+      clearHomeDashboard(org);
+      // Active tab no longer exists in the recomputed set → fall back to first.
+      if (!DEFAULT_TABS.value.find((tb) => tb.id === activeHomeTab.value)) {
+        activeHomeTab.value = tabOrder.value[0]?.id ?? "usage";
+      }
+    }
+
+    // The pinned dashboard could not be loaded (deleted / inaccessible). Clear
+    // the pin and tell the user why — distinct from a deliberate close.
+    function onPinnedUnavailable() {
+      removeHomePin();
+      toast({
+        variant: "error",
+        message: t("dashboard.homePinUnavailable"),
+      });
+    }
+
+    function onCloseTab(id: string) {
+      if (!id.startsWith("dash:")) return;
+      // Deliberate unpin — no error toast.
+      removeHomePin();
+    }
 
     function loadTabOrder() {
       try {
@@ -154,7 +217,9 @@ export default defineComponent({
           });
           return ordered;
         }
-      } catch {}
+      } catch {
+        /* ignore: fall back to default tab order */
+      }
       return [...DEFAULT_TABS.value];
     }
 
@@ -191,6 +256,17 @@ export default defineComponent({
 
     watch(activeHomeTab, (val) => localStorage.setItem(LS_ACTIVE_TAB_KEY, val));
 
+    // When the user opens the pinned dashboard tab, re-read the authoritative
+    // home_dashboard org setting so a snapshot that went stale on another system
+    // (e.g. the dashboard was moved to a different folder elsewhere) self-corrects
+    // before we render / navigate with its folderId.
+    watch(activeHomeTab, (val) => {
+      if (val.startsWith("dash:")) {
+        const org = store.state.selectedOrganization?.identifier;
+        if (org) useHomeDashboard().load(org);
+      }
+    });
+
     // Drag-to-reorder — OTabs reports the move (dragged id → target id + which
     // side of the target) and we apply it to our own ordered list, then persist.
     function onTabReorder({
@@ -215,10 +291,7 @@ export default defineComponent({
       order.splice(toIdx, 0, moved);
 
       tabOrder.value = order;
-      localStorage.setItem(
-        LS_TAB_ORDER_KEY,
-        JSON.stringify(order.map((t) => t.id)),
-      );
+      localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.id)));
     }
 
     const homeChat = ref<any>(null);
@@ -236,9 +309,7 @@ export default defineComponent({
       }
     }
     onMounted(() => window.addEventListener("o2:home-switch-tab", onSwitchTab));
-    onUnmounted(() =>
-      window.removeEventListener("o2:home-switch-tab", onSwitchTab),
-    );
+    onUnmounted(() => window.removeEventListener("o2:home-switch-tab", onSwitchTab));
 
     return {
       t,
@@ -251,6 +322,10 @@ export default defineComponent({
       homeChat,
       onLoadChat,
       onNewChat,
+      parsePinnedTabId,
+      onPinnedLabel,
+      onPinnedUnavailable,
+      onCloseTab,
     };
   },
   components: {
@@ -260,12 +335,14 @@ export default defineComponent({
     HomeChatHistory,
     OTabs,
     OTab,
-    AppPageHeader,
+    OTooltip,
+    OPageLayout,
+    PinnedDashboardTab,
   },
 });
 </script>
 
-<style>
+<style scoped>
 /*
  * HomeView Styles — Tab bar and page layout only.
  * Usage-tab-specific styles live in UsageTab.vue.
@@ -273,8 +350,14 @@ export default defineComponent({
 
 /* Home tab bar now uses the shared OTabs component (see template). */
 
+/* keep(lib-override): every selector below reaches into the AI chat component's own DOM
+   (.chat-container / .chat-content / .messages-container / .chat-header /
+   .unified-input-box), so none of it is addressable from this template's utilities.
+   The brand ribbon gradient + accent glow use the --color-gradient-brand-ribbon and
+   --color-ai-accent tokens. */
+
 /* Chat fills remaining width and height */
-.home-ai-panel .chat-container {
+.home-ai-panel :deep(.chat-container) {
   flex: 1;
   height: 100%;
   box-shadow: none;
@@ -285,8 +368,8 @@ export default defineComponent({
 
 /* Allow the input's gradient glow + shadow to spill outside the container.
    messages-container has its own overflow-y, so the page itself won't grow. */
-.home-ai-panel .chat-content-wrapper,
-.home-ai-panel .chat-content {
+.home-ai-panel :deep(.chat-content-wrapper),
+.home-ai-panel :deep(.chat-content) {
   overflow: visible;
 }
 
@@ -296,78 +379,70 @@ export default defineComponent({
    to their content height and push the input bar off the bottom. min-height:0
    lets them shrink within their flex columns so the message list scrolls and
    the input stays pinned at the bottom. */
-.home-ai-panel .chat-content,
-.home-ai-panel .messages-container {
+.home-ai-panel :deep(.chat-content),
+.home-ai-panel :deep(.messages-container) {
   min-height: 0;
 }
 
 /* Hide the entire chat header + its separator — sidebar owns this UI */
-.home-ai-panel .chat-header,
-.home-ai-panel .chat-content-wrapper > [role="separator"] {
+.home-ai-panel :deep(.chat-header),
+.home-ai-panel :deep(.chat-content-wrapper > [role="separator"]) {
   display: none;
 }
 
 /* Gradient border on the prompt input — home tab only.
    Uses the dual-background trick: bg color for padding-box, gradient for border-box.
-   2px border for stronger presence + layered shadows for depth. */
-.home-ai-panel .unified-input-box {
+   Heavier border for stronger presence + layered shadows for depth. */
+.home-ai-panel :deep(.unified-input-box) {
+  --color-ai-input-bg: var(--color-white);
   position: relative;
-  border: 2px solid transparent !important;
+  border: 0.125rem solid transparent !important;
   background:
-    linear-gradient(
-        var(--o2-ai-input-bg, #ffffff),
-        var(--o2-ai-input-bg, #ffffff)
-      )
-      padding-box,
-    linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff) border-box !important;
+    linear-gradient(var(--color-ai-input-bg), var(--color-ai-input-bg)) padding-box,
+    var(--color-gradient-brand-ribbon) border-box !important;
   box-shadow:
-    0 2px 4px rgba(15, 23, 42, 0.06),
-    0 8px 20px -2px rgba(15, 23, 42, 0.12),
-    0 18px 44px -10px rgba(123, 97, 255, 0.3) !important;
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 6%, transparent),
+    0 0.5rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 12%, transparent),
+    0 1.125rem 2.75rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
 }
 
-.home-ai-panel .unified-input-box {
-  --o2-ai-input-bg: #ffffff;
-}
-
-.dark .home-ai-panel .unified-input-box {
-  --o2-ai-input-bg: #191919;
+.dark .home-ai-panel :deep(.unified-input-box) {
+  --color-ai-input-bg: var(--color-surface-panel);
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    0 8px 22px -2px rgba(0, 0, 0, 0.55),
-    0 20px 48px -10px rgba(123, 97, 255, 0.45) !important;
+    0 0.125rem 0.25rem color-mix(in srgb, var(--color-black) 45%, transparent),
+    0 0.5rem 1.375rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.25rem 3rem -0.625rem color-mix(in srgb, var(--color-ai-accent) 45%, transparent) !important;
 }
 
 /* Soft ambient glow behind the input */
-.home-ai-panel .unified-input-box::before {
+.home-ai-panel :deep(.unified-input-box::before) {
   content: "";
   position: absolute;
-  inset: -10px;
+  inset: -0.625rem;
   border-radius: inherit;
-  background: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  background: var(--color-gradient-brand-ribbon);
   opacity: 0.22;
-  filter: blur(22px);
+  filter: blur(1.375rem);
   z-index: -1;
   pointer-events: none;
 }
 
 /* Stronger glow + shadow on focus, no harsh ring */
-.home-ai-panel .unified-input-box:focus-within {
+.home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.04),
-    0 6px 16px -2px rgba(15, 23, 42, 0.1),
-    0 16px 40px -8px rgba(123, 97, 255, 0.32) !important;
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent),
+    0 0.375rem 1rem -0.125rem color-mix(in srgb, var(--color-black) 10%, transparent),
+    0 1rem 2.5rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 32%, transparent) !important;
 }
 
-.dark .home-ai-panel .unified-input-box:focus-within {
+.dark .home-ai-panel :deep(.unified-input-box:focus-within) {
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.4),
-    0 6px 20px -2px rgba(0, 0, 0, 0.55),
-    0 18px 44px -8px rgba(123, 97, 255, 0.42) !important;
+    0 1px 0.125rem color-mix(in srgb, var(--color-black) 40%, transparent),
+    0 0.375rem 1.25rem -0.125rem color-mix(in srgb, var(--color-black) 55%, transparent),
+    0 1.125rem 2.75rem -0.5rem color-mix(in srgb, var(--color-ai-accent) 42%, transparent) !important;
 }
 
-.home-ai-panel .unified-input-box:focus-within::before {
+.home-ai-panel :deep(.unified-input-box:focus-within::before) {
   opacity: 0.4;
 }
-
 </style>

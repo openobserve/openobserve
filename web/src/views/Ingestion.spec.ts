@@ -23,62 +23,72 @@ import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
 
-// Install Quasar plugins
-
 // Mock services with default resolved values
 vi.mock("@/services/organizations", () => ({
   default: {
-    get_organization_passcode: vi.fn(() => Promise.resolve({
-      data: {
+    get_organization_passcode: vi.fn(() =>
+      Promise.resolve({
         data: {
-          token: "default-token",
-          passcode: "default-passcode"
-        }
-      }
-    })),
-    update_organization_passcode: vi.fn(() => Promise.resolve({
-      data: {
+          data: {
+            token: "default-token",
+            passcode: "default-passcode",
+          },
+        },
+      }),
+    ),
+    update_organization_passcode: vi.fn(() =>
+      Promise.resolve({
         data: {
-          token: "updated-token",
-          passcode: "updated-passcode"
-        }
-      }
-    })),
-    list_org_ingestion_tokens: vi.fn(() => Promise.resolve({
-      data: {
-        data: []
-      }
-    })),
-  }
+          data: {
+            token: "updated-token",
+            passcode: "updated-passcode",
+          },
+        },
+      }),
+    ),
+    list_org_ingestion_tokens: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          data: [],
+        },
+      }),
+    ),
+  },
 }));
 
 vi.mock("@/services/api_keys", () => ({
   default: {
-    createRUMToken: vi.fn(() => Promise.resolve({
-      data: { 
-        data: { 
-          new_key: "default-rum-token" 
-        } 
-      }
-    })),
-    updateRUMToken: vi.fn(() => Promise.resolve({
-      data: { success: true }
-    })),
-    listRUMTokens: vi.fn(() => Promise.resolve({
-      data: { 
-        data: { 
-          rum_token: "default-rum-token",
-          id: "default-rum-id"
-        } 
-      }
-    })),
-  }
+    createRUMToken: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          data: {
+            new_key: "default-rum-token",
+          },
+        },
+      }),
+    ),
+    updateRUMToken: vi.fn(() =>
+      Promise.resolve({
+        data: { success: true },
+      }),
+    ),
+    listRUMTokens: vi.fn(() =>
+      Promise.resolve({
+        data: {
+          data: {
+            rum_token: "default-rum-token",
+            id: "default-rum-id",
+          },
+        },
+      }),
+    ),
+  },
 }));
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
     track: vi.fn(),
-  }
+  },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -98,10 +108,10 @@ vi.mock("@/aws-exports", () => ({
   default: {
     aws_project_region: "us-east-1",
     aws_cognito_region: "us-east-1",
-  }
+  },
 }));
 
-// Mock clipboard and toast (replaces deprecated Quasar mock)
+// Mock clipboard and toast
 const mockNotify = vi.fn();
 
 vi.mock("@/utils/clipboard", () => ({
@@ -117,7 +127,7 @@ describe("Ingestion", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     try {
       wrapper = mount(Ingestion, {
         global: {
@@ -127,28 +137,36 @@ describe("Ingestion", () => {
           plugins: [i18n, router],
           stubs: {
             ConfirmDialog: {
-              name: 'ConfirmDialog',
+              name: "ConfirmDialog",
               template: '<div class="mock-confirm-dialog"><slot /></div>',
-              props: ['title', 'message', 'modelValue'],
-              emits: ['update:ok', 'update:cancel']
+              props: ["title", "message", "modelValue"],
+              emits: ["update:ok", "update:cancel"],
             },
-                        'q-btn': { template: '<button class="q-btn" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
-            'q-tabs': { template: '<div class="q-tabs"><slot /></div>' },
-            'q-route-tab': { template: '<div class="q-route-tab"><slot /></div>' },
-            OButton: { template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>', props: ['variant', 'size', 'disabled', 'icon', 'title', 'data-test', 'class'], emits: ['click'] },
-            OTabs: { template: '<div class="o-tabs-stub"><slot /></div>', props: ['modelValue', 'horizontal', 'align'], emits: ['update:modelValue'] },
-            ORouteTab: { template: '<div class="o-route-tab-stub"><slot /></div>', props: ['name', 'to', 'label', 'icon'] },
-            'q-separator': { template: '<div class="q-separator"></div>' },
-            'router-view': { 
-              template: '<div class="router-view" @copy-to-clipboard-fn="$emit(\'copy-to-clipboard-fn\', $event)"><slot /></div>', 
-              emits: ['copy-to-clipboard-fn']
+            OButton: {
+              template: '<button class="o-button-stub" @click="$emit(\'click\')"><slot /></button>',
+              props: ["variant", "size", "disabled", "icon", "title", "data-test", "class"],
+              emits: ["click"],
             },
-          }
-        }
+            OTabs: {
+              template: '<div class="o-tabs-stub"><slot /></div>',
+              props: ["modelValue", "horizontal", "align"],
+              emits: ["update:modelValue"],
+            },
+            ORouteTab: {
+              template: '<div class="o-route-tab-stub"><slot /></div>',
+              props: ["name", "to", "label", "icon"],
+            },
+            "router-view": {
+              template:
+                '<div class="router-view" @copy-to-clipboard-fn="$emit(\'copy-to-clipboard-fn\', $event)"><slot /></div>',
+              emits: ["copy-to-clipboard-fn"],
+            },
+          },
+        },
       });
       await flushPromises();
     } catch (error) {
-      console.error('Error mounting component:', error);
+      console.error("Error mounting component:", error);
       wrapper = null;
     }
   });
@@ -167,7 +185,7 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.ingestionPage').exists()).toBe(true);
+      expect(wrapper.find(".ingestionPage").exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
@@ -207,7 +225,15 @@ describe("Ingestion", () => {
         return;
       }
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
-      expect(wrapper.vm.metricRoutes).toEqual(["prometheus", "otelCollector", "telegraf", "cloudwatchMetrics"]);
+      expect(wrapper.vm.metricRoutes).toEqual([
+        "prometheus",
+        "vmagent",
+        "nightingale",
+        "categraf",
+        "otelCollector",
+        "telegraf",
+        "cloudwatchMetrics",
+      ]);
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP"]);
     });
   });
@@ -222,14 +248,14 @@ describe("Ingestion", () => {
       const mockResponse = {
         data: {
           data: {
-            new_key: "test-rum-token-123"
-          }
-        }
+            new_key: "test-rum-token-123",
+          },
+        },
       };
 
       apiKeysService.createRUMToken.mockResolvedValue(mockResponse);
       apiKeysService.listRUMTokens.mockResolvedValue({
-        data: { data: { rum_token: "test-rum-token-123" } }
+        data: { data: { rum_token: "test-rum-token-123" } },
       });
 
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
@@ -260,18 +286,18 @@ describe("Ingestion", () => {
       const mockError = {
         response: {
           status: 500,
-          data: { message: "Internal server error" }
-        }
+          data: { message: "Internal server error" },
+        },
       };
 
       apiKeysService.createRUMToken.mockRejectedValue(mockError);
 
       // Test that the function executes without throwing an error
       expect(() => wrapper.vm.generateRUMToken()).not.toThrow();
-      
+
       // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       // Verify that the service was called
       expect(apiKeysService.createRUMToken).toHaveBeenCalledWith("default");
     });
@@ -285,8 +311,8 @@ describe("Ingestion", () => {
       const mockError = {
         response: {
           status: 403,
-          data: { message: "Forbidden" }
-        }
+          data: { message: "Forbidden" },
+        },
       };
 
       apiKeysService.createRUMToken.mockRejectedValue(mockError);
@@ -305,18 +331,18 @@ describe("Ingestion", () => {
       const mockError = {
         response: {
           status: 500,
-          data: {}
-        }
+          data: {},
+        },
       };
 
       apiKeysService.createRUMToken.mockRejectedValue(mockError);
 
       // Test that the function executes without throwing an error
       expect(() => wrapper.vm.generateRUMToken()).not.toThrow();
-      
+
       // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       // Verify that the service was called
       expect(apiKeysService.createRUMToken).toHaveBeenCalledWith("default");
     });
@@ -338,15 +364,12 @@ describe("Ingestion", () => {
       const mockResponse = { data: { success: true } };
       apiKeysService.updateRUMToken.mockResolvedValue(mockResponse);
       apiKeysService.listRUMTokens.mockResolvedValue({
-        data: { data: { rum_token: "updated-rum-token" } }
+        data: { data: { rum_token: "updated-rum-token" } },
       });
 
       await wrapper.vm.updateRUMToken();
 
-      expect(apiKeysService.updateRUMToken).toHaveBeenCalledWith(
-        "default",
-        "rum-token-id-123"
-      );
+      expect(apiKeysService.updateRUMToken).toHaveBeenCalledWith("default", "rum-token-id-123");
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "success",
         message: "RUM Token updated successfully.",
@@ -369,18 +392,18 @@ describe("Ingestion", () => {
       const mockError = {
         response: {
           status: 500,
-          data: { message: "Server error" }
-        }
+          data: { message: "Server error" },
+        },
       };
 
       apiKeysService.updateRUMToken.mockRejectedValue(mockError);
 
       // Test that the function executes without throwing an error
       expect(() => wrapper.vm.updateRUMToken()).not.toThrow();
-      
+
       // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       // Verify that the service was called
       expect(apiKeysService.updateRUMToken).toHaveBeenCalled();
     });
@@ -394,8 +417,8 @@ describe("Ingestion", () => {
       const mockError = {
         response: {
           status: 403,
-          data: { message: "Forbidden" }
-        }
+          data: { message: "Forbidden" },
+        },
       };
 
       apiKeysService.updateRUMToken.mockRejectedValue(mockError);
@@ -414,18 +437,18 @@ describe("Ingestion", () => {
       const mockError = {
         response: {
           status: 500,
-          data: {}
-        }
+          data: {},
+        },
       };
 
       apiKeysService.updateRUMToken.mockRejectedValue(mockError);
 
       // Test that the function executes without throwing an error
       expect(() => wrapper.vm.updateRUMToken()).not.toThrow();
-      
+
       // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       // Verify that the service was called
       expect(apiKeysService.updateRUMToken).toHaveBeenCalled();
     });
@@ -442,9 +465,9 @@ describe("Ingestion", () => {
         data: {
           data: {
             token: "test-token",
-            passcode: "test-passcode-123"
-          }
-        }
+            passcode: "test-passcode-123",
+          },
+        },
       };
 
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
@@ -467,9 +490,9 @@ describe("Ingestion", () => {
         data: {
           data: {
             token: "",
-            passcode: ""
-          }
-        }
+            passcode: "",
+          },
+        },
       };
 
       organizationsService.get_organization_passcode.mockResolvedValue(mockResponse);
@@ -478,7 +501,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });
@@ -495,9 +518,9 @@ describe("Ingestion", () => {
         data: {
           data: {
             rum_token: "retrieved-rum-token",
-            id: "token-id-123"
-          }
-        }
+            id: "token-id-123",
+          },
+        },
       };
 
       apiKeysService.listRUMTokens.mockResolvedValue(mockResponse);
@@ -521,9 +544,9 @@ describe("Ingestion", () => {
         data: {
           data: {
             token: "new-token",
-            passcode: "new-passcode-123"
-          }
-        }
+            passcode: "new-passcode-123",
+          },
+        },
       };
 
       organizationsService.update_organization_passcode.mockResolvedValue(mockResponse);
@@ -556,9 +579,9 @@ describe("Ingestion", () => {
         data: {
           data: {
             token: "",
-            passcode: ""
-          }
-        }
+            passcode: "",
+          },
+        },
       };
 
       organizationsService.update_organization_passcode.mockResolvedValue(mockResponse);
@@ -567,7 +590,7 @@ describe("Ingestion", () => {
 
       expect(mockNotify).toHaveBeenCalledWith({
         variant: "error",
-        message: "API Key not found.",
+        message: "Passcode not found.",
         timeout: 5000,
       });
     });
@@ -582,17 +605,17 @@ describe("Ingestion", () => {
         response: {
           status: 500,
         },
-        error: "Network error"
+        error: "Network error",
       };
 
       organizationsService.update_organization_passcode.mockRejectedValue(mockError);
 
       // Test that the function executes without throwing an error
       expect(() => wrapper.vm.updatePasscode()).not.toThrow();
-      
+
       // Wait a bit for async operations
-      await new Promise(resolve => setTimeout(resolve, 10));
-      
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       // Verify that the service was called
       expect(organizationsService.update_organization_passcode).toHaveBeenCalledWith("default");
     });
@@ -607,7 +630,7 @@ describe("Ingestion", () => {
         response: {
           status: 403,
         },
-        error: "Forbidden"
+        error: "Forbidden",
       };
 
       organizationsService.update_organization_passcode.mockRejectedValue(mockError);
@@ -624,7 +647,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.confirmRUMUpdate).toBe(false);
       wrapper.vm.showRUMUpdateDialogFn();
       expect(wrapper.vm.confirmRUMUpdate).toBe(true);
@@ -637,7 +660,7 @@ describe("Ingestion", () => {
       }
 
       const mockContent = {
-        innerText: "test content to copy"
+        innerText: "test content to copy",
       };
 
       const { copyToClipboard } = await import("@/utils/clipboard");
@@ -646,7 +669,7 @@ describe("Ingestion", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
       await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -660,7 +683,7 @@ describe("Ingestion", () => {
       }
 
       const mockContent = {
-        innerText: "test content to copy"
+        innerText: "test content to copy",
       };
 
       const { copyToClipboard } = await import("@/utils/clipboard");
@@ -672,7 +695,7 @@ describe("Ingestion", () => {
       await flushPromises();
 
       // Verify that copyToClipboard was called
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -686,7 +709,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       const tabs = wrapper.find(".o-tabs-stub");
       expect(tabs.exists()).toBe(true);
     });
@@ -706,7 +729,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       const confirmDialogs = wrapper.findAll(".mock-confirm-dialog");
       expect(confirmDialogs).toHaveLength(1);
     });
@@ -716,7 +739,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       const routerView = wrapper.find(".router-view");
       expect(routerView.exists()).toBe(true);
     });
@@ -728,14 +751,15 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.organizationData.rumToken.rum_token = "existing-token";
       wrapper.vm.router.currentRoute.value.name = "frontendMonitoring";
       await wrapper.vm.$nextTick();
 
-      const shouldShowResetRUM = wrapper.vm.rumRoutes.indexOf(wrapper.vm.router.currentRoute.value.name) > -1 &&
-        wrapper.vm.store.state.organizationData.rumToken.rum_token !== '';
-      
+      const shouldShowResetRUM =
+        wrapper.vm.rumRoutes.indexOf(wrapper.vm.router.currentRoute.value.name) > -1 &&
+        wrapper.vm.store.state.organizationData.rumToken.rum_token !== "";
+
       expect(shouldShowResetRUM).toBe(true);
     });
 
@@ -744,14 +768,15 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.organizationData.rumToken.rum_token = "";
       wrapper.vm.router.currentRoute.value.name = "frontendMonitoring";
       await wrapper.vm.$nextTick();
 
-      const shouldShowGenerateRUM = wrapper.vm.rumRoutes.indexOf(wrapper.vm.router.currentRoute.value.name) > -1 &&
-        wrapper.vm.store.state.organizationData.rumToken.rum_token === '';
-      
+      const shouldShowGenerateRUM =
+        wrapper.vm.rumRoutes.indexOf(wrapper.vm.router.currentRoute.value.name) > -1 &&
+        wrapper.vm.store.state.organizationData.rumToken.rum_token === "";
+
       expect(shouldShowGenerateRUM).toBe(true);
     });
 
@@ -760,11 +785,12 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.router.currentRoute.value.name = "logs";
       await wrapper.vm.$nextTick();
 
-      const isRumRoute = wrapper.vm.rumRoutes.indexOf(wrapper.vm.router.currentRoute.value.name) > -1;
+      const isRumRoute =
+        wrapper.vm.rumRoutes.indexOf(wrapper.vm.router.currentRoute.value.name) > -1;
       expect(isRumRoute).toBe(false);
     });
   });
@@ -775,15 +801,19 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data = true;
       wrapper.vm.store.state.organizationData.isDataIngested = false;
       await wrapper.vm.$nextTick();
 
-      const shouldShowWarning = wrapper.vm.store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
+      const shouldShowWarning =
+        Object.prototype.hasOwnProperty.call(
+          wrapper.vm.store.state.zoConfig,
+          "restricted_routes_on_empty_data",
+        ) &&
         wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
         wrapper.vm.store.state.organizationData.isDataIngested === false;
-      
+
       expect(shouldShowWarning).toBe(true);
     });
 
@@ -792,15 +822,19 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data = true;
       wrapper.vm.store.state.organizationData.isDataIngested = true;
       await wrapper.vm.$nextTick();
 
-      const shouldShowWarning = wrapper.vm.store.state.zoConfig.hasOwnProperty('restricted_routes_on_empty_data') &&
+      const shouldShowWarning =
+        Object.prototype.hasOwnProperty.call(
+          wrapper.vm.store.state.zoConfig,
+          "restricted_routes_on_empty_data",
+        ) &&
         wrapper.vm.store.state.zoConfig.restricted_routes_on_empty_data === true &&
         wrapper.vm.store.state.organizationData.isDataIngested === false;
-      
+
       expect(shouldShowWarning).toBe(false);
     });
   });
@@ -811,7 +845,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.splitterModel).toBe(200);
     });
 
@@ -820,7 +854,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.currentUserEmail).toBe("example@gmail.com");
     });
 
@@ -829,7 +863,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.config).toBeDefined();
     });
 
@@ -838,7 +872,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.getImageURL).toBeDefined();
       expect(typeof wrapper.vm.getImageURL).toBe("function");
     });
@@ -848,7 +882,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.router).toBeDefined();
     });
 
@@ -857,7 +891,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       expect(wrapper.vm.store).toBeDefined();
     });
   });
@@ -868,13 +902,14 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.organizationData.organizationPasscode = "";
       wrapper.vm.store.state.organizationData.rumToken.rum_token = "";
       wrapper.vm.store.state.selectedOrganization.identifier = "test-org";
 
-      const shouldCallServices = (!wrapper.vm.store.state.organizationData.organizationPasscode ||
-        !wrapper.vm.store.state.organizationData.rumToken.rum_token) && 
+      const shouldCallServices =
+        (!wrapper.vm.store.state.organizationData.organizationPasscode ||
+          !wrapper.vm.store.state.organizationData.rumToken.rum_token) &&
         wrapper.vm.store.state.selectedOrganization.identifier !== undefined;
 
       expect(shouldCallServices).toBe(true);
@@ -885,11 +920,12 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.selectedOrganization.identifier = undefined;
-      
-      const shouldCallServices = (!wrapper.vm.store.state.organizationData.organizationPasscode ||
-        !wrapper.vm.store.state.organizationData.rumToken.rum_token) && 
+
+      const shouldCallServices =
+        (!wrapper.vm.store.state.organizationData.organizationPasscode ||
+          !wrapper.vm.store.state.organizationData.rumToken.rum_token) &&
         wrapper.vm.store.state.selectedOrganization.identifier !== undefined;
 
       expect(shouldCallServices).toBe(false);
@@ -900,14 +936,14 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       // Ensure organization identifier is set
       wrapper.vm.store.state.selectedOrganization.identifier = "default";
-      
+
       const mockPush = vi.fn();
-      wrapper.vm.router = { 
+      wrapper.vm.router = {
         currentRoute: { value: { name: "ingestion" } },
-        push: mockPush 
+        push: mockPush,
       };
 
       if (wrapper.vm.router.currentRoute.value.name === "ingestion") {
@@ -934,7 +970,7 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       // Ensure organization identifier is set
       wrapper.vm.store.state.selectedOrganization.identifier = "default";
       wrapper.vm.store.state.organizationData.rumToken.id = undefined;
@@ -944,10 +980,7 @@ describe("Ingestion", () => {
 
       await wrapper.vm.updateRUMToken();
 
-      expect(apiKeysService.updateRUMToken).toHaveBeenCalledWith(
-        "default",
-        undefined
-      );
+      expect(apiKeysService.updateRUMToken).toHaveBeenCalledWith("default", undefined);
     });
 
     it("should handle generateRUMToken tracking with different organization", async () => {
@@ -955,21 +988,21 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       wrapper.vm.store.state.selectedOrganization.identifier = "test-org";
       wrapper.vm.store.state.userInfo.email = "test@example.com";
 
       const mockResponse = {
         data: {
           data: {
-            new_key: "test-token"
-          }
-        }
+            new_key: "test-token",
+          },
+        },
       };
 
       apiKeysService.createRUMToken.mockResolvedValue(mockResponse);
       apiKeysService.listRUMTokens.mockResolvedValue({
-        data: { data: { rum_token: "test-token" } }
+        data: { data: { rum_token: "test-token" } },
       });
 
       await wrapper.vm.generateRUMToken();
@@ -987,12 +1020,12 @@ describe("Ingestion", () => {
         expect.fail("Component failed to mount");
         return;
       }
-      
+
       // Reset to default user state
       wrapper.vm.store.state.selectedOrganization.identifier = "default";
       wrapper.vm.store.state.userInfo.email = "example@gmail.com";
       wrapper.vm.router.currentRoute.value.name = "custom";
-      
+
       const mockContent = { innerText: "test content" };
       const { copyToClipboard } = await import("@/utils/clipboard");
       copyToClipboard.mockResolvedValue(true);

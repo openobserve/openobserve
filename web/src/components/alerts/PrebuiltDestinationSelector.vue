@@ -13,50 +13,61 @@ See the License for the specific language governing permissions and
 limitations under the License. -->
 
 <template>
-  <div data-test="prebuilt-destination-selector" class="destination-selector">
+  <div data-test="prebuilt-destination-selector">
     <!-- Destination Type Grid -->
-    <div class="selector-grid tw:grid tw:gap-3 tw:mb-4 tw:[grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))]">
+    <div
+      class="selector-grid mb-4 grid [grid-template-columns:repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
+    >
       <div
         v-for="type in filteredDestinationTypes"
         :key="type.id"
         data-test="destination-type-card"
         :data-type="type.id"
-        class="destination-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
-        :class="selectedType === type.id ? 'selected tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'tw:bg-[var(--o2-card-bg)]'"
+        class="destination-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)]"
+        :class="
+          selectedType === type.id
+            ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]'
+            : 'bg-card-glass-bg'
+        "
         @click="selectType(type.id)"
       >
         <!-- Card Content -->
-        <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
+        <div class="card-content relative flex h-full flex-col items-center text-center">
           <!-- Icon/Image -->
-          <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
+          <div
+            data-test="destination-type-icon"
+            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
+          >
             <img
               v-if="type.image"
               :src="type.image"
               :alt="type.name"
-              class="destination-logo tw:w-6 tw:h-6 tw:[object-fit:contain]"
+              class="destination-logo h-6 w-6 [object-fit:contain]"
             />
-            <OIcon
-              v-else
-              :name="getIconName(type.icon)"
-              size="md"
-            />
+            <OIcon v-else :name="getIconName(type.icon)" size="md" />
           </div>
 
           <!-- Name -->
-          <div data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--o2-text-primary)] tw:[line-height:1.3] tw:text-center">
+          <div
+            data-test="destination-type-name"
+            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
+          >
             {{ type.name }}
           </div>
 
           <!-- Description -->
-          <div data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
-            {{ type.description }}
+          <div
+            data-test="destination-type-description"
+            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
+          >
+            {{ t(type.descriptionKey) }}
           </div>
         </div>
 
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === type.id"
-          class="check-icon tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-5 tw:h-5 tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
+          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -66,26 +77,39 @@ limitations under the License. -->
       <div
         data-test="destination-type-card"
         data-type="custom"
-        class="destination-card custom-card tw:group/dest-card tw:relative tw:py-5 tw:px-3 tw:border-2 tw:border-[var(--o2-border-color)] tw:border-dashed tw:rounded-xl tw:cursor-pointer tw:transition-all tw:duration-300 tw:[min-height:7.5rem] tw:flex tw:flex-col tw:hover:-translate-y-0.5 tw:hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)] tw:hover:border-[var(--o2-primary-color)]"
-        :class="selectedType === 'custom' ? 'selected tw:border-[var(--o2-primary-color)] tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_10%,var(--o2-card-bg))] tw:shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]' : 'tw:bg-[var(--o2-card-bg)]'"
+        class="destination-card custom-card group/dest-card border-card-glass-border rounded-default hover:border-accent relative flex [min-height:7.5rem] cursor-pointer flex-col border-2 border-dashed px-3 py-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_0.25rem_0.75rem_rgba(25,118,210,0.15)]"
+        :class="
+          selectedType === 'custom'
+            ? 'selected border-accent bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] shadow-[0_0.25rem_1rem_rgba(25,118,210,0.2)]'
+            : 'bg-card-glass-bg'
+        "
         @click="selectType('custom')"
       >
-        <div class="card-content tw:flex tw:flex-col tw:items-center tw:text-center tw:h-full tw:relative">
-          <div data-test="destination-type-icon" class="tw:mb-2 tw:text-[var(--o2-icon-color)] tw:group-[.selected]/dest-card:text-[var(--o2-primary-color)]">
+        <div class="card-content relative flex h-full flex-col items-center text-center">
+          <div
+            data-test="destination-type-icon"
+            class="text-icon-color group-[.selected]/dest-card:text-accent mb-2"
+          >
             <OIcon name="settings" size="md" />
           </div>
-          <div data-test="destination-type-name" class="card-title tw:text-[0.8125rem] tw:font-medium tw:mt-1 tw:mb-0 tw:text-[var(--o2-text-primary)] tw:[line-height:1.3] tw:text-center">
-            {{ t('alerts.customDestination') }}
+          <div
+            data-test="destination-type-name"
+            class="card-title text-compact text-text-heading mt-1 mb-0 text-center [line-height:1.3] font-medium"
+          >
+            {{ t("alerts.customDestination") }}
           </div>
-          <div data-test="destination-type-description" class="card-description tw:text-[0.6875rem] tw:text-[var(--o2-text-secondary)] tw:mt-1 tw:mb-0 tw:[line-height:1.2] tw:grow tw:text-center tw:hidden">
-            {{ t('alerts.customDestinationDescription') }}
+          <div
+            data-test="destination-type-description"
+            class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
+          >
+            {{ t("alerts.customDestinationDescription") }}
           </div>
         </div>
 
         <!-- Selection Indicator -->
         <div
           v-if="selectedType === 'custom'"
-          class="check-icon tw:absolute tw:top-[0.375rem] tw:right-[0.375rem] tw:w-5 tw:h-5 tw:rounded-full tw:overflow-hidden tw:bg-[var(--o2-positive)] tw:text-white tw:flex tw:items-center tw:justify-center tw:z-[1]"
+          class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
         >
           <OIcon name="check" size="xs" />
         </div>
@@ -95,68 +119,64 @@ limitations under the License. -->
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useI18n } from 'vue-i18n';
-import { PREBUILT_DESTINATION_TYPES } from '@/utils/prebuilt-templates';
-import type { PrebuiltTypeId } from '@/utils/prebuilt-templates/types';
+import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
+import type { PrebuiltTypeId } from "@/utils/prebuilt-templates/types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 // Define component props
+// `modelValue` is the owner form's `destination_type` field, which is a plain
+// string in the schema; accept `string` so the bound form value fits while the
+// emit side stays narrowed to real selections.
 interface Props {
-  modelValue?: PrebuiltTypeId | 'custom' | null;
+  modelValue?: PrebuiltTypeId | "custom" | "" | null | string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  modelValue: null
+  modelValue: null,
 });
 
 // Define component emits
 interface Emits {
-  (e: 'update:modelValue', value: PrebuiltTypeId | 'custom' | null): void;
-  (e: 'select', value: PrebuiltTypeId | 'custom'): void;
+  (e: "update:modelValue", value: PrebuiltTypeId | "custom"): void;
+  (e: "select", value: PrebuiltTypeId | "custom"): void;
 }
 
 const emit = defineEmits<Emits>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Reactive state
 const selectedType = computed({
   get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value)
+  // Only user selections flow through the setter, so null/'' never get emitted.
+  set: (value: PrebuiltTypeId | "custom") => emit("update:modelValue", value),
 });
 
 // Computed properties
 const filteredDestinationTypes = computed(() => PREBUILT_DESTINATION_TYPES);
 
 // Methods
-function selectType(typeId: PrebuiltTypeId | 'custom') {
+function selectType(typeId: PrebuiltTypeId | "custom") {
   selectedType.value = typeId;
-  emit('select', typeId);
+  emit("select", typeId);
 }
 
 function getIconName(icon: string): string {
-  // Map destination type icons to Quasar icon names
+  // Map destination type icons to icon names
   const iconMap: Record<string, string> = {
-    slack: 'chat',
-    discord: 'forum',
-    msteams: 'groups',
-    email: 'email',
-    pagerduty: 'warning',
-    opsgenie: 'notifications_active',
-    servicenow: 'support_agent',
-    custom: 'settings'
+    slack: "chat",
+    discord: "forum",
+    msteams: "groups",
+    email: "email",
+    pagerduty: "warning",
+    opsgenie: "notifications_active",
+    servicenow: "support_agent",
+    custom: "settings",
   };
 
   return iconMap[icon] || icon;
 }
 </script>
-
-<style>
-@media (min-width: 75rem) {
-  .destination-selector .destination-card .card-description {
-    display: block;
-  }
-}
-</style>

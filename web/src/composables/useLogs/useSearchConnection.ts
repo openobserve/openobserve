@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useNotifications from "@/composables/useNotifications";
@@ -23,28 +24,21 @@ import { useStore } from "vuex";
 import {
   SearchRequestPayload,
   WebSocketSearchPayload,
+  WebSocketSearchResponse,
+  WebSocketErrorResponse,
 } from "@/ts/interfaces/query";
 import { generateTraceContext } from "@/utils/zincutils";
+import { raw } from "@/types/i18n";
 
-export const useSearchConnection = () => {
+export const useSearchConnection = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
-  const {
-    addTraceId,
-    removeTraceId,
-    fnParsedSQL,
-    isLimitQuery,
-    isDistinctQuery,
-    isWithQuery,
-  } = logsUtils();
+  const { addTraceId, removeTraceId, fnParsedSQL, isLimitQuery, isDistinctQuery, isWithQuery } =
+    logsUtils();
   const store = useStore();
   const { searchObj, notificationMsg, searchPartitionMap } = searchState();
-  const { resetHistogramWithError } = useHistogram();
+  useHistogram();
 
-  const {
-    fetchQueryDataWithWebSocket,
-    sendSearchMessageBasedOnRequestId,
-    closeSocketBasedOnRequestId,
-  } = useSearchWebSocket();
+  const { sendSearchMessageBasedOnRequestId, closeSocketBasedOnRequestId } = useSearchWebSocket();
 
   const { fetchQueryDataWithHttpStream } = useStreamingSearch();
 
@@ -73,6 +67,10 @@ export const useSearchConnection = () => {
       org_id: string;
       meta?: any;
       clear_cache?: boolean;
+      onData?: (payload: WebSocketSearchPayload, response: WebSocketSearchResponse) => void;
+      onError?: (payload: WebSocketSearchPayload, error: WebSocketErrorResponse) => void;
+      onComplete?: (payload: WebSocketSearchPayload, response: unknown) => void;
+      onReset?: (data: unknown, traceId?: string) => void;
     } = {
       queryReq,
       type,
@@ -86,9 +84,7 @@ export const useSearchConnection = () => {
     return payload;
   };
 
-  const initializeSearchConnection = (
-    payload: any,
-  ): string | Promise<void> | null => {
+  const initializeSearchConnection = (payload: any): string | Promise<void> | null => {
     payload.searchType = "ui";
     payload.pageType = searchObj.data.stream.streamType;
     return fetchQueryDataWithHttpStream(payload, {
@@ -120,9 +116,7 @@ export const useSearchConnection = () => {
           trace_id: queryReq.traceId,
           payload: {
             query: queryReq.queryReq.query,
-            ...(store.state.zoConfig.sql_base64_enabled
-              ? { encoding: "base64" }
-              : {}),
+            ...(store.state.zoConfig.sql_base64_enabled ? { encoding: "base64" } : {}),
           } as SearchRequestPayload,
           stream_type: searchObj.data.stream.streamType,
           search_type: "ui",
@@ -143,7 +137,10 @@ export const useSearchConnection = () => {
     } catch (e: any) {
       searchObj.loading = false;
       showErrorNotification(
-        notificationMsg.value || "Error occurred while sending socket message.",
+        raw(
+          notificationMsg.value ||
+            t("toastMessages.useLogs.errorOccurredWhileSendingSocketMessage"),
+        ),
       );
       notificationMsg.value = "";
     }
@@ -172,11 +169,7 @@ export const useSearchConnection = () => {
         let initialHistogramErrorMsg = "";
         if (searchObj.meta.sqlMode && searchObj.meta.showHistogram) {
           const parsedSQL = fnParsedSQL();
-          if (
-            isLimitQuery(parsedSQL) ||
-            isDistinctQuery(parsedSQL) ||
-            isWithQuery(parsedSQL)
-          ) {
+          if (isLimitQuery(parsedSQL) || isDistinctQuery(parsedSQL) || isWithQuery(parsedSQL)) {
             initialHistogramErrorCode = -1;
             initialHistogramErrorMsg =
               "Histogram unavailable for CTEs, DISTINCT, JOIN and LIMIT queries.";
@@ -189,7 +182,8 @@ export const useSearchConnection = () => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
+            titleParts: null,
             unparsed_x_data: [],
             timezone: "",
           },
@@ -218,10 +212,7 @@ export const useSearchConnection = () => {
       }
 
       // in case of live refresh, reset from to 0
-      if (
-        searchObj.meta.refreshInterval > 0 &&
-        window.location.pathname.includes("logs")
-      ) {
+      if (searchObj.meta.refreshInterval > 0 && window.location.pathname.includes("logs")) {
         queryReq.query.from = 0;
         searchObj.meta.refreshHistogram = false;
       }
@@ -229,20 +220,17 @@ export const useSearchConnection = () => {
       const requestId = initializeSearchConnection(payload);
 
       if (!requestId) {
-        throw new Error(
-          `Failed to initialize ${searchObj.communicationMethod} connection`,
-        );
+        throw new Error(`Failed to initialize ${searchObj.communicationMethod} connection`);
       }
 
       addTraceId(payload.traceId);
     } catch (e: any) {
-      console.error(
-        `Error while getting data through ${searchObj.communicationMethod}`,
-        e,
-      );
+      console.error(`Error while getting data through ${searchObj.communicationMethod}`, e);
       searchObj.loading = false;
       showErrorNotification(
-        notificationMsg.value || "Error occurred during the search operation.",
+        raw(
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
       );
       notificationMsg.value = "";
     }

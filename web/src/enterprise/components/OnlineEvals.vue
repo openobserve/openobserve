@@ -7,8 +7,8 @@ the Free Software Foundation, either version 3 of the License, or
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:gap-2.5 tw:h-[calc(100vh-var(--navbar-height))] tw:min-h-0 tw:pt-1 tw:px-2.5 tw:pb-2.5 tw:text-(--o2-text)"
-    :class="{ 'tw:h-full! tw:p-0! tw:gap-0!': hideTabBar }"
+    class="text-text-body flex h-[calc(100vh-var(--navbar-height))] min-h-0 flex-col gap-2.5 px-2.5 pt-1 pb-2.5"
+    :class="{ 'h-full! gap-0! p-0!': hideTabBar }"
     data-test="online-evals-page"
   >
     <!-- Full-page forms (jobs / scorers) -->
@@ -54,23 +54,25 @@ the Free Software Foundation, either version 3 of the License, or
     />
 
     <template v-else>
-      <div v-if="!hideTabBar" class="online-evals__header card-container tw:flex tw:items-center tw:justify-between tw:gap-4 tw:min-h-17 tw:py-2.5 tw:px-4 tw:shrink-0 tw:bg-(--o2-card-bg)">
+      <div
+        v-if="!hideTabBar"
+        class="online-evals__header bg-card-glass-bg flex min-h-17 shrink-0 items-center justify-between gap-4 px-4 py-2.5"
+      >
         <div>
-          <h1 class="tw:m-0 tw:text-[var(--text-lg)] tw:font-semibold tw:text-[var(--color-text-heading)] tw:[letter-spacing:0]">{{ t("onlineEvals.title") }}</h1>
+          <h1 class="text-text-heading m-0 font-semibold [letter-spacing:0] text-[var(--text-lg)]">
+            {{ t("onlineEvals.title") }}
+          </h1>
         </div>
       </div>
 
-      <AppPageHeader
+      <OPageHeader
         v-if="hideTabBar && embeddedHeader"
-        :title="embeddedHeader.title"
-        :subtitle="embeddedHeader.subtitle"
+        :title="raw(embeddedHeader.title)"
+        :subtitle="raw(embeddedHeader.subtitle)"
         :icon="embeddedHeader.icon"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
+        class="border-border-default shrink-0 border-b"
       >
-        <template
-          v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'"
-          #actions
-        >
+        <template v-if="activeTab === 'scorers' || activeTab === 'scoreConfigs'" #actions>
           <ODropdown side="bottom" align="end">
             <template #trigger>
               <OButton
@@ -84,38 +86,26 @@ the Free Software Foundation, either version 3 of the License, or
             </template>
             <ODropdownItem
               :data-test="`${activeTab}-import-custom`"
-              @select="
-                activeTab === 'scorers'
-                  ? goToImportScorer()
-                  : goToImportScoreConfig()
-              "
+              @select="activeTab === 'scorers' ? goToImportScorer() : goToImportScoreConfig()"
             >
-              <div class="tw:flex tw:flex-col">
+              <div class="flex flex-col">
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.customLabel`) }}
                 </span>
-                <span
-                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >
+                <span class="text-dropdown-item-text text-xs opacity-60">
                   {{ t(`onlineEvals.${importI18nKey}.import.customSubtitle`) }}
                 </span>
               </div>
             </ODropdownItem>
             <ODropdownItem
               :data-test="`${activeTab}-import-library`"
-              @select="
-                activeTab === 'scorers'
-                  ? openScorerLibrary()
-                  : openScoreConfigLibrary()
-              "
+              @select="activeTab === 'scorers' ? openScorerLibrary() : openScoreConfigLibrary()"
             >
-              <div class="tw:flex tw:flex-col">
+              <div class="flex flex-col">
                 <span>
                   {{ t(`onlineEvals.${importI18nKey}.import.libraryLabel`) }}
                 </span>
-                <span
-                  class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >
+                <span class="text-dropdown-item-text text-xs opacity-60">
                   {{ t(`onlineEvals.${importI18nKey}.import.librarySubtitle`) }}
                 </span>
               </div>
@@ -155,7 +145,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
                ORefreshButton renders no border of its own. -->
           <div
-            class="tw:inline-flex tw:items-center tw:border tw:border-border-default tw:rounded-md tw:px-1 tw:h-[2rem] tw:overflow-hidden"
+            class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
           >
             <ORefreshButton
               :last-run-at="qualityLastRunAt"
@@ -166,15 +156,22 @@ the Free Software Foundation, either version 3 of the License, or
             />
           </div>
         </template>
-      </AppPageHeader>
+      </OPageHeader>
 
-      <section class="online-evals__content card-container tw:flex tw:flex-1 tw:flex-col tw:min-h-0 tw:overflow-hidden tw:bg-(--o2-card-bg)">
-        <div v-if="!hideTabBar" class="online-evals__tabs tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:py-0 tw:px-3.5 tw:bg-transparent tw:border-b tw:border-(--o2-border)">
+      <section
+        class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <div
+          v-if="!hideTabBar"
+          class="online-evals__tabs border-border-default flex shrink-0 items-center gap-2 border-b bg-transparent px-3.5 py-0"
+        >
           <button
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab tw:inline-flex tw:items-center tw:gap-1.75 tw:h-9.5 tw:py-0 tw:px-3.5 tw:bg-transparent tw:border-0 tw:border-b-2 tw:border-b-transparent tw:text-(--o2-text-muted) tw:cursor-pointer tw:font-semibold tw:text-[13px]"
-            :class="activeTab === tab.value ? 'is-active tw:text-[var(--o2-text)] tw:border-b-[var(--o2-brand)] tw:-mb-px' : ''"
+            class="online-evals__tab text-text-muted text-compact inline-flex h-9.5 cursor-pointer items-center gap-1.75 border-0 border-b-2 border-b-transparent bg-transparent px-3.5 py-0 font-semibold"
+            :class="
+              activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
+            "
             type="button"
             @click="activeTab = tab.value"
           >
@@ -182,7 +179,7 @@ the Free Software Foundation, either version 3 of the License, or
           </button>
         </div>
 
-        <div class="online-evals__body tw:flex tw:flex-1 tw:min-h-0">
+        <div class="online-evals__body flex min-h-0 flex-1">
           <QualityPage
             v-if="activeTab === 'quality'"
             ref="qualityPageRef"
@@ -212,6 +209,7 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
+            @refresh="loadAll(orgId)"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
@@ -232,12 +230,14 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
+            @refresh="loadAll(orgId)"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
             :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
+            :action-loading="jobsBulkDeleting"
             :pending-status-id="pendingJobStatusId"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
@@ -246,13 +246,21 @@ the Free Software Foundation, either version 3 of the License, or
             @activate="(row: EvalJob) => activateJob(row)"
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
+            @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
+            @refresh="loadAll(orgId)"
           />
         </div>
       </section>
 
+      <!-- Kept mounted (no v-if) and driven by :open so ODialog can play its
+           close animation on dismiss; a v-if would unmount it and cut it short. -->
       <ScorerTypeDialog
-        v-if="scorerTypeDialog"
-        @close="closeScorerTypeDialog"
+        :open="scorerTypeDialog"
+        @update:open="
+          (v: boolean) => {
+            if (!v) closeScorerTypeDialog();
+          }
+        "
         @select="selectScorerType"
       />
 
@@ -266,12 +274,15 @@ the Free Software Foundation, either version 3 of the License, or
       />
 
       <ODrawer
+        bleed
         v-model:open="showScoreConfigLibrary"
         side="right"
         size="lg"
         :title="t('onlineEvals.scoreConfig.import.libraryDrawerTitle')"
-        secondary-button-label="Cancel"
-        :primary-button-label="`Import (${scoreConfigLibrarySelectedCount})`"
+        :secondary-button-label="t('onlineEvals.buttons.cancel')"
+        :primary-button-label="
+          t('onlineEvals.importCount', { count: scoreConfigLibrarySelectedCount })
+        "
         :primary-button-disabled="scoreConfigLibrarySelectedCount === 0"
         :primary-button-loading="scoreConfigLibraryImporting"
         data-test="score-config-library-drawer"
@@ -281,20 +292,19 @@ the Free Software Foundation, either version 3 of the License, or
         <ScoreConfigLibrary
           ref="scoreConfigLibraryRef"
           :org-id="orgId"
-          @update:selected-count="
-            (n: number) => (scoreConfigLibrarySelectedCount = n)
-          "
+          @update:selected-count="(n: number) => (scoreConfigLibrarySelectedCount = n)"
           @imported="handleScoreConfigLibraryImported"
         />
       </ODrawer>
 
       <ODrawer
+        bleed
         v-model:open="showScorerLibrary"
         side="right"
         size="lg"
         :title="t('onlineEvals.scorer.import.libraryDrawerTitle')"
-        secondary-button-label="Cancel"
-        :primary-button-label="`Import (${scorerLibrarySelectedCount})`"
+        :secondary-button-label="t('onlineEvals.buttons.cancel')"
+        :primary-button-label="t('onlineEvals.importCount', { count: scorerLibrarySelectedCount })"
         :primary-button-disabled="scorerLibrarySelectedCount === 0"
         :primary-button-loading="scorerLibraryImporting"
         data-test="scorer-library-drawer"
@@ -307,9 +317,7 @@ the Free Software Foundation, either version 3 of the License, or
           :score-configs="scoreConfigs"
           :scorers="scorers"
           :providers="providers"
-          @update:selected-count="
-            (n: number) => (scorerLibrarySelectedCount = n)
-          "
+          @update:selected-count="(n: number) => (scorerLibrarySelectedCount = n)"
           @imported="handleScorerLibraryImported"
         />
       </ODrawer>
@@ -343,12 +351,8 @@ the Free Software Foundation, either version 3 of the License, or
 
       <ConfirmDialog
         v-model="confirmDeleteOpen"
-        :title="pendingDeleteLabel"
-        :message="
-          t('onlineEvals.deleteConfirmMessage', {
-            name: pendingDeleteRow?.name ?? '',
-          })
-        "
+        :title="deleteDialogTitle"
+        :message="deleteDialogMessage"
         @update:ok="performDelete"
         @update:cancel="cancelDelete"
       />
@@ -360,7 +364,7 @@ the Free Software Foundation, either version 3 of the License, or
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type EvalJob,
@@ -401,7 +405,7 @@ import ScoreConfigLibrary from "./onlineEvals/ScoreConfigLibrary.vue";
 import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -409,13 +413,11 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
-import {
-  useAiDateRange,
-  resolveAiDateWindow,
-} from "@/enterprise/composables/useAiDateRange";
+import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
+import type { I18nKey } from "@/types/i18n";
 import {
   ALL_AGENTS_VALUE,
   agentFilterKey,
@@ -441,7 +443,7 @@ withDefaults(defineProps<{ hideTabBar?: boolean }>(), { hideTabBar: false });
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
@@ -465,9 +467,7 @@ const dialog = ref<{
 
 const scorerFormRow = computed(() => dialog.value.row as Scorer | null);
 const jobFormRow = computed(() => dialog.value.row as EvalJob | null);
-const scoreConfigDialogRow = computed(
-  () => dialog.value.row as ScoreConfig | null,
-);
+const scoreConfigDialogRow = computed(() => dialog.value.row as ScoreConfig | null);
 
 const viewRow = ref<ScoreConfig | null>(null);
 const scorerViewRow = ref<Scorer | null>(null);
@@ -477,13 +477,15 @@ const pendingJobStatusId = ref<string | null>(null);
 const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<AnyRow | null>(null);
 const pendingDeleteTab = ref<ActiveTab | null>(null);
+// Ids for a pending bulk delete (jobs tab). Non-empty => the confirm dialog and
+// performDelete operate on the whole batch instead of a single `pendingDeleteRow`.
+const pendingBulkDeleteIds = ref<string[]>([]);
+const jobsBulkDeleting = ref(false);
 const catalogOpenTab = ref<ActiveTab | null>(null);
 const showScoreConfigLibrary = ref(false);
 const scoreConfigLibrarySelectedCount = ref(0);
 const scoreConfigLibraryImporting = ref(false);
-const scoreConfigLibraryRef = ref<InstanceType<
-  typeof ScoreConfigLibrary
-> | null>(null);
+const scoreConfigLibraryRef = ref<InstanceType<typeof ScoreConfigLibrary> | null>(null);
 const showScorerLibrary = ref(false);
 const scorerLibrarySelectedCount = ref(0);
 const scorerLibraryImporting = ref(false);
@@ -533,9 +535,7 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<
-  Array<{ value: ActiveTab; label: string; badge?: string }>
->(() => [
+const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string }>>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -547,23 +547,37 @@ const tabs = computed<
 // shares the same title strip. Title + icon track the active rail item.
 const EMBEDDED_HEADER_META: Record<
   ActiveTab,
-  { i18nKey: string; subtitleKey: string; icon: IconName }
+  { i18nKey: I18nKey; subtitleKey: I18nKey; icon: IconName }
 > = {
-  quality: { i18nKey: "aiObservability.nav.quality", subtitleKey: "aiObservability.subtitle.quality", icon: "star-rate" },
-  jobs: { i18nKey: "aiObservability.nav.evalJobs", subtitleKey: "aiObservability.subtitle.evalJobs", icon: "event" },
-  scorers: { i18nKey: "aiObservability.nav.scorers", subtitleKey: "aiObservability.subtitle.scorers", icon: "rule" },
-  scoreConfigs: { i18nKey: "aiObservability.nav.scoreConfigs", subtitleKey: "aiObservability.subtitle.scoreConfigs", icon: "tune" },
+  quality: {
+    i18nKey: "aiObservability.nav.quality",
+    subtitleKey: "aiObservability.subtitle.quality",
+    icon: "star-rate",
+  },
+  jobs: {
+    i18nKey: "aiObservability.nav.evalJobs",
+    subtitleKey: "aiObservability.subtitle.evalJobs",
+    icon: "event",
+  },
+  scorers: {
+    i18nKey: "aiObservability.nav.scorers",
+    subtitleKey: "aiObservability.subtitle.scorers",
+    icon: "rule",
+  },
+  scoreConfigs: {
+    i18nKey: "aiObservability.nav.scoreConfigs",
+    subtitleKey: "aiObservability.subtitle.scoreConfigs",
+    icon: "tune",
+  },
 };
 
-const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(
-  () => {
-    const meta = EMBEDDED_HEADER_META[activeTab.value];
-    if (!meta) return null;
-    return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
-  },
-);
+const embeddedHeader = computed<{ title: string; subtitle: string; icon: IconName } | null>(() => {
+  const meta = EMBEDDED_HEADER_META[activeTab.value];
+  if (!meta) return null;
+  return { title: t(meta.i18nKey), subtitle: t(meta.subtitleKey), icon: meta.icon };
+});
 
-// Per-tab "create" button label for the embedded AppPageHeader. Quality has
+// Per-tab "create" button label for the embedded OPageHeader. Quality has
 // no list-style create, so it returns an empty string and the button is
 // suppressed via v-if.
 const addButtonLabel = computed<string>(() => {
@@ -586,10 +600,10 @@ const importI18nKey = computed<"scorer" | "scoreConfig">(() =>
 );
 
 // ── Quality tab: date picker + refresh state ─────────────────────────────
-// Lifted out of QualityPage so the picker + refresh button live in the
-// embedded AppPageHeader's #actions slot (matching LLM Insights / Sessions).
-// QualityPage consumes `qualityDateWindow` as a prop and exposes
-// `refreshAll` + `isAnyLoading` for the Refresh button below.
+// The picker + refresh button live in the embedded OPageHeader's #actions
+// slot (matching LLM Insights / Sessions). QualityPage consumes
+// `qualityDateWindow` as a prop and exposes `refreshAll` + `isAnyLoading` for
+// the Refresh button below.
 //
 // Date state is the shared `useAiDateRange()` ref — the same singleton
 // driving LLM Insights and Sessions — so picking a window on one page
@@ -598,11 +612,8 @@ const { state: qualitySelectedDate } = useAiDateRange();
 
 // Seed the window from the *persisted* AI date range (relative or absolute),
 // resolved synchronously, so QualityPage's initial onMounted refresh queries
-// the correct window from the very first paint. Previously this was a hardcoded
-// 15-minute placeholder, so the first KPI query ran against 15m (e.g. "2
-// evaluated") and then the picker-mount sync re-queried the real range (e.g.
-// "36"), causing a visible flash. Fall back to the 15m default only if the
-// persisted state can't be resolved.
+// the correct window from the very first paint. Fall back to the 15m default
+// only if the persisted state can't be resolved.
 const initialQualityWindow = resolveAiDateWindow(qualitySelectedDate.value);
 const qualityDateWindow = ref<DateWindow>(
   initialQualityWindow
@@ -626,9 +637,9 @@ const qualityPageRef = ref<{
 } | null>(null);
 
 const qualityAgentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
   ...qualityAgents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -636,9 +647,7 @@ const qualityAgentOptions = computed(() => [
 const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
   if (qualityAgentKey.value === ALL_AGENTS_VALUE) return null;
   return (
-    qualityAgents.value.find(
-      (agent) => agentFilterKey(agent) === qualityAgentKey.value,
-    ) ?? null
+    qualityAgents.value.find((agent) => agentFilterKey(agent) === qualityAgentKey.value) ?? null
   );
 });
 
@@ -653,17 +662,11 @@ async function loadQualityAgents() {
   if (!orgId.value || !startUs || !endUs) return;
   qualityAgentsLoading.value = true;
   try {
-    const response = await genAiAgentMappingService.listAgents(
-      orgId.value,
-      startUs,
-      endUs,
-    );
+    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
     qualityAgents.value = response.agents;
     if (
       qualityAgentKey.value !== ALL_AGENTS_VALUE &&
-      !qualityAgents.value.some(
-        (agent) => agentFilterKey(agent) === qualityAgentKey.value,
-      )
+      !qualityAgents.value.some((agent) => agentFilterKey(agent) === qualityAgentKey.value)
     ) {
       qualityAgentKey.value = ALL_AGENTS_VALUE;
     }
@@ -680,11 +683,7 @@ function syncQualityDateWindow() {
   const picker = qualityDatePickerRef.value;
   if (!picker) return;
   const dt = picker.getConsumableDateTime();
-  if (
-    dt &&
-    typeof dt.startTime === "number" &&
-    typeof dt.endTime === "number"
-  ) {
+  if (dt && typeof dt.startTime === "number" && typeof dt.endTime === "number") {
     qualityDateWindow.value = { startUs: dt.startTime, endUs: dt.endTime };
   }
 }
@@ -774,9 +773,7 @@ watch(qualityRefreshing, (isLoading, wasLoading) => {
   if (wasLoading && !isLoading) qualityLastRunAt.value = Date.now();
 });
 
-const currentSingularLabel = computed(() =>
-  t(`onlineEvals.singular.${activeTab.value}`),
-);
+const currentSingularLabel = computed(() => t(`onlineEvals.singular.${activeTab.value}`));
 
 const pendingDeleteLabel = computed(() => {
   const tab = pendingDeleteTab.value;
@@ -785,6 +782,22 @@ const pendingDeleteLabel = computed(() => {
     label: t(`onlineEvals.singular.${tab}`),
   });
 });
+
+const isBulkDelete = computed(() => pendingBulkDeleteIds.value.length > 0);
+
+const deleteDialogTitle = computed(() =>
+  isBulkDelete.value ? t("onlineEvals.job.deleteBulkTitle") : pendingDeleteLabel.value,
+);
+
+const deleteDialogMessage = computed(() =>
+  isBulkDelete.value
+    ? t("onlineEvals.job.deleteBulkConfirm", {
+        count: pendingBulkDeleteIds.value.length,
+      })
+    : t("onlineEvals.deleteConfirmMessage", {
+        name: pendingDeleteRow.value?.name ?? "",
+      }),
+);
 
 watch(activeTab, (next) => {
   filterQuery.value = "";
@@ -891,20 +904,12 @@ function closeJobView() {
  * and overwrite the `action` / `id` params. The URL → state watcher then
  * syncs activeTab + opens the right drawer. */
 function crossNavigateToScorer(row: Scorer) {
-  const query = buildCrossNavigationQuery(
-    { ...route.query },
-    "scorers",
-    entityId(row),
-  );
+  const query = buildCrossNavigationQuery({ ...route.query }, "scorers", entityId(row));
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
 function crossNavigateToJob(row: EvalJob) {
-  const query = buildCrossNavigationQuery(
-    { ...route.query },
-    "jobs",
-    String(row.id),
-  );
+  const query = buildCrossNavigationQuery({ ...route.query }, "jobs", String(row.id));
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
@@ -1019,7 +1024,7 @@ function exportScoreConfigRow(row: ScoreConfig) {
     "application/json",
   );
   if (!ok) {
-    toast({ variant: "error", message: "Failed to export score config" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScoreConfig") });
   }
 }
 
@@ -1064,7 +1069,7 @@ function exportScorerRow(row: Scorer) {
     "application/json",
   );
   if (!ok) {
-    toast({ variant: "error", message: "Failed to export scorer" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScorer") });
   }
 }
 
@@ -1073,7 +1078,7 @@ function exportScorerBulk(ids: string[]) {
     (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
-    toast({ variant: "warning", message: "No scorers selected" });
+    toast({ variant: "warning", message: t("toastMessages.components.noScorersSelected") });
     return;
   }
   const payload = selected.map((row) =>
@@ -1090,10 +1095,12 @@ function exportScorerBulk(ids: string[]) {
   if (ok) {
     toast({
       variant: "success",
-      message: `Exported ${selected.length} scorer${selected.length > 1 ? "s" : ""}`,
+      message: t("toastMessages.components.exportedScorer", {
+        count: selected.length,
+      }),
     });
   } else {
-    toast({ variant: "error", message: "Failed to export scorers" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScorers") });
   }
 }
 
@@ -1102,7 +1109,7 @@ function exportScoreConfigBulk(ids: string[]) {
     (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
-    toast({ variant: "warning", message: "No score configs selected" });
+    toast({ variant: "warning", message: t("toastMessages.components.noScoreConfigsSelected") });
     return;
   }
   const payload = selected.map(stripScoreConfigForExport);
@@ -1114,16 +1121,22 @@ function exportScoreConfigBulk(ids: string[]) {
   if (ok) {
     toast({
       variant: "success",
-      message: `Exported ${selected.length} score config${selected.length > 1 ? "s" : ""}`,
+      message: t("toastMessages.components.exportedScoreConfig", {
+        count: selected.length,
+      }),
     });
   } else {
-    toast({ variant: "error", message: "Failed to export score configs" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScoreConfigs") });
   }
 }
 
 function syncFromRoute() {
   // Route is the source of truth — reset everything first.
   formPage.value = null;
+  // The import wizard renders off local `importingEntity` (it isn't route-
+  // driven), so it must be torn down here too — otherwise it stays stranded on
+  // screen when the user navigates to another AI section.
+  importingEntity.value = null;
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   viewRow.value = null;
@@ -1172,12 +1185,7 @@ function syncFromRoute() {
 }
 
 watch(
-  () => [
-    route.query.action,
-    route.query.id,
-    route.query.scorer_type,
-    route.query.tab,
-  ],
+  () => [route.query.action, route.query.id, route.query.scorer_type, route.query.tab],
   () => syncFromRoute(),
 );
 
@@ -1187,30 +1195,35 @@ function deleteRow(row: AnyRow) {
   confirmDeleteOpen.value = true;
 }
 
+function deleteJobsBulk(ids: string[]) {
+  if (ids.length === 0) return;
+  pendingBulkDeleteIds.value = [...ids];
+  pendingDeleteTab.value = "jobs";
+  confirmDeleteOpen.value = true;
+}
+
 function cancelDelete() {
   confirmDeleteOpen.value = false;
   pendingDeleteRow.value = null;
   pendingDeleteTab.value = null;
+  pendingBulkDeleteIds.value = [];
 }
 
 async function performDelete() {
+  if (pendingBulkDeleteIds.value.length > 0) {
+    await performBulkJobsDelete();
+    return;
+  }
   const row = pendingDeleteRow.value;
   const tab = pendingDeleteTab.value;
   if (!row || !tab) return;
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
     if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(
-        orgId.value,
-        entityId(row as ScoreConfig),
-      );
+      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
     else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(
-        orgId.value,
-        entityId(row as Scorer),
-      );
-    else if (tab === "jobs")
-      await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
+    else if (tab === "jobs") await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
 
     toast({
       variant: "success",
@@ -1218,25 +1231,42 @@ async function performDelete() {
     });
     await loadAll(orgId.value);
   } catch (err: any) {
-    showError(
-      err,
-      t("onlineEvals.deleteError", { label: singular.toLowerCase() }),
-    );
+    showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
   } finally {
     pendingDeleteRow.value = null;
     pendingDeleteTab.value = null;
   }
 }
-</script>
 
-<!-- Non-scoped @media-only rule: responsive override for the form side rail
-     (.eval-form-page__side is used by ScorerTestPanel). Kept as a plain style
-     block per the "don't convert @media to tw:" rule. -->
-<style>
-@media (max-width: 960px) {
-  .eval-form-page__side {
-    border-left: 0;
-    border-top: 1px solid var(--o2-border);
+// Bulk-delete the selected eval jobs. Deletions run in parallel; if any fail we
+// surface an error but still reload so the successfully deleted rows disappear.
+async function performBulkJobsDelete() {
+  const ids = [...pendingBulkDeleteIds.value];
+  if (ids.length === 0) return;
+  jobsBulkDeleting.value = true;
+  try {
+    const results = await Promise.allSettled(
+      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) {
+      showError(
+        (results.find((r) => r.status === "rejected") as PromiseRejectedResult)?.reason,
+        t("onlineEvals.deleteError", {
+          label: t("onlineEvals.singular.jobs").toLowerCase(),
+        }),
+      );
+    } else {
+      toast({
+        variant: "success",
+        message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
+      });
+    }
+    await loadAll(orgId.value);
+  } finally {
+    pendingBulkDeleteIds.value = [];
+    pendingDeleteTab.value = null;
+    jobsBulkDeleting.value = false;
   }
 }
-</style>
+</script>

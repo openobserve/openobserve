@@ -82,12 +82,12 @@ describe("OSlider", () => {
 
   it("applies sm size by adjusting track height class", () => {
     wrapper = mount(OSlider, { props: { size: "sm" } });
-    expect(wrapper.find("input").classes()).toContain("tw:h-1");
+    expect(wrapper.find("input").classes()).toContain("h-1");
   });
 
   it("applies lg size by adjusting track height class", () => {
     wrapper = mount(OSlider, { props: { size: "lg" } });
-    expect(wrapper.find("input").classes()).toContain("tw:h-2");
+    expect(wrapper.find("input").classes()).toContain("h-2");
   });
 
   it("forwards the name attribute", () => {

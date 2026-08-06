@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { DOMWrapper, flushPromises, mount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import FunctionSelector from "@/plugins/logs/FunctionSelector.vue";
 import i18n from "@/locales";
@@ -38,7 +38,6 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalWrapContent: vi.fn(() => false),
 }));
 
-
 const mockFunctionOptions = [
   { name: "Function 1", function: "SELECT * FROM table1" },
   { name: "Function 2", function: "SELECT * FROM table2" },
@@ -58,68 +57,33 @@ describe("FunctionSelector", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
-          "q-toggle": {
-            template: '<button class="q-toggle" @click="$emit(\'update:modelValue\', !modelValue)" :data-test="$attrs[\'data-test\']"><slot /></button>',
-            props: ["modelValue"],
-          },
-          "q-btn-group": {
-            template: '<div class="q-btn-group" :class="{ disabled: disable }"><slot /></div>',
-            props: ["disable"],
-          },
-          "q-btn-dropdown": {
-            template: '<div class="q-btn-dropdown" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></div>',
-            props: ["modelValue", "size", "icon", "iconRight", "title", "split"],
-          },
-          "q-btn": {
-            template: '<button class="q-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>',
-            props: ["icon", "class"],
-          },
           ODropdown: {
             name: "ODropdown",
-            template: '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
+            template:
+              '<div class="o-dropdown-stub" v-bind="$attrs"><slot name="trigger" /><slot /></div>',
             emits: ["update:open"],
             props: ["open", "side", "align", "sideOffset"],
           },
           ODropdownItem: {
             name: "ODropdownItem",
-            template: '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+            template:
+              '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
             emits: ["select"],
-          },
-          "q-tooltip": {
-            template: '<div class="q-tooltip"><slot /></div>',
-            props: ["class", "offset", "delay"],
-          },
-          "q-list": {
-            template: '<div class="q-list" :data-test="$attrs[\'data-test\']"><slot /></div>',
-          },
-          "q-input": {
-            template: '<input class="q-input" v-model="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" :data-test="$attrs[\'data-test\']" />',
-            props: ["modelValue", "dense", "filled", "borderless", "clearable", "debounce", "placeholder"],
           },
           // OInput stub mirrors the real component's wrapper-div + inner-<input>
           // shape, so tests can keep using data-test on the wrapper but drill
           // into `wrapper.find('input')` for value mutation.
           OInput: {
             template:
-              '<div class="o-input-stub" :data-test="$attrs[\'data-test\']">'
-              + '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
-              + '</div>',
+              '<div class="o-input-stub" :data-test="$attrs[\'data-test\']">' +
+              '<input :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' +
+              "</div>",
             props: ["modelValue", "clearable", "debounce", "placeholder"],
             emits: ["update:modelValue"],
           },
-          "OIcon": {
+          OIcon: {
             template: '<span class="OIcon" :name="name"></span>',
             props: ["name"],
-          },
-          "q-item": {
-            template: '<div class="q-item" @click="$emit(\'click\')" v-close-popup><slot /></div>',
-            props: ["clickable"],
-          },
-          "q-item-section": {
-            template: '<div class="q-item-section" @click="$emit(\'click\')"><slot /></div>',
-          },
-          "q-item-label": {
-            template: '<div class="q-item-label"><slot /></div>',
           },
         },
         directives: {
@@ -169,20 +133,6 @@ describe("FunctionSelector", () => {
   });
 
   // Computed Properties Tests
-  it("should compute functionToggleIcon based on showTransformEditor state", async () => {
-    // The store theme is set to "dark" by default, so it should show function_dark.svg
-    const currentTheme = store.state.theme;
-    if (currentTheme === "dark") {
-      expect(wrapper.vm.functionToggleIcon).toContain("function_dark.svg");
-    } else {
-      expect(wrapper.vm.functionToggleIcon).toContain("function.svg");
-    }
-
-    // The computed property depends on reactive searchObj from composable
-    // In a real scenario, changing the searchObj would trigger reactivity
-    expect(wrapper.vm.searchObj.meta.showTransformEditor).toBe(false);
-  });
-
   it("should compute iconRight based on theme", async () => {
     // Check current theme and expected icon
     const currentTheme = store.state.theme;
@@ -191,12 +141,12 @@ describe("FunctionSelector", () => {
     } else {
       expect(wrapper.vm.iconRight).toContain("function.svg");
     }
-    
+
     // Change to dark theme and verify reactivity
     store.state.theme = "dark";
     await wrapper.vm.$nextTick();
     expect(wrapper.vm.iconRight).toContain("function_dark.svg");
-    
+
     // Reset theme for other tests
     store.state.theme = "light";
     await wrapper.vm.$nextTick();
@@ -216,11 +166,11 @@ describe("FunctionSelector", () => {
     // OInput migration: data-test sits on the wrapper. Drill into the native
     // <input> so setValue can fire the input event the v-model listens for.
     const searchWrapper = wrapper.find('[data-test="function-search-input"]');
-    const nativeInput = searchWrapper.find('input');
+    const nativeInput = searchWrapper.find("input");
     if (nativeInput.exists()) {
       await nativeInput.setValue("test");
     } else {
-      // Fallback for old q-input stub path which exposes the wrapper as the input.
+      // Fallback for legacy stub path which exposes the wrapper as the input.
       await searchWrapper.setValue("test");
     }
     expect(wrapper.vm.searchTerm).toBe("test");
@@ -284,7 +234,7 @@ describe("FunctionSelector", () => {
   it("should emit select:function when applyFunction is called", () => {
     const testFunction = { name: "Test", function: "SELECT test" };
     wrapper.vm.applyFunction(testFunction, true);
-    
+
     expect(wrapper.emitted("select:function")).toBeTruthy();
     expect(wrapper.emitted("select:function")[0]).toEqual([testFunction, true]);
   });
@@ -292,7 +242,7 @@ describe("FunctionSelector", () => {
   it("should call applyFunction with default flag when not provided", () => {
     const testFunction = { name: "Test", function: "SELECT test" };
     wrapper.vm.applyFunction(testFunction);
-    
+
     expect(wrapper.emitted("select:function")).toBeTruthy();
     expect(wrapper.emitted("select:function")[0]).toEqual([testFunction, false]);
   });
@@ -313,7 +263,7 @@ describe("FunctionSelector", () => {
   it("should display 'no functions found' message when filtered list is empty", async () => {
     wrapper.vm.searchTerm = "nonexistent";
     await wrapper.vm.$nextTick();
-    
+
     const notFoundText = wrapper.text();
     // The translation key gets resolved to actual text
     expect(notFoundText).toContain("Function not found");
@@ -330,7 +280,7 @@ describe("FunctionSelector", () => {
         stubs: wrapper.vm.$options.components,
       },
     });
-    
+
     expect(emptyWrapper.vm.filteredFunctionOptions).toHaveLength(0);
     emptyWrapper.unmount();
   });
@@ -340,7 +290,7 @@ describe("FunctionSelector", () => {
       { name: "Custom 1", function: "CUSTOM QUERY 1" },
       { name: "Custom 2", function: "CUSTOM QUERY 2" },
     ];
-    
+
     const customWrapper = mount(FunctionSelector, {
       props: {
         functionOptions: customFunctions,
@@ -350,7 +300,7 @@ describe("FunctionSelector", () => {
         stubs: wrapper.vm.$options.components,
       },
     });
-    
+
     expect(customWrapper.vm.filteredFunctionOptions).toEqual(customFunctions);
     customWrapper.unmount();
   });
@@ -390,7 +340,7 @@ describe("FunctionSelector", () => {
     expect(wrapper.vm.filteredFunctionOptions).toEqual(newFunctions);
   });
 
-  // State Management Tests  
+  // State Management Tests
   it("should access store state for theme", () => {
     expect(wrapper.vm.store).toBeTruthy();
     expect(wrapper.vm.store.state.theme).toBeDefined();
@@ -408,7 +358,7 @@ describe("FunctionSelector", () => {
       name: `Function ${i}`,
       function: `SELECT * FROM table${i}`,
     }));
-    
+
     const largeWrapper = mount(FunctionSelector, {
       props: {
         functionOptions: largeFunctionsList,
@@ -418,12 +368,12 @@ describe("FunctionSelector", () => {
         stubs: wrapper.vm.$options.components,
       },
     });
-    
+
     // Test filtering performance with large dataset
     largeWrapper.vm.searchTerm = "999";
     await largeWrapper.vm.$nextTick();
     expect(largeWrapper.vm.filteredFunctionOptions).toHaveLength(1);
-    
+
     largeWrapper.unmount();
   });
 });

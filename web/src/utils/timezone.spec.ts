@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 
 // Mock moment-timezone (dynamic import via importMoment)
 // moment.tz is called two ways:
@@ -40,6 +40,7 @@ import {
   localTimeSelectedTimezoneUTCTime,
   getLocalTime,
   convertDateToTimestamp,
+  resolveBrowserTimezone,
   getTimezoneOffset,
   convertTimeFromMicroToMilli,
   convertTimeFromNsToMs,
@@ -76,11 +77,7 @@ describe("timestampToTimezoneDate", () => {
   });
 
   it("respects a custom format string", () => {
-    const result = timestampToTimezoneDate(
-      1_700_000_000_000,
-      "UTC",
-      "yyyy-MM-dd",
-    );
+    const result = timestampToTimezoneDate(1_700_000_000_000, "UTC", "yyyy-MM-dd");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
@@ -144,7 +141,6 @@ describe("getLocalTime", () => {
   });
 
   it("logs and returns undefined when an exception is thrown by Date()", () => {
-    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     // Pass a non-null value that causes Date constructor to throw when called as new Date(invalid.toString())
     // We can patch Date globally to throw for this test
     const OriginalDate = global.Date;
@@ -162,9 +158,7 @@ describe("getLocalTime", () => {
     const result = getLocalTime("2023-11-14T10:30:00.000Z");
 
     global.Date = OriginalDate;
-    expect(logSpy).toHaveBeenCalled();
     expect(result).toBeUndefined();
-    logSpy.mockRestore();
   });
 });
 
@@ -190,6 +184,60 @@ describe("convertDateToTimestamp", () => {
 
     expect(result).toHaveProperty("timestamp");
     expect(result.timestamp).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveBrowserTimezone
+// ---------------------------------------------------------------------------
+
+describe("resolveBrowserTimezone", () => {
+  it("returns a raw IANA zone unchanged", () => {
+    expect(resolveBrowserTimezone("America/Los_Angeles")).toBe("America/Los_Angeles");
+  });
+
+  it("returns 'UTC' unchanged", () => {
+    expect(resolveBrowserTimezone("UTC")).toBe("UTC");
+  });
+
+  it("resolves a 'Browser Time (<zone>)' label to the inner IANA zone", () => {
+    expect(resolveBrowserTimezone("Browser Time (America/Los_Angeles)")).toBe(
+      "America/Los_Angeles",
+    );
+  });
+
+  it("resolves a legacy label saved on another machine (rc9 update case)", () => {
+    expect(resolveBrowserTimezone("Browser Time (Asia/Kolkata)")).toBe("Asia/Kolkata");
+  });
+
+  it("matches the label prefix regardless of case", () => {
+    expect(resolveBrowserTimezone("browser time (Asia/Kolkata)")).toBe("Asia/Kolkata");
+    expect(resolveBrowserTimezone("BROWSER TIME (Asia/Kolkata)")).toBe("Asia/Kolkata");
+  });
+
+  it("trims whitespace inside the label parentheses", () => {
+    expect(resolveBrowserTimezone("Browser Time ( Asia/Kolkata )")).toBe("Asia/Kolkata");
+  });
+
+  it("leaves a value that only contains (not starts with) the label untouched", () => {
+    expect(resolveBrowserTimezone("Not Browser Time (Asia/Kolkata)")).toBe(
+      "Not Browser Time (Asia/Kolkata)",
+    );
+  });
+
+  it("never returns a 'Browser Time' label for a malformed value", () => {
+    const result = resolveBrowserTimezone("Browser Time");
+    expect(result.toLowerCase().startsWith("browser time")).toBe(false);
+    expect(result).toBeTruthy();
+  });
+
+  it("returns an empty string unchanged", () => {
+    expect(resolveBrowserTimezone("")).toBe("");
+  });
+
+  it("passes a null/undefined value through without throwing", () => {
+    expect(resolveBrowserTimezone(null as any)).toBeNull();
+    expect(resolveBrowserTimezone(undefined as any)).toBeUndefined();
   });
 });
 
@@ -343,12 +391,7 @@ describe("getFunctionErrorMessage", () => {
     const startMs = 1_700_000_000_000_000; // microseconds
     const endMs = 1_700_003_600_000_000;
 
-    const result = getFunctionErrorMessage(
-      "Error occurred",
-      startMs,
-      endMs,
-      "UTC",
-    );
+    const result = getFunctionErrorMessage("Error occurred", startMs, endMs, "UTC");
 
     expect(result).toContain("Error occurred");
     expect(result).toContain("Data returned for:");

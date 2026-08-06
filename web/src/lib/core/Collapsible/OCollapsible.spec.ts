@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
 import { h, defineComponent } from "vue";
 import OCollapsible from "./OCollapsible.vue";
@@ -88,7 +88,7 @@ describe("OCollapsible", () => {
     });
     expect(wrapper.html()).toContain("custom-trigger");
     // Default label span should not be present
-    expect(wrapper.find(".tw\\:text-collapsible-label").exists()).toBe(false);
+    expect(wrapper.find(".text-collapsible-label").exists()).toBe(false);
   });
 
   it("exposes open state to #trigger slot", async () => {

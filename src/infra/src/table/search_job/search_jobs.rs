@@ -26,7 +26,9 @@ use super::{
     super::{
         entity::{
             search_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
-            search_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
+            search_job_results::{
+                ActiveModel as JobResultModel, Column as JobResultColumn, Entity as JobResultEntity,
+            },
             search_jobs::*,
         },
         get_lock,
@@ -343,6 +345,63 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 
     if let Err(e) = res {
         return orm_err!(format!("clean deleted jobs error: {e}"));
+    }
+
+    Ok(())
+}
+
+/// Delete all search jobs (and their partitions and results) for the given org.
+/// Child rows are deleted explicitly because SQLite does not enforce FK cascades
+/// unless `PRAGMA foreign_keys = ON` is set.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database (only for SQLite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+
+    // Collect job IDs for this org
+    let job_ids: Vec<String> = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .select_only()
+        .column(Column::Id)
+        .into_tuple()
+        .all(client)
+        .await
+        .map_err(|e| {
+            errors::Error::DbError(errors::DbError::SeaORMError(format!(
+                "delete_by_org list jobs error: {e}"
+            )))
+        })?;
+
+    if job_ids.is_empty() {
+        return Ok(());
+    }
+
+    // Delete partitions
+    let res = PartitionJobEntity::delete_many()
+        .filter(PartitionJobColumn::JobId.is_in(job_ids.clone()))
+        .exec(client)
+        .await;
+    if let Err(e) = res {
+        return orm_err!(format!("delete_by_org partitions error: {e}"));
+    }
+
+    // Delete results
+    let res = JobResultEntity::delete_many()
+        .filter(JobResultColumn::JobId.is_in(job_ids.clone()))
+        .exec(client)
+        .await;
+    if let Err(e) = res {
+        return orm_err!(format!("delete_by_org results error: {e}"));
+    }
+
+    // Delete the jobs themselves
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await;
+    if let Err(e) = res {
+        return orm_err!(format!("delete_by_org jobs error: {e}"));
     }
 
     Ok(())

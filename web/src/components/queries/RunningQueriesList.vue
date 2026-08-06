@@ -30,12 +30,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       sorting="client"
       filter-mode="client"
       :default-columns="false"
+      show-index
       :enable-column-resize="true"
       :persist-columns="true"
       table-id="settings-query-management"
       :show-global-filter="false"
       @update:selected-ids="handleSelectedIdsUpdate"
     >
+      <template #toolbar>
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+          <span
+            class="text-xs font-bold whitespace-nowrap"
+            data-test="running-queries-last-refresh"
+          >
+            {{ t("queries.lastDataRefreshTime") }} {{ lastRefreshed }}
+          </span>
+          <div class="flex-1"></div>
+          <OToggleGroup
+            v-if="searchTypes && searchTypes.length"
+            :model-value="searchType"
+            @update:model-value="$emit('update:searchType', $event)"
+            data-test="running-queries-search-type-tabs"
+          >
+            <OToggleGroupItem
+              v-for="visual in searchTypes"
+              :key="visual as string"
+              :value="visual as string"
+              size="sm"
+            >
+              {{ getSearchTypeLabel(visual as string) }}
+            </OToggleGroupItem>
+          </OToggleGroup>
+        </div>
+      </template>
+      <template #toolbar-trailing>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          class="shrink-0"
+          icon-left="refresh"
+          data-test="running-queries-refresh-btn"
+          @click="$emit('refresh')"
+        >
+          <OTooltip side="bottom" :content="t('common.refresh')" />
+        </OButton>
+      </template>
       <template #empty>
         <OEmptyState
           size="hero"
@@ -84,15 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           @click="handleMultiQueryCancel"
         >
-          {{ t('queries.cancelQuery') }}
+          {{ t("queries.cancelQuery") }}
         </OButton>
       </template>
     </OTable>
-    <ODrawer
-      v-model:open="showListSchemaDialog"
-      size="lg"
-      data-test="list-schema-dialog"
-    >
+    <ODrawer bleed v-model:open="showListSchemaDialog" size="lg" data-test="list-schema-dialog">
       <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
     </ODrawer>
   </template>
@@ -100,24 +135,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
-import { ref, type Ref, defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref, defineComponent, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { getDuration, durationFormatter } from "@/utils/zincutils";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "RunningQueriesList",
-  components: { QueryList, OEmptyState, OButton, ODrawer, OSpinner, OTable, OUserCell, OTag },
+  components: {
+    QueryList,
+    OEmptyState,
+    OButton,
+    OTooltip,
+    OToggleGroup,
+    OToggleGroupItem,
+    ODrawer,
+    OTable,
+    OUserCell,
+    OTag,
+  },
   props: {
     rows: {
       type: Array,
@@ -131,13 +179,31 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    lastRefreshed: {
+      type: String,
+      default: "",
+    },
+    searchType: {
+      type: String,
+      default: "",
+    },
+    searchTypes: {
+      type: Array,
+      default: () => [],
+    },
+    searchTypeLabels: {
+      type: Object,
+      default: () => ({}),
+    },
   },
   emits: [
+    "update:searchType",
     "update:selectedRows",
     "delete:queries",
     "delete:query",
     "show:schema",
     "clear:filters",
+    "refresh",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -145,7 +211,7 @@ export default defineComponent({
     const { isMetaOrg } = useIsMetaOrg();
     const loadingState = ref(false);
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {
@@ -153,7 +219,6 @@ export default defineComponent({
     };
 
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
       {
         id: "user_id",
         header: t("user.email"),
@@ -163,7 +228,7 @@ export default defineComponent({
         hideable: true,
         size: COL.email,
         minSize: 160,
-        meta: { align: "left" , flex: true },
+        meta: { align: "left", flex: true },
       },
       {
         id: "org_id",
@@ -276,6 +341,9 @@ export default defineComponent({
       emit("delete:queries");
     };
 
+    const getSearchTypeLabel = (visual: string) =>
+      (props.searchTypeLabels as Record<string, string>)?.[visual] ?? visual;
+
     return {
       t,
       store,
@@ -292,13 +360,14 @@ export default defineComponent({
       handleMultiQueryCancel,
       getDuration,
       durationFormatter,
+      getSearchTypeLabel,
     };
   },
 });
 </script>
 
-<style>
-/* Deep override for empty-state image spacing — must stay in CSS */
+<style scoped>
+/* keep(lib-override): empty-state image spacing (child EmptyState DOM) */
 :deep(.no-data-image) {
   margin-bottom: 0.5rem;
 }

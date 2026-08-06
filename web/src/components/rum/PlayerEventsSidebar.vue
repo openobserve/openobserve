@@ -15,32 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-[calc(100%-1px)] tw:overflow-hidden relative-position tw:h-full tw:flex tw:flex-col">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:px-2 tw:py-1 tw:mt-2! tw:mx-2!" />
+  <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">
-      <div
-        data-test="event-metadata"
-        class="tw:flex tw:p-2 tw:sticky tw:top-0 tw:px-3"
-      >
-        <div class="tw:w-full tw:flex tw:flex-col">
-          <div class="tw:w-full tw:pb-2 tw:text-xs">
-            <OIcon name="mail" size="sm" class="tw:pr-1" />
-            {{ sessionDetails.user_email || "Unknown User" }}
+      <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">
+        <div class="flex w-full flex-col">
+          <div class="w-full pb-2 text-xs">
+            <OIcon name="mail" size="sm" class="pr-1" />
+            {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
-            <OIcon name="schedule" size="sm" class="tw:pr-1" />
+          <div class="mb-2 w-full truncate pr-1 text-xs">
+            <OIcon name="schedule" size="sm" class="pr-1" />
             {{ sessionDetails.date }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate tw:pr-1">
-            <OIcon name="settings" size="sm" class="tw:pr-1" />
+          <div class="mb-2 w-full truncate pr-1 text-xs">
+            <OIcon name="settings" size="sm" class="pr-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
-            <OIcon name="language" size="sm" class="tw:pr-1" />
+          <div class="mb-2 w-full truncate text-xs">
+            <OIcon name="language" size="sm" class="pr-1" />
             {{ sessionDetails.ip }}
           </div>
-          <div class="tw:w-full tw:mb-2 tw:text-xs tw:truncate">
-            <OIcon name="location-on" size="sm" class="tw:pr-1" />
+          <div class="mb-2 w-full truncate text-xs">
+            <OIcon name="location-on" size="sm" class="pr-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -56,10 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template>
     <template v-else>
-      <div
-        class="tw:flex tw:items-center tw:justify-between tw:w-full tw:pt-2 tw:px-[0.375rem]"
-      >
-        <div class="tw:pr-1 tw:w-[60%]">
+      <div class="flex w-full items-center justify-between px-1.5 pt-2">
+        <div class="w-[60%] pr-1">
           <OInput
             v-model="searchEvent"
             clearable
@@ -67,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="tw:pl-1 event-type-selector tw:w-[40%] relative-position">
+        <div class="event-type-selector relative-position w-[40%] pl-1">
           <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
@@ -79,43 +74,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <OSeparator class="tw:my-2" />
-      <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden tw:px-2">
+      <OSeparator class="my-2" />
+      <div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="tw:mb-1 tw:px-2 tw:py-2 tw:cursor-pointer tw:rounded tw:hover:bg-[#ededed] tw:hover:text-black"
+            class="rounded-default hover:bg-interactive-hover-bg hover:text-text-body mb-1 cursor-pointer px-2 py-2"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="tw:truncate">
-              <div class="tw:mr-3 tw:inline" data-test="event-display-time">
+            <div class="truncate">
+              <div class="mr-3 inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="tw:mr-3"
+                class="mr-3"
                 data-test="event-type-badge"
               />
               <template
-                v-if="
-                  filteredEvent.frustration_types &&
-                  filteredEvent.frustration_types.length > 0
-                "
+                v-if="filteredEvent.frustration_types && filteredEvent.frustration_types.length > 0"
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="tw:mr-1 tw:inline"
+                  class="mr-1 inline"
                 />
               </template>
-              <div
-                class="tw:inline"
-                :title="filteredEvent.name"
-                data-test="event-name"
-              >
+              <div class="inline" :title="filteredEvent.name" data-test="event-name">
                 {{ filteredEvent.name }}
               </div>
             </div>
@@ -132,14 +120,14 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
 
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import PlayerTracesTab from "./PlayerTracesTab.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   events: {
@@ -169,7 +157,12 @@ const props = defineProps({
 });
 
 const activeTab = ref<string>("breadcrumbs");
-const tabs = [
+const tabs: Array<{
+  label: I18nText;
+  value: string;
+  icon: string;
+  style: Record<string, string>;
+}> = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
@@ -206,19 +199,14 @@ watch(
   { immediate: true, deep: true },
 );
 
-const selectedEventTypes = ref<string[]>([
-  "error",
-  "action",
-  "view",
-  "frustration",
-]);
+const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustration"]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
-  { label: "Error", value: "error" },
-  { label: "Action", value: "action" },
-  { label: "View", value: "view" },
-  { label: "Frustration", value: "frustration" },
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("rum.playerEvents.action"), value: "action" },
+  { label: t("rum.playerEvents.view"), value: "view" },
+  { label: t("rum.playerEvents.frustration"), value: "frustration" },
 ];
 
 const searchEvents = (value: string | number | null) => {
@@ -233,16 +221,12 @@ const searchEvents = (value: string | number | null) => {
         ? true
         : (() => {
             // Check if event type is selected
-            const isTypeSelected = selectedEventTypes.value.includes(
-              event.type,
-            );
+            const isTypeSelected = selectedEventTypes.value.includes(event.type);
 
             // Check if frustration filter is active and event has frustrations
-            const hasFrustration =
-              event.frustration_types && event.frustration_types.length > 0;
+            const hasFrustration = event.frustration_types && event.frustration_types.length > 0;
             const showFrustration =
-              selectedEventTypes.value.includes("frustration") &&
-              hasFrustration;
+              selectedEventTypes.value.includes("frustration") && hasFrustration;
 
             // Show event if its type is selected OR if frustration filter is active and event has frustrations
             return isTypeSelected || showFrustration;
@@ -261,11 +245,3 @@ const handleEventClick = (event: any) => {
   emit("event-emitted", "event-click", event);
 };
 </script>
-
-<style>
-.event-type-selector .q-field__control .q-field__native span {
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  overflow: hidden;
-}
-</style>

@@ -97,9 +97,38 @@ pub enum Error {
     OtherError(#[from] anyhow::Error),
     #[error("Expired Trial Period")]
     TrialPeriodExpired,
+    #[error("QueueError# {0}")]
+    QueueError(#[from] QueueError),
 }
 
 unsafe impl Send for Error {}
+
+#[derive(ThisError, Debug)]
+pub enum QueueError {
+    #[error("queue topic {0} not found, create it first")]
+    TopicNotFound(String),
+    #[error("queue topic {0} already exists with a different configuration")]
+    TopicConfigConflict(String),
+    #[error("queue topic {0} already has an active consumer")]
+    ConsumerAlreadyActive(String),
+    #[error(
+        "queue message too large: requested {requested_bytes} bytes exceeds the total queue capacity {limit_bytes} bytes"
+    )]
+    MessageTooLarge {
+        requested_bytes: u64,
+        limit_bytes: u64,
+    },
+    #[error(
+        "queue full: requested {requested_bytes} bytes, used {used_bytes} of {limit_bytes} bytes"
+    )]
+    QueueFull {
+        requested_bytes: u64,
+        used_bytes: u64,
+        limit_bytes: u64,
+    },
+    #[error("queue is closed")]
+    QueueClosed,
+}
 
 #[derive(ThisError, Debug)]
 #[error("cannot parse \"{value}\" as {ty}")]
@@ -249,7 +278,39 @@ impl std::fmt::Display for ErrorCodes {
     }
 }
 
+impl Error {
+    /// The HTTP status code this error maps to. This is the single source of
+    /// truth shared by the HTTP response mapping and audit logging.
+    pub fn http_status(&self) -> u16 {
+        match self {
+            Error::ErrorCode(code) => code.http_status(),
+            Error::ResourceError(_) => 503,
+            // A JSON deserialization failure means the client sent a malformed
+            // request body, so surface it as 400 rather than a 500 server error.
+            _ => 400,
+        }
+    }
+}
+
 impl ErrorCodes {
+    /// The HTTP status code this error code maps to.
+    pub fn http_status(&self) -> u16 {
+        match self {
+            ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
+            ErrorCodes::SearchTimeout(_) => 408,
+            ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
+            ErrorCodes::InvalidParams(_)
+            | ErrorCodes::SearchSQLExecuteError(_)
+            | ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
+            | ErrorCodes::SearchFunctionNotDefined(_)
+            | ErrorCodes::FullTextSearchFieldNotFound
+            | ErrorCodes::SearchFieldNotFound(_)
+            | ErrorCodes::SearchSQLNotValid(_)
+            | ErrorCodes::SearchStreamNotFound(_)
+            | ErrorCodes::SearchHistogramNotAvailable(_) => 400,
+        }
+    }
+
     pub fn get_code(&self) -> u16 {
         match self {
             ErrorCodes::ServerInternalError(_) => 10001,
@@ -382,6 +443,9 @@ impl ErrorCodes {
             20008 => Ok(ErrorCodes::SearchSQLExecuteError(message)),
             20009 => Ok(ErrorCodes::SearchCancelQuery(message)),
             20010 => Ok(ErrorCodes::SearchTimeout(message)),
+            20011 => Ok(ErrorCodes::InvalidParams(message)),
+            20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
+            20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -552,20 +616,24 @@ mod tests {
     }
 
     #[test]
-    fn test_error_codes_from_json_codes_above_20010_fall_to_server_internal() {
-        // from_json only handles codes up to 20010; 20011-20013 fall through
-        for (code, inner) in [
-            (20011, "invalid_params"),
-            (20012, "rate_exceeded"),
-            (20013, "histogram_unavail"),
+    fn test_error_codes_from_json_round_trips_20011_to_20013() {
+        for (code, expected) in [
+            (
+                20011,
+                ErrorCodes::InvalidParams("invalid_params".to_string()),
+            ),
+            (
+                20012,
+                ErrorCodes::RatelimitExceeded("rate_exceeded".to_string()),
+            ),
+            (
+                20013,
+                ErrorCodes::SearchHistogramNotAvailable("histogram_unavail".to_string()),
+            ),
         ] {
-            let json = format!(r#"{{"code":{code},"message":"x","inner":"{inner}"}}"#);
-            let result = ErrorCodes::from_json(&json).unwrap();
-            // The fallback wraps the entire input JSON string, not the inner value
-            match result {
-                ErrorCodes::ServerInternalError(_) => {}
-                other => panic!("expected ServerInternalError for code {code}, got {other:?}"),
-            }
+            let result = ErrorCodes::from_json(&expected.to_json()).unwrap();
+            assert_eq!(result.get_code(), code);
+            assert_eq!(result.get_inner_message(), expected.get_inner_message());
         }
     }
 

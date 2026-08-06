@@ -15,10 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="move-dashboard-to-another-folder-dialog"
+  <ODialog
+    data-test="move-dashboard-to-another-folder-dialog"
     :open="open"
     size="md"
-    title="Move Dashboard"
+    :title="t('dashboard.moveDashboardToAnotherFolder.moveDashboard')"
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
     :primary-button-loading="onSubmit.isLoading.value"
@@ -27,12 +28,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="$emit('update:open', false)"
     @click:primary="onSubmit.execute()"
   >
-  <div data-test="dashboard-folder-move-body">
-      <div class="tw:flex tw:flex-col tw:gap-3">
+    <div data-test="dashboard-folder-move-body">
+      <div class="flex flex-col gap-3">
         <OInput
           :model-value="
             store.state.organizationData.folders.find(
-              (item) => item.folderId === activeFolderId,
+              (item: { folderId: string; name: string }) => item.folderId === activeFolderId,
             )?.name
           "
           :label="t('dashboard.currentFolderLabel')"
@@ -47,13 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :activeFolderId="activeFolderId"
         />
       </div>
-  </div>
+    </div>
   </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "../../utils/zincutils";
 import { moveDashboardToAnotherFolder } from "../../utils/commons";
@@ -73,7 +74,7 @@ export default defineComponent({
     },
     dashboardIds: {
       type: Array,
-      default: [],
+      default: () => [],
     },
     open: {
       type: Boolean,
@@ -90,9 +91,8 @@ export default defineComponent({
       )?.name,
       value: props.activeFolderId,
     });
-    const { t } = useI18n();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { t } = useI18nTyped();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     // Reset selection to current folder whenever the drawer reopens so the
     // same-folder comparison is always accurate.
@@ -112,9 +112,7 @@ export default defineComponent({
     );
 
     // Disable Move when the selected folder is the same as the current one.
-    const isSameFolder = computed(
-      () => props.activeFolderId === selectedFolder.value?.value,
-    );
+    const isSameFolder = computed(() => props.activeFolderId === selectedFolder.value?.value);
 
     const onSubmit = useLoading(async () => {
       // here  we send dashboard ids as array so it will work for both single and multiple dashboards move
@@ -126,7 +124,7 @@ export default defineComponent({
           selectedFolder.value.value,
         );
 
-        showPositiveNotification("Dashboard Moved successfully", {
+        showPositiveNotification(t("dashboard.moveDashboardToAnotherFolder.movedSuccessfully"), {
           timeout: 2000,
         });
 
@@ -134,9 +132,12 @@ export default defineComponent({
       } catch (err: any) {
         //this condition is kept to handle if 403 error is thrown we are showing unautorized message and we dont need this error explicitly
         if (err.status !== 403) {
-          showErrorNotification(err?.message ?? "Dashboard move failed.", {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            err?.message ?? t("dashboard.moveDashboardToAnotherFolder.moveFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
       }
     });
@@ -152,4 +153,3 @@ export default defineComponent({
   },
 });
 </script>
-

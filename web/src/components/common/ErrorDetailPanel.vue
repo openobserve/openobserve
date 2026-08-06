@@ -26,41 +26,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div
-    class="tw:text-left tw:rounded-lg tw:border tw:border-border-default tw:bg-surface-panel tw:flex tw:flex-col"
+    class="rounded-default border-border-default bg-surface-panel flex flex-col border text-left"
     data-test="error-detail-panel"
   >
     <!-- Summary row (always shown) -->
-    <div class="tw:px-4 tw:py-3 tw:flex tw:flex-col tw:gap-1">
+    <div class="flex flex-col gap-1 px-4 py-3">
       <p
         v-if="summaryLine"
-        class="tw:text-sm tw:font-medium tw:text-text-body tw:m-0"
+        class="text-text-body m-0 text-sm font-medium"
         data-test="error-detail-summary"
       >
         {{ summaryLine }}
       </p>
-      <small
-        v-if="traceId"
-        class="tw:text-text-caption"
-        data-test="error-detail-trace-id"
-      >
-        <span class="tw:font-medium">{{ t("queryError.traceId") }}</span>
+      <small v-if="traceId" class="text-text-secondary" data-test="error-detail-trace-id">
+        <span class="font-medium">{{ t("queryError.traceId") }}</span>
         {{ traceId }}
       </small>
     </div>
 
     <!-- Toggle row -->
     <template v-if="hasDetail">
-      <div class="tw:border-t tw:border-border-default tw:px-4 tw:py-1">
+      <div class="border-border-default border-t px-4 py-1">
         <button
           type="button"
-          class="tw:flex tw:items-center tw:gap-1.5 tw:text-xs tw:text-text-secondary tw:py-1.5 tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:hover:text-text-body tw:transition-colors"
+          class="text-text-secondary hover:text-text-body flex cursor-pointer items-center gap-1.5 border-0 bg-transparent p-0 py-1.5 text-xs transition-colors"
           data-test="error-detail-toggle-btn"
           @click="emit('toggle-detail')"
         >
-          <OIcon
-            :name="showDetail ? 'expand-less' : 'expand-more'"
-            size="xs"
-          />
+          <OIcon :name="showDetail ? 'expand-less' : 'expand-more'" size="xs" />
           {{ showDetail ? t("queryError.hideDetail") : t("queryError.showDetail") }}
         </button>
       </div>
@@ -68,12 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Expanded body — scrollable, capped height -->
       <div
         v-if="showDetail"
-        class="tw:border-t tw:border-border-default tw:px-4 tw:py-3 tw:max-h-52 tw:overflow-y-auto"
+        class="border-border-default max-h-52 overflow-y-auto border-t px-4 py-3"
         data-test="error-detail-body"
       >
-        <p
-          class="tw:text-xs tw:font-mono tw:text-text-secondary tw:m-0 tw:whitespace-pre-wrap tw:break-all"
-        >
+        <p class="text-text-secondary m-0 font-mono text-xs break-all whitespace-pre-wrap">
           {{ detailBody }}
         </p>
       </div>
@@ -82,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 defineProps<{
@@ -94,5 +85,5 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{ "toggle-detail": [] }>();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 </script>

@@ -19,22 +19,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="semantic-field-groups-config-import-drawer"
     v-model:open="internalOpen"
     :width="40"
-    title="Import Semantic Groups"
-    sub-title="Upload JSON file to import semantic field groups"
-    secondary-button-label="Cancel"
-    primary-button-label="Apply Changes"
+    :title="t('correlation.importSemanticGroupsTitle')"
+    :sub-title="t('correlation.importSemanticGroupsSubtitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('correlation.applyChanges')"
     :primary-button-disabled="!hasSelectedChanges"
     :primary-button-loading="isApplying"
     @click:secondary="handleClose"
     @click:primary="handleApply"
     @update:open="handleOpenChange"
   >
-  <div class="tw:p-3">
+    <div>
       <!-- File Upload -->
-      <div class="tw:mb-3">
+      <div class="mb-3">
         <OFile
           v-model="jsonFile"
-          label="Select JSON file"
+          :label="t('correlation.selectJsonFile')"
           accept=".json"
           @update:model-value="loadFile"
           data-test="semantic-groups-import-file-drawer"
@@ -48,102 +48,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               name="close"
               size="sm"
               @click.stop="clearFile"
-              class="tw:cursor-pointer"
+              class="cursor-pointer"
             />
           </template>
         </OFile>
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="tw:text-center tw:p-4">
+      <div v-if="isLoading" class="p-4 text-center">
         <OSpinner variant="dots" size="lg" />
-        <div class="tw:text-sm tw:text-gray-400 tw:mt-3">Analyzing file...</div>
+        <div class="text-text-muted mt-3 text-sm">{{ t("correlation.analyzingFile") }}</div>
       </div>
 
       <!-- Diff Preview -->
       <div v-else-if="diffData" class="diff-preview">
         <!-- Summary -->
-        <div class="summary-bar tw:mb-3">
-          <div class="tw:flex tw:gap-2 tw:items-center">
+        <div class="summary-bar mb-3">
+          <div class="flex items-center gap-2">
             <div class="col-auto">
               <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
-                >&nbsp;New
+                >&nbsp;{{ t("correlation.new") }}
               </OTag>
             </div>
             <div class="col-auto">
               <OTag type="diffCategory" value="modified">
                 <strong>{{ diffData.modifications.length }}</strong
-                >&nbsp;Modified
+                >&nbsp;{{ t("correlation.modified") }}
               </OTag>
             </div>
             <div class="col-auto">
               <OTag type="diffCategory" value="unchanged">
-                {{ diffData.unchanged.length }} Unchanged
+                {{ diffData.unchanged.length }} {{ t("correlation.unchanged") }}
               </OTag>
             </div>
           </div>
         </div>
 
         <!-- Selection Actions -->
-        <div class="selection-actions tw:mb-3">
+        <div class="selection-actions mb-3">
           <OButtonGroup>
-            <OButton
-              variant="ghost-primary"
-              size="xs"
-              @click="selectAllAdditions"
-              >Select All New</OButton
-            >
-            <OButton
-              variant="ghost-warning"
-              size="xs"
-              @click="selectAllModifications"
-              >Select All Modified</OButton
-            >
-            <OButton variant="ghost-muted" size="xs" @click="deselectAll"
-              >Clear All</OButton
-            >
+            <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions">{{
+              t("correlation.selectAllNew")
+            }}</OButton>
+            <OButton variant="ghost-warning" size="xs" @click="selectAllModifications">{{
+              t("correlation.selectAllModified")
+            }}</OButton>
+            <OButton variant="ghost-muted" size="xs" @click="deselectAll">{{
+              t("correlation.clearAll")
+            }}</OButton>
           </OButtonGroup>
         </div>
 
         <!-- Groups List -->
-        <div class="tw:max-h-[calc(100vh-400px)] tw:overflow-y-auto">
+        <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
-          <div v-if="diffData.additions.length > 0" class="tw:mb-3">
-            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-green-500 tw:p-2">
+          <div v-if="diffData.additions.length > 0" class="mb-3">
+            <div class="border-separator text-status-positive border-b p-2 text-sm font-semibold">
               <OIcon name="add-circle" size="sm" />
-              New ({{ selectedAdditions.length }}/{{
+              {{ t("correlation.new") }} ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
             </div>
-            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+            <ul class="divide-border rounded-default flex flex-col divide-y border">
               <li
                 v-for="group in diffData.additions"
                 :key="group.id"
                 data-test="semantic-groups-drawer-addition-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+                class="hover:bg-muted/50 flex cursor-pointer items-center gap-2 px-3 py-2"
                 @click="toggleAddition(group.id)"
               >
-                <div class="tw:flex tw:items-center tw:shrink-0">
+                <div class="flex shrink-0 items-center">
                   <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-medium">{{
-                    group.display
-                  }}</span>
-                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
-                    {{ group.id }} • {{ group.fields.length }} fields
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-sm font-medium">{{ group.display }}</span>
+                  <span class="text-muted-foreground block text-xs">
+                    {{ group.id }} • {{ group.fields.length }} {{ t("correlation.fieldsCount") }}
                   </span>
                 </div>
-                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
-                  <OButton
-                    variant="ghost"
-                    size="icon-circle-sm"
-                    @click.stop="viewGroup(group)"
-                  >
+                <div class="ms-auto flex shrink-0 items-center">
+                  <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
                     <OIcon name="visibility" size="sm" />
                   </OButton>
                 </div>
@@ -152,39 +140,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Modifications -->
-          <div v-if="diffData.modifications.length > 0" class="tw:mb-3">
-            <div class="tw:text-sm tw:font-semibold tw:border-b tw:border-[var(--color-separator)] tw:text-amber-500 tw:p-2">
+          <div v-if="diffData.modifications.length > 0" class="mb-3">
+            <div
+              class="border-separator text-status-warning-text border-b p-2 text-sm font-semibold"
+            >
               <OIcon name="edit" size="sm" />
-              Modified ({{ selectedModifications.length }}/{{
+              {{ t("correlation.modified") }} ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
             </div>
-            <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+            <ul class="divide-border rounded-default flex flex-col divide-y border">
               <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
                 data-test="semantic-groups-drawer-modification-item"
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+                class="hover:bg-muted/50 flex cursor-pointer items-center gap-2 px-3 py-2"
                 @click="toggleModification(mod.proposed.id)"
               >
-                <div class="tw:flex tw:items-center tw:shrink-0">
+                <div class="flex shrink-0 items-center">
                   <OCheckbox
-                    :model-value="
-                      selectedModifications.includes(mod.proposed.id)
-                    "
+                    :model-value="selectedModifications.includes(mod.proposed.id)"
                     @update:model-value="toggleModification(mod.proposed.id)"
                   />
                 </div>
-                <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                  <span class="tw:text-sm tw:font-medium">{{
-                    mod.proposed.display
-                  }}</span>
-                  <span class="tw:block tw:text-xs tw:text-muted-foreground">
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-sm font-medium">{{ mod.proposed.display }}</span>
+                  <span class="text-muted-foreground block text-xs">
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
-                    {{ mod.proposed.fields.length }} fields
+                    {{ mod.proposed.fields.length }} {{ t("correlation.fieldsCount") }}
                   </span>
                 </div>
-                <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+                <div class="ms-auto flex shrink-0 items-center">
                   <OButton
                     variant="ghost"
                     size="icon-circle-sm"
@@ -201,20 +187,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="diffData.unchanged.length > 0">
             <OCollapsible
               v-model="unchangedOpen"
-              :label="`Unchanged (${diffData.unchanged.length})`"
+              :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
               icon="check-circle"
             >
-              <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+              <ul class="divide-border rounded-default flex flex-col divide-y border">
                 <li
                   v-for="group in diffData.unchanged"
                   :key="group.id"
-                  class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2"
+                  class="flex items-center gap-2 px-3 py-2"
                 >
-                  <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                    <span class="tw:text-sm">{{ group.display }}</span>
-                    <span class="tw:block tw:text-xs tw:text-muted-foreground"
-                      >{{ group.id }} •
-                      {{ group.fields.length }} fields</span
+                  <div class="flex min-w-0 flex-1 flex-col">
+                    <span class="text-sm">{{ group.display }}</span>
+                    <span class="text-muted-foreground block text-xs"
+                      >{{ group.id }} • {{ group.fields.length }}
+                      {{ t("correlation.fieldsCount") }}</span
                     >
                   </div>
                 </li>
@@ -225,11 +211,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state tw:text-center tw:p-4">
-        <OIcon name="cloud-upload" class="tw:mb-3" style="width: 64px; height: 64px;" />
-        <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mb-2">Upload a JSON file</div>
-        <div class="tw:text-sm tw:text-gray-400">
-          The system will analyze the file and show you what will change
+      <div v-else class="empty-state p-4 text-center">
+        <OIcon name="cloud-upload" class="mb-3 size-16!" />
+        <div class="text-text-muted mb-2 text-xl font-semibold">
+          {{ t("correlation.uploadAJsonFile") }}
+        </div>
+        <div class="text-text-secondary text-sm">
+          {{ t("correlation.analyzeFilePrompt") }}
         </div>
       </div>
     </div>
@@ -240,21 +228,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="import-semantic-groups-drawer-group-dialog"
     v-model:open="showGroupDialog"
     size="md"
-    :title="selectedGroup?.display"
-    :sub-title="`ID: ${selectedGroup?.id}`"
-    primary-button-label="Close"
+    :title="raw(selectedGroup?.display)"
+    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
+    :primary-button-label="t('common.close')"
     @click:primary="showGroupDialog = false"
   >
     <div>
-      <div class="tw:text-sm tw:font-medium tw:mb-2">
-        Fields ({{ selectedGroup?.fields.length }})
+      <div class="mb-2 text-sm font-medium">
+        {{ t("correlation.fieldsLabel") }} ({{ selectedGroup?.fields.length }})
       </div>
       <OTag
         v-for="field in selectedGroup?.fields"
         :key="field"
         type="fieldNameChip"
         value="highlight"
-        class="tw:m-1"
+        class="m-1"
       >
         {{ field }}
       </OTag>
@@ -266,50 +254,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="import-semantic-groups-drawer-modification-dialog"
     v-model:open="showModificationDialog"
     size="lg"
-    :title="selectedModification?.proposed.display"
-    sub-title="Compare Changes"
-    primary-button-label="Close"
+    :title="raw(selectedModification?.proposed.display)"
+    :sub-title="t('correlation.compareChanges')"
+    :primary-button-label="t('common.close')"
     @click:primary="showModificationDialog = false"
   >
-    <div class="tw:flex tw:gap-3">
-      <div class="tw:w-1/2">
-        <div class="tw:text-sm tw:font-medium tw:text-red-500 tw:mb-2">Current</div>
-        <div class="tw:text-xs tw:mb-1">
-          {{ selectedModification?.current.fields.length }} fields
+    <div class="flex gap-3">
+      <div class="w-1/2">
+        <div class="text-status-error-text mb-2 text-sm font-medium">
+          {{ t("correlation.current") }}
         </div>
-        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.current.fields.length }} {{ t("correlation.fieldsCount") }}
+        </div>
+        <div class="bg-surface-subtle rounded-default max-h-62.5 overflow-y-auto p-2">
           <OTag
             v-for="field in selectedModification?.current.fields"
             :key="`current-${field}`"
             type="fieldNameChip"
             value="muted"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
           </OTag>
         </div>
       </div>
-      <div class="tw:w-1/2">
-        <div class="tw:text-sm tw:font-medium tw:text-green-500 tw:mb-2">Proposed</div>
-        <div class="tw:text-xs tw:mb-1">
-          {{ selectedModification?.proposed.fields.length }} fields
+      <div class="w-1/2">
+        <div class="text-status-positive mb-2 text-sm font-medium">
+          {{ t("correlation.proposed") }}
         </div>
-        <div class="tw:max-h-[250px] tw:overflow-y-auto tw:p-2 tw:bg-[var(--q-dark)] tw:rounded">
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.proposed.fields.length }} {{ t("correlation.fieldsCount") }}
+        </div>
+        <div class="bg-surface-subtle rounded-default max-h-62.5 overflow-y-auto p-2">
           <OTag
             v-for="field in selectedModification?.proposed.fields"
             :key="`proposed-${field}`"
             type="fieldDiffStatus"
             :value="isNewField(field) ? 'new' : 'existing'"
-            class="tw:m-1"
+            class="m-1"
           >
             {{ field }}
             <template #trailing>
-              <OIcon
-                v-if="isNewField(field)"
-                name="add"
-                size="xs"
-                class="tw:ml-1"
-              />
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ml-1" />
             </template>
           </OTag>
         </div>
@@ -326,13 +313,16 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
+import { type FileValue } from "@/lib/forms/File/OFile.types";
 import alertsService from "@/services/alerts";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, useI18nTyped } from "@/types/i18n";
 
+const { t } = useI18nTyped();
 
 interface SemanticGroup {
   id: string;
@@ -379,7 +369,6 @@ function handleOpenChange(v: boolean) {
   emit("update:open", v);
 }
 
-
 const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
@@ -393,12 +382,12 @@ const selectedGroup = ref<SemanticGroup | null>(null);
 const selectedModification = ref<SemanticGroupModification | null>(null);
 
 const hasSelectedChanges = computed(() => {
-  return (
-    selectedAdditions.value.length > 0 || selectedModifications.value.length > 0
-  );
+  return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
 });
 
-const loadFile = async (file: File | null) => {
+const loadFile = async (value: FileValue) => {
+  // OFile single-mode emits File | null
+  const file = value as File | null;
   if (!file) return;
 
   isLoading.value = true;
@@ -417,7 +406,7 @@ const loadFile = async (file: File | null) => {
     await previewDiff(groups);
   } catch (error: any) {
     toast({
-      message: `Failed to parse JSON: ${error.message}`,
+      message: t("toastMessages.alerts.failedToParseJson", { error: error.message }),
       variant: "error",
     });
     clearFile();
@@ -435,22 +424,19 @@ const clearFile = () => {
 
 const previewDiff = async (groups: SemanticGroup[]) => {
   try {
-    const response = await alertsService.previewSemanticGroupsDiff(
-      props.orgId,
-      groups,
-    );
+    const response = await alertsService.previewSemanticGroupsDiff(props.orgId, groups);
     diffData.value = response.data;
 
     // Auto-select all additions and modifications
-    selectedAdditions.value = response.data.additions.map(
-      (g: SemanticGroup) => g.id,
-    );
+    selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
     selectedModifications.value = response.data.modifications.map(
       (m: SemanticGroupModification) => m.proposed.id,
     );
   } catch (error: any) {
     toast({
-      message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
+      message: t("toastMessages.alerts.failedToPreviewChanges", {
+        error: error.response?.data?.error || error.message,
+      }),
       variant: "error",
     });
   }
@@ -463,9 +449,7 @@ const selectAllAdditions = () => {
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(
-    (m) => m.proposed.id,
-  );
+  selectedModifications.value = diffData.value.modifications.map((m) => m.proposed.id);
 };
 
 const deselectAll = () => {
@@ -527,8 +511,7 @@ const handleApply = () => {
   mergedGroups.push(...selectedModificationGroups);
 
   // Capture count before clearing state
-  const changeCount =
-    selectedAdditions.value.length + selectedModifications.value.length;
+  const changeCount = selectedAdditions.value.length + selectedModifications.value.length;
 
   // Emit the merged groups to parent
   emit("apply", mergedGroups);
@@ -539,7 +522,7 @@ const handleApply = () => {
   handleOpenChange(false);
 
   toast({
-    message: `Applied ${changeCount} changes`,
+    message: t("toastMessages.alerts.appliedChanges", { count: changeCount }),
     variant: "success",
   });
 };

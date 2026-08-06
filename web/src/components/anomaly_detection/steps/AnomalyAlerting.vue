@@ -15,73 +15,96 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="step-anomaly-alerting tw:h-full"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
-  >
+  <div class="step-anomaly-alerting h-full">
     <div
-      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:border tw:bg-[var(--color-surface-overlay)] tw:border-[var(--color-border-default)]"
+      class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-y-auto border px-3 py-4"
     >
+      <!-- Priority & tags (Feature 2). Anomaly configs appear in the same
+           alert list, so they carry the same triage metadata. -->
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex h-9 w-47.5 items-center font-semibold">
+          {{ t("alerts.priority") }}
+          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+            <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="flex h-11 items-center">
+          <OSelect
+            v-model="configModel.priority"
+            :options="priorityOptions"
+            labelKey="label"
+            valueKey="value"
+            :searchable="false"
+            clearable
+            width="xs"
+            :placeholder="t('alerts.priorityUnset')"
+            data-test="anomaly-priority-select"
+          />
+        </div>
+      </div>
+
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex h-9 w-47.5 items-center font-semibold">
+          {{ t("alerts.tags") }}
+          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+            <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
+          </OIcon>
+        </div>
+        <div class="min-w-60 flex-1">
+          <OTagInput
+            v-model="tagsModel"
+            :placeholder="t('alerts.placeholders.addTag')"
+            data-test="anomaly-tags-input"
+          />
+        </div>
+      </div>
+
       <!-- Enable Notifications toggle -->
-      <div class="tw:flex tw:items-start tw:mb-6!  tw:pb-0!">
-        <div
-          class="tw:font-semibold tw:flex tw:items-center"
-          style="width: 190px; height: 36px"
-        >
-          {{ t('alerts.anomaly.notifications') }}
-          <OIcon
-            name="info"
-            size="sm"
-            class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-          >
+      <div class="mb-6! flex items-start pb-0!">
+        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+          {{ t("alerts.anomaly.notifications") }}
+          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
-        <div class="tw:flex tw:items-center tw:h-11">
+        <div class="flex h-11 items-center">
           <OSwitch
-            v-model="config.alert_enabled"
-            :label="config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')"
+            v-model="configModel.alert_enabled"
+            :label="
+              config.alert_enabled ? t('alerts.anomaly.enabled') : t('alerts.anomaly.disabled')
+            "
             data-test="anomaly-alert-enabled"
           />
         </div>
       </div>
 
       <!-- Destination picker (shown when alert_enabled) -->
-      <div
-        v-if="config.alert_enabled"
-        class="tw:flex tw:items-start tw:mb-6! tw:pb-0!"
-      >
-        <div
-          class="tw:font-semibold tw:flex tw:items-center"
-          style="width: 190px; height: 36px"
-        >
+      <div v-if="config.alert_enabled" class="mb-6! flex items-start pb-0!">
+        <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
           {{ t("alerts.destination") }}
-          <span class="tw:text-red-500 tw:ml-1">*</span>
+          <span class="text-status-error-text ml-1">*</span>
         </div>
-        <div class="tw:flex tw:flex-col">
-          <div class="tw:flex tw:items-center">
+        <div class="flex flex-col">
+          <div class="flex items-center">
             <OSelect
-              v-model="config.alert_destination_ids"
+              v-model="configModel.alert_destination_ids"
               :options="destinations"
               labelKey="name"
               valueKey="name"
               multiple
               searchable
-              class="tw:min-h-auto! tw:h-auto!"
+              class="h-auto! min-h-auto!"
               style="min-width: 300px; max-width: 420px"
               data-test="anomaly-destination"
             >
               <template #selected-item="{ index, opt, removeAtIndex }">
-                <OTag
-                  v-if="index < visibleChipCount"
-                  type="selectionChip"
-                >
+                <OTag v-if="index < visibleChipCount" type="selectionChip">
                   {{ typeof opt === "object" ? opt.name : opt }}
                   <template #trailing>
                     <button
                       type="button"
-                      aria-label="Remove"
-                      class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+                      :aria-label="t('common.remove')"
+                      class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
                       @click="removeAtIndex(index)"
                     >
                       <OIcon name="close" size="xs" />
@@ -93,41 +116,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index === visibleChipCount &&
                     config.alert_destination_ids.length > visibleChipCount
                   "
-                  class="tw:text-[13px] tw:text-gray-500 tw:ml-1 tw:whitespace-nowrap"
+                  class="text-compact text-text-secondary ml-1 whitespace-nowrap"
                 >
                   +{{ config.alert_destination_ids.length - visibleChipCount }}
                 </span>
               </template>
               <template #empty>
-                <span>{{ t('alerts.anomaly.noDestinationsFound') }}</span>
+                <span>{{ t("alerts.anomaly.noDestinationsFound") }}</span>
               </template>
             </OSelect>
             <OButton
               variant="ghost"
               size="sm"
-              class="tw:ml-1"
+              class="ml-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
             />
-            <OButton
-              variant="outline"
-              size="sm"
-              class="tw:ml-2"
-              @click="openAddDestination"
-            >
-              {{ t('alerts.anomaly.addNewDestination') }}
+            <OButton variant="outline" size="sm" class="ml-2" @click="openAddDestination">
+              {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>
           <div
-            v-if="
-              config.alert_enabled && config.alert_destination_ids.length === 0
-            "
-            class="text-red-8 tw:pt-1"
-            style="font-size: 11px; line-height: 12px"
+            v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
+            class="text-input-error-text pt-1 text-xs"
             data-test="anomaly-destination-error"
           >
-            {{ t('alerts.anomaly.destinationRequired') }}
+            {{ t("alerts.anomaly.destinationRequired") }}
           </div>
         </div>
       </div>
@@ -135,35 +150,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Info note when notifications disabled -->
       <div
         v-if="!config.alert_enabled"
-        class="tw:flex tw:items-start tw:gap-2 tw:text-xs tw:mt-2"
-        :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
+        class="mt-2 flex items-start gap-2 text-xs"
+        :class="'text-text-secondary'"
       >
-        <OIcon name="info" size="sm"
-class="tw:mt-px tw:flex-shrink-0" />
-        <span>{{ t('alerts.anomaly.disabledNotificationsInfo') }}</span>
+        <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
+        <span>{{ t("alerts.anomaly.disabledNotificationsInfo") }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, type PropType } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OSwitch from '@/lib/forms/Switch/OSwitch.vue';
-import OSelect from '@/lib/forms/Select/OSelect.vue';
-import OTooltip from '@/lib/overlay/Tooltip/OTooltip.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 
 export default defineComponent({
   name: "AnomalyAlerting",
-  components: { OButton, OSwitch, OSelect, OTooltip,
-    OIcon,
-    OTag,
-},
+  components: { OButton, OSwitch, OSelect, OTagInput, OTooltip, OIcon, OTag },
 
   props: {
     config: {
@@ -171,7 +184,7 @@ export default defineComponent({
       required: true,
     },
     destinations: {
-      type: Array as PropType<any[]>,
+      type: Array as PropType<(SelectOption & { name: string })[]>,
       default: () => [],
     },
   },
@@ -179,9 +192,50 @@ export default defineComponent({
   emits: ["refresh:destinations"],
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const store = useStore();
+
+    // Alias for the config prop; same reference, mutation stays identical.
+    const configModel = computed(() => props.config);
+
+    // Value is the INTEGER storage id so the form holds exactly what the API
+    // serializes; "P3" is display only.
+    const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
+      label: raw(`P${value}`),
+      value,
+    }));
+
+    // `config` is an untyped bag supplied by the parent, and not every caller
+    // pre-populates `tags` — OTagInput reads `.length`, so binding straight to
+    // a possibly-undefined field throws on mount. Default on read, write back
+    // to the config so edits still propagate.
+    const tagsModel = computed({
+      get: () => configModel.value.tags ?? [],
+      set: (v: string[]) => {
+        configModel.value.tags = v;
+      },
+    });
+
+    // Dynamically decide how many chips to show based on text length.
+    // Restored from pre-refactor version; the template still depends on it.
+    const MAX_CHARS = 42;
+    const visibleChipCount = computed(() => {
+      const ids = props.config.alert_destination_ids;
+      if (!ids || ids.length === 0) return 0;
+      if (ids.length === 1) return 1;
+      // Resolve names from destinations list
+      const getName = (id: string) => {
+        const dest = props.destinations.find((d) => d.name === id);
+        return dest ? dest.name : id;
+      };
+      const firstLen = getName(ids[0]).length;
+      if (firstLen > MAX_CHARS) return 1;
+      const secondLen = getName(ids[1]).length;
+      // Show 2 chips if both fit within budget
+      if (firstLen + secondLen <= MAX_CHARS) return 2;
+      return 1;
+    });
 
     const openAddDestination = () => {
       const route = router.resolve({
@@ -194,7 +248,11 @@ export default defineComponent({
     return {
       t,
       store,
+      configModel,
+      priorityOptions,
+      tagsModel,
       openAddDestination,
+      visibleChipCount,
     };
   },
 });

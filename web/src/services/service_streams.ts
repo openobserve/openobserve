@@ -43,12 +43,15 @@ export interface FieldAlias {
   fields: string[];
   group?: string;
   is_workload_type?: boolean;
+  is_stable?: boolean;
 }
 
 export interface StreamInfo {
   stream_name: string;
   stream_type: string;
   filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
+  /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
+  dropped_dimensions?: string[];
 }
 
 export interface RelatedStreams {
@@ -194,7 +197,10 @@ export const getSemanticGroups = (org_identifier: string): Promise<{ data: Field
   return http().get(`/api/${org_identifier}/alerts/deduplication/semantic-groups`);
 };
 
-export const updateSemanticGroups = (org_identifier: string, groups: FieldAlias[]): Promise<any> => {
+export const updateSemanticGroups = (
+  org_identifier: string,
+  groups: FieldAlias[],
+): Promise<any> => {
   return http().put(`/api/${org_identifier}/alerts/deduplication/semantic-groups`, groups);
 };
 
@@ -212,7 +218,7 @@ export const updateSemanticGroups = (org_identifier: string, groups: FieldAlias[
  */
 export const correlate = (
   org_identifier: string,
-  request: CorrelationRequest
+  request: CorrelationRequest,
 ): Promise<{ data: CorrelationResponse }> => {
   return http().post(`/api/${org_identifier}/service_streams/_correlate`, request);
 };
@@ -229,11 +235,10 @@ export const correlate = (
  * @returns Dimension analytics summary
  */
 export const getDimensionAnalytics = (
-  org_identifier: string
+  org_identifier: string,
 ): Promise<{ data: DimensionAnalyticsSummary }> => {
   return http().get(`/api/${org_identifier}/service_streams/_analytics`);
 };
-
 
 /**
  * Get flat list of services
@@ -241,9 +246,7 @@ export const getDimensionAnalytics = (
  * @param orgIdentifier Organization ID
  * @returns Flat list of services
  */
-export const getServicesList = (
-  orgIdentifier: string
-): Promise<{ data: any }> => {
+export const getServicesList = (orgIdentifier: string): Promise<{ data: any }> => {
   return http().get(`/api/${orgIdentifier}/service_streams`);
 };
 
@@ -276,7 +279,7 @@ export interface ServiceIdentityConfig {
  */
 export const saveIdentityConfig = (
   orgIdentifier: string,
-  config: ServiceIdentityConfig
+  config: ServiceIdentityConfig,
 ): Promise<{ data: any }> => {
   return http().put(`/api/${orgIdentifier}/service_streams/config/identity`, config);
 };
@@ -288,7 +291,7 @@ export const saveIdentityConfig = (
  * @returns Identity config
  */
 export const getIdentityConfig = (
-  orgIdentifier: string
+  orgIdentifier: string,
 ): Promise<{ data: ServiceIdentityConfig }> => {
   return http().get(`/api/${orgIdentifier}/service_streams/config/identity`);
 };
@@ -300,7 +303,7 @@ export const getIdentityConfig = (
  * @returns Reset result with deleted_count, message, and note
  */
 export const resetServices = (
-  org_identifier: string
+  org_identifier: string,
 ): Promise<{ data: { deleted_count: number; message: string; note: string } }> => {
   return http().delete(`/api/${org_identifier}/service_streams/_reset`);
 };

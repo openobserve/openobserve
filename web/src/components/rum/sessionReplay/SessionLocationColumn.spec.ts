@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionLocationColumn from "@/components/rum/sessionReplay/SessionLocationColumn.vue";
 import i18n from "@/locales";
@@ -109,7 +109,9 @@ describe("SessionLocationColumn", () => {
       await flushPromises();
 
       // Act
-      await wrapper.setProps({ column: { ...mockColumn, country_iso_code: "uk", country: "United Kingdom" } });
+      await wrapper.setProps({
+        column: { ...mockColumn, country_iso_code: "uk", country: "United Kingdom" },
+      });
 
       // Assert
       expect(wrapper.find(".fi-uk").exists()).toBe(true);
@@ -267,8 +269,20 @@ describe("SessionLocationColumn", () => {
       await flushPromises();
 
       const testCases = [
-        { country: "Japan", country_iso_code: "jp", city: "Tokyo", browser: "Chrome", os: "Android" },
-        { country: "Brazil", country_iso_code: "br", city: "São Paulo", browser: "Firefox", os: "iOS" },
+        {
+          country: "Japan",
+          country_iso_code: "jp",
+          city: "Tokyo",
+          browser: "Chrome",
+          os: "Android",
+        },
+        {
+          country: "Brazil",
+          country_iso_code: "br",
+          city: "São Paulo",
+          browser: "Firefox",
+          os: "iOS",
+        },
       ];
 
       // Act & Assert

@@ -17,8 +17,9 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 
-// No composable dependency — the component is now a pure wrapper.
-// No vi.mock() calls needed.
+// The component derives its optional "jump to latest data" action from the
+// shared useTraces singleton via useJumpToLatestData. With no stream selected
+// (default mount) there is no jump target, so it renders the plain empty state.
 
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
@@ -74,12 +75,13 @@ describe("ServicesCatalogNoDataState", () => {
       expect(stub.props("preset")).toBe("no-services-catalog");
     });
 
-    it("passes size='block' to OEmptyState", () => {
+    it("passes size='hero' to OEmptyState so it matches the other traces empty states", () => {
       const stub = wrapper.findComponent({ name: "OEmptyState" });
-      expect(stub.props("size")).toBe("block");
+      expect(stub.props("size")).toBe("hero");
     });
 
-    it("passes hide-action=true to OEmptyState so no action card is rendered", () => {
+    it("hides the action when the stream has no data to jump to", () => {
+      // No stream selected in the default mount → no jump target → hide-action.
       const stub = wrapper.findComponent({ name: "OEmptyState" });
       expect(stub.props("hideAction")).toBe(true);
     });

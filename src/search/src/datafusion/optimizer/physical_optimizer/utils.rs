@@ -1,0 +1,342 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::sync::Arc;
+
+use config::{TIMESTAMP_COL_NAME, meta::inverted_index::UNKNOWN_NAME};
+use datafusion::{
+    common::{
+        Result,
+        tree_node::{TreeNode, TreeNodeRecursion, TreeNodeVisitor},
+    },
+    error::DataFusionError,
+    logical_expr::Operator,
+    physical_expr::{
+        PhysicalExpr,
+        aggregate::AggregateFunctionExpr,
+        expressions::{Column, Literal},
+    },
+    physical_plan::{
+        ExecutionPlan,
+        aggregates::{AggregateExec, AggregateMode},
+        expressions::{BinaryExpr, CastExpr, lit},
+    },
+    scalar::ScalarValue,
+};
+
+pub fn is_aggregate_exec(plan: &Arc<dyn ExecutionPlan>) -> bool {
+    plan.exists(|plan| Ok(plan.name() == "AggregateExec"))
+        .unwrap_or(false)
+}
+
+/// Get the first final aggregate plan from bottom to top.
+pub(crate) fn get_final_aggregate_plan(plan: Arc<dyn ExecutionPlan>) -> Option<AggregateExec> {
+    let mut visitor = FinalAggregateVisitor::default();
+    let _ = plan.visit(&mut visitor);
+    visitor
+        .plan
+        .map(|plan| plan.downcast_ref::<AggregateExec>().unwrap().clone())
+}
+
+#[derive(Default)]
+struct FinalAggregateVisitor {
+    plan: Option<Arc<dyn ExecutionPlan>>,
+}
+
+impl<'n> TreeNodeVisitor<'n> for FinalAggregateVisitor {
+    type Node = Arc<dyn ExecutionPlan>;
+
+    fn f_up(&mut self, node: &'n Self::Node) -> Result<TreeNodeRecursion> {
+        let Some(aggregate) = node.downcast_ref::<AggregateExec>() else {
+            return Ok(TreeNodeRecursion::Continue);
+        };
+        if matches!(
+            aggregate.mode(),
+            AggregateMode::Final | AggregateMode::FinalPartitioned
+        ) {
+            self.plan = Some(node.clone());
+            Ok(TreeNodeRecursion::Stop)
+        } else {
+            Ok(TreeNodeRecursion::Continue)
+        }
+    }
+}
+
+pub fn extract_string_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<String> {
+    if let Some(literal) = expr.downcast_ref::<Literal>() {
+        match literal.value() {
+            ScalarValue::Utf8(Some(s)) => Ok(s.clone()),
+            ScalarValue::Utf8View(Some(s)) => Ok(s.to_string()),
+            ScalarValue::LargeUtf8(Some(s)) => Ok(s.clone()),
+            _ => Err(DataFusionError::Internal(format!(
+                "Expected string literal, got: {:?}",
+                literal.value()
+            ))),
+        }
+    } else {
+        Err(DataFusionError::Internal(
+            "Expected literal expression for string argument".to_string(),
+        ))
+    }
+}
+
+pub fn extract_column(expr: &Arc<dyn PhysicalExpr>) -> Result<Column> {
+    if let Some(column) = expr.downcast_ref::<Column>() {
+        Ok(column.clone())
+    } else {
+        Err(DataFusionError::Internal(
+            "Expected column expression".to_string(),
+        ))
+    }
+}
+
+pub fn extract_int64_literal(expr: &Arc<dyn PhysicalExpr>) -> Result<i64> {
+    if let Some(literal) = expr.downcast_ref::<Literal>() {
+        match literal.value() {
+            ScalarValue::Int64(Some(s)) => Ok(*s),
+            _ => Err(DataFusionError::Internal(format!(
+                "Expected int64 literal, got: {:?}",
+                literal.value()
+            ))),
+        }
+    } else {
+        Err(DataFusionError::Internal(
+            "Expected literal expression for int64 argument".to_string(),
+        ))
+    }
+}
+
+// combine all exprs with OR operator
+pub fn disjunction(
+    predicates: impl IntoIterator<Item = Arc<dyn PhysicalExpr>>,
+) -> Arc<dyn PhysicalExpr> {
+    disjunction_opt(predicates).unwrap_or_else(|| lit(true))
+}
+
+fn disjunction_opt(
+    predicates: impl IntoIterator<Item = Arc<dyn PhysicalExpr>>,
+) -> Option<Arc<dyn PhysicalExpr>> {
+    predicates
+        .into_iter()
+        .fold(None, |acc, predicate| match acc {
+            None => Some(predicate),
+            Some(acc) => Some(Arc::new(BinaryExpr::new(acc, Operator::Or, predicate))),
+        })
+}
+
+pub fn is_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    if expr.downcast_ref::<Column>().is_some() {
+        true
+    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
+        is_column(expr.expr())
+    } else {
+        false
+    }
+}
+
+pub fn get_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
+    if let Some(expr) = expr.downcast_ref::<Column>() {
+        expr.name()
+    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
+        get_column_name(expr.expr())
+    } else {
+        UNKNOWN_NAME
+    }
+}
+
+pub fn is_count_rows_aggregate(expr: &AggregateFunctionExpr) -> bool {
+    if expr.name() == "count(Int64(1))" {
+        return true;
+    }
+
+    if !expr.fun().name().eq_ignore_ascii_case("count") || expr.is_distinct() {
+        return false;
+    }
+
+    let args = expr.expressions();
+    args.len() == 1 && is_column(&args[0]) && get_column_name(&args[0]) == TIMESTAMP_COL_NAME
+}
+
+pub fn is_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    expr.downcast_ref::<Literal>().is_some()
+}
+
+pub fn is_only_timestamp_filter(expr: &[&Arc<dyn PhysicalExpr>]) -> bool {
+    expr.iter().all(|expr| is_timestamp_filter(expr))
+}
+
+fn is_timestamp_filter(expr: &Arc<dyn PhysicalExpr>) -> bool {
+    if let Some(expr) = expr.downcast_ref::<BinaryExpr>() {
+        match expr.op() {
+            Operator::Gt | Operator::GtEq | Operator::Lt | Operator::LtEq => {
+                let column = if is_value(expr.left()) && is_column(expr.right()) {
+                    get_column_name(expr.right())
+                } else if is_value(expr.right()) && is_column(expr.left()) {
+                    get_column_name(expr.left())
+                } else {
+                    return false;
+                };
+
+                if column != TIMESTAMP_COL_NAME {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    } else {
+        return false;
+    }
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::{
+        physical_expr::expressions::Column, physical_plan::expressions::Literal,
+        scalar::ScalarValue,
+    };
+
+    use super::*;
+
+    fn utf8_literal(s: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Literal::new(ScalarValue::Utf8(Some(s.to_string()))))
+    }
+
+    fn int64_literal(n: i64) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Literal::new(ScalarValue::Int64(Some(n))))
+    }
+
+    fn col_expr(name: &str) -> Arc<dyn PhysicalExpr> {
+        Arc::new(Column::new(name, 0))
+    }
+
+    #[test]
+    fn test_extract_string_literal_utf8() {
+        let expr = utf8_literal("hello");
+        assert_eq!(extract_string_literal(&expr).unwrap(), "hello");
+    }
+
+    #[test]
+    fn test_extract_string_literal_utf8view() {
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(Literal::new(ScalarValue::Utf8View(Some(
+            "viewval".to_string(),
+        ))));
+        assert_eq!(extract_string_literal(&expr).unwrap(), "viewval");
+    }
+
+    #[test]
+    fn test_extract_string_literal_wrong_type_returns_error() {
+        let expr = int64_literal(42);
+        assert!(extract_string_literal(&expr).is_err());
+    }
+
+    #[test]
+    fn test_extract_string_literal_column_returns_error() {
+        let expr = col_expr("mycol");
+        assert!(extract_string_literal(&expr).is_err());
+    }
+
+    #[test]
+    fn test_extract_int64_literal() {
+        let expr = int64_literal(99);
+        assert_eq!(extract_int64_literal(&expr).unwrap(), 99);
+    }
+
+    #[test]
+    fn test_extract_int64_literal_wrong_type_returns_error() {
+        let expr = utf8_literal("not_int");
+        assert!(extract_int64_literal(&expr).is_err());
+    }
+
+    #[test]
+    fn test_is_value_true_for_literal() {
+        let expr = utf8_literal("x");
+        assert!(is_value(&expr));
+    }
+
+    #[test]
+    fn test_is_value_false_for_column() {
+        let expr = col_expr("col");
+        assert!(!is_value(&expr));
+    }
+
+    #[test]
+    fn test_is_column_true() {
+        let expr = col_expr("mycol");
+        assert!(is_column(&expr));
+    }
+
+    #[test]
+    fn test_is_column_false_for_literal() {
+        let expr = utf8_literal("val");
+        assert!(!is_column(&expr));
+    }
+
+    #[test]
+    fn test_get_column_name() {
+        let expr = col_expr("mycolname");
+        assert_eq!(get_column_name(&expr), "mycolname");
+    }
+
+    #[test]
+    fn test_get_column_name_unknown_for_literal() {
+        let expr = utf8_literal("val");
+        assert_eq!(get_column_name(&expr), UNKNOWN_NAME);
+    }
+
+    #[test]
+    fn test_is_aggregate_exec_false_for_empty_exec() {
+        use arrow::datatypes::{DataType, Field, Schema};
+        use datafusion::physical_plan::empty::EmptyExec;
+
+        let schema = Arc::new(Schema::new(vec![Field::new("a", DataType::Int32, false)]));
+        let exec: Arc<dyn ExecutionPlan> = Arc::new(EmptyExec::new(schema));
+        assert!(!is_aggregate_exec(&exec));
+    }
+
+    #[test]
+    fn test_extract_column_ok() {
+        let expr = col_expr("mycol");
+        let col = extract_column(&expr).unwrap();
+        assert_eq!(col.name(), "mycol");
+    }
+
+    #[test]
+    fn test_extract_column_err_for_literal() {
+        let expr = utf8_literal("val");
+        assert!(extract_column(&expr).is_err());
+    }
+
+    #[test]
+    fn test_disjunction_empty_returns_true_literal() {
+        let result = disjunction(vec![]);
+        // empty → lit(true)
+        let lit = result.downcast_ref::<datafusion::physical_plan::expressions::Literal>();
+        assert!(lit.is_some());
+    }
+
+    #[test]
+    fn test_disjunction_single_returns_same() {
+        let expr = utf8_literal("x");
+        let result = disjunction(vec![expr.clone()]);
+        assert!(is_value(&result));
+    }
+
+    #[test]
+    fn test_is_only_timestamp_filter_empty_slice() {
+        // all() on empty = true
+        assert!(is_only_timestamp_filter(&[]));
+    }
+}

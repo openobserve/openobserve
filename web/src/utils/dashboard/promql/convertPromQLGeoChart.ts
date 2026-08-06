@@ -36,25 +36,19 @@ function normalizeValue(value: any, minValue: any, maxValue: any) {
 export class GeoConverter implements PromQLChartConverter {
   supportedTypes = ["geomap"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any) {
     const config: GeoMapConfig & Record<string, any> = panelSchema.config || {};
     const aggregation = config.aggregation || "last";
 
     // Get label names for geo coordinates
-    const latLabel = config.lat_label || "latitude" || "lat";
-    const lonLabel = config.lon_label || "longitude" || "lon";
-    const weightLabel = config.weight_label || "weight" || "value";
+    const latLabel = config.lat_label || "latitude";
+    const lonLabel = config.lon_label || "longitude";
+    const weightLabel = config.weight_label || "weight";
 
     const geoData: any[] = [];
     const errors: string[] = [];
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         const lat = seriesData.metric[latLabel];
         const lon = seriesData.metric[lonLabel];
 
@@ -177,17 +171,12 @@ export class GeoConverter implements PromQLChartConverter {
           data: geoData,
           symbolSize: function (val: any) {
             const normalizedSize = normalizeValue(val[2], minValue, maxValue);
-            const minSymbolSize =
-              config.map_symbol_style?.size_by_value?.min ?? 1;
-            const maxSymbolSize =
-              config.map_symbol_style?.size_by_value?.max ?? 100;
-            const mapSymbolStyleSelected =
-              config.map_symbol_style?.size ?? "by Value";
+            const minSymbolSize = config.map_symbol_style?.size_by_value?.min ?? 1;
+            const maxSymbolSize = config.map_symbol_style?.size_by_value?.max ?? 100;
+            const mapSymbolStyleSelected = config.map_symbol_style?.size ?? "by Value";
 
             if (mapSymbolStyleSelected === "by Value") {
-              return (
-                minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize)
-              );
+              return minSymbolSize + normalizedSize * (maxSymbolSize - minSymbolSize);
             } else if (mapSymbolStyleSelected === "fixed") {
               return config.map_symbol_style?.size_fixed ?? 2;
             }

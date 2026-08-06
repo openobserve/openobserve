@@ -31,7 +31,7 @@ vi.mock("@/services/short_url", () => ({
 }));
 
 // Mock only the routeGuard function
-vi.spyOn(zincutils, 'routeGuard').mockImplementation(async (to, from, next) => {
+vi.spyOn(zincutils, "routeGuard").mockImplementation(async (to, from, next) => {
   next();
 });
 
@@ -53,7 +53,6 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 describe("ShortUrl", () => {
   let wrapper;
   let mockShortURLGet;
@@ -62,10 +61,10 @@ describe("ShortUrl", () => {
     mockShortURLGet = vi.mocked(shortURL.get);
     mockShortURLGet.mockClear();
     mockReplace.mockClear();
-    
+
     // Default mock implementation to prevent errors
     mockShortURLGet.mockRejectedValue(new Error("Mock error"));
-    
+
     wrapper = mount(ShortUrl, {
       attachTo: "#app",
       global: {
@@ -76,11 +75,11 @@ describe("ShortUrl", () => {
       },
       props: {
         id: "test-id",
-      }
+      },
     });
-    
+
     // Wait for any pending async operations
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   });
 
   afterEach(() => {
@@ -95,11 +94,11 @@ describe("ShortUrl", () => {
 
   it("should render loading container with correct CSS classes", () => {
     const container = wrapper.find('[data-test="loading-container"]');
-    expect(container.classes()).toContain("tw:h-[100vh]");
-    expect(container.classes()).toContain("tw:flex");
-    expect(container.classes()).toContain("tw:flex-col");
-    expect(container.classes()).toContain("tw:items-center");
-    expect(container.classes()).toContain("tw:justify-center");
+    expect(container.classes()).toContain("h-[100vh]");
+    expect(container.classes()).toContain("flex");
+    expect(container.classes()).toContain("flex-col");
+    expect(container.classes()).toContain("items-center");
+    expect(container.classes()).toContain("justify-center");
   });
 
   it("should render spinner with correct data-test attribute", () => {
@@ -109,7 +108,6 @@ describe("ShortUrl", () => {
   it("should render spinner with correct props", () => {
     const spinner = wrapper.find('[data-test="spinner"]');
     expect(spinner.exists()).toBe(true);
-    // Note: Quasar component props may not be reflected as HTML attributes
   });
 
   it("should render message with correct data-test attribute", () => {
@@ -122,8 +120,8 @@ describe("ShortUrl", () => {
 
   it("should render message with correct CSS class", () => {
     const message = wrapper.find('[data-test="message"]');
-    expect(message.classes()).toContain("tw:text-base");
-    expect(message.classes()).toContain("tw:text-[#666]");
+    expect(message.classes()).toContain("text-base");
+    expect(message.classes()).toContain("text-text-secondary");
   });
 
   // Props Tests
@@ -251,18 +249,18 @@ describe("ShortUrl", () => {
   it("should call shortURL.get with correct parameters", async () => {
     mockShortURLGet.mockResolvedValue({ data: "http://localhost:3000/dashboard/logs" });
     mockShortURLGet.mockClear();
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockShortURLGet).toHaveBeenCalledWith("default", "test-id");
   });
 
   it("should call handleOriginalUrl on successful API response", async () => {
     mockReplace.mockClear();
     mockShortURLGet.mockResolvedValue({ data: "http://localhost:3000/dashboard/logs" });
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     // Since handleOriginalUrl calls routeToOriginalUrl which calls mockReplace
     expect(mockReplace).toHaveBeenCalled();
   });
@@ -270,36 +268,36 @@ describe("ShortUrl", () => {
   it("should call routeToHome when API returns non-string data", async () => {
     mockReplace.mockClear();
     mockShortURLGet.mockResolvedValue({ data: null });
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
   });
 
   it("should call routeToHome when API returns undefined data", async () => {
     mockReplace.mockClear();
     mockShortURLGet.mockResolvedValue({ data: undefined });
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
   });
 
   it("should call routeToHome when API returns number data", async () => {
     mockReplace.mockClear();
     mockShortURLGet.mockResolvedValue({ data: 404 });
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
   });
 
   it("should call routeToHome when API returns object data", async () => {
     mockReplace.mockClear();
     mockShortURLGet.mockResolvedValue({ data: { error: "Not found" } });
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
   });
 
@@ -308,12 +306,12 @@ describe("ShortUrl", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const apiError = new Error("Network error");
     mockShortURLGet.mockRejectedValue(apiError);
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
     expect(consoleSpy).toHaveBeenCalledWith("Error fetching short URL:", apiError);
-    
+
     consoleSpy.mockRestore();
   });
 
@@ -321,32 +319,32 @@ describe("ShortUrl", () => {
     mockReplace.mockClear();
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockShortURLGet.mockRejectedValue("String error");
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockReplace).toHaveBeenCalledWith({ name: "home" });
     expect(consoleSpy).toHaveBeenCalledWith("Error fetching short URL:", "String error");
-    
+
     consoleSpy.mockRestore();
   });
 
   it("should use organization identifier from store", async () => {
     mockShortURLGet.mockResolvedValue({ data: "http://localhost:3000/dashboard" });
-    
+
     await wrapper.vm.fetchAndRedirect();
-    
+
     expect(mockShortURLGet).toHaveBeenCalledWith(
       store.state.selectedOrganization.identifier,
-      "test-id"
+      "test-id",
     );
   });
 
-  // Integration Tests  
+  // Integration Tests
   it("should call fetchAndRedirect on component mount", async () => {
     // This test verifies that fetchAndRedirect is called during component initialization
     // by checking that the shortURL.get mock was called during component mount
     const initialCallCount = mockShortURLGet.mock.calls.length;
-    
+
     // Mount a new component instance
     const testWrapper = mount(ShortUrl, {
       attachTo: "#app",
@@ -362,10 +360,10 @@ describe("ShortUrl", () => {
     });
 
     await nextTick();
-    
+
     // Verify that shortURL.get was called more times (indicating fetchAndRedirect was called)
     expect(mockShortURLGet.mock.calls.length).toBeGreaterThan(initialCallCount);
-    
+
     testWrapper.unmount();
   });
 

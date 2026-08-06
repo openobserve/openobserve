@@ -15,17 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:divide-y tw:divide-[rgba(128,128,128,0.08)]">
+  <div class="divide-y divide-[color-mix(in_srgb,var(--color-grey-500)_8%,transparent)]">
     <!-- Field type -->
-    <div class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
         {{ t("dashboard.sectionFieldType") }}
       </div>
-      <OToggleGroup
-        class="cf-seg tw:h-8"
-        type="single"
-        v-model="col.fieldType"
-      >
+      <OToggleGroup class="cf-seg h-8" type="single" v-model="colModel.fieldType">
         <OToggleGroupItem
           v-for="ft in fieldTypeOptions"
           :key="ft.value"
@@ -39,111 +37,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Value formatting (numeric only) -->
-    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div v-if="isNumeric" class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
         {{ t("dashboard.sectionValueFormatting") }}
       </div>
       <OSelect
-        v-model="col.unit"
+        v-model="colModel.unit"
         :options="unitOptions"
-        class="tw:w-full tw:max-w-[22.5rem]"
+        class="w-full max-w-[22.5rem]"
         :data-test="`o2-format-unit-${col.field}`"
       />
       <OInput
         v-if="col.unit === 'custom'"
-        v-model="col.customUnit"
+        :model-value="colModel.customUnit ?? ''"
+        @update:model-value="colModel.customUnit = String($event)"
         :label="t('dashboard.customunitLabel')"
-        class="tw:w-full tw:max-w-[22.5rem] tw:mt-2"
+        class="mt-2 w-full max-w-[22.5rem]"
         :data-test="`o2-format-custom-unit-${col.field}`"
       />
     </div>
 
     <!-- Alignment -->
-    <div class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
         {{ t("dashboard.sectionAlignment") }}
       </div>
-      <OToggleGroup
-        class="cf-seg tw:h-8"
-        type="single"
-        v-model="alignmentModel"
-      >
-        <OToggleGroupItem
-          v-for="a in alignOptions"
-          :key="a.value"
-          :value="a.value"
-          size="sm"
-        >
+      <OToggleGroup class="cf-seg h-8" type="single" v-model="alignmentModel">
+        <OToggleGroupItem v-for="a in alignOptions" :key="a.value" :value="a.value" size="sm">
           {{ a.label }}
         </OToggleGroupItem>
       </OToggleGroup>
     </div>
 
-
     <!-- Styling -->
-    <div class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">{{ t("dashboard.sectionStyling") }}</div>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
-        <span class="o-input-label tw:shrink-0 tw:w-24">{{ t("dashboard.textColor") }}</span>
+    <div class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
+        {{ t("dashboard.sectionStyling") }}
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span
+          class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
+          >{{ t("dashboard.textColor") }}</span
+        >
         <ColorSwatchPicker
-          v-model="col.textColor"
+          v-model="colModel.textColor"
           :swatches="TEXT_SWATCHES"
           :data-test="`o2-format-text-color-${col.field}`"
         />
       </div>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:mt-2 tw:flex-wrap">
-        <span class="o-input-label tw:shrink-0 tw:w-24">{{ t("dashboard.bgColor") }}</span>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span
+          class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
+          >{{ t("dashboard.bgColor") }}</span
+        >
         <ColorSwatchPicker
-          v-model="col.bgColor"
+          v-model="colModel.bgColor"
           :swatches="BG_SWATCHES"
           :data-test="`o2-format-bg-color-${col.field}`"
         />
       </div>
       <button
         type="button"
-        class="tw:inline-flex tw:items-center tw:gap-2 tw:py-1.5 tw:px-2.5 tw:mt-3 tw:rounded-md tw:border tw:border-[rgba(128,128,128,0.28)] tw:bg-transparent tw:cursor-pointer tw:text-left tw:transition-colors tw:hover:border-[var(--color-primary-600)]"
-        :class="{ 'cf-toggle-active': col.autoColor }"
+        class="rounded-default hover:border-accent mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
+        :class="
+          col.autoColor
+            ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_7%,transparent)]'
+            : 'border-[color-mix(in_srgb,var(--color-grey-500)_28%,transparent)] bg-transparent'
+        "
         :data-test="`o2-format-unique-color-${col.field}`"
-        @click="col.autoColor = !col.autoColor"
+        @click="colModel.autoColor = !colModel.autoColor"
       >
-        <OCheckbox :model-value="col.autoColor" size="sm" class="tw:pointer-events-none" />
-        <span class="o-input-label tw:cursor-pointer">{{
-          t("dashboard.overrideConfigUniqueValueColor")
-        }}</span>
+        <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
+        <span
+          class="o-input-label text-compact text-input-label-text cursor-pointer leading-tight font-medium"
+          >{{ t("dashboard.overrideConfigUniqueValueColor") }}</span
+        >
       </button>
     </div>
 
     <!-- Conditional (numeric only) -->
-    <div v-if="isNumeric" class="tw:px-3 tw:py-2">
-      <div class="o-input-label tw:block tw:mb-1.5">
+    <div v-if="isNumeric" class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
         {{ t("dashboard.sectionConditionalStyling") }}
       </div>
-      <div
-        v-if="!col.conditions.length"
-        class="tw:text-[length:var(--text-sm)] tw:text-[var(--color-text-secondary,#9e9e9e)] tw:mb-1.5"
-      >
+      <div v-if="!col.conditions.length" class="text-compact text-text-secondary mb-1.5">
         {{ t("dashboard.conditionNoRules") }}
       </div>
       <div
         v-for="(rule, ruleIdx) in col.conditions"
         :key="ruleIdx"
-        class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-2.5 tw:mb-1.5 tw:rounded-md tw:bg-[rgba(128,128,128,0.04)] tw:border tw:border-[rgba(128,128,128,0.1)]"
+        class="rounded-default mb-1.5 flex flex-col gap-2 border border-[color-mix(in_srgb,var(--color-grey-500)_10%,transparent)] bg-[color-mix(in_srgb,var(--color-grey-500)_4%,transparent)] px-2.5 py-2"
       >
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <span class="o-input-label tw:shrink-0 tw:w-28">{{ t("dashboard.conditionIfValue") }}</span>
-          <div class="tw:w-52 tw:shrink-0">
-            <OSelect
-              v-model="rule.operator"
-              :options="conditionOperators"
-              class="tw:w-full"
-            />
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
+            >{{ t("dashboard.conditionIfValue") }}</span
+          >
+          <div class="w-52 shrink-0">
+            <OSelect v-model="rule.operator" :options="conditionOperators" class="w-full" />
           </div>
-          <div class="tw:w-28 tw:shrink-0">
+          <div class="w-28 shrink-0">
             <OInput
               v-model="rule.threshold"
               type="number"
               :placeholder="t('dashboard.conditionThreshold')"
-              class="tw:w-full"
+              class="w-full"
+              :data-test="`o2-format-cond-threshold-${col.field}-${ruleIdx}`"
             />
           </div>
           <OButton
@@ -151,20 +158,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="icon-xs"
             icon-left="close"
             :title="t('common.remove')"
-            class="tw:shrink-0 tw:ml-auto"
-            @click="col.conditions.splice(ruleIdx, 1)"
+            class="ml-auto shrink-0"
+            @click="colModel.conditions.splice(ruleIdx, 1)"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <span class="o-input-label tw:shrink-0 tw:w-28 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionThenText") }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
+            >{{ t("dashboard.conditionThenText") }}</span
+          >
           <ColorSwatchPicker
             v-model="rule.textColor"
             :swatches="TEXT_SWATCHES"
             :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
           />
         </div>
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <span class="o-input-label tw:shrink-0 tw:w-28 tw:text-[var(--color-text-secondary,#9e9e9e)]">{{ t("dashboard.conditionAndBg") }}</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
+            >{{ t("dashboard.conditionAndBg") }}</span
+          >
           <ColorSwatchPicker
             v-model="rule.bgColor"
             :swatches="BG_SWATCHES"
@@ -175,9 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton
         variant="outline"
         size="sm"
-        class="tw:mt-1"
+        class="mt-1"
         :data-test="`o2-format-add-rule-${col.field}`"
-        @click="col.conditions.push(emptyConditionalRule())"
+        @click="colModel.conditions.push(emptyConditionalRule())"
       >
         {{ t("dashboard.conditionAddRule") }}
       </OButton>
@@ -187,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -219,20 +232,24 @@ export default defineComponent({
     isNumeric: { type: Boolean, default: false },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { unitOptions, fieldTypeOptions, alignOptions, conditionOperators } =
       useColumnFormattingOptions();
+
+    // Alias preserves the same prop reference for in-place mutation via v-model.
+    const colModel = computed(() => props.col);
 
     // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
     const alignmentModel = computed({
       get: () => props.col.alignment ?? "auto",
       set: (v: string) => {
-        props.col.alignment = v === "auto" ? null : v;
+        colModel.value.alignment = v === "auto" ? null : v;
       },
     });
 
     return {
       t,
+      colModel,
       unitOptions,
       fieldTypeOptions,
       alignOptions,
@@ -247,15 +264,11 @@ export default defineComponent({
 </script>
 
 <style lang="scss" scoped>
-// Segmented switchers: child buttons fill the 32px outer height.
+/* keep(lib-override:o2-toggle-group): OToggleGroup renders its own <button>
+   children, so their intrinsic min-height can only be reset from the parent via
+   :deep() — no utility on this component can reach that generated element. */
 .cf-seg :deep(button) {
   height: 100% !important;
   min-height: 0 !important;
-}
-
-// "Unique value color" toggle — active tint (color-mix has no Tailwind form).
-.cf-toggle-active {
-  border-color: var(--color-primary-600, #1976d2) !important;
-  background: color-mix(in srgb, var(--color-primary-600, #1976d2) 7%, transparent) !important;
 }
 </style>

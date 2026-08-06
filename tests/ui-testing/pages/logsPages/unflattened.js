@@ -24,11 +24,11 @@ class UnflattenedPage {
         // Logs explorer
         this.dateTimeButton = page.locator('[data-test="date-time-btn"]');
         this.relativeTab = page.locator('[data-test="date-time-relative-tab"]');
-        this.logTableRowExpandMenu = page.locator('[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.logTableRowExpandMenu = page.locator('[data-test="o2-table-expand-1"]');
         // FTS default-column feature: first cell may be the generic "source"
         // column OR an FTS column (body/message/log). Target whichever first-row
         // cell is rendered; a click bubbles to the row handler that opens detail.
-        this.logSourceColumn = page.locator('[data-test^="log-table-column-0-"]').first();
+        this.logSourceColumn = page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         this.o2IdText = page.locator('[data-test="log-detail-json-content"] [data-test="log-expand-detail-key-_o2_id"]');
         this.unflattenedTab = page.locator('[data-test="log-detail-json-content"] [data-test="tab-unflattened"]');
         this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
@@ -225,7 +225,7 @@ class UnflattenedPage {
      * Do NOT click the expand button first.  Clicking the expand button inserts
      * a new virtual row at rowIndex+1 in the TenstackTable, which shifts all
      * subsequent row indices by 1.  After row 0 is expanded,
-     * log-table-column-1-_timestamp no longer exists (index 1 is the inline
+     * the row-1 _timestamp cell no longer exists (index 1 is the inline
      * expanded-content row), so findRowWithO2Id breaks after the first row and
      * never scans the rest of the table.
      */
@@ -236,17 +236,62 @@ class UnflattenedPage {
         // default-column feature the first cell may be the generic "source"
         // column OR an FTS column (body/message/log), so target whichever
         // first cell of this row is rendered rather than "source" only.
-        const sourceCell = this.page.locator(`[data-test^="log-table-column-${rowIndex}-"]`).first();
+        const sourceCell = this.page.locator(`[data-test="o2-table-row-${rowIndex}"] [data-test^="o2-table-cell-"]`).first();
         await sourceCell.waitFor({ state: 'visible', timeout: 15000 });
         await sourceCell.click();
         // Wait for the detail drawer to be open — deterministic on drawer state.
         await this.page
             .locator('[data-test="logs-search-result-detail-dialog"][data-state="open"]')
             .waitFor({ state: 'visible', timeout: 10000 });
-        // JSON content renders asynchronously after the drawer opens.
-        // Hard wait gives Vue time to populate the field list before callers
-        // probe for specific keys like _o2_id.
-        await this.page.waitForTimeout(3000);
+        await this.openJsonDetailTab();
+        // JSON content renders asynchronously after the drawer opens. Wait for the
+        // first detail key to actually render instead of a fixed 3s sleep — the keys
+        // appearing IS the signal callers need before probing for _o2_id, and the
+        // fixed sleep made findRowWithO2Id's 15-row scan cost ~1.5 minutes per
+        // attempt (the dominant share of the 5-minute-timeout flake on CI).
+        await this.allLogDetailKeys
+            .first()
+            .waitFor({ state: 'visible', timeout: 10000 })
+            .catch(() => {});
+    }
+
+    /**
+     * Select the JSON tab in the log detail drawer.
+     *
+     * The drawer now opens on the Table tab — see 4194865a63 "logs sidebar table
+     * will be default view and draggable tabs", which flipped
+     * SearchResult.vue's `detailTableInitialTab` and DetailTable's `initialTab`
+     * default from "json" to "table". Everything this page object reads
+     * (`_o2_id`, the per-key `log-expand-detail-key-*` rows, the unflattened
+     * sub-tab) lives in the JSON panel, and `OTabPanels` is used with
+     * `keep-alive`, so the inactive JSON panel stays mounted but `v-show`-hidden.
+     * It is therefore present in the DOM yet never *visible*, which is what made
+     * every `_o2_id` probe time out.
+     *
+     * The tab bar is user-reorderable (order persisted in localStorage), so
+     * select by data-test rather than position.
+     */
+    async openJsonDetailTab() {
+        const jsonTab = this.page
+            .locator('[data-test="logs-search-result-detail-dialog"] [data-test="log-detail-json-tab"]')
+            .first();
+        await jsonTab.waitFor({ state: 'visible', timeout: 10000 });
+        // The JSON panel content can lag behind the tab activation on a slow
+        // (shared alpha) runner, so a single click + wait occasionally times
+        // out. Re-assert the tab and re-wait once before giving up.
+        for (let attempt = 0; attempt < 2; attempt++) {
+            if ((await jsonTab.getAttribute('data-state')) !== 'active') {
+                await jsonTab.click();
+            }
+            const rendered = await this.logDetailJsonContent
+                .waitFor({ state: 'visible', timeout: 10000 })
+                .then(() => true)
+                .catch(() => false);
+            if (rendered) return;
+        }
+        // Last attempt with the original throwing behaviour so callers still see
+        // a clear failure if the panel genuinely never renders.
+        await this.logDetailJsonContent.waitFor({ state: 'visible', timeout: 10000 });
     }
 
     /**
@@ -271,11 +316,20 @@ class UnflattenedPage {
      * drawer OPEN on the matching row so the caller can continue interacting
      * with the `_o2_id` element.  Returns -1 if no row in the range contains
      * `_o2_id`.
+     *
+     * Pass `deadlineAt` (an absolute `Date.now()` value) to cap how long the
+     * sweep may run.  Each row costs a drawer open plus a probe, so a 15-row
+     * sweep on a slow runner could otherwise outlive the whole test timeout and
+     * get the test killed mid-action instead of returning -1.
      */
-    async findRowWithO2Id(maxRows = 5) {
+    async findRowWithO2Id(maxRows = 5, { deadlineAt = null } = {}) {
         for (let rowIndex = 0; rowIndex < maxRows; rowIndex++) {
+            if (deadlineAt && Date.now() >= deadlineAt) {
+                console.warn(`findRowWithO2Id: time budget reached after scanning ${rowIndex} row(s)`);
+                break;
+            }
             const expandBtn = this.page.locator(
-                `[data-test="log-table-column-${rowIndex}-_timestamp"] [data-test="table-row-expand-menu"]`
+                `[data-test="o2-table-expand-${rowIndex}"]`
             );
             // Stop if the row doesn't exist (table shorter than maxRows).
             if (!(await expandBtn.isVisible().catch(() => false))) {
@@ -314,7 +368,11 @@ class UnflattenedPage {
      */
     async waitForO2IdQueryable({ streamName = 'e2e_automate', timeout = 90000, pollInterval = 2000 } = {}) {
         const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
-        const baseUrl = (process.env.ZO_BASE_URL || '').replace(/\/$/, '');
+        // Prefer INGESTION_URL like waitForStreamAvailable does: on CI both point at the
+        // same server, but in local setups ZO_BASE_URL can be a frontend dev server that
+        // does not serve /api/* (it returns an HTML hint page with HTTP 200, which made
+        // this gate silently poll uselessly for its entire budget).
+        const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || '').replace(/\/$/, '');
         const orgId = getOrgIdentifier();
         const headers = getAuthHeaders();
         const deadline = Date.now() + timeout;
@@ -342,8 +400,14 @@ class UnflattenedPage {
                     }
                 );
                 if (resp.ok()) {
-                    const body = await resp.json().catch(() => ({}));
-                    const hits = Array.isArray(body.hits) ? body.hits : [];
+                    const body = await resp.json().catch(() => null);
+                    if (body === null) {
+                        // HTTP 200 but not JSON — almost certainly the wrong endpoint
+                        // (e.g. a frontend dev server). Surface it instead of silently
+                        // burning the whole gate budget.
+                        console.warn('waitForO2IdQueryable: response OK but not JSON — wrong endpoint? (will retry)');
+                    }
+                    const hits = Array.isArray(body?.hits) ? body.hits : [];
                     if (hits.some((h) => h && Object.prototype.hasOwnProperty.call(h, '_o2_id'))) {
                         return true;
                     }

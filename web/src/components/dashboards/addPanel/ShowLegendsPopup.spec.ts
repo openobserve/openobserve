@@ -12,15 +12,8 @@ vi.mock("@/utils/clipboard", () => ({
 // Mock color utilities
 vi.mock("@/utils/dashboard/colorPalette", () => ({
   getSeriesColor: vi.fn().mockReturnValue("#ff0000"),
-  getColorPalette: vi.fn().mockReturnValue([
-    "#5960b2",
-    "#ff6384",
-    "#36a2eb",
-    "#ffce56",
-    "#4bc0c0",
-  ]),
+  getColorPalette: vi.fn().mockReturnValue(["#5960b2", "#ff6384", "#36a2eb", "#ffce56", "#4bc0c0"]),
 }));
-
 
 // Stub ODialog so its slot content renders inline (not teleported to document.body).
 const ODialogStub = {
@@ -85,21 +78,7 @@ describe("ShowLegendsPopup Component", () => {
         stubs: {
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          "q-card": {
-            template: '<div class="q-card" :data-test="$attrs[\'data-test\']"><slot /></div>',
-          },
-          "q-card-section": {
-            template: '<div class="q-card-section"><slot /></div>',
-          },
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\', $event)" :data-test="$attrs[\'data-test\']" :icon="$attrs.icon"><slot /></button>',
-            emits: ["click"],
-          },
-          "q-tooltip": {
-            template: '<span class="q-tooltip"><slot /></span>',
-          },
-          "OIcon": {
+          OIcon: {
             template: '<span class="OIcon">{{ $attrs.name }}</span>',
           },
         },
@@ -203,9 +182,7 @@ describe("ShowLegendsPopup Component", () => {
     it("should use explicit color from itemStyle when available", () => {
       const panelData = {
         options: {
-          series: [
-            { name: "Red Series", data: [], itemStyle: { color: "#ff0000" } },
-          ],
+          series: [{ name: "Red Series", data: [], itemStyle: { color: "#ff0000" } }],
         },
       };
       wrapper = createWrapper({ panelData });
@@ -216,9 +193,7 @@ describe("ShowLegendsPopup Component", () => {
     it("should use explicit color from lineStyle when available", () => {
       const panelData = {
         options: {
-          series: [
-            { name: "Blue Series", data: [], lineStyle: { color: "#0000ff" } },
-          ],
+          series: [{ name: "Blue Series", data: [], lineStyle: { color: "#0000ff" } }],
         },
       };
       wrapper = createWrapper({ panelData });
@@ -285,7 +260,11 @@ describe("ShowLegendsPopup Component", () => {
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyLegend("Series A", 0);
       await flushPromises();
-      expect(copyToClipboard).toHaveBeenCalledWith("Series A", expect.any(Object));
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "Series A",
+        expect.any(Function),
+        expect.any(Object),
+      );
     });
 
     it("should add index to copiedLegendIndices after copy", async () => {
@@ -313,7 +292,11 @@ describe("ShowLegendsPopup Component", () => {
       wrapper = createWrapper({ panelData: simplePanelData });
       await wrapper.vm.copyAllLegends();
       await flushPromises();
-      expect(copyToClipboard).toHaveBeenCalledWith("Series A\nSeries B\nSeries C", expect.any(Object));
+      expect(copyToClipboard).toHaveBeenCalledWith(
+        "Series A\nSeries B\nSeries C",
+        expect.any(Function),
+        expect.any(Object),
+      );
     });
 
     it("should set isAllCopied to true after copy", async () => {

@@ -19,18 +19,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        `error` banner stays reserved for hard failures. -->
   <OBanner
     :variant="insight.kind === 'frustration' ? 'warning' : 'error-soft'"
-    :icon="
-      insight.kind === 'frustration'
-        ? 'sentiment-very-dissatisfied'
-        : 'error-outline'
-    "
+    :icon="insight.kind === 'frustration' ? 'sentiment-very-dissatisfied' : 'error-outline'"
     dense
     inline-actions
     data-test="rum-sessions-insight-banner"
   >
     <span data-test="rum-sessions-insight-text">{{ message }}</span>
     <template #actions>
-      <div class="tw:flex tw:items-center tw:gap-3 tw:whitespace-nowrap">
+      <div class="flex items-center gap-3 whitespace-nowrap">
         <!-- Error cluster: filter the table to THIS error, not all error
              sessions; plus a jump to Error Tracking pre-filtered. Buttons
              inherit the banner text color so they stay readable on every
@@ -38,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template v-if="insight.kind === 'error'">
           <button
             type="button"
-            class="insight-action-btn"
+            class="text-compact font-medium text-current underline underline-offset-3 hover:opacity-75"
             data-test="rum-sessions-insight-filter-btn"
             @click="emit('filter')"
           >
@@ -46,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </button>
           <button
             type="button"
-            class="insight-action-btn"
+            class="text-compact font-medium text-current underline underline-offset-3 hover:opacity-75"
             data-test="rum-sessions-insight-open-error-tracking-btn"
             @click="emit('open-error-tracking')"
           >
@@ -56,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-else
           type="button"
-          class="insight-action-btn"
+          class="text-compact font-medium text-current underline underline-offset-3 hover:opacity-75"
           data-test="rum-sessions-insight-apply-btn"
           @click="emit('apply')"
         >
@@ -69,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export interface InsightPayload {
@@ -77,7 +73,7 @@ export interface InsightPayload {
   count: number;
   target?: string;
   view?: string;
-  message?: string;
+  message?: I18nText;
   rate?: number;
 }
 
@@ -94,7 +90,7 @@ const emit = defineEmits<{
   "open-error-tracking": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Show the path, not the full URL — the origin is the same for every view.
 const viewPath = computed(() => {
@@ -106,8 +102,7 @@ const viewPath = computed(() => {
   }
 });
 
-const truncate = (text: string, max = 120) =>
-  text.length > max ? `${text.slice(0, max)}…` : text;
+const truncate = (text: string, max = 120) => (text.length > max ? `${text.slice(0, max)}…` : text);
 
 const message = computed(() => {
   if (props.insight.kind === "frustration") {
@@ -134,19 +129,3 @@ const message = computed(() => {
   });
 });
 </script>
-
-<style scoped lang="scss">
-// Inherit the banner variant's text color — the soft variants use their
-// darkest palette step for text, so currentColor stays readable.
-.insight-action-btn {
-  color: currentColor;
-  font-size: var(--text-sm);
-  font-weight: var(--font-medium);
-  text-decoration: underline;
-  text-underline-offset: 0.1875rem;
-
-  &:hover {
-    opacity: 0.75;
-  }
-}
-</style>

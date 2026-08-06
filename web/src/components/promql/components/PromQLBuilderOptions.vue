@@ -4,33 +4,40 @@
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div>
-      <div class="tw:flex tw:flex-row tw:items-center tw:pl-2">
+      <div class="flex flex-row items-center pl-2">
         <div
           data-test="promql-builder-options-label"
-          class="tw:whitespace-nowrap tw:min-w-21.5 tw:text-sm tw:flex tw:items-center"
-        >{{ t("panel.options") }}</div>
-        <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
+          class="flex min-w-24 items-center whitespace-nowrap"
+        >
+          <span
+            class="rounded-default bg-text-secondary mr-1.5 h-2 w-2 shrink-0"
+            aria-hidden="true"
+          ></span>
+          {{ t("panel.options") }}
+        </div>
+        <span class="mr-0.5 ml-0.5 flex items-center">:</span>
         <div
           data-test="promql-builder-options-axis-container"
-          class="tw:my-0.5 tw:mx-1.25 tw:flex tw:gap-2 tw:flex-wrap tw:items-center"
+          class="mx-1.25 my-0.5 flex flex-wrap items-center gap-2"
         >
           <!-- Legend -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+            class="ml-2.5 flex flex-row items-center gap-2"
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
-            >{{ t("dashboard.legendLabel") }}</span>
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
+              >{{ t("dashboard.legendLabel") }}</span
+            >
             <div
               data-test="promql-builder-options-field-input-wrapper"
-              class="tw:relative tw:inline-block"
+              class="relative inline-block"
             >
               <OCombobox
                 v-model="
-                  dashboardPanelData.data.queries[
-                    dashboardPanelData.layout.currentQueryIndex
+                  dashboardPanelDataModel.data.queries[
+                    dashboardPanelDataModel.layout.currentQueryIndex
                   ].config.promql_legend
                 "
                 :items="dashboardSelectfieldPromQlList"
@@ -43,11 +50,12 @@
                 name="info"
                 size="sm"
                 data-test="promql-builder-options-field-info-icon"
-                class="tw:cursor-pointer tw:absolute tw:right-2 tw:top-1/2 tw:-translate-y-1/2 tw:z-10 tw:opacity-60 tw:hover:opacity-100 tw:pointer-events-auto"
+                class="pointer-events-auto absolute top-1/2 right-2 z-10 -translate-y-1/2 cursor-pointer opacity-60 hover:opacity-100"
               >
                 <OTooltip side="top" max-width="250px">
                   <template #content>
-                    ({{ t("dashboard.optional") }}) <b>Legend - </b>
+                    ({{ t("dashboard.optional") }})
+                    <b>{{ t("metrics.promQLBuilderOptions.legend") }}</b>
                     {{ t("dashboard.overrideMessage") }}
                     <br />
                     {{ t("dashboard.overrideMessageExample") }}
@@ -60,28 +68,30 @@
           <!-- Step Value -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+            class="ml-2.5 flex flex-row items-center gap-2"
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
-            >{{ t("dashboard.stepValue") }}</span>
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
+              >{{ t("dashboard.stepValue") }}</span
+            >
             <OInput
               v-model="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
                 ].config.step_value
               "
               type="text"
-              placeholder="e.g., 30s, 1m"
+              :placeholder="t('metrics.promQLBuilderOptions.stepValuePlaceholder')"
               data-test="dashboard-promql-builder-step-value"
               style="width: 140px"
             >
               <template v-slot:icon-right>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
+                <OIcon name="info" size="sm" class="cursor-pointer">
                   <OTooltip side="top" max-width="250px">
                     <template #content>
-                      ({{ t("dashboard.optional") }}) <b>Step - </b>
+                      ({{ t("dashboard.optional") }})
+                      <b>{{ t("metrics.promQLBuilderOptions.step") }}</b>
                       {{ t("dashboard.stepValueTooltip") }}
                       <br />
                       {{ t("dashboard.stepValueTooltipInfo") }}
@@ -97,16 +107,17 @@
           <!-- Query Type Select (Range/Instant) -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="tw:flex tw:flex-row tw:items-center tw:gap-2 tw:ml-2.5"
+            class="ml-2.5 flex flex-row items-center gap-2"
           >
             <span
               data-test="promql-builder-options-field-label"
-              class="tw:text-[11px] tw:font-medium tw:whitespace-nowrap tw:opacity-85"
-            >{{ t("common.type") }}</span>
+              class="text-2xs font-medium whitespace-nowrap opacity-85"
+              >{{ t("common.type") }}</span
+            >
             <OSelect
               v-model="
-                dashboardPanelData.data.queries[
-                  dashboardPanelData.layout.currentQueryIndex
+                dashboardPanelDataModel.data.queries[
+                  dashboardPanelDataModel.layout.currentQueryIndex
                 ].config.query_type
               "
               :options="queryTypeOptions"
@@ -114,19 +125,22 @@
               valueKey="value"
               data-test="dashboard-promql-builder-query-type"
               style="width: 120px"
+            />
+            <OIcon
+              name="info"
+              size="sm"
+              data-test="promql-builder-options-field-info-icon"
+              class="cursor-pointer"
             >
-              <template v-slot:append>
-                <OIcon name="info" size="sm" class="tw:cursor-pointer">
-                  <OTooltip side="top" max-width="250px">
-                    <template #content>
-                      <b>Query Type - </b><br />
-                      Range: Returns time series data over a time range.<br />
-                      Instant: Returns single value at a specific point in time.
-                    </template>
-                  </OTooltip>
-                </OIcon>
-              </template>
-            </OSelect>
+              <OTooltip side="top" max-width="250px">
+                <template #content>
+                  <b>{{ t("metrics.promQLBuilderOptions.queryType") }}</b
+                  ><br />
+                  {{ t("metrics.promQLBuilderOptions.rangeDescription") }}<br />
+                  {{ t("metrics.promQLBuilderOptions.instantDescription") }}
+                </template>
+              </OTooltip>
+            </OIcon>
           </div>
         </div>
       </div>
@@ -136,7 +150,7 @@
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -161,25 +175,26 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+
+    // Alias for the prop; same reference, mutation stays identical.
+    const dashboardPanelDataModel = computed(() => props.dashboardPanelData);
 
     // Initialize query_type if not set (default to "range")
     const currentQuery =
-      props.dashboardPanelData.data.queries[
-        props.dashboardPanelData.layout.currentQueryIndex
-      ];
+      props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
     if (!currentQuery.config.query_type) {
       currentQuery.config.query_type = "range";
     }
 
-    // Query type options for q-select
+    // Query type options for the select
     const queryTypeOptions = [
       {
-        label: "Range",
+        label: t("metrics.promQLBuilderOptions.range"),
         value: "range",
       },
       {
-        label: "Instant",
+        label: t("metrics.promQLBuilderOptions.instant"),
         value: "instant",
       },
     ];
@@ -188,18 +203,15 @@ export default defineComponent({
     const dashboardSelectfieldPromQlList = computed(() => {
       // Get fields from groupedFields based on current query's stream
       const currentQuery =
-        props.dashboardPanelData.data.queries[
-          props.dashboardPanelData.layout.currentQueryIndex
-        ];
+        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex];
       const currentStream = currentQuery?.fields?.stream;
 
       if (!currentStream) return [];
 
       // Find the current stream in groupedFields
-      const streamFields =
-        props.dashboardPanelData.meta.streamFields.groupedFields.find(
-          (group: any) => group.name === currentStream,
-        );
+      const streamFields = props.dashboardPanelData.meta.streamFields.groupedFields.find(
+        (group: any) => group.name === currentStream,
+      );
 
       if (!streamFields?.schema) return [];
 
@@ -214,9 +226,8 @@ export default defineComponent({
     // Method to replace PromQL legend value with selected option
     const selectPromQlNameOption = (option: any) => {
       const inputValue =
-        props.dashboardPanelData.data.queries[
-          props.dashboardPanelData.layout.currentQueryIndex
-        ].config.promql_legend;
+        props.dashboardPanelData.data.queries[props.dashboardPanelData.layout.currentQueryIndex]
+          .config.promql_legend;
 
       // Find the index of the last opening brace '{'
       const openingBraceIndex = inputValue.lastIndexOf("{");
@@ -225,18 +236,17 @@ export default defineComponent({
 
       const fieldName = (option as any)?.value ?? option;
       if (openingBraceIndex === -1) {
-        const newValue =
-          "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
+        const newValue = "{" + inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       } else {
-        const newValue =
-          inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
+        const newValue = inputValue.slice(0, openingBraceIndex + 1) + fieldName + "}";
         return newValue;
       }
     };
 
     return {
       t,
+      dashboardPanelDataModel,
       queryTypeOptions,
       dashboardSelectfieldPromQlList,
       selectPromQlNameOption,
@@ -244,4 +254,3 @@ export default defineComponent({
   },
 });
 </script>
-

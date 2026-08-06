@@ -15,35 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
+  <OEmptyState
     v-if="!hasSpanError"
-    class="tw:w-full tw:flex tw:items-center tw:justify-center tw:text-center tw:pt-4 tw:font-bold tab-content-dynamic-height tw:h-full"
+    size="inline"
+    variant="no-results"
+    :title="t('traces.noErrorPresent')"
+    hide-action
     data-test="trace-details-sidebar-no-error"
-  >
-    {{ t("traces.noErrorPresent") }}
-  </div>
+  />
   <!-- Error Summary: HTTP / gRPC status code -->
   <div
     v-if="hasSpanError && (spanStatusCode || spanGrpcStatusCode)"
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-error-summary"
   >
-    <div class="tw:flex-col tw:items-center tw:gap-1">
-      <div
-        class="tw:text-[var(--o2-text-4)]! tw:text-[0.85rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
-      >
-        {{ spanStatusCode ? "HTTP Status Code" : "gRPC Status Code" }}
+    <div class="flex-col items-center gap-1">
+      <div class="text-text-label! w-full pb-0.5 pl-2 text-sm tracking-[0.03rem]">
+        {{
+          spanStatusCode
+            ? t("traces.traceErrorTab.httpStatusCode")
+            : t("traces.traceErrorTab.grpcStatusCode")
+        }}
       </div>
-      <div class="tw:flex tw:items-center">
+      <div class="flex items-center">
         <SpanStatusCodeBadge
           v-if="spanStatusCode || spanGrpcStatusCode"
           :code="spanStatusCode"
           :grpc-code="spanGrpcStatusCode"
-          class="tw:text-[0.9rem]! tw:flex! tw:items-center"
+          class="flex! items-center text-sm!"
         />
         <span
-          class="tw:text-[0.9rem] tw:font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-error-summary-title"
         >
           {{ statusCodeTitle }}
@@ -55,19 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- DB Response Status Code -->
   <div
     v-if="hasSpanError && spanDbResponseStatusCode"
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-db-response-status-code"
   >
-    <div class="tw:flex-col tw:items-center tw:gap-1">
-      <div
-        class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
-      >
-        DB Response Status Code
+    <div class="flex-col items-center gap-1">
+      <div class="text-text-label! text-3xs w-full pb-0.5 pl-2 tracking-[0.03rem]">
+        {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
-      <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
+      <div class="flex items-center pl-2">
         <span
-          class="tw:text-[0.9rem] tw:font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-db-response-status-code-value"
         >
           {{ spanDbResponseStatusCode }}
@@ -79,19 +78,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Process Exit Code -->
   <div
     v-if="hasSpanError && spanProcessExitCode"
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-process-exit-code"
   >
-    <div class="tw:flex-col tw:items-center tw:gap-1">
-      <div
-        class="tw:text-[var(--o2-text-4)]! tw:text-[0.65rem] tw:tracking-[0.03rem] tw:pl-[0.5rem] tw:w-full tw:pb-[0.125rem]"
-      >
-        Process Exit Code
+    <div class="flex-col items-center gap-1">
+      <div class="text-text-label! text-3xs w-full pb-0.5 pl-2 tracking-[0.03rem]">
+        {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
-      <div class="tw:flex tw:items-center tw:pl-[0.5rem]">
+      <div class="flex items-center pl-2">
         <span
-          class="tw:text-[0.9rem] tw:font-semibold"
-          :style="{ color: 'var(--o2-status-error-text)' }"
+          class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-process-exit-code-value"
         >
           {{ spanProcessExitCode }}
@@ -102,21 +98,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Generic Error Banner -->
   <div
-    v-if="
-      hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)
-    "
-    class="error-summary tw:rounded tw:p-[0.5rem] tw:mb-[0.5rem] tw:border tw:border-solid tw:bg-[var(--o2-status-error-bg)] tw:border-[var(--o2-status-error-text)]"
+    v-if="hasSpanError && (errorBannerTitle || errorBannerMessage || spanErrorType)"
+    class="error-summary rounded-default bg-status-error-bg border-status-error-text mb-2 border border-solid p-2"
     data-test="trace-details-sidebar-error-summary"
   >
-    <div class="tw:flex tw:items-center tw:gap-2 tw:mb-[0.25rem]">
-      <OIcon
-        name="error"
-        size="sm"
-        class="tw:text-[var(--o2-status-error-text)]"
-      />
+    <div class="mb-1 flex items-center gap-2">
+      <OIcon name="error" size="sm" class="text-status-error-text" />
       <span
-        class="tw:text-[1rem] tw:font-semibold"
-        :style="{ color: 'var(--o2-status-error-text)' }"
+        class="text-status-error-text text-base font-semibold"
         data-test="trace-details-sidebar-error-summary-title"
       >
         {{ errorBannerTitle }}
@@ -124,8 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="errorBannerMessage"
-      class="tw:ml-[1.5rem] tw:text-[0.875rem] tw:mb-[0.25rem]"
-      :style="{ color: 'var(--o2-text-secondary)' }"
+      class="text-text-secondary mb-1 ml-6 text-sm"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}
@@ -134,9 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
   <!-- Exceptions Table -->
   <template v-if="hasExceptionEvents.length">
-    <div
-      class="tw:text-[0.9rem] tw:pt-[0.325rem]! tw:font-semibold tw:pb-[0.325rem] tw:text-[var(--o2-text-secondary)]!"
-    >
+    <div class="text-text-secondary! pt-[0.325rem]! pb-[0.325rem] text-sm font-semibold">
       {{ t("traces.exceptionsWithCount", { count: hasExceptionEvents.length }) }}
     </div>
     <OTable
@@ -150,45 +136,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       expansion="multiple"
       :expanded-ids="expandedExceptionIds"
       @update:expanded-ids="expandedExceptionIds = $event"
-      class="trace-detail-tab-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)] tab-content-dynamic-height"
+      class="trace-detail-tab-table border-card-glass-border tab-content-dynamic-height w-full border border-solid"
     >
       <template #cell-@timestamp="{ row }">
         <span>{{ formatTimestamp(row) }}</span>
       </template>
 
       <template #cell-type="{ row }">
-        <span
-          v-html="highlightTextMatch(row['exception.type'], searchQuery)"
-        />
+        <span v-html="highlightTextMatch(row['exception.type'], searchQuery)" />
       </template>
 
       <template #expansion="{ row }">
-        <div class="tw:px-4 tw:py-3 tw:bg-[var(--o2-card-background)] tw:rounded">
-          <div class="tw:space-y-3">
+        <div class="bg-surface-base rounded-default px-4 py-3">
+          <div class="space-y-3">
             <!-- Exception Type -->
-            <div class="tw:space-y-1">
-              <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.typeLabel") }}</span>
-              <span class="tw:text-[#d32f2f] tw:font-semibold tw:bg-[rgba(211,47,47,0.1)] tw:py-1 tw:px-2 tw:rounded tw:inline-block tw:text-sm tw:dark:text-[#ef5350] tw:dark:bg-[rgba(239,83,80,0.15)]">{{ row["exception.type"] }}</span>
+            <div class="space-y-1">
+              <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
+                t("traces.typeLabel")
+              }}</span>
+              <span
+                class="text-status-error-text bg-status-error-bg rounded-default inline-block px-2 py-1 text-sm font-semibold"
+                >{{ row["exception.type"] }}</span
+              >
             </div>
 
             <!-- Exception Message -->
-            <div class="tw:space-y-1">
-              <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.messageLabel") }}</span>
-              <div class="tw:text-(--o2-text-secondary) tw:bg-(--o2-code-bg) tw:p-2 tw:rounded tw:border-l-[3px] tw:border-l-[#ff9800] tw:whitespace-pre-wrap tw:break-words tw:leading-normal tw:text-sm tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-l-[#ffb74d] tw:dark:text-[var(--o2-border)]">
+            <div class="space-y-1">
+              <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
+                t("traces.messageLabel")
+              }}</span>
+              <div
+                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-[3px] p-2 text-sm leading-normal break-words whitespace-pre-wrap"
+              >
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
             </div>
 
             <!-- Exception Escaped -->
-            <div class="tw:space-y-1">
-              <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm tw:mb-1">{{ t("traces.escapedLabel") }}</span>
-              <span class="tw:text-sm">{{ row["exception.escaped"] }}</span>
+            <div class="space-y-1">
+              <span class="text-text-secondary mb-1 block text-sm font-semibold">{{
+                t("traces.escapedLabel")
+              }}</span>
+              <span class="text-sm">{{ row["exception.escaped"] }}</span>
             </div>
 
             <!-- Stacktrace -->
-            <div class="tw:space-y-2">
-              <div class="tw:flex tw:items-center tw:justify-between">
-                <span class="tw:block tw:font-semibold tw:text-[var(--o2-text-secondary)] tw:text-sm">{{ t("traces.stacktraceLabel") }}</span>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-text-secondary block text-sm font-semibold">{{
+                  t("traces.stacktraceLabel")
+                }}</span>
                 <OButton
                   v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
                   variant="secondary"
@@ -203,13 +200,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="row['exception.stacktrace'] && row['exception.stacktrace'].trim()"
-                class="tw:bg-(--o2-code-bg) tw:rounded tw:border tw:border-(--o2-border) tw:p-3 tw:overflow-x-auto tw:max-h-[600px] tw:overflow-y-auto tw:dark:bg-[#0d0d0d] tw:dark:border-[#2a2a2a]"
+                class="bg-code-bg rounded-default border-border-default max-h-150 overflow-x-auto overflow-y-auto border p-3"
                 data-test="exception-stacktrace-container"
               >
-                <div class="stacktrace-content tw:m-0 tw:p-0 tw:text-[11px] tw:leading-[1.6] tw:text-[#2c3e50] tw:font-[Monaco,Menlo,'Ubuntu_Mono',Consolas,'source-code-pro',monospace] tw:whitespace-pre-wrap tw:break-words tw:dark:text-[#d4d4d4]" v-html="formatStackTrace(row['exception.stacktrace'])" />
+                <div
+                  class="stacktrace-content text-2xs text-code-text m-0 p-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
+                  v-html="formatStackTrace(row['exception.stacktrace'])"
+                />
               </div>
-              <div v-else class="tw:flex tw:items-center tw:justify-center tw:bg-(--o2-code-bg) tw:text-[#6c757d] tw:text-xs tw:italic tw:py-4 tw:px-3 tw:border tw:border-dashed tw:border-(--o2-border) tw:rounded tw:dark:bg-[rgba(255,255,255,0.05)] tw:dark:border-[#4a5568] tw:dark:text-[#a0aec0]" data-test="exception-stacktrace-empty">
-                <OIcon name="info" size="sm" class="tw:mr-1" />
+              <div
+                v-else
+                class="bg-code-bg text-text-muted border-border-default rounded-default flex items-center justify-center border border-dashed px-3 py-4 text-xs italic"
+                data-test="exception-stacktrace-empty"
+              >
+                <OIcon name="info" size="sm" class="mr-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>
             </div>
@@ -223,14 +227,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { formatTimestampNs } from "@/utils/date";
-import DOMPurify from "dompurify";
 import { escapeHtml } from "@/utils/html";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import SpanStatusCodeBadge from "./SpanStatusCodeBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -244,7 +248,7 @@ const props = defineProps<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const spanRef = computed(() => props.span);
 
@@ -265,18 +269,16 @@ const timestampColumn = computed(() => store.state.zoConfig.timestamp_column);
 
 const expandedExceptionIds = ref<string[]>([]);
 
-const exceptionData = computed(() =>
-  hasExceptionEvents.value?.map((event: any, index: number) => ({
-    ...event,
-    _index: index,
-  })) || [],
+const exceptionData = computed(
+  () =>
+    hasExceptionEvents.value?.map((event: any, index: number) => ({
+      ...event,
+      _index: index,
+    })) || [],
 );
 
 const formatTimestamp = (row: any) =>
-  formatTimestampNs(
-    row[timestampColumn.value],
-    "MMM DD, YYYY HH:mm:ss.SSS Z",
-  );
+  formatTimestampNs(row[timestampColumn.value], "MMM DD, YYYY HH:mm:ss.SSS Z");
 
 const exceptionEventColumns: OTableColumnDef[] = [
   {
@@ -313,16 +315,12 @@ watch(
   { immediate: true },
 );
 
-
-const highlightTextMatch = (text: string, query: string): string => {
+const highlightTextMatch = (text: string, query: string | undefined): string => {
   if (!query) return escapeHtml(text);
   try {
     const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const regex = new RegExp(`(${escapedQuery})`, "gi");
-    return escapeHtml(text).replace(
-      regex,
-      (match) => `<span class="highlight">${match}</span>`,
-    );
+    return escapeHtml(text).replace(regex, (match) => `<span class="highlight">${match}</span>`);
   } catch {
     return escapeHtml(text);
   }
@@ -355,9 +353,7 @@ function formatPythonStackTrace(lines: string[]): string {
       if (!trimmed) return '<div class="stack-line stack-empty"></div>';
 
       if (trimmed.startsWith("File ")) {
-        const fileMatch = line.match(
-          /(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/,
-        );
+        const fileMatch = line.match(/(File\s+)"([^"]+)"(,\s+line\s+)(\d+)(,\s+in\s+)(.+)/);
         if (fileMatch) {
           return `<div class="stack-line stack-file">  ${escapeHtml(fileMatch[1])}<span class="stack-path">"${escapeHtml(fileMatch[2])}"</span>${escapeHtml(fileMatch[3])}<span class="stack-lineno">${escapeHtml(fileMatch[4])}</span>${escapeHtml(fileMatch[5])}<span class="stack-function">${escapeHtml(fileMatch[6])}</span></div>`;
         }
@@ -408,29 +404,20 @@ function formatJavaStackTrace(lines: string[]): string {
       const trimmed = line.trim();
       if (!trimmed) return '<div class="stack-line stack-empty"></div>';
 
-      const javaAtMatch = trimmed.match(
-        /^(at\s+)([\w.]+)\.([\w<>$]+)\(([\w.]+):(\d+)\)/,
-      );
+      const javaAtMatch = trimmed.match(/^(at\s+)([\w.]+)\.([\w<>$]+)\(([\w.]+):(\d+)\)/);
       if (javaAtMatch) {
         return `<div class="stack-line stack-java-at">  <span class="stack-keyword">${escapeHtml(javaAtMatch[1])}</span><span class="stack-java-package">${escapeHtml(javaAtMatch[2])}</span>.<span class="stack-function">${escapeHtml(javaAtMatch[3])}</span>(<span class="stack-path">${escapeHtml(javaAtMatch[4])}</span>:<span class="stack-lineno">${escapeHtml(javaAtMatch[5])}</span>)</div>`;
       }
 
       if (trimmed.startsWith("Caused by:")) {
-        const causedMatch = trimmed.match(
-          /^(Caused by:\s+)([\w.]+)(:?\s*)(.*)/,
-        );
+        const causedMatch = trimmed.match(/^(Caused by:\s+)([\w.]+)(:?\s*)(.*)/);
         if (causedMatch) {
           return `<div class="stack-line stack-java-caused"><span class="stack-keyword">${escapeHtml(causedMatch[1])}</span><span class="stack-exception">${escapeHtml(causedMatch[2])}</span><span class="stack-error-msg">${escapeHtml(causedMatch[3])}${escapeHtml(causedMatch[4])}</span></div>`;
         }
       }
 
-      if (
-        trimmed.match(/^[\w.]+Exception:/) ||
-        trimmed.match(/^[\w.]+Error:/)
-      ) {
-        const excMatch = trimmed.match(
-          /^([\w.]+(?:Exception|Error))(:?\s*)(.*)/,
-        );
+      if (trimmed.match(/^[\w.]+Exception:/) || trimmed.match(/^[\w.]+Error:/)) {
+        const excMatch = trimmed.match(/^([\w.]+(?:Exception|Error))(:?\s*)(.*)/);
         if (excMatch) {
           return `<div class="stack-line stack-error"><span class="stack-exception">${escapeHtml(excMatch[1])}</span><span class="stack-error-msg">${escapeHtml(excMatch[2])}${escapeHtml(excMatch[3])}</span></div>`;
         }
@@ -463,9 +450,7 @@ function formatGoStackTrace(lines: string[]): string {
         return `<div class="stack-line stack-go-created"><span class="stack-keyword">${escapeHtml(trimmed)}</span></div>`;
       }
 
-      const goFrameMatch = trimmed.match(
-        /^(.+)\(.*\)\s+([\w./-]+):(\d+)\s+\+0x[0-9a-f]+/,
-      );
+      const goFrameMatch = trimmed.match(/^(.+)\(.*\)\s+([\w./-]+):(\d+)\s+\+0x[0-9a-f]+/);
       if (goFrameMatch) {
         return `<div class="stack-line stack-go-frame">  <span class="stack-function">${escapeHtml(goFrameMatch[1])}</span>(...)<br/>      <span class="stack-path">${escapeHtml(goFrameMatch[2])}</span>:<span class="stack-lineno">${escapeHtml(goFrameMatch[3])}</span></div>`;
       }
@@ -488,9 +473,7 @@ function formatNodeStackTrace(lines: string[]): string {
         }
       }
 
-      const nodeAtMatch = trimmed.match(
-        /^(at\s+)([\w.<>$\s]+?)\s+\(([^)]+):(\d+):(\d+)\)/,
-      );
+      const nodeAtMatch = trimmed.match(/^(at\s+)([\w.<>$\s]+?)\s+\(([^)]+):(\d+):(\d+)\)/);
       if (nodeAtMatch) {
         return `<div class="stack-line stack-node-at">  <span class="stack-keyword">${escapeHtml(nodeAtMatch[1])}</span><span class="stack-function">${escapeHtml(nodeAtMatch[2])}</span> (<span class="stack-path">${escapeHtml(nodeAtMatch[3])}</span>:<span class="stack-lineno">${escapeHtml(nodeAtMatch[4])}</span>:<span class="stack-lineno">${escapeHtml(nodeAtMatch[5])}</span>)</div>`;
       }
@@ -527,10 +510,7 @@ function formatRustStackTrace(lines: string[]): string {
 
 function formatExceptionMessage(message: any) {
   if (!message) return "";
-  if (
-    typeof message === "string" &&
-    (message.includes("{") || message.includes("["))
-  ) {
+  if (typeof message === "string" && (message.includes("{") || message.includes("["))) {
     try {
       const jsonMatch = message.match(/\{[^}]+\}/g);
       if (jsonMatch) {
@@ -555,7 +535,7 @@ function formatExceptionMessage(message: any) {
 
 function copyStackTrace(stacktrace: string) {
   if (!stacktrace) return;
-  copyToClipboard(stacktrace, {
+  copyToClipboard(stacktrace, t, {
     successMessage: t("traces.stacktraceCopied"),
     errorMessage: t("traces.stacktraceCopyFailed"),
     timeout: 2000,
@@ -563,141 +543,102 @@ function copyStackTrace(stacktrace: string) {
 }
 </script>
 
-<style>
-body.body--dark .stacktrace-content .stack-file {
-  color: #9cdcfe;
+<style scoped>
+/* keep(generated-content): the `.stack-*` classes style the stacktrace markup that
+   formatStackTrace() builds and the template injects with v-html — there is no
+   template element to carry a utility, so they stay as CSS (:deep, since the
+   generated nodes carry no scope attribute).
+   Every colour maps onto the shared --color-syntax-* family (the same palette
+   OCodeBlock uses); those tokens flip light<->dark in dark.css, so ONE rule set
+   covers both themes and the per-theme override list is gone. */
+.stacktrace-content :deep(.stack-line) {
+  padding: 0.125rem 0;
 }
 
-body.body--dark .stacktrace-content .stack-path {
-  color: #ce9178;
-}
-
-body.body--dark .stacktrace-content .stack-lineno {
-  color: #b5cea8;
-}
-
-body.body--dark .stacktrace-content .stack-function {
-  color: #dcdcaa;
-}
-
-body.body--dark .stacktrace-content .stack-keyword {
-  color: #c586c0;
-}
-
-body.body--dark .stacktrace-content .stack-exception {
-  color: #f48771;
-}
-
-body.body--dark .stacktrace-content .stack-traceback {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-traceback-header {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-during {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-code {
-  color: #d4d4d4;
-}
-
-body.body--dark .stacktrace-content .stack-call {
-  color: #4ec9b0;
-}
-
-body.body--dark .stacktrace-content .stack-ellipsis {
-  color: #808080;
-}
-
-body.body--dark .stacktrace-content .stack-error-msg {
-  color: #d4d4d4;
-}
-
-body.body--dark .stacktrace-content .stack-raise {
-  color: #f48771;
-}
-
-/* Child/descendant selectors for stacktrace-content */
-.stacktrace-content .stack-line {
-  padding: 2px 0;
-}
-
-.stacktrace-content .stack-empty {
+.stacktrace-content :deep(.stack-empty) {
   height: 0.5em;
 }
 
-.stacktrace-content .stack-file {
-  color: #0066cc;
+/* `File "…", line N, in fn` scaffolding literals — a frame-header role of its
+   own, distinct from path / lineno / function which the inner spans set. */
+.stacktrace-content :deep(.stack-file) {
+  color: var(--color-syntax-builtin);
   font-weight: 500;
 }
 
-.stacktrace-content .stack-path {
-  color: #d63384;
+/* file + module paths -> string role */
+.stacktrace-content :deep(.stack-path) {
+  color: var(--color-syntax-string);
 }
 
-.stacktrace-content .stack-lineno {
-  color: #087990;
+/* line and column numbers -> number role */
+.stacktrace-content :deep(.stack-lineno) {
+  color: var(--color-syntax-number);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-function {
-  color: #6f42c1;
+/* function / frame names -> function role */
+.stacktrace-content :deep(.stack-function) {
+  color: var(--color-syntax-function);
 }
 
-.stacktrace-content .stack-keyword {
-  color: #8250df;
+/* language keywords (`at`, `raise`, `panic:`, `goroutine`, `Caused by:`) */
+.stacktrace-content :deep(.stack-keyword) {
+  color: var(--color-syntax-keyword);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-exception {
-  color: #d73a49;
+/* exception / error type names -> the app's error text role */
+.stacktrace-content :deep(.stack-exception) {
+  color: var(--color-status-error-text);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-traceback {
-  color: #6c757d;
+/* dim framing lines (Traceback header, "During handling of…", `... N more`) */
+.stacktrace-content :deep(.stack-traceback) {
+  color: var(--color-syntax-comment);
   font-style: italic;
 }
 
-.stacktrace-content .stack-traceback-header {
-  color: #6c757d;
+.stacktrace-content :deep(.stack-traceback-header) {
+  color: var(--color-syntax-comment);
   font-weight: 600;
 }
 
-.stacktrace-content .stack-during {
-  color: #6c757d;
+.stacktrace-content :deep(.stack-during) {
+  color: var(--color-syntax-comment);
   margin: 0.5em 0;
 }
 
-.stacktrace-content .stack-during-text {
+.stacktrace-content :deep(.stack-during-text) {
   font-style: italic;
 }
 
-.stacktrace-content .stack-code {
-  color: #2c3e50;
+.stacktrace-content :deep(.stack-ellipsis) {
+  color: var(--color-syntax-comment);
+}
+
+/* echoed source line + trailing error message -> plain code body text */
+.stacktrace-content :deep(.stack-code) {
+  color: var(--color-syntax-text);
   padding-left: 2em;
 }
 
-.stacktrace-content .stack-call {
-  color: #0969da;
+.stacktrace-content :deep(.stack-error-msg) {
+  color: var(--color-syntax-text);
 }
 
-.stacktrace-content .stack-ellipsis {
-  color: #6c757d;
+/* call sites `fn(` inside the echoed source line */
+.stacktrace-content :deep(.stack-call) {
+  color: var(--color-syntax-tag);
 }
 
-.stacktrace-content .stack-error {
+/* the `raise` line's residual text — same error red as the exception it names */
+.stacktrace-content :deep(.stack-raise) {
+  color: var(--color-status-error-text);
+}
+
+.stacktrace-content :deep(.stack-error) {
   margin-top: 0.5em;
-}
-
-.stacktrace-content .stack-error-msg {
-  color: #2c3e50;
-}
-
-.stacktrace-content .stack-raise {
-  color: #d73a49;
 }
 </style>

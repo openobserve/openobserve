@@ -31,7 +31,6 @@ vi.mock("@/services/model_pricing", () => ({
 // Component import must come after all vi.mock() declarations.
 import TestModelMatchDialog from "./TestModelMatchDialog.vue";
 
-
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
@@ -89,30 +88,8 @@ const ODialogStub = {
   `,
 };
 
-const QInputStub = {
-  name: "QInput",
-  props: ["modelValue", "dense", "borderless", "placeholder"],
-  emits: ["update:modelValue"],
-  template: `
-    <div data-test="q-input-stub">
-      <slot name="prepend" />
-      <input
-        data-test="q-input-stub-input"
-        :value="modelValue"
-        @input="$emit('update:modelValue', $event.target.value)"
-      />
-      <slot name="append" />
-    </div>
-  `,
-  methods: {
-    focus() {
-      /* no-op for tests */
-    },
-  },
-};
-
-const QIconStub = {
-  name: "QIcon",
+const OIconStub = {
+  name: "OIcon",
   props: ["name", "size", "color"],
   template: `<i data-test="OIcon" :data-name="name" :class="$attrs.class" />`,
 };
@@ -162,8 +139,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
         ODialog: ODialogStub,
         OButton: OButtonStub,
         OInput: OInputStub,
-        "q-input": QInputStub,
-        "OIcon": QIconStub,
+        OIcon: OIconStub,
         OBadge: OBadgeStub,
       },
     },
@@ -253,8 +229,7 @@ describe("TestModelMatchDialog", () => {
             ODialog: ODialogStub,
             OButton: OButtonStub,
             OInput: OInputStub,
-            "q-input": QInputStub,
-            "OIcon": QIconStub,
+            OIcon: OIconStub,
             OBadge: OBadgeStub,
           },
         },
@@ -292,9 +267,7 @@ describe("TestModelMatchDialog", () => {
   describe("body states", () => {
     it("renders the empty state when testModelName is empty", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect(wrapper.find('[data-test="test-match-empty"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-empty"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Enter a model name to test matching");
     });
 
@@ -302,9 +275,7 @@ describe("TestModelMatchDialog", () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-waiting"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-waiting"]').exists()).toBe(true);
       expect(wrapper.text()).toContain('Click "Test Match" to see results');
     });
 
@@ -314,9 +285,7 @@ describe("TestModelMatchDialog", () => {
       (wrapper.vm as any).testResult = { matched: null };
       await nextTick();
 
-      expect(
-        wrapper.find('[data-test="test-match-no-result"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="test-match-no-result"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("No Match Found");
       expect(wrapper.text()).toContain('No rule matched "gpt-4".');
     });
@@ -343,9 +312,7 @@ describe("TestModelMatchDialog", () => {
         tier: "Default",
       };
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-result"]').exists()).toBe(true);
       expect(wrapper.text()).toContain("Match Found");
     });
   });
@@ -353,18 +320,14 @@ describe("TestModelMatchDialog", () => {
   describe("input clear button", () => {
     it("does not render the clear button when input is empty", () => {
       wrapper = mountDialog({ modelValue: true });
-      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(
-        false,
-      );
+      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(false);
     });
 
     it("renders the clear button when input has a value", async () => {
       wrapper = mountDialog({ modelValue: true });
       (wrapper.vm as any).testModelName = "gpt-4";
       await nextTick();
-      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="test-match-clear-btn"]').exists()).toBe(true);
     });
 
     it("clears the input when clearAndFocus is invoked", async () => {
@@ -491,7 +454,7 @@ describe("TestModelMatchDialog", () => {
       await dialog.vm.$emit("update:open", false);
       // ODialog's update:open is wired via v-model:open which writes back
       // through the computed setter and re-emits update:modelValue.
-      // Quasar/Vue handles this implicitly; assert by setting internalValue.
+      // Vue handles this implicitly; assert by setting internalValue.
       (wrapper.vm as any).internalValue = false;
       const emitted = wrapper.emitted("update:modelValue");
       expect(emitted).toBeTruthy();
@@ -658,9 +621,7 @@ describe("TestModelMatchDialog", () => {
       await nextTick();
       const rows = (wrapper.vm as any).pricingRows;
       expect(rows).toHaveLength(2);
-      const byKey = Object.fromEntries(
-        rows.map((r: any) => [r.key, r.rate]),
-      );
+      const byKey = Object.fromEntries(rows.map((r: any) => [r.key, r.rate]));
       expect(byKey.input).toBeCloseTo(10);
       expect(byKey.output).toBeCloseTo(30);
     });
@@ -773,9 +734,7 @@ describe("TestModelMatchDialog", () => {
       };
       await nextTick();
       // The "Default" fallback should be rendered as the tier name
-      expect(wrapper.find('[data-test="test-match-result"]').text()).toContain(
-        "Default",
-      );
+      expect(wrapper.find('[data-test="test-match-result"]').text()).toContain("Default");
     });
 
     it("renders the no-pricing message when matched tier has no prices", async () => {

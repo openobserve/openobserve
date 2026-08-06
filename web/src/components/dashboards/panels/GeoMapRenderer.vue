@@ -15,25 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="dashboard-geomap-renderer"
-    style="padding: 5px; height: 100%; width: 100%"
-  >
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+  <div class="h-full w-full p-1.25" data-test="dashboard-geomap-renderer">
+    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  watch,
-  onUnmounted,
-  nextTick,
-  onBeforeMount,
-} from "vue";
-import { useStore } from "vuex";
+import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 
 import L from "leaflet";
 import "@/utils/dashboard/leaflet-echarts/index";
@@ -78,6 +66,7 @@ import type {
   TreeSeriesOption,
 } from "echarts/charts";
 import type { ComposeOption } from "echarts/core";
+import { withChartFont } from "@/utils/fonts";
 import type {
   TitleComponentOption,
   TooltipComponentOption,
@@ -151,11 +140,8 @@ export default defineComponent({
     let chart: any;
     let lmap: any;
     let lmapComponent: any;
-    const lmapOptions = props.data.options?.lmap
-      ? { ...props.data.options.lmap }
-      : {};
+    const lmapOptions = props.data.options?.lmap ? { ...props.data.options.lmap } : {};
 
-    const store = useStore();
     const windowResizeEventCallback = async () => {
       await nextTick();
       await nextTick();
@@ -177,18 +163,18 @@ export default defineComponent({
         ...props.data.options,
         lmap: lmapOptions,
       };
-      chart?.setOption(options || {}, true);
+      chart?.setOption(withChartFont(options || {}), true);
       window.addEventListener("resize", windowResizeEventCallback);
 
       // Get Leaflet extension component
       // getModel and getComponent do not seem to be exported in echarts typescript
       // add the following two comments to circumvent this
-       
+
       // @ts-ignore
       lmapComponent = chart?.getModel()?.getComponent("lmap");
 
       // Get the instance of Leaflet
-       
+
       // @ts-ignore
       lmap = lmapComponent?.getLeaflet();
 
@@ -200,11 +186,8 @@ export default defineComponent({
       }
       if (props.data.options?.lmap?.center) {
         lmap.setView(
-          [
-            props.data.options?.lmap?.center[1],
-            props.data.options?.lmap?.center[0],
-          ],
-          props.data.options?.lmap?.zoom
+          [props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]],
+          props.data.options?.lmap?.zoom,
         );
       }
       // L.geoJson(mapData).addTo(lmap);
@@ -221,23 +204,23 @@ export default defineComponent({
 
     watch(
       () => props.data.options,
-      async (newOptions) => {
+      async () => {
         await nextTick();
         chart?.resize();
         const options = {
           ...props.data.options,
           lmap: lmapOptions,
         };
-        chart?.setOption(options || {}, true);
+        chart?.setOption(withChartFont(options || {}), true);
         // Get Leaflet extension component
         // getModel and getComponent do not seem to be exported in echarts typescript
         // add the following two comments to circumvent this
-         
+
         // @ts-ignore
         lmapComponent = chart?.getModel().getComponent("lmap");
 
         // Get the instance of Leaflet
-         
+
         // @ts-ignore
         lmap = lmapComponent?.getLeaflet();
 
@@ -249,15 +232,12 @@ export default defineComponent({
         }
         if (props.data.options?.lmap?.center) {
           lmap?.setView(
-            [
-              props.data.options?.lmap?.center[1],
-              props.data.options?.lmap?.center[0],
-            ],
-            props.data.options?.lmap?.zoom
+            [props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]],
+            props.data.options?.lmap?.zoom,
           );
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef };
   },

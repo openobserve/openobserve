@@ -17,86 +17,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <PageLayout
+  <OPageLayout
+    bleed
     :key="store.state.selectedOrganization.identifier"
+    :title="t('dashboard.header')"
+    icon="dashboard"
+    :subtitle="t('dashboard.subtitle')"
     :main-panel="false"
-    :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
   >
-    <!-- ── Page header (row 1) ──────────────────────────────────────
-         The breadcrumb path now lives in the top chrome bar (published
-         below); this row carries the page title + description + actions. -->
-    <template #header>
-      <AppPageHeader
-        :title="t('dashboard.header')"
-        icon="dashboard"
-        :subtitle="t('dashboard.subtitle')"
+    <template #actions>
+      <!-- Org home dashboard shortcut: shows which dashboard is pinned to
+             the home page and jumps straight to it. -->
+      <OButton
+        v-if="homeDashboard"
+        variant="outline"
+        size="sm"
+        icon-left="keep"
+        class="max-w-60"
+        data-test="dashboard-home-shortcut"
+        @click="openHomeDashboard"
       >
-      <template #actions>
-        <!-- import dashboard button with dropdown -->
-        <ODropdown side="bottom" align="end">
-          <template #trigger>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="dashboard-import"
-              icon-left="upload-file"
-              icon-right="expand-more"
-            >
-              {{ t(`dashboard.import`) }}
-            </OButton>
-          </template>
-          <ODropdownItem
-            @select="importDashboard"
-            data-test="dashboard-import-custom"
+        <span class="truncate">{{ homeDashboard.label }}</span>
+      </OButton>
+      <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
+      <!-- import dashboard button with dropdown -->
+      <ODropdown side="bottom" align="end">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="sm"
+            data-test="dashboard-import"
+            icon-left="upload-file"
+            icon-right="expand-more"
           >
-            <div class="tw:flex tw:flex-col">
-              <span>{{ t('dashboard.importCustom') }}</span>
-              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >{{ t('dashboard.importCustomDesc') }}</span
-              >
-            </div>
-          </ODropdownItem>
-          <ODropdownItem
-            @select="showAddDashboardFromGitHub = true"
-            data-test="dashboard-import-templates"
-          >
-            <div class="tw:flex tw:flex-col">
-              <span>{{ t('dashboard.importTemplates') }}</span>
-              <span class="tw:text-xs tw:text-dropdown-item-text tw:opacity-60"
-                >{{ t('dashboard.importTemplatesDesc') }}</span
-              >
-            </div>
-          </ODropdownItem>
-        </ODropdown>
-        <!-- new dashboard button -->
-        <OButton
-          variant="primary"
-          size="sm"
-          icon-left="add"
-          data-test="dashboard-new"
-          @click="addDashboard"
+            {{ t(`dashboard.import`) }}
+          </OButton>
+        </template>
+        <ODropdownItem @select="importDashboard" data-test="dashboard-import-custom">
+          <div class="flex flex-col">
+            <span>{{ t("dashboard.importCustom") }}</span>
+            <span class="text-dropdown-item-text text-xs opacity-60">{{
+              t("dashboard.importCustomDesc")
+            }}</span>
+          </div>
+        </ODropdownItem>
+        <ODropdownItem
+          @select="showAddDashboardFromGitHub = true"
+          data-test="dashboard-import-templates"
         >
-          {{ t(`dashboard.add`) }}
-        </OButton>
-      </template>
-      </AppPageHeader>
+          <div class="flex flex-col">
+            <span>{{ t("dashboard.importTemplates") }}</span>
+            <span class="text-dropdown-item-text text-xs opacity-60">{{
+              t("dashboard.importTemplatesDesc")
+            }}</span>
+          </div>
+        </ODropdownItem>
+        <ODropdownSeparator />
+        <ODropdownItem
+          v-for="migration in migrationOptions"
+          :key="migration.key"
+          :data-test="`dashboard-migrate-${migration.key}`"
+          @select="openMigration(migration.url)"
+        >
+          <div class="flex w-full items-center gap-2">
+            <div class="flex min-w-0 flex-1 flex-col">
+              <span>{{ t(`dashboard.${migration.labelKey}`) }}</span>
+              <span class="text-dropdown-item-text text-xs opacity-60">{{
+                t(`dashboard.${migration.descKey}`)
+              }}</span>
+            </div>
+            <OIcon
+              name="open-in-new"
+              size="xs"
+              class="text-dropdown-item-text shrink-0 opacity-60"
+            />
+          </div>
+        </ODropdownItem>
+      </ODropdown>
+      <!-- new dashboard button -->
+      <OButton
+        variant="primary"
+        size="sm"
+        icon-left="add"
+        data-test="dashboard-new"
+        @click="addDashboard"
+      >
+        {{ t(`dashboard.add`) }}
+      </OButton>
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
+    <div class="flex min-h-0 flex-1">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
+      <div class="w-rail h-full shrink-0">
+        <div class="h-full">
           <FolderList
             type="dashboards"
+            show-favorites
             @update:activeFolderId="updateActiveFolderId"
           />
         </div>
       </div>
       <!-- Right: dashboards table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
+      <div class="h-full min-w-0 flex-1">
+        <div class="bg-card-glass-bg h-full">
           <OTable
+            class="h-full w-full"
             ref="oTableRef"
             :data="dashboards"
             :columns="columns"
@@ -104,6 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             :frame="false"
             :default-columns="false"
+            show-index
             :global-filter="filterQuery"
             :show-global-filter="false"
             :footer-title="t('dashboard.header')"
@@ -116,23 +143,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="dashboards-dashboard-list"
             @row-click="onRowClick"
             data-test="dashboard-table"
-            style="width: 100%; height: 100%"
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:min-w-0">
+              <div class="flex w-full items-center gap-2">
+                <div class="min-w-0 flex-1">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
-                      searchAcrossFolders
-                        ? t('dashboard.searchAcross')
-                        : t('dashboard.search')
+                      searchAcrossFolders ? t('dashboard.searchAcross') : t('dashboard.search')
                     "
-                    :clearable="searchAcrossFolders"
+                    clearable
                     @clear="clearSearchHistory"
                     data-test="dashboard-search"
-                    class="tw:w-full"
+                    class="w-full"
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
@@ -141,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="tw:self-center tw:mr-1"
+                        class="mr-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -150,19 +174,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           :title="t('dashboard.searchThisFolderTitle')"
-                        >{{ t('dashboard.searchThisFolder') }}</OToggleGroupItem>
+                          >{{ t("dashboard.searchThisFolder") }}</OToggleGroupItem
+                        >
                         <OToggleGroupItem
                           value="all"
                           size="xs"
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           :title="t('dashboard.searchAllFoldersTitle')"
-                        >{{ t('dashboard.searchAllFolders') }}</OToggleGroupItem>
+                          >{{ t("dashboard.searchAllFolders") }}</OToggleGroupItem
+                        >
                       </OToggleGroup>
                     </template>
                   </OInput>
                 </div>
-
               </div>
             </template>
             <template #toolbar-trailing>
@@ -174,30 +199,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="dashboard-list-refresh"
                 @click="getDashboards"
               >
-                <OTooltip side="bottom" :content="t('dashboard.reloadDashboards')" shortcut-id="dashboardsListRefresh" />
+                <OTooltip
+                  side="bottom"
+                  :content="t('dashboard.reloadDashboards')"
+                  shortcut-id="dashboardsListRefresh"
+                />
               </OButton>
             </template>
             <template #cell-name="{ row, value }">
-              <span
-                class="tw:text-text-primary"
-                :data-test="`dashboard-name-cell-${value}`"
-                :title="value"
-                >{{ value }}</span
-              >
+              <span class="inline-flex items-center gap-1">
+                <!-- One-click favorite toggle — filled gold star when
+                     favorited, neutral outline otherwise. -->
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  :icon-left="isFavorite(row.id) ? 'star' : 'star-outline'"
+                  :class="isFavorite(row.id) ? 'text-favorite shrink-0' : 'shrink-0'"
+                  :title="
+                    isFavorite(row.id)
+                      ? t('dashboard.removeFromFavorites')
+                      : t('dashboard.addToFavorites')
+                  "
+                  :data-test="`dashboard-favorite-toggle-${value}`"
+                  @click.stop="toggleFavorite(row)"
+                />
+                <span
+                  class="text-text-body"
+                  :data-test="`dashboard-name-cell-${value}`"
+                  :title="value"
+                  >{{ value }}</span
+                >
+                <!-- At-a-glance indicator: shows which dashboard is the org
+                     home dashboard without an interactive icon on every row. -->
+                <OIcon
+                  v-if="isHome(row.id)"
+                  name="keep"
+                  size="xs"
+                  class="text-primary shrink-0"
+                  :data-test="`dashboard-home-indicator-${value}`"
+                />
+                <OTooltip
+                  v-if="isHome(row.id)"
+                  side="bottom"
+                  :content="t('dashboard.pinnedOnHome')"
+                />
+              </span>
             </template>
             <template #cell-identifier="{ value }">
-              <span
-                class="tw:font-mono tw:text-xs tw:text-text-primary"
-                :title="value"
-                >{{ value }}</span
-              >
+              <span class="text-text-body font-mono text-xs" :title="value">{{ value }}</span>
             </template>
             <template #cell-description="{ value }">
-              <span
-                class="tw:text-text-primary"
-                :title="value"
-                >{{ value || "—" }}</span
-              >
+              <span class="text-text-body" :title="value">{{ value || "—" }}</span>
             </template>
             <template #cell-owner="{ value }">
               <OUserCell :value="value" />
@@ -212,17 +264,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="tw:inline-flex tw:items-center tw:gap-1 tw:max-w-full tw:px-2 tw:py-0.5 tw:rounded-full tw:bg-surface-subtle tw:text-text-primary tw:text-xs tw:leading-5 tw:transition-colors tw:outline-none tw:hover:bg-surface-subtle-hover tw:hover:text-text-primary tw:focus-visible:ring-4 tw:focus-visible:ring-primary-500/25 tw:focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-accent/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
-                <span class="tw:truncate">{{ row.folder }}</span>
+                <span class="truncate">{{ row.folder }}</span>
               </button>
             </template>
             <template #cell-actions="{ row }">
-              <span
-                class="row-actions tw:flex tw:items-center tw:justify-center tw:gap-0.5"
-              >
+              <span class="row-actions flex items-center justify-end gap-0.5">
                 <OButton
                   v-if="row.actions == 'true'"
                   icon-left="drive-file-move"
@@ -252,12 +302,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
                 />
+                <!-- Overflow menu (rightmost) — houses the low-frequency "set as
+                     home" action so it doesn't clutter every row with an
+                     always-on icon. Move/Duplicate/Delete stay inline. -->
+                <ODropdown v-if="row.actions == 'true'" side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      :title="t('dashboard.moreActions')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      data-test="dashboard-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
+                    data-test="dashboard-list-set-home-btn"
+                    @select="toggleHome(row)"
+                  >
+                    <span>{{
+                      isHome(row.id) ? t("dashboard.removeFromHome") : t("dashboard.setAsHome")
+                    }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </span>
             </template>
             <template #empty>
               <OEmptyState
                 size="hero"
                 :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
+                :title="
+                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
+                "
+                :description="
+                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesMessage') : undefined
+                "
+                :hide-action="showFavoritesOnly && !filterQuery"
                 :filtered="!!filterQuery"
                 @action="
                   (id) =>
@@ -272,27 +353,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #bottom>
-              <div
-                class="tw:flex tw:w-full tw:justify-between tw:items-center tw:py-1"
-              >
-                <div
-                  class="o2-table-footer-title tw:flex tw:items-center tw:gap-2 tw:shrink-0"
-                >
-                  <span class="tw:text-text-primary">{{
-                    resultTotal || 0
-                  }}</span>
-                  <span class="tw:text-text-secondary">{{
-                    t("dashboard.header")
-                  }}</span>
+              <div class="flex w-full items-center justify-between gap-4 py-1">
+                <div class="flex shrink-0 items-center text-xs font-normal">
+                  {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
-                <div
-                  v-if="selectedIds.length > 0"
-                  class="bulk-action-bar tw:flex tw:items-center tw:gap-2"
-                >
-                  <span
-                    class="tw:text-sm tw:text-text-primary tw:mr-1"
-                    >{{ selectedIds.length }} selected</span
-                  >
+                <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
+                  <span class="text-text-body mr-1 text-sm">{{
+                    t("dashboard.dashboards.selected", { count: selectedIds.length })
+                  }}</span>
                   <OButton
                     variant="outline"
                     size="sm-action"
@@ -300,7 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="moveMultipleDashboards"
                     icon-left="drive-file-move"
                   >
-                    {{ t('common.move') }}
+                    {{ t("common.move") }}
                   </OButton>
                   <OButton
                     variant="outline"
@@ -309,16 +377,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="dashboard-list-export-dashboards-btn"
                     @click="multipleExportDashboard"
                   >
-                    {{ t('common.export') }}
+                    {{ t("common.export") }}
                   </OButton>
                   <OButton
                     variant="outline-destructive"
                     size="sm-action"
                     icon-left="delete"
                     data-test="dashboard-list-delete-dashboards-btn"
+                    :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
                   >
-                    {{ t('common.delete') }}
+                    {{ t("common.delete") }}
                   </OButton>
                 </div>
               </div>
@@ -328,105 +397,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-          <!-- add dashboard -->
-          <ODialog
-            v-model:open="showAddDashboardDialog"
-            size="md"
-            :title="t('dashboard.createdashboard')"
-            data-test="dashboard-add-dialog"
-            :secondary-button-label="t('dashboard.cancel')"
-            :primary-button-label="t('dashboard.save')"
-            form-id="add-dashboard-form"
-            @click:secondary="showAddDashboardDialog = false"
-          >
-            <AddDashboard
-              ref="addDashboardRef"
-              @close="showAddDashboardDialog = false"
-              @updated="updateDashboardList"
-              :activeFolderId="activeFolderId"
-            />
-          </ODialog>
+    <!-- add dashboard -->
+    <ODialog
+      v-model:open="showAddDashboardDialog"
+      size="md"
+      :title="t('dashboard.createdashboard')"
+      data-test="dashboard-add-dialog"
+      :secondary-button-label="t('dashboard.cancel')"
+      :primary-button-label="t('dashboard.save')"
+      form-id="add-dashboard-form"
+      @click:secondary="showAddDashboardDialog = false"
+    >
+      <AddDashboard
+        ref="addDashboardRef"
+        @close="showAddDashboardDialog = false"
+        @updated="updateDashboardList"
+        :activeFolderId="activeFolderId ?? undefined"
+      />
+    </ODialog>
 
-          <!-- add dashboard from GitHub gallery -->
-          <AddDashboardFromGitHub
-            v-model="showAddDashboardFromGitHub"
-            @added="getDashboards"
-          />
+    <!-- add dashboard from GitHub gallery -->
+    <AddDashboardFromGitHub v-model="showAddDashboardFromGitHub" @added="getDashboards" />
 
-          <!-- add/edit folder -->
-          <ODialog
-            v-model:open="showAddFolderDialog"
-            size="sm"
-            :title="
-              isFolderEditMode
-                ? t('dashboard.updateFolder')
-                : t('dashboard.newFolder')
-            "
-            data-test="dashboard-folder-dialog"
-            :secondary-button-label="t('dashboard.cancel')"
-            :primary-button-label="t('dashboard.save')"
-            form-id="add-folder-dashboards-form"
-            @click:secondary="showAddFolderDialog = false"
-          >
-            <AddFolder
-              ref="addFolderRef"
-              @update:modelValue="updateFolderList"
-              :edit-mode="isFolderEditMode"
-              :folder-id="selectedFolderToEdit ?? 'default'"
-            />
-          </ODialog>
+    <!-- add/edit folder -->
+    <ODialog
+      v-model:open="showAddFolderDialog"
+      size="sm"
+      :title="isFolderEditMode ? t('dashboard.updateFolder') : t('dashboard.newFolder')"
+      data-test="dashboard-folder-dialog"
+      :secondary-button-label="t('dashboard.cancel')"
+      :primary-button-label="t('dashboard.save')"
+      form-id="add-folder-dashboards-form"
+      @click:secondary="showAddFolderDialog = false"
+    >
+      <AddFolder
+        ref="addFolderRef"
+        @update:modelValue="updateFolderList"
+        :edit-mode="isFolderEditMode"
+        :folder-id="selectedFolderToEdit ?? 'default'"
+      />
+    </ODialog>
 
-          <!-- move dashboard to another folder -->
-          <MoveDashboardToAnotherFolder
-            v-model:open="showMoveDashboardDialog"
-            @updated="handleDashboardMoved"
-            :dashboard-ids="selectedDashboardIdToMove"
-            :activeFolderId="activeFolderToMove"
-            data-test="dashboard-move-to-another-folder-dialog"
-          />
+    <!-- move dashboard to another folder -->
+    <MoveDashboardToAnotherFolder
+      v-model:open="showMoveDashboardDialog"
+      @updated="handleDashboardMoved"
+      :dashboard-ids="selectedDashboardIdToMove ?? undefined"
+      :activeFolderId="activeFolderToMove ?? undefined"
+      data-test="dashboard-move-to-another-folder-dialog"
+    />
 
-          <!-- delete dashboard dialog -->
-          <ConfirmDialog
-            :title="t('dashboard.deleteDashboardConfirmTitle')"
-            data-test="dashboard-confirm-dialog"
-            :message="t('dashboard.deleteDashboardConfirmMsg')"
-            @update:ok="deleteDashboard"
-            @update:cancel="confirmDeleteDialog = false"
-            v-model="confirmDeleteDialog"
-          />
+    <!-- delete dashboard dialog -->
+    <ConfirmDialog
+      :title="t('dashboard.deleteDashboardConfirmTitle')"
+      data-test="dashboard-confirm-dialog"
+      :message="t('dashboard.deleteDashboardConfirmMsg')"
+      @update:ok="deleteDashboard"
+      @update:cancel="confirmDeleteDialog = false"
+      v-model="confirmDeleteDialog"
+    />
 
-          <!-- delete folder dialog -->
-          <ConfirmDialog
-            :title="t('dashboard.deleteFolder')"
-            data-test="dashboard-confirm-delete-folder-dialog"
-            :message="t('dashboard.deleteFolderMessage')"
-            @update:ok="deleteFolder"
-            @update:cancel="confirmDeleteFolderDialog = false"
-            v-model="confirmDeleteFolderDialog"
-          />
+    <!-- delete folder dialog -->
+    <ConfirmDialog
+      :title="t('dashboard.deleteFolder')"
+      data-test="dashboard-confirm-delete-folder-dialog"
+      :message="t('dashboard.deleteFolderMessage')"
+      @update:ok="deleteFolder"
+      @update:cancel="confirmDeleteFolderDialog = false"
+      v-model="confirmDeleteFolderDialog"
+    />
 
-          <!-- bulk delete dashboards dialog -->
-          <ConfirmDialog
-            :title="t('dashboard.deleteDashboardsConfirmTitle')"
-            data-test="dashboard-confirm-bulk-delete-dialog"
-            :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
-            @update:ok="bulkDeleteDashboards"
-            @update:cancel="confirmBulkDelete = false"
-            v-model="confirmBulkDelete"
-          />
-  </PageLayout>
+    <!-- bulk delete dashboards dialog -->
+    <ConfirmDialog
+      :title="t('dashboard.deleteDashboardsConfirmTitle')"
+      data-test="dashboard-confirm-bulk-delete-dialog"
+      :message="t('dashboard.deleteDashboardsConfirmMsg', { count: selectedIds.length })"
+      @update:ok="bulkDeleteDashboards"
+      @update:cancel="confirmBulkDelete = false"
+      v-model="confirmBulkDelete"
+    />
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 // @ts-nocheck
@@ -443,15 +505,15 @@ import {
   watch,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 
 import dashboardService from "../../services/dashboards";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
 import { toRaw } from "vue";
@@ -460,12 +522,13 @@ import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import {
   deleteDashboardById,
   deleteFolderById,
+  evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
   getDashboard,
   getFoldersList,
   moveModuleToAnotherFolder,
-} from "../../utils/commons.ts";
+} from "../../utils/commons";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
@@ -478,6 +541,8 @@ import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
   return import("@/components/dashboards/MoveDashboardToAnotherFolder.vue");
@@ -491,20 +556,49 @@ const AddDashboardFromGitHub = defineAsyncComponent(() => {
   return import("@/components/dashboards/AddDashboardFromGitHub.vue");
 });
 
+interface DashboardRow {
+  "#": string | number;
+  id: string;
+  folder?: string;
+  folder_id?: string;
+  name: string;
+  identifier: string;
+  description: I18nText;
+  owner: string;
+  created_raw: string;
+  created: string;
+  actions: string;
+}
+
+interface DashboardSearchResult {
+  dashboard: Record<string, any>;
+  hash: string;
+  folder_id: string;
+  folder_name: string;
+}
+
+// Narrows a caught `unknown` to the axios-style error shape this view reads.
+interface CaughtError {
+  name?: string;
+  message?: I18nText;
+  status?: number;
+  response?: { status?: number; data?: { message?: string } };
+}
+const asCaughtError = (e: unknown): CaughtError => (e ?? {}) as CaughtError;
+
 export default defineComponent({
   name: "Dashboards",
   components: {
     OUserCell,
     OTimeCell,
-    PageLayout,
-    AppPageHeader,
+    OPageLayout,
     OEmptyState,
     OButton,
     OIcon,
     ODropdown,
     ODropdownItem,
+    ODropdownSeparator,
     OInput,
-    OCheckbox,
     ODialog,
     AddDashboard,
     OTooltip,
@@ -519,7 +613,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboard = ref({});
     const showAddDashboardDialog = ref(false);
     const showAddDashboardFromGitHub = ref(false);
@@ -531,16 +625,19 @@ export default defineComponent({
     const route = useRoute();
     const orgData: any = ref(store.state.selectedOrganization);
     const confirmDeleteDialog = ref<boolean>(false);
-    const selectedDelete = ref(null);
-    const activeFolderId = ref(null);
+    const selectedDelete = ref<DashboardRow | null>(null);
+    const activeFolderId = ref<string | null>(null);
+    // Set once the onMounted landing decision has run; folder-selection events
+    // arriving earlier are child-initialization noise, not user intent.
+    let landingDecided = false;
     const isFolderEditMode = ref(false);
-    const selectedFolderDelete = ref(null);
-    const selectedFolderToEdit = ref(null);
+    const selectedFolderDelete = ref<string | null>(null);
+    const selectedFolderToEdit = ref<string | null>(null);
     const searchQuery = ref("");
-    const filteredResults = ref([]);
+    const filteredResults = ref<DashboardSearchResult[]>([]);
     const confirmDeleteFolderDialog = ref<boolean>(false);
-    const selectedDashboardToMove = ref(null);
-    const selectedDashboardIdToMove = ref(null);
+    const selectedDashboardToMove = ref<DashboardRow | null>(null);
+    const selectedDashboardIdToMove = ref<string[] | null>(null);
     const showMoveDashboardDialog = ref(false);
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
@@ -548,12 +645,108 @@ export default defineComponent({
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
 
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+
+    const { isHome, setHomeDashboard, clearHomeDashboard, homeDashboard } = useHomeDashboard();
+
+    // Per-user favorites — heart toggle on each row + a folder-independent
+    // favorites view.
+    const {
+      favorites,
+      isFavorite,
+      toggleFavorite: toggleFavoriteSetting,
+      load: loadFavorites,
+      removeFavorites,
+    } = useFavoriteDashboards();
+    // Prune favorites that pointed at just-deleted dashboards, so the Favorites
+    // view doesn't keep a row whose id is already gone from the backend.
+    const pruneFavorites = async (dashboardIds: string[]) => {
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      if (org && userId) await removeFavorites(org, userId, dashboardIds);
+    };
+    // The favorites view is a rail location, not a toolbar filter: it is
+    // active exactly when the Favorites pseudo-folder is selected.
+    const showFavoritesOnly = computed(() => activeFolderId.value === FAVORITES_FOLDER_ID);
+    const toggleFavorite = (row: any) => {
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      // row.folder_id is populated in the cross-folder surfaces (search
+      // results, the favorites view); in the normal folder view it is
+      // undefined, so fall back to the active folder (default). Never store
+      // the Favorites pseudo-folder as a real folder id.
+      const folderId =
+        row.folder_id || (showFavoritesOnly.value ? "default" : activeFolderId.value) || "default";
+      toggleFavoriteSetting(
+        org,
+        userId,
+        {
+          dashboardId: row.id,
+          folderId,
+          label: row.name,
+        },
+        t,
+      );
+    };
+    const openHomeDashboard = async () => {
+      if (!homeDashboard.value) return;
+      const org = store.state.selectedOrganization?.identifier;
+      const dashId = homeDashboard.value.dashboardId;
+      const folder = homeDashboard.value.folderId || "default";
+      try {
+        // Confirm the pinned dashboard still resolves before navigating. The GET
+        // is folder-agnostic on the backend, so this both validates existence and
+        // lets the re-synced folder drive the route. A deleted dashboard throws /
+        // returns an empty object — clear the pin instead of routing to a 404.
+        const dash = await getDashboard(store, dashId, folder);
+        if (!dash || typeof dash !== "object" || !(dash as any).title) {
+          throw { response: { status: 404 } };
+        }
+      } catch (e: any) {
+        if (e?.response?.status === 404) {
+          clearHomeDashboard(org);
+          toast({
+            variant: "error",
+            message: t("dashboard.homePinNotFound"),
+          });
+          return;
+        }
+        // Non-404 (e.g. transient error): fall through and attempt navigation.
+      }
+      router.push({
+        path: "/dashboards/view",
+        query: {
+          org_identifier: org,
+          dashboard: dashId,
+          folder: homeDashboard.value?.folderId || "default",
+        },
+      });
+    };
+    const toggleHome = (row: any) => {
+      const org = store.state.selectedOrganization?.identifier;
+      if (isHome(row.id)) {
+        clearHomeDashboard(org);
+      } else {
+        // Resolve the folder the SAME way routeToViewD does: row.folder_id is
+        // only populated in search-across-folders mode; in the normal folder
+        // view it is undefined, so fall back to the active folder (default).
+        // This keeps the home dashboard id (dash:<folderId>:<id>) identical to
+        // the one ViewDashboard produces, so setting home from either place is
+        // idempotent and the home dashboard is fetched with a valid folder
+        // (never "undefined").
+        const folderId = searchAcrossFolders.value
+          ? row.folder_id
+          : activeFolderId.value || "default";
+        setHomeDashboard(org, {
+          dashboardId: row.id,
+          folderId,
+          label: row.name,
+        });
+      }
+    };
 
     // Listen for AI assistant dashboard mutations to auto-refresh the list
-    const { on: onDashboardEvent, off: offDashboardEvent } =
-      useAiDashboardEvents();
+    const { on: onDashboardEvent, off: offDashboardEvent } = useAiDashboardEvents();
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
@@ -568,22 +761,21 @@ export default defineComponent({
     };
     onMounted(() => {
       onDashboardEvent(handleAiDashboardEvent);
+      // Re-read the authoritative home_dashboard setting so the shortcut button
+      // navigates to the pinned dashboard's CURRENT folder even if it was moved
+      // on another system since this tab last loaded.
+      const org = store.state.selectedOrganization?.identifier;
+      if (org) useHomeDashboard().load(org);
+      // Favorites are loaded by the landing-view onMounted below, before the
+      // favorites-first landing decision needs them.
     });
     onUnmounted(() => {
       offDashboardEvent(handleAiDashboardEvent);
     });
 
-    let currentSearchAbortController = null;
+    let currentSearchAbortController: AbortController | null = null;
     const columns = computed(() => {
-      const baseColumns = [
-        {
-          id: "#",
-          header: "#",
-          accessorKey: "#",
-          sortable: false,
-          size: TABLE_INDEX_COL_SIZE,
-          meta: { align: "left" },
-        },
+      const baseColumns: OTableColumnDef[] = [
         {
           id: "name",
           header: t("dashboard.name"),
@@ -640,11 +832,11 @@ export default defineComponent({
           sortable: false,
           isAction: true,
           size: 124,
-          meta: { align: "center", cellClass: "actions-column", actionCount: 3 },
+          meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
         },
       ];
 
-      if (searchAcrossFolders.value && searchQuery.value != "") {
+      if ((searchAcrossFolders.value && searchQuery.value != "") || showFavoritesOnly.value) {
         baseColumns.splice(2, 0, {
           id: "folder",
           header: t("dashboard.folder"),
@@ -665,21 +857,28 @@ export default defineComponent({
       //get folders list
       await getFoldersList(store);
 
-      //initial activeFolderId will be null
-      //if route has query and we have a folder in folder list then set activeFolderId to that folder
-      // else default as a folder
+      // Load favorites BEFORE picking the landing view — the favorites-first
+      // landing below depends on knowing whether any exist.
+      const org = store.state.selectedOrganization?.identifier;
+      const userId = store.state.userInfo?.email;
+      if (org && userId) await loadFavorites(org, userId);
 
+      // Landing rules: the folder is synced in the URL, so whenever it's
+      // present — a deep link, the folder-watcher stamp, or the
+      // dashboard-view back button — it wins outright and we redirect to
+      // that folder (Favorites pseudo-folder included). Only with no folder
+      // in the URL at all do we fall back to the favorites-first landing.
       activeFolderId.value = null;
-      if (
-        route.query.folder &&
-        store.state.organizationData.folders.find(
-          (it: any) => it.folderId === route.query.folder,
-        )
-      ) {
+      if (route.query.folder === FAVORITES_FOLDER_ID) {
+        activeFolderId.value = FAVORITES_FOLDER_ID;
+      } else if (typeof route.query.folder === "string" && route.query.folder) {
         activeFolderId.value = route.query.folder;
+      } else if (favorites.value.length > 0) {
+        activeFolderId.value = FAVORITES_FOLDER_ID;
       } else {
         activeFolderId.value = "default";
       }
+      landingDecided = true;
     });
 
     watch(
@@ -688,21 +887,38 @@ export default defineComponent({
         //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
         //the selected dashboards are not shown
         selectedIds.value = [];
-        // skip the skeleton for already-cached folders so we don't flash it
-        loading.value =
-          !store.state.organizationData.allDashboardList[activeFolderId.value];
-        try {
-          const response = await getAllDashboardsByFolderId(
-            store,
-            activeFolderId.value,
+        // The Favorites pseudo-folder has no backend list. Rows render
+        // immediately from the stored favorites; fetch the involved folders'
+        // lists in the background purely to enrich them (owner/created/fresh
+        // titles) — cached folders resolve instantly.
+        if (activeFolderId.value === FAVORITES_FOLDER_ID) {
+          loading.value = false;
+          const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
+          Promise.all(
+            favFolders.map((fid) => getAllDashboardsByFolderId(store, fid).catch(() => null)),
           );
+          searchAcrossFolders.value = false;
+          router.push({
+            path: "/dashboards",
+            query: {
+              org_identifier: store.state.selectedOrganization.identifier,
+              folder: activeFolderId.value,
+            },
+          });
+          return;
+        }
+        // skip the skeleton for already-cached folders so we don't flash it
+        // String() matches JS's own null→"null" key coercion (behavior-neutral).
+        loading.value =
+          !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        try {
+          const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
 
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
           showErrorNotification(
-            error?.message ||
-              "Failed to load dashboards for the selected folder.",
+            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
           );
         } finally {
           loading.value = false;
@@ -748,12 +964,10 @@ export default defineComponent({
               currentSearchAbortController.abort();
             }
             currentSearchAbortController = new AbortController();
-            const searchResults = await fetchSearchResults.execute(
-              searchQuery.value,
-            );
+            const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            if (error.name !== "AbortError") {
+            if (asCaughtError(error).name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
@@ -843,29 +1057,53 @@ export default defineComponent({
       });
     };
 
-    const duplicateDashboard = async (
-      dashboardId: any,
-      folderId = activeFolderId.value,
-    ) => {
+    const migrationOptions = [
+      {
+        key: "datadog",
+        url: "https://migration.openobserve.ai/datadog-to-o2",
+        labelKey: "migrateFromDatadog",
+        descKey: "migrateFromDatadogDesc",
+      },
+      {
+        key: "grafana",
+        url: "https://migration.openobserve.ai/grafana-to-o2",
+        labelKey: "migrateFromGrafana",
+        descKey: "migrateFromGrafanaDesc",
+      },
+      {
+        key: "kibana",
+        url: "https://migration.openobserve.ai/kibana-to-o2",
+        labelKey: "migrateFromKibana",
+        descKey: "migrateFromKibanaDesc",
+      },
+      {
+        key: "cloudwatch",
+        url: "https://migration.openobserve.ai/cloudwatch-to-o2",
+        labelKey: "migrateFromCloudWatch",
+        descKey: "migrateFromCloudWatchDesc",
+      },
+    ];
+
+    const openMigration = (url: string) => {
+      window.open(url, "_blank", "noopener,noreferrer");
+    };
+
+    const duplicateDashboard = async (dashboardId: any, folderId = activeFolderId.value) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
-              timeout: 0,
-});
+        message: t("dashboard.dashboards.pleaseWait"),
+        timeout: 0,
+      });
 
       try {
         // Get the dashboard
-        const dashboard = await getDashboard(
-          store,
-          dashboardId,
-          folderId ?? "default",
-        );
+        const dashboard = await getDashboard(store, dashboardId, folderId ?? "default");
 
         // Duplicate the dashboard
         const data = JSON.parse(JSON.stringify(dashboard));
 
         //change title owner name and created date
-        data.title = `${data.title} - Copy`;
+        data.title = t("dashboard.dashboards.copySuffix", { title: data.title });
         data.owner = store.state.userInfo.name;
         data.created = new Date().toISOString();
 
@@ -877,46 +1115,78 @@ export default defineComponent({
 
         await getDashboards();
 
-        showPositiveNotification("Dashboard Duplicated Successfully.");
+        showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
-        showErrorNotification(err?.message ?? "Dashboard duplication failed");
+        showErrorNotification(
+          raw(asCaughtError(err).message ?? t("dashboard.dashboards.duplicationFailed")),
+        );
       }
 
       dismiss();
     };
 
-    const routeToViewD = (row) => {
+    const routeToViewD = (row: DashboardRow) => {
       return router.push({
         path: "/dashboards/view",
         query: {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: row.id,
-          folder: searchAcrossFolders.value
-            ? row.folder_id
-            : activeFolderId.value || "default",
+          folder: row.folder_id || activeFolderId.value || "default",
           // tab: selectedTabId,
         },
       });
     };
-    const dashboardList = ref([]);
+    const dashboardList = ref<Record<string, any>[]>([]);
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
     const getDashboards = async () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading dashboards...",
-              timeout: 0,
-});
+        message: t("dashboard.dashboards.loadingDashboards"),
+        timeout: 0,
+      });
       loading.value = true;
       try {
-        const response = await getAllDashboards(
-          store,
-          activeFolderId.value ?? "default",
-        );
-        dashboardList.value = response;
+        if (showFavoritesOnly.value) {
+          // Refresh in the favorites view: re-read the favorites setting and
+          // force-refetch each involved folder so titles/owners are current.
+          const org = store.state.selectedOrganization?.identifier;
+          const userId = store.state.userInfo?.email;
+          if (org && userId) await loadFavorites(org, userId);
+          const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
+          const fetched = await Promise.all(
+            favFolders.map((fid) =>
+              getAllDashboards(store, fid)
+                .then(() => fid)
+                .catch(() => null),
+            ),
+          );
+          // Self-heal favorites left behind by deletions we didn't perform here
+          // (another tab, another user's session, the dashboard view). Only
+          // folders that actually came back are authoritative — a failed fetch
+          // must not be read as "the dashboard is gone".
+          const refreshed = new Set(fetched.filter(Boolean));
+          const lists = store.state.organizationData?.allDashboardList ?? {};
+          const stale = favorites.value
+            .filter(
+              (f: any) =>
+                refreshed.has(f.folderId) &&
+                Array.isArray(lists[f.folderId]) &&
+                !lists[f.folderId].some((b: any) => b.dashboardId === f.dashboardId),
+            )
+            .map((f: any) => f.dashboardId);
+          await pruneFavorites(stale);
+        } else {
+          const response = await getAllDashboards(store, activeFolderId.value ?? "default");
+          // folderId is always truthy here, so getAllDashboards never returns
+          // undefined; `?? []` only satisfies the type (fallback unreachable).
+          dashboardList.value = response ?? [];
+        }
       } catch (err) {
-        showErrorNotification(err?.message || "Failed to load dashboards.");
+        showErrorNotification(
+          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+        );
       } finally {
         dismiss();
         loading.value = false;
@@ -928,7 +1198,6 @@ export default defineComponent({
       index: number,
       folderInfo?: { name: string; id: string },
     ) => ({
-      "#": index < 9 ? `0${index + 1}` : index + 1,
       id: folderInfo ? board.dashboard.dashboardId : board.dashboardId,
       ...(folderInfo && {
         folder: folderInfo.name,
@@ -947,18 +1216,41 @@ export default defineComponent({
     });
 
     const dashboards = computed(function () {
-      selectedIds.value = [];
+      // Favorites view is folder-independent, but yield to an active
+      // cross-folder search so results from all folders show.
+      const crossFolderSearchActive = searchAcrossFolders.value && searchQuery.value !== "";
+      if (showFavoritesOnly.value && !crossFolderSearchActive) {
+        const folderNames = new Map(
+          (store.state.organizationData?.folders ?? []).map((f: any) => [f.folderId, f.name]),
+        );
+        const allLists = store.state.organizationData?.allDashboardList ?? {};
+        return favorites.value.map((fav: any, index: number) => {
+          const cached = (allLists[fav.folderId] ?? []).find(
+            (board: any) => board.dashboardId === fav.dashboardId,
+          );
+          return {
+            id: fav.dashboardId,
+            folder: folderNames.get(fav.folderId) ?? fav.folderId,
+            folder_id: fav.folderId,
+            name: cached?.title ?? fav.label,
+            identifier: fav.dashboardId,
+            description: cached?.description ?? "",
+            owner: cached?.owner ?? "",
+            created_raw: cached?.created ?? "",
+            created: cached?.created ? formatDate(cached.created, "YYYY-MM-DDTHH:mm:ss") : "",
+            actions: "true",
+          };
+        });
+      }
       if (!searchAcrossFolders.value || searchQuery.value == "") {
         const dashboardList = toRaw(
-          store.state.organizationData?.allDashboardList[
-            activeFolderId.value
-          ] ?? [],
+          store.state.organizationData?.allDashboardList[String(activeFolderId.value)] ?? [],
         );
-        return dashboardList.map((board: any, index) =>
+        return dashboardList.map((board: Record<string, any>, index: number) =>
           mapDashboard(board, index),
         );
       } else {
-        return filteredResults.value.map((board: any, index) =>
+        return filteredResults.value.map((board: Record<string, any>, index: number) =>
           mapDashboard(board, index, {
             name: board.folder_name,
             id: board.folder_id,
@@ -967,18 +1259,30 @@ export default defineComponent({
       }
     });
 
+    // Clear selection whenever the derived list recomputes (favorites toggle,
+    // folder switch, cross-folder search, store list changes). Runs sync so the
+    // selection is cleared in the same tick the list changes, matching the prior
+    // in-computed side effect.
+    watch(
+      dashboards,
+      () => {
+        selectedIds.value = [];
+      },
+      { flush: "sync" },
+    );
+
     const resultTotal = computed(function () {
-      if (!searchAcrossFolders.value || searchQuery.value == "") {
-        return store.state.organizationData?.allDashboardList[
-          activeFolderId.value
-        ]?.length;
-      } else {
-        return filteredResults.value.length;
-      }
+      // Derived from the rendered rows so the footer count matches what the
+      // favorites filter / cross-folder search actually shows.
+      return dashboards.value.length;
     });
 
     const deleteDashboard = async () => {
       if (selectedDelete.value) {
+        // Capture before the row reference is cleared — used below to drop a
+        // stale Home pin that pointed at the just-deleted dashboard.
+        const deletedWasHome = isHome(selectedDelete.value.id);
+        const deletedId = selectedDelete.value.id;
         try {
           //delete dashboard by id and folder id
           await deleteDashboardById(
@@ -988,10 +1292,24 @@ export default defineComponent({
               ? selectedDelete.value.folder_id
               : (activeFolderId.value ?? "default"),
           );
-          showPositiveNotification("Dashboard deleted successfully.");
+          showPositiveNotification(
+            deletedWasHome
+              ? t("dashboard.pinnedDeletedPinRemoved")
+              : t("dashboard.deletedSuccessfully"),
+          );
+          await pruneFavorites([deletedId]);
+          // The backend clears the home_dashboard setting on delete; re-read it
+          // so the Home shortcut button / pin state updates immediately instead
+          // of lingering until the next navigation.
+          if (deletedWasHome) {
+            const org = store.state.selectedOrganization?.identifier;
+            if (org) useHomeDashboard().load(org);
+          }
         } catch (err) {
-          showErrorNotification(err?.message ?? "Dashboard deletion failed", {
-          });
+          showErrorNotification(
+            raw(asCaughtError(err).message ?? t("dashboard.dashboards.deletionFailed")),
+            {},
+          );
         }
       }
     };
@@ -1035,18 +1353,15 @@ export default defineComponent({
           await deleteFolderById(store, selectedFolderDelete.value);
 
           //check activeFolderId to be deleted
-          if (activeFolderId.value === selectedFolderDelete.value)
-            activeFolderId.value = "default";
+          if (activeFolderId.value === selectedFolderDelete.value) activeFolderId.value = "default";
 
-          showPositiveNotification("Folder deleted successfully.", {
-          });
+          showPositiveNotification(t("dashboard.dashboards.folderDeletedSuccessfully"), {});
         } catch (err) {
           showErrorNotification(
-            err?.response?.data?.message ||
-              err?.message ||
-              "Folder deletion failed",
-            {
-            },
+            raw(asCaughtError(err).response?.data?.message) ||
+              raw(asCaughtError(err).message) ||
+              t("dashboard.dashboards.folderDeletionFailed"),
+            {},
           );
         } finally {
           confirmDeleteFolderDialog.value = false;
@@ -1056,9 +1371,7 @@ export default defineComponent({
 
     const dynamicQueryModel = computed({
       get() {
-        return searchAcrossFolders.value
-          ? searchQuery.value
-          : filterQuery.value;
+        return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
       },
       set(value) {
         if (searchAcrossFolders.value) {
@@ -1069,7 +1382,7 @@ export default defineComponent({
       },
     });
 
-    const fetchSearchResults = useLoading(async (query) => {
+    const fetchSearchResults = useLoading(async (query: string) => {
       //this is used for showing search msg when user tries to toggle every time before searching across folders
       try {
         //here we are directly calling the dashboard service to get the search results
@@ -1087,21 +1400,17 @@ export default defineComponent({
           return [];
         }
 
-        const migratedDashboards = response.data.dashboards.map(
-          (dashboard: any) => ({
-            dashboard: convertDashboardSchemaVersion(
-              dashboard["v" + dashboard.version],
-            ),
-            hash: dashboard.hash.toString(),
-            folder_id: dashboard.folder_id,
-            folder_name: dashboard.folder_name,
-          }),
-        );
+        const migratedDashboards = response.data.dashboards.map((dashboard: any) => ({
+          dashboard: convertDashboardSchemaVersion(dashboard["v" + dashboard.version]),
+          hash: dashboard.hash.toString(),
+          folder_id: dashboard.folder_id,
+          folder_name: dashboard.folder_name,
+        }));
 
         return migratedDashboards;
       } catch (error) {
         showErrorNotification(
-          error?.message ?? "Error fetching search results",
+          raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorFetchingSearch")),
         );
       }
     });
@@ -1124,19 +1433,24 @@ export default defineComponent({
         : activeFolderId.value;
     });
     const clearSearchHistory = () => {
+      // Clear both scope models (searchQuery/filterQuery) so clear works in either mode.
       searchQuery.value = "";
+      filterQuery.value = "";
       filteredResults.value = [];
     };
     const filteredFolders = computed(() => {
       if (!folderSearchQuery.value) return store.state.organizationData.folders;
       return store.state.organizationData.folders?.filter((folder: any) =>
-        folder.name
-          .toLowerCase()
-          .includes(folderSearchQuery.value.toLowerCase()),
+        folder.name.toLowerCase().includes(folderSearchQuery.value.toLowerCase()),
       );
     });
 
     const updateActiveFolderId = (folderId: any) => {
+      // FolderList emits its own initialization value asynchronously; before
+      // the landing decision in onMounted has run, that emission is rail
+      // presentation state, not a user action — letting it through would
+      // clobber the favorites-first landing with "default".
+      if (!landingDecided) return;
       activeFolderId.value = folderId;
       filterQuery.value = "";
       searchQuery.value = "";
@@ -1168,11 +1482,13 @@ export default defineComponent({
         htmlA.click();
 
         showPositiveNotification(
-          `${cleanedDashboards.length} Dashboards exported successfully.`,
+          t("dashboard.dashboards.exportedSuccessfully", { count: cleanedDashboards.length }),
         );
         selectedIds.value = [];
       } catch (error) {
-        showErrorNotification(error?.message ?? "Error exporting dashboards");
+        showErrorNotification(
+          raw(asCaughtError(error).message ?? t("dashboard.dashboards.errorExporting")),
+        );
       }
     };
 
@@ -1184,15 +1500,17 @@ export default defineComponent({
     };
 
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteDashboards = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting dashboards...",
+        message: t("dashboard.dashboards.deletingDashboards"),
         timeout: 0,
       });
 
@@ -1200,28 +1518,58 @@ export default defineComponent({
         if (selectedIds.value.length === 0) {
           toast({
             variant: "error",
-            message: "No dashboards selected for deletion",
+            message: t("dashboard.dashboards.noneSelectedForDeletion"),
           });
           dismiss();
           return;
         }
 
-        // Extract dashboard ids
-        const payload = {
-          ids: selectedDashboardIds.value,
-        };
+        // Snapshot the selection first: reading `dashboards` below can re-run
+        // that computed, which resets selectedIds as a side effect.
+        const idsToDelete = [...selectedDashboardIds.value];
 
-        const response = await dashboardService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-          activeFolderId.value,
+        // Did this batch include the Home-pinned dashboard? Captured before the
+        // delete so we can refresh the pin state afterwards (the backend clears
+        // the home_dashboard setting when the pinned dashboard is deleted).
+        const bulkIncludedHome = idsToDelete.some((id: string) => isHome(id));
+
+        // Group the selection by the folder each dashboard actually lives in.
+        // The Favorites view is a pseudo-folder spanning many real folders, so
+        // its id is not a valid `?folder=` value (the backend 404s on it) and a
+        // single folder-scoped call could not cover the selection anyway. In a
+        // normal folder view every row shares activeFolderId, so this collapses
+        // to the one request it always was.
+        const rowFolders = new Map<string, string>(
+          dashboards.value.map((row: any) => [row.id, row.folder_id]),
+        );
+        const idsByFolder = new Map<string, string[]>();
+        for (const id of idsToDelete) {
+          const folderId =
+            rowFolders.get(id) ||
+            (showFavoritesOnly.value ? "default" : activeFolderId.value) ||
+            "default";
+          const bucket = idsByFolder.get(folderId);
+          if (bucket) bucket.push(id);
+          else idsByFolder.set(folderId, [id]);
+        }
+
+        const responses = await Promise.all(
+          [...idsByFolder].map(([folderId, ids]) =>
+            dashboardService.bulkDelete(
+              store.state.selectedOrganization.identifier,
+              { ids },
+              folderId,
+            ),
+          ),
         );
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
-        if (response.data) {
-          const { successful = [], unsuccessful = [] } = response.data;
+        // Handle response based on successful/unsuccessful arrays, merged
+        // across the per-folder calls.
+        const successful = responses.flatMap((r: any) => r?.data?.successful ?? []);
+        const unsuccessful = responses.flatMap((r: any) => r?.data?.unsuccessful ?? []);
+        if (responses.some((r: any) => r?.data)) {
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
@@ -1229,68 +1577,109 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} dashboard(s) deleted successfully, ${failCount} failed`,
+              message: t("dashboard.dashboards.partialDeleteResult", {
+                count: successCount,
+                failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} dashboard(s)`,
+              message: t("dashboard.dashboards.failedToDeleteCount", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} dashboard(s) deleted successfully`,
+              message: t("dashboard.dashboards.deletedSuccessfullyCount", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedIds.value.length} dashboard(s) deleted successfully`,
+            message: t("dashboard.dashboards.deletedSuccessfullyCount", {
+              count: idsToDelete.length,
+            }),
           });
         }
 
+        // Drop favorites for everything that actually got deleted, so the
+        // Favorites view doesn't keep rows whose ids are gone. `unsuccessful`
+        // entries may be plain ids or objects, so normalise before excluding.
+        const failedIds = new Set(
+          unsuccessful.map((u: any) => (typeof u === "string" ? u : (u?.dashboardId ?? u?.id))),
+        );
+        const deletedIds = idsToDelete.filter((id: string) => !failedIds.has(id));
+
+        // Drop the deleted rows from the cached folder lists. Folder navigation
+        // is cache-first, so the source folder would otherwise keep rendering
+        // them until a manual refresh — and pruning favorites below removes the
+        // folder from the set that gets refetched, so nothing else would.
+        const deletedByFolder = new Map<string, string[]>();
+        idsByFolder.forEach((ids, folderId) => {
+          const kept = ids.filter((id: string) => !failedIds.has(id));
+          if (kept.length) deletedByFolder.set(folderId, kept);
+        });
+        evictDashboardsFromCache(store, deletedByFolder);
+
+        await pruneFavorites(deletedIds);
+
         selectedIds.value = [];
-        // Refresh dashboards
-        await getDashboards(store, activeFolderId.value);
-      } catch (error: any) {
+        // Refresh dashboards. The local getDashboards() takes no arguments; the
+        // previous (store, folderId) args were silently ignored at runtime, so
+        // dropping them is behavior-neutral.
+        await getDashboards();
+        // If the pinned dashboard was in the batch, re-read the (now cleared)
+        // home_dashboard setting so the Home shortcut/pin updates immediately.
+        if (bulkIncludedHome) {
+          const org = store.state.selectedOrganization?.identifier;
+          if (org) await useHomeDashboard().load(org);
+        }
+      } catch (error) {
         dismiss();
         console.error("Error deleting dashboards:", error);
 
+        const caught = asCaughtError(error);
         // Show error message from response if available
         const errorMessage =
-          error.response?.data?.message ||
-          error?.message ||
-          "Error deleting dashboards. Please try again.";
-        if (error.response?.status != 403 || error?.status != 403) {
+          caught.response?.data?.message ||
+          caught.message ||
+          t("dashboard.dashboards.errorDeleting");
+        if (caught.response?.status != 403 || caught.status != 403) {
           toast({
             variant: "error",
-            message: errorMessage,
+            message: raw(errorMessage),
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
     };
 
-
-
     // ── Keyboard shortcuts ────────────────────────────────────────────────
     useShortcuts([
       {
         id: "dashboardsListAdd",
-        handler: () => { if (!isInputFocused()) addDashboard(); },
+        handler: () => {
+          if (!isInputFocused()) addDashboard();
+        },
       },
       {
         id: "dashboardsListImport",
-        handler: () => { if (!isInputFocused()) importDashboard(); },
+        handler: () => {
+          if (!isInputFocused()) importDashboard();
+        },
       },
       {
         id: "dashboardsListRefresh",
-        handler: () => { if (!isInputFocused()) getDashboards(); },
+        handler: () => {
+          if (!isInputFocused()) getDashboards();
+        },
       },
       {
         id: "dashboardsListFocusSearch",
@@ -1314,6 +1703,8 @@ export default defineComponent({
       showAddDashboardFromGitHub,
       addDashboard,
       importDashboard,
+      migrationOptions,
+      openMigration,
       resultTotal,
       routeToViewD,
       showDeleteDialogFn,
@@ -1359,6 +1750,14 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteDashboards,
       confirmBulkDelete,
+      bulkDeleteLoading,
+      isHome,
+      toggleHome,
+      homeDashboard,
+      openHomeDashboard,
+      isFavorite,
+      toggleFavorite,
+      showFavoritesOnly,
     };
   },
   methods: {
@@ -1378,8 +1777,8 @@ export default defineComponent({
         },
       });
     },
-    onRowClick(row, _evt) {
-      this.routeToViewD(row);
+    onRowClick(row: Record<string, any>, _evt: MouseEvent) {
+      this.routeToViewD(row as DashboardRow);
     },
     ownerInitials(name: string) {
       if (!name) return "";

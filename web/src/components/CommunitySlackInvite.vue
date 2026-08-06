@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
@@ -25,7 +25,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // ── One-time first-login invite (self-contained) ───────────────────────────
@@ -36,9 +36,7 @@ const isOpen = ref(false);
 
 // Per-user "seen" record + a pending flag that survives reloads until the user
 // actually dismisses the invite (so it still appears if they leave mid-onboarding).
-const seenKey = `communitySlackInviteSeen:${
-  store.state.userInfo?.email ?? "anonymous"
-}`;
+const seenKey = `communitySlackInviteSeen:${store.state.userInfo?.email ?? "anonymous"}`;
 const PENDING_KEY = "communitySlackInvitePending";
 
 // Community Slack URL — enterprise can override it via backend config.
@@ -50,10 +48,7 @@ const slackUrl = computed(() => {
 });
 
 const maybeShow = () => {
-  if (
-    localStorage.getItem(PENDING_KEY) === "true" &&
-    localStorage.getItem(seenKey) !== "true"
-  ) {
+  if (localStorage.getItem(PENDING_KEY) === "true" && localStorage.getItem(seenKey) !== "true") {
     isOpen.value = true;
   }
 };
@@ -117,10 +112,10 @@ const benefits = computed(() => [
 // dark enough for a white person glyph). Full literal classes so Tailwind emits
 // them. These are placeholders — not real members.
 const avatarBgClasses = [
-  "tw:bg-primary-700",
-  "tw:bg-primary-600",
-  "tw:bg-primary-500",
-  "tw:bg-primary-400",
+  "bg-avatar-tint-1",
+  "bg-avatar-tint-2",
+  "bg-avatar-tint-3",
+  "bg-avatar-tint-4",
 ];
 
 // Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
@@ -149,18 +144,14 @@ const joinSlack = () => {
     :show-close="false"
     @update:open="handleOpenChange"
   >
-    <div class="tw:flex tw:flex-col tw:gap-4 tw:p-2">
+    <div class="flex flex-col gap-4 p-2">
       <!-- Header: Slack badge, title to its right, close button on the far right -->
-      <div class="tw:flex tw:items-start tw:gap-3">
+      <div class="flex items-start gap-3">
         <div
-          class="tw:flex tw:h-12 tw:w-12 tw:shrink-0 tw:items-center tw:justify-center tw:rounded-xl tw:bg-primary-50"
+          class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
           aria-hidden="true"
         >
-          <svg
-            viewBox="0 0 122.8 122.8"
-            class="tw:h-6 tw:w-6"
-            xmlns="http://www.w3.org/2000/svg"
-          >
+          <svg viewBox="0 0 122.8 122.8" class="h-6 w-6" xmlns="http://www.w3.org/2000/svg">
             <path
               d="M25.8 77.6c0 7.1-5.8 12.9-12.9 12.9S0 84.7 0 77.6s5.8-12.9 12.9-12.9h12.9v12.9zm6.5 0c0-7.1 5.8-12.9 12.9-12.9s12.9 5.8 12.9 12.9v32.3c0 7.1-5.8 12.9-12.9 12.9s-12.9-5.8-12.9-12.9V77.6z"
               fill="#e01e5a"
@@ -180,18 +171,15 @@ const joinSlack = () => {
           </svg>
         </div>
 
-        <h2
-          data-test="community-slack-invite-title"
-          class="tw:flex-1 tw:self-center"
-        >
+        <h2 data-test="community-slack-invite-title" class="flex-1 self-center">
           {{ t("communitySlackInvite.title") }}
         </h2>
 
         <OButton
           variant="ghost"
           size="icon-sm"
-          class="tw:-mr-1 tw:shrink-0"
-          aria-label="Close"
+          class="-mr-1 shrink-0"
+          :aria-label="t('common.close')"
           data-test="community-slack-invite-close-btn"
           @click="dismiss"
         >
@@ -199,20 +187,17 @@ const joinSlack = () => {
         </OButton>
       </div>
 
-      <p
-        data-test="community-slack-invite-description"
-        class="tw:text-[var(--o2-text-secondary)]"
-      >
+      <p data-test="community-slack-invite-description" class="text-text-secondary">
         {{ t("communitySlackInvite.description") }}
       </p>
 
       <!-- Benefits -->
-      <ul class="tw:flex tw:flex-col tw:gap-2.5">
+      <ul class="flex flex-col gap-2.5">
         <li
           v-for="(benefit, index) in benefits"
           :key="index"
           :data-test="`community-slack-invite-benefit-${index}`"
-          class="tw:flex tw:items-start tw:gap-2.5"
+          class="flex items-start gap-2.5"
         >
           <svg
             viewBox="0 0 24 24"
@@ -221,50 +206,46 @@ const joinSlack = () => {
             stroke-width="2.5"
             stroke-linecap="round"
             stroke-linejoin="round"
-            class="tw:mt-0.5 tw:h-4 tw:w-4 tw:shrink-0 tw:text-primary-600"
+            class="text-accent mt-0.5 h-4 w-4 shrink-0"
             aria-hidden="true"
           >
             <path d="M20 6 9 17l-5-5" />
           </svg>
-          <span class="tw:text-[var(--o2-text-secondary)]">{{
-            benefit
-          }}</span>
+          <span class="text-text-secondary">{{ benefit }}</span>
         </li>
       </ul>
 
       <!-- Social proof — generic avatar stack, no fabricated counts -->
       <div
         data-test="community-slack-invite-members"
-        class="tw:flex tw:items-center tw:gap-3 tw:rounded-lg tw:bg-surface-panel tw:px-3 tw:py-2.5"
+        class="rounded-default bg-surface-panel flex items-center gap-3 px-3 py-2.5"
       >
-        <div class="tw:flex tw:items-center" aria-hidden="true">
+        <div class="flex items-center" aria-hidden="true">
           <span
             v-for="(bg, i) in avatarBgClasses"
             :key="i"
             :class="[
-              'tw:flex tw:h-7 tw:w-7 tw:items-center tw:justify-center tw:rounded-full tw:text-white tw:ring-2 tw:ring-surface-panel',
+              'text-text-inverse ring-surface-panel flex h-7 w-7 items-center justify-center rounded-full ring-2',
               bg,
-              i > 0 ? 'tw:-ml-2' : '',
+              i > 0 ? '-ml-2' : '',
             ]"
           >
             <OIcon name="person" size="sm" />
           </span>
         </div>
-        <small data-test="community-slack-invite-members-text">{{
-          captionText
-        }}</small>
+        <small data-test="community-slack-invite-members-text">{{ captionText }}</small>
       </div>
 
       <!-- Actions -->
-      <div class="tw:flex tw:items-center tw:gap-3 tw:pt-1">
+      <div class="flex items-center gap-3 pt-1">
         <OButton
           data-test="community-slack-invite-join-btn"
           variant="primary"
-          class="tw:flex-1"
+          class="flex-1"
           @click="joinSlack"
         >
           <template #icon-left>
-            <SlackIcon class="tw:h-5 tw:w-5" />
+            <SlackIcon class="h-5 w-5" />
           </template>
           {{ t("communitySlackInvite.joinSlack") }}
         </OButton>

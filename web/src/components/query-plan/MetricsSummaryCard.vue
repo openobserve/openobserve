@@ -15,40 +15,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard
-    data-test="metrics-summary-card"
-    class="tw:bg-transparent tw:shadow-none"
-  >
+  <OCard data-test="metrics-summary-card" class="bg-transparent shadow-none">
     <OCardSection role="body">
-      <div class="tw:text-sm tw:font-medium text-weight-bold tw:mb-3">{{ t("search.executionSummary") }}</div>
-      <div class="tw:grid tw:[grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] tw:gap-4">
-        <div data-test="metrics-summary-card-item" class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
+      <div class="mb-3 text-sm font-bold font-medium">{{ t("search.executionSummary") }}</div>
+      <div class="grid [grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr))] gap-4">
+        <div
+          data-test="metrics-summary-card-item"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+        >
+          <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="schedule" size="md" />
           </div>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div data-test="metrics-summary-card-label" class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-[var(--o2-text-label)] tw:mb-1">{{ t("search.totalTime") }}</div>
-            <div data-test="metrics-summary-card-value" class="tw:text-xl tw:font-bold tw:text-[var(--o2-primary-color)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ metrics.totalTime }}</div>
+          <div class="min-w-0 flex-1">
+            <div
+              data-test="metrics-summary-card-label"
+              class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
+            >
+              {{ t("search.totalTime") }}
+            </div>
+            <div
+              data-test="metrics-summary-card-value"
+              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+            >
+              {{ metrics.totalTime }}
+            </div>
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
+        <div
+          data-test="metrics-summary-card-item"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+        >
+          <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="format-list-numbered" size="md" />
           </div>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div data-test="metrics-summary-card-label" class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-[var(--o2-text-label)] tw:mb-1">{{ t("search.totalRows") }}</div>
-            <div data-test="metrics-summary-card-value" class="tw:text-xl tw:font-bold tw:text-[var(--o2-primary-color)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ metrics.totalRows }}</div>
+          <div class="min-w-0 flex-1">
+            <div
+              data-test="metrics-summary-card-label"
+              class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
+            >
+              {{ t("search.totalRows") }}
+            </div>
+            <div
+              data-test="metrics-summary-card-value"
+              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+            >
+              {{ metrics.totalRows }}
+            </div>
           </div>
         </div>
 
-        <div data-test="metrics-summary-card-item" class="tw:flex tw:items-center tw:gap-3 tw:p-[0.875rem_1rem] tw:rounded-lg tw:bg-[var(--o2-card-bg)] tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:transition-[border-color,box-shadow] tw:duration-200 tw:hover:border-[var(--o2-primary-color)] tw:hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]">
-          <div data-test="metrics-summary-card-icon" class="tw:shrink-0 tw:text-[var(--o2-text-secondary)]">
+        <div
+          data-test="metrics-summary-card-item"
+          class="rounded-default bg-card-glass-bg border-card-glass-border hover:border-accent flex items-center gap-3 border border-solid p-[0.875rem_1rem] transition-[border-color,box-shadow] duration-200 hover:shadow-[0_0.0625rem_0.1875rem_rgba(0,0,0,0.05)]"
+        >
+          <div data-test="metrics-summary-card-icon" class="text-text-secondary shrink-0">
             <OIcon name="memory" size="md" />
           </div>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div data-test="metrics-summary-card-label" class="tw:text-xs tw:font-semibold tw:uppercase tw:tracking-[0.04em] tw:text-[var(--o2-text-label)] tw:mb-1">{{ t("search.peakMemory") }}</div>
-            <div data-test="metrics-summary-card-value" class="tw:text-xl tw:font-bold tw:text-[var(--o2-primary-color)] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ metrics.peakMemory }}</div>
+          <div class="min-w-0 flex-1">
+            <div
+              data-test="metrics-summary-card-label"
+              class="text-text-label mb-1 text-xs font-semibold tracking-[0.04em] uppercase"
+            >
+              {{ t("search.peakMemory") }}
+            </div>
+            <div
+              data-test="metrics-summary-card-value"
+              class="text-accent overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap"
+            >
+              {{ metrics.peakMemory }}
+            </div>
           </div>
         </div>
       </div>
@@ -58,7 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { SummaryMetrics } from "@/utils/queryPlanParser";
@@ -78,9 +114,8 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     return { t };
   },
 });
 </script>
-

@@ -22,7 +22,7 @@ defineOptions({ inheritAttrs: false });
 // tests target the actual interactive element via [data-test="…"] without
 // relying on element-tag/class selectors. Mirrors OInput / OFile patterns.
 // Also forward `data-test-value` so consumers that render N radios from a
-// list can target each option by its value (audit pattern shared with OSelect).
+// list can target each option by its value.
 const $attrs = useAttrs();
 const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 const parentDataTestValue = computed(() => $attrs["data-test-value"] as string | undefined);
@@ -46,21 +46,15 @@ watchEffect(() => {
 });
 
 const circleSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "tw:size-3",
-  sm: "tw:size-3.5",
-  md: "tw:size-4",
+  xs: "size-3",
+  sm: "size-3.5",
+  md: "size-4",
 };
 
 const dotSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "tw:size-1",
-  sm: "tw:size-1.5",
-  md: "tw:size-2",
-};
-
-const labelSize: Record<"xs" | "sm" | "md", string> = {
-  xs: "tw:text-xs",
-  sm: "tw:text-xs",
-  md: "tw:text-sm",
+  xs: "size-1",
+  sm: "size-1.5",
+  md: "size-2",
 };
 
 const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
@@ -69,8 +63,8 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
-      props.disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+      'inline-flex items-center gap-2',
+      props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
     ]"
     :for="props.id"
   >
@@ -92,33 +86,30 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       :data-test="parentDataTest"
       :data-test-value="parentDataTestValue"
       :class="[
-        'tw:shrink-0 tw:rounded-full tw:border-2 tw:flex tw:items-center tw:justify-center',
-        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base',
-        'tw:focus-visible:ring-2 tw:focus-visible:ring-radio-focus-ring',
+        'flex shrink-0 items-center justify-center rounded-full border-2',
+        'transition-[color,background-color,border-color,box-shadow] duration-150',
+        'ring-offset-surface-base ring-offset-1 outline-none',
+        'focus-visible:ring-radio-focus-ring focus-visible:ring-2',
         circleSize[resolvedSize],
-        'tw:bg-radio-bg tw:border-radio-border',
-        'tw:enabled:hover:border-radio-hover-border',
-        'tw:data-[state=checked]:border-radio-checked-border',
-        'tw:data-disabled:bg-radio-disabled-bg',
-        'tw:data-disabled:border-radio-disabled-border',
-        'tw:data-disabled:border-dashed',
-        'tw:data-disabled:cursor-not-allowed',
+        'bg-radio-bg border-radio-border',
+        'enabled:hover:border-radio-hover-border',
+        'data-[state=checked]:border-radio-checked-border',
+        'data-disabled:bg-radio-disabled-bg',
+        'data-disabled:border-radio-disabled-border',
+        'data-disabled:border-dashed',
+        'data-disabled:cursor-not-allowed',
       ]"
     >
-      <RadioGroupIndicator
-        :class="[
-          'tw:rounded-full tw:bg-radio-checked-dot',
-          dotSize[resolvedSize],
-        ]"
-      />
+      <RadioGroupIndicator :class="['bg-radio-checked-dot rounded-full', dotSize[resolvedSize]]" />
     </RadioGroupItem>
 
     <span
       v-if="$slots.label || props.label"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
-        props.disabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight select-none',
+        props.disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
       <slot name="label">{{ props.label }}</slot>

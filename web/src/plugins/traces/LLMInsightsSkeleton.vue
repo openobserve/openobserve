@@ -15,75 +15,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="tw:pt-[0.625rem] tw:flex tw:flex-col tw:gap-[0.625rem]"
-    :class="
-      store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-    "
-  >
+  <div class="tile-content flex flex-col gap-2.5 pt-2.5">
     <!-- Toolbar: Stream/Agent toggle + picker. Only in the full-page skeleton
          when the real toolbar is hidden (initial !streamsLoaded). On a mid-session
          switch the real toolbar is already shown, so `hideToolbar` drops this to
          avoid a duplicate toggle/picker row. The kpiOnly variant never shows it. -->
-    <div
-      v-if="!kpiOnly && !hideToolbar"
-      class="tw:flex tw:items-center tw:justify-end tw:gap-[0.5rem] tw:py-[0.5rem]"
-    >
-      <SkeletonBox width="116px" height="32px" rounded />
-      <SkeletonBox width="14rem" height="36px" rounded />
+    <div v-if="!kpiOnly && !hideToolbar" class="flex items-center justify-end gap-2 py-2">
+      <OSkeleton type="text" class="h-8 w-29" />
+      <OSkeleton type="text" class="h-9 w-56" />
     </div>
 
     <!-- Row 1: 5 KPI cards -->
-    <div class="tw:grid tw:grid-cols-5 tw:gap-[0.625rem]">
+    <div class="grid grid-cols-5 gap-2.5">
       <div
         v-for="n in 5"
         :key="n"
-        class="tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary) tw:rounded-lg tw:py-[0.625rem] tw:px-[0.875rem] tw:flex tw:flex-col tw:gap-2 tw:h-[130px]"
-        :class="
-          store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-        "
+        class="rounded-default tile-content flex h-32.5 flex-col gap-2 border border-(--tile-border) bg-(--tile-bg) px-3.5 py-2.5 text-(--text-primary)"
       >
-        <SkeletonBox width="60%" height="12px" rounded />
-        <SkeletonBox width="55%" height="22px" rounded />
-        <SkeletonBox width="40%" height="10px" rounded />
-        <div class="tw:flex tw:items-end tw:gap-[0.15rem] tw:h-8 tw:mt-auto">
-          <SkeletonBox
+        <OSkeleton type="text" class="h-3 w-[60%]" />
+        <OSkeleton type="text" class="h-5.5 w-[55%]" />
+        <OSkeleton type="text" class="h-2.5 w-[40%]" />
+        <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
+          <OSkeleton
+            type="text"
             v-for="bar in 16"
             :key="bar"
-            width="100%"
-            :height="`${30 + ((bar * 23) % 65)}%`"
-            rounded
+            :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
+            class="w-full"
           />
         </div>
       </div>
     </div>
 
     <!-- Row 2 & 3: 2-column trend panel grid -->
-    <div v-if="!kpiOnly" class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem]">
+    <div v-if="!kpiOnly" class="grid grid-cols-2 gap-2.5">
       <div
         v-for="n in 4"
         :key="n"
-        class="tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary) tw:rounded-lg tw:p-4 tw:flex tw:flex-col tw:gap-[0.4rem]"
-        :class="
-          store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-        "
+        class="rounded-default tile-content flex flex-col border border-(--tile-border) bg-(--tile-bg) text-(--text-primary)"
       >
-        <SkeletonBox width="120px" height="16px" rounded />
-        <SkeletonBox width="160px" height="10px" rounded />
-        <div class="tw:relative tw:h-[220px] tw:mt-2 tw:overflow-hidden">
-          <svg
-            class="tw:w-full tw:h-full tw:block"
-            viewBox="0 0 200 80"
-            preserveAspectRatio="none"
-          >
+        <div class="mb-1 flex flex-col gap-[0.4rem] p-1.5">
+          <OSkeleton type="text" class="h-4 w-30" />
+          <OSkeleton type="text" class="h-2.5 w-40" />
+        </div>
+        <div class="relative h-55 overflow-hidden">
+          <svg class="block h-full w-full" viewBox="0 0 200 80" preserveAspectRatio="none">
             <path
-              class="panel-tile__area-fill tw:[animation:llm-line-pulse_1.6s_ease-in-out_infinite]"
-              :class="store.state.theme === 'dark' ? 'tw:fill-[rgba(255,255,255,0.08)]' : 'tw:fill-[rgba(0,0,0,0.08)]'"
+              class="panel-tile__area-fill fill-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18 L200,80 L0,80 Z"
             />
             <path
-              class="panel-tile__line-stroke tw:[animation:llm-line-pulse_1.6s_ease-in-out_infinite]"
-              :class="store.state.theme === 'dark' ? 'tw:[stroke:rgba(255,255,255,0.22)]' : 'tw:[stroke:rgba(0,0,0,0.18)]'"
+              class="panel-tile__line-stroke stroke-[color-mix(in_srgb,var(--color-text-heading)_18%,transparent)]"
               d="M0,55 C20,42 35,52 55,46 C72,41 85,30 105,28 C125,26 140,42 160,38 C175,35 190,22 200,18"
               fill="none"
               stroke-width="2"
@@ -93,28 +75,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <!-- Row 4: tw:w-full recent errors table -->
+    <!-- Row 4: w-full recent errors table -->
     <div
       v-if="!kpiOnly"
-      class="tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:text-(--text-primary) tw:rounded-lg tw:p-4 tw:flex tw:flex-col tw:gap-[0.4rem]"
-      :class="
-        store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'
-      "
+      class="rounded-default tile-content flex flex-col gap-[0.4rem] border border-(--tile-border) bg-(--tile-bg) p-4 text-(--text-primary)"
     >
-      <SkeletonBox width="120px" height="16px" rounded />
-      <SkeletonBox width="160px" height="10px" rounded />
-      <div class="tw:flex tw:flex-col tw:gap-2 tw:mt-2">
+      <OSkeleton type="text" class="h-4 w-30" />
+      <OSkeleton type="text" class="h-2.5 w-40" />
+      <div class="mt-2 flex flex-col gap-2">
         <div
           v-for="row in 5"
           :key="row"
-          class="panel-tile__row tw:flex tw:items-center tw:gap-3 tw:py-1 tw:border-t tw:border-(--tile-border)"
+          class="panel-tile__row flex items-center gap-3 border-t border-(--tile-border) py-1 first:border-t-0"
         >
-          <SkeletonBox width="70px" height="14px" rounded />
-          <SkeletonBox width="90px" height="20px" rounded />
-          <SkeletonBox width="180px" height="14px" rounded />
-          <SkeletonBox width="110px" height="14px" rounded />
-          <SkeletonBox width="60px" height="14px" rounded />
-          <SkeletonBox width="50px" height="14px" rounded />
+          <OSkeleton type="text" class="h-3.5 w-17.5" />
+          <OSkeleton type="text" class="h-5 w-22.5" />
+          <OSkeleton type="text" class="h-3.5 w-45" />
+          <OSkeleton type="text" class="h-3.5 w-27.5" />
+          <OSkeleton type="text" class="h-3.5 w-15" />
+          <OSkeleton type="text" class="h-3.5 w-12.5" />
         </div>
       </div>
     </div>
@@ -122,79 +101,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 // kpiOnly: render just the KPI tiles row. Used when the trend/table panels
 // render live underneath (firing their own queries) while only the KPI strip
 // is still loading — so the panels aren't blocked behind the KPI fetch.
 defineProps<{ kpiOnly?: boolean; hideToolbar?: boolean }>();
-
-const store = useStore();
 </script>
 
-<style>
-.dark-tile-content {
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-  --text-primary: #cccfd1;
-}
-.light-tile-content {
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-  --text-primary: #2e3133;
-}
-
-.panel-tile__row:first-child {
-  border-top: none;
+<style scoped>
+/* keep(keyframes): The `line-pulse` keyframe and its `animation:` must both live in this scoped
+   block: the scoped compiler renames a keyframe and its `animation:` together
+   only within the same block, and never rewrites class strings in the template.
+   `.tile-content` publishes the --tile-* contract for this component's tiles. */
+.tile-content {
+  --tile-bg: var(--color-surface-base);
+  --tile-border: var(--color-border-default);
+  --text-primary: var(--color-text-heading);
 }
 
-/* Skeleton overrides — same pattern as HomeViewSkeleton.
-   The SkeletonBox component's default gradient is theme-agnostic; redefining
-   here under .dark-tile-content / .light-tile-content gives proper contrast. */
-.skeleton-box {
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.15),
-    transparent
-  );
-  background-size: 200% 100%;
-  animation: llm-skel-wave 1.5s ease-in-out infinite;
-  position: relative;
-  overflow: hidden;
+/* Breathing sparkline placeholder — the area fill and the line stroke pulse in
+   step; the fill/stroke colours stay as utilities on the <path>s. */
+.panel-tile__area-fill,
+.panel-tile__line-stroke {
+  animation: line-pulse 1.6s ease-in-out infinite;
 }
 
-.dark-tile-content .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.12),
-    rgba(255, 255, 255, 0.04)
-  );
-  background-size: 200% 100%;
-}
-
-.light-tile-content .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.04),
-    rgba(0, 0, 0, 0.1),
-    rgba(0, 0, 0, 0.04)
-  );
-  background-size: 200% 100%;
-}
-
-@keyframes llm-skel-wave {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes llm-line-pulse {
+@keyframes line-pulse {
   0%,
   100% {
     opacity: 0.55;

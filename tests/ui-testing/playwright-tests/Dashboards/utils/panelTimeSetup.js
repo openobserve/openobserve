@@ -50,8 +50,11 @@ export async function startPanelCreation(page, pm, config) {
     timeout: 10000
   });
 
-  // Set panel name — OInput inner native <input> uses data-test="<name>-field"
-  await page.locator('[data-test="dashboard-panel-name-field"]').fill(panelName);
+  // Set panel name — inline-edited title (OFormInlineEdit): click the trigger to
+  // open the editor, then fill the revealed input.
+  await page.locator('[data-test="dashboard-panel-name-trigger"]').click();
+  await page.locator('[data-test="dashboard-panel-name-input"]').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('[data-test="dashboard-panel-name-input"]').fill(panelName);
   await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
 
   // Select stream type and stream
@@ -170,8 +173,11 @@ export async function addPanelWithPanelTime(page, pm, config) {
     timeout: 10000
   });
 
-  // Set panel name — OInput inner native <input> uses data-test="<name>-field"
-  await page.locator('[data-test="dashboard-panel-name-field"]').fill(panelName);
+  // Set panel name — inline-edited title (OFormInlineEdit): click the trigger to
+  // open the editor, then fill the revealed input.
+  await page.locator('[data-test="dashboard-panel-name-trigger"]').click();
+  await page.locator('[data-test="dashboard-panel-name-input"]').waitFor({ state: 'visible', timeout: 10000 });
+  await page.locator('[data-test="dashboard-panel-name-input"]').fill(panelName);
 
   // Wait for UI to settle after filling panel name
   await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
@@ -322,8 +328,8 @@ export async function savePanel(page) {
   // Wait for ODropdown date-time menu and portal menus to be hidden
   await page.locator('#date-time-menu').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
-  // Also wait for any date picker portal menus to close (they use q-portal--menu--* IDs)
-  await page.locator('[id^="q-portal--menu--"]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
+  // Also wait for any date picker portal menus to close (reka-ui portalled content)
+  await page.locator('[data-reka-popper-content-wrapper]').first().waitFor({ state: "hidden", timeout: 3000 }).catch(() => {});
 
   // Click somewhere neutral to dismiss any remaining overlays (like date picker)
   await page.locator('[data-test="dashboard-panel-name"]').click().catch(() => {});

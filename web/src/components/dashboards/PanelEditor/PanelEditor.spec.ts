@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { shallowMount } from "@vue/test-utils";
 import { ref, reactive, nextTick } from "vue";
 import { createI18n } from "vue-i18n";
 import PanelEditor from "./PanelEditor.vue";
@@ -272,14 +272,6 @@ const ODialogStub = {
 const mountGlobal = {
   plugins: [i18n],
   stubs: {
-    QSeparator: true,
-    QSplitter: {
-      template:
-        '<div class="q-splitter-mock"><slot name="before" /><slot name="separator" /><slot name="after" /></div>',
-    },
-    QIcon: true,
-    QBtn: true,
-    QTooltip: true,
     // OSplitter slots must render so nested ODialogs (e.g. the custom-chart
     // selector inside the splitter's #before slot) appear in the DOM.
     OSplitter: {
@@ -304,7 +296,6 @@ const mountGlobal = {
     },
   },
 };
-
 
 describe("PanelEditor.vue", () => {
   let wrapper: any;
@@ -332,9 +323,7 @@ describe("PanelEditor.vue", () => {
       });
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="panel-editor-container"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="panel-editor-container"]').exists()).toBe(true);
     });
 
     it("should mount successfully with metrics pageType", () => {
@@ -528,19 +517,17 @@ describe("PanelEditor.vue", () => {
   });
 
   describe("Content Height Calculation", () => {
-    it.each([
-      ["dashboard"],
-      ["logs"],
-      ["metrics"],
-      ["build"],
-    ])("should mount cleanly for pageType=%s", (pageType) => {
-      wrapper = shallowMount(PanelEditor, {
-        props: { pageType: pageType as any },
-        global: mountGlobal,
-      });
+    it.each([["dashboard"], ["logs"], ["metrics"], ["build"]])(
+      "should mount cleanly for pageType=%s",
+      (pageType) => {
+        wrapper = shallowMount(PanelEditor, {
+          props: { pageType: pageType as any },
+          global: mountGlobal,
+        });
 
-      expect(wrapper.exists()).toBe(true);
-    });
+        expect(wrapper.exists()).toBe(true);
+      },
+    );
   });
 
   describe("Conditional Rendering", () => {
@@ -552,11 +539,9 @@ describe("PanelEditor.vue", () => {
         global: mountGlobal,
       });
 
-      expect(
-        wrapper
-          .find('[data-test="panel-editor-field-list-sidebar-collapsed"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="panel-editor-field-list-sidebar-collapsed"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should not show collapsed field list when showFieldList is true", () => {
@@ -567,11 +552,9 @@ describe("PanelEditor.vue", () => {
         global: mountGlobal,
       });
 
-      expect(
-        wrapper
-          .find('[data-test="panel-editor-field-list-sidebar-collapsed"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="panel-editor-field-list-sidebar-collapsed"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should show HTML editor section when type is html", async () => {
@@ -755,9 +738,7 @@ describe("PanelEditor.vue", () => {
       await nextTick();
 
       const dialogs = wrapper.findAll('[data-test="o-dialog-stub"]');
-      const selectorDialog = dialogs.find(
-        (d: any) => d.attributes("data-width") === "95",
-      );
+      const selectorDialog = dialogs.find((d: any) => d.attributes("data-width") === "95");
 
       expect(selectorDialog).toBeTruthy();
       expect(selectorDialog!.attributes("data-show-close")).toBe("false");

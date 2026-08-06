@@ -20,23 +20,20 @@ import {
   buildPatternSqlQuery,
   buildAlertNameFromPattern,
   buildPatternAlertData,
+  compactCount,
+  formatBucketDuration,
 } from "./patternUtils";
 
 describe("extractConstantsFromPattern", () => {
   it("returns segments longer than 10 chars split by <*>", () => {
-    const result = extractConstantsFromPattern(
-      "User authentication failed for <*> from host <*>",
+    const result = extractConstantsFromPattern("User authentication failed for <*> from host <*>");
+    expect(result).toEqual(
+      ["User authentication failed for", "from host"].filter((s) => s.trim().length > 10),
     );
-    expect(result).toEqual([
-      "User authentication failed for",
-      "from host",
-    ].filter((s) => s.trim().length > 10));
   });
 
   it("returns only segments longer than 10 chars", () => {
-    const result = extractConstantsFromPattern(
-      "INFO action <*> at 14:47.1755283",
-    );
+    const result = extractConstantsFromPattern("INFO action <*> at 14:47.1755283");
     // "INFO action" = 11 chars > 10 — included; "at 14:47.1755283" = 16 chars > 10 — included
     expect(result).toContain("INFO action");
     expect(result).toContain("at 14:47.1755283");
@@ -72,13 +69,9 @@ describe("extractConstantsFromPattern", () => {
   });
 
   it("handles template with no variable markers", () => {
-    const result = extractConstantsFromPattern(
-      "This is a long constant string with no variables",
-    );
+    const result = extractConstantsFromPattern("This is a long constant string with no variables");
     expect(result).toHaveLength(1);
-    expect(result[0]).toBe(
-      "This is a long constant string with no variables",
-    );
+    expect(result[0]).toBe("This is a long constant string with no variables");
   });
 });
 
@@ -134,39 +127,24 @@ describe("buildPatternSqlQuery", () => {
   });
 
   it("escapes special chars in constants", () => {
-    const sql = buildPatternSqlQuery(
-      "Error: it's a problem here <*> done",
-      "my_stream",
-    );
+    const sql = buildPatternSqlQuery("Error: it's a problem here <*> done", "my_stream");
     expect(sql).toContain("match_all('Error: it\\'s a problem here')");
   });
 });
 
 describe("buildAlertNameFromPattern", () => {
   it("prefixes with Alert for normal patterns", () => {
-    const name = buildAlertNameFromPattern(
-      "User logged in from <*>",
-      "mystream",
-      false,
-    );
+    const name = buildAlertNameFromPattern("User logged in from <*>", "mystream", false);
     expect(name).toMatch(/^Alert_/);
   });
 
   it("prefixes with Anomaly for anomaly patterns", () => {
-    const name = buildAlertNameFromPattern(
-      "Unknown error occurred <*>",
-      "mystream",
-      true,
-    );
+    const name = buildAlertNameFromPattern("Unknown error occurred <*>", "mystream", true);
     expect(name).toMatch(/^Anomaly_/);
   });
 
   it("includes stream name in alert name", () => {
-    const name = buildAlertNameFromPattern(
-      "User logged in <*>",
-      "prod_logs",
-      false,
-    );
+    const name = buildAlertNameFromPattern("User logged in <*>", "prod_logs", false);
     expect(name).toContain("prod_logs");
   });
 
@@ -221,12 +199,7 @@ describe("buildPatternAlertData", () => {
   });
 
   it("sets isAnomaly true when pattern.is_anomaly is truthy", () => {
-    const data = buildPatternAlertData(
-      { ...mockPattern, is_anomaly: true },
-      "my_stream",
-      15,
-      0,
-    );
+    const data = buildPatternAlertData({ ...mockPattern, is_anomaly: true }, "my_stream", 15, 0);
     expect(data.isAnomaly).toBe(true);
   });
 
@@ -241,5 +214,53 @@ describe("buildPatternAlertData", () => {
     expect(data.patternFrequency).toBe(0);
     expect(data.patternPercentage).toBe(0);
     expect(data.isAnomaly).toBe(false);
+  });
+});
+
+describe("compactCount", () => {
+  it("keeps small numbers verbatim", () => {
+    expect(compactCount(0)).toBe("0");
+    expect(compactCount(812)).toBe("812");
+  });
+
+  it("formats thousands with one decimal below 10K", () => {
+    expect(compactCount(1234)).toBe("1.2K");
+    expect(compactCount(9950)).toBe("9.9K");
+  });
+
+  it("formats larger thousands without decimals", () => {
+    expect(compactCount(45600)).toBe("46K");
+    expect(compactCount(206275)).toBe("206K");
+  });
+
+  it("formats millions and billions", () => {
+    expect(compactCount(1_234_567)).toBe("1.2M");
+    expect(compactCount(2_500_000_000)).toBe("2.5B");
+  });
+});
+
+describe("formatBucketDuration", () => {
+  // Stand-in for vue-i18n's plural handling: pick the form by n.
+  const t = (key: string, named: Record<string, unknown>) => {
+    const n = Number(named.n);
+    const unit = key.replace("logs.patternList.duration", "").toLowerCase();
+    const word = n === 1 ? unit.slice(0, -1) : unit;
+    return `${n} ${word}`;
+  };
+
+  it("uses the largest whole unit that fits", () => {
+    expect(formatBucketDuration(1680, t)).toBe("28 minutes");
+    expect(formatBucketDuration(3600, t)).toBe("1 hour");
+    expect(formatBucketDuration(7200, t)).toBe("2 hours");
+    expect(formatBucketDuration(86400, t)).toBe("1 day");
+  });
+
+  it("falls back to seconds when it isn't a whole minute", () => {
+    expect(formatBucketDuration(45, t)).toBe("45 seconds");
+    expect(formatBucketDuration(90, t)).toBe("90 seconds");
+  });
+
+  it("never reports a zero-length bucket", () => {
+    expect(formatBucketDuration(0, t)).toBe("1 second");
   });
 });

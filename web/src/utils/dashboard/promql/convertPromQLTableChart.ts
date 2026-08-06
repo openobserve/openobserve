@@ -15,10 +15,7 @@
 
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import {
-  getUnitValue,
-  formatUnitValue,
-} from "../convertDataIntoUnitValue";
+import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { formatDate } from "../dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import {
@@ -35,13 +32,7 @@ import {
 export class TableConverter implements PromQLChartConverter {
   supportedTypes = ["table"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any) {
     // Build columns from metric labels + value
     const columns = this.buildColumns(processedData, panelSchema);
 
@@ -49,7 +40,7 @@ export class TableConverter implements PromQLChartConverter {
     const rows = this.buildRows(processedData, panelSchema, store);
 
     // Return the same structure as SQL tables (convertTableData)
-    // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
+    // TableRenderer component (table) handles pagination, sorting, filtering automatically
     const result = {
       rows,
       columns,
@@ -65,22 +56,15 @@ export class TableConverter implements PromQLChartConverter {
    * Note: Sticky columns remain in their ordered position (they don't move to front)
    * Sticky is just a CSS property for horizontal scrolling
    */
-  private applyColumnOrdering(
-    labelKeys: string[],
-    config: any,
-  ): string[] {
-    const columnOrder = config.column_order || [];
+  private applyColumnOrdering(labelKeys: string[], config: any): string[] {
+    const columnOrder: string[] = config.column_order || [];
 
     // Apply custom ordering if specified
     if (columnOrder.length > 0) {
       // First: columns in column_order (in that order)
-      const orderedKeys = columnOrder.filter((key) =>
-        labelKeys.includes(key),
-      );
+      const orderedKeys = columnOrder.filter((key) => labelKeys.includes(key));
       // Then: columns not in column_order (alphabetically)
-      const unorderedKeys = labelKeys
-        .filter((key) => !columnOrder.includes(key))
-        .sort();
+      const unorderedKeys = labelKeys.filter((key) => !columnOrder.includes(key)).sort();
       return [...orderedKeys, ...unorderedKeys];
     } else {
       // Default: alphabetical sort
@@ -95,10 +79,7 @@ export class TableConverter implements PromQLChartConverter {
    * Supports sticky columns: mark columns as sticky to keep them visible while scrolling
    * Supports column ordering: custom order for visible, non-sticky columns via config
    */
-  private buildColumns(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-  ): any[] {
+  private buildColumns(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
@@ -111,11 +92,7 @@ export class TableConverter implements PromQLChartConverter {
     const valueMappingCache = buildValueMappingCache(mappings);
 
     // ── Shared column factories (one definition per column kind) ──────────────
-    const baseColumn = (
-      name: string,
-      label: string,
-      defaultAlign: string,
-    ): any => {
+    const baseColumn = (name: string, label: string, defaultAlign: string): any => {
       const col: any = { name, field: name, label, sortable: true };
       applyColumnOverrides(col, name.toLowerCase(), maps, defaultAlign);
       return col;
@@ -130,18 +107,18 @@ export class TableConverter implements PromQLChartConverter {
       const mapped = lookupValueMapping(val, valueMappingCache);
       if (mapped != null) return mapped;
       const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
-      const customUnitToUse =
-        unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
-      return formatUnitValue(
-        getUnitValue(val, unitToUse, customUnitToUse, config?.decimals),
-      );
+      const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
+      return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
     };
 
+    // `mono` on the timestamp and value columns matches the rule the SQL table
+    // converters already apply (`isNumber || isTimestamp`) and the monospace
+    // cells in logs and traces, so digits line up column-to-column. Label
+    // columns hold free text and stay in the sans face.
     const makeTimestampColumn = (sticky = false): any => ({
       ...baseColumn("timestamp", "Timestamp", "left"),
-      ...(sticky
-        ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" }
-        : {}),
+      mono: true,
+      ...(sticky ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" } : {}),
     });
 
     const makeLabelColumn = (key: string, sticky = false): any => ({
@@ -154,29 +131,22 @@ export class TableConverter implements PromQLChartConverter {
 
     const makeValueColumn = (name: string, label: string): any => ({
       ...baseColumn(name, label, "right"),
+      mono: true,
       format: valueFormat(name.toLowerCase()),
     });
 
     const filterLabelKeys = (keys: string[]): string[] => {
-      if (
-        Array.isArray(config.visible_columns) &&
-        config.visible_columns.length > 0
-      ) {
+      if (Array.isArray(config.visible_columns) && config.visible_columns.length > 0) {
         return keys.filter((k) => config.visible_columns.includes(k));
       }
-      if (
-        Array.isArray(config.hidden_columns) &&
-        config.hidden_columns.length > 0
-      ) {
+      if (Array.isArray(config.hidden_columns) && config.hidden_columns.length > 0) {
         return keys.filter((k) => !config.hidden_columns.includes(k));
       }
       return keys;
     };
 
     // Get selected aggregations (default: ['last'])
-    const aggregations = config.table_aggregations || [
-      config.aggregation || "last",
-    ];
+    const aggregations = config.table_aggregations || [config.aggregation || "last"];
 
     // In "single" (Timestamp) mode, show timestamp + value columns
     if (tableMode === "single") {
@@ -225,10 +195,7 @@ export class TableConverter implements PromQLChartConverter {
     const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
 
     const columns: any[] = sortedLabelKeys.map((key, index) =>
-      makeLabelColumn(
-        key,
-        stickyColumns.includes(key) || (makeFirstSticky && index === 0),
-      ),
+      makeLabelColumn(key, stickyColumns.includes(key) || (makeFirstSticky && index === 0)),
     );
 
     aggregations.forEach((agg: string) => {
@@ -237,8 +204,6 @@ export class TableConverter implements PromQLChartConverter {
       columns.push(makeValueColumn(columnName, columnLabel));
     });
 
-    // Timestamp column removed as per user request
-
     return columns;
   }
 
@@ -246,26 +211,20 @@ export class TableConverter implements PromQLChartConverter {
    * Build table rows from processed data
    * Supports multi-aggregation: calculates all selected aggregations for each series
    */
-  private buildRows(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-  ): any[] {
+  private buildRows(processedData: ProcessedPromQLData[], panelSchema: any, store: any): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
     const rows: any[] = [];
 
     // Get selected aggregations (default: ['last'])
-    const aggregations = config.table_aggregations || [
-      config.aggregation || "last",
-    ];
+    const aggregations = config.table_aggregations || [config.aggregation || "last"];
 
     // In "single" (Timestamp) mode, create rows with timestamp + value for ALL series
     if (tableMode === "single") {
       const timezone = store.state.timezone;
 
-      processedData.forEach((queryData, qIndex) => {
-        queryData.series.forEach((seriesData, sIndex) => {
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
           // Create a row for each data point
           seriesData.values.forEach(([timestamp, value]) => {
             rows.push({
@@ -289,8 +248,8 @@ export class TableConverter implements PromQLChartConverter {
     if (tableMode === "expanded_timeseries") {
       const timezone = store.state.timezone;
 
-      processedData.forEach((queryData, qIndex) => {
-        queryData.series.forEach((seriesData, sIndex) => {
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
           // Create a row for each data point with all metadata
           seriesData.values.forEach(([timestamp, value]) => {
             const row: any = {
@@ -313,8 +272,8 @@ export class TableConverter implements PromQLChartConverter {
     }
 
     // In "all" (Aggregate) mode, create rows with metric labels and aggregated values
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         // Create row with metric labels
         const row: any = {
           ...seriesData.metric,
@@ -324,8 +283,7 @@ export class TableConverter implements PromQLChartConverter {
 
         // Calculate each aggregation for the series
         aggregations.forEach((agg: string) => {
-          const columnName =
-            aggregations.length === 1 ? "value" : `value_${agg}`;
+          const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
           row[columnName] = applyAggregation(seriesData.values, agg);
         });
 

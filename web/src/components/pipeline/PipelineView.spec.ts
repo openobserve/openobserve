@@ -19,7 +19,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import PipelineView from "@/components/pipeline/PipelineView.vue";
 
-
 // --------------------------------------------------------------------------
 // Module mocks
 // --------------------------------------------------------------------------
@@ -79,9 +78,9 @@ vi.mock("@/plugins/pipelines/CustomNode.vue", () => ({
   },
 }));
 
-vi.mock("@/plugins/pipelines/CustomEdge.vue", () => ({
+vi.mock("@/components/flow/FlowEdge.vue", () => ({
   default: {
-    name: "CustomEdge",
+    name: "FlowEdge",
     template: '<div data-test="custom-edge">{{ id }}</div>',
     props: [
       "id",
@@ -148,7 +147,7 @@ function createWrapper(pipeline: Record<string, any> = mockPipeline) {
           props: ["nodes", "edges", "options", "defaultViewport"],
         },
         CustomNode: true,
-        CustomEdge: true,
+        FlowEdge: true,
         DropzoneBackground: true,
         Controls: true,
         ControlButton: true,
@@ -187,9 +186,9 @@ describe("PipelineView.vue", () => {
       expect(wrapper.classes()).toContain("pipeline-view-tooltip");
     });
 
-    it("has container as root class", () => {
+    it("has o2-scroll-container as root class", () => {
       wrapper = createWrapper();
-      expect(wrapper.classes()).toContain("container");
+      expect(wrapper.classes()).toContain("o2-scroll-container");
     });
 
     it("renders the VueFlow component stub", () => {
@@ -287,9 +286,7 @@ describe("PipelineView.vue", () => {
       expect(wrapper.vm.lockedNodes).toHaveLength(3);
       await wrapper.setProps({
         pipeline: {
-          nodes: [
-            { id: "x1", io_type: "input", position: { x: 0, y: 0 }, data: {} },
-          ],
+          nodes: [{ id: "x1", io_type: "input", position: { x: 0, y: 0 }, data: {} }],
           edges: [],
         },
       });
@@ -495,10 +492,10 @@ describe("PipelineView.vue", () => {
   // -----------------------------------------------------------------------
 
   describe("CSS and styling", () => {
-    it("root element has pipeline-view-tooltip and container classes", () => {
+    it("root element has pipeline-view-tooltip and o2-scroll-container classes", () => {
       wrapper = createWrapper();
       expect(wrapper.classes()).toContain("pipeline-view-tooltip");
-      expect(wrapper.classes()).toContain("container");
+      expect(wrapper.classes()).toContain("o2-scroll-container");
     });
   });
 

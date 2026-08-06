@@ -17,6 +17,7 @@ mod entry;
 pub mod errors;
 mod immutable;
 mod memtable;
+mod pack;
 mod partition;
 mod rwmap;
 mod stream;
@@ -35,6 +36,11 @@ pub use entry::Entry;
 pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
+};
+pub use pack::{
+    PackSegment, PackSegmentMeta, PendingStreamStats, collect_pack_metrics,
+    get_pending_stream_stats, get_segment_index_stats, get_stream_segments, mark_segments_consumed,
+    read_from_pack, read_segment,
 };
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
@@ -71,8 +77,8 @@ pub struct ProcessedBatch {
     pub bytes_entries: Vec<Vec<u8>>,
     /// Arrow RecordBatch entries for Memtable writing
     pub batch_entries: Vec<Arc<entry::RecordBatchEntry>>,
-    /// Total JSON size for rotation check
-    pub entries_json_size: usize,
+    /// Total serialized WAL bytes for rotation check
+    pub entries_wal_size: usize,
     /// Total Arrow size for rotation check
     pub entries_arrow_size: usize,
 }
@@ -84,7 +90,7 @@ impl ProcessedBatch {
             entries: Vec::new(),
             bytes_entries: Vec::new(),
             batch_entries: Vec::new(),
-            entries_json_size: 0,
+            entries_wal_size: 0,
             entries_arrow_size: 0,
         }
     }
@@ -104,11 +110,20 @@ pub async fn init() -> errors::Result<()> {
         path: wal_dir.clone(),
     })?;
 
-    // check uncompleted parquet files, need delete those files
-    wal::check_uncompleted_parquet_files().await?;
+    // must run before pack::init and wal replay: a lock-referenced .pack.tmp
+    // is finished data, not an orphan
+    wal::check_uncompleted_lock_files().await?;
+
+    // clean orphan tmp pack files and rebuild the pack segment index
+    pack::init().await?;
 
     // replay wal files
+    let process_start = std::time::SystemTime::now();
     tokio::task::spawn(async move {
+        // wal/files can hold millions of files, clean orphans in the background
+        if let Err(e) = wal::clean_orphan_par_files(process_start).await {
+            log::error!("Clean orphan par files error: {e}");
+        }
         log::info!("Scanning wal files from {wal_dir:?}");
         let wal_files = wal::wal_scan_files(&wal_dir, "wal")
             .await

@@ -10,7 +10,7 @@ import type {
   RelativeUnit,
   DateTimeMode,
 } from "./ODateTimeRange.types";
-import { computed, ref, useAttrs, watch } from "vue";
+import { computed, ref, useAttrs, watch, type Ref } from "vue";
 import {
   PopoverRoot,
   PopoverTrigger,
@@ -33,6 +33,9 @@ import OTime from "@/lib/forms/Time/OTime.vue";
 import { parseDate } from "@internationalized/date";
 import type { DateValue } from "@internationalized/date";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   startDate: "",
@@ -48,7 +51,8 @@ const props = withDefaults(defineProps<DateTimeRangeProps>(), {
   hideTime: false,
   showTimezone: false,
   disabled: false,
-  placeholder: "Select date range",
+  // No default here: t() cannot run at module scope, so the English fallback is
+  // resolved reactively below (see `placeholderText`).
 });
 
 const emit = defineEmits<DateTimeRangeEmits>();
@@ -59,7 +63,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -74,10 +78,11 @@ const popoverOpen = computed({
 
 // ── Staged state ───────────────────────────────────────────────
 const activeTab = ref<DateTimeMode>(props.disableRelative ? "absolute" : props.mode);
+// Cast: ref() deep-unwraps DateRange's class members structurally, breaking DateRange bindings
 const stagedRange = ref<DateRange>({
   start: props.startDate ? tryParseDate(props.startDate) : undefined,
   end: props.endDate ? tryParseDate(props.endDate) : undefined,
-} as DateRange);
+} as DateRange) as Ref<DateRange>;
 const stagedStartTime = ref(props.startTime);
 const stagedEndTime = ref(props.endTime);
 const stagedTimezone = ref(props.timezone ?? "");
@@ -115,14 +120,7 @@ function tryParseDate(s: string): DateValue | undefined {
 }
 
 // ── Relative config ────────────────────────────────────────────
-const RELATIVE_UNITS: RelativeUnit[] = [
-  "seconds",
-  "minutes",
-  "hours",
-  "days",
-  "weeks",
-  "months",
-];
+const RELATIVE_UNITS: RelativeUnit[] = ["seconds", "minutes", "hours", "days", "weeks", "months"];
 
 const RELATIVE_OPTIONS: Record<RelativeUnit, number[]> = {
   seconds: [1, 5, 10, 15, 30, 45],
@@ -159,8 +157,9 @@ function isRelativeDisabled(unit: RelativeUnit, amount: number): boolean {
 // ── Timezones ──────────────────────────────────────────────────
 const timezones = computed((): string[] => {
   const list: string[] =
-    (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
-      .supportedValuesOf?.("timeZone") ?? [];
+    (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.(
+      "timeZone",
+    ) ?? [];
   return ["", "UTC", ...list.filter((t) => t !== "UTC")];
 });
 
@@ -174,9 +173,7 @@ const tzOpen = ref(false);
 const filteredTimezones = computed((): string[] => {
   const term = tzSearch.value.trim().toLowerCase();
   if (!term) return timezones.value;
-  return timezones.value.filter((tz) =>
-    tzLabel(tz).toLowerCase().includes(term),
-  );
+  return timezones.value.filter((tz) => tzLabel(tz).toLowerCase().includes(term));
 });
 
 function selectTimezone(tz: string) {
@@ -186,6 +183,8 @@ function selectTimezone(tz: string) {
 }
 
 // ── Trigger label ──────────────────────────────────────────────
+const placeholderText = computed((): string => props.placeholder ?? t("common.selectDateRange"));
+
 const triggerLabel = computed((): string => {
   if (props.mode === "relative" && (props.relativeAmount ?? 0) > 0) {
     return formatRelativeLabel(props.relativeUnit, props.relativeAmount);
@@ -196,7 +195,7 @@ const triggerLabel = computed((): string => {
     if (start && end) return `${start} → ${end}`;
     return start || end;
   }
-  return props.placeholder ?? "Select date range";
+  return placeholderText.value;
 });
 
 function formatRelativeLabel(unit: RelativeUnit, amount: number): string {
@@ -226,7 +225,7 @@ const rangeLabel = computed((): string | null => {
   if (!start && !end) return null;
   return start && end
     ? `${start.toString()} — ${end.toString()}`
-    : (start ?? end)?.toString() ?? null;
+    : ((start ?? end)?.toString() ?? null);
 });
 
 function handleRangeChange(value: DateRange | undefined) {
@@ -291,36 +290,36 @@ function handleApply() {
 
 // ── Trigger styling ────────────────────────────────────────────
 const hasError = computed(() => !!props.errorMessage);
-const isPlaceholder = computed(
-  () => triggerLabel.value === (props.placeholder ?? "Select date range"),
-);
+const isPlaceholder = computed(() => triggerLabel.value === placeholderText.value);
 
 const triggerClasses = computed(() => [
-  "tw:flex tw:items-center tw:gap-2 tw:w-full tw:min-h-10 tw:px-3 tw:rounded-md tw:border tw:text-sm tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:bg-datepicker-bg",
+  "flex items-center gap-2 w-full min-h-10 px-3 rounded-default border text-sm transition-[color,background-color,border-color,box-shadow] duration-150 outline-none ring-offset-1 ring-offset-surface-base focus-visible:ring-2 focus-visible:ring-datepicker-focus-ring bg-datepicker-bg",
   hasError.value
-    ? "tw:border-datepicker-error-border"
-    : "tw:border-datepicker-border tw:hover:border-datepicker-hover-border",
+    ? "border-datepicker-error-border"
+    : "border-datepicker-border hover:border-datepicker-hover-border",
   props.disabled
-    ? "tw:opacity-60 tw:cursor-not-allowed tw:bg-datepicker-disabled-bg tw:border-datepicker-disabled-border"
-    : "tw:cursor-pointer",
+    ? "opacity-60 cursor-not-allowed bg-datepicker-disabled-bg border-datepicker-disabled-border"
+    : "cursor-pointer",
 ]);
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <!-- Label -->
     <div
       v-if="$slots.label || label || $slots.tooltip"
-      class="tw:text-xs tw:font-medium tw:text-datepicker-label tw:leading-none tw:flex tw:items-center tw:gap-1"
+      class="text-datepicker-label flex items-center gap-1 text-xs leading-none font-medium"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help tw:text-datepicker-label"
-      ><slot name="tooltip" /></OIcon>
+        class="text-datepicker-label cursor-help"
+        ><slot name="tooltip"
+      /></OIcon>
     </div>
 
     <!-- Trigger + Popover -->
@@ -340,32 +339,27 @@ const triggerClasses = computed(() => [
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            class="tw:size-4 tw:shrink-0 tw:text-datepicker-icon"
+            class="text-datepicker-icon size-4 shrink-0"
             aria-hidden="true"
           >
             <path
               d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13Zm0 12a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11Z"
             />
-            <path
-              d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z"
-            />
+            <path d="M8 4a.5.5 0 0 1 .5.5V8H11a.5.5 0 0 1 0 1H7.5V4.5A.5.5 0 0 1 8 4Z" />
           </svg>
           <!-- Label -->
           <span
-            class="tw:flex-1 tw:truncate"
-            :class="
-              isPlaceholder
-                ? 'tw:text-datepicker-placeholder'
-                : 'tw:text-datepicker-text'
-            "
-          >{{ triggerLabel }}</span>
+            class="flex-1 truncate"
+            :class="isPlaceholder ? 'text-datepicker-placeholder' : 'text-datepicker-text'"
+            >{{ triggerLabel }}</span
+          >
           <!-- Chevron -->
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 16 16"
             fill="currentColor"
-            class="tw:size-4 tw:shrink-0 tw:text-datepicker-icon tw:transition-transform"
-            :class="popoverOpen ? 'tw:rotate-180' : ''"
+            class="text-datepicker-icon size-4 shrink-0 transition-transform"
+            :class="popoverOpen ? 'rotate-180' : ''"
             aria-hidden="true"
           >
             <path
@@ -380,129 +374,121 @@ const triggerClasses = computed(() => [
       <PopoverContent
         :side-offset="4"
         align="start"
-        class="tw:z-50 tw:rounded-lg tw:border tw:shadow-lg tw:bg-datepicker-popup-bg tw:border-datepicker-popup-border tw:w-80 tw:outline-none"
+        class="rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-50 w-80 border shadow-lg outline-none"
         data-test="datetimerange-popup"
       >
         <!-- Tab bar -->
         <div
           v-if="!disableRelative"
-          class="tw:flex tw:border-b tw:border-datepicker-popup-border"
+          class="border-datepicker-popup-border flex border-b"
           data-test="datetimerange-tabs"
         >
           <button
             type="button"
             :class="[
-              'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
+              'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring flex-1 border-b-2 py-2.5 text-sm ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
               activeTab === 'relative'
-                ? 'tw:font-medium tw:border-datepicker-day-selected-bg tw:text-datepicker-day-selected-bg'
-                : 'tw:border-transparent tw:text-datepicker-weekday-text tw:hover:text-datepicker-heading-text',
+                ? 'border-datepicker-day-selected-bg text-datepicker-day-selected-bg font-medium'
+                : 'text-datepicker-weekday-text hover:text-datepicker-heading-text border-transparent',
             ]"
             data-test="datetimerange-tab-relative"
             @click="activeTab = 'relative'"
           >
-            Relative
+            {{ t("common.relative") }}
           </button>
           <button
             type="button"
             :class="[
-              'tw:flex-1 tw:py-2.5 tw:text-sm tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:border-b-2 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
+              'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring flex-1 border-b-2 py-2.5 text-sm ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
               activeTab === 'absolute'
-                ? 'tw:font-medium tw:border-datepicker-day-selected-bg tw:text-datepicker-day-selected-bg'
-                : 'tw:border-transparent tw:text-datepicker-weekday-text tw:hover:text-datepicker-heading-text',
+                ? 'border-datepicker-day-selected-bg text-datepicker-day-selected-bg font-medium'
+                : 'text-datepicker-weekday-text hover:text-datepicker-heading-text border-transparent',
             ]"
             data-test="datetimerange-tab-absolute"
             @click="activeTab = 'absolute'"
           >
-            Absolute
+            {{ t("common.absolute") }}
           </button>
         </div>
 
         <!-- ── RELATIVE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'relative'"
-          class="tw:p-3 tw:flex tw:flex-col tw:gap-2"
+          class="flex flex-col gap-2 p-3"
           data-test="datetimerange-relative-panel"
         >
           <!-- Quick-select rows -->
-          <div
-            v-for="unit in RELATIVE_UNITS"
-            :key="unit"
-            class="tw:flex tw:items-center tw:gap-2"
-          >
-            <span
-              class="tw:w-14 tw:text-xs tw:text-datepicker-relative-label tw:shrink-0 tw:capitalize"
-            >{{ UNIT_LABELS[unit] }}</span>
-            <div class="tw:flex tw:gap-1 tw:flex-wrap">
+          <div v-for="unit in RELATIVE_UNITS" :key="unit" class="flex items-center gap-2">
+            <span class="text-datepicker-relative-label w-14 shrink-0 text-xs capitalize">{{
+              UNIT_LABELS[unit]
+            }}</span>
+            <div class="flex flex-wrap gap-1">
               <button
                 v-for="val in RELATIVE_OPTIONS[unit]"
                 :key="val"
                 type="button"
                 :disabled="isRelativeDisabled(unit, val) || disabled"
                 :class="[
-                  'tw:w-8 tw:h-7 tw:rounded tw:text-xs tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:tabular-nums',
-                  stagedRelativeUnit === unit && stagedRelativeAmount === val && !isRelativeDisabled(unit, val)
-                    ? 'tw:bg-datepicker-relative-btn-selected-bg tw:text-datepicker-relative-btn-selected-text'
+                  'rounded-default ring-offset-surface-base focus-visible:ring-datepicker-focus-ring h-7 w-8 text-xs tabular-nums ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
+                  stagedRelativeUnit === unit &&
+                  stagedRelativeAmount === val &&
+                  !isRelativeDisabled(unit, val)
+                    ? 'bg-datepicker-relative-btn-selected-bg text-datepicker-relative-btn-selected-text'
                     : isRelativeDisabled(unit, val)
-                      ? 'tw:bg-datepicker-relative-btn-bg tw:text-datepicker-day-disabled-text tw:cursor-not-allowed'
-                      : 'tw:bg-datepicker-relative-btn-bg tw:text-datepicker-relative-btn-text tw:hover:bg-datepicker-relative-btn-hover-bg tw:cursor-pointer',
+                      ? 'bg-datepicker-relative-btn-bg text-datepicker-day-disabled-text cursor-not-allowed'
+                      : 'bg-datepicker-relative-btn-bg text-datepicker-relative-btn-text hover:bg-datepicker-relative-btn-hover-bg cursor-pointer',
                 ]"
                 @click="selectRelative(unit, val)"
-              >{{ val }}</button>
+              >
+                {{ val }}
+              </button>
             </div>
           </div>
 
           <!-- Custom row -->
-          <div
-            class="tw:flex tw:items-center tw:gap-2 tw:mt-1 tw:pt-2 tw:border-t tw:border-datepicker-popup-border"
-          >
-            <span
-              class="tw:w-14 tw:text-xs tw:text-datepicker-relative-label tw:shrink-0"
-            >Custom</span>
+          <div class="border-datepicker-popup-border mt-1 flex items-center gap-2 border-t pt-2">
+            <span class="text-datepicker-relative-label w-14 shrink-0 text-xs">{{
+              t("common.custom")
+            }}</span>
             <input
               v-model="customAmount"
               type="number"
               min="1"
               :disabled="disabled"
-              class="tw:w-16 tw:h-7 tw:rounded tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:focus:border-datepicker-focus-border tw:tabular-nums tw:disabled:opacity-50"
+              class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 w-16 border px-2 text-xs tabular-nums outline-none disabled:opacity-50"
               data-test="datetimerange-custom-amount"
               @keydown.enter="applyCustomRelative"
             />
             <select
               v-model="customUnit"
               :disabled="disabled"
-              class="tw:flex-1 tw:h-7 tw:rounded tw:border tw:border-datepicker-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:focus:border-datepicker-focus-border tw:disabled:opacity-50"
+              class="rounded-default border-datepicker-border bg-datepicker-bg text-datepicker-text focus:border-datepicker-focus-border h-7 flex-1 border px-2 text-xs outline-none disabled:opacity-50"
               data-test="datetimerange-custom-unit"
             >
-              <option
-                v-for="u in RELATIVE_UNITS"
-                :key="u"
-                :value="u"
-              >{{ UNIT_LABELS[u] }}</option>
+              <option v-for="u in RELATIVE_UNITS" :key="u" :value="u">{{ UNIT_LABELS[u] }}</option>
             </select>
           </div>
 
           <!-- Timezone row -->
           <div
             v-if="showTimezone"
-            class="tw:flex tw:flex-col tw:gap-1 tw:pt-2 tw:border-t tw:border-datepicker-popup-border"
+            class="border-datepicker-popup-border flex flex-col gap-1 border-t pt-2"
           >
-            <span
-              class="tw:text-xs tw:text-datepicker-relative-label"
-            >Timezone</span>
+            <span class="text-datepicker-relative-label text-xs">{{ t("common.timezone") }}</span>
             <button
               type="button"
               :disabled="disabled"
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-7 tw:rounded tw:border tw:border-datepicker-inner-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-xs tw:px-2 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="rounded-default border-datepicker-inner-border bg-datepicker-bg text-datepicker-text flex h-7 w-full items-center justify-between border px-2 text-xs outline-none disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-timezone-trigger"
               @click="!disabled && (tzOpen = !tzOpen)"
             >
-              <span class="tw:truncate">{{ tzLabel(stagedTimezone) }}</span>
+              <span class="truncate">{{ tzLabel(stagedTimezone) }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-3 tw:shrink-0 tw:text-datepicker-icon tw:transition-transform"
-                :class="tzOpen ? 'tw:rotate-180' : ''"
+                class="text-datepicker-icon size-3 shrink-0 transition-transform"
+                :class="tzOpen ? 'rotate-180' : ''"
                 aria-hidden="true"
               >
                 <path
@@ -514,33 +500,37 @@ const triggerClasses = computed(() => [
             </button>
             <div
               v-if="tzOpen && !disabled"
-              class="tw:rounded tw:border tw:border-datepicker-inner-border tw:overflow-hidden"
+              class="rounded-default border-datepicker-inner-border overflow-hidden border"
             >
               <input
                 v-model="tzSearch"
                 type="text"
-                placeholder="Search timezone..."
+                :placeholder="t('components.dateTimeRange.searchTimezonePlaceholder')"
                 autofocus
-                class="tw:w-full tw:h-7 tw:px-2 tw:text-xs tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-inner-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
+                class="bg-datepicker-bg text-datepicker-text border-datepicker-inner-border focus:border-datepicker-focus-border placeholder:text-datepicker-placeholder h-7 w-full border-b px-2 text-xs outline-none"
                 data-test="datetimerange-timezone-search"
               />
-              <div class="tw:overflow-y-auto tw:max-h-36 tw:bg-datepicker-bg">
+              <div class="bg-datepicker-bg max-h-36 overflow-y-auto">
                 <button
                   v-for="tz in filteredTimezones"
                   :key="tz"
                   type="button"
                   :class="[
-                    'tw:w-full tw:text-left tw:px-2 tw:py-1 tw:text-xs tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
+                    'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring w-full px-2 py-1 text-left text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                     stagedTimezone === tz
-                      ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
-                      : 'tw:text-datepicker-text tw:hover:bg-datepicker-relative-btn-hover-bg',
+                      ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
+                      : 'text-datepicker-text hover:bg-datepicker-relative-btn-hover-bg',
                   ]"
                   @click="selectTimezone(tz)"
-                >{{ tzLabel(tz) }}</button>
+                >
+                  {{ tzLabel(tz) }}
+                </button>
                 <div
                   v-if="filteredTimezones.length === 0"
-                  class="tw:px-2 tw:py-2 tw:text-xs tw:text-datepicker-weekday-text"
-                >No timezones found</div>
+                  class="text-datepicker-weekday-text px-2 py-2 text-xs"
+                >
+                  {{ t("components.dateTimeRange.noTimezonesFound") }}
+                </div>
               </div>
             </div>
           </div>
@@ -548,22 +538,24 @@ const triggerClasses = computed(() => [
           <!-- Apply -->
           <div
             v-if="!autoApply"
-            class="tw:flex tw:justify-end tw:pt-2 tw:border-t tw:border-datepicker-popup-border"
+            class="border-datepicker-popup-border flex justify-end border-t pt-2"
           >
             <button
               type="button"
               :disabled="disabled || stagedRelativeAmount <= 0"
-              class="tw:px-4 tw:py-1.5 tw:rounded tw:text-sm tw:font-medium tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-relative-apply"
               @click="commitRelative"
-            >Apply</button>
+            >
+              {{ t("common.apply") }}
+            </button>
           </div>
         </div>
 
         <!-- ── ABSOLUTE TAB ──────────────────────────────────── -->
         <div
           v-if="activeTab === 'absolute'"
-          class="tw:p-3 tw:flex tw:flex-col tw:gap-3 tw:overflow-y-auto tw:max-h-[70vh]"
+          class="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-3"
           data-test="datetimerange-absolute-panel"
         >
           <!-- Range calendar -->
@@ -576,17 +568,15 @@ const triggerClasses = computed(() => [
             @update:model-value="handleRangeChange"
           >
             <template #default="{ weekDays, grid }">
-              <RangeCalendarHeader
-                class="tw:flex tw:items-center tw:justify-between tw:mb-3"
-              >
+              <RangeCalendarHeader class="mb-3 flex items-center justify-between">
                 <RangeCalendarPrev
-                  class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+                  class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 16 16"
                     fill="currentColor"
-                    class="tw:size-4"
+                    class="size-4"
                     aria-hidden="true"
                   >
                     <path
@@ -596,17 +586,15 @@ const triggerClasses = computed(() => [
                     />
                   </svg>
                 </RangeCalendarPrev>
-                <RangeCalendarHeading
-                  class="tw:text-sm tw:font-medium tw:text-datepicker-heading-text"
-                />
+                <RangeCalendarHeading class="text-datepicker-heading-text text-sm font-medium" />
                 <RangeCalendarNext
-                  class="tw:flex tw:items-center tw:justify-center tw:size-7 tw:rounded tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-icon tw:hover:bg-datepicker-nav-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring"
+                  class="rounded-default ring-offset-surface-base text-datepicker-icon hover:bg-datepicker-nav-hover-bg focus-visible:ring-datepicker-focus-ring flex size-7 items-center justify-center ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     viewBox="0 0 16 16"
                     fill="currentColor"
-                    class="tw:size-4"
+                    class="size-4"
                     aria-hidden="true"
                   >
                     <path
@@ -618,16 +606,13 @@ const triggerClasses = computed(() => [
                 </RangeCalendarNext>
               </RangeCalendarHeader>
 
-              <RangeCalendarGrid
-                v-for="month in grid"
-                :key="month.value.toString()"
-              >
+              <RangeCalendarGrid v-for="month in grid" :key="month.value.toString()">
                 <RangeCalendarGridHead>
-                  <RangeCalendarGridRow class="tw:flex tw:gap-1 tw:mb-1">
+                  <RangeCalendarGridRow class="mb-1 flex gap-1">
                     <RangeCalendarHeadCell
                       v-for="day in weekDays"
                       :key="day"
-                      class="tw:w-8 tw:h-6 tw:flex tw:items-center tw:justify-center tw:text-xs tw:font-medium tw:text-datepicker-weekday-text"
+                      class="text-datepicker-weekday-text flex h-6 w-8 items-center justify-center text-xs font-medium"
                     >
                       {{ day }}
                     </RangeCalendarHeadCell>
@@ -637,7 +622,7 @@ const triggerClasses = computed(() => [
                   <RangeCalendarGridRow
                     v-for="(weekDates, idx) in month.rows"
                     :key="idx"
-                    class="tw:flex tw:gap-1 tw:mb-1"
+                    class="mb-1 flex gap-1"
                   >
                     <RangeCalendarCell
                       v-for="date in weekDates"
@@ -647,8 +632,9 @@ const triggerClasses = computed(() => [
                       <RangeCalendarCellTrigger
                         :day="date"
                         :month="month.value"
-                        class="tw:flex tw:items-center tw:justify-center tw:size-8 tw:rounded tw:text-xs tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:ring-offset-1 tw:ring-offset-surface-base tw:text-datepicker-day-text tw:hover:bg-datepicker-day-hover-bg tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:data-selected:bg-datepicker-day-selected-bg tw:data-selected:text-datepicker-day-selected-text tw:data-today:border tw:data-today:border-datepicker-day-today-border tw:data-outside-view:text-datepicker-day-outside-text tw:data-unavailable:text-datepicker-day-disabled-text tw:data-unavailable:cursor-not-allowed tw:data-highlighted:bg-datepicker-day-range-bg tw:data-highlighted:text-datepicker-day-range-text tw:data-selection-start:bg-datepicker-day-selected-bg tw:data-selection-start:text-datepicker-day-selected-text tw:data-selection-end:bg-datepicker-day-selected-bg tw:data-selection-end:text-datepicker-day-selected-text"
-                      >{{ date.day }}</RangeCalendarCellTrigger>
+                        class="rounded-default ring-offset-surface-base text-datepicker-day-text hover:bg-datepicker-day-hover-bg focus-visible:ring-datepicker-focus-ring data-selected:bg-datepicker-day-selected-bg data-selected:text-datepicker-day-selected-text data-today:border-datepicker-day-today-border data-outside-view:text-datepicker-day-outside-text data-unavailable:text-datepicker-day-disabled-text data-highlighted:bg-datepicker-day-range-bg data-highlighted:text-datepicker-day-range-text data-selection-start:bg-datepicker-day-selected-bg data-selection-start:text-datepicker-day-selected-text data-selection-end:bg-datepicker-day-selected-bg data-selection-end:text-datepicker-day-selected-text flex size-8 cursor-pointer items-center justify-center text-xs ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 data-today:border data-unavailable:cursor-not-allowed"
+                        >{{ date.day }}</RangeCalendarCellTrigger
+                      >
                     </RangeCalendarCell>
                   </RangeCalendarGridRow>
                 </RangeCalendarGridBody>
@@ -659,17 +645,20 @@ const triggerClasses = computed(() => [
           <!-- Range hint -->
           <p
             v-if="rangeLabel"
-            class="tw:text-xs tw:text-datepicker-weekday-text tw:text-center"
+            class="text-datepicker-weekday-text text-center text-xs"
             aria-live="polite"
           >
             {{ rangeLabel }}
           </p>
 
           <!-- Start / End time -->
-          <div v-if="!hideTime" class="tw:flex tw:gap-3 tw:[--color-datepicker-border:var(--color-datepicker-inner-border)]">
+          <div
+            v-if="!hideTime"
+            class="flex gap-3 [--color-datepicker-border:var(--color-datepicker-inner-border)]"
+          >
             <OTime
               v-model="stagedStartTime"
-              label="Start time"
+              :label="t('common.startTime')"
               :with-seconds="withSeconds"
               :disabled="disabled"
               data-test="datetimerange-start-time"
@@ -677,7 +666,7 @@ const triggerClasses = computed(() => [
             />
             <OTime
               v-model="stagedEndTime"
-              label="End time"
+              :label="t('common.endTime')"
               :with-seconds="withSeconds"
               :disabled="disabled"
               data-test="datetimerange-end-time"
@@ -686,22 +675,22 @@ const triggerClasses = computed(() => [
           </div>
 
           <!-- Timezone -->
-          <div v-if="showTimezone" class="tw:flex tw:flex-col tw:gap-1">
-            <span class="tw:text-xs tw:text-datepicker-label">Timezone</span>
+          <div v-if="showTimezone" class="flex flex-col gap-1">
+            <span class="text-datepicker-label text-xs">{{ t("common.timezone") }}</span>
             <button
               type="button"
               :disabled="disabled"
-              class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-9 tw:rounded-md tw:border tw:border-datepicker-inner-border tw:bg-datepicker-bg tw:text-datepicker-text tw:text-sm tw:px-3 tw:outline-none tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="rounded-default border-datepicker-inner-border bg-datepicker-bg text-datepicker-text flex h-9 w-full items-center justify-between border px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-timezone-trigger"
               @click="!disabled && (tzOpen = !tzOpen)"
             >
-              <span class="tw:truncate">{{ tzLabel(stagedTimezone) }}</span>
+              <span class="truncate">{{ tzLabel(stagedTimezone) }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-4 tw:shrink-0 tw:text-datepicker-icon tw:transition-transform"
-                :class="tzOpen ? 'tw:rotate-180' : ''"
+                class="text-datepicker-icon size-4 shrink-0 transition-transform"
+                :class="tzOpen ? 'rotate-180' : ''"
                 aria-hidden="true"
               >
                 <path
@@ -713,65 +702,68 @@ const triggerClasses = computed(() => [
             </button>
             <div
               v-if="tzOpen && !disabled"
-              class="tw:rounded-md tw:border tw:border-datepicker-inner-border tw:overflow-hidden"
+              class="rounded-default border-datepicker-inner-border overflow-hidden border"
             >
               <input
                 v-model="tzSearch"
                 type="text"
-                placeholder="Search timezone..."
+                :placeholder="t('components.dateTimeRange.searchTimezonePlaceholder')"
                 autofocus
-                class="tw:w-full tw:h-9 tw:px-3 tw:text-sm tw:bg-datepicker-bg tw:text-datepicker-text tw:border-b tw:border-datepicker-inner-border tw:outline-none tw:focus:border-datepicker-focus-border tw:placeholder:text-datepicker-placeholder"
+                class="bg-datepicker-bg text-datepicker-text border-datepicker-inner-border focus:border-datepicker-focus-border placeholder:text-datepicker-placeholder h-9 w-full border-b px-3 text-sm outline-none"
                 data-test="datetimerange-timezone-search"
               />
-              <div class="tw:overflow-y-auto tw:max-h-40 tw:bg-datepicker-bg">
+              <div class="bg-datepicker-bg max-h-40 overflow-y-auto">
                 <button
                   v-for="tz in filteredTimezones"
                   :key="tz"
                   type="button"
                   :class="[
-                    'tw:w-full tw:text-left tw:px-3 tw:py-1.5 tw:text-sm tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring',
+                    'ring-offset-surface-base focus-visible:ring-datepicker-focus-ring w-full px-3 py-1.5 text-left text-sm ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2',
                     stagedTimezone === tz
-                      ? 'tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text'
-                      : 'tw:text-datepicker-text tw:hover:bg-datepicker-relative-btn-hover-bg',
+                      ? 'bg-datepicker-day-selected-bg text-datepicker-day-selected-text'
+                      : 'text-datepicker-text hover:bg-datepicker-relative-btn-hover-bg',
                   ]"
                   @click="selectTimezone(tz)"
-                >{{ tzLabel(tz) }}</button>
+                >
+                  {{ tzLabel(tz) }}
+                </button>
                 <div
                   v-if="filteredTimezones.length === 0"
-                  class="tw:px-3 tw:py-2 tw:text-sm tw:text-datepicker-weekday-text"
-                >No timezones found</div>
+                  class="text-datepicker-weekday-text px-3 py-2 text-sm"
+                >
+                  {{ t("components.dateTimeRange.noTimezonesFound") }}
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Apply -->
-          <div v-if="!autoApply" class="tw:flex tw:justify-end">
+          <div v-if="!autoApply" class="flex justify-end">
             <button
               type="button"
               :disabled="disabled"
-              class="tw:px-4 tw:py-1.5 tw:rounded tw:text-sm tw:font-medium tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:bg-datepicker-day-selected-bg tw:text-datepicker-day-selected-text tw:hover:opacity-90 tw:focus-visible:ring-2 tw:focus-visible:ring-datepicker-focus-ring tw:disabled:opacity-50 tw:disabled:cursor-not-allowed"
+              class="rounded-default ring-offset-surface-base bg-datepicker-day-selected-bg text-datepicker-day-selected-text focus-visible:ring-datepicker-focus-ring px-4 py-1.5 text-sm font-medium ring-offset-1 transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:opacity-90 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
               data-test="datetimerange-apply"
               @click="handleApply"
-            >Apply</button>
+            >
+              {{ t("common.apply") }}
+            </button>
           </div>
         </div>
       </PopoverContent>
     </PopoverRoot>
 
     <!-- Error / help text -->
-    <div
-      v-if="errorMessage || helpText"
-      class="tw:flex tw:items-center tw:gap-2"
-    >
+    <div v-if="errorMessage || helpText" class="flex items-center gap-2">
       <span
         v-if="errorMessage"
-        class="tw:text-xs tw:text-datepicker-error-text tw:leading-none"
+        class="text-datepicker-error-text text-xs leading-none"
         role="alert"
-      >{{ errorMessage }}</span>
-      <span
-        v-else-if="helpText"
-        class="tw:text-xs tw:text-datepicker-label tw:leading-none"
-      >{{ helpText }}</span>
+        >{{ errorMessage }}</span
+      >
+      <span v-else-if="helpText" class="text-datepicker-label text-xs leading-none">{{
+        helpText
+      }}</span>
     </div>
   </div>
 </template>

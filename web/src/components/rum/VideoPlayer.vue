@@ -15,42 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container tw:h-full tw:p-2 tw:flex tw:flex-col">
+  <div class="player-container flex h-full flex-col p-2">
     <div
       v-if="isLoading"
-      class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:w-full tw:flex-1 tw:min-h-0"
+      class="flex min-h-0 w-full flex-1 items-center justify-center pb-4 text-center"
     >
       <div>
-        <OSpinner
-          size="md"
-          class="tw:mx-auto tw:block"
-          data-test="video-player-loading-indicator"
-        />
-        <div class="tw:text-center tw:w-full">
+        <OSpinner size="md" class="mx-auto block" data-test="video-player-loading-indicator" />
+        <div class="w-full text-center">
           {{ t("rum.loadingSessions") }}
         </div>
       </div>
     </div>
-    <div
-      ref="playerContainerRef"
-      class="tw:flex tw:items-center tw:justify-center tw:flex-1 tw:min-h-0"
-    >
+    <div ref="playerContainerRef" class="flex min-h-0 flex-1 items-center justify-center">
       <div
         ref="playerRef"
         id="player"
-        class="player tw:h-full tw:flex tw:items-center tw:cursor-pointer"
+        class="player flex h-full cursor-pointer items-center"
         @click="togglePlay"
       />
     </div>
-    <div class="tw:w-full tw:p-2 tw:pt-3 controls-container">
+    <div class="controls-container w-full p-2 pt-3">
       <div
         ref="playbackBarRef"
         data-test="video-player-playback-bar"
-        class="tw:w-full tw:h-[0.3125rem] tw:bg-[#ebebeb] tw:mt-2 tw:mb-3 tw:relative tw:cursor-pointer"
+        class="bg-surface-subtle relative mt-2 mb-3 h-[0.3125rem] w-full cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="tw:bg-(--o2-primary-btn-bg)! tw:absolute"
+          class="bg-button-primary! absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -60,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="tw:bg-(--o2-primary-btn-bg)! tw:absolute"
+          class="bg-button-primary! absolute"
           :style="{
             width: '2px',
             left: playerState.progressWidth - 2 + 'px',
@@ -74,16 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="event in events as any[]"
           :key="event.id"
           data-test="video-player-event-marker"
-          class="tw:absolute tw:cursor-pointer"
+          class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
-            width:
-              event.frustration_types && event.frustration_types.length > 0
-                ? '3px'
-                : '2px',
-            left:
-              (event.relativeTime / playerState.totalTime) * playerState.width +
-              'px',
+            width: event.frustration_types && event.frustration_types.length > 0 ? '3px' : '2px',
+            left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
             bottom: '-0.3125rem',
             height:
               event.frustration_types && event.frustration_types.length > 0
@@ -93,41 +81,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="getEventTooltip(event)"
         />
       </div>
-      <div class="controls tw:flex tw:justify-between tw:items-center">
-        <div class="tw:flex tw:items-center">
+      <div class="controls flex items-center justify-between">
+        <div class="flex items-center">
           <div>
             <OIcon
               name="replay-10"
               size="md"
-              class="tw:mr-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+              class="text-icon-color hover:text-button-primary mr-2 cursor-pointer"
               @click="skipTo('backward')"
             />
             <OIcon
-              :name="
-                playerState.isPlaying
-                  ? 'pause-circle-filled'
-                  : 'play-circle-filled'
-              "
+              :name="playerState.isPlaying ? 'pause-circle-filled' : 'play-circle-filled'"
               size="lg"
-              class="tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+              class="text-icon-color hover:text-button-primary cursor-pointer"
               @click="togglePlay"
             />
             <OIcon
               name="forward-10"
               size="md"
-              class="tw:ml-2 tw:cursor-pointer tw:text-[var(--o2-icon-color-dark)] tw:hover:text-[var(--o2-primary-btn-bg)]"
+              class="text-icon-color hover:text-button-primary ml-2 cursor-pointer"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="tw:flex tw:ml-4 tw:items-center">
+          <div class="ml-4 flex items-center">
             <div>{{ playerState.time }}</div>
-            <div class="tw:px-1">/</div>
+            <div class="px-1">/</div>
             <div>{{ playerState.duration }}</div>
           </div>
         </div>
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OSwitch
-            class="tw:mr-3 tw:whitespace-nowrap"
+            class="mr-3 whitespace-nowrap"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
             @update:model-value="toggleSkipInactive"
@@ -158,11 +142,13 @@ import {
   onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
 const props = defineProps({
   events: {
     type: Array,
@@ -178,7 +164,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -204,27 +190,27 @@ const resizeObserver = ref<ResizeObserver | null>(null);
 
 const speedOptions = [
   {
-    label: "0.5x",
+    label: raw("0.5x"),
     value: 0.5,
   },
   {
-    label: "1x",
+    label: raw("1x"),
     value: 1,
   },
   {
-    label: "1.5x",
+    label: raw("1.5x"),
     value: 1.5,
   },
   {
-    label: "2x",
+    label: raw("2x"),
     value: 2,
   },
   {
-    label: "3x",
+    label: raw("3x"),
     value: 3,
   },
   {
-    label: "4x",
+    label: raw("4x"),
     value: 4,
   },
 ];
@@ -332,9 +318,20 @@ const setupSession = async () => {
   session.value = [];
   if (!props.segments.length) return;
 
+  // The SDK v7 serialization emits session-replay snapshots in the compact "Change"
+  // format (FullSnapshot type 2 with format:1 and data:Change[], plus Change records of
+  // type 12). @openobserve/rrweb-player only understands the classic rrweb format, so we
+  // convert here. A single converter instance threads node-id / string-table state across
+  // all records in order (it resets itself on each full snapshot, mirroring the SDK).
+  const recordConverter = createRecordConverter();
+
   props.segments.forEach((segment: any) => {
+    const convertedRecords: any[] = [];
     segment.records.forEach((record: any) => {
-      let segCopy = cloneDeep(record);
+      convertedRecords.push(...recordConverter.convert(cloneDeep(record)));
+    });
+    convertedRecords.forEach((record: any) => {
+      let segCopy = record;
       if (segCopy.type === 8) {
         const seg = {
           ...segCopy,
@@ -364,12 +361,11 @@ const setupSession = async () => {
                       __child.attributes._cssText
                     ) {
                       workerProcessId.value++;
-                      processCss(
-                        __child.attributes._cssText,
-                        workerProcessId.value,
-                      ).then((res: any) => {
-                        __child.attributes._cssText = res.updatedCssString;
-                      });
+                      processCss(__child.attributes._cssText, workerProcessId.value).then(
+                        (res: any) => {
+                          __child.attributes._cssText = res.updatedCssString;
+                        },
+                      );
                     }
                   });
                 }
@@ -465,9 +461,7 @@ const updatePlayerState = () => {
   playerState.value.startTime = playerMeta?.startTime;
   playerState.value.endTime = playerMeta?.endTime;
   playerState.value.totalTime = playerMeta?.totalTime;
-  playerState.value.duration = formatTimeDifference(
-    playerState.value.totalTime,
-  );
+  playerState.value.duration = formatTimeDifference(playerState.value.totalTime);
 
   const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
   // calculate width of progress bar
@@ -477,24 +471,21 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "tw:bg-[#fb923c]! tw:shadow-[0_0_4px_rgba(251,146,60,0.6)]";
+    return "bg-badge-orange-solid-bg! shadow-[0_0_4px_rgba(251,146,60,0.6)]";
   }
   if (event.type === "error") {
-    return "tw:bg-[#ef4444]!";
+    return "bg-badge-error-solid-bg!";
   }
-  return "tw:bg-[#14b8a6]!";
+  return "bg-badge-teal-solid-bg!";
 };
 
 const getEventTooltip = (event: any) => {
-  const eventName =
-    event.name.length > 100 ? event.name.slice(0, 100) + "..." : event.name;
+  const eventName = event.name.length > 100 ? event.name.slice(0, 100) + "..." : event.name;
 
   if (event.frustration_types && event.frustration_types.length > 0) {
     const frustrationLabels = event.frustration_types
       .map((type: string) => {
-        return type
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l: string) => l.toUpperCase());
+        return type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase());
       })
       .join(", ");
     return `⚠️ FRUSTRATION: ${frustrationLabels}\n${eventName}`;
@@ -506,12 +497,8 @@ const getEventTooltip = (event: any) => {
 function formatTimeDifference(milliSeconds: number) {
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
-  let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
-  );
-  let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000,
-  );
+  let minutes: string | number = Math.floor((milliSeconds % (1000 * 60 * 60)) / (1000 * 60));
+  let seconds: string | number = Math.floor((milliSeconds % (1000 * 60)) / 1000);
 
   // Add leading zeros if needed
   hours = hours < 10 ? "0" + hours : hours;
@@ -541,8 +528,7 @@ const handlePlaybackBarClick = (event: any) => {
   const playbackBarEl = playbackBarRef.value.getBoundingClientRect();
 
   let time =
-    ((event.clientX - playbackBarEl.left) / playerState.value.width) *
-    playerState.value.totalTime;
+    ((event.clientX - playbackBarEl.left) / playerState.value.width) * playerState.value.totalTime;
 
   goto(time, playerState.value.isPlaying);
 };
@@ -566,8 +552,9 @@ const pause = () => {
   player.value?.pause();
 };
 
-const setSpeed = (speed: number) => {
-  player.value?.setSpeed(speed);
+const setSpeed = (speed: SelectModelValue) => {
+  // speedOptions are numeric; ignore any non-numeric emission.
+  if (typeof speed === "number") player.value?.setSpeed(speed);
 };
 const toggleSkipInactive = () => {
   player.value?.toggleSkipInactive();
@@ -595,10 +582,9 @@ const skipTo = (skipTo: string) => {
 const initializeWorker = () => {
   if (window.Worker) {
     // Creating the Web Worker
-    worker.value = new Worker(
-      new URL("../../workers/rumcssworker.js", import.meta.url),
-      { type: "module" },
-    );
+    worker.value = new Worker(new URL("../../workers/rumcssworker.js", import.meta.url), {
+      type: "module",
+    });
   } else {
     console.error("Web Workers are not supported in this browser.");
   }
@@ -609,8 +595,7 @@ const processCss = (cssString: string, id: string | number) => {
     if (worker.value) {
       const handleWorkerMessage = (event: any) => {
         if (event.data.id === id) {
-          if (worker.value)
-            worker.value.removeEventListener("message", handleWorkerMessage);
+          if (worker.value) worker.value.removeEventListener("message", handleWorkerMessage);
           resolve(event.data);
         }
       };
@@ -645,4 +630,3 @@ defineExpose({
   updatePlayerState,
 });
 </script>
-

@@ -19,37 +19,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="tw:fixed tw:z-9999 tw:bg-white tw:dark:bg-[#2c2c2c] tw:border tw:border-(--o2-border) tw:dark:border-[#404040] tw:rounded tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)] tw:dark:shadow-[0_2px_8px_rgba(0,0,0,0.4)] tw:min-w-70 tw:py-1 tw:px-0"
+      class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-70 border px-0 py-1 shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('above')"
         data-test="alert-context-menu-above"
       >
-        <OIcon name="arrow-upward" size="sm" class="tw:mr-2" />
-        <span class="tw:select-none">Create Alert with threshold above {{ formattedValue }}</span>
+        <OIcon name="arrow-upward" size="sm" class="mr-2" />
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.thresholdAbove", { value: formattedValue })
+        }}</span>
       </div>
       <div
-        class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:[transition:background-color_0.2s] tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-[var(--o2-border)] tw:dark:text-[var(--o2-border)] tw:dark:hover:bg-[#383838] tw:dark:active:bg-[#404040]"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('below')"
         data-test="alert-context-menu-below"
       >
-        <OIcon name="arrow-downward" size="sm" class="tw:mr-2" />
-        <span class="tw:select-none">Create Alert with threshold below {{ formattedValue }}</span>
+        <OIcon name="arrow-downward" size="sm" class="mr-2" />
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.thresholdBelow", { value: formattedValue })
+        }}</span>
       </div>
     </div>
   </teleport>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
-  name: 'AlertContextMenu',
+  name: "AlertContextMenu",
   components: {
     OIcon,
   },
@@ -71,12 +76,13 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['select', 'close'],
+  emits: ["select", "close"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const menuRef = ref<HTMLElement | null>(null);
 
     const formattedValue = computed(() => {
-      if (typeof props.value === 'number') {
+      if (typeof props.value === "number") {
         return props.value.toLocaleString(undefined, {
           maximumFractionDigits: 2,
         });
@@ -89,8 +95,8 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
-    const handleMenuItemClick = (condition: 'above' | 'below') => {
-      emit('select', {
+    const handleMenuItemClick = (condition: "above" | "below") => {
+      emit("select", {
         condition,
         threshold: props.value,
       });
@@ -98,13 +104,13 @@ export default defineComponent({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
-        emit('close');
+        emit("close");
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        emit('close');
+      if (event.key === "Escape") {
+        emit("close");
       }
     };
 
@@ -113,22 +119,23 @@ export default defineComponent({
       (newVisible) => {
         if (newVisible) {
           setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('keydown', handleEscape);
+            document.addEventListener("click", handleClickOutside);
+            document.addEventListener("keydown", handleEscape);
           }, 0);
         } else {
-          document.removeEventListener('click', handleClickOutside);
-          document.removeEventListener('keydown', handleEscape);
+          document.removeEventListener("click", handleClickOutside);
+          document.removeEventListener("keydown", handleEscape);
         }
       },
     );
 
     onBeforeUnmount(() => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     });
 
     return {
+      t,
       menuRef,
       formattedValue,
       menuStyle,
@@ -137,4 +144,3 @@ export default defineComponent({
   },
 });
 </script>
-

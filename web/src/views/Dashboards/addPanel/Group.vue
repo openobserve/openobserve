@@ -1,28 +1,29 @@
 <template>
   <div
     data-test="dashboard-group"
-    :style="`--group-index: ${groupNestedIndex}; padding-left: ${groupNestedIndex > 0 ? '0.3125rem' : '0'}; background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));`"
-    class="tw:flex tw:p-0 tw:rounded-[5px]"
+    :style="`--group-index: ${groupNestedIndex};`"
+    class="rounded-default flex bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(5%*var(--group-index)),transparent)] p-0"
+    :class="groupNestedIndex > 0 ? 'pl-1.25' : 'pl-0'"
   >
-    <div class="tw:flex tw:flex-row tw:flex-wrap tw:items-center" data-test="dashboard-group-conditions">
+    <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
-        class="tw:inline-flex tw:items-center tw:mr-2.5 tw:min-h-8.75 tw:gap-2"
+        class="mr-2.5 inline-flex min-h-8.75 items-center gap-2"
         data-test="dashboard-group-condition-group"
       >
         <Group
           v-if="condition.filterType === 'group'"
           :group="condition"
           :group-nested-index="groupNestedIndex + 1"
-          :group-index="index"
+          :group-index="Number(index)"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
           @add-condition="addConditionToGroup"
           @add-group="addGroupToGroup"
-          @remove-group="removeGroupFromNested(index)"
+          @remove-group="removeGroupFromNested(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
         />
         <AddCondition
@@ -32,7 +33,7 @@
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
-          @remove-condition="removeConditionFromGroup(index)"
+          @remove-condition="removeConditionFromGroup(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
           :condition-index="index"
         />
@@ -40,50 +41,49 @@
       <ODropdown v-model:open="showAddMenu">
         <template #trigger>
           <OButton
-            variant="primary"
-            size="icon-xs-circle"
+            variant="outline"
+            size="icon-chip"
             data-test="dashboard-add-condition-add"
             icon-left="add"
           />
         </template>
-        <ODropdownItem
-          data-test="dashboard-add-group-add-condition"
-          @select="emitAddCondition"
-        >
+        <ODropdownItem data-test="dashboard-add-group-add-condition" @select="emitAddCondition">
           {{ t("common.addCondition") }}
         </ODropdownItem>
-        <ODropdownItem
-          data-test="dashboard-add-group-add-group"
-          @select="emitAddGroup"
-        >
+        <ODropdownItem data-test="dashboard-add-group-add-group" @select="emitAddGroup">
           {{ t("common.addGroup") }}
         </ODropdownItem>
       </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="tw:border-l tw:border-[#f5f5f5] tw:flex tw:justify-between tw:items-center">
+    <div
+      v-if="groupNestedIndex !== 0"
+      class="border-border-default ms-2 flex items-center justify-between border-l ps-1.5"
+    >
       <OButton
         variant="ghost"
-        size="icon"
+        size="icon-chip"
+        class="!w-4"
         @click="$emit('remove-group')"
         data-test="dashboard-add-group-remove"
-        icon-left="close"
       >
+        <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
       </OButton>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent, ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "Group",
-  components: { AddCondition, OButton, ODropdown, ODropdownItem },
+  components: { AddCondition, OButton, OIcon, ODropdown, ODropdownItem },
   props: {
     group: {
       type: Object,
@@ -116,15 +116,13 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: [
-    "add-condition",
-    "add-group",
-    "remove-group",
-    "logical-operator-change",
-  ],
+  emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showAddMenu = ref(false);
+
+    // Same reference as props.group; mutation targets its nested fields only.
+    const groupModel = computed(() => props.group);
     const filterOptions = ["AND", "OR"];
 
     const emitAddCondition = () => {
@@ -138,7 +136,7 @@ export default defineComponent({
     };
 
     const removeConditionFromGroup = (index: number) => {
-      props.group.conditions.splice(index, 1);
+      groupModel.value.conditions.splice(index, 1);
     };
 
     const removeGroupFromNested = (groupIndex: number) => {

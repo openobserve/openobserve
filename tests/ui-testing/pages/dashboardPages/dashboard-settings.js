@@ -235,7 +235,7 @@ export default class DashboardSetting {
     await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
 
-    // Wait for dialog tabs to be fully loaded - the tabs are in a q-tabs container
+    // Wait for dialog tabs to be fully loaded - the tabs are in a tabs container
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
     // Retry pattern for clicking variables tab (element can get detached during dialog transitions)

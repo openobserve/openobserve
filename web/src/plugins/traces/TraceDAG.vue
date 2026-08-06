@@ -15,22 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:min-h-125">
-    <div v-if="isLoading" data-test="traces-trace-dag-loading-container" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
+  <div class="h-full min-h-125 w-full">
+    <div
+      v-if="isLoading"
+      data-test="traces-trace-dag-loading-container"
+      class="flex h-125 flex-col items-center justify-center p-6"
+    >
       <OSpinner size="lg" />
-      <div class="tw:mt-3 tw:text-gray-400">Loading trace DAG...</div>
+      <div class="text-text-secondary mt-3 text-sm">{{ t("traces.loadingTraceDag") }}</div>
     </div>
 
-    <div v-else-if="error" data-test="traces-trace-dag-error-message" class="tw:p-3">
-      <OBanner variant="error" icon="error" :content="`Failed to load DAG: ${error}`" />
+    <div v-else-if="error" data-test="traces-trace-dag-error-message" class="p-3">
+      <OBanner
+        variant="error"
+        icon="error"
+        :content="t('traces.traceDAG.failedToLoad', { error })"
+      />
     </div>
 
-    <div v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0" data-test="traces-trace-dag-empty-container" class="tw:flex tw:items-center tw:justify-center tw:flex-col tw:p-6 tw:h-125">
-      <OIcon name="info" style="width: 48px; height: 48px;" />
-      <div class="tw:mt-3 tw:text-gray-400">No DAG data available</div>
+    <div
+      v-else-if="!dagData || !dagData.nodes || dagData.nodes.length === 0"
+      data-test="traces-trace-dag-empty-container"
+      class="flex h-125 flex-col items-center justify-center p-6"
+    >
+      <OIcon name="info" style="width: 48px; height: 48px" />
+      <div class="text-text-muted mt-3">{{ t("traces.traceDAG.noData") }}</div>
     </div>
 
-    <div v-else data-test="traces-trace-dag-wrapper" class="tw:w-full tw:h-full tw:min-h-150 tw:border tw:border-(--o2-border) tw:rounded tw:relative tw:dark:border-[#444]">
+    <div
+      v-else
+      data-test="traces-trace-dag-wrapper"
+      class="border-border-default rounded-default relative h-full min-h-150 w-full border"
+    >
       <VueFlow
         :nodes="nodes"
         :edges="edges"
@@ -39,39 +55,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :max-zoom="3"
         fit-view-on-init
         :fit-view-options="{ padding: 0.3, minZoom: 0.3, maxZoom: 0.7 }"
-        class="trace-dag-flow tw:w-full tw:h-full tw:bg-[#fafafa] tw:dark:bg-[#1e1e1e]!"
+        class="trace-dag-flow bg-surface-panel! h-full w-full"
       >
         <Background pattern-color="#aaa" :gap="16" />
         <Controls />
 
         <template #node-custom="{ data }">
-          <Handle v-if="data.hasIncoming" type="target" :position="Position.Top"
-            class="tw:w-2 tw:h-2 tw:bg-[#1976d2] tw:border-2 tw:border-white tw:rounded-full tw:shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+          <Handle
+            v-if="data.hasIncoming"
+            type="target"
+            :position="Position.Top"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+          />
           <div
-            class="tw:p-[6px_12px] tw:rounded-md tw:bg-white tw:border-2 tw:border-[#1976d2] tw:min-w-[80px] tw:max-w-[180px] tw:min-h-[28px] tw:shadow-[0_2px_6px_rgba(0,0,0,0.1)] tw:transition-all tw:duration-200 tw:cursor-pointer tw:text-center tw:flex tw:flex-col tw:items-center tw:justify-center tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] tw:hover:[transform:translateY(-2px)] tw:dark:bg-[#2a2a2a] tw:dark:border-[#64b5f6] tw:dark:text-[var(--o2-border)]"
+            class="rounded-default bg-surface-base border-info flex min-h-7 max-w-45 min-w-20 cursor-pointer flex-col items-center justify-center border-2 p-[6px_12px] text-center shadow-[0_2px_6px_rgba(0,0,0,0.1)] transition-all duration-200 hover:[transform:translateY(-2px)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
             :class="[
               {
-                'tw:border-[#c62828]! tw:bg-[#ffebee]! tw:dark:border-[#ef5350]! tw:dark:bg-[#3a1a1a]!': data.span_status === 'ERROR',
-                'tw:border-[#2e7d32]! tw:dark:border-[#66bb6a]!': data.span_status === 'OK' && !data.gen_ai_operation_name,
+                'border-status-negative! bg-status-error-bg!': data.span_status === 'ERROR',
+                'border-status-positive!': data.span_status === 'OK' && !data.gen_ai_operation_name,
               },
               getObservationTypeClass(data.gen_ai_operation_name),
             ]"
             @click="handleNodeClick(data.span_id)"
           >
             <div
-              class="tw:text-[13px] tw:text-[#1976d2] tw:font-semibold tw:break-words tw:max-w-[160px] tw:leading-[1.3] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:dark:text-[#90caf9]"
+              class="text-compact text-info max-w-40 overflow-hidden leading-[1.3] font-semibold break-words text-ellipsis whitespace-nowrap"
               :class="getObservationTypeTextClass(data.gen_ai_operation_name)"
-            >{{ data.operation_name }}</div>
+            >
+              {{ data.operation_name }}
+            </div>
             <OTag
               v-if="data.span_status === 'ERROR'"
               type="spanStatus"
               :value="data.span_status"
-              label="ERR"
-              class="tw:text-[10px] tw:h-[14px] tw:mt-0.5 tw:px-1"
+              :label="t('traces.errLabel')"
+              class="text-3xs mt-0.5 h-3.5 px-1"
             />
           </div>
-          <Handle v-if="data.hasOutgoing" type="source" :position="Position.Bottom"
-            class="tw:w-2 tw:h-2 tw:bg-[#1976d2] tw:border-2 tw:border-white tw:rounded-full tw:shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+          <Handle
+            v-if="data.hasOutgoing"
+            type="source"
+            :position="Position.Bottom"
+            class="bg-info border-surface-base h-2 w-2 rounded-full border-2 shadow-[0_1px_3px_rgba(0,0,0,0.15)]"
+          />
         </template>
       </VueFlow>
     </div>
@@ -84,6 +110,7 @@ import { VueFlow, Position, MarkerType, Handle, useVueFlow } from "@vue-flow/cor
 import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 
 // VueFlow CSS imports
@@ -127,7 +154,8 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTag,
-},
+    OBanner,
+  },
   props: {
     traceId: {
       type: String,
@@ -153,6 +181,7 @@ export default defineComponent({
   emits: ["node-click"],
   setup(props, { emit }) {
     const store = useStore();
+    const { t } = useI18nTyped();
     const isLoading = ref(true);
     const error = ref<string | null>(null);
     const dagData = ref<DAGResponse | null>(null);
@@ -185,7 +214,7 @@ export default defineComponent({
       });
 
       // Sort children by start_time for proper preorder traversal ordering
-      children.forEach((childIds, parentId) => {
+      children.forEach((childIds) => {
         childIds.sort((a, b) => {
           const nodeA = nodeMap.get(a);
           const nodeB = nodeMap.get(b);
@@ -299,7 +328,7 @@ export default defineComponent({
       });
 
       // Center the entire tree
-      const allX = Array.from(positions.values()).map(p => p.x);
+      const allX = Array.from(positions.values()).map((p) => p.x);
       const minX = Math.min(...allX);
       const maxX = Math.max(...allX);
       const offsetX = -(minX + maxX) / 2;
@@ -316,10 +345,10 @@ export default defineComponent({
       if (!dagData.value || !dagData.value.nodes) return [];
 
       // Create a set of valid node IDs
-      const validNodeIds = new Set(dagData.value.nodes.map(n => n.span_id));
+      const validNodeIds = new Set(dagData.value.nodes.map((n) => n.span_id));
 
       // Filter out edges that reference non-existent nodes
-      return dagData.value.edges.filter(edge => {
+      return dagData.value.edges.filter((edge) => {
         const isValid = validNodeIds.has(edge.from) && validNodeIds.has(edge.to);
         if (!isValid) {
           console.warn(`[TraceDAG] Skipping invalid edge: ${edge.from} → ${edge.to}`);
@@ -335,8 +364,8 @@ export default defineComponent({
       const positions = calculateLayout(dagData.value.nodes, validEdges.value);
 
       // Determine which nodes have incoming/outgoing edges
-      const nodesWithIncoming = new Set(validEdges.value.map(e => e.to));
-      const nodesWithOutgoing = new Set(validEdges.value.map(e => e.from));
+      const nodesWithIncoming = new Set(validEdges.value.map((e) => e.to));
+      const nodesWithOutgoing = new Set(validEdges.value.map((e) => e.from));
 
       return dagData.value.nodes.map((node) => ({
         id: node.span_id,
@@ -385,7 +414,8 @@ export default defineComponent({
         dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
-        error.value = err.response?.data?.message || err.message || "Unknown error occurred";
+        error.value =
+          err.response?.data?.message || err.message || t("traces.traceDAG.unknownError");
       } finally {
         isLoading.value = false;
       }
@@ -401,18 +431,18 @@ export default defineComponent({
           !streamName ||
           startTime == null ||
           endTime == null ||
-          typeof startTime !== 'number' ||
-          typeof endTime !== 'number' ||
+          typeof startTime !== "number" ||
+          typeof endTime !== "number" ||
           startTime >= endTime
         ) {
-          error.value = "Invalid parameters for DAG fetch";
+          error.value = t("traces.traceDAG.invalidParameters");
           isLoading.value = false;
           return;
         }
 
         fetchDAG();
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const handleNodeClick = (spanId: string) => {
@@ -442,48 +472,72 @@ export default defineComponent({
       event: "event",
     };
 
+    // Node border+bg derived from ONE base token per type: border = base,
+    // bg = base@12% over the surface. The base flips light/dark (see dark.css),
+    // so no dark: variant is needed. Full literal classes so Tailwind compiles them.
     const llmNodeStyles: Record<string, string> = {
-      generation: 'tw:border-[#4caf50] tw:bg-[#e8f5e9] tw:dark:border-[#66bb6a] tw:dark:bg-[#1a2e1a]',
-      embedding:  'tw:border-[#2196f3] tw:bg-[#e3f2fd] tw:dark:border-[#64b5f6] tw:dark:bg-[#1a2a3a]',
-      agent:      'tw:border-[#9c27b0] tw:bg-[#f3e5f5] tw:dark:border-[#ce93d8] tw:dark:bg-[#2a1a2e]',
-      tool:       'tw:border-[#ff9800] tw:bg-[#fff3e0] tw:dark:border-[#ffb74d] tw:dark:bg-[#2e2218]',
-      chain:      'tw:border-[#3f51b5] tw:bg-[#e8eaf6] tw:dark:border-[#7986cb] tw:dark:bg-[#1a1a2e]',
-      retriever:  'tw:border-[#00bcd4] tw:bg-[#e0f7fa] tw:dark:border-[#4dd0e1] tw:dark:bg-[#1a2a2e]',
-      task:       'tw:border-[#009688] tw:bg-[#e0f2f1] tw:dark:border-[#4db6ac] tw:dark:bg-[#1a2e2a]',
-      evaluator:  'tw:border-[#e91e63] tw:bg-[#fce4ec] tw:dark:border-[#f48fb1] tw:dark:bg-[#2e1a22]',
-      workflow:   'tw:border-[#673ab7] tw:bg-[#ede7f6] tw:dark:border-[#b39ddb] tw:dark:bg-[#221a2e]',
-      rerank:     'tw:border-[#03a9f4] tw:bg-[#e1f5fe] tw:dark:border-[#4fc3f7] tw:dark:bg-[#1a2a3a]',
-      guardrail:  'tw:border-[#f44336] tw:bg-[#ffebee] tw:dark:border-[#ef5350] tw:dark:bg-[#2e1a1a]',
-      span:       'tw:border-[#9e9e9e] tw:bg-[#f5f5f5] tw:dark:border-[#9e9e9e] tw:dark:bg-[#262626]',
-      event:      'tw:border-[#ffc107] tw:bg-[#fff8e1] tw:dark:border-[#ffd54f] tw:dark:bg-[#2e2a18]',
-      default:    'tw:border-[#9e9e9e] tw:bg-[#fafafa] tw:dark:border-[#9e9e9e] tw:dark:bg-[#262626]',
+      generation:
+        "border-[var(--color-dag-node-generation)] bg-[color-mix(in_srgb,var(--color-dag-node-generation)_12%,var(--color-surface-base))]",
+      embedding:
+        "border-[var(--color-dag-node-embedding)] bg-[color-mix(in_srgb,var(--color-dag-node-embedding)_12%,var(--color-surface-base))]",
+      agent:
+        "border-[var(--color-dag-node-agent)] bg-[color-mix(in_srgb,var(--color-dag-node-agent)_12%,var(--color-surface-base))]",
+      tool: "border-[var(--color-dag-node-tool)] bg-[color-mix(in_srgb,var(--color-dag-node-tool)_12%,var(--color-surface-base))]",
+      chain:
+        "border-[var(--color-dag-node-chain)] bg-[color-mix(in_srgb,var(--color-dag-node-chain)_12%,var(--color-surface-base))]",
+      retriever:
+        "border-[var(--color-dag-node-retriever)] bg-[color-mix(in_srgb,var(--color-dag-node-retriever)_12%,var(--color-surface-base))]",
+      task: "border-[var(--color-dag-node-task)] bg-[color-mix(in_srgb,var(--color-dag-node-task)_12%,var(--color-surface-base))]",
+      evaluator:
+        "border-[var(--color-dag-node-evaluator)] bg-[color-mix(in_srgb,var(--color-dag-node-evaluator)_12%,var(--color-surface-base))]",
+      workflow:
+        "border-[var(--color-dag-node-workflow)] bg-[color-mix(in_srgb,var(--color-dag-node-workflow)_12%,var(--color-surface-base))]",
+      rerank:
+        "border-[var(--color-dag-node-rerank)] bg-[color-mix(in_srgb,var(--color-dag-node-rerank)_12%,var(--color-surface-base))]",
+      guardrail:
+        "border-[var(--color-dag-node-guardrail)] bg-[color-mix(in_srgb,var(--color-dag-node-guardrail)_12%,var(--color-surface-base))]",
+      span: "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
+      event:
+        "border-[var(--color-dag-node-event)] bg-[color-mix(in_srgb,var(--color-dag-node-event)_12%,var(--color-surface-base))]",
+      default:
+        "border-[var(--color-dag-node-default)] bg-[color-mix(in_srgb,var(--color-dag-node-default)_12%,var(--color-surface-base))]",
     };
 
+    // Text = base mixed 70/30 toward the primary text color, which flips light/dark,
+    // so text darkens in light mode and lightens in dark mode from the one base.
     const llmTextStyles: Record<string, string> = {
-      generation: 'tw:text-[#388e3c] tw:dark:text-[#81c784]',
-      embedding:  'tw:text-[#1976d2] tw:dark:text-[#90caf9]',
-      agent:      'tw:text-[#7b1fa2] tw:dark:text-[#ce93d8]',
-      tool:       'tw:text-[#e65100] tw:dark:text-[#ffcc80]',
-      chain:      'tw:text-[#283593] tw:dark:text-[#9fa8da]',
-      retriever:  'tw:text-[#00838f] tw:dark:text-[#80deea]',
-      task:       'tw:text-[#00796b] tw:dark:text-[#80cbc4]',
-      evaluator:  'tw:text-[#c2185b] tw:dark:text-[#f48fb1]',
-      workflow:   'tw:text-[#4527a0] tw:dark:text-[#b39ddb]',
-      rerank:     'tw:text-[#0277bd] tw:dark:text-[#81d4fa]',
-      guardrail:  'tw:text-[#c62828] tw:dark:text-[#ef9a9a]',
-      span:       'tw:text-[#616161] tw:dark:text-[#bdbdbd]',
-      event:      'tw:text-[#f57f17] tw:dark:text-[#ffe082]',
-      default:    'tw:text-[#757575] tw:dark:text-[#bdbdbd]',
+      generation:
+        "text-[color-mix(in_srgb,var(--color-dag-node-generation)_70%,var(--color-text-heading))]",
+      embedding:
+        "text-[color-mix(in_srgb,var(--color-dag-node-embedding)_70%,var(--color-text-heading))]",
+      agent: "text-[color-mix(in_srgb,var(--color-dag-node-agent)_70%,var(--color-text-heading))]",
+      tool: "text-[color-mix(in_srgb,var(--color-dag-node-tool)_70%,var(--color-text-heading))]",
+      chain: "text-[color-mix(in_srgb,var(--color-dag-node-chain)_70%,var(--color-text-heading))]",
+      retriever:
+        "text-[color-mix(in_srgb,var(--color-dag-node-retriever)_70%,var(--color-text-heading))]",
+      task: "text-[color-mix(in_srgb,var(--color-dag-node-task)_70%,var(--color-text-heading))]",
+      evaluator:
+        "text-[color-mix(in_srgb,var(--color-dag-node-evaluator)_70%,var(--color-text-heading))]",
+      workflow:
+        "text-[color-mix(in_srgb,var(--color-dag-node-workflow)_70%,var(--color-text-heading))]",
+      rerank:
+        "text-[color-mix(in_srgb,var(--color-dag-node-rerank)_70%,var(--color-text-heading))]",
+      guardrail:
+        "text-[color-mix(in_srgb,var(--color-dag-node-guardrail)_70%,var(--color-text-heading))]",
+      span: "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]",
+      event: "text-[color-mix(in_srgb,var(--color-dag-node-event)_70%,var(--color-text-heading))]",
+      default:
+        "text-[color-mix(in_srgb,var(--color-dag-node-default)_70%,var(--color-text-heading))]",
     };
 
     const getObservationTypeClass = (type: string | null): string => {
-      if (!type) return '';
+      if (!type) return "";
       const cssSuffix = specToCssSuffix[type.toLowerCase()];
       return llmNodeStyles[cssSuffix] || llmNodeStyles.default;
     };
 
     const getObservationTypeTextClass = (type: string | null): string => {
-      if (!type) return '';
+      if (!type) return "";
       const cssSuffix = specToCssSuffix[type.toLowerCase()];
       return llmTextStyles[cssSuffix] || llmTextStyles.default;
     };
@@ -499,10 +553,11 @@ export default defineComponent({
             fitView({ padding: 0.3, duration: 300 });
           }, 50);
         });
-      }
+      },
     );
 
     return {
+      t,
       isLoading,
       error,
       dagData,
@@ -517,9 +572,11 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.body--dark .trace-dag-flow .vue-flow__background {
-  background-color: #1e1e1e !important;
+<style scoped>
+/* keep: lib-override:vue-flow — the library's background layer paints its own
+   surface over the canvas, so it has to be repainted here. The token flips
+   light/dark on its own, which retires the `.dark`-only twin this replaced. */
+.trace-dag-flow :deep(.vue-flow__background) {
+  background-color: var(--color-surface-panel) !important;
 }
-
 </style>

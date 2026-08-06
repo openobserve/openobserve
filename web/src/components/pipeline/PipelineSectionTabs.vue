@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   PipelineSectionTabs — the L2 section switcher (Stream Pipelines / Functions /
   Enrichment Tables) rendered as tabs next to a page title.
-  Drop it into an AppPageHeader's #tabs slot on any pipeline section page; the
+  Drop it into an OPageHeader's #tabs slot on any pipeline section page; the
   active tab is derived from the current route and clicking a tab navigates.
   This mirrors the breadcrumb section dropdown as faster inline navigation.
 -->
@@ -37,37 +37,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :name="s.key"
       :data-test="`pipeline-section-tab-${s.key}`"
     >
-      <OIcon :name="s.icon" size="sm" class="tw:shrink-0" />
+      <OIcon :name="s.icon" size="sm" class="shrink-0" />
       <span>{{ s.label }}</span>
       <span
         v-if="s.count != null"
-        class="tw:text-[11px] tw:font-bold tw:leading-none tw:px-1.5 tw:py-1 tw:rounded-full"
+        class="text-2xs rounded-full px-1.5 py-1 leading-none font-bold"
         :class="
           s.key === activeSectionKey
-            ? 'tw:bg-primary-100 tw:text-primary-700'
-            : 'tw:bg-surface-subtle tw:text-text-secondary'
+            ? 'bg-badge-primary-soft-bg text-badge-primary-soft-text'
+            : 'bg-surface-subtle text-text-secondary'
         "
-      >{{ s.count }}</span>
+        >{{ s.count }}</span
+      >
     </OTab>
   </OTabs>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
-const orgIdentifier = computed(
-  () => store.state.selectedOrganization?.identifier,
-);
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier);
 
 // Route name → section key. Detail/sub routes resolve to their parent section
 // so the right tab stays highlighted on editor/history/add pages.
@@ -89,7 +88,7 @@ const activeSectionKey = computed(() => {
 
 interface Section {
   key: string;
-  label: string;
+  label: I18nText;
   icon: string;
   to: RouteLocationRaw;
   visible: boolean;
@@ -127,9 +126,7 @@ const sections = computed<Section[]>(() => {
   ];
 });
 
-const visibleSections = computed(() =>
-  sections.value.filter((s) => s.visible),
-);
+const visibleSections = computed(() => sections.value.filter((s) => s.visible));
 
 const navigateToSection = (key: string | number) => {
   if (key === activeSectionKey.value) return;

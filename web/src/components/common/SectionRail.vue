@@ -22,27 +22,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   tinted-active treatment. Sentence-case group headings, soft single-line items.
 -->
 <template>
-  <nav
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:bg-surface-panel"
-    data-test="section-rail"
-  >
+  <nav class="bg-surface-panel flex h-full min-h-0 flex-col" data-test="section-rail">
+    <!-- Title aligns with the item LABELS below it (the page-edge grid line the
+         OTab pills' text lands on), not the pill edge — so 'IAM'/'Settings' sits
+         directly above 'Users'. Matches FolderList's heading. -->
     <div
       v-if="title"
-      class="tw:shrink-0 tw:px-3.5 tw:pt-3 tw:pb-1 tw:text-sm tw:font-semibold tw:text-text-primary tw:truncate"
+      class="pl-page-edge text-text-heading shrink-0 truncate pt-3 pr-1.5 pb-1 text-sm font-semibold"
     >
       {{ title }}
     </div>
 
-    <div class="tw:flex-1 tw:overflow-y-auto tw:px-2 tw:pt-1 tw:pb-3">
+    <div class="flex-1 overflow-y-auto px-1.5 pt-1 pb-3">
       <OTabs
         :model-value="activeKey ?? ''"
         orientation="vertical"
-        class="tw:w-full"
+        class="section-rail-tabs w-full"
         @change="onTabChange"
       >
-        <template v-for="group in visibleGroups" :key="group.label">
+        <template v-for="(group, idx) in visibleGroups" :key="group.label">
+          <!-- Section label. Each group after the first gets top spacing so the
+               sub-sections read as separate blocks rather than one merged list. -->
+          <!-- pl-1.5 (on top of the container's px-1.5) puts the section label on
+               the same 12px item-label grid line as the tabs below it. -->
           <div
-            class="tw:px-2 tw:py-1 tw:text-[0.72rem] tw:font-semibold tw:text-text-secondary"
+            class="text-text-secondary py-1 pl-1.5 text-xs font-semibold"
+            :class="{ 'mt-3': idx > 0 }"
           >
             {{ group.label }}
           </div>
@@ -53,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :label="item.label"
             :icon="item.icon"
             :data-test="item.dataTest"
-            class="tw:w-full"
+            class="w-full"
             @click="navigate(item.to)"
           />
         </template>
@@ -63,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -79,7 +85,7 @@ function navigate(to: RouteLocationRaw) {
 
 // OTabs emits change when a tab is clicked; navigation is handled by navigate()
 // above, so this is a no-op that satisfies the required @change binding.
-function onTabChange(_key: string | number) {}
+function onTabChange() {}
 
 const props = defineProps<{
   /** The same grouped sections the hub uses. */
@@ -87,7 +93,7 @@ const props = defineProps<{
   /** Currently-active section key (highlighted). */
   activeKey?: string;
   /** Optional small heading shown above the groups (e.g. the module name). */
-  title?: string;
+  title?: I18nText;
 }>();
 
 // Drop hidden items/empty groups (each item may carry a `visible` flag).
@@ -99,5 +105,4 @@ const visibleGroups = computed(() =>
     }))
     .filter((g) => g.items.length > 0),
 );
-
 </script>

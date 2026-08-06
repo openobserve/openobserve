@@ -36,56 +36,35 @@ const anomaly_detection = {
 
   // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"
   update: (org_identifier: string, anomaly_id: string, data: object) => {
-    return http().put(
-      `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-      data,
-    );
+    return http().put(`/api/v2/${org_identifier}/alerts/${anomaly_id}`, data);
   },
 
   // DELETE /api/v2/{org}/alerts/{id} — falls back to anomaly config delete when ID not in alerts
   delete: (org_identifier: string, anomaly_id: string) => {
-    return http().delete(
-      `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-    );
+    return http().delete(`/api/v2/${org_identifier}/alerts/${anomaly_id}`);
   },
 
   // Pause (enabled=false) or Resume (enabled=true) via unified alerts update endpoint
-  toggleEnabled: (
-    org_identifier: string,
-    anomaly_id: string,
-    enabled: boolean,
-  ) => {
-    return http().put(
-      `/api/v2/${org_identifier}/alerts/${anomaly_id}`,
-      { alert_type: "anomaly_detection", anomaly_config: { enabled } },
-    );
+  toggleEnabled: (org_identifier: string, anomaly_id: string, enabled: boolean) => {
+    return http().put(`/api/v2/${org_identifier}/alerts/${anomaly_id}`, {
+      alert_type: "anomaly_detection",
+      anomaly_config: { enabled },
+    });
   },
 
   triggerTraining: (org_identifier: string, anomaly_id: string) => {
-    return http().post(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`,
-      {},
-    );
+    return http().post(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`, {});
   },
 
   cancelTraining: (org_identifier: string, anomaly_id: string) => {
-    return http().delete(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`,
-    );
+    return http().delete(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/train`);
   },
 
   triggerDetection: (org_identifier: string, anomaly_id: string) => {
-    return http().post(
-      `/api/${org_identifier}/anomaly_detection/${anomaly_id}/detect`,
-      {},
-    );
+    return http().post(`/api/${org_identifier}/anomaly_detection/${anomaly_id}/detect`, {});
   },
 
-  getHistory: (
-    org_identifier: string,
-    anomaly_id: string,
-    limit: number = 100,
-  ) => {
+  getHistory: (org_identifier: string, anomaly_id: string, limit: number = 100) => {
     return http().get(
       `/api/${org_identifier}/anomaly_detection/${anomaly_id}/history?limit=${limit}`,
     );
@@ -93,9 +72,7 @@ const anomaly_detection = {
 
   // Bulk endpoint — returns history for ALL configs in one request
   getAllHistory: (org_identifier: string, limit: number = 20) => {
-    return http().get(
-      `/api/${org_identifier}/anomaly_detection/history?limit=${limit}`,
-    );
+    return http().get(`/api/${org_identifier}/anomaly_detection/history?limit=${limit}`);
   },
 };
 

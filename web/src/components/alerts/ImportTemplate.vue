@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,187 +15,178 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
-    title="Import Template"
+    :title="t('alert_templates.importTemplateTitle')"
     test-prefix="template"
     :is-importing="isTemplateImporting"
     container-class=""
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 130px)',
-    }"
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Template-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
         <div
           v-if="templateErrorsToDisplay.length > 0 || tempalteCreators.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
-          {{ templateErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
+          {{
+            templateErrorsToDisplay.length > 0
+              ? t("alerts.errorValidations")
+              : t("alerts.outputMessagesLabel")
+          }}
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="tw:h-[calc(60vh-8px)] tw:overflow-auto [resize:none] tw:w-full tw:min-w-[400px]">
-        <!-- Template Errors Section -->
-        <div
-          class="error-section tw:p-2.5 tw:mb-2.5"
-          v-if="templateErrorsToDisplay.length > 0"
-        >
-          <div class="error-list">
-            <!-- Iterate through the outer array -->
-            <div
-              v-for="(errorGroup, index) in templateErrorsToDisplay"
-              :key="index"
-              :data-test="`template-import-error-${index}`"
-            >
-              <!-- Iterate through each inner array (the individual error message) -->
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+          {{ t("alert_templates.outputMessages") }}
+        </div>
+        <OSeparator class="mt-1 shrink-0" />
+        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
+          <!-- Template Errors Section -->
+          <div class="error-section mb-2.5 p-2.5" v-if="templateErrorsToDisplay.length > 0">
+            <div class="error-list">
+              <!-- Iterate through the outer array -->
               <div
-                v-for="(errorMessage, errorIndex) in errorGroup"
-                :key="errorIndex"
-                class="error-item tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word"
-                :data-test="`template-import-error-${index}-${errorIndex}`"
+                v-for="(errorGroup, index) in templateErrorsToDisplay"
+                :key="index"
+                :data-test="`template-import-error-${index}`"
               >
-                <span
-                  class="text-red"
-                  v-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'template_name'
-                  "
+                <!-- Iterate through each inner array (the individual error message) -->
+                <div
+                  v-for="(errorMessage, errorIndex) in errorGroup"
+                  :key="errorIndex"
+                  class="error-item px-0 py-1.25 text-sm wrap-break-word"
+                  :data-test="`template-import-error-${index}-${errorIndex}`"
                 >
-                  {{ errorMessage.message }}
-                  <div style="width: 300px">
-                    <OInput
-                      data-test="template-import-name-input"
-                      :model-value="userSelectedTemplateNames[index] || ''"
-                      @update:model-value="(val) => {
-                        userSelectedTemplateNames[index] = val;
-                        updateTemplateName(val, index);
-                      }"
-                      :label="'Template Name *'"
-                      class="showLabelOnTop"
-                      tabindex="0"
-                    />
-                  </div>
-                </span>
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'body'
-                  "
+                  <span
+                    class="text-status-negative"
+                    v-if="typeof errorMessage === 'object' && errorMessage.field == 'template_name'"
+                  >
+                    {{ errorMessage.message }}
+                    <div class="w-75">
+                      <OInput
+                        data-test="template-import-name-input"
+                        :model-value="userSelectedTemplateNames[index] || ''"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTemplateNames[index] = val;
+                            updateTemplateName(val, index);
+                          }
+                        "
+                        :label="t('alert_templates.importNameLabel')"
+                        class="showLabelOnTop"
+                        tabindex="0"
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'body'"
+                  >
+                    {{ errorMessage.message }}
+                    <div class="w-75">
+                      <OInput
+                        data-test="template-import-body-input"
+                        :model-value="userSelectedTemplateBodies[index] || ''"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTemplateBodies[index] = val;
+                            updateTemplateBody(val, index);
+                          }
+                        "
+                        :label="t('alert_templates.importBodyLabel')"
+                        class="showLabelOnTop"
+                        tabindex="0"
+                      />
+                    </div>
+                  </span>
+                  <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
+                  <span
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'type'"
+                  >
+                    {{ errorMessage.message }}
+                    <div class="w-75">
+                      <OSelect
+                        data-test="template-import-type-input"
+                        :model-value="userSelectedTemplateTypes[index] || ''"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTemplateTypes[index] = val;
+                            updateTemplateType(val as string, index);
+                          }
+                        "
+                        :options="destinationTypes"
+                        :label="t('alert_templates.importTypeLabel')"
+                        class="showLabelOnTop no-case py-2"
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'title'"
+                  >
+                    {{ errorMessage.message }}
+                    <div class="w-75">
+                      <OInput
+                        data-test="template-import-title-input"
+                        :model-value="userSelectedTemplateTitles[index] || ''"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTemplateTitles[index] = val;
+                            updateTemplateTitle(val, index);
+                          }
+                        "
+                        :label="t('alert_templates.importTitleLabel')"
+                        class="showLabelOnTop"
+                        tabindex="0"
+                      />
+                    </div>
+                  </span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="error-section mb-2.5 p-2.5" v-if="tempalteCreators.length > 0">
+            <div
+              class="text-primary mb-2.5 text-base uppercase"
+              data-test="template-import-creation-title"
+            >
+              {{ t("alert_templates.templateCreationTitle") }}
+            </div>
+            <div
+              class="error-list"
+              v-for="(val, index) in tempalteCreators"
+              :key="index"
+              :data-test="`template-import-creation-${index}`"
+            >
+              <div
+                :class="{
+                  'error-item px-0 py-1.25 text-sm font-bold wrap-break-word': true,
+                  'text-green': val.success,
+                  'text-status-negative': !val.success,
+                }"
+                :data-test="`template-import-creation-${index}-message`"
+              >
+                <pre
+                  class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
+                  >{{ val.message }}</pre
                 >
-                  {{ errorMessage.message }}
-                  <div style="width: 300px">
-                    <OInput
-                      data-test="template-import-body-input"
-                      :model-value="userSelectedTemplateBodies[index] || ''"
-                      @update:model-value="(val) => {
-                        userSelectedTemplateBodies[index] = val;
-                        updateTemplateBody(val, index);
-                      }"
-                      :label="'Template Body *'"
-                      class="showLabelOnTop"
-                      tabindex="0"
-                    />
-                  </div>
-                </span>
-                <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'type'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div style="width: 300px">
-                    <OSelect
-                      data-test="template-import-type-input"
-                      :model-value="userSelectedTemplateTypes[index] || ''"
-                      @update:model-value="(val) => {
-                        userSelectedTemplateTypes[index] = val;
-                        updateTemplateType(val, index);
-                      }"
-                      :options="destinationTypes"
-                      :label="'Template Type *'"
-                      class="tw:py-2 showLabelOnTop no-case"
-                    />
-                  </div>
-                </span>
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'title'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div style="width: 300px">
-                    <OInput
-                      data-test="template-import-title-input"
-                      :model-value="userSelectedTemplateTitles[index] || ''"
-                      @update:model-value="(val) => {
-                        userSelectedTemplateTitles[index] = val;
-                        updateTemplateTitle(val, index);
-                      }"
-                      :label="'Template Title *'"
-                      class="showLabelOnTop"
-                      tabindex="0"
-                    />
-                  </div>
-                </span>
-                <span class="text-red" v-else>{{ errorMessage }}</span>
               </div>
             </div>
           </div>
         </div>
-
-        <div class="error-section tw:p-2.5 tw:mb-2.5" v-if="tempalteCreators.length > 0">
-          <div
-            class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
-            data-test="template-import-creation-title"
-          >
-            Template Creation
-          </div>
-          <div
-            class="error-list"
-            v-for="(val, index) in tempalteCreators"
-            :key="index"
-            :data-test="`template-import-creation-${index}`"
-          >
-            <div
-              :class="{
-                'error-item tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word tw:font-bold': true,
-                'text-green ': val.success,
-                'text-red': !val.success,
-              }"
-              :data-test="`template-import-creation-${index}-message`"
-            >
-              <pre class="tw:[white-space:pre-wrap] tw:[word-wrap:break-word] tw:[word-break:break-word] tw:[overflow-wrap:break-word] tw:font-[inherit] tw:m-0">{{ val.message }}</pre>
-            </div>
-          </div>
-        </div>
-        </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import templateService from "@/services/alert_templates";
@@ -203,11 +194,8 @@ import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import {
-  validateTemplateBody,
-  getTemplateValidationErrorMessage,
-} from "@/utils/templates/validation";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { validateTemplateBody } from "@/utils/templates/validation";
 
 export default defineComponent({
   name: "ImportTemplate",
@@ -230,15 +218,15 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type templateCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
     type templateErrors = (ErrorMessage | string)[][];
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
@@ -259,7 +247,7 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
 
     const getFormattedTemplates = computed(() => {
@@ -272,11 +260,7 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].type = type;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -284,11 +268,7 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = name;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -296,11 +276,7 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].body = body;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -308,15 +284,11 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].title = title;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       templateErrorsToDisplay.value = [];
       tempalteCreators.value = [];
 
@@ -328,9 +300,7 @@ export default defineComponent({
 
         const parsedJson = JSON.parse(jsonString);
         // Convert single object to array if needed
-        jsonArrayOfObj.value = Array.isArray(parsedJson)
-          ? parsedJson
-          : [parsedJson];
+        jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
           message: e.message || "Invalid JSON format",
@@ -357,7 +327,9 @@ export default defineComponent({
       // Only redirect and show success message if ALL templates were imported successfully
       if (successCount === totalCount) {
         toast({
-          message: `Successfully imported template(s)`,
+          message: t("toastMessages.alerts.successfullyImportedTemplates", {
+            count: successCount,
+          }),
           variant: "success",
         });
 
@@ -389,7 +361,7 @@ export default defineComponent({
         return hasCreatedTemplate;
       } catch (e: any) {
         toast({
-          message: "Error importing Template please check the JSON",
+          message: t("toastMessages.alerts.errorImportingTemplatePleaseCheckThe"),
           variant: "error",
         });
         return false;
@@ -397,23 +369,17 @@ export default defineComponent({
     };
 
     const validateTemplateInputs = async (input: any, index: number) => {
-      let templateErrors: (string | { message: string; field: string })[] = [];
+      let templateErrors: (string | ErrorMessage)[] = [];
 
       // Validate name using the updated props.templates
-      if (
-        !input.name ||
-        typeof input.name !== "string" ||
-        input.name.trim() === ""
-      ) {
+      if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         templateErrors.push({
-          message: `Template - ${index}: The "name" field is required and should be a valid string.`,
+          message: t("alert_templates.import.nameRequired", { index }),
           field: "template_name",
         });
-      } else if (
-        props.templates.some((template: any) => template.name === input.name)
-      ) {
+      } else if (props.templates.some((template: any) => template.name === input.name)) {
         templateErrors.push({
-          message: `Template - ${index}: "${input.name}" already exists`,
+          message: t("alert_templates.import.nameExists", { index, name: input.name }),
           field: "template_name",
         });
       }
@@ -421,26 +387,22 @@ export default defineComponent({
       // Validate type
       if (!input.type || (input.type !== "email" && input.type !== "http")) {
         templateErrors.push({
-          message: `Template - ${index}: The "type" field must be either "email" or "http"`,
+          message: t("alert_templates.import.typeInvalid", { index }),
           field: "type",
         });
       }
 
       // Validate body
-      if (
-        !input.body ||
-        typeof input.body !== "string" ||
-        input.body.trim() === ""
-      ) {
+      if (!input.body || typeof input.body !== "string" || input.body.trim() === "") {
         templateErrors.push({
-          message: `Template - ${index}: The "body" field is required and should be a valid JSON string.`,
+          message: t("alert_templates.import.bodyRequired", { index }),
           field: "body",
         });
       } else {
         const result = validateTemplateBody(input.body);
         if (!result.valid) {
-            templateErrors.push({
-            message: `Template - ${index}: The "body" field should contain valid JSON. Placeholders like {value} for numbers and "{name}" for strings are supported.`,
+          templateErrors.push({
+            message: t("alert_templates.import.bodyInvalidJson", { index }),
             field: "body",
           });
         }
@@ -448,13 +410,9 @@ export default defineComponent({
 
       // Validate title for email type
       if (input.type === "email") {
-        if (
-          !input.title ||
-          typeof input.title !== "string" ||
-          input.title.trim() === ""
-        ) {
+        if (!input.title || typeof input.title !== "string" || input.title.trim() === "") {
           templateErrors.push({
-            message: `Template - ${index}: The "title" field is required for email type templates.`,
+            message: t("alert_templates.import.titleRequiredEmail", { index }),
             field: "title",
           });
         }
@@ -487,7 +445,7 @@ export default defineComponent({
         });
 
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file `,
+          message: t("alert_templates.import.createSuccess", { index, name: input.name }),
           success: true,
         });
 
@@ -497,7 +455,11 @@ export default defineComponent({
         return true;
       } catch (error: any) {
         tempalteCreators.value.push({
-          message: `Template - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alert_templates.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alert_templates.import.unknownError"),
+          }),
           success: false,
         });
         return false;

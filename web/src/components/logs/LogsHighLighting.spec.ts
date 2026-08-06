@@ -554,7 +554,7 @@ describe("LogsHighLighting Component", () => {
     });
 
     it("should render strings with double and single quotes without throwing", async () => {
-      await wrapper.setProps({ data: 'Test "double" and \'single\' quotes' });
+      await wrapper.setProps({ data: "Test \"double\" and 'single' quotes" });
       expect(wrapper.find("span.logs-highlight-json").exists()).toBe(true);
     });
   });
@@ -626,7 +626,11 @@ describe("LogsHighLighting Component", () => {
     });
 
     it("should wrap object key text in double-quotes when showQuotes is true", () => {
-      quotesWrapper = mountComponent({ data: { key: "value" }, showBraces: true, showQuotes: true });
+      quotesWrapper = mountComponent({
+        data: { key: "value" },
+        showBraces: true,
+        showQuotes: true,
+      });
       // log-key span must contain the key with surrounding "..."
       expect(html(quotesWrapper)).toContain('"key"');
     });

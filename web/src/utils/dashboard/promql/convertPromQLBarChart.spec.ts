@@ -36,16 +36,16 @@ vi.mock("./shared/dataProcessor", () => ({
 }));
 
 vi.mock("./shared/axisBuilder", () => ({
-  buildCategoryXAxis: vi.fn((categories, panelSchema) => ({
+  buildCategoryXAxis: vi.fn((categories) => ({
     type: "category",
     data: categories,
   })),
-  buildCategoryYAxis: vi.fn((categories, panelSchema) => ({
+  buildCategoryYAxis: vi.fn((categories) => ({
     type: "category",
     data: categories,
     axisLabel: {},
   })),
-  buildValueAxis: vi.fn((panelSchema) => ({
+  buildValueAxis: vi.fn(() => ({
     type: "value",
   })),
   buildTooltip: vi.fn((panelSchema, triggerType) => ({
@@ -58,7 +58,7 @@ vi.mock("./shared/gridBuilder", () => ({
 }));
 
 vi.mock("../colorPalette", () => ({
-  getSeriesColor: vi.fn((colorConfig, name, values, min, max, theme, colorBySeries) => {
+  getSeriesColor: vi.fn((colorConfig, name) => {
     const colors: Record<string, string> = {
       series1: "#FF0000",
       series2: "#00FF00",
@@ -341,9 +341,11 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.grid.left).toBe("15%");
+      // containLabel reserves the label area; insets are small fixed margins
+      // (12px bottom without a bottom legend, 40px with one)
+      expect(result.grid.left).toBe(16);
       expect(result.grid.right).toBe("4%");
-      expect(result.grid.bottom).toBe("10%");
+      expect(result.grid.bottom).toBe(12);
       expect(result.grid.containLabel).toBe(true);
     });
 
@@ -660,7 +662,7 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].data).toEqual([10, '-']);
+      expect(result.series[0].data).toEqual([10, "-"]);
     });
 
     it("should apply colors to stacked series", () => {
@@ -744,9 +746,10 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.grid.left).toBe("3%");
-      expect(result.grid.right).toBe("4%");
-      expect(result.grid.bottom).toBe("10%");
+      expect(result.grid.left).toBe(16);
+      // measured half-width of the last category label, floored at 20
+      expect(result.grid.right).toBe(20);
+      expect(result.grid.bottom).toBe(12);
     });
 
     it("should apply custom bar width for stacked", () => {
@@ -894,7 +897,7 @@ describe("BarConverter", () => {
 
       const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.grid.left).toBe("15%");
+      expect(result.grid.left).toBe(16);
     });
   });
 
@@ -1131,7 +1134,7 @@ describe("BarConverter", () => {
         panelSchema,
         mockStore,
         mockExtras,
-        mockChartPanelRef
+        mockChartPanelRef,
       );
 
       expect(result).toBeDefined();

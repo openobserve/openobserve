@@ -31,6 +31,61 @@ use crate::{
     errors::{DbError, Error, Result},
 };
 
+const PULL_QUERY: &str = r#"
+WITH jobs_to_pull AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
+    ORDER BY next_run_at, id
+    LIMIT $10
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, start_time = $2,
+    end_time = CASE
+        WHEN jobs.module = $3 THEN $4
+        ELSE $5
+    END
+FROM jobs_to_pull
+WHERE jobs.id = jobs_to_pull.id
+RETURNING jobs.*;
+"#;
+
+const PULL_QUERY_BY_MODULE: &str = r#"
+WITH jobs_to_pull AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
+      AND module = $10
+    ORDER BY next_run_at, id
+    LIMIT $11
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, start_time = $2,
+    end_time = CASE
+        WHEN jobs.module = $3 THEN $4
+        ELSE $5
+    END
+FROM jobs_to_pull
+WHERE jobs.id = jobs_to_pull.id
+RETURNING jobs.*;
+"#;
+
+const WATCH_TIMEOUT_QUERY: &str = r#"
+WITH timed_out_jobs AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $2 AND end_time <= $3
+    ORDER BY id
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, retries = jobs.retries + 1
+FROM timed_out_jobs
+WHERE jobs.id = timed_out_jobs.id;
+"#;
+
 pub struct PostgresScheduler {}
 
 impl PostgresScheduler {
@@ -615,10 +670,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
     /// - Take a global `pg_advisory_xact_lock` so only one puller across all nodes claims jobs at a
-    ///   time. This serializes the pull cluster-wide; the query itself does **not** use `FOR UPDATE
-    ///   SKIP LOCKED`.
-    /// - Read the records with status "Waiting", next_run_at <= now, ordered by next_run_at and
-    ///   limited to `concurrency`
+    ///   time. This serializes the pull cluster-wide.
+    /// - Read the records with status "Waiting", next_run_at <= now, ordered by next_run_at and id,
+    ///   locking candidates with `FOR UPDATE SKIP LOCKED` and limiting to `concurrency`
     /// - Changes their statuses from "Waiting" to "Processing"
     /// - Commits as a single transaction
     /// - Returns the Trigger jobs
@@ -627,11 +681,18 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     /// automatically on COMMIT/ROLLBACK, never outliving the transaction. This is the safe variant
     /// on pooled sqlx connections; a session-scoped lock (`pg_advisory_lock`) could leak onto a
     /// connection returned to the pool and is deliberately avoided here.
+    ///
+    /// When `module` is `Some(m)` (per-module pullers, A3), the pull is filtered to that module
+    /// and the advisory lock key becomes `scheduler_pull_lock:{module}` (strategy C3). Different
+    /// modules hash to different lock ids, so their pullers run concurrently instead of
+    /// serializing behind one global lock; within a module the lock still gives per-module FIFO.
+    /// When `module` is `None`, the legacy global key + unfiltered pull are used unchanged.
     async fn pull(
         &self,
         concurrency: i64,
         alert_timeout: i64,
         report_timeout: i64,
+        module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
         let pool = CLIENT.clone();
 
@@ -646,27 +707,22 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        let query = r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-    ORDER BY next_run_at
-    LIMIT $10
-)
-RETURNING *;"#;
+        let query = if module.is_some() {
+            PULL_QUERY_BY_MODULE
+        } else {
+            PULL_QUERY
+        };
 
         let mut tx = pool.begin().await?;
 
         // Take a transaction-scoped advisory lock (not a table lock) for the duration of the
-        // transaction; auto-released on commit/rollback. Serializes the pull across all nodes.
-        let lock_key = "scheduler_pull_lock";
-        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        // transaction; auto-released on commit/rollback. Per-module key (C3) when filtering by
+        // module so modules don't serialize against each other; global key otherwise.
+        let lock_key = match &module {
+            Some(m) => format!("scheduler_pull_lock:{m}"),
+            None => "scheduler_pull_lock".to_string(),
+        };
+        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
         let lock_id = if lock_id > i64::MAX as u64 {
             (lock_id >> 1) as i64
         } else {
@@ -686,7 +742,7 @@ RETURNING *;"#;
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
+        let mut q = sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
             .bind(TriggerModule::Report)
@@ -695,11 +751,12 @@ RETURNING *;"#;
             .bind(TriggerStatus::Waiting)
             .bind(now)
             .bind(true)
-            .bind(false)
-            .bind(concurrency)
-            .fetch_all(&mut *tx)
-            .await
-        {
+            .bind(false);
+        if let Some(m) = module {
+            q = q.bind(m);
+        }
+        q = q.bind(concurrency);
+        let jobs: Vec<Trigger> = match q.fetch_all(&mut *tx).await {
             Ok(jobs) => jobs,
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
@@ -809,9 +866,8 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// Background job that watches for timeout of a job
     /// Steps:
-    /// - Select all the records with status = "Processing"
-    /// - calculate the current timestamp and difference from `start_time` of each record
-    /// - Get the record ids with difference more than the given timeout
+    /// - Select records with status = "Processing" whose `end_time` has passed
+    /// - Lock candidates in id order, skipping rows being handled by another transaction
     /// - Update their status back to "Waiting" and increase their "retries" by 1
     async fn watch_timeout(&self) -> Result<()> {
         let pool = CLIENT.clone();
@@ -819,17 +875,12 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let now = now_micros();
-        let res = sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = $1, retries = retries + 1
-WHERE status = $2 AND end_time <= $3;
-                "#,
-        )
-        .bind(TriggerStatus::Waiting)
-        .bind(TriggerStatus::Processing)
-        .bind(now)
-        .execute(&pool)
-        .await?;
+        let res = sqlx::query(WATCH_TIMEOUT_QUERY)
+            .bind(TriggerStatus::Waiting)
+            .bind(TriggerStatus::Processing)
+            .bind(now)
+            .execute(&pool)
+            .await?;
         log::debug!(
             "[SCHEDULER] watch_timeout for scheduler updated {} rows",
             res.rows_affected()
@@ -885,17 +936,25 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{PULL_QUERY, PULL_QUERY_BY_MODULE, PostgresScheduler, WATCH_TIMEOUT_QUERY};
 
     #[test]
     fn test_postgres_scheduler_new() {
-        let s = PostgresScheduler::new();
-        drop(s);
+        let _scheduler = PostgresScheduler::new();
     }
 
     #[test]
     fn test_postgres_scheduler_default() {
-        let s = PostgresScheduler::default();
-        drop(s);
+        let _scheduler = PostgresScheduler::default();
+    }
+
+    #[test]
+    fn scheduler_updates_lock_candidates_in_a_stable_order() {
+        assert!(PULL_QUERY.contains("ORDER BY next_run_at, id"));
+        assert!(PULL_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+        assert!(PULL_QUERY_BY_MODULE.contains("ORDER BY next_run_at, id"));
+        assert!(PULL_QUERY_BY_MODULE.contains("FOR UPDATE SKIP LOCKED"));
+        assert!(WATCH_TIMEOUT_QUERY.contains("ORDER BY id"));
+        assert!(WATCH_TIMEOUT_QUERY.contains("FOR UPDATE SKIP LOCKED"));
     }
 }

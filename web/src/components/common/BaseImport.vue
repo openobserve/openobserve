@@ -16,18 +16,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:w-full"
+    class="flex h-full min-h-0 w-full flex-col overflow-hidden"
     :class="[containerClass]"
     :style="containerStyle"
   >
-    <!-- Header Section — the standard AppPageHeader (back tile + title + actions)
+    <!-- Header Section — the standard OPageHeader (back tile + title + actions)
          used across the app. Hidden when the host page provides its own page
-         header, e.g. the pipeline shell's AppPageHeader (avoids a duplicate). -->
-    <AppPageHeader
+         header, e.g. the pipeline shell's OPageHeader (avoids a duplicate). -->
+    <OPageHeader
       v-if="!hideHeader"
       :title="title"
-      :back="{ label: '', onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
-      class="tw:-mx-[0.625rem] tw:px-4 tw:border-b tw:border-border-default"
+      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      class="border-border-default shrink-0 border-b"
       :class="headerContainerClass"
     >
       <template #actions>
@@ -40,7 +40,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="cancelButtonClass"
           @click="handleCancel"
           :data-test="`${testPrefix}-import-cancel-btn`"
-        >{{ t('function.cancel') }}</OButton>
+          >{{ t("function.cancel") }}</OButton
+        >
         <OButton
           variant="primary"
           size="sm"
@@ -50,29 +51,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :loading="isImporting || $props.isImporting"
           :disabled="isImporting || $props.isImporting"
           :data-test="`${testPrefix}-import-json-btn`"
-        >{{ t('dashboard.import') }}</OButton>
+          >{{ t("dashboard.import") }}</OButton
+        >
       </template>
-    </AppPageHeader>
+    </OPageHeader>
 
-    <div class="tw:flex" :class="contentWrapperClass">
-      <div class="tw:flex" :style="contentStyle">
+    <!-- No px-page-edge here: the tabs section carries its own px-page-edge so
+         it aligns with the header back-button icon (which is inset one
+         page-edge from the container). A page-edge on this wrapper too would
+         double the inset and push the content past the header icon. -->
+    <div class="flex min-h-0 flex-1" :class="contentWrapperClass">
+      <div class="flex min-h-0 w-full" :style="contentStyle">
         <OSplitter
           v-if="showSplitter"
-          class="logs-search-splitter"
+          class="logs-search-splitter h-full min-h-0 w-full"
           v-model="splitterModel"
           :style="splitterStyle"
           :limits="[30, 60]"
           :horizontal="false"
         >
           <template #before>
-            <div class="tw:w-full tw:h-full tw:border-r tw:border-border-default">
+            <div class="border-border-default flex h-full w-full flex-col border-r">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-2 tw:px-2 tw:mb-[0.625rem]">
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-                  <app-tabs
+              <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
+                <div class="app-tabs-container h-9 w-fit">
+                  <AppTabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
-                    :tabs="tabs"
+                    :tabs="resolvedTabs"
                     v-model:active-tab="activeTab"
                     @update:active-tab="handleTabChange"
                   />
@@ -82,27 +88,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
+                class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
               >
-                <div class="tw:mx-2 tw:pb-2">
+                <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="tw:flex tw:mt-3 tw:mb-3">
-                        <OInput
-                          :data-test="`${testPrefix}-import-url-input`"
-                          v-model="url"
-                          size="md"
-                          :placeholder="t('dashboard.addURL')"
-                        />
+                    <div class="mb-3 flex shrink-0">
+                      <OInput
+                        :data-test="`${testPrefix}-import-url-input`"
+                        v-model="url"
+                        size="md"
+                        :placeholder="t('dashboard.addURL')"
+                      />
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-url-editor tw:mx-2"
+                    class="import-url-editor border-card-glass-border rounded-default min-h-0 flex-1 overflow-hidden border"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -111,13 +117,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container tw:py-1"
+                class="editor-container-json bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
               >
-                <div class="tw:mx-2 tw:mt-3 tw:pb-2">
+                <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="tw:mb-1 tw:flex">
-                      <div style="width: 100%" class="tw:pr-2">
+                    <div class="mb-1 flex w-full shrink-0">
+                      <div class="w-full">
                         <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
@@ -125,16 +131,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
-                          helpText=".json files only"
+                          :helpText="t('common.jsonFilesOnlyHint')"
                         >
                           <template v-slot:prepend>
                             <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                           </template>
                           <template v-slot:append>
                             <OIcon
-                              name="close" size="sm"
+                              name="close"
+                              size="sm"
                               @click.stop.prevent="jsonFiles = null"
-                              class="tw:cursor-pointer"
+                              class="cursor-pointer"
                             />
                           </template>
                         </OFile>
@@ -142,12 +149,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="import-editor-shell import-file-editor tw:mx-2"
+                    class="import-file-editor border-card-glass-border rounded-default min-h-0 flex-1 overflow-hidden border"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
@@ -162,18 +169,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw:w-full"
-              :style="outputContainerStyle"
+              class="bg-card-glass-bg flex h-full min-h-0 w-full flex-col"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-                  <OSeparator class="tw:mr-4 tw:mt-4" />
-                  <div class="error-report-container">
-                    <div class="tw:text-center tw:p-3 tw:text-gray-400">
-                      No messages to display
+                  <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+                    {{ t("dashboard.outputMessages") }}
+                  </div>
+                  <OSeparator class="mt-1 shrink-0" />
+                  <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
+                    <div class="text-text-muted p-3 text-center">
+                      {{ t("dashboard.noMessagesToDisplay") }}
                     </div>
                   </div>
                 </slot>
@@ -182,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
         </OSplitter>
 
-        <!-- Slot for tw:w-full content (when splitter is not shown) -->
+        <!-- Slot for w-full content (when splitter is not shown) -->
         <slot name="full-width-content" v-if="!showSplitter" />
       </div>
     </div>
@@ -193,34 +201,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  reactive,
   watch,
   defineAsyncComponent,
   computed,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
-import AppPageHeader from "./AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "BaseImport",
   components: {
     OSeparator,
     OSplitter,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     AppTabs,
-    AppPageHeader,
+    OPageHeader,
     OButton,
     OInput,
     OIcon,
@@ -229,24 +235,17 @@ export default defineComponent({
   props: {
     // Title for the import page
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
-    // Tabs configuration
+    // Tabs configuration (shape matches AppTabs' Tab interface).
+    // No `default` here on purpose: a prop default factory runs outside the i18n
+    // context and would freeze the labels at one locale — see `resolvedTabs`.
     tabs: {
-      type: Array,
-      default: () => [
-        {
-          label: "File Upload / JSON",
-          value: "import_json_file",
-          icon: "upload",
-        },
-        {
-          label: "URL Import",
-          value: "import_json_url",
-          icon: "link",
-        },
-      ],
+      type: Array as PropType<
+        { label: I18nText; value: string; icon?: string; disabled?: boolean }[]
+      >,
+      required: false,
     },
     // Default active tab
     defaultActiveTab: {
@@ -287,7 +286,7 @@ export default defineComponent({
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem]",
+      default: "mb-2.5",
     },
     containerStyle: {
       type: String,
@@ -299,11 +298,11 @@ export default defineComponent({
     },
     headerClass: {
       type: String,
-      default: "tw:py-3",
+      default: "py-3",
     },
     titleClass: {
       type: String,
-      default: "tw:font-[600] tw:text-[20px]",
+      default: "font-[600] text-xl",
     },
     contentWrapperClass: {
       type: String,
@@ -319,16 +318,9 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: [
-    "back",
-    "cancel",
-    "import",
-    "update:jsonStr",
-    "update:jsonArray",
-    "update:activeTab",
-  ],
+  emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // State
     const jsonStr = ref<any>("");
@@ -353,6 +345,14 @@ export default defineComponent({
       }
     };
 
+    const resolvedTabs = computed(
+      () =>
+        props.tabs ?? [
+          { label: t("common.fileUploadJsonTab"), value: "import_json_file", icon: "upload" },
+          { label: t("common.urlImportTab"), value: "import_json_url", icon: "link" },
+        ],
+    );
+
     // Computed styles
     const contentStyle = computed(() => {
       return "width: 100%;";
@@ -362,12 +362,6 @@ export default defineComponent({
       return {
         width: "100%",
         height: "100%",
-      };
-    });
-
-    const outputContainerStyle = computed(() => {
-      return {
-        height: props.editorHeights.outputContainer,
       };
     });
 
@@ -418,13 +412,13 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
+                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
                   toast({
-                    message: `Error parsing JSON from file ${file.name}`,
+                    message: t("toastMessages.common.errorParsingJsonFromFile", {
+                      fileName: file.name,
+                    }),
                     variant: "error",
                   });
                   resolve([]);
@@ -460,27 +454,25 @@ export default defineComponent({
               response.headers["content-type"]?.includes("text/plain")
             ) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = Array.isArray(response.data)
-                ? response.data
-                : [response.data];
+              jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
               toast({
-                message: "Invalid JSON format in the URL",
+                message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
                 variant: "error",
               });
             }
           } catch (parseError) {
             toast({
-              message: "Invalid JSON format",
+              message: t("toastMessages.common.invalidJsonFormat"),
               variant: "error",
             });
           }
         }
       } catch (error) {
         toast({
-          message: "Error fetching data",
+          message: t("toastMessages.common.errorFetchingData"),
           variant: "error",
         });
       }
@@ -511,7 +503,7 @@ export default defineComponent({
           emit("update:jsonArray", newVal);
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Cleanup before component unmounts to prevent Monaco editor errors
@@ -523,12 +515,14 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       jsonStr,
       jsonFiles,
       url,
       jsonArrayOfObj,
       activeTab,
+      resolvedTabs,
       splitterModel,
       editorKey,
       isImporting,
@@ -542,44 +536,19 @@ export default defineComponent({
       updateJsonArray,
       contentStyle,
       splitterStyle,
-      outputContainerStyle,
     };
   },
 });
 </script>
 
-<style>
-/*
- * Box styling (border, radius, padding, height) lives on the editor SHELL
- * wrapper — never on Monaco's internal .monaco-editor element. Monaco sizes
- * its inner .overflow-guard to the full box it measures; adding border/padding
- * directly to that element shrinks the content box and forces phantom
- * horizontal + vertical scrollbars. Styling the wrapper lets Monaco fill a
- * clean box and removes the scrollbars without any !important overrides.
- */
-.import-editor-shell {
-  box-sizing: border-box;
-  /* tw:w-full (100%) + tw:mx-2 (1rem total) would overflow by 1rem and add a
-     horizontal scrollbar; subtract the margins so the box stays inside and
-     keeps a right-side gap. */
-  width: calc(100% - 1rem);
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco height for the URL import editor.
+   Previously inherited from ImportDashboard.vue's global .editor-container-url
+   rule; now owned locally (via :deep to Monaco's DOM), same value/props, so the
+   editor no longer depends on that view having been mounted first. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
   overflow: hidden;
-}
-
-.import-url-editor {
-  height: v-bind('editorHeights.urlEditor');
-}
-
-.import-file-editor {
-  height: v-bind('editorHeights.fileEditor');
-}
-
-.error-report-container {
-  height: v-bind('editorHeights.errorReport') !important;
-  overflow: auto;
   resize: none;
 }
-
 </style>

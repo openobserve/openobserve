@@ -1,116 +1,157 @@
 <template>
-  <div class="condition tw:flex tw:items-center tw:gap-2">
+  <div class="condition flex items-center gap-2">
     <OSelect
       v-if="conditionIndex !== 0"
-      v-model="condition.logicalOperator"
+      v-model="conditionModel.logicalOperator"
       :options="filterOptions"
+      size="sm"
       @update:model-value="emitLogicalOperatorChange"
-      class="condition-logical-operator tw:w-fit tw:max-w-[8rem]"
+      class="condition-logical-operator w-fit max-w-32"
       :data-test="`dashboard-add-condition-logical-operator-${conditionIndex}`"
     />
-    <OButtonGroup class="axis-field tw:shrink-0" radius="sm">
-      <ODropdown
-        @update:open="(v: boolean) => v && loadFilterItem(condition.column)"
-      >
+    <OButtonGroup
+      class="axis-field border-border-default border-s-text-body bg-surface-panel shrink-0 border border-s-2 [&>*:not(:first-child)]:!border-s"
+      radius="sm"
+      :divided="true"
+    >
+      <ODropdown @update:open="(v: boolean) => v && loadFilterItem(condition.column)">
         <template #trigger>
           <OButton
-            variant="primary"
+            variant="ghost"
             size="chip-12"
+            class="!pe-1"
             :data-test="`dashboard-add-condition-label-${conditionIndex}-${computedLabel(condition)}`"
             icon-right="arrow-drop-down"
           >
-            {{ computedLabel(condition) }}
+            <span class="leading-normal font-normal whitespace-nowrap"
+              ><span class="text-text-body">{{ labelParts(condition).prefix }}</span
+              ><span class="text-text-body">{{ labelParts(condition).field }}</span
+              ><span v-if="labelParts(condition).op" class="text-text-secondary">{{
+                labelParts(condition).op
+              }}</span
+              ><template v-if="labelParts(condition).value"
+                ><span class="text-badge-blue-ol-text">{{ labelParts(condition).valueOpen }}</span
+                ><span
+                  :class="
+                    labelParts(condition).valueIsNumber
+                      ? 'text-badge-success-ol-text'
+                      : 'text-badge-error-ol-text'
+                  "
+                  >{{ labelParts(condition).valueInner }}</span
+                ><span class="text-badge-blue-ol-text">{{
+                  labelParts(condition).valueClose
+                }}</span></template
+              ></span
+            >
           </OButton>
         </template>
-        <div class="tw:p-4 tw:w-72">
-          <div style="display: flex; align-items: center; gap: 4px">
-            <StreamFieldSelect
-              class="tw:w-full"
-              :streams="getAllSelectedStreams()"
-              v-model="condition.column"
-              :data-test="`dashboard-add-condition-column-${conditionIndex}`"
-            />
-            <OButton
-              variant="ghost"
-              size="icon"
-              @click="removeColumnName"
-              :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
-              icon-left="close"
-            >
-            </OButton>
-          </div>
-          <div>
-            <div class="tw:p-1">
-              <div class="tw:gap-1">
-                <OTabs v-model="condition.type" dense>
-                  <OTab
-                    name="list"
-                    :label="t('common.list')"
-                    class="tw:flex-1"
-                    :data-test="`dashboard-add-condition-list-${conditionIndex}`"
-                  ></OTab>
-                  <OTab
-                    name="condition"
-                    :label="t('common.condition')"
-                    class="tw:flex-1"
-                    :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
-                  ></OTab>
-                </OTabs>
-                <OSeparator />
-                <div>
-                  <OTabPanels v-model="condition.type" animated>
-                    <OTabPanel name="condition">
-                      <div class="tw:flex tw:flex-col tw:gap-2">
-                        <OSelect
-                          v-model="condition.operator"
-                          :options="operators"
-                          :label="t('common.operator')"
-                          style="width: 100%"
-                          data-test="dashboard-add-condition-operator"
-                          class="o2-custom-select-dashboard"
-                        />
-                        <OCombobox
-                          v-if="
-                            !['Is Null', 'Is Not Null'].includes(
-                              condition.operator,
-                            )
-                          "
-                          :label="t('common.value')"
-                          v-model="condition.value"
-                          :items="dashboardVariablesFilterItems"
-                          search-regex="(?:^|[^$])\$?(\w+)"
-                          data-test="dashboard-add-condition-value"
-                        />
-                      </div>
-                    </OTabPanel>
-                    <OTabPanel name="list">
-                      <OSelect
-                        v-model="condition.values"
-                        :options="sortedFilteredListOptions"
-                        :label="t('common.selectFilter')"
-                        multiple
-                        searchable
-                        :error="condition.values?.length === 0"
-                        :error-message="condition.values?.length === 0 ? 'At least 1 item required' : ''"
-                        data-test="dashboard-add-condition-list-tab"
-                        class="o2-custom-select-dashboard"
-                      />
-                    </OTabPanel>
-                  </OTabPanels>
-                </div>
+        <div class="w-80">
+          <div class="flex flex-col gap-2.5 p-3">
+            <div class="flex flex-col gap-1">
+              <div class="text-2xs text-text-secondary font-semibold">
+                {{ t("common.field") }}
               </div>
+              <div class="flex items-center gap-1.5">
+                <StreamFieldSelect
+                  class="min-w-0 flex-1"
+                  :streams="getAllSelectedStreams()"
+                  v-model="conditionModel.column"
+                  :data-test="`dashboard-add-condition-column-${conditionIndex}`"
+                />
+                <OButton
+                  variant="outline"
+                  size="icon"
+                  class="shrink-0"
+                  @click="removeColumnName"
+                  :data-test="`dashboard-add-condition-remove-column-${conditionIndex}`"
+                  icon-left="close"
+                >
+                </OButton>
+              </div>
+            </div>
+
+            <div>
+              <OTabs v-model="conditionModel.type" dense>
+                <OTab
+                  name="list"
+                  :label="t('common.list')"
+                  class="flex-1"
+                  :data-test="`dashboard-add-condition-list-${conditionIndex}`"
+                ></OTab>
+                <OTab
+                  name="condition"
+                  :label="t('common.condition')"
+                  class="flex-1"
+                  :data-test="`dashboard-add-condition-condition-${conditionIndex}`"
+                ></OTab>
+              </OTabs>
+              <OSeparator />
+              <!-- -mx-1 px-1: padding so the animated panels don't clip focus rings -->
+              <OTabPanels v-model="conditionModel.type" animated class="-mx-1 px-1">
+                <OTabPanel name="condition">
+                  <div class="flex flex-col gap-3 pt-3">
+                    <div class="flex flex-col gap-1">
+                      <div class="text-2xs text-text-secondary font-semibold">
+                        {{ t("common.operator") }}
+                      </div>
+                      <OSelect
+                        v-model="conditionModel.operator"
+                        :options="operators"
+                        data-test="dashboard-add-condition-operator"
+                        class="o2-custom-select-dashboard w-full"
+                      />
+                    </div>
+                    <div
+                      v-if="!['Is Null', 'Is Not Null'].includes(condition.operator)"
+                      class="flex flex-col gap-1"
+                    >
+                      <div class="text-2xs text-text-secondary font-semibold">
+                        {{ t("common.value") }}
+                      </div>
+                      <OCombobox
+                        v-model="conditionModel.value"
+                        :items="dashboardVariablesFilterItems"
+                        search-regex="(?:^|[^$])\$?(\w+)"
+                        :placeholder="t('common.enterValueOrVariable')"
+                        data-test="dashboard-add-condition-value"
+                      />
+                    </div>
+                  </div>
+                </OTabPanel>
+                <OTabPanel name="list">
+                  <div class="flex flex-col gap-1 pt-3">
+                    <div class="text-2xs text-text-secondary font-semibold">
+                      {{ t("common.selectFilter") }}
+                    </div>
+                    <OSelect
+                      v-model="conditionModel.values"
+                      :options="sortedFilteredListOptions"
+                      multiple
+                      searchable
+                      :error="condition.values?.length === 0"
+                      :error-message="
+                        condition.values?.length === 0
+                          ? t('common.atLeastOneItemRequired')
+                          : raw('')
+                      "
+                      data-test="dashboard-add-condition-list-tab"
+                      class="o2-custom-select-dashboard"
+                    />
+                  </div>
+                </OTabPanel>
+              </OTabPanels>
             </div>
           </div>
         </div>
       </ODropdown>
       <OButton
-        variant="outline"
+        variant="ghost"
         size="icon-chip"
-        class="tw:shrink-0"
+        class="!w-4 shrink-0"
         @click="$emit('remove-condition')"
         data-test="dashboard-add-condition-remove"
-        icon-left="close"
       >
+        <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
       </OButton>
     </OButtonGroup>
   </div>
@@ -119,16 +160,18 @@
 <script lang="ts">
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import { type SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { defineComponent, ref, computed, toRef, watch, inject } from "vue";
 import OCombobox from "@/lib/forms/Combobox/OCombobox.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
@@ -141,6 +184,7 @@ export default defineComponent({
     OSeparator,
     OButtonGroup,
     OButton,
+    OIcon,
     ODropdown,
     OTabs,
     OTab,
@@ -160,17 +204,14 @@ export default defineComponent({
     "conditionIndex",
   ],
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const {
-      getAllSelectedStreams,
-      getStreamNameFromStreamAlias,
-      dashboardPanelData,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
-    const { t } = useI18n();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { t } = useI18nTyped();
+    const { getAllSelectedStreams, getStreamNameFromStreamAlias, dashboardPanelData } =
+      useDashboardPanelData(dashboardPanelDataPageKey, t);
     const searchTerm = ref("");
+
+    // Same reference as props.condition; mutation targets its nested fields only.
+    const conditionModel = computed(() => props.condition);
     const { filterFn: filterStreamFn, filteredOptions: filteredSchemaOptions } =
       useSelectAutoComplete(toRef(props, "schemaOptions"), "label");
 
@@ -179,19 +220,14 @@ export default defineComponent({
         .find(
           (it: any) =>
             it.column == props?.condition?.column?.field &&
-            it.stream ==
-              getStreamNameFromStreamAlias(
-                props?.condition?.column?.streamAlias,
-              ),
+            it.stream == getStreamNameFromStreamAlias(props?.condition?.column?.streamAlias),
         )
         ?.value?.filter((option: any) =>
           option?.toLowerCase().includes(searchTerm.value.toLowerCase()),
         );
 
       // Sort options alphabetically
-      return options
-        ? options.sort((a: string, b: string) => a.localeCompare(b))
-        : [];
+      return options ? options.sort((a: string, b: string) => a.localeCompare(b)) : [];
     });
 
     const filterListFn = (search: any, update: any) => {
@@ -222,8 +258,8 @@ export default defineComponent({
     ];
 
     const filterOptions = [
-      { label: "AND", value: "AND" },
-      { label: "OR", value: "OR" },
+      { label: raw("AND"), value: "AND" },
+      { label: raw("OR"), value: "OR" },
     ];
 
     const computedLabel = (condition: any) => {
@@ -236,7 +272,48 @@ export default defineComponent({
           : builtCondition;
     };
 
-    const emitLogicalOperatorChange = (newOperator: string) => {
+    /**
+     * Split a condition label like "stream.field IN ('x')" into styled parts:
+     * muted stream prefix + bold field, muted operator, and the parenthesised
+     * value highlighted separately. Labels without an operator/value collapse
+     * to just prefix + field.
+     */
+    const labelParts = (condition: any) => {
+      const label = String(computedLabel(condition) ?? "");
+      const spaceIdx = label.indexOf(" ");
+      const column = spaceIdx === -1 ? label : label.slice(0, spaceIdx);
+      let rest = spaceIdx === -1 ? "" : label.slice(spaceIdx + 1);
+      let value = "";
+      const parens = rest.match(/^(.*?)\s*(\(.*\)?)\s*$/);
+      if (parens) {
+        rest = parens[1];
+        value = parens[2];
+      }
+      const dotIdx = column.lastIndexOf(".");
+      // Peel the outer parentheses off the value so they can render blue like
+      // the query editor's brackets, leaving the inner literal(s) to colour.
+      const valueOpen = value.startsWith("(") ? "(" : "";
+      const valueClose = value.endsWith(")") ? ")" : "";
+      const valueInner = value.slice(valueOpen.length, value.length - valueClose.length);
+      // A value is numeric when its inner content (no quotes/commas) is all
+      // numbers → green like a number in the query; otherwise red (string).
+      const bare = valueInner.replace(/['"]/g, "").trim();
+      const valueIsNumber = bare !== "" && /^-?[\d.\s,]+$/.test(bare);
+      return {
+        prefix: dotIdx === -1 ? "" : column.slice(0, dotIdx + 1),
+        field: dotIdx === -1 ? column : column.slice(dotIdx + 1),
+        // Pre-padded — Vue's whitespace condensing strips spaces between the
+        // adjacent label spans, so the operator carries its own.
+        op: rest ? ` ${rest} ` : "",
+        value,
+        valueOpen,
+        valueInner,
+        valueClose,
+        valueIsNumber,
+      };
+    };
+
+    const emitLogicalOperatorChange = (newOperator: SelectModelValue) => {
       emit("logical-operator-change", newOperator);
     };
 
@@ -245,14 +322,14 @@ export default defineComponent({
     };
 
     const removeColumnName = () => {
-      props.condition.column = {};
+      conditionModel.value.column = {};
     };
 
     watch(
       () => props.condition.column,
       (newColumn, oldColumn) => {
         if (newColumn !== oldColumn) {
-          props.condition.values = [];
+          conditionModel.value.values = [];
         }
       },
     );
@@ -267,13 +344,16 @@ export default defineComponent({
     return {
       operators,
       computedLabel,
+      labelParts,
       t,
+      raw,
       filterStreamFn,
       filterOptions,
       filterListFn,
       emitLogicalOperatorChange,
       handleFieldChange,
       removeColumnName,
+      conditionModel,
       filteredSchemaOptions,
       sortedFilteredListOptions: filteredListOptions,
       getAllSelectedStreams,

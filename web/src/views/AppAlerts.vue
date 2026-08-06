@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0" data-test="alerts-page" style="min-height: inherit">
+  <div class="rounded-default p-0" data-test="alerts-page" style="min-height: inherit">
     <RouterView
       :templates="templates"
       :destinations="destinations"
@@ -26,10 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, watch } from "vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 
@@ -37,8 +36,7 @@ export default defineComponent({
   name: "AppAlerts",
   setup() {
     const store = useStore();
-    const { t } = useI18n();
-    const router = useRouter();
+    const { t } = useI18nTyped();
     const activeTab: any = ref("destinations");
     const templates = ref([]);
     const destinations = ref([]);

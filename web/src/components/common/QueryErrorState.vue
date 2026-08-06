@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   └─────────────────────────────────────────────────────────────────────────┘
 
   Usage examples:
-    <!-- Logs / Traces / Metrics (full page) -->
+    Logs / Traces / Metrics (full page):
     <QueryErrorState
       :error-code="searchObj.data.errorCode"
       :error-msg="searchObj.data.errorMsg"
@@ -70,14 +70,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @widen-range="onWidenRange"
     />
 
-    <!-- Dashboard panel (compact) -->
+    Dashboard panel (compact):
     <QueryErrorState
       :error-code="state.errorDetail.code"
       :error-msg="state.errorDetail.message"
       size="block"
     />
 
-    <!-- Alert test query result -->
+    Alert test query result:
     <QueryErrorState
       :error-msg="testResult.error"
       size="block"
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- ── HERO layout ──────────────────────────────────────────────────── -->
   <div
     v-if="size === 'hero'"
-    class="tw:w-full tw:h-full tw:overflow-y-auto tw:flex tw:flex-col tw:items-center tw:pb-8"
+    class="flex h-full w-full flex-col items-center overflow-y-auto pb-8"
     data-test="query-error-state"
   >
     <!-- Illustration + title + description + action cards -->
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :illustration="illustration ?? 'broken-panel'"
       size="block"
       :hide-action="true"
-      class="tw:w-full tw:shrink-0"
+      class="w-full shrink-0"
     >
       <template #title>{{ resolvedTitle }}</template>
       <template #description>{{ resolvedDescription }}</template>
@@ -133,10 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OEmptyState>
 
     <!-- Detail panel + buttons (outside OEmptyState — avoids its overflow:hidden) -->
-    <div
-      v-if="hasAnyContent"
-      class="tw:w-full tw:max-w-2xl tw:mx-auto tw:px-6 tw:flex tw:flex-col tw:gap-3"
-    >
+    <div v-if="hasAnyContent" class="mx-auto flex w-full max-w-2xl flex-col gap-3 px-6">
       <ErrorDetailPanel
         :summary-line="summaryLine"
         :detail-body="detailBody"
@@ -146,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @toggle-detail="showDetail = !showDetail"
       />
 
-      <div class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:flex-wrap">
+      <div class="flex flex-wrap items-center justify-center gap-2">
         <OButton
           variant="ghost"
           size="sm"
@@ -160,12 +157,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="aiEnabled && (isQueryError || errorCode === 0)"
           variant="ghost"
           size="sm"
-          class="ai-hover-btn"
+          class="group text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
           data-test="query-error-ask-ai-btn"
           @click="emit('ask-ai')"
         >
           <template #icon-left>
-            <img :src="aiIconSrc" class="tw:w-4 tw:h-4 tw:shrink-0" alt="" />
+            <img
+              :src="aiIconSrc"
+              class="h-4 w-4 shrink-0 group-hover:brightness-0 group-hover:invert group-hover:[transition:filter_0.3s_ease]"
+              alt=""
+            />
           </template>
           {{ t("queryError.askAi") }}
         </OButton>
@@ -175,13 +176,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- AI button when there's nothing to show in the detail panel -->
     <div
       v-else-if="aiEnabled && (isQueryError || errorCode === 0)"
-      class="tw:flex tw:justify-center tw:mt-2"
+      class="mt-2 flex justify-center"
     >
       <OButton
         variant="ghost"
         size="sm"
         icon-left="bolt"
-        class="ai-hover-btn"
+        class="text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -194,25 +195,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 
   <!-- ── BLOCK layout (dashboard panels, alerts) ───────────────────────── -->
-  <div
-    v-else
-    class="tw:w-full tw:flex tw:flex-col tw:gap-3 tw:p-4"
-    data-test="query-error-state"
-  >
+  <div v-else class="flex w-full flex-col gap-3 p-4" data-test="query-error-state">
     <!-- Title row -->
-    <div class="tw:flex tw:items-start tw:gap-2">
-      <OIcon
-        name="error-outline"
-        size="sm"
-        class="tw:text-status-error tw:shrink-0 tw:mt-0.5"
-      />
-      <div class="tw:flex tw:flex-col tw:gap-0.5 tw:min-w-0">
-        <p class="tw:text-sm tw:font-semibold tw:text-text-body tw:m-0">
+    <div class="flex items-start gap-2">
+      <OIcon name="error-outline" size="sm" class="text-status-error mt-0.5 shrink-0" />
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <p class="text-text-body m-0 text-sm font-semibold">
           {{ resolvedTitle }}
         </p>
         <p
           v-if="summaryLine"
-          class="tw:text-xs tw:text-text-secondary tw:m-0 tw:break-words"
+          class="text-text-secondary m-0 text-xs break-words"
           data-test="query-error-summary"
         >
           {{ summaryLine }}
@@ -224,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <template v-if="hasDetail">
       <button
         type="button"
-        class="tw:flex tw:items-center tw:gap-1 tw:text-xs tw:text-text-secondary tw:cursor-pointer tw:bg-transparent tw:border-0 tw:p-0 tw:self-start tw:hover:text-text-body tw:transition-colors"
+        class="text-text-secondary hover:text-text-body flex cursor-pointer items-center gap-1 self-start border-0 bg-transparent p-0 text-xs transition-colors"
         data-test="query-error-toggle-detail-btn"
         @click="showDetail = !showDetail"
       >
@@ -233,25 +226,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </button>
       <div
         v-if="showDetail"
-        class="tw:rounded tw:bg-surface-panel tw:border tw:border-border-default tw:px-3 tw:py-2 tw:max-h-40 tw:overflow-y-auto"
+        class="rounded-default bg-surface-panel border-border-default max-h-40 overflow-y-auto border px-3 py-2"
         data-test="query-error-detail-expanded"
       >
-        <p
-          class="tw:text-xs tw:font-mono tw:text-text-secondary tw:m-0 tw:whitespace-pre-wrap tw:break-all"
-        >
+        <p class="text-text-secondary m-0 font-mono text-xs break-all whitespace-pre-wrap">
           {{ detailBody }}
         </p>
       </div>
     </template>
 
     <!-- Trace ID (block) -->
-    <small v-if="traceId" class="tw:text-text-caption" data-test="query-error-trace-id">
-      <span class="tw:font-medium">{{ t("queryError.traceId") }}</span>
+    <small v-if="traceId" class="text-text-secondary" data-test="query-error-trace-id">
+      <span class="font-medium">{{ t("queryError.traceId") }}</span>
       {{ traceId }}
     </small>
 
     <!-- Action row (block) -->
-    <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
+    <div class="flex flex-wrap items-center gap-2">
       <!-- Default slot for module-specific actions -->
       <slot name="actions" v-bind="slotProps">
         <OButton
@@ -300,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="sm"
         icon-left="bolt"
-        class="ai-hover-btn"
+        class="text-ai-accent! [background:var(--color-gradient-ai-subtle)]! [transition:background_0.3s_ease,box-shadow_0.3s_ease,color_0.3s_ease] hover:text-white! hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)] hover:[background:var(--color-gradient-ai)]! dark:text-white! dark:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)] dark:hover:shadow-[0_0.25rem_0.75rem_0_color-mix(in_srgb,var(--color-ai-accent)_35%,transparent)]"
         data-test="query-error-ask-ai-btn"
         @click="emit('ask-ai')"
       >
@@ -312,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useAiIcon } from "@/composables/useAiIcon";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
@@ -344,9 +335,9 @@ const props = withDefaults(
     /** Override the default "broken-panel" illustration (hero size only). */
     illustration?: IllustrationName;
     /** Override the error code's default title. */
-    title?: string;
+    title?: I18nText;
     /** Override the error code's default description. */
-    description?: string;
+    description?: I18nText;
   }>(),
   { size: "hero", aiEnabled: false },
 );
@@ -386,11 +377,9 @@ const {
 
 // ── Resolved copy ──────────────────────────────────────────────────────────
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const resolvedTitle = computed(() => props.title ?? defaultTitle.value);
-const resolvedDescription = computed(
-  () => props.description ?? defaultDescription.value,
-);
+const resolvedDescription = computed(() => props.description ?? defaultDescription.value);
 
 // ── Copy feedback — show "Copied!" for 2 s after the user clicks ───────────
 

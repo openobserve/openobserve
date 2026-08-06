@@ -3,10 +3,7 @@ const API_REQUIRING_CHANGES = new Set(["queries", "variables"]);
 
 // Keys under "queries" that are runtime metadata — changes to these
 // should NOT trigger the "chart not up to date" banner or require an API call.
-const IGNORED_QUERY_KEYS = new Set([
-  "vrlFunctionFieldList",
-  "tabName",
-]);
+const IGNORED_QUERY_KEYS = new Set(["vrlFunctionFieldList", "tabName"]);
 
 /**
  * Flattens an object's keys with dot notation
@@ -28,10 +25,7 @@ const flattenObject = (obj: any, prefix = ""): Record<string, any> => {
           acc[`${pre}${k}.${idx}`] = item;
         }
       });
-    } else if (
-      typeof obj[k] === "object" &&
-      obj[k] !== null
-    ) {
+    } else if (typeof obj[k] === "object" && obj[k] !== null) {
       Object.assign(acc, flattenObject(obj[k], pre + k));
     } else {
       acc[pre + k] = obj[k];
@@ -49,9 +43,7 @@ const getChangedKeys = (oldObj: any, newObj: any): string[] => {
   const changedKeys: string[] = [];
 
   // Check all keys in both objects
-  const allKeys = Array.from(
-    new Set([...Object.keys(flatOld), ...Object.keys(flatNew)]),
-  );
+  const allKeys = Array.from(new Set([...Object.keys(flatOld), ...Object.keys(flatNew)]));
 
   for (const key of allKeys) {
     if (JSON.stringify(flatOld[key]) !== JSON.stringify(flatNew[key])) {

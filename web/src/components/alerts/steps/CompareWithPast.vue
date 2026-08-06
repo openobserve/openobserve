@@ -15,169 +15,228 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div ref="multiWindowContainerRef" class="step-compare-with-past tw:w-full tw:h-full tw:flex tw:flex-col tw:mx-auto" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content tw:rounded-lg tw:flex-1 tw:min-h-0 tw:overflow-auto tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]" :class="store.state.theme === 'dark' ? 'dark-mode-multi-window' : 'light-mode-multi-window'">
-      <div class="section-header tw:flex tw:items-center tw:gap-0 tw:py-2.5 tw:px-3" :class="store.state.theme === 'dark' ? 'tw:border-b tw:border-[#343434]' : 'tw:border-b tw:border-[#eeeeee]'">
-        <div class="section-header-accent tw:w-0.75 tw:h-4 tw:rounded-xs tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
-        <span class="section-header-title tw:text-[13px] tw:font-semibold tw:text-[var(--color-text-primary)]">{{ t('alerts.steps.compareWithPast') }}</span>
+  <div
+    ref="multiWindowContainerRef"
+    class="step-compare-with-past mx-auto flex h-full w-full flex-col"
+  >
+    <div
+      class="step-content rounded-default bg-surface-overlay border-border-default min-h-0 flex-1 overflow-auto border"
+    >
+      <div
+        class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
+      >
+        <div
+          class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+        />
+        <span class="section-header-title text-compact text-text-heading font-semibold">{{
+          t("alerts.steps.compareWithPast")
+        }}</span>
       </div>
-      <div class="tw:px-3 tw:pb-2">
-      <!-- Alert set for header -->
-      <div class="multi-window-text tw:flex tw:items-center tw:gap-2 tw:py-2 tw:mt-3 tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
-        <span>{{ t('alerts.compareWithPast.alertSetFor') }}</span>
-        <div class="tw:h-px border-line tw:flex-1"></div>
-      </div>
-
-      <!-- Current Window -->
-      <div class="tw:flex tw:flex-row tw:justify-between tw:items-start tw:min-h-27.5 tw:px-3 tw:py-2 tw:bg-[var(--o2-card-bg)]"
-        :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#343434]' : 'tw:border tw:border-[#e6e6e6]'">
-        <div class="multi-window-text tw:w-auto tw:text-left tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
-          {{ t('alerts.compareWithPast.currentWindow') }}
+      <div class="px-3 pb-2">
+        <!-- Alert set for header -->
+        <div
+          class="multi-window-text text-text-body mt-3 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+        >
+          <span>{{ t("alerts.compareWithPast.alertSetFor") }}</span>
+          <div class="border-line h-px flex-1"></div>
         </div>
 
-        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-auto tw:text-left tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
-            {{ t('alerts.compareWithPast.cycle') }}
-            <span class="tw:cursor-pointer">
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
-               />
-                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
-            </span>
+        <!-- Current Window -->
+        <div
+          class="bg-card-glass-bg border-border-default flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
+        >
+          <div
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+          >
+            {{ t("alerts.compareWithPast.currentWindow") }}
           </div>
-          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-[300px] tw:font-normal tw:leading-5 tw:text-sm">
-              {{ t('alerts.compareWithPast.runningFor', { period: convertMinutesToDisplayValue(period), frequency: convertMinutesToDisplayValue(frequency) }) }}
+
+          <div class="flex flex-col items-start gap-2">
+            <div
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            >
+              {{ t("alerts.compareWithPast.cycle") }}
+              <span class="cursor-pointer">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="ml-1 cursor-pointer"
+                  :class="'text-text-secondary'"
+                />
+                <OTooltip
+                  :content="t('alerts.compareWithPast.cycleTooltip')"
+                  side="right"
+                  align="center"
+                  max-width="300px"
+                />
+              </span>
             </div>
-            <div>
-              <span class="tw:inline-block">
+            <div class="flex items-start justify-between gap-4">
+              <div class="w-75 text-sm leading-5 font-normal">
+                {{
+                  t("alerts.compareWithPast.runningFor", {
+                    period: convertMinutesToDisplayValue(period),
+                    frequency: convertMinutesToDisplayValue(frequency),
+                  })
+                }}
+              </div>
+              <div>
+                <span class="inline-block">
+                  <OButton
+                    class="pointer-events-none min-w-auto opacity-30"
+                    variant="ghost"
+                    size="icon-circle-sm"
+                    disable
+                  >
+                    <OIcon name="delete-outline" size="sm" />
+                  </OButton>
+                  <OTooltip
+                    :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')"
+                    side="top"
+                    align="center"
+                    :sideOffset="8"
+                  />
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Comparing with header -->
+        <div
+          v-if="localMultiTimeRange.length > 0"
+          class="multi-window-text text-text-body mt-2 flex items-center gap-2 py-2 align-middle text-sm leading-6 font-bold"
+        >
+          <span>{{ t("alerts.compareWithPast.comparingWith") }}</span>
+          <div class="border-line h-px flex-1"></div>
+        </div>
+
+        <!-- Reference Windows List -->
+        <!-- `:key` is the row UUID (NOT the array index) because the only per-row
+           control is CustomDateTimePicker — a non-form widget bound by object
+           reference (`v-model="picker.offSet"`), not by an index-based OForm*
+           `name=`. The multi_time_range array is bridged into the form via
+           setFieldValue (descendant) / emit (bare) — see commit(). -->
+        <div
+          v-for="(picker, index) in localMultiTimeRange"
+          :key="picker.uuid"
+          class="reference-window-container bg-card-glass-bg border-border-default mt-2 flex min-h-27.5 flex-row items-start justify-between border px-3 py-2"
+        >
+          <div
+            class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+          >
+            {{ t("alerts.compareWithPast.referenceWindow") }} {{ index + 1 }}
+          </div>
+
+          <!-- Time Frame -->
+          <div class="flex flex-col items-start gap-2">
+            <div class="flex items-center">
+              <span class="mr-1"><OIcon name="schedule" size="sm" /></span>
+              {{ t("alerts.compareWithPast.timeFrame") }}
+              <span class="ml-2 cursor-pointer">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="ml-1 cursor-pointer"
+                  :class="'text-text-secondary'"
+                />
+                <OTooltip
+                  :content="t('alerts.compareWithPast.timeFrameTooltip')"
+                  side="right"
+                  align="center"
+                  max-width="300px"
+                />
+              </span>
+            </div>
+            <div class="datetime-picker-wrapper rounded-default !border-border-default mt-2 border">
+              <CustomDateTimePicker
+                v-model="picker.offSet"
+                :picker="picker"
+                :isFirstEntry="false"
+                @update:model-value="updateDateTimePicker"
+                :changeStyle="true"
+              />
+            </div>
+          </div>
+
+          <!-- Cycle Info -->
+          <div class="flex flex-col items-start gap-2">
+            <div
+              class="multi-window-text text-text-body w-auto text-left align-middle text-sm leading-6 font-bold"
+            >
+              {{ t("alerts.compareWithPast.cycle") }}
+              <span class="cursor-pointer">
+                <OIcon
+                  name="info"
+                  size="sm"
+                  class="ml-1 cursor-pointer"
+                  :class="'text-text-secondary'"
+                />
+                <OTooltip
+                  :content="t('alerts.compareWithPast.cycleTooltip')"
+                  side="right"
+                  align="center"
+                  max-width="300px"
+                />
+              </span>
+            </div>
+            <div class="flex items-start justify-between gap-4">
+              <div class="w-75 text-sm font-normal">
+                {{
+                  t("alerts.compareWithPast.comparingText", {
+                    offset: getDisplayValue(picker.offSet),
+                  })
+                }}
+              </div>
+              <div>
                 <OButton
+                  data-test="multi-time-range-alerts-delete-btn"
                   variant="ghost"
                   size="icon-circle-sm"
-                  disable
-                  style="min-width: auto; opacity: 0.3; pointer-events: none;"
+                  @click="removeTimeShift(index)"
                 >
                   <OIcon name="delete-outline" size="sm" />
                 </OButton>
-                <OTooltip :content="t('alerts.compareWithPast.currentWindowCannotBeDeleted')" side="top" align="center" :sideOffset="8" />
-              </span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Comparing with header -->
-      <div v-if="localMultiTimeRange.length > 0" class="multi-window-text tw:flex tw:items-center tw:gap-2 tw:py-2 tw:mt-2 tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
-        <span>{{ t('alerts.compareWithPast.comparingWith') }}</span>
-        <div class="tw:h-px border-line tw:flex-1"></div>
-      </div>
-
-      <!-- Reference Windows List -->
-      <div
-        v-for="(picker, index) in localMultiTimeRange"
-        :key="picker.uuid"
-        class="reference-window-container tw:flex tw:flex-row tw:justify-between tw:items-start tw:min-h-27.5 tw:mt-2 tw:px-3 tw:py-2"
-        :class="store.state.theme === 'dark' ? ['tw:bg-[var(--o2-card-bg)]', 'tw:border', 'tw:border-[#343434]'] : ['tw:bg-[var(--o2-card-bg)]', 'tw:border', 'tw:border-[#e6e6e6]']"
-      >
-        <div class="multi-window-text tw:w-auto tw:text-left tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
-          {{ t('alerts.compareWithPast.referenceWindow') }} {{ index + 1 }}
-        </div>
-
-        <!-- Time Frame -->
-        <div class="tw:flex tw:flex-col tw:gap-2 tw:items-start">
-          <div class="tw:flex tw:items-center">
-            <span class="tw:mr-1"><OIcon name="schedule" size="sm" /></span>
-            {{ t('alerts.compareWithPast.timeFrame') }}
-            <span class="tw:ml-2 tw:cursor-pointer">
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
-               />
-                <OTooltip :content="t('alerts.compareWithPast.timeFrameTooltip')" side="right" align="center" max-width="300px" />
-            </span>
-          </div>
-          <div class="datetime-picker-wrapper tw:mt-2 tw:border tw:rounded tw:!border-[#d0d0d0] tw:dark:!border-[#4a4a4a]">
-            <CustomDateTimePicker
-              v-model="picker.offSet"
-              :picker="picker"
-              :isFirstEntry="false"
-              @update:model-value="updateDateTimePicker"
-              :changeStyle="true"
+        <!-- Action Buttons Section -->
+        <div class="mt-2 flex w-full items-center justify-center gap-3">
+          <OButton
+            data-test="multi-time-range-alerts-add-btn"
+            variant="outline"
+            size="sm"
+            :disabled="isComparisonDisabled"
+            @click="addTimeShift"
+          >
+            {{ t("alerts.compareWithPast.addComparisonWindow") }}
+            <OTooltip
+              v-if="isComparisonDisabled"
+              :content="raw(comparisonDisabledTooltip)"
+              side="top"
+              align="center"
+              :sideOffset="8"
             />
-          </div>
-        </div>
-
-        <!-- Cycle Info -->
-        <div class="tw:flex tw:flex-col tw:items-start tw:gap-2">
-          <div class="multi-window-text tw:w-auto tw:text-left tw:font-bold tw:text-sm tw:leading-6 tw:align-middle" :class="store.state.theme === 'dark' ? 'tw:text-white' : 'tw:text-[#3d3d3d]'">
-            {{ t('alerts.compareWithPast.cycle') }}
-            <span class="tw:cursor-pointer">
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
-                :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
-               />
-                <OTooltip :content="t('alerts.compareWithPast.cycleTooltip')" side="right" align="center" max-width="300px" />
-            </span>
-          </div>
-          <div class="tw:flex tw:justify-between tw:items-start tw:gap-4">
-            <div class="tw:w-[300px] tw:text-sm tw:font-normal">
-              {{ t('alerts.compareWithPast.comparingText', { offset: getDisplayValue(picker.offSet) }) }}
-            </div>
-            <div>
-              <OButton
-                data-test="multi-time-range-alerts-delete-btn"
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="removeTimeShift(index)"
-              >
-                <OIcon name="delete-outline" size="sm" />
-              </OButton>
-            </div>
-          </div>
+          </OButton>
         </div>
       </div>
-
-      <!-- Action Buttons Section -->
-      <div class="tw:w-full tw:flex tw:justify-center tw:items-center tw:gap-3 tw:mt-2">
-        <OButton
-          data-test="multi-time-range-alerts-add-btn"
-          variant="outline"
-          size="sm"
-          :disabled="isComparisonDisabled"
-          @click="addTimeShift"
-        >
-          {{ t('alerts.compareWithPast.addComparisonWindow') }}
-          <OTooltip
-            v-if="isComparisonDisabled"
-            :content="comparisonDisabledTooltip"
-            side="top"
-            align="center"
-            :sideOffset="8"
-          />
-        </OButton>
-
-      </div>
-      </div><!-- end tw:px-3 tw:py-2 -->
+      <!-- end px-3 py-2 -->
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, computed, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, watch, computed, inject, type PropType } from "vue";
+import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import CustomDateTimePicker from "@/components/CustomDateTimePicker.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
 interface TimeShiftPicker {
   offSet: string;
@@ -191,7 +250,7 @@ export default defineComponent({
     OButton,
     OIcon,
     OTooltip,
-},
+  },
   props: {
     multiTimeRange: {
       type: Array as PropType<TimeShiftPicker[]>,
@@ -220,20 +279,46 @@ export default defineComponent({
   },
   emits: ["update:multiTimeRange"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
-    const multiWindowContainerRef = ref<HTMLElement | null>(null);
-    const localMultiTimeRange = ref<TimeShiftPicker[]>([...(props.multiTimeRange || [])]);
+    // CompareWithPast has no OForm* fields — its only per-row control is the
+    // CustomDateTimePicker, a non-form widget (a relative/absolute date-time
+    // dropdown, not a plain input). It stays bare and its value is bridged into
+    // the form: when a parent OForm exists (descendant mode) we write the
+    // multi_time_range array straight into that form via setFieldValue;
+    // otherwise we emit (bare) so the parent's @update:multiTimeRange→setF
+    // bridge stays the write path.
+    const injectedForm = inject(FORM_CONTEXT_KEY, null);
+    const hasParentForm = !!injectedForm;
 
-    // Watch for prop changes
+    const multiWindowContainerRef = ref<HTMLElement | null>(null);
+    // Deep-clone rows into a LOCAL working copy so the bare CustomDateTimePicker
+    // mutates real local reactive objects, never the form's internal state.
+    const cloneRows = (rows: TimeShiftPicker[] | undefined): TimeShiftPicker[] =>
+      (rows || []).map((p) => ({ offSet: p.offSet, uuid: p.uuid }));
+    const localMultiTimeRange = ref<TimeShiftPicker[]>(cloneRows(props.multiTimeRange));
+
+    // Watch for prop changes (props.multiTimeRange is fed FROM the form in
+    // descendant mode, so this keeps the local working copy in sync both ways).
     watch(
       () => props.multiTimeRange,
       (newVal) => {
-        localMultiTimeRange.value = [...(newVal || [])];
+        localMultiTimeRange.value = cloneRows(newVal);
       },
-      { deep: true }
+      { deep: true },
     );
+
+    // Single write path: form (descendant) or emit (bare). Fresh clones so the
+    // form never shares mutable refs with the local working copy.
+    const commit = () => {
+      const rows = cloneRows(localMultiTimeRange.value);
+      if (hasParentForm) {
+        injectedForm!.setFieldValue("query_condition.multi_time_range", rows);
+      } else {
+        emit("update:multiTimeRange", rows);
+      }
+    };
 
     // Check if comparison window should be disabled (only SQL mode supports comparison)
     const isComparisonDisabled = computed(() => {
@@ -242,7 +327,7 @@ export default defineComponent({
 
     const comparisonDisabledTooltip = computed(() => {
       if (props.selectedTab !== "sql") {
-        return t('alerts.compareWithPast.comparisonDisabledTooltip');
+        return t("alerts.compareWithPast.comparisonDisabledTooltip");
       }
       return "";
     });
@@ -253,62 +338,64 @@ export default defineComponent({
         uuid: getUUID(),
       };
       localMultiTimeRange.value.push(newTimeShift);
-      emit("update:multiTimeRange", localMultiTimeRange.value);
+      commit();
     };
 
     const removeTimeShift = (index: number) => {
       localMultiTimeRange.value.splice(index, 1);
-      emit("update:multiTimeRange", localMultiTimeRange.value);
+      commit();
     };
 
     const updateDateTimePicker = () => {
-      emit("update:multiTimeRange", localMultiTimeRange.value);
+      commit();
+    };
+
+    // Offset code ("15m") → counted noun. Shares the *Count plural keys with
+    // convertMinutesToDisplayValue so "1m" reads "1 Minute", not "1 Minutes".
+    const UNIT_COUNT_KEYS: Record<string, I18nKey> = {
+      s: "alerts.compareWithPast.secondCount",
+      m: "alerts.compareWithPast.minuteCount",
+      h: "alerts.compareWithPast.hourCount",
+      d: "alerts.compareWithPast.dayCount",
+      w: "alerts.compareWithPast.weekCount",
+      M: "alerts.compareWithPast.monthCount",
     };
 
     const getDisplayValue = (value: string) => {
-      const relativePeriods = [
-        { label: "Second(s)", value: "s" },
-        { label: "Minute(s)", value: "m" },
-        { label: "Hour(s)", value: "h" },
-        { label: "Day(s)", value: "d" },
-        { label: "Week(s)", value: "w" },
-        { label: "Month(s)", value: "M" },
-      ];
-
-      if (typeof value !== 'string') return value;
+      if (typeof value !== "string") return value;
 
       const match = value.match(/^(\d+)([smhdwM])$/);
       if (!match) return value;
 
       const [, numberPart, unitPart] = match;
-      const period = relativePeriods.find((p) => p.value === unitPart);
+      const countKey = UNIT_COUNT_KEYS[unitPart];
 
-      if (period) {
-        return `${numberPart} ${period.label}`;
+      if (countKey) {
+        return t(countKey, Number(numberPart));
       }
 
       return value;
     };
 
+    // Counted nouns → vue-i18n plural forms ("{n} Minute | {n} Minutes"),
+    // called as t(key, n). vue-i18n picks the singular form only for n === 1
+    // (n === 0 → "0 Minutes").
     const convertMinutesToDisplayValue = (minutes: number) => {
       if (minutes < 60) {
-        return `${minutes} Minute${minutes !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.minuteCount", minutes);
       } else if (minutes < 1440) {
-        const hours = Math.floor(minutes / 60);
-        return `${hours} Hour${hours !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.hourCount", Math.floor(minutes / 60));
       } else if (minutes < 10080) {
-        const days = Math.floor(minutes / 1440);
-        return `${days} Day${days !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.dayCount", Math.floor(minutes / 1440));
       } else if (minutes < 43200) {
-        const weeks = Math.floor(minutes / 10080);
-        return `${weeks} Week${weeks !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.weekCount", Math.floor(minutes / 10080));
       } else {
-        const months = Math.floor(minutes / 43200);
-        return `${months} Month${months !== 1 ? 's' : ''}`;
+        return t("alerts.compareWithPast.monthCount", Math.floor(minutes / 43200));
       }
     };
 
     return {
+      raw,
       t,
       store,
       multiWindowContainerRef,
@@ -324,4 +411,3 @@ export default defineComponent({
   },
 });
 </script>
-

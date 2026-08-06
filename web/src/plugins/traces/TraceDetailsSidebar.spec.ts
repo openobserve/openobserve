@@ -13,16 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 
 // Hoisted mock references — available inside vi.mock factories so individual
@@ -32,17 +23,21 @@ const {
   mockBuildQueryDetails,
   mockNavigateToLogs,
   mockNavigateToCorrelatedLogs,
+  mockToast,
 } = vi.hoisted(() => ({
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
   mockNavigateToCorrelatedLogs: vi.fn(),
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi
-    .fn()
-    .mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
 }));
 
 vi.mock("@/composables/useTraces", () => ({
@@ -81,7 +76,6 @@ import TraceDetailsSidebar from "@/plugins/traces/TraceDetailsSidebar.vue";
 import useTraceDetails from "@/composables/traces/useTraceDetails";
 import config from "@/aws-exports";
 import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
@@ -115,7 +109,6 @@ node.setAttribute("id", "app");
 node.style.height = "1024px";
 document.body.appendChild(node);
 
-
 const mockStore = createStore({
   state: {
     theme: "light",
@@ -131,9 +124,6 @@ const mockStore = createStore({
 
 const mockEvents =
   '[{"name":"[work_group:short] done a job: user_id None, trace_id bd64db54267785abbe7a43869ed8eb6e","_timestamp":1752490492843047,"code.filepath":"/home/runner/work/o2-enterprise/o2-enterprise/o2-enterprise/o2_enterprise/src/enterprise/search/work_group.rs","code.lineno":"125","level":"DEBUG","target":"o2_enterprise::enterprise::search::work_group","code.namespace":"o2_enterprise::enterprise::search::work_group"}]';
-
-const mockExceptions =
-  '[{"_timestamp": 1752490492843047,"name": "exception","exception.type": "RuntimeError","exception.message": "Test error","exception.escaped": "false","exception.stacktrace": "Error: Test error\\n    at test.js:1:1"}]';
 
 const mockLinks =
   '[{"context": {"traceId": "f6e08ab2a928aa393375f0d9b05a9054", "spanId": "ecc59cb843104cf8"}}, {"context": {"traceId": "6262666637a9ae45ad3e25f5111dd59f", "spanId": "d9603ec7f76eb499"}}]';
@@ -210,7 +200,8 @@ const tabStubs = {
   },
   OTab: {
     name: "OTab",
-    template: '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
+    template:
+      '<div class="o-tab-stub" v-bind="$attrs" @click="$parent.$emit(\'update:modelValue\', name)"><slot /></div>',
     props: ["name", "label", "style"],
   },
   // OTabPanels: provide reactive context via setup()
@@ -246,18 +237,6 @@ const traceErrorTabStub = {
 
 // Base stubs shared across all mount calls in this spec file
 const baseStubs = {
-  "q-resize-observer": true,
-  "q-virtual-scroll": {
-    template: `
-      <div>
-        <slot name="before"></slot>
-        <div v-for="(item, index) in items" :key="index">
-          <slot :item="item" :index="index"></slot>
-        </div>
-      </div>
-    `,
-    props: ["items"],
-  },
   TraceErrorTab: traceErrorTabStub,
   ...tabStubs,
 };
@@ -305,17 +284,13 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   it("should display operation name in header", () => {
-    const operationName = wrapper.find(
-      '[data-test="trace-details-sidebar-header-operation-name"]',
-    );
+    const operationName = wrapper.find('[data-test="trace-details-sidebar-header-operation-name"]');
     expect(operationName.exists()).toBe(true);
     expect(operationName.text()).toBe(mockSpan.operation_name);
   });
 
   it("should display service name", () => {
-    const serviceName = wrapper.find(
-      '[data-test="trace-details-sidebar-header-toolbar-service"]',
-    );
+    const serviceName = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-service"]');
     expect(serviceName.exists()).toBe(true);
     expect(serviceName.text()).toContain(mockSpan.service_name);
   });
@@ -350,33 +325,25 @@ describe("TraceDetailsSidebar", async () => {
   });
 
   it("should display duration", () => {
-    const duration = wrapper.find(
-      '[data-test="trace-details-sidebar-header-toolbar-duration"]',
-    );
+    const duration = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-duration"]');
     expect(duration.exists()).toBe(true);
     expect(duration.text()).toContain("321.37ms");
   });
 
   it("should display start time", () => {
-    const startTime = wrapper.find(
-      '[data-test="trace-details-sidebar-header-toolbar-start-time"]',
-    );
+    const startTime = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-start-time"]');
     expect(startTime.exists()).toBe(true);
     expect(startTime.text()).toContain("0us");
   });
 
   it("should display span ID", () => {
-    const spanId = wrapper.find(
-      '[data-test="trace-details-sidebar-header-toolbar-span-id"]',
-    );
+    const spanId = wrapper.find('[data-test="trace-details-sidebar-header-toolbar-span-id"]');
     expect(spanId.exists()).toBe(true);
     expect(spanId.text()).toContain(mockSpan.span_id);
   });
 
   it("should emit close when close button is clicked", async () => {
-    const closeBtn = wrapper.find(
-      '[data-test="trace-details-sidebar-header-close-btn"]',
-    );
+    const closeBtn = wrapper.find('[data-test="trace-details-sidebar-header-close-btn"]');
     expect(closeBtn.exists()).toBe(true);
 
     await closeBtn.trigger("click");
@@ -412,43 +379,40 @@ describe("TraceDetailsSidebar", async () => {
         // — we set vm state directly.
         viewLogsWrapper.vm.correlationProps = {
           logStreams: [
-            { stream_name: "test-stream", filters: { service_name: "test-svc" } },
+            {
+              stream_name: "test-stream",
+              filters: { service_name: "test-svc" },
+            },
           ],
           timeRange: { startTime: 1000000, endTime: 2000000 },
         };
         // Spy on store.dispatch and router.push to prevent real navigation and
         // assert they are called with the expected arguments.
-        dispatchSpy = vi
-          .spyOn(mockStore, "dispatch")
-          .mockResolvedValue(undefined);
+        dispatchSpy = vi.spyOn(mockStore, "dispatch").mockResolvedValue(undefined);
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
 
         // Wire navigateToCorrelatedLogs to replicate the real composable behavior:
         // call loadSemanticGroups, dispatch, and push to /logs.
-        mockNavigateToCorrelatedLogs.mockImplementation(
-          async (correlationProps: any) => {
-            await mockLoadSemanticGroups();
-            mockStore.dispatch("logs/setIsInitialized", false);
-            const streamNames = correlationProps.logStreams
-              .map((s: any) => s.stream_name)
-              .join(",");
-            router.push({
-              path: "/logs",
-              query: {
-                stream: streamNames,
-                sql_mode: "false",
-                query: "mock-encoded-query",
-                from: String(correlationProps.timeRange.startTime),
-                to: String(correlationProps.timeRange.endTime),
-                stream_type: "logs",
-                org_identifier: mockStore.state.selectedOrganization.identifier,
-                type: "trace_explorer",
-                quick_mode: "false",
-                show_histogram: "true",
-              },
-            });
-          },
-        );
+        mockNavigateToCorrelatedLogs.mockImplementation(async (correlationProps: any) => {
+          await mockLoadSemanticGroups();
+          mockStore.dispatch("logs/setIsInitialized", false);
+          const streamNames = correlationProps.logStreams.map((s: any) => s.stream_name).join(",");
+          router.push({
+            path: "/logs",
+            query: {
+              stream: streamNames,
+              sql_mode: "false",
+              query: "mock-encoded-query",
+              from: String(correlationProps.timeRange.startTime),
+              to: String(correlationProps.timeRange.endTime),
+              stream_type: "logs",
+              org_identifier: mockStore.state.selectedOrganization.identifier,
+              type: "trace_explorer",
+              quick_mode: "false",
+              show_histogram: "true",
+            },
+          });
+        });
       });
 
       it("should call loadSemanticGroups and navigate to /logs with query", async () => {
@@ -461,10 +425,7 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect(mockLoadSemanticGroups).toHaveBeenCalled();
-        expect(dispatchSpy).toHaveBeenCalledWith(
-          "logs/setIsInitialized",
-          false,
-        );
+        expect(dispatchSpy).toHaveBeenCalledWith("logs/setIsInitialized", false);
         expect(pushSpy).toHaveBeenCalled();
         const pushArgs = pushSpy.mock.calls[0][0];
         expect(pushArgs.path).toBe("/logs");
@@ -484,18 +445,24 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
+    describe("when isEnterprise is true but no correlation was found", () => {
       beforeEach(() => {
         config.isEnterprise = "true";
-        // correlationProps is null — correlation data hasn't been loaded yet
+        // Remount with a streamName so loadCorrelation() runs the real lookup
+        // instead of bailing out on a missing stream. findRelatedTelemetry is
+        // mocked to resolve null, i.e. the lookup succeeds with nothing correlated.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+        });
         viewLogsWrapper.vm.correlationProps = null;
-        dispatchSpy = vi
-          .spyOn(mockStore, "dispatch")
-          .mockResolvedValue(undefined);
+        mockToast.mockClear();
+        dispatchSpy = vi.spyOn(mockStore, "dispatch").mockResolvedValue(undefined);
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       });
 
-      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
+      it("should toast a warning instead of navigating when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -504,11 +471,16 @@ describe("TraceDetailsSidebar", async () => {
         await viewLogsBtn.trigger("click");
         await flushPromises();
 
-        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
-        expect(mockNavigateToLogs).toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "No correlated logs found for this span",
+          }),
+        );
+        expect(pushSpy).not.toHaveBeenCalled();
       });
 
-      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
+      it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -516,6 +488,26 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+
+      it("should toast the lookup failure reason when correlation could not be loaded", async () => {
+        // No streamName — loadCorrelation() bails out and records why.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({ parentMode: "standalone" });
+        mockToast.mockClear();
+
+        const viewLogsBtn = viewLogsWrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "Missing span or stream name",
+          }),
+        );
       });
     });
 
@@ -558,9 +550,7 @@ describe("TraceDetailsSidebar", async () => {
     await flushPromises();
 
     // Check if clipboard.writeText was called
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      mockSpan.span_id,
-    );
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(mockSpan.span_id);
   });
 
   it("should show error notification when copy fails", async () => {
@@ -580,9 +570,7 @@ describe("TraceDetailsSidebar", async () => {
     await flushPromises();
 
     // Check if clipboard.writeText was called
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-      mockSpan.span_id,
-    );
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(mockSpan.span_id);
 
     // Restore original mock
     (navigator.clipboard.writeText as any) = originalWriteText;
@@ -595,9 +583,7 @@ describe("TraceDetailsSidebar", async () => {
 
       const tabNames = ["attributes", "events", "error", "links"];
       tabNames.forEach((tabName) => {
-        const tab = wrapper.find(
-          `[data-test="trace-details-sidebar-tabs-${tabName}"]`,
-        );
+        const tab = wrapper.find(`[data-test="trace-details-sidebar-tabs-${tabName}"]`);
         expect(tab.exists()).toBe(true);
       });
     });
@@ -607,15 +593,13 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should not show database tab when span has no db_ attributes", () => {
-      expect(
-        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should switch tabs when clicked", async () => {
-      const eventsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-events"]',
-      );
+      const eventsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-events"]');
       await eventsTab.trigger("click");
 
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
@@ -626,9 +610,7 @@ describe("TraceDetailsSidebar", async () => {
       await wrapper.setProps({
         span: { ...mockSpan, db_system: "postgresql" },
       });
-      expect(
-        wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="trace-details-sidebar-tabs-database"]').exists()).toBe(true);
     });
 
     it("should report hasDbSpan as true when span has db_ attributes", async () => {
@@ -645,24 +627,18 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Attributes tab content", () => {
     it("should display attributes table", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
     });
 
     it("should display HTTP method in attributes", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
       expect(attributesTable.text()).toContain("GET");
     });
 
     it("should display HTTP status code in attributes", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
       expect(attributesTable.text()).toContain("200");
     });
@@ -670,53 +646,39 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Service information in Attributes tab", () => {
     it("should display service information", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
     });
 
     it("should display service name in attributes", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
       expect(attributesTable.text()).toContain("alertmanager");
     });
 
     it("should display service instance in attributes", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain(
-        "dev2-openobserve-alertmanager-1",
-      );
+      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
     });
   });
 
   describe("Events tab", () => {
     beforeEach(async () => {
-      const eventsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-events"]',
-      );
+      const eventsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-events"]');
       await eventsTab.trigger("click");
     });
 
     it("should display events table", () => {
       // When there are no events, the table doesn't exist, only the no-events message shows
-      const noEventsMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-events"]',
-      );
+      const noEventsMsg = wrapper.find('[data-test="trace-details-sidebar-no-events"]');
       expect(noEventsMsg.exists()).toBe(true);
     });
 
     it("should display no events message when no events", () => {
-      const noEventsMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-events"]',
-      );
+      const noEventsMsg = wrapper.find('[data-test="trace-details-sidebar-no-events"]');
       expect(noEventsMsg.exists()).toBe(true);
-      expect(noEventsMsg.text()).toContain("No events present for this span");
+      expect(noEventsMsg.text()).toContain("No events for this span");
     });
 
     describe("When events exist", () => {
@@ -730,9 +692,7 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should display events table", async () => {
-        const eventsTable = wrapper.find(
-          '[data-test="trace-details-sidebar-events-table"]',
-        );
+        const eventsTable = wrapper.find('[data-test="trace-details-sidebar-events-table"]');
 
         expect(eventsTable.exists()).toBe(true);
       });
@@ -742,8 +702,8 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
-        const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
+        // OTable renders rows with data-test="o2-table-row-{index}"
+        const eventRows = wrapper.findAll('[data-test^="o2-table-row-"]');
         expect(eventRows.length).toBeGreaterThan(0);
       });
 
@@ -751,25 +711,22 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // TenstackTable renders an expand button for each row
-        const expandBtn = wrapper.find('[data-test="table-row-expand-menu"]');
+        // One expand button per row: o2-table-expand-{index}, distinct from the
+        // wrapping cell o2-table-expand-cell.
+        const expandBtn = wrapper.find('[data-test="o2-table-expand-0"]');
         expect(expandBtn.exists()).toBe(true);
 
         await expandBtn.trigger("click");
         await flushPromises();
         await wrapper.vm.$nextTick();
 
-        // After expansion TenstackTable inserts an expanded row (data-test="o2-table-expanded-row-{index}")
-        const expandedRow = wrapper.find(
-          '[data-test^="o2-table-expanded-row-"]',
-        );
+        // After expansion OTable inserts an expanded row (data-test="o2-table-expanded-row-{index}")
+        const expandedRow = wrapper.find('[data-test^="o2-table-expanded-row-"]');
         expect(expandedRow.exists()).toBe(true);
       });
 
       it("should not display no events message", () => {
-        const noEventsMsg = wrapper.find(
-          '[data-test="trace-details-sidebar-no-events"]',
-        );
+        const noEventsMsg = wrapper.find('[data-test="trace-details-sidebar-no-events"]');
         expect(noEventsMsg.exists()).toBe(false);
       });
 
@@ -788,8 +745,8 @@ describe("TraceDetailsSidebar", async () => {
           await wrapper.vm.$nextTick();
 
           // Events are not filtered by searchQuery — all rows remain visible.
-          // TenstackTable renders rows with data-test="o2-table-detail-{timestamp}"
-          const eventRows = wrapper.findAll('[data-test^="o2-table-detail-"]');
+          // OTable renders rows with data-test="o2-table-row-{index}"
+          const eventRows = wrapper.findAll('[data-test^="o2-table-row-"]');
           expect(eventRows.length).toBeGreaterThan(0);
         });
       });
@@ -798,16 +755,12 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Error tab", () => {
     beforeEach(async () => {
-      const exceptionsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-error"]',
-      );
+      const exceptionsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-error"]');
       await exceptionsTab.trigger("click");
     });
 
     it("should pass span to TraceErrorTab stub", () => {
-      const spanIdEl = wrapper.find(
-        '[data-test="trace-error-tab-span-id"]',
-      );
+      const spanIdEl = wrapper.find('[data-test="trace-error-tab-span-id"]');
       expect(spanIdEl.exists()).toBe(true);
       expect(spanIdEl.text()).toBe(mockSpan.span_id);
     });
@@ -826,9 +779,7 @@ describe("TraceDetailsSidebar", async () => {
 
         errorWrapper = mountSidebar();
 
-        const exceptionsTab = errorWrapper.find(
-          '[data-test="trace-details-sidebar-tabs-error"]',
-        );
+        const exceptionsTab = errorWrapper.find('[data-test="trace-details-sidebar-tabs-error"]');
         await exceptionsTab.trigger("click");
       });
 
@@ -841,9 +792,7 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should show error count badge on the tab", () => {
-        const badge = errorWrapper.find(
-          '[data-test="trace-details-sidebar-tabs-error-count"]',
-        );
+        const badge = errorWrapper.find('[data-test="trace-details-sidebar-tabs-error-count"]');
         expect(badge.exists()).toBe(true);
         expect(badge.text()).toBe("2");
       });
@@ -852,20 +801,14 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Links tab", () => {
     beforeEach(async () => {
-      const linksTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-links"]',
-      );
+      const linksTab = wrapper.find('[data-test="trace-details-sidebar-tabs-links"]');
       await linksTab.trigger("click");
     });
 
     it("should display no links message when no links", () => {
       // Check if either no-links message exists OR links are present
-      const noLinksMsg = wrapper.find(
-        '[data-test="trace-details-sidebar-no-links"]',
-      );
-      const linksTable = wrapper.find(
-        '[data-test="trace-details-sidebar-links-table"]',
-      );
+      const noLinksMsg = wrapper.find('[data-test="trace-details-sidebar-no-links"]');
+      const linksTable = wrapper.find('[data-test="trace-details-sidebar-links-table"]');
       // Either message or table should exist, but not both
       expect(noLinksMsg.exists() || linksTable.exists()).toBe(true);
     });
@@ -880,9 +823,7 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should display links table", () => {
-        const linksTable = wrapper.find(
-          '[data-test="trace-details-sidebar-links-table"]',
-        );
+        const linksTable = wrapper.find('[data-test="trace-details-sidebar-links-table"]');
         expect(linksTable.exists()).toBe(true);
       });
 
@@ -895,9 +836,7 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should not display no links message", () => {
-        const noLinksMsg = wrapper.find(
-          '[data-test="trace-details-sidebar-no-links"]',
-        );
+        const noLinksMsg = wrapper.find('[data-test="trace-details-sidebar-no-links"]');
         expect(noLinksMsg.exists()).toBe(false);
       });
 
@@ -929,9 +868,7 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should display links table", () => {
-        const linksTable = wrapper.find(
-          '[data-test="trace-details-sidebar-links-table"]',
-        );
+        const linksTable = wrapper.find('[data-test="trace-details-sidebar-links-table"]');
         expect(linksTable.exists()).toBe(true);
       });
 
@@ -944,9 +881,7 @@ describe("TraceDetailsSidebar", async () => {
       });
 
       it("should not display no links message", () => {
-        const noLinksMsg = wrapper.find(
-          '[data-test="trace-details-sidebar-no-links"]',
-        );
+        const noLinksMsg = wrapper.find('[data-test="trace-details-sidebar-no-links"]');
         expect(noLinksMsg.exists()).toBe(false);
       });
     });
@@ -963,12 +898,8 @@ describe("TraceDetailsSidebar", async () => {
       it("should display no links message", () => {
         // Component should handle invalid JSON gracefully
         // Check if either no-links message exists OR links table with default data
-        const noLinksMsg = wrapper.find(
-          '[data-test="trace-details-sidebar-no-links"]',
-        );
-        const linksTable = wrapper.find(
-          '[data-test="trace-details-sidebar-links-table"]',
-        );
+        const noLinksMsg = wrapper.find('[data-test="trace-details-sidebar-no-links"]');
+        const linksTable = wrapper.find('[data-test="trace-details-sidebar-links-table"]');
         // At least one should exist
         expect(noLinksMsg.exists() || linksTable.exists()).toBe(true);
       });
@@ -982,9 +913,7 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("Attributes tab", () => {
     beforeEach(async () => {
-      const attributesTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-attributes"]',
-      );
+      const attributesTab = wrapper.find('[data-test="trace-details-sidebar-tabs-attributes"]');
       await attributesTab.trigger("click");
     });
 
@@ -1014,9 +943,7 @@ describe("TraceDetailsSidebar", async () => {
       // Verify search query is set
       expect(wrapper.vm.searchQuery).toBe("GET");
       // Attributes tab is default — verify it contains the search term
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.text()).toContain("GET");
     });
 
@@ -1030,9 +957,7 @@ describe("TraceDetailsSidebar", async () => {
       // Verify search query is set
       expect(wrapper.vm.searchQuery).toBe("alertmanager");
       // Attributes tab is default — verify it contains the search term
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.text()).toContain("alertmanager");
     });
   });
@@ -1043,9 +968,7 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should emit update:activeTab when tab changes", async () => {
-      const eventsTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-events"]',
-      );
+      const eventsTab = wrapper.find('[data-test="trace-details-sidebar-tabs-events"]');
       await eventsTab.trigger("click");
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
       expect(wrapper.emitted("update:activeTab")![0]).toEqual(["events"]);
@@ -1059,15 +982,11 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should emit update:activeTab with the new tab value on click", async () => {
-      const errorTab = wrapper.find(
-        '[data-test="trace-details-sidebar-tabs-error"]',
-      );
+      const errorTab = wrapper.find('[data-test="trace-details-sidebar-tabs-error"]');
       await errorTab.trigger("click");
       expect(wrapper.emitted("update:activeTab")).toBeTruthy();
       const lastEmit =
-        wrapper.emitted("update:activeTab")![
-          wrapper.emitted("update:activeTab")!.length - 1
-        ];
+        wrapper.emitted("update:activeTab")![wrapper.emitted("update:activeTab")!.length - 1];
       expect(lastEmit).toEqual(["error"]);
     });
   });
@@ -1177,8 +1096,6 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should properly update when span props change", async () => {
       // First, check the initial state
-      const initialLinks = wrapper.vm.spanLinks;
-
       // Update the span with invalid links
       await wrapper.setProps({
         span: {
@@ -1269,7 +1186,7 @@ describe("TraceDetailsSidebar", async () => {
       });
       expect(testWrapper.exists()).toBe(true);
       // Check that the component has the prop correctly set
-      expect(typeof testWrapper.vm.showLogStreamSelector).toBe('boolean');
+      expect(typeof testWrapper.vm.showLogStreamSelector).toBe("boolean");
       expect(testWrapper.vm.showLogStreamSelector).toBe(true);
       testWrapper.unmount();
     });
@@ -1319,13 +1236,15 @@ describe("TraceDetailsSidebar", async () => {
       });
       // The tooltip content should be computed and available
       expect(testWrapper.vm.viewLogsTooltipContent).toBeDefined();
-      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe('string');
+      expect(typeof testWrapper.vm.viewLogsTooltipContent).toBe("string");
 
       // The button should be wrapped in spans for tooltip functionality
-      const viewLogsBtn = testWrapper.find('[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]');
+      const viewLogsBtn = testWrapper.find(
+        '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+      );
       if (viewLogsBtn.exists()) {
         const buttonWrapper = viewLogsBtn.element.parentElement;
-        expect(buttonWrapper?.tagName.toLowerCase()).toBe('span');
+        expect(buttonWrapper?.tagName.toLowerCase()).toBe("span");
       }
       testWrapper.unmount();
     });
@@ -1422,7 +1341,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain the internationalized string
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1438,7 +1357,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain loading text
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1454,7 +1373,7 @@ describe("TraceDetailsSidebar", async () => {
       // The tooltip should contain default text
       const tooltipContent = testWrapper.vm.viewLogsTooltipContent;
       expect(tooltipContent).toBeDefined();
-      expect(typeof tooltipContent).toBe('string');
+      expect(typeof tooltipContent).toBe("string");
       expect(tooltipContent.length).toBeGreaterThan(0);
       testWrapper.unmount();
     });
@@ -1544,9 +1463,7 @@ describe("TraceDetailsSidebar", async () => {
       const tsWrapper = mountSidebar({ span: spanWithTsCol });
       await tsWrapper.vm.$nextTick();
       const displayValue = "2025-07-14T10:14:52.843Z";
-      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(
-        rawTsValue,
-      );
+      expect(tsWrapper.vm.getFilterValue("@timestamp", displayValue)).toBe(rawTsValue);
       tsWrapper.unmount();
     });
 
@@ -1566,17 +1483,13 @@ describe("TraceDetailsSidebar", async () => {
     // in the rendered attributes, and the component must not attempt to delete them.
 
     it("should not render _start_time_ns in the attributes table", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
       expect(attributesTable.text()).not.toContain("_start_time_ns");
     });
 
     it("should not render _end_time_ns in the attributes table", () => {
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
       expect(attributesTable.text()).not.toContain("_end_time_ns");
     });
@@ -1585,16 +1498,10 @@ describe("TraceDetailsSidebar", async () => {
       // The NS patching pipeline no longer injects _start_time_ns / _end_time_ns into spans.
       // mockSpan represents a normal span that does not carry those keys, so they must not
       // appear in the rendered attribute list.
-      expect(
-        Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns"),
-      ).toBe(false);
-      expect(
-        Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns"),
-      ).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_start_time_ns")).toBe(false);
+      expect(Object.prototype.hasOwnProperty.call(mockSpan, "_end_time_ns")).toBe(false);
 
-      const attributesTable = wrapper.find(
-        '[data-test="trace-details-sidebar-attributes-table"]',
-      );
+      const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
       expect(attributesTable.text()).not.toContain("_start_time_ns");
       expect(attributesTable.text()).not.toContain("_end_time_ns");
@@ -1603,8 +1510,8 @@ describe("TraceDetailsSidebar", async () => {
 
   describe("apply-filter-immediately emit — getFilterValue called at the emit site", () => {
     // This describe block mounts a separate wrapper with JsonPreview stubbed to render
-    // its #field-dropdown slot directly in the DOM (no q-btn-dropdown popup layer).
-    // This lets us click the filter q-item without needing Quasar popup mechanics.
+    // its #field-dropdown slot directly in the DOM (no popup layer).
+    // This lets us click the filter item without needing popup mechanics.
     //
     // start_time and end_time are provided as nanosecond strings to reflect the real
     // runtime type after NS-field patching in the search pipeline.
@@ -1632,14 +1539,9 @@ describe("TraceDetailsSidebar", async () => {
           stubs: {
             ...baseStubs,
             // Stub JsonPreview to render its #field-dropdown slot inline for each key
-            // in `value`, so the q-item inside is immediately clickable without a popup.
+            // in `value`, so the dropdown item inside is immediately clickable without a popup.
             JsonPreview: {
-              props: [
-                "value",
-                "highlightQuery",
-                "showCopyButton",
-                "copyButtonClass",
-              ],
+              props: ["value", "highlightQuery", "showCopyButton", "copyButtonClass"],
               template: `
                 <div data-test="trace-details-sidebar-attributes-table">
                   <div
@@ -1667,9 +1569,7 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should emit apply-filter-immediately with the raw NS-string start_time, not the display string", async () => {
       // The stub renders the slot for every key. Find the filter action under the start_time field.
-      const startTimeSlot = filterWrapper.find(
-        '[data-test="json-preview-field-start_time"]',
-      );
+      const startTimeSlot = filterWrapper.find('[data-test="json-preview-field-start_time"]');
       expect(startTimeSlot.exists()).toBe(true);
 
       // Click the first filter action (the "=" operator) within the slot
@@ -1689,14 +1589,10 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should emit apply-filter-immediately with the raw NS-string end_time, not the display string", async () => {
-      const endTimeSlot = filterWrapper.find(
-        '[data-test="json-preview-field-end_time"]',
-      );
+      const endTimeSlot = filterWrapper.find('[data-test="json-preview-field-end_time"]');
       expect(endTimeSlot.exists()).toBe(true);
 
-      const items = endTimeSlot.findAll(
-        '[data-test^="trace-details-sidebar-json-filter-action-"]',
-      );
+      const items = endTimeSlot.findAll('[data-test^="trace-details-sidebar-json-filter-action-"]');
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1710,14 +1606,10 @@ describe("TraceDetailsSidebar", async () => {
     });
 
     it("should emit apply-filter-immediately with the display string unchanged for span_id", async () => {
-      const spanIdSlot = filterWrapper.find(
-        '[data-test="json-preview-field-span_id"]',
-      );
+      const spanIdSlot = filterWrapper.find('[data-test="json-preview-field-span_id"]');
       expect(spanIdSlot.exists()).toBe(true);
 
-      const items = spanIdSlot.findAll(
-        '[data-test^="trace-details-sidebar-json-filter-action-"]',
-      );
+      const items = spanIdSlot.findAll('[data-test^="trace-details-sidebar-json-filter-action-"]');
       expect(items.length).toBeGreaterThan(0);
       await items[0].trigger("click");
 
@@ -1745,13 +1637,11 @@ describe("TraceDetailsSidebar", async () => {
         await copyBtn.trigger("click");
 
         // Check that the copy function was called
-        // Since we're using Quasar's copyToClipboard, we can't easily mock it
+        // Since copy uses the clipboard API, we can't easily mock it
         // But we can check that the component didn't crash
         expect(wrapper.exists()).toBe(true);
         // Check if clipboard.writeText was called
-        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
-          mockSpan.span_id,
-        );
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(mockSpan.span_id);
       }
     });
 
@@ -1795,10 +1685,8 @@ describe("TraceDetailsSidebar", async () => {
       llm_model_name: "gpt-4",
       gen_ai_operation_name: "chat",
       gen_ai_response_model: "gpt-4",
-      gen_ai_input_messages:
-        '{"messages": [{"role": "user", "content": "Hello"}]}',
-      gen_ai_output_messages:
-        '{"choices": [{"message": {"content": "Hi there!"}}]}',
+      gen_ai_input_messages: '{"messages": [{"role": "user", "content": "Hello"}]}',
+      gen_ai_output_messages: '{"choices": [{"message": {"content": "Hi there!"}}]}',
     };
 
     let llmWrapper: any;
@@ -1810,6 +1698,7 @@ describe("TraceDetailsSidebar", async () => {
           span: mockLLMSpan,
           baseTracePosition: mockBaseTracePosition,
           searchQuery: "",
+          showEvaluateButton: true,
         },
         global: {
           plugins: [i18n, router],
@@ -1817,7 +1706,7 @@ describe("TraceDetailsSidebar", async () => {
           stubs: {
             ...baseStubs,
             LLMContentRenderer: {
-              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId"><slot /></div>`,
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-instance-id="instanceId" :data-content="content"><slot /></div>`,
               props: [
                 "content",
                 "observationType",
@@ -1828,8 +1717,6 @@ describe("TraceDetailsSidebar", async () => {
               ],
             },
             TenstackTable: true,
-            "q-expansion-item": true,
-            CodemirrorEditor: true,
             CodeQueryEditor: true,
           },
         },
@@ -1844,64 +1731,108 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should render the preview tab for an LLM span", () => {
       // The preview tab appears in the tab bar for LLM spans (v-if="isLLMSpan")
-      const previewTab = llmWrapper.find(
-        '[data-test="trace-details-sidebar-tabs-preview"]',
-      );
+      const previewTab = llmWrapper.find('[data-test="trace-details-sidebar-tabs-preview"]');
       expect(previewTab.exists()).toBe(true);
     });
 
+    it("shows evaluation whenever the Preview tab is available", () => {
+      expect(
+        llmWrapper.find('[data-test="trace-details-sidebar-evaluate-span-btn"]').exists(),
+      ).toBe(true);
+    });
+
+    it("hides evaluation with the Preview tab for an ordinary span", () => {
+      const ordinaryWrapper = mountSidebar({ showEvaluateButton: true });
+
+      expect(
+        ordinaryWrapper.find('[data-test="trace-details-sidebar-tabs-preview"]').exists(),
+      ).toBe(false);
+      expect(
+        ordinaryWrapper.find('[data-test="trace-details-sidebar-evaluate-span-btn"]').exists(),
+      ).toBe(false);
+
+      ordinaryWrapper.unmount();
+    });
+
     it("should render the input LLMContentRenderer when llm_input has content", () => {
-      const inputRenderer = llmWrapper.find(
-        '[data-test="llm-content-renderer-input"]',
-      );
+      const inputRenderer = llmWrapper.find('[data-test="llm-content-renderer-input"]');
       expect(inputRenderer.exists()).toBe(true);
     });
 
     it("should render the output LLMContentRenderer when llm_output has content", () => {
-      const outputRenderer = llmWrapper.find(
-        '[data-test="llm-content-renderer-output"]',
-      );
+      const outputRenderer = llmWrapper.find('[data-test="llm-content-renderer-output"]');
       expect(outputRenderer.exists()).toBe(true);
+    });
+
+    it("renders a remote evaluator response in Preview without GenAI fields", async () => {
+      const remoteWrapper = mount(TraceDetailsSidebar, {
+        props: {
+          span: {
+            span_id: "remote-evaluator-span",
+            trace_id: "remote-evaluator-trace",
+            attributes_status: "success",
+            attributes_response: '{"code":"OK","value":0.9,"reason":"Supported"}',
+          },
+          baseTracePosition: mockBaseTracePosition,
+          searchQuery: "",
+          activeTab: "preview",
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: {
+            ...baseStubs,
+            LLMContentRenderer: {
+              template: `<div :data-test="\`llm-content-renderer-\${contentType}\`" :data-content="content"><slot /></div>`,
+              props: [
+                "content",
+                "observationType",
+                "contentType",
+                "span",
+                "viewMode",
+                "instanceId",
+              ],
+            },
+            TenstackTable: true,
+            "q-expansion-item": true,
+            CodeQueryEditor: true,
+          },
+        },
+      });
+      await remoteWrapper.vm.$nextTick();
+
+      expect(remoteWrapper.find('[data-test="trace-details-sidebar-tabs-preview"]').exists()).toBe(
+        true,
+      );
+      expect(
+        remoteWrapper.find('[data-test="llm-content-renderer-output"]').attributes("data-content"),
+      ).toBe('{"code":"OK","value":0.9,"reason":"Supported"}');
+
+      remoteWrapper.unmount();
     });
 
     it("should pass instance-id ending with -input to the input LLMContentRenderer", () => {
-      const inputRenderer = llmWrapper.find(
-        '[data-test="llm-content-renderer-input"]',
-      );
+      const inputRenderer = llmWrapper.find('[data-test="llm-content-renderer-input"]');
       expect(inputRenderer.exists()).toBe(true);
-      expect(inputRenderer.attributes("data-instance-id")).toBe(
-        `${LLM_SPAN_ID}-input`,
-      );
+      expect(inputRenderer.attributes("data-instance-id")).toBe(`${LLM_SPAN_ID}-input`);
     });
 
     it("should pass instance-id ending with -output to the output LLMContentRenderer", () => {
-      const outputRenderer = llmWrapper.find(
-        '[data-test="llm-content-renderer-output"]',
-      );
+      const outputRenderer = llmWrapper.find('[data-test="llm-content-renderer-output"]');
       expect(outputRenderer.exists()).toBe(true);
-      expect(outputRenderer.attributes("data-instance-id")).toBe(
-        `${LLM_SPAN_ID}-output`,
-      );
+      expect(outputRenderer.attributes("data-instance-id")).toBe(`${LLM_SPAN_ID}-output`);
     });
 
     it("should include the span_id in the input instance-id", () => {
-      const inputRenderer = llmWrapper.find(
-        '[data-test="llm-content-renderer-input"]',
-      );
+      const inputRenderer = llmWrapper.find('[data-test="llm-content-renderer-input"]');
       expect(inputRenderer.exists()).toBe(true);
-      expect(inputRenderer.attributes("data-instance-id")).toContain(
-        LLM_SPAN_ID,
-      );
+      expect(inputRenderer.attributes("data-instance-id")).toContain(LLM_SPAN_ID);
     });
 
     it("should include the span_id in the output instance-id", () => {
-      const outputRenderer = llmWrapper.find(
-        '[data-test="llm-content-renderer-output"]',
-      );
+      const outputRenderer = llmWrapper.find('[data-test="llm-content-renderer-output"]');
       expect(outputRenderer.exists()).toBe(true);
-      expect(outputRenderer.attributes("data-instance-id")).toContain(
-        LLM_SPAN_ID,
-      );
+      expect(outputRenderer.attributes("data-instance-id")).toContain(LLM_SPAN_ID);
     });
   });
 

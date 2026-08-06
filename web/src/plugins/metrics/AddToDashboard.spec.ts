@@ -61,8 +61,7 @@ const mockShowConfictErrorNotificationWithRefreshBtn = vi.fn();
 vi.mock("@/composables/useNotifications", () => ({
   default: () => ({
     showErrorNotification: mockShowErrorNotification,
-    showConfictErrorNotificationWithRefreshBtn:
-      mockShowConfictErrorNotificationWithRefreshBtn,
+    showConfictErrorNotificationWithRefreshBtn: mockShowConfictErrorNotificationWithRefreshBtn,
   }),
 }));
 
@@ -158,37 +157,29 @@ const createWrapper = (props: Record<string, any> = {}) => {
         ODialog: ODialogStub,
         OForm: {
           name: "OForm",
-          template: "<form class='o-form-stub' @submit.prevent='$emit(\"submit\", {})'><slot /></form>",
+          template:
+            "<form class='o-form-stub' @submit.prevent='$emit(\"submit\", {})'><slot /></form>",
           emits: ["submit"],
           methods: {
-            submit() { (this as any).$emit("submit", {}); },
+            submit() {
+              (this as any).$emit("submit", {});
+            },
           },
-        },
-        QForm: {
-          template:
-            "<form class='q-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
-          emits: ["submit"],
-        },
-        QInput: {
-          template:
-            "<input class='q-input' :data-test='$attrs[\"data-test\"]' :value='modelValue' @input='$emit(\"update:modelValue\", $event.target.value)' />",
-          props: ["modelValue", "label", "rules", "lazyRules", "stackLabel"],
-          emits: ["update:modelValue"],
         },
         SelectFolderDropdown: {
           template:
-            "<div class='select-folder-dropdown' @click='$emit(\"folder-selected\", { value: \"folder-1\", label: \"Folder 1\" })'></div>",
+            '<div class=\'select-folder-dropdown\' @click=\'$emit("folder-selected", { value: "folder-1", label: "Folder 1" })\'></div>',
           emits: ["folder-selected"],
         },
         SelectDashboardDropdown: {
           template:
-            "<div class='select-dashboard-dropdown' @click='$emit(\"dashboard-selected\", { value: \"dash-1\", label: \"Dashboard 1\" })'></div>",
+            '<div class=\'select-dashboard-dropdown\' @click=\'$emit("dashboard-selected", { value: "dash-1", label: "Dashboard 1" })\'></div>',
           props: ["folderId"],
           emits: ["dashboard-selected"],
         },
         SelectTabDropdown: {
           template:
-            "<div class='select-tab-dropdown' @click='$emit(\"tab-selected\", { value: \"tab-1\", label: \"Tab 1\" })'></div>",
+            '<div class=\'select-tab-dropdown\' @click=\'$emit("tab-selected", { value: "tab-1", label: "Tab 1" })\'></div>',
           props: ["folderId", "dashboardId"],
           emits: ["tab-selected"],
         },
@@ -320,8 +311,6 @@ describe("AddToDashboard — props", () => {
       global: {
         stubs: {
           ODialog: ODialogStub,
-          QForm: true,
-          QInput: true,
           SelectFolderDropdown: true,
           SelectDashboardDropdown: true,
           SelectTabDropdown: true,
@@ -461,9 +450,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit();
     await flushPromises();
 
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("shows an error notification when selectedDashboard is set but activeTabId is null", async () => {
@@ -475,9 +462,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit();
     await flushPromises();
 
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "error" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 
   it("calls addPanel when both dashboard and tab are selected", async () => {
@@ -513,6 +498,31 @@ describe("AddToDashboard — onSubmit validation", () => {
     );
   });
 
+  it("multi-panel mode: adds one panel per `panels` entry (convert-to-dashboard)", async () => {
+    // With a non-empty `panels` prop the component adds each as a separate panel
+    // in one submit. The single-panel path (no `panels`) is unchanged — see above.
+    const wrapper = createWrapper({
+      panels: [
+        { title: "cpu", queries: [] },
+        { title: "mem", queries: [] },
+      ],
+    });
+    await flushPromises();
+
+    wrapper.vm.selectedDashboard = "dash-1";
+    wrapper.vm.activeTabId = "tab-1";
+
+    await wrapper.vm.onSubmit({ panelTitle: "" });
+    await flushPromises();
+
+    // One addPanel call per pinned metric.
+    expect(mockAddPanel).toHaveBeenCalledTimes(2);
+    // Each carries its own title and a freshly-assigned id.
+    const titles = mockAddPanel.mock.calls.map((c: any[]) => c[2].title);
+    expect(titles).toEqual(["cpu", "mem"]);
+    expect(mockAddPanel.mock.calls[0][2].id).toBeDefined();
+  });
+
   it("emits 'save' event after successful panel addition", async () => {
     const wrapper = createWrapper();
     await flushPromises();
@@ -536,9 +546,7 @@ describe("AddToDashboard — onSubmit validation", () => {
     await wrapper.vm.onSubmit({ panelTitle: "New Panel" });
     await flushPromises();
 
-    expect(mockToast).toHaveBeenCalledWith(
-      expect.objectContaining({ variant: "success" }),
-    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
   });
 
   it("navigates to viewDashboard route after successful panel addition", async () => {
@@ -697,9 +705,7 @@ describe("AddToDashboard — ODrawer surface", () => {
   it("renders the ODrawer with the migrated data-test attribute", async () => {
     const wrapper = createWrapper();
     await flushPromises();
-    expect(
-      wrapper.find('[data-test="add-to-dashboard-dialog"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="add-to-dashboard-dialog"]').exists()).toBe(true);
   });
 
   it("passes the localized title to ODrawer", async () => {
@@ -720,7 +726,7 @@ describe("AddToDashboard — ODrawer surface", () => {
     const wrapper = createWrapper();
     await flushPromises();
     const drawer = wrapper.findComponent(ODialogStub);
-    expect(drawer.props("secondaryButtonLabel")).toBe("Cancel");
+    expect(drawer.props("secondaryButtonLabel")).toBe("metrics.addToDashboardPage.cancel");
   });
 
   it("passes the configured size (md) to ODialog", async () => {

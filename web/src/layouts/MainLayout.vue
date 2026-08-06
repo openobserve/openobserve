@@ -16,19 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="[store.state.printMode === true ? 'printMode' : '', 'o2-app-root', 'tw:min-h-screen', 'tw:h-screen', 'tw:flex', 'tw:flex-col']"
+    :class="[
+      store.state.printMode === true ? 'printMode' : '',
+      'o2-app-root',
+      'w-full',
+      'transition-[width]',
+      'duration-300',
+      'ease-[ease]',
+      'min-h-screen',
+      'h-screen',
+      'flex',
+      'flex-col',
+    ]"
   >
-    <header class="o2-app-header tw:shrink-0" :class="store.state.printMode === true ? 'tw:hidden' : ''">
+    <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
       <!-- Webinar announcement bar: shown above toolbar for cloud users -->
       <div
         v-if="config.isCloud === 'true'"
-        class="tw:bg-[var(--o2-primary-btn-bg)] tw:text-[var(--o2-primary-btn-text)] tw:text-center"
+        class="bg-button-primary text-button-primary-foreground text-center"
       >
         <WebinarBanner variant="header" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
-      <Header
+      <AppHeader
         :store="store"
         :router="router"
         :config="config"
@@ -58,39 +69,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </header>
 
-    <div class="tw:flex-1 tw:flex tw:min-h-0">
+    <div class="flex min-h-0 flex-1">
       <ONavbar
         v-if="store.state.printMode !== true"
-        :links-list="linksList"
+        :links-list="navLinks"
         :mini-mode="miniMode"
         :visible="leftDrawerOpen"
         @menu-hover="handleMenuHover"
       />
 
-      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:min-h-0 tw:h-full">
+      <div class="flex h-full min-h-0 min-w-0 flex-1">
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="tw:flex tw:flex-col tw:min-h-0 tw:bg-[var(--color-surface-chrome-deeper)] tw:pr-2 tw:pb-2"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
           :style="{
-            width:
-              store.state.isAiChatEnabled && !store.state.isAiChatExpanded
-                ? '75%'
-                : '100%',
+            width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%',
           }"
         >
-          <!-- White content card — rounded, soft shadow (light) / border (dark). All pages render inside this. -->
+          <!-- Content card — all pages render inside this. The border stays present in both
+               themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:bg-surface-base tw:rounded-xl tw:overflow-hidden tw:shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
-            :class="store.state.theme === 'dark' ? 'tw:border tw:border-border-default' : ''"
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"
-              class="o2-content-scroll tw:flex-1 tw:overflow-y-auto tw:h-full"
+              class="o2-content-scroll h-full flex-1 overflow-y-auto"
             >
               <router-view v-slot="{ Component }">
-                <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+                <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
               </router-view>
             </div>
           </div>
@@ -99,11 +108,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right tw:overflow-y-auto tw:sticky tw:top-[var(--navbar-height,2.25rem)] tw:self-start tw:shrink-0"
+          class="o2-sidebar o2-sidebar-right sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
           :class="[
-            store.state.theme == 'dark'
-              ? 'dark-mode-chat-container'
-              : 'light-mode-chat-container',
+            isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
           ]"
           :style="[
@@ -137,10 +144,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :aiChatPayload="aiChatPayload"
           />
         </aside>
-    </div>
+      </div>
     </div>
 
-    <ODialog data-test="main-layout-get-started-dialog" v-model:open="showGetStarted" size="full" :show-close="false">
+    <ODialog
+      data-test="main-layout-get-started-dialog"
+      v-model:open="showGetStarted"
+      size="full"
+      :show-close="false"
+    >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
     <CommunitySlackInvite />
@@ -151,8 +163,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
-import Header from "../components/Header.vue";
-import { useI18n } from "vue-i18n";
+import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import AppHeader from "../components/Header.vue";
+import { useI18nTyped } from "@/types/i18n";
 import {
   useLocalCurrentUser,
   useLocalOrganization,
@@ -161,6 +174,7 @@ import {
   invalidateLoginData,
   getDueDays,
   trialPeriodAllowedPath,
+  emptyDataAllowedPaths,
 } from "../utils/zincutils";
 
 import {
@@ -175,6 +189,7 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -201,10 +216,9 @@ import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { useShortcut } from "@/lib/vue-shortcut-manager";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -217,7 +231,7 @@ export default defineComponent({
   name: "MainLayout",
   mixins: [mainLayoutMixin],
   components: {
-    Header,
+    AppHeader,
     WebinarBanner,
     "keep-alive": KeepAlive,
     ONavbar,
@@ -235,10 +249,7 @@ export default defineComponent({
   methods: {
     navigateToDocs() {
       let docURL = "https://openobserve.ai/docs";
-      if (
-        this.config.isEnterprise == "true" &&
-        this.store.state.zoConfig.custom_docs_url != ""
-      ) {
+      if (this.config.isEnterprise == "true" && this.store.state.zoConfig.custom_docs_url != "") {
         docURL = this.store.state.zoConfig.custom_docs_url;
       }
       window.open(docURL, "_blank");
@@ -248,6 +259,11 @@ export default defineComponent({
     },
     signout() {
       this.closeSocket();
+
+      // AI chat streams outlive their component by design, so navigating away
+      // doesn't kill an answer. Logout has to stop them explicitly — otherwise
+      // they keep streaming and writing chat history after sign-out.
+      window.dispatchEvent(new Event("o2:abort-ai-streams"));
 
       // Clear any open notifications so they don't carry over past logout.
       dismissAll();
@@ -292,22 +308,20 @@ export default defineComponent({
   },
   setup() {
     const store: any = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const miniMode = ref(false);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
-    const { getStreams, resetStreams } = useStreams();
+    const { getStreams, resetStreams } = useStreams(t);
     const { closeSocket } = useSearchWebSocket();
-    const { isOpen: isPredefinedThemesOpen, toggleThemes } =
-      usePredefinedThemes();
+    const { isOpen: isPredefinedThemesOpen, toggleThemes } = usePredefinedThemes();
     const { prefetchRoute } = useRoutePrefetch();
 
     const isMonacoEditorLoaded = ref(false);
-    const showGetStarted = ref(
-      (localStorage.getItem("isFirstTimeLogin") ?? "false") === "true",
-    );
+    const showGetStarted = ref((localStorage.getItem("isFirstTimeLogin") ?? "false") === "true");
     const isHovered = ref(false);
     const aiChatInputContext = ref("");
     const aiChatAppendMode = ref(true);
@@ -316,7 +330,8 @@ export default defineComponent({
       autoSend: boolean;
       id: number;
     } | null>(null);
-    let customOrganization = router.currentRoute.value.query.hasOwnProperty(
+    let customOrganization = Object.prototype.hasOwnProperty.call(
+      router.currentRoute.value.query,
       "org_identifier",
     )
       ? router.currentRoute.value.query.org_identifier
@@ -337,8 +352,20 @@ export default defineComponent({
       );
     });
 
+    // Workflows — enterprise/cloud only (FD3). Build-time gate, no runtime flag.
+    // Enterprise/cloud build AND the backend `/config` flag `workflows_enabled`
+    // (enterprise `O2_WORKFLOWS_ENABLED`). Reactive so the menu picks it up
+    // regardless of whether the config response arrived before or after mount.
+    // `=== true`, not truthy: /config is fetched without await, so the flag is
+    // briefly undefined and the entry must stay hidden rather than flash in.
+    const isWorkflowsEnabled = computed(
+      () =>
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        store.state.zoConfig?.workflows_enabled === true,
+    );
+
     // Backend `/config` flag `online_evals_enabled` — controlled by
-    // enterprise `O2_ONLINE_EVALS_ENABLED`. Reactive so the menu picks it up regardless
+    // enterprise `O2_EVAL_ENABLED`. Reactive so the menu picks it up regardless
     // of whether the config response arrived before or after this component
     // mounted.
     const isOnlineEvalsEnabled = computed(() => {
@@ -348,18 +375,48 @@ export default defineComponent({
       );
     });
 
-    const orgOptions = ref([{ label: Number, value: String }]);
+    // Backend `/config` flag `synthetics_enabled` — controlled by enterprise
+    // `O2_SYNTHETICS_ENABLED`. Reactive so the menu picks it up regardless of
+    // whether the config response arrived before or after mount.
+    const isSyntheticsEnabled = computed(() => {
+      return (
+        (config.isEnterprise == "true" || config.isCloud == "true") &&
+        Boolean(store.state.zoConfig?.synthetics_enabled)
+      );
+    });
+
+    // Backend `/config` flag `slo_enabled` — controlled by `ZO_SLO_ENABLED`.
+    // NOT build-gated: SLO measurement is an OSS capability, so unlike
+    // Synthetics/Incidents this deliberately has no enterprise/cloud check.
+    // `=== true`, not truthy: /config is fetched without await, so the flag is
+    // briefly undefined and the entry must stay hidden rather than flash in
+    // and then navigate to a page the API answers with 501.
+    // TEMPORARY, for the release: SLOs are hidden from the nav whatever
+    // `slo_enabled` says. To restore, set this to false (or delete it and the
+    // `!SLO_HIDDEN_FOR_RELEASE &&` below). Nothing else is touched — the flag,
+    // the routes, the pages and the Reliability group's `sloList` child are all
+    // still there, so the entry returns exactly as it was, and /slos remains
+    // reachable by typing the URL.
+    //
+    // Typed as boolean rather than left to literal inference so the `&&` below
+    // is not a constant expression.
+    const SLO_HIDDEN_FOR_RELEASE: boolean = true;
+    const isSloEnabled = computed(
+      () => !SLO_HIDDEN_FOR_RELEASE && store.state.zoConfig?.slo_enabled === true,
+    );
+
+    // Real entries carry `identifier`; the placeholder literal only sets label/value.
+    const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
+      { label: Number, value: String },
+    ]);
     let slackURL = "https://short.openobserve.ai/community";
-    if (
-      config.isEnterprise == "true" &&
-      store.state.zoConfig.custom_slack_url
-    ) {
+    if (config.isEnterprise == "true" && store.state.zoConfig.custom_slack_url) {
       slackURL = store.state.zoConfig.custom_slack_url;
     }
 
     let user = store.state.userInfo;
 
-    var linksList = ref([
+    var linksList = ref<NavItem[]>([
       {
         title: t("menu.home"),
         icon: "home",
@@ -409,6 +466,8 @@ export default defineComponent({
         link: "/alerts",
         name: "alertList",
       },
+      // SLOs are spliced in by updateSloMenu() when `slo_enabled` is on —
+      // directly after Alerts, since an SLO is what an SLO alert burns against.
       {
         title: t("menu.ingestion"),
         icon: "data-plus-line",
@@ -430,10 +489,22 @@ export default defineComponent({
       },
     ]);
 
+    // Reveal the rail only once its item list is settled — true immediately when
+    // config is cached, else set when getConfig() resolves. Avoids config-driven
+    // tiles popping in and shifting the layout.
+    const menuReady = ref(
+      !!(
+        store.state.zoConfig &&
+        Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") &&
+        store.state.zoConfig.version != ""
+      ),
+    );
+    const navLinks = computed(() => (menuReady.value ? linksList.value : []));
+
     const langList = [
       {
         label: "English",
-        code: "en-gb",
+        code: "en-us",
       },
       {
         label: "Türkçe",
@@ -479,6 +550,18 @@ export default defineComponent({
         label: "Português",
         code: "pt",
       },
+      {
+        label: "Русский",
+        code: "ru",
+      },
+      {
+        label: "Polski",
+        code: "pl",
+      },
+      {
+        label: "Tiếng Việt",
+        code: "vi",
+      },
     ];
 
     onBeforeMount(() => {
@@ -507,10 +590,7 @@ export default defineComponent({
       () => store.state.isWebinarBannerVisible,
       (visible) => {
         const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
-        document.documentElement.style.setProperty(
-          "--navbar-height",
-          navbarHeight,
-        );
+        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
       },
       { immediate: true },
     );
@@ -520,17 +600,16 @@ export default defineComponent({
 
       // TODO OK : Clean get config functions which sets rum user and functions menu. Move it to common method.
       if (
-        !store.state.zoConfig.hasOwnProperty("version") ||
+        !Object.prototype.hasOwnProperty.call(store.state.zoConfig, "version") ||
         store.state.zoConfig.version == ""
       ) {
         getConfig();
       } else {
         if (config.isCloud == "false") {
-          linksList.value = mainLayoutMixin
-            .setup()
-            .leftNavigationLinks(linksList, t);
+          linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           filterMenus();
         }
+        menuReady.value = true;
         await nextTick();
         // if rum enabled then setUser to capture session details.
         if (store.state.zoConfig.rum?.enabled) {
@@ -541,13 +620,9 @@ export default defineComponent({
 
     const updateIncidentsMenu = () => {
       if (isIncidentsEnabled.value) {
-        const alertIndex = linksList.value.findIndex(
-          (link) => link.name === "alertList",
-        );
+        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
 
-        const incidentExists = linksList.value.some(
-          (link) => link.name === "incidentList",
-        );
+        const incidentExists = linksList.value.some((link) => link.name === "incidentList");
 
         if (alertIndex !== -1 && !incidentExists) {
           linksList.value.splice(alertIndex + 1, 0, {
@@ -560,15 +635,38 @@ export default defineComponent({
       }
     };
 
+    // Insert / remove the SLOs entry directly after Alerts. Like Workflows and
+    // Synthetics this REMOVES when the flag is off rather than merely skipping:
+    // the menu is rebuilt on org switch and `slo_enabled` can differ per
+    // deployment, so an add-only guard would leave a stale entry behind.
+    const updateSloMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "sloList");
+
+      if (!isSloEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
+      if (alertIndex === -1) return;
+
+      linksList.value.splice(alertIndex + 1, 0, {
+        title: t("menu.slos"),
+        icon: "target",
+        link: "/slos",
+        name: "sloList",
+      });
+    };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSloEnabled, () => updateSloMenu(), { immediate: false });
+
     const updateActionsMenu = () => {
       if (isActionsEnabled.value) {
-        const incidentIndex = linksList.value.findIndex(
-          (link) => link.name === "incidentList",
-        );
+        const incidentIndex = linksList.value.findIndex((link) => link.name === "incidentList");
 
-        const actionExists = linksList.value.some(
-          (link) => link.name === "actionScripts",
-        );
+        const actionExists = linksList.value.some((link) => link.name === "actionScripts");
 
         if (incidentIndex !== -1 && !actionExists) {
           linksList.value.splice(incidentIndex + 1, 0, {
@@ -580,9 +678,38 @@ export default defineComponent({
         }
       }
     };
+
+    // Insert the Workflows entry after Actions (fallback: Alerts). Idempotent.
+    const updateWorkflowsMenu = () => {
+      const existingIndex = linksList.value.findIndex((link) => link.name === "workflows");
+
+      if (isWorkflowsEnabled.value) {
+        if (existingIndex !== -1) return;
+
+        const actionIndex = linksList.value.findIndex((link) => link.name === "actionScripts");
+        const alertIndex = linksList.value.findIndex((link) => link.name === "alertList");
+        const anchor = actionIndex !== -1 ? actionIndex : alertIndex;
+        if (anchor === -1) return;
+
+        linksList.value.splice(anchor + 1, 0, {
+          title: t("menu.workflows"),
+          icon: "schema",
+          link: "/workflows",
+          name: "workflows",
+        });
+      } else if (existingIndex !== -1) {
+        // The entry must be REMOVED, not just skipped: the menu is rebuilt on
+        // org switch and `workflows_enabled` can differ per deployment, so an
+        // add-only guard would leave a stale entry behind.
+        linksList.value.splice(existingIndex, 1);
+      }
+    };
+
+    // If `/config` resolves after this component mounted (or the flag flips),
+    // keep the menu in sync — same contract as the other flag-driven entries.
+    watch(isWorkflowsEnabled, () => updateWorkflowsMenu(), { immediate: false });
     const splitterModel = ref(100);
-    const selectedLanguage: any =
-      langList.find((l) => l.code == getLocale()) || langList[0];
+    const selectedLanguage: any = langList.find((l) => l.code == getLocale()) || langList[0];
 
     // Insert / remove the AI Observability menu entry based on the live config
     // flag. Position: directly after Traces. Idempotent — safe to call from
@@ -594,9 +721,7 @@ export default defineComponent({
 
       if (isOnlineEvalsEnabled.value) {
         if (existingIndex !== -1) return;
-        const tracesIndex = linksList.value.findIndex(
-          (link: any) => link.name === "traces",
-        );
+        const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
         const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
         linksList.value.splice(insertAt, 0, {
           title: t("menu.aiObservability"),
@@ -613,15 +738,49 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
+    const updateSyntheticMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "synthetics");
+
+      if (!isSyntheticsEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const incidentIndex = linksList.value.findIndex((l: any) => l.name === "incidentList");
+      const alertIndex = linksList.value.findIndex((l: any) => l.name === "alertList");
+      const insertAt =
+        incidentIndex !== -1
+          ? incidentIndex + 1
+          : alertIndex !== -1
+            ? alertIndex + 1
+            : linksList.value.length;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.synthetic"),
+        icon: "radar",
+        link: "/synthetics",
+        name: "synthetics",
+      });
+    };
+
+    // Keep the menu in sync if /config resolves after mount.
+    watch(isSyntheticsEnabled, () => updateSyntheticMenu(), {
+      immediate: false,
+    });
+
     const filterMenus = () => {
       updateIncidentsMenu();
+      // After Incidents, so the flat order reads Alerts → SLOs → Incidents.
+      updateSloMenu();
       updateActionsMenu();
+      updateWorkflowsMenu();
+      updateSyntheticMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
-        store.state.zoConfig?.custom_hide_menus
-          ?.split(",")
-          ?.filter((val: string) => val?.trim()) || [],
+        store.state.zoConfig?.custom_hide_menus?.split(",")?.filter((val: string) => val?.trim()) ||
+          [],
       );
 
       store.dispatch("setHiddenMenus", disableMenus);
@@ -635,9 +794,7 @@ export default defineComponent({
 
     // additional links based on environment and conditions
     if (config.isCloud == "true") {
-      linksList.value = mainLayoutMixin
-        .setup()
-        .leftNavigationLinks(linksList, t);
+      linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
       filterMenus();
     } else {
       linksList.value.splice(7, 0, {
@@ -646,14 +803,14 @@ export default defineComponent({
         link: "/reports",
         name: "reports",
       });
+      filterMenus();
     }
 
     //orgIdentifier query param exists then clear the localstorage and store.
     if (store.state.selectedOrganization != null) {
       if (
         mainLayoutMixin.setup().customOrganization != undefined &&
-        mainLayoutMixin.setup().customOrganization !=
-          store.state.selectedOrganization?.identifier
+        mainLayoutMixin.setup().customOrganization != store.state.selectedOrganization?.identifier
       ) {
         useLocalOrganization("");
         store.dispatch("setSelectedOrganization", {});
@@ -666,9 +823,7 @@ export default defineComponent({
       store.dispatch("setIsDataIngested", false);
       const orgIdentifier = selectedOrg.value.identifier;
       const queryParams =
-        router.currentRoute.value.path.indexOf(".logs") > -1
-          ? router.currentRoute.value.query
-          : {};
+        router.currentRoute.value.path.indexOf(".logs") > -1 ? router.currentRoute.value.query : {};
       router.push({
         path: router.currentRoute.value.path,
         query: {
@@ -699,7 +854,8 @@ export default defineComponent({
       //     });
       // } else {
       if (
-        store.state.zoConfig.hasOwnProperty(
+        Object.prototype.hasOwnProperty.call(
+          store.state.zoConfig,
           "restricted_routes_on_empty_data",
         ) &&
         store.state.zoConfig.restricted_routes_on_empty_data == true &&
@@ -716,16 +872,21 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          // IAM is org-setup, not data consumption — don't bounce out
-          // of IAM screens just because no streams exist yet.
+          // IAM is org-setup, not data consumption — don't bounce out of IAM
+          // screens just because no streams exist yet. General Settings is exempt
+          // because it hosts the Danger Zone: switching to an empty org must still
+          // leave the admin able to delete it. Mirrors the routeGuard exemptions —
+          // General only, not the rest of the Settings tree.
           const currentPath = router.currentRoute.value.path || "";
-          if (currentPath.indexOf("/iam") !== -1) {
+          if (
+            currentPath.indexOf("/iam") !== -1 ||
+            emptyDataAllowedPaths.indexOf(currentPath.replace(/\/$/, "")) !== -1
+          ) {
             return;
           }
           toast({
             variant: "warning",
-            message:
-              "You haven't initiated the data ingestion process yet. To explore other pages, please start the data ingestion.",
+            message: t("toastMessages.layouts.ingestionNotStarted"),
             timeout: 5000,
           });
           router.push({ name: "ingestion" });
@@ -737,7 +898,8 @@ export default defineComponent({
 
     const setSelectedOrganization = async () => {
       try {
-        customOrganization = router.currentRoute.value.query.hasOwnProperty(
+        customOrganization = Object.prototype.hasOwnProperty.call(
+          router.currentRoute.value.query,
           "org_identifier",
         )
           ? router.currentRoute.value.query.org_identifier
@@ -745,6 +907,32 @@ export default defineComponent({
         let tempDefaultOrg = {};
         let localOrgFlag = false;
         const url = new URL(window.location.href);
+
+        // If the org the user is currently on (URL or stored) is no longer in the
+        // available list, it is being deleted (the backend hides deleting orgs from
+        // this list). Warn the user, then fall through to default-org selection and
+        // redirect home so the stale org_identifier query param is dropped.
+        const intendedOrgId =
+          customOrganization || (useLocalOrganization()?.value?.identifier ?? "");
+        const orgs = store.state.organizations || [];
+        if (
+          intendedOrgId &&
+          orgs.length > 0 &&
+          !orgs.some((o: any) => o.identifier === intendedOrgId)
+        ) {
+          toast({
+            variant: "warning",
+            message: t("organization.orgBeingDeletedSwitching"),
+          });
+          // Clear stale selection so the logic below picks the default org.
+          customOrganization = "";
+          useLocalOrganization("");
+          selectedOrg.value = {};
+          store.dispatch("setSelectedOrganization", {});
+          if (router.currentRoute.value.query.org_identifier) {
+            router.replace({ path: "/", query: {} });
+          }
+        }
         if (store.state.organizations?.length > 0) {
           const localOrg: any = useLocalOrganization();
           if (
@@ -776,11 +964,14 @@ export default defineComponent({
                   user_email: store.state.userInfo.email,
                   ingest_threshold: data.ingest_threshold,
                   search_threshold: data.search_threshold,
-                  subscription_type: data.hasOwnProperty("CustomerBillingObj")
+                  subscription_type: Object.prototype.hasOwnProperty.call(
+                    data,
+                    "CustomerBillingObj",
+                  )
                     ? data.CustomerBillingObj.subscription_type
                     : "",
                   status: data.status,
-                  note: data.hasOwnProperty("CustomerBillingObj")
+                  note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                     ? data.CustomerBillingObj.note
                     : "",
                 };
@@ -807,15 +998,11 @@ export default defineComponent({
                   (Object.keys(selectedOrg.value).length == 0 &&
                     data.type == "default" &&
                     store.state.userInfo.email == data.UserObj.email &&
-                    (customOrganization == "" ||
-                      customOrganization == undefined)) ||
+                    (customOrganization == "" || customOrganization == undefined)) ||
                   (store.state.organizations?.length == 1 &&
-                    (customOrganization == "" ||
-                      customOrganization == undefined))
+                    (customOrganization == "" || customOrganization == undefined))
                 ) {
-                  selectedOrg.value = localOrg.value
-                    ? localOrg.value
-                    : optiondata;
+                  selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
                   useLocalOrganization(optiondata);
                   store.dispatch("setSelectedOrganization", optiondata);
                 } else if (data.identifier == customOrganization) {
@@ -840,10 +1027,7 @@ export default defineComponent({
           store.dispatch("setSelectedOrganization", tempDefaultOrg);
         }
 
-        if (
-          Object.keys(selectedOrg.value).length == 0 &&
-          store.state.organizations.length > 0
-        ) {
+        if (Object.keys(selectedOrg.value).length == 0 && store.state.organizations.length > 0) {
           let data = store.state.organizations[0];
           let optiondata = {
             label: data.name,
@@ -852,11 +1036,11 @@ export default defineComponent({
             user_email: store.state.userInfo.email,
             ingest_threshold: data.ingest_threshold,
             search_threshold: data.search_threshold,
-            subscription_type: data.hasOwnProperty("CustomerBillingObj")
+            subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.subscription_type
               : "",
             status: data.status,
-            note: data.hasOwnProperty("CustomerBillingObj")
+            note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
               ? data.CustomerBillingObj.note
               : "",
           };
@@ -916,20 +1100,15 @@ export default defineComponent({
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           scrape_interval:
-            orgSettings?.data?.data?.scrape_interval ??
-            defaultSettings.scrape_interval,
+            orgSettings?.data?.data?.scrape_interval ?? defaultSettings.scrape_interval,
           span_id_field_name:
-            orgSettings?.data?.data?.span_id_field_name ??
-            defaultSettings.span_id_field_name,
+            orgSettings?.data?.data?.span_id_field_name ?? defaultSettings.span_id_field_name,
           trace_id_field_name:
-            orgSettings?.data?.data?.trace_id_field_name ??
-            defaultSettings.trace_id_field_name,
+            orgSettings?.data?.data?.trace_id_field_name ?? defaultSettings.trace_id_field_name,
           toggle_ingestion_logs:
-            orgSettings?.data?.data?.toggle_ingestion_logs ??
-            defaultSettings.toggle_ingestion_logs,
+            orgSettings?.data?.data?.toggle_ingestion_logs ?? defaultSettings.toggle_ingestion_logs,
           usage_stream_enabled:
-            orgSettings?.data?.data?.usage_stream_enabled ??
-            defaultSettings.usage_stream_enabled,
+            orgSettings?.data?.data?.usage_stream_enabled ?? defaultSettings.usage_stream_enabled,
           enable_websocket_search:
             orgSettings?.data?.data?.enable_websocket_search ??
             defaultSettings.enable_websocket_search,
@@ -940,27 +1119,25 @@ export default defineComponent({
             orgSettings?.data?.data?.streaming_aggregation_enabled ??
             defaultSettings.streaming_aggregation_enabled,
           free_trial_expiry:
-            orgSettings?.data?.data?.free_trial_expiry ??
-            defaultSettings.free_trial_expiry,
-          light_mode_theme_color:
-            orgSettings?.data?.data?.light_mode_theme_color,
+            orgSettings?.data?.data?.free_trial_expiry ?? defaultSettings.free_trial_expiry,
+          light_mode_theme_color: orgSettings?.data?.data?.light_mode_theme_color,
           dark_mode_theme_color: orgSettings?.data?.data?.dark_mode_theme_color,
           claim_parser_function:
-            orgSettings?.data?.data?.claim_parser_function ??
-            defaultSettings.claim_parser_function,
+            orgSettings?.data?.data?.claim_parser_function ?? defaultSettings.claim_parser_function,
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
           org_storage_enabled:
-            orgSettings?.data?.data?.org_storage_enabled ??
-            defaultSettings.org_storage_enabled,
+            orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
         });
+
+        // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
+        // settings so it's available on boot and every org switch.
+        await useHomeDashboard().load(store.state?.selectedOrganization?.identifier);
 
         if (
           orgSettings?.data?.data?.free_trial_expiry != null &&
           orgSettings?.data?.data?.free_trial_expiry != ""
         ) {
-          const trialDueDays = getDueDays(
-            orgSettings?.data?.data?.free_trial_expiry,
-          );
+          const trialDueDays = getDueDays(orgSettings?.data?.data?.free_trial_expiry);
           if (
             trialDueDays <= 0 &&
             trialPeriodAllowedPath.indexOf(router.currentRoute.value.name) == -1
@@ -976,9 +1153,7 @@ export default defineComponent({
       } catch (error: any) {
         // Handle permission errors gracefully (403 = Forbidden)
         if (error?.response?.status === 403) {
-          console.warn(
-            "Organization settings access denied (403). Using default settings.",
-          );
+          console.warn("Organization settings access denied (403). Using default settings.");
           // Set default settings when access is denied
           store.dispatch("setOrganizationSettings", defaultSettings);
         } else {
@@ -1000,21 +1175,24 @@ export default defineComponent({
         .get_config()
         .then(async (res: any) => {
           if (config.isCloud == "false") {
-            linksList.value = mainLayoutMixin
-              .setup()
-              .leftNavigationLinks(linksList, t);
+            linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
 
           store.dispatch("setConfig", res.data);
           await nextTick();
 
           filterMenus();
+          menuReady.value = true;
           // if rum enabled then setUser to capture session details.
           if (res.data.rum.enabled) {
             setRumUser();
           }
         })
-        .catch((error) => console.log(error));
+        .catch((error) => {
+          console.log(error);
+          // Fail open: reveal the base menu even if /config never resolves.
+          menuReady.value = true;
+        });
     };
 
     if (config.isCloud == "true") {
@@ -1037,9 +1215,7 @@ export default defineComponent({
 
     const prefetch = () => {
       const href = "/web/assets/editor.api.v1.js";
-      const existingLink = document.querySelector(
-        `link[rel="prefetch"][href="${href}"]`,
-      );
+      const existingLink = document.querySelector(`link[rel="prefetch"][href="${href}"]`);
 
       if (!existingLink) {
         // Create a new link element
@@ -1063,13 +1239,11 @@ export default defineComponent({
     const toggleAIChat = () => {
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
-        window.dispatchEvent(
-          new CustomEvent("o2:home-switch-tab", { detail: "ai" }),
-        );
+        window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
         return;
       }
       if (!store.state.isAiChatEnabled) {
-        // Closed → Open tw:inline sidebar
+        // Closed → Open inline sidebar
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
@@ -1077,7 +1251,7 @@ export default defineComponent({
         store.dispatch("setIsAiChatEnabled", false);
         store.dispatch("setIsAiChatExpanded", false);
       } else {
-        // Expanded overlay → Back to tw:inline sidebar
+        // Expanded overlay → Back to inline sidebar
         store.dispatch("setIsAiChatExpanded", false);
       }
       window.dispatchEvent(new Event("resize"));
@@ -1090,7 +1264,7 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      if (store.state.theme === "dark") {
+      if (isDark.value) {
         return getImageURL("images/common/ai_icon_dark.svg");
       }
 
@@ -1107,11 +1281,7 @@ export default defineComponent({
       localStorage.removeItem("isFirstTimeLogin");
     };
 
-    const sendToAiChat = (
-      value: any,
-      append: boolean = true,
-      autoSend: boolean = false,
-    ) => {
+    const sendToAiChat = (value: any, append: boolean = true, autoSend: boolean = false) => {
       if (!store.state.isAiChatEnabled) {
         store.dispatch("setIsAiChatEnabled", true);
       }
@@ -1161,13 +1331,28 @@ export default defineComponent({
       { immediate: true },
     );
 
+    // Home page has its own inline AI tab (see toggleAIChat's home special-case
+    // above), so the sidebar chat panel is redundant there — close it on
+    // arrival so we don't show both the sidebar and the home AI tab at once.
+    watch(
+      () => router.currentRoute.value.name,
+      (routeName) => {
+        if (routeName === "home" && store.state.isAiChatEnabled) {
+          closeChat();
+        }
+      },
+    );
+
     const showShortcuts = ref(false);
-    const openShortcutsList = () => { showShortcuts.value = true; };
+    const openShortcutsList = () => {
+      showShortcuts.value = true;
+    };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
     useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
 
     return {
+      isDark,
       t,
       router,
       store,
@@ -1175,6 +1360,7 @@ export default defineComponent({
       langList,
       selectedLanguage,
       linksList,
+      navLinks,
       selectedOrg,
       orgOptions,
       leftDrawerOpen: true,
@@ -1191,7 +1377,7 @@ export default defineComponent({
       expandMenu,
       slackIcon: markRaw(SlackIcon),
       openSlack,
-      "settings": "settings",
+      settings: "settings",
       closeSocket,
       splitterModel,
       toggleAIChat,
@@ -1259,8 +1445,7 @@ export default defineComponent({
       this.isLoading = true;
       // Find the matching organization from orgOptions
       const matchingOrg = this.orgOptions.find(
-        (org) =>
-          org.identifier === this.store.state.selectedOrganization.identifier,
+        (org) => org.identifier === this.store.state.selectedOrganization.identifier,
       );
 
       if (matchingOrg) {
@@ -1271,10 +1456,14 @@ export default defineComponent({
 });
 </script>
 
-
-<style>
-/* Print mode — hide header + sidebar, show body overflow */
-.printMode body {
-  overflow: auto !important;
+<style scoped>
+/* keep(print): This layout's root is the ONLY writer of `.printMode` (store.state.printMode,
+   above), so the rule can only ever fire on descendants of that root — but
+   `.hideOnPrintMode` is placed by other components (VariableAdHocValueSelector,
+   pipeline/PipelineEditor, Dashboards/ViewDashboard) that render through
+   <router-view> and so do not carry this scope id. :deep() pierces to them while
+   keeping the ancestor condition scoped to the owner. */
+.printMode :deep(.hideOnPrintMode) {
+  display: none;
 }
 </style>

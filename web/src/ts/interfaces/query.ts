@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface Query {
   from: number;
   size: number;
@@ -43,7 +45,15 @@ export interface HistogramQueryPayload {
 }
 
 export interface WebSocketSearchResponse {
-  type: "search_response" | "cancel_response" | "error" | "end" | "progress" | "event_progress" | "search_response_metadata" | "search_response_hits";
+  type:
+    | "search_response"
+    | "cancel_response"
+    | "error"
+    | "end"
+    | "progress"
+    | "event_progress"
+    | "search_response_metadata"
+    | "search_response_hits";
   content: {
     // Present on "event_progress" responses (streaming progress percent 0-100)
     percent?: number;
@@ -62,11 +72,14 @@ export interface WebSocketSearchResponse {
       histogram_interval?: number;
       is_histogram_eligible?: boolean;
       converted_histogram_query?: string;
+      histogram_breakdown_field?: string | null;
     };
     streaming_aggs?: boolean;
     total?: number;
     time_offset?: string;
     traceId: string;
+    // streaming payloads carry the snake_case trace_id alongside declared traceId
+    trace_id?: string;
     type?: string;
   };
 }
@@ -89,7 +102,7 @@ export interface WebSocketValuesPayload {
 }
 
 export interface ErrorContent {
-  message: string;
+  message: I18nText;
   trace_id?: string;
   code?: number;
   error_detail?: string;
@@ -135,7 +148,7 @@ export interface StreamingSearchPayload {
 }
 
 export interface StreamingErrorResponse {
-  message: string;
+  message: I18nText;
   trace_id?: string;
   code?: number;
   error_detail?: string;

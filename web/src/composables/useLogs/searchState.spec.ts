@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, nextTick } from "vue";
 import { mount } from "@vue/test-utils";
-import { flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { searchState } from "./searchState";
@@ -121,10 +120,7 @@ describe("searchState composable", () => {
   // ---------------------------------------------------------------------------
   describe("resetQueryData", () => {
     it("should clear sortedQueryResults when it contains items", () => {
-      wrapper.vm.searchObj.data.sortedQueryResults = [
-        { _timestamp: 1 },
-        { _timestamp: 2 },
-      ];
+      wrapper.vm.searchObj.data.sortedQueryResults = [{ _timestamp: 1 }, { _timestamp: 2 }];
 
       wrapper.vm.resetQueryData();
 
@@ -221,8 +217,7 @@ describe("searchState composable", () => {
     });
 
     it("should clear histogram.errorDetail when it has a non-empty value", () => {
-      wrapper.vm.searchObj.data.histogram.errorDetail =
-        "Rate limit exceeded on histogram endpoint";
+      wrapper.vm.searchObj.data.histogram.errorDetail = "Rate limit exceeded on histogram endpoint";
 
       wrapper.vm.resetHistogramError();
 
@@ -282,16 +277,11 @@ describe("searchState composable", () => {
 
       wrapper.vm.resetSearchObj();
 
-      expect(wrapper.vm.searchObj.data.errorMsg).toBe(
-        "No stream found in selected organization!",
-      );
+      expect(wrapper.vm.searchObj.data.errorMsg).toBe("No stream found in selected organization!");
     });
 
     it("should clear streamLists when it contains items", () => {
-      wrapper.vm.searchObj.data.stream.streamLists = [
-        { name: "stream-a" },
-        { name: "stream-b" },
-      ];
+      wrapper.vm.searchObj.data.stream.streamLists = [{ name: "stream-a" }, { name: "stream-b" }];
 
       wrapper.vm.resetSearchObj();
 
@@ -307,9 +297,7 @@ describe("searchState composable", () => {
     });
 
     it("should clear selectedStreamFields when populated", () => {
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-        { name: "field1" },
-      ];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "field1" }];
 
       wrapper.vm.resetSearchObj();
 
@@ -423,9 +411,7 @@ describe("searchState composable", () => {
 
       wrapper.vm.resetFunctions();
 
-      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual([
-        "stream-x",
-      ]);
+      expect(wrapper.vm.searchObj.data.stream.selectedStream).toEqual(["stream-x"]);
     });
   });
 
@@ -442,9 +428,7 @@ describe("searchState composable", () => {
     });
 
     it("should clear selectedStreamFields when populated", () => {
-      wrapper.vm.searchObj.data.stream.selectedStreamFields = [
-        { name: "field1" },
-      ];
+      wrapper.vm.searchObj.data.stream.selectedStreamFields = [{ name: "field1" }];
 
       wrapper.vm.resetStreamData();
 

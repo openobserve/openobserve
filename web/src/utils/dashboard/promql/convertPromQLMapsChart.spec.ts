@@ -103,18 +103,11 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series).toBeDefined();
       expect(result.series[0].type).toBe("map");
-      expect(result.series[0].data).toEqual([
-        { name: "United States", value: 100 },
-      ]);
+      expect(result.series[0].data).toEqual([{ name: "United States", value: 100 }]);
     });
 
     it("should use custom name label from config", () => {
@@ -142,16 +135,9 @@ describe("MapsConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].data).toEqual([
-        { name: "United Kingdom", value: 50 },
-      ]);
+      expect(result.series[0].data).toEqual([{ name: "United Kingdom", value: 50 }]);
     });
 
     it("should use series name when metric label is missing", () => {
@@ -174,12 +160,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([{ name: "Canada", value: 75 }]);
     });
@@ -214,16 +195,9 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
-      expect(result.series[0].data).toEqual([
-        { name: "United States", value: 150 },
-      ]);
+      expect(result.series[0].data).toEqual([{ name: "United States", value: 150 }]);
     });
 
     it("should apply aggregation to series values", () => {
@@ -254,12 +228,7 @@ describe("MapsConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([{ name: "Japan", value: 30 }]);
     });
@@ -289,12 +258,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([{ name: "China", value: 20 }]);
     });
@@ -319,12 +283,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.error).toBe(true);
       expect(result.message).toContain("No valid map data found");
@@ -361,12 +320,7 @@ describe("MapsConverter", () => {
 
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toHaveLength(1);
       expect(result.series[0].data[0]).toEqual({
@@ -375,9 +329,7 @@ describe("MapsConverter", () => {
       });
       expect(consoleSpy).toHaveBeenCalledWith(
         "Maps conversion warnings:",
-        expect.arrayContaining([
-          expect.stringContaining("missing location name"),
-        ]),
+        expect.arrayContaining([expect.stringContaining("missing location name")]),
       );
 
       consoleSpy.mockRestore();
@@ -413,12 +365,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([
         { name: "United States", value: 100 },
@@ -484,12 +431,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].map).toBe("world");
     });
@@ -520,12 +462,7 @@ describe("MapsConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].map).toBe("USA");
     });
@@ -552,12 +489,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].roam).toBe(true);
     });
@@ -586,12 +518,7 @@ describe("MapsConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].roam).toBe(false);
     });
@@ -618,12 +545,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].emphasis.label.show).toBe(true);
     });
@@ -650,12 +572,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.tooltip.trigger).toBe("item");
       expect(result.tooltip.showDelay).toBe(0);
@@ -685,12 +602,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const formatted = result.tooltip.formatter({
         name: "United States",
@@ -722,12 +634,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const formatted = result.tooltip.formatter({
         name: "United States",
@@ -759,12 +666,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       const formatted = result.tooltip.formatter({
         name: "United States",
@@ -796,12 +698,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.toolbox.show).toBe(true);
       expect(result.toolbox.left).toBe("left");
@@ -830,12 +727,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.xAxis).toEqual([]);
       expect(result.yAxis).toEqual([]);
@@ -879,12 +771,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.visualMap.min).toBe(50);
       expect(result.visualMap.max).toBe(100);
@@ -912,12 +799,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.visualMap.min).toBe(0);
       expect(result.visualMap.max).toBe(100);
@@ -945,12 +827,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.visualMap.left).toBe("right");
       expect(result.visualMap.calculable).toBe(true);
@@ -979,12 +856,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.visualMap.inRange.color).toEqual([
         "#313695",
@@ -1036,12 +908,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data).toEqual([
         { name: "United States", value: 100 },
@@ -1071,12 +938,7 @@ describe("MapsConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.series[0].data[0].value).toBe(100);
       expect(result.visualMap.min).toBe(0);

@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use config::{
     ider,
-    meta::destinations::{Template, TemplateType},
+    meta::destinations::{Template, TemplateKind, TemplateType},
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
@@ -55,6 +55,7 @@ impl TryFrom<Model> for Template {
             is_default: value.is_default,
             template_type,
             body: value.body,
+            kind: TemplateKind::from(value.kind.as_str()),
         })
     }
 }
@@ -76,6 +77,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
         r#type: Set(template.template_type.to_string()),
         body: Set(template.body),
         title: Set(title),
+        kind: Set(template.kind.to_string()),
     };
     let model: Model = match get_model(client, &template.org_id, &template.name).await? {
         Some(model) => {
@@ -158,6 +160,17 @@ async fn list_models(
         .await
 }
 
+/// Deletes all templates belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    let _lock = get_lock().await;
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use svix_ksuid::KsuidLike;
@@ -173,6 +186,7 @@ mod tests {
             r#type: tmpl_type.to_string(),
             body: r#"{"text": "alert"}"#.to_string(),
             title: title.map(|s| s.to_string()),
+            kind: "custom".to_string(),
         }
     }
 
@@ -235,5 +249,14 @@ mod tests {
         let model = make_model(&id, None, "http");
         let tmpl = Template::try_from(model).unwrap();
         assert_eq!(tmpl.body, r#"{"text": "alert"}"#);
+    }
+
+    #[test]
+    fn test_try_from_model_kind_content() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.kind = "content".to_string();
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.kind, TemplateKind::Content);
     }
 }

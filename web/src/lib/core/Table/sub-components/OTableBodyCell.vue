@@ -2,12 +2,18 @@
 
 <script setup lang="ts">
 import type { Cell, Row } from "@tanstack/vue-table";
-import { computed, inject, ref } from "vue";
+import { computed, inject, ref, useSlots } from "vue";
 import { FlexRender } from "@tanstack/vue-table";
 import { useSanitizedHtml } from "../composables/useSanitizedHtml";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { OTableTreeContextKey } from "../composables/useTableTree";
+import { OTableCellActionsKey } from "../OTable.types";
+import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useI18nTyped } from "@/types/i18n";
+
+const slots = useSlots();
 
 const { sanitize } = useSanitizedHtml();
 
@@ -16,8 +22,10 @@ let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function handleCopy(event: MouseEvent) {
   event.stopPropagation();
-  const value = String(props.cell.getValue() ?? "");
-  const success = await copyToClipboard(value, { silent: true });
+  // Copy what the user sees: the formatted display value (dashboard format fns
+  // handle units, timestamps and no_value_replacement), not the raw cell value.
+  const value = String(displayValue.value ?? "");
+  const success = await copyToClipboard(value, t, { silent: true });
   if (success) {
     copied.value = true;
     if (copyTimer) clearTimeout(copyTimer);
@@ -38,32 +46,27 @@ const props = defineProps<{
   dense?: boolean;
   bordered?: boolean;
   enableCellCopy?: boolean;
-  getCellStyle?: (params: {
-    columnId: string;
-    row: any;
-    value: any;
-  }) => Record<string, any>;
+  getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
+  /** Pivot row-field cell merge: hide the cell's content / inner border so a
+   *  group of equal row-field values reads as one merged cell. */
+  pivotMerge?: { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
 const emit = defineEmits<{
-  "cell-click": [
-    params: { columnId: string; row: any; value: any },
-  ];
+  "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
 }>();
 
 const meta = computed(() => props.cell.column.columnDef.meta as any);
 const align = computed(() => meta.value?.align ?? "left");
 
-// Record-name column → weight 500 (HANDOFF §8.2). Metadata columns stay 400.
-// Only the default-rendered text path uses this; custom cells style their own.
-const defaultTextClass = computed(() => [
-  "tw:text-text-primary",
-]);
+// Record-name column weight. Only the default-rendered text path uses this;
+const defaultTextClass = computed(() => ["text-inherit"]);
 
 const alignClass = computed(() => {
-  if (align.value === "center") return "tw:text-center";
-  if (align.value === "right") return "tw:text-right";
-  return "tw:text-left";
+  if (align.value === "center") return "text-center";
+  if (align.value === "right") return "text-right";
+  return "text-left";
 });
 
 const isAction = computed(() => meta.value?.isAction ?? false);
@@ -71,49 +74,117 @@ const isAction = computed(() => meta.value?.isAction ?? false);
 const slotAlignClass = computed(() => {
   // Action cells shrink to their content (inline-flex, no w-full) so the
   // column can be measured and sized to the buttons with no dead space.
-  if (isAction.value) return "tw:inline-flex tw:items-center";
+  if (isAction.value) return "inline-flex items-center";
   // `min-w-0` lets the inner truncation wrapper actually shrink.
-  if (align.value === "center") return "tw:flex tw:items-center tw:justify-center tw:w-full tw:min-w-0";
-  if (align.value === "right") return "tw:flex tw:items-center tw:justify-end tw:w-full tw:min-w-0";
-  return "tw:flex tw:items-center tw:w-full tw:min-w-0";
+  if (align.value === "center") return "flex items-center justify-center w-full min-w-0";
+  if (align.value === "right") return "flex items-center justify-end w-full min-w-0";
+  return "flex items-center w-full min-w-0";
 });
+
+// Slotted content truncates to one line unless `wrap` is on, mirroring the
+// default (non-slot) behaviour.
+const slotContentClass = computed(() =>
+  props.wrap ? "min-w-0 flex-1 wrap-anywhere whitespace-normal" : "truncate min-w-0 flex-1",
+);
 
 const isPinned = computed(() => props.cell.column.getIsPinned?.() ?? false);
 
 const pinOffset = computed(() => {
   if (!isPinned.value) return 0;
-  if (isPinned.value === "left")
-    return props.cell.column.getStart?.("left") ?? 0;
-  if (isPinned.value === "right")
-    return props.cell.column.getAfter?.("right") ?? 0;
+  if (isPinned.value === "left") return props.cell.column.getStart?.("left") ?? 0;
+  if (isPinned.value === "right") return props.cell.column.getAfter?.("right") ?? 0;
   return 0;
 });
 
 const rawValue = computed(() => props.cell.getValue());
 
 const displayValue = computed(() => {
-  const formatFn = meta.value?.format as
-    | ((value: any, row: any) => any)
-    | undefined;
-  if (rawValue.value === null || rawValue.value === undefined)
-    return rawValue.value;
-  return formatFn ? formatFn(rawValue.value, props.row.original) : rawValue.value;
+  const formatFn = meta.value?.format as ((value: any, row: any) => any) | undefined;
+  // Call `format` even for null/undefined: dashboard format fns turn empty cells
+  // into the configured `no_value_replacement`.
+  if (!formatFn) return rawValue.value;
+  return formatFn(rawValue.value, props.row.original);
 });
 
-const horizontalScroll = inject<{ value: boolean } | null>(
-  "o2TableHorizontalScroll",
-  null,
+// ── Cell copy ─────────────────────────────────────────────────────
+// Empty cells get no copy affordance (matches the pre-migration table).
+const hasCopyableValue = computed(() => {
+  const value = rawValue.value;
+  if (value === null || value === undefined || value === "undefined") return false;
+  return String(value).trim() !== "";
+});
+
+const showCellCopy = computed(
+  () => !!props.enableCellCopy && !slots.default && hasCopyableValue.value,
 );
 
+// The button shares a flex row with the value instead of floating over it, so it
+// can never overlap the text. Right-aligned (numeric) columns put the button on
+// the left; left/center-aligned columns put it on the right.
+const copyRowAlignClass = computed(() => {
+  if (align.value === "center") return "justify-center";
+  if (align.value === "right") return "justify-end";
+  return "";
+});
+
+const copyValueClass = computed(() =>
+  props.wrap ? "min-w-0 wrap-anywhere whitespace-normal" : "min-w-0 truncate",
+);
+
+const horizontalScroll = inject<{ value: boolean } | null>("o2TableHorizontalScroll", null);
+
+// Keep right-pinned total cells in step with the sticky header and footer.
+const stickyColTotals = inject<{ value: boolean } | null>("o2TableStickyColTotals", null);
+const pivotTotalStyle = computed<Record<string, any>>(() => {
+  if (!stickyColTotals?.value || !meta.value?._isTotalColumn) return {};
+  const rightOffset = (meta.value._totalColRightIndex ?? 0) * PIVOT_TABLE_TOTAL_COLUMN_WIDTH;
+  return {
+    position: "sticky",
+    right: `${rightOffset}px`,
+    zIndex: 2,
+    // Pinned width, so the column can't diverge from the fixed-width sticky
+    // header under table-auto/w-full.
+    width: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
+    backgroundColor: "var(--color-table-cell-bg)",
+    // Same left-edge separator as the header, so it runs down the whole column.
+    boxShadow: "-2px 0 4px -2px var(--color-border-default)",
+  };
+});
+
 const isAutoWidth = computed(() => meta.value?.autoWidth === true);
+
+const boundedFillTable = inject<{ value: boolean } | null>("o2TableBoundedFill", null);
+// The clamp only counteracts `min-w-max`; a container-bounded table needs none.
+const inBoundedFillTable = computed(
+  () => !!boundedFillTable?.value && !!horizontalScroll?.value && !props.wrap,
+);
+const isBoundedFill = computed(
+  () => meta.value?.fillRemaining === true && inBoundedFillTable.value,
+);
+// Sized siblings of a bounded filler pin to their own size and clip — otherwise
+// a long value stretches the column (nothing else caps it when scrolling).
+const isSizeClamped = computed(
+  () =>
+    inBoundedFillTable.value && !isAutoWidth.value && !isAction.value && !meta.value?.fixedWidth,
+);
 
 const cellStyle = computed(() => {
   const base: Record<string, any> = {};
   if (isAutoWidth.value) {
     // Elastic column: no width (absorbs the table's leftover space), but honour
     // minSize so it can't collapse — it pushes the table to scroll instead.
+    // While WRAPPING the floor has to go: the pre-migration table gave the fill
+    // column `flex: 1 1 0; min-width: 0` so it shrank to the row and the text
+    // wrapped. Keeping minSize here pins the column open and nothing ever wraps.
     const min = props.cell.column.columnDef.minSize;
-    if (min) base.minWidth = `${min}px`;
+    if (min && !props.wrap) base.minWidth = `${min}px`;
+    // `max-width: 0` keeps the filler's text out of the intrinsic-width sum, so
+    // it takes the leftover instead of sizing to its longest value; min-width
+    // still floors it. Never `width: 100%` — the percentage resolves against a
+    // table sized from its own cells and the column runs away to ~500000px.
+    if (isBoundedFill.value) base.maxWidth = "0";
   } else {
     const sizeVar = `var(--header-${props.cell.column.id.replace(/[^a-zA-Z0-9]/g, "-")}-size)`;
     base.width = sizeVar;
@@ -124,6 +195,16 @@ const cellStyle = computed(() => {
       base.maxWidth = sizeVar;
     } else if (!horizontalScroll?.value) {
       base.maxWidth = sizeVar;
+    } else if (isSizeClamped.value) {
+      // min: auto layout can't squeeze it; max: its content can't stretch it.
+      base.minWidth = sizeVar;
+      base.maxWidth = sizeVar;
+    } else if (props.wrap) {
+      // Wrapping drops the table's `min-w-max`, so auto layout would otherwise
+      // squeeze these sized columns to fit the container. The pre-migration
+      // table pinned them with `flex-shrink: 0` and let the ROW scroll instead;
+      // only the fill column was allowed to shrink.
+      base.minWidth = sizeVar;
     }
   }
   if (isPinned.value === "left") {
@@ -143,7 +224,9 @@ const cellStyle = computed(() => {
     row: props.row.original,
     value: rawValue.value,
   });
-  return extra ? { ...base, ...extra } : base;
+  const merged = extra ? { ...base, ...extra } : base;
+  // Right-pinned pivot total columns win (sticky position + fixed width).
+  return { ...merged, ...pivotTotalStyle.value };
 });
 
 const highlightedHtml = computed(() => {
@@ -154,12 +237,10 @@ const highlightedHtml = computed(() => {
   return raw ? sanitize(raw) : null;
 });
 
-// ── Tree mode: tw:inline chevron + indent for the designated tree column ──
+// ── Tree mode: inline chevron + indent for the designated tree column ──
 const treeCtx = inject(OTableTreeContextKey, null);
 const isTreeColumn = computed(
-  () =>
-    !!treeCtx?.value?.enabled &&
-    treeCtx.value.treeColumnId === props.cell.column.id,
+  () => !!treeCtx?.value?.enabled && treeCtx.value.treeColumnId === props.cell.column.id,
 );
 const treeMeta = computed(() => {
   if (!isTreeColumn.value) return null;
@@ -173,9 +254,7 @@ const treeIndentPx = computed(() => (treeMeta.value?.depth ?? 0) * 16);
  * For child rows we want the horizontal stub to start at the *parent's*
  * chevron x, which is `depth - 1` indents in.
  */
-const treeChevronX = computed(
-  () => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9,
-);
+const treeChevronX = computed(() => 8 + (treeMeta.value?.depth ?? 0) * 16 + 9);
 const treeParentChevronX = computed(
   () => 8 + Math.max((treeMeta.value?.depth ?? 0) - 1, 0) * 16 + 9,
 );
@@ -193,6 +272,33 @@ function handleClick() {
     value: props.cell.getValue(),
   });
 }
+
+const { t } = useI18nTyped();
+
+// Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
+// context menu keeps rendering correctly even after the virtualizer recycles
+// the row underneath it. The event is NOT prevented — the consumer decides
+// whether to open a menu or leave the native one alone.
+function handleContextMenu() {
+  emit("cell-contextmenu", {
+    columnId: props.cell.column.id,
+    row: props.row.original,
+    value: props.cell.getValue(),
+  });
+}
+
+// ── Cell hover-actions ────────────────────────────────────────────
+// The shared single-active-cell context tracks which cell the pointer is over,
+// keyed by `cell.id` (already `${row.id}_${column.id}`).
+const hasCellActions = computed(() => !!slots["cell-hover-actions"]);
+const cellActionsCtx = inject(OTableCellActionsKey, null);
+const isCellActionActive = computed(() => cellActionsCtx?.activeCellKey.value === props.cell.id);
+function onCellActionsEnter() {
+  if (hasCellActions.value) cellActionsCtx?.setActiveCell(props.cell.id);
+}
+function onCellActionsLeave() {
+  if (hasCellActions.value) cellActionsCtx?.setActiveCell(null);
+}
 </script>
 
 <template>
@@ -203,73 +309,82 @@ function handleClick() {
       // the default text wrapper) still inherit the theme-aware primary color
       // instead of falling back to a grey inherited value in dark mode. Inner
       // links/badges override this with their own color.
-      'tw:text-text-primary',
-      meta?.spacer ? 'tw:px-0 tw:align-middle' : (meta?.compactPadding ? 'tw:px-1 tw:align-middle' : 'tw:px-2 tw:align-middle'),
-      bordered ? 'tw:border-b tw:border-[var(--color-table-row-divider)]' : '',
+      'text-text-body',
+      meta?.spacer
+        ? 'px-0 align-middle'
+        : meta?.compactPadding
+          ? 'px-1 align-middle'
+          : 'px-2 align-middle',
+      bordered && !pivotMerge?.hideBorder ? 'border-table-row-divider border-b' : '',
       alignClass,
-      isAction ? 'tw:w-0 tw:whitespace-nowrap' : '',
-       isPinned
-        ? (rowSelected
-            ? 'tw:bg-[var(--color-table-row-selected-bg)] tw:group-hover/row:bg-table-row-hover-bg tw:transition-colors tw:duration-150'
-            : 'tw:bg-[var(--color-table-cell-bg)] tw:group-hover/row:bg-[var(--color-table-row-hover-bg)] tw:transition-colors tw:duration-150')
+      isAction ? 'w-0 whitespace-nowrap' : '',
+      isPinned
+        ? rowSelected
+          ? 'bg-table-row-selected-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
+          : 'bg-table-cell-bg group-hover/row:bg-table-row-hover-bg transition-colors duration-150'
         : '',
       wrap
-        ? 'tw:break-words tw:whitespace-normal'
+        ? 'wrap-anywhere whitespace-normal'
         : horizontalScroll?.value
-          ? 'tw:whitespace-nowrap'
+          ? isBoundedFill || isSizeClamped
+            ? 'overflow-hidden text-ellipsis whitespace-nowrap'
+            : 'whitespace-nowrap'
           : isAction
-            ? 'tw:whitespace-nowrap tw:overflow-hidden'
-            : 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis',
+            ? 'overflow-hidden whitespace-nowrap'
+            : 'overflow-hidden text-ellipsis whitespace-nowrap',
       meta?.cellClass ?? '',
-      isTreeColumn ? 'tw:relative' : '',
+      isTreeColumn || hasCellActions ? 'relative' : '',
+      enableCellCopy ? 'group/cell' : '',
       isTreeColumn && treeMeta?.isParent && treeMeta?.isExpanded ? 'o2-tree-parent-expanded' : '',
-      isTreeColumn && treeMeta && (treeMeta.parentId !== null) ? 'o2-tree-child' : '',
+      isTreeColumn && treeMeta && treeMeta.parentId !== null ? 'o2-tree-child' : '',
       isTreeColumn && treeMeta?.isLastChild ? 'o2-tree-last-child' : '',
-      isTreeColumn && treeMeta && (treeMeta.parentId !== null) && !treeMeta.hasChildren ? 'o2-tree-leaf' : '',
+      isTreeColumn && treeMeta && treeMeta.parentId !== null && !treeMeta.hasChildren
+        ? 'o2-tree-leaf'
+        : '',
     ]"
     :style="[
       cellStyle,
       isTreeColumn
         ? {
-            '--o2-tree-x': treeChevronX + 'px',
-            '--o2-tree-parent-x': treeParentChevronX + 'px',
+            '--tree-x': treeChevronX + 'px',
+            '--tree-parent-x': treeParentChevronX + 'px',
           }
         : {},
     ]"
     @click="handleClick"
+    @contextmenu="handleContextMenu"
+    @mouseenter="onCellActionsEnter"
+    @mouseleave="onCellActionsLeave"
   >
     <!-- Tree-mode wrapper: indent + chevron + cell content -->
     <div
       v-if="isTreeColumn"
-      class="tw:flex tw:items-center tw:gap-1 tw:min-w-0"
+      class="flex min-w-0 items-center gap-1"
       :style="{ paddingLeft: `${treeIndentPx}px` }"
     >
       <span
         v-if="treeMeta?.hasChildren || (treeMeta && treeMeta.parentId !== null)"
-        class="tw:inline-flex tw:items-center tw:justify-center tw:w-[18px] tw:h-[18px] tw:shrink-0"
+        class="inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center"
       >
         <button
           v-if="treeMeta?.hasChildren"
           type="button"
-          class="tw:inline-flex tw:items-center tw:justify-center tw:w-[18px] tw:h-[18px] tw:p-0 tw:bg-transparent tw:border-0 tw:rounded tw:cursor-pointer tw:text-(--color-text-secondary,#6b7280) tw:hover:bg-(--color-table-row-hover-bg,rgba(0,0,0,0.05)) tw:hover:text-(--color-text-primary)"
+          class="rounded-default text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body inline-flex h-4.5 w-4.5 cursor-pointer items-center justify-center border-0 bg-transparent p-0"
           :data-test="`o2-table-tree-toggle-${cell.column.id}`"
           :aria-expanded="treeMeta?.isExpanded ? 'true' : 'false'"
           @click="onTreeToggle"
         >
-          <OIcon
-            :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'"
-            size="sm"
-          />
+          <OIcon :name="treeMeta?.isExpanded ? 'expand-more' : 'chevron-right'" size="sm" />
         </button>
         <span
           v-else
-          class="tw:w-[7px] tw:h-[7px] tw:bg-(--q-primary,#6366f1) tw:opacity-75 tw:rounded-[1px] tw:shadow-[0_0_0_2px_var(--color-table-cell-bg,#fff)] tw:z-3 tw:relative"
+          class="bg-theme-accent rounded-default ring-table-cell-bg relative z-3 size-1.75 opacity-75 ring-2"
           aria-hidden="true"
         />
       </span>
-      <div class="tw:flex-1 tw:min-w-0">
+      <div class="min-w-0 flex-1">
         <div v-if="$slots.default" :class="slotAlignClass">
-          <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+          <div v-if="!isAction" :class="slotContentClass"><slot /></div>
           <slot v-else />
         </div>
         <FlexRender
@@ -277,22 +392,52 @@ function handleClick() {
           :render="cell.column.columnDef.cell"
           :props="cell.getContext()"
         />
-        <span
-          v-else-if="highlightedHtml"
-          :class="defaultTextClass"
-          v-html="highlightedHtml"
-        />
+        <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
         <span v-else :class="defaultTextClass">
           {{ displayValue }}
         </span>
       </div>
     </div>
 
-    <template v-else>
+    <!-- Pivot-merged cells hide their content (the group's first row shows it). -->
+    <template v-else-if="!pivotMerge?.hideContent">
       <div v-if="$slots.default" :class="slotAlignClass">
         <!-- Non-action slot content truncates with an ellipsis by default. -->
-        <div v-if="!isAction" class="tw:truncate tw:min-w-0 tw:flex-1"><slot /></div>
+        <div v-if="!isAction" :class="slotContentClass"><slot /></div>
         <slot v-else />
+      </div>
+      <!-- Copy-enabled cell: value and copy button share a flex row, so the
+           button sits beside the text instead of covering it. -->
+      <div
+        v-else-if="showCellCopy"
+        class="flex w-full min-w-0 items-center"
+        :class="copyRowAlignClass"
+      >
+        <FlexRender
+          v-if="cell.column.columnDef.cell"
+          :render="cell.column.columnDef.cell"
+          :props="cell.getContext()"
+        />
+        <span
+          v-else-if="highlightedHtml"
+          :class="[defaultTextClass, copyValueClass]"
+          v-html="highlightedHtml"
+        />
+        <span v-else :class="[defaultTextClass, copyValueClass]">
+          {{ displayValue }}
+        </span>
+        <OButton
+          variant="ghost"
+          size="icon-xs-sq"
+          :data-test="`o2-table-cell-copy-${cell.column.id}`"
+          :data-copied="copied ? 'true' : undefined"
+          class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
+          :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
+          :title="copied ? t('common.copiedExclaim') : t('common.copy')"
+          @click="handleCopy"
+        >
+          <OIcon :name="copied ? 'check' : 'content-copy'" size="sm" />
+        </OButton>
       </div>
       <!-- Custom cell render via TanStack FlexRender -->
       <FlexRender
@@ -301,43 +446,44 @@ function handleClick() {
         :props="cell.getContext()"
       />
       <!-- Highlighted HTML (safe: composable escapes user content before wrapping) -->
-      <span
-        v-else-if="highlightedHtml"
-        :class="defaultTextClass"
-        v-html="highlightedHtml"
-      />
+      <span v-else-if="highlightedHtml" :class="defaultTextClass" v-html="highlightedHtml" />
       <!-- Default: plain text -->
       <span v-else :class="defaultTextClass">
         {{ displayValue }}
       </span>
     </template>
 
-    <!-- Cell copy button (visible on hover) -->
-    <button
-      v-if="enableCellCopy && !$slots.default"
-      type="button"
-      :data-test="`o2-table-cell-copy-${cell.column.id}`"
-      class="tw:absolute tw:right-1 tw:opacity-0 tw:group-hover:opacity-100 tw:bg-[var(--color-surface-base)] tw:border tw:border-[var(--color-border-default)] tw:rounded tw:cursor-pointer tw:p-0.5 tw:text-[var(--color-text-muted)] tw:hover:text-[var(--color-text-primary)] tw:leading-none tw:transition-opacity"
-      :title="copied ? 'Copied!' : 'Copy'"
-      @click="handleCopy"
+    <!-- Per-cell hover-action overlay. Spans the cell's right edge full-height
+         so it anchors both flow content and self-positioned content. -->
+    <div
+      v-if="hasCellActions"
+      class="o2-table-cell-hover-actions absolute inset-y-0 right-0 z-2 flex items-center"
+      :data-test="`o2-table-cell-hover-actions-${cell.column.id}`"
     >
-      <OIcon :name="copied ? 'check' : 'content-copy'" size="xs" />
-    </button>
+      <slot
+        name="cell-hover-actions"
+        :row="row.original"
+        :column="cell.column.columnDef"
+        :value="rawValue"
+        :active="isCellActionActive"
+      />
+    </div>
   </td>
 </template>
 
-<style>
-/* ── Tree connector lines (parent ↓ children) ────────────────── */
+<style scoped>
+/* keep(generated-content): tree connector lines (parent ↓ children) drawn as
+   ::before/::after pseudo-elements positioned off inline --tree-x vars. */
 
 /* Vertical line going down from below the chevron, on expanded parent rows */
 .o2-tree-parent-expanded::after {
   content: "";
   position: absolute;
-  left: var(--o2-tree-x);
-  top: calc(50% + 9px);
+  left: var(--tree-x, 0);
+  top: calc(50% + 0.5625rem);
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
@@ -349,11 +495,11 @@ function handleClick() {
 .o2-tree-child::before {
   content: "";
   position: absolute;
-  left: var(--o2-tree-parent-x);
+  left: var(--tree-parent-x, 0);
   top: 0;
   bottom: 0;
-  width: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
@@ -363,19 +509,19 @@ function handleClick() {
 .o2-tree-child::after {
   content: "";
   position: absolute;
-  left: var(--o2-tree-parent-x);
+  left: var(--tree-parent-x, 0);
   top: 50%;
-  /* Parent-row child (has its own chevron): stop the stub 9px before the
+  /* Parent-row child (has its own chevron): stop the stub 0.5625rem before the
      chevron center so the line doesn't run into the icon. */
-  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x) - 9px);
-  height: 1.5px;
-  background-color: var(--q-primary, #6366f1);
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0) - 0.5625rem);
+  height: 0.09375rem;
+  background-color: var(--color-theme-accent);
   opacity: 0.55;
   z-index: 1;
 }
 /* Leaf children (no chevron, endpoint marker dot instead): run the stub all
    the way to the dot's centre so the line visually touches it. */
 .o2-tree-child.o2-tree-leaf::after {
-  width: calc(var(--o2-tree-x) - var(--o2-tree-parent-x));
+  width: calc(var(--tree-x, 0) - var(--tree-parent-x, 0));
 }
 </style>

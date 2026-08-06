@@ -1,13 +1,15 @@
+import type { I18nText } from "@/types/i18n";
+
 export interface OCollapsibleProps {
   /** Trigger label text (used when no #trigger slot is provided) */
-  label?: string;
+  label?: I18nText;
   /**
    * Material icon name shown before the label.
    * Pass the icon name string e.g. `"settings"` or `"expand_more"`.
    */
   icon?: string;
   /** Secondary caption text below the label */
-  caption?: string;
+  caption?: I18nText;
   /**
    * Initial open state (uncontrolled).
    * When `modelValue` is also provided, `modelValue` takes precedence.
@@ -26,9 +28,12 @@ export interface OCollapsibleProps {
   /**
    * Visual layout variant.
    * - `'default'` — chevron on the right, rounded trigger (general content sections)
-   * - `'sidebar'` — chevron on the left, flush trigger (sidebar/config panel sections)
+   * - `'sidebar'` — chevron on the left, flush trigger (generic sidebar sections)
+   * - `'config'`  — dashboard panel config: leading icon, right chevron, an
+   *   open-state accent (tinted header + left accent bar + accent icon) and a
+   *   sticky header. Scoped to the panel config sidebar; do not reuse elsewhere.
    */
-  variant?: "default" | "sidebar";
+  variant?: "default" | "sidebar" | "config";
   /** Extra classes applied directly to the trigger button element. */
   triggerClass?: string;
 }

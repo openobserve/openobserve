@@ -5,6 +5,7 @@ import { inject } from "vue";
 import OInput from "./OInput.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormInputProps } from "./OFormInput.types";
 
 defineOptions({ inheritAttrs: false });
@@ -19,11 +20,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <OInput
         v-bind="$attrs"
@@ -47,12 +44,10 @@ if (import.meta.env.DEV && !form) {
         :size="props.size"
         :width="props.width"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
+          !$slots.error && field.state.meta.errors.length > 0
+            ? raw(firstFieldError(field.state.meta.errors))
             : undefined
         "
         @update:model-value="(val: unknown) => field.handleChange(val)"
@@ -79,6 +74,15 @@ if (import.meta.env.DEV && !form) {
           <slot name="append" />
         </template>
       </OInput>
+      <!-- #error slot: when provided the consumer OWNS the message — only the
+           inline TEXT is suppressed above (error-message is left undefined). The
+           invalid STATE still reaches OInput, so the field keeps its red border:
+           a narrow field that re-homes its message must still look invalid.
+           Rendered after OInput so it can escape a composite border; may be left
+           empty purely to suppress the text. -->
+      <template v-if="$slots.error">
+        <slot name="error" />
+      </template>
     </template>
   </component>
 </template>

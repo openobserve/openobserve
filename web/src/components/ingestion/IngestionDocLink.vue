@@ -23,17 +23,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div>
-    Click
+    {{ t("ingestion.docLinkClick") }}
     <a
       :href="href"
       target="_blank"
       rel="noopener noreferrer"
-      class="tw:text-text-link tw:hover:text-text-link-hover tw:underline tw:font-medium"
-      >here</a
-    ><slot> to check further documentation.</slot>
+      class="text-text-link hover:text-text-link-hover font-medium underline"
+      >{{ t("ingestion.docLinkHere") }}</a
+    ><slot> {{ t("ingestion.docLinkDefaultText") }}</slot>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
 defineProps<{ href: string }>();
 </script>

@@ -1,9 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  clearServiceColorRegistry,
-  getOrSetServiceColor,
-} from "./serviceColorRegistry";
+import { clearServiceColorRegistry, getOrSetServiceColor } from "./serviceColorRegistry";
 
 describe("serviceColorRegistry", () => {
   afterEach(() => {
@@ -30,7 +27,7 @@ describe("serviceColorRegistry", () => {
   it("should assign colors sequentially (first service = index 0, second = index 1)", () => {
     const first = getOrSetServiceColor("svc-a");
     const second = getOrSetServiceColor("svc-b");
-    // index 0 and index 1 from LIGHT_SPAN_COLORS must differ
+    // the first two trace-span colors must differ
     expect(first).not.toBe(second);
   });
 

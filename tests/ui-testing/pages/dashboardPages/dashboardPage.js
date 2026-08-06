@@ -49,7 +49,10 @@ export class DashboardPage {
 
     // Dashboard view/edit locators
     this.addPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
-    this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name-field"]');
+    // Panel name is an inline-edited title (OFormInlineEdit): click the trigger
+    // to reveal the input, then fill it.
+    this.dashboardPanelNameTrigger = page.locator('[data-test="dashboard-panel-name-trigger"]');
+    this.dashboardPanelNameInput = page.locator('[data-test="dashboard-panel-name-input"]');
     this.savePanelButton = page.locator('[data-test="dashboard-panel-save"]');
     this.applyButton = page.locator('[data-test="dashboard-apply"]');
     this.shareButton = page.locator('[data-test="dashboard-share-btn"]');
@@ -273,10 +276,18 @@ export class DashboardPage {
 
     // Clear search
     await this.fieldSearchInput.fill('');
+    await this.dashboardPanelNameTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await this.dashboardPanelNameTrigger.click();
     await this.dashboardPanelNameInput.waitFor({ state: 'visible', timeout: 10000 });
-    await this.dashboardPanelNameInput.click();
     await this.dashboardPanelNameInput.fill(this.panelName);
-    await this.dashboardPanelNameInput.press('Enter');
+    // Do NOT press Enter here. Post UX revamp the panel-name field is an
+    // OFormInput inside <OForm id="add-panel-form"> (AddPanel.vue) whose only
+    // input it is, so Enter triggers the form's implicit submit → onSave →
+    // savePanelChangesToDashboard, which saves the panel and navigates away,
+    // detaching the Apply button mid-flow (see reports E2E timeouts on
+    // [data-test="dashboard-apply"]). The legacy input ignored Enter;
+    // .fill() already commits the title through OFormInput's reactive binding,
+    // so no key press is needed to "commit" the name.
     await expect(this.applyButton).toBeVisible();
     await this.applyButton.click();
     await this.page.waitForTimeout(5000);

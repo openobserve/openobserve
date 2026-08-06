@@ -18,16 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <div
+    class="h-full w-full"
     data-test="chart-renderer"
     ref="chartRef"
     id="chart"
     @mouseover="handleMouseOver"
     @mouseleave="handleMouseLeave"
-    style="height: 100%; width: 100%"
   ></div>
 </template>
 
-<script>
+<script lang="ts">
 import {
   defineComponent,
   ref,
@@ -36,8 +36,11 @@ import {
   onUnmounted,
   nextTick,
   inject,
+  type PropType,
+  type Ref,
 } from "vue";
 import * as echarts from "echarts";
+import { useI18nTyped } from "@/types/i18n";
 
 // Import all components and renderers once for generic usage
 import {
@@ -51,8 +54,13 @@ import {
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
 
 import DOMPurify from "dompurify";
+import { withChartFont } from "@/utils/fonts";
 
-// Register necessary components
+// Register necessary components.
+// echarts' subpath type decls (echarts/components, echarts/renderers) resolve to
+// a separate copy of EChartsExtensionInstaller than the full "echarts" package,
+// so these installers are structurally incompatible only at the type level —
+// cast at this 3rd-party boundary to the exact param type of echarts.use.
 echarts.use([
   TitleComponent,
   TooltipComponent,
@@ -62,7 +70,19 @@ echarts.use([
   DataZoomComponent,
   CanvasRenderer,
   SVGRenderer,
-]);
+] as unknown as Parameters<typeof echarts.use>[0]);
+
+// Custom-chart option object. It is user-authored ECharts config that may embed
+// function-strings and an `o2_events` map, so its shape is intentionally open.
+type CustomChartData = Record<string, unknown> & {
+  extras?: { panelId?: string | number };
+  o2_events?: Record<string, (params: echarts.ECElementEvent, chart: echarts.EChartsType) => void>;
+};
+
+// Injected cross-panel hover state (provided by the dashboard grid).
+interface HoveredSeriesState {
+  panelId: string | number | undefined;
+}
 
 export default defineComponent({
   name: "CustomChartRenderer",
@@ -70,7 +90,7 @@ export default defineComponent({
   props: {
     data: {
       required: true,
-      type: Object,
+      type: Object as PropType<CustomChartData>,
       default: () => ({}),
     },
     renderType: {
@@ -83,19 +103,28 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const chartRef = ref(null);
-    let chart = null;
+    // The declared events are string-named, but existing runtime call sites emit
+    // an error-payload object as the first arg (a long-standing shape this typing
+    // conversion must preserve). Cast the payload to emit's event-name param type.
+    type EmitEvent = Parameters<typeof emit>[0];
 
-    const hoveredSeriesState = inject("hoveredSeriesState", null);
-    const convertStringToFunction = (obj) => {
+    const { t } = useI18nTyped();
+    const chartRef: Ref<HTMLElement | null> = ref(null);
+    let chart: echarts.EChartsType | null = null;
+
+    const hoveredSeriesState = inject<HoveredSeriesState | null>("hoveredSeriesState", null);
+    const convertStringToFunction = (obj: unknown): unknown => {
       if (typeof obj === "string" && obj.startsWith("function")) {
         try {
           return new Function(`return ${obj}`)(); // Convert string to function
         } catch (error) {
+          // Preserve original runtime read of error.message; catch binds unknown
+          // under strict TS, so narrow the shape without changing the value read.
+          const message = (error as { message?: string }).message;
           emit({
-            message: `Error while executing the code: ${error.message}`,
+            message: t("dashboard.customChartRenderer.errorExecutingCodeWithMessage", { message }),
             code: "",
-          });
+          } as unknown as EmitEvent);
         }
       }
 
@@ -104,10 +133,10 @@ export default defineComponent({
       }
 
       if (typeof obj === "object" && obj !== null) {
-        const result = {};
+        const result: Record<string, unknown> = {};
         for (const key in obj) {
-          if (obj.hasOwnProperty(key)) {
-            result[key] = convertStringToFunction(obj[key]); // Recursively handle object properties
+          if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            result[key] = convertStringToFunction((obj as Record<string, unknown>)[key]); // Recursively handle object properties
           }
         }
         return result;
@@ -115,7 +144,7 @@ export default defineComponent({
 
       return obj; // If it's not a function string or an object, return it as is
     };
-    function deepSanitize(obj) {
+    function deepSanitize(obj: unknown): unknown {
       if (typeof obj === "string") {
         return DOMPurify.sanitize(obj);
       } else if (Array.isArray(obj)) {
@@ -131,7 +160,7 @@ export default defineComponent({
     const initChart = async () => {
       if (!chartRef.value) return;
 
-      const echartsGL = await import("echarts-gl");
+      await import("echarts-gl");
 
       // Initialize chart if it doesn't exist, otherwise reuse existing instance
       if (!chart) {
@@ -144,24 +173,26 @@ export default defineComponent({
       }
 
       try {
-        const convertedData = convertStringToFunction(props.data);
-        const safeChartOptions = deepSanitize(convertedData);
-        chart.setOption(safeChartOptions);
+        const convertedData = convertStringToFunction(props.data) as CustomChartData;
+        const safeChartOptions = deepSanitize(convertedData) as CustomChartData;
+        chart.setOption(withChartFont(safeChartOptions));
 
-        if (convertedData.o2_events) {
+        const o2Events = convertedData.o2_events;
+        if (o2Events) {
+          const boundChart = chart;
           // Add event listeners for custom interactions
-          for (const event in convertedData.o2_events) {
+          for (const event in o2Events) {
             chart.off(event);
             chart.on(event, (params) =>
-              convertedData.o2_events[event](params, chart),
+              o2Events[event](params as echarts.ECElementEvent, boundChart),
             );
           }
         }
       } catch (e) {
         emit({
-          message: "Error while executing the code",
+          message: t("dashboard.customChartRenderer.errorExecutingCode"),
           code: "",
-        });
+        } as unknown as EmitEvent);
       }
     };
 
@@ -171,8 +202,7 @@ export default defineComponent({
     };
 
     const handleMouseOver = () => {
-      if (hoveredSeriesState)
-        hoveredSeriesState.panelId = props.data.extras?.panelId;
+      if (hoveredSeriesState) hoveredSeriesState.panelId = props.data.extras?.panelId;
     };
 
     const handleMouseLeave = () => {

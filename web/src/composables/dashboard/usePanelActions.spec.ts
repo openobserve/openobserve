@@ -14,11 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
-import {
-  wrapCsvValue,
-  usePanelAlertCreation,
-  usePanelDownload,
-} from "./usePanelActions";
+import { wrapCsvValue, usePanelAlertCreation, usePanelDownload } from "./usePanelActions";
 import { downloadFile } from "@/utils/dom";
 
 vi.mock("@/utils/dom", () => ({
@@ -103,9 +99,7 @@ describe("usePanelActions", () => {
       expect(api.contextMenuVisible.value).toBe(true);
       expect(api.contextMenuPosition.value).toEqual({ x: 100, y: 200 });
       expect(api.contextMenuValue.value).toBe(42);
-      expect(args.contextMenuData.value).toEqual(
-        expect.objectContaining({ seriesName: "errors" }),
-      );
+      expect(args.contextMenuData.value).toEqual(expect.objectContaining({ seriesName: "errors" }));
 
       args.allowAlertCreation.value = false;
       api.hideContextMenu();
@@ -130,8 +124,7 @@ describe("usePanelActions", () => {
       expect(decoded.panelTitle).toBe("Errors");
       expect(decoded.queryType).toBe("sql");
       expect(decoded.threshold).toBe(10);
-      expect(decoded.condition).toBe(">"
-      );
+      expect(decoded.condition).toBe(">");
       expect(decoded.yAxisColumn).toBe("errors");
       expect(decoded.executedQuery).toContain("where level");
     });
@@ -150,7 +143,14 @@ describe("usePanelActions", () => {
   describe("usePanelDownload", () => {
     const makeDeps = () => ({
       panelSchema: { value: { type: "line", queryType: "sql" } },
-      data: { value: [[{ a: 1, b: "x" }, { a: 2, b: "y" }]] },
+      data: {
+        value: [
+          [
+            { a: 1, b: "x" },
+            { a: 2, b: "y" },
+          ],
+        ],
+      },
       filteredData: { value: [{ result: [{ value: [1, "10"] }] }] },
       tableRendererRef: {
         value: {

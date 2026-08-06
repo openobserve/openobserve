@@ -17,29 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0 tw:h-full tw:flex tw:flex-col">
-    <!-- Standard page header: title + actions only. Search moved into the
-         table's own toolbar (built-in global filter). -->
-    <AppPageHeader
-      :title="t('organization.header')"
-      :subtitle="'Organizations you can access'"
-      icon="corporate-fare"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-    >
-      <template #actions>
-        <OButton
-          variant="primary"
-          size="sm"
-          @click="addOrganization"
-          data-test="Add Organization"
-        >
-          {{ t('organization.add') }}
-        </OButton>
-      </template>
-    </AppPageHeader>
-    <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="card-container tw:h-full">
-      <OTable
+  <!-- OPageLayout owns the whole skeleton (header + body inset/bleed) — search
+       lives in the table's own toolbar. -->
+  <OPageLayout
+    :title="t('organization.header')"
+    :subtitle="t('iam.listOrganizations.subtitle')"
+    icon="corporate-fare"
+    bleed
+    :scroll="false"
+  >
+    <template #actions>
+      <OButton variant="primary" size="sm" @click="addOrganization" data-test="Add Organization">
+        {{ t("organization.add") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
+        <OTable
           :frame="false"
           :data="organizations"
           :columns="columns"
@@ -54,19 +48,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           sorting="client"
           filter-mode="client"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="iam-organizations-list"
         >
           <template #toolbar>
-            <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
+            <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
-                class="tw:flex-1"
+                class="flex-1"
                 data-test="organizations-search-input"
               />
             </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="organizations-list-refresh-btn"
+              @click="getOrganizations"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamOrganizationsRefresh"
+              />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -78,61 +89,124 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-
           <template #cell-identifier="{ row }">
             <OCodeCell :value="row.identifier" />
           </template>
 
           <template #cell-type="{ row }">
             <OTag v-if="row.type" :value="row.type" />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
           </template>
 
           <template #cell-plan="{ row }">
             <OTag v-if="row.plan && row.plan !== '-'" type="subscriptionPlan" :value="row.plan" />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span v-else class="text-text-body">—</span>
+          </template>
+
+          <template #cell-status="{ row }">
+            <OBadge
+              :variant="
+                row.status === 'pending_deletion'
+                  ? 'warning'
+                  : row.status === 'deleting'
+                    ? 'warning'
+                    : 'success-soft'
+              "
+              size="sm"
+            >
+              {{ row.status === "pending_deletion" ? pendingLabel(row) : row.status }}
+            </OBadge>
           </template>
 
           <template #cell-actions="{ row }">
-            <OButton
-              data-test="organization-name-edit"
-              variant="ghost"
-              size="icon-sm"
-              :title="'Edit'"
-              @click="renameOrganization(row)"
-            >
-              <OIcon name="edit" size="sm" />
-            </OButton>
+            <!-- Edit is pinned first so it stays column-aligned across every row,
+                 regardless of which trailing actions a row shows. It is disabled
+                 while the org is being deleted (editing a deleting org is a no-op). -->
+            <div class="flex items-center justify-start gap-1">
+              <OButton
+                data-test="organization-name-edit"
+                variant="ghost"
+                size="icon-sm"
+                :disabled="row.status !== 'active'"
+                :title="
+                  row.status === 'deleting'
+                    ? t('iam.listOrganizations.cannotEditWhileDeleting')
+                    : t('iam.listOrganizations.edit')
+                "
+                @click="row.status === 'active' && renameOrganization(row)"
+              >
+                <OIcon name="edit" size="sm" />
+              </OButton>
+              <OButton
+                v-if="canDeleteOrg(row)"
+                data-test="organization-delete"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('iam.listOrganizations.deleteOrganization')"
+                @click="deleteOrganization(row)"
+              >
+                <OIcon name="delete" size="sm" />
+              </OButton>
+              <OButton
+                v-if="row.status === 'deleting'"
+                data-test="organization-cleanup-tasks"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('iam.listOrganizations.viewDeletionProgress')"
+                @click="viewCleanupTasks(row)"
+              >
+                <OIcon name="history" size="sm" />
+              </OButton>
+              <OButton
+                v-if="row.status === 'pending_deletion'"
+                data-test="organization-resurrect"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('organization.resurrect')"
+                @click="resurrectOrganization(row)"
+              >
+                <OIcon name="undo" size="sm" />
+              </OButton>
+            </div>
           </template>
-      </OTable>
+        </OTable>
       </div>
     </div>
-    <add-update-organization
+    <AddUpdateOrganization
       :open="showAddOrganizationDialog"
       @update:open="onDrawerOpenChange"
       @updated="updateOrganizationList"
       :model-value="toBeUpdatedOrganization"
     />
-  </div>
+    <OrgCleanupTasksDialog
+      :open="showCleanupDialog"
+      :org-id="cleanupTargetOrg.id"
+      :org-name="cleanupTargetOrg.name"
+      @update:open="showCleanupDialog = $event"
+    />
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-
 // @ts-nocheck
-import { defineComponent, ref, watch, onMounted, computed } from "vue";
+import { defineComponent, ref, watch, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import organizationsService from "@/services/organizations";
-import JoinOrganization from "./JoinOrganization.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
+import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -141,31 +215,39 @@ import segment from "@/services/segment_analytics";
 import { convertToTitleCase } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "PageOrganization",
   components: {
     OCodeCell,
     AddUpdateOrganization,
+    OrgCleanupTasksDialog,
     OEmptyState,
     OButton,
+    OTooltip,
     OTag,
-    AppPageHeader,
+    OBadge,
+    OPageLayout,
     OIcon,
     OTable,
     OSearchInput,
-},
+  },
   setup() {
     const store = useStore();
+    const { isMetaOrg } = useIsMetaOrg();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const organizations = ref([]);
     const organization = ref({});
     const showAddOrganizationDialog = ref(false);
     const showJoinOrganizationDialog = ref(false);
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
+    const showCleanupDialog = ref(false);
+    const cleanupTargetOrg = ref({ id: "", name: "" });
     const filterQuery = ref("");
     const toBeUpdatedOrganization = ref({
       id: "",
@@ -173,15 +255,6 @@ export default defineComponent({
       identifier: "",
     });
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        minSize: 32,
-        maxSize: 40,
-        meta: { align: "left", compactPadding: true, cellClass: 'tw:pl-4!', headerClass: 'tw:pl-4!' },
-      },
       {
         id: "name",
         header: t("organization.name"),
@@ -212,6 +285,16 @@ export default defineComponent({
         size: 150,
         meta: { align: "left" },
       },
+      {
+        id: "status",
+        header: t("iam.listOrganizations.status"),
+        accessorKey: "status",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: 120,
+        meta: { align: "left" },
+      },
     ];
 
     if (config.isCloud == "true") {
@@ -231,10 +314,11 @@ export default defineComponent({
       header: t("user.actions"),
       isAction: true,
       pinned: "right",
-      size: 80,
-      minSize: 64,
-      maxSize: 100,
-      meta: { align: "center", actionCount: 1 },
+      size: 112,
+      minSize: 96,
+      maxSize: 140,
+      // Center-aligned to match every other listing table's actions column.
+      meta: { align: "center", actionCount: 3 },
     });
 
     watch(
@@ -242,8 +326,7 @@ export default defineComponent({
       (action) => {
         if (action == "add") {
           showAddOrganizationDialog.value = true;
-        }
-        else if (action == "update") {
+        } else if (action == "update") {
           showAddOrganizationDialog.value = true;
           toBeUpdatedOrganization.value = {
             id: router.currentRoute.value.query?.to_be_updated_org_id || "",
@@ -260,9 +343,7 @@ export default defineComponent({
       // is intentionally NOT handled here — the dialog only opens via the
       // "Add Organization" button click; refreshing on an `action=add` URL
       // should leave the user on the list view.
-      if (
-        router.currentRoute.value.query.action == "update"
-      ) {
+      if (router.currentRoute.value.query.action == "update") {
         showAddOrganizationDialog.value = true;
         toBeUpdatedOrganization.value = {
           id: router.currentRoute.value.query?.to_be_updated_org_id || "",
@@ -276,80 +357,91 @@ export default defineComponent({
     const getOrganizations = () => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading organizations...",
-              timeout: 0,
-});
-      loading.value = true;
-      organizationsService.list(0, 1000000, "name", false, "").then((res) => {
-        // Updating store so that organizations in navbar also gets updated
-        store.dispatch("setOrganizations", res.data.data);
-
-        let counter = 1;
-        const billingPlans = {
-          "0": "Free",
-          "1": "Pay as you go",
-          "2": "Enterprise"
-        };
-        organizations.value = res.data.data.map((data) => {
-          // Common fields for all configurations
-
-          const commonOrganization = {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
-            name: data.name,
-            identifier: data.identifier,
-            type: convertToTitleCase(data.type),
-            plan: billingPlans[data.plan] || "-",
-          };
-
-          // Additional fields and logic for cloud configuration
-          // if (config.isCloud === "true") {
-          //   const memberrole = data.OrganizationMemberObj.filter(
-          //     (v) =>
-          //       v.user_id === store.state.currentuser.id && v.role === "admin",
-          //   );
-
-          //   // If invited, pass props to inviteTeam function
-          //   // if (
-          //   //   router.currentRoute.value.query.action === "invite" &&
-          //   //   data.identifier === router.currentRoute.value.query.id
-          //   // ) {
-          //   //   const props = {
-          //   //     row: {
-          //   //       id: data.id,
-          //   //       name: data.name,
-          //   //       identifier: data.identifier,
-          //   //       role: data.role,
-          //   //       member_lists: [],
-          //   //     },
-          //   //   };
-          //   //   inviteTeam(props);
-          //   // }
-
-          //   const role = memberrole.length ? memberrole[0].role : "member";
-
-          //   // Extend common fields with cloud-specific data
-          //   return {
-          //     ...commonOrganization,
-          //     id: data.id,
-          //     created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
-          //     role: convertToTitleCase(role),
-          //     status: convertToTitleCase(data.status),
-          //     plan_type:
-          //       data.CustomerBillingObj.subscription_type === config.freePlan ||
-          //       data.CustomerBillingObj.subscription_type === ""
-          //         ? "Developer"
-          //         : "Pro",
-          //   };
-          // }
-
-          // For open-source or enterprise, return only common fields
-          return commonOrganization;
-        });
-
-        dismiss();
-      }).finally(() => {
-        loading.value = false;
+        message: t("iam.listOrganizations.loadingOrganizations"),
+        timeout: 0,
       });
+      loading.value = true;
+      // In the _meta admin context on cloud, use the admin endpoint so admins can
+      // track org deletion status; otherwise use the regular list. Access is always
+      // enforced server-side.
+      const useAdminEndpoint = isMetaOrg.value && config.isCloud === "true";
+      const request = useAdminEndpoint
+        ? organizationsService.get_admin_org("_meta")
+        : organizationsService.list(0, 1000000, "name", false, "");
+      request
+        .then((res) => {
+          // Sync Vuex so the header org selector updates without a page reload.
+          store.dispatch("setOrganizations", res.data.data);
+
+          const billingPlans = {
+            "0": "Free",
+            "1": "Pay as you go",
+            "2": "Enterprise",
+          };
+          organizations.value = res.data.data.map((data) => {
+            // Common fields for all configurations
+
+            const commonOrganization = {
+              name: data.name,
+              identifier: data.identifier,
+              type: convertToTitleCase(data.type),
+              plan: billingPlans[data.plan] || "-",
+              status: data.status ?? "active",
+              deleted_at: data.deleted_at ?? null,
+              grace_period_days: data.grace_period_days ?? null,
+              _userRole: data.role ?? data.user_role ?? "",
+            };
+
+            // Additional fields and logic for cloud configuration
+            // if (config.isCloud === "true") {
+            //   const memberrole = data.OrganizationMemberObj.filter(
+            //     (v) =>
+            //       v.user_id === store.state.currentuser.id && v.role === "admin",
+            //   );
+
+            //   // If invited, pass props to inviteTeam function
+            //   // if (
+            //   //   router.currentRoute.value.query.action === "invite" &&
+            //   //   data.identifier === router.currentRoute.value.query.id
+            //   // ) {
+            //   //   const props = {
+            //   //     row: {
+            //   //       id: data.id,
+            //   //       name: data.name,
+            //   //       identifier: data.identifier,
+            //   //       role: data.role,
+            //   //       member_lists: [],
+            //   //     },
+            //   //   };
+            //   //   inviteTeam(props);
+            //   // }
+
+            //   const role = memberrole.length ? memberrole[0].role : "member";
+
+            //   // Extend common fields with cloud-specific data
+            //   return {
+            //     ...commonOrganization,
+            //     id: data.id,
+            //     created: date.formatDate(data.created_at, "YYYY-MM-DDTHH:mm:ssZ"),
+            //     role: convertToTitleCase(role),
+            //     status: convertToTitleCase(data.status),
+            //     plan_type:
+            //       data.CustomerBillingObj.subscription_type === config.freePlan ||
+            //       data.CustomerBillingObj.subscription_type === ""
+            //         ? "Developer"
+            //         : "Pro",
+            //   };
+            // }
+
+            // For open-source or enterprise, return only common fields
+            return commonOrganization;
+          });
+
+          dismiss();
+        })
+        .finally(() => {
+          loading.value = false;
+        });
     };
 
     getOrganizations();
@@ -411,7 +503,69 @@ export default defineComponent({
       });
     };
 
+    const { confirm } = useConfirmDialog();
+
+    // Returns true if the current user can delete the given org row.
+    // Only shown on cloud builds; user must be root or an admin of that org.
+    const canDeleteOrg = (row: any): boolean => {
+      if (config.isCloud !== "true") return false;
+      if (row.status === "deleting") return false;
+      const role = row._userRole?.toLowerCase();
+      return role === "root" || role === "admin";
+    };
+
+    const deleteOrganization = async (row: any) => {
+      const confirmed = await confirm({
+        title: t("iam.listOrganizations.deleteOrganization"),
+        message: t("iam.listOrganizations.deleteConfirm", { name: row.name }),
+        confirmLabel: t("iam.listOrganizations.delete"),
+        cancelLabel: t("iam.listOrganizations.cancel"),
+      });
+      if (!confirmed) return;
+
+      try {
+        await organizationsService.delete_org(row.identifier);
+        toast({ variant: "success", message: t("iam.listOrganizations.deletionInitiated") });
+        getOrganizations();
+      } catch (e: any) {
+        const msg =
+          e?.response?.data?.message ||
+          e?.message ||
+          t("iam.listOrganizations.failedToInitiateDeletion");
+        toast({ variant: "error", message: msg });
+      }
+    };
+
+    const viewCleanupTasks = (row: any) => {
+      cleanupTargetOrg.value = { id: row.identifier, name: row.name };
+      showCleanupDialog.value = true;
+    };
+
+    const pendingLabel = (row: any): string => {
+      if (!row.deleted_at || !row.grace_period_days) return t("organization.pendingDeletion");
+      const deletedAtMs = row.deleted_at / 1000; // micros → ms
+      const windowMs = row.grace_period_days * 86400 * 1000;
+      const msLeft = deletedAtMs + windowMs - Date.now();
+      const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
+      return `${t("organization.pendingDeletion")} — ${t("organization.daysLeft", { n: daysLeft })}`;
+    };
+
+    const resurrectOrganization = async (row: any) => {
+      try {
+        await organizationsService.resurrect_org("_meta", row.identifier);
+        toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
+        getOrganizations();
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect"),
+        });
+      }
+    };
+
     const renameOrganization = (row: any) => {
+      // Guard: an org being deleted cannot be edited (the UI button is also disabled).
+      if (row.status === "deleting") return;
       toBeUpdatedOrganization.value = {
         id: row.identifier,
         name: row.name,
@@ -428,6 +582,15 @@ export default defineComponent({
       });
     };
 
+    useShortcuts([
+      {
+        id: "iamOrganizationsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getOrganizations();
+        },
+      },
+    ]);
+
     return {
       t,
       store,
@@ -441,6 +604,8 @@ export default defineComponent({
       showJoinOrganizationDialog,
       showOrgAPIKeyDialog,
       organizationAPIKey,
+      showCleanupDialog,
+      cleanupTargetOrg,
       addOrganization,
       getOrganizations,
       inviteTeam,
@@ -448,7 +613,12 @@ export default defineComponent({
       hideAddOrgDialog,
       onDrawerOpenChange,
       renameOrganization,
+      viewCleanupTasks,
+      canDeleteOrg,
+      deleteOrganization,
       toBeUpdatedOrganization,
+      pendingLabel,
+      resurrectOrganization,
     };
   },
   methods: {
@@ -466,26 +636,28 @@ export default defineComponent({
         id: "",
         name: "",
         identifier: "",
-      }
+      };
       this.getOrganizations();
 
       toast({
         variant: "success",
-        message: isUpdated ? 'Organization updated successfully.' : 'Organization added successfully.',
+        message: isUpdated
+          ? this.t("iam.listOrganizations.organizationUpdated")
+          : this.t("iam.listOrganizations.organizationAdded"),
       });
     },
     joinOrganization() {
       toast({
         variant: "success",
-        message: "Request completed successfully.",
+        message: this.t("iam.listOrganizations.requestCompleted"),
         timeout: 5000,
       });
       this.showJoinOrganizationDialog = false;
     },
     copyAPIKey() {
-      copyToClipboard(this.organizationAPIKey, {
-        successMessage: "API Key Copied Successfully!",
-        errorMessage: "Error while copy API Key.",
+      copyToClipboard(this.organizationAPIKey, this.t, {
+        successMessage: this.t("iam.listOrganizations.apiKeyCopied"),
+        errorMessage: this.t("iam.listOrganizations.apiKeyCopyError"),
         timeout: 5000,
       });
     },

@@ -54,9 +54,12 @@ export class SDRVerificationPage {
    * ingestion indexing for THIS batch — once `minCount` records appear, any SDR
    * transform on them is already final, so the result is deterministic.
    *
+   * @param {string} streamType - search stream type ('logs' | 'traces'). SDR is
+   *   identical across stream types except which index the search reads: logs SDR
+   *   reads `?type=logs`, traces SDR reads `?type=traces`. Same marker-scoped SQL.
    * @returns {Promise<Object[]>} hit objects (may be fewer than minCount on timeout)
    */
-  async fetchRecordsByMarker(streamName, marker, minCount = 1) {
+  async fetchRecordsByMarker(streamName, marker, minCount = 1, streamType = 'logs') {
     expect(marker, 'SDR verification requires an ingest marker — pass the value returned by ingestMultipleFields/ingestSingleLog').toBeTruthy();
 
     const headers = getAuthHeaders();
@@ -77,7 +80,7 @@ export class SDRVerificationPage {
 
       try {
         const response = await this.page.request.post(
-          `${baseUrl}/api/${orgName}/_search?type=logs`,
+          `${baseUrl}/api/${orgName}/_search?type=${streamType}`,
           { headers, data: searchPayload, timeout: 15000 }
         );
         if (!response.ok()) {
@@ -118,11 +121,12 @@ export class SDRVerificationPage {
    *
    * @param {Object} logsPage - kept for call-site compatibility (unused; API-based)
    * @param {string} marker   - marker returned by the ingest that wrote this record
+   * @param {string} streamType - 'logs' | 'traces' (which search index to read)
    */
-  async verifySingleFieldInLatestLog(logsPage, streamName, fieldName, shouldBeDropped, shouldBeRedacted, marker) {
+  async verifySingleFieldInLatestLog(logsPage, streamName, fieldName, shouldBeDropped, shouldBeRedacted, marker, streamType = 'logs') {
     testLogger.info(`Verifying field: ${fieldName}, shouldBeDropped: ${shouldBeDropped}, shouldBeRedacted: ${shouldBeRedacted}, marker: ${marker}`);
 
-    const hits = await this.fetchRecordsByMarker(streamName, marker, 1);
+    const hits = await this.fetchRecordsByMarker(streamName, marker, 1, streamType);
     expect(hits.length, `No record found for marker ${marker} in stream ${streamName}`).toBeGreaterThan(0);
 
     const hit = hits[0];
@@ -149,11 +153,12 @@ export class SDRVerificationPage {
    *
    * @param {Object} logsPage - kept for call-site compatibility (unused; API-based)
    * @param {string} marker   - marker returned by the ingest under test
+   * @param {string} streamType - 'logs' | 'traces' (which search index to read)
    */
-  async verifyMultipleFields(logsPage, streamName, fieldsToVerify, marker) {
+  async verifyMultipleFields(logsPage, streamName, fieldsToVerify, marker, streamType = 'logs') {
     testLogger.info(`Verifying ${fieldsToVerify.length} fields in stream: ${streamName} (marker: ${marker})`);
 
-    const hits = await this.fetchRecordsByMarker(streamName, marker, fieldsToVerify.length);
+    const hits = await this.fetchRecordsByMarker(streamName, marker, fieldsToVerify.length, streamType);
     expect(hits.length, `Expected ${fieldsToVerify.length} records for marker ${marker} but found ${hits.length}`).toBeGreaterThanOrEqual(fieldsToVerify.length);
 
     for (const { fieldName, shouldBeDropped, shouldBeRedacted, shouldBeHashed } of fieldsToVerify) {
@@ -190,11 +195,12 @@ export class SDRVerificationPage {
    *
    * @param {Object} logsPage - kept for call-site compatibility (unused; API-based)
    * @param {string} marker   - marker of the post-drop ingest batch
+   * @param {string} streamType - 'logs' | 'traces' (which search index to read)
    */
-  async verifyFieldsAreAbsent(logsPage, streamName, fieldNames, marker) {
+  async verifyFieldsAreAbsent(logsPage, streamName, fieldNames, marker, streamType = 'logs') {
     testLogger.info(`Verifying ${fieldNames.length} fields are ABSENT in stream ${streamName} (marker: ${marker})`);
 
-    const hits = await this.fetchRecordsByMarker(streamName, marker, fieldNames.length);
+    const hits = await this.fetchRecordsByMarker(streamName, marker, fieldNames.length, streamType);
     expect(hits.length, `Expected ${fieldNames.length} records for marker ${marker} but found ${hits.length}`).toBeGreaterThanOrEqual(fieldNames.length);
 
     for (const fieldName of fieldNames) {

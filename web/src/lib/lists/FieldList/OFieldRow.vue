@@ -16,13 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="o-field-row tw:group tw:h-6 tw:flex tw:items-center tw:gap-1 tw:w-full tw:relative tw:pl-1 tw:rounded-[0.25rem] tw:hover:bg-field-list-row-hover-bg"
-    :class="[highlight && 'tw:bg-field-list-row-hover-bg!']"
+    class="o-field-row group rounded-default hover:bg-field-list-row-hover-bg relative flex h-6 w-full items-center gap-1 pl-1"
+    :class="[highlight && 'bg-field-list-row-hover-bg!']"
   >
     <slot />
     <div
       v-if="$slots.actions"
-      class="o-field-row__actions tw:absolute tw:right-0 tw:top-0 tw:bottom-0 tw:hidden tw:group-hover:flex tw:items-center tw:py-0 tw:px-1 tw:gap-[0.375rem] tw:bg-(--color-field-list-actions-bg) tw:rounded tw:overflow-hidden"
+      class="o-field-row__actions bg-field-list-actions-bg rounded-default absolute top-0 right-0 bottom-0 hidden items-center gap-1.5 overflow-hidden px-1 py-0 group-hover:flex"
     >
       <slot name="actions" />
     </div>
@@ -31,7 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 defineProps<{
-  highlight?: boolean
-}>()
+  highlight?: boolean;
+}>();
 </script>
-

@@ -27,6 +27,9 @@ sea-orm-cli generate entity \
   --ignore-tables org_invites \
   --ignore-tables organization_usage \
   --ignore-tables customer_billings \
+  --ignore-tables service_streams \
+  --ignore-tables file_list_dump_stats \
+  --ignore-tables system_prompts \
   --database-url YOUR_DATABASE_URL
 ```
 

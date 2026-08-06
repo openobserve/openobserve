@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
 import ODialog from "./ODialog.vue";
 import { DialogContent } from "reka-ui";
 
@@ -86,36 +85,28 @@ describe("ODialog", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test" },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(true);
   });
 
   it("hides the close button when showClose=false", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", showClose: false },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(false);
   });
 
   it("shows the close button when persistent=true (persistent only blocks Escape/backdrop)", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", persistent: true },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(true);
   });
 
   it("hides the close button when showClose=false even with persistent=true", () => {
     const wrapper = mount(ODialog, {
       props: { open: true, title: "Test", persistent: true, showClose: false },
     });
-    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('button[aria-label="Close dialog"]').exists()).toBe(false);
   });
 
   it("emits update:open when triggered", async () => {
@@ -157,8 +148,8 @@ describe("ODialog", () => {
         slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
       });
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
-      expect(hrWrapper.className).toContain("tw:shrink-0");
-      expect(hrWrapper.className).not.toContain("tw:flex-1");
+      expect(hrWrapper.className).toContain("shrink-0");
+      expect(hrWrapper.className).not.toContain("flex-1");
     });
 
     it("spacer appears before header-right in DOM (keeps content right-aligned)", () => {
@@ -170,7 +161,7 @@ describe("ODialog", () => {
       const headerEl = closeBtn.element.parentElement!;
       const children = Array.from(headerEl.children) as HTMLElement[];
       const spacer = children.find(
-        (el) => el.className.includes("tw:flex-1") && !el.className.includes("tw:min-w-0"),
+        (el) => el.className.includes("flex-1") && !el.className.includes("min-w-0"),
       );
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
       expect(spacer).toBeDefined();
@@ -186,7 +177,7 @@ describe("ODialog", () => {
       // The close button is a direct child of the header div
       const closeBtn = wrapper.find('button[aria-label="Close dialog"]');
       const headerEl = closeBtn.element.parentElement;
-      expect(headerEl?.className).toContain("tw:shrink-0");
+      expect(headerEl?.className).toContain("shrink-0");
     });
 
     it("body does NOT have flex-1 (must not push footer to bottom on short content)", () => {
@@ -196,9 +187,9 @@ describe("ODialog", () => {
       });
       const bodyContent = wrapper.find('[data-testid="body-content"]');
       const bodyEl = bodyContent.element.parentElement;
-      expect(bodyEl?.className).not.toContain("tw:flex-1");
-      expect(bodyEl?.className).toContain("tw:min-h-0");
-      expect(bodyEl?.className).toContain("tw:overflow-y-auto");
+      expect(bodyEl?.className).not.toContain("flex-1");
+      expect(bodyEl?.className).toContain("min-h-0");
+      expect(bodyEl?.className).toContain("overflow-y-auto");
     });
 
     it("footer has shrink-0 class (does not expand to fill space)", () => {
@@ -208,53 +199,13 @@ describe("ODialog", () => {
       });
       const footerBtn = wrapper.find('[data-testid="footer-btn"]');
       const footerEl = footerBtn.element.parentElement;
-      expect(footerEl?.className).toContain("tw:shrink-0");
-      expect(footerEl?.className).not.toContain("tw:flex-1");
-      expect(footerEl?.className).not.toContain("tw:mt-auto");
+      expect(footerEl?.className).toContain("shrink-0");
+      expect(footerEl?.className).not.toContain("flex-1");
+      expect(footerEl?.className).not.toContain("mt-auto");
     });
   });
 
   describe("body action button validation suppression", () => {
-    it("AC-1/AC-2: focusin on a non-input body element calls resetValidation on q-fields", async () => {
-      const resetValidation = vi.fn();
-      const wrapper = mount(ODialog, {
-        props: { open: true },
-        slots: {
-          default: `
-            <div class="q-field" data-testid="name-field"></div>
-            <button data-testid="action-btn">+</button>
-          `,
-        },
-      });
-      // Attach the vue component instance mock so clearBodyValidation can reach it
-      const qField = wrapper.find('[data-testid="name-field"]').element as any;
-      qField.__vueParentComponent = { ctx: { resetValidation } };
-
-      await wrapper.find('[data-testid="action-btn"]').trigger("focusin");
-
-      expect(resetValidation).toHaveBeenCalled();
-    });
-
-    it("AC-1/AC-2: focusin on a native input inside q-field does NOT call resetValidation", async () => {
-      const resetValidation = vi.fn();
-      const wrapper = mount(ODialog, {
-        props: { open: true },
-        slots: {
-          default: `
-            <div class="q-field">
-              <input data-testid="name-input" />
-            </div>
-          `,
-        },
-      });
-      const qField = wrapper.find(".q-field").element as any;
-      qField.__vueParentComponent = { ctx: { resetValidation } };
-
-      await wrapper.find('[data-testid="name-input"]').trigger("focusin");
-
-      expect(resetValidation).not.toHaveBeenCalled();
-    });
-
     it("AC-4: primary button emits click:primary so consumer can trigger validation", async () => {
       const wrapper = mount(ODialog, {
         props: { open: true, primaryButtonLabel: "Save" },
@@ -279,10 +230,7 @@ describe("ODialog", () => {
         props: { open: true, title: "Test" },
       });
       const panel = findDialogPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);
@@ -293,11 +241,57 @@ describe("ODialog", () => {
         props: { open: true, title: "Test", persistent: true },
       });
       const panel = findDialogPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
+    });
+  });
+
+  // A bare printable key pressed on a non-field element inside the modal
+  // (footer button, panel itself) must not bubble to the window-level shortcut
+  // manager, where it would fire page shortcuts (e.g. logs "s" opening Saved
+  // Views on top of an open dialog). Keys typed in inputs, modifier combos,
+  // and non-printable keys (Escape) must keep propagating.
+  describe("modal keystroke containment", () => {
+    function dispatchKeydown(el: Element, init: KeyboardEventInit): boolean {
+      const spy = vi.fn();
+      document.addEventListener("keydown", spy);
+      el.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, ...init }));
+      document.removeEventListener("keydown", spy);
+      return spy.mock.calls.length > 0;
+    }
+
+    it("should stop a printable key pressed on a footer button from reaching document", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+      });
+      const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      expect(btn.exists()).toBe(true);
+      expect(dispatchKeydown(btn.element, { key: "s" })).toBe(false);
+      wrapper.unmount();
+    });
+
+    it("should let a printable key typed inside an input propagate", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test" },
+        slots: { default: '<input data-testid="field" />' },
+      });
+      const input = wrapper.find('[data-testid="field"]');
+      expect(input.exists()).toBe(true);
+      expect(dispatchKeydown(input.element, { key: "s" })).toBe(true);
+      wrapper.unmount();
+    });
+
+    it("should let modifier combos and non-printable keys propagate", () => {
+      const wrapper = mount(ODialog, {
+        attachTo: document.body,
+        props: { open: true, title: "Test", primaryButtonLabel: "OK" },
+      });
+      const btn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      expect(dispatchKeydown(btn.element, { key: "s", ctrlKey: true })).toBe(true);
+      expect(dispatchKeydown(btn.element, { key: "Escape" })).toBe(true);
+      wrapper.unmount();
     });
   });
 });

@@ -1,0 +1,63 @@
+[package]
+name = "search_service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = []
+enterprise = [
+    "audit/enterprise",
+    "dep:o2_enterprise",
+    "common/enterprise",
+    "config/enterprise",
+    "search/enterprise",
+    "usage_reporting/enterprise",
+]
+vectorscan = [
+    "dep:o2_enterprise",
+    "o2_enterprise/vectorscan",
+    "search/vectorscan",
+]
+
+[dependencies]
+anyhow.workspace = true
+audit = { workspace = true, optional = true }
+common.workspace = true
+transform.workspace = true
+vector-enrichment.workspace = true
+search.workspace = true
+async-recursion.workspace = true
+arrow.workspace = true
+arrow-schema.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+config.workspace = true
+db.workspace = true
+datafusion.workspace = true
+datafusion-proto.workspace = true
+datafusion-functions-json.workspace = true
+flight.workspace = true
+futures.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+ingester.workspace = true
+itertools.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+opentelemetry.workspace = true
+parking_lot.workspace = true
+parquet.workspace = true
+proto.workspace = true
+rand.workspace = true
+rayon.workspace = true
+serde_json.workspace = true
+sqlparser.workspace = true
+svix-ksuid.workspace = true
+tokio.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+wal.workspace = true
+usage_reporting.workspace = true

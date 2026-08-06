@@ -34,7 +34,6 @@ import {
   parseWhereClauseToFilter,
   extractWhereClause,
 } from "./sqlUtils";
-import store from "@/test/unit/helpers/store";
 
 // Mock the imported modules
 const mockAstify = vi.fn();
@@ -49,10 +48,11 @@ let mockParser: any;
 
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
-    sqlParser: () => Promise.resolve({
-      astify: mockAstify,
-      sqlify: mockSqlify,
-    }),
+    sqlParser: () =>
+      Promise.resolve({
+        astify: mockAstify,
+        sqlify: mockSqlify,
+      }),
   }),
 }));
 
@@ -64,16 +64,12 @@ describe("isSqlQuery", () => {
 
     it("detects SELECT with aggregation and GROUP BY", () => {
       expect(
-        isSqlQuery(
-          'SELECT histogram(_timestamp) as x, count(*) as y FROM "stream" GROUP BY x',
-        ),
+        isSqlQuery('SELECT histogram(_timestamp) as x, count(*) as y FROM "stream" GROUP BY x'),
       ).toBe(true);
     });
 
     it("detects WITH … SELECT (CTE)", () => {
-      expect(
-        isSqlQuery('WITH cte AS (SELECT * FROM "s") SELECT * FROM cte'),
-      ).toBe(true);
+      expect(isSqlQuery('WITH cte AS (SELECT * FROM "s") SELECT * FROM cte')).toBe(true);
     });
 
     it("is case-insensitive", () => {
@@ -187,7 +183,7 @@ describe("sqlUtils", () => {
 
     it("should build SQL query with where clause", () => {
       const query = buildSqlQuery("logs", ["*"], "level = 'ERROR'");
-      expect(query).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(query).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should build SQL query with empty fields array", () => {
@@ -196,8 +192,14 @@ describe("sqlUtils", () => {
     });
 
     it("should build SQL query with multiple fields", () => {
-      const query = buildSqlQuery("application_logs", ["level", "message", "_timestamp"], "level IN ('ERROR', 'WARN')");
-      expect(query).toBe('SELECT level, message, _timestamp FROM "application_logs" WHERE level IN (\'ERROR\', \'WARN\')');
+      const query = buildSqlQuery(
+        "application_logs",
+        ["level", "message", "_timestamp"],
+        "level IN ('ERROR', 'WARN')",
+      );
+      expect(query).toBe(
+        "SELECT level, message, _timestamp FROM \"application_logs\" WHERE level IN ('ERROR', 'WARN')",
+      );
     });
 
     it("should handle empty table name", () => {
@@ -216,8 +218,14 @@ describe("sqlUtils", () => {
     });
 
     it("should handle complex where clause", () => {
-      const query = buildSqlQuery("events", ["timestamp", "event"], "timestamp > '2023-01-01' AND event = 'login'");
-      expect(query).toBe('SELECT timestamp, event FROM "events" WHERE timestamp > \'2023-01-01\' AND event = \'login\'');
+      const query = buildSqlQuery(
+        "events",
+        ["timestamp", "event"],
+        "timestamp > '2023-01-01' AND event = 'login'",
+      );
+      expect(query).toBe(
+        "SELECT timestamp, event FROM \"events\" WHERE timestamp > '2023-01-01' AND event = 'login'",
+      );
     });
   });
 
@@ -228,13 +236,13 @@ describe("sqlUtils", () => {
         if (query === undefined || query === null || query === "") {
           throw new Error("Cannot parse empty/null/undefined query");
         }
-        if (typeof query === 'string' && query.trim() === '') {
+        if (typeof query === "string" && query.trim() === "") {
           throw new Error("Cannot parse whitespace-only query");
         }
         return {
           type: "select",
           columns: [{ expr: { column: "*", type: "column_ref" } }],
-          from: [{ table: "logs" }]
+          from: [{ table: "logs" }],
         };
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs`");
@@ -303,13 +311,13 @@ describe("sqlUtils", () => {
               type: "column_ref",
               column: {
                 expr: {
-                  value: "level"
-                }
-              }
+                  value: "level",
+                },
+              },
             },
-            as: "log_level"
-          }
-        ]
+            as: "log_level",
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -318,7 +326,7 @@ describe("sqlUtils", () => {
         column: "level",
         alias: "log_level",
         aggregationFunction: null,
-        streamAlias: null
+        streamAlias: null,
       });
     });
 
@@ -333,15 +341,15 @@ describe("sqlUtils", () => {
                 expr: {
                   column: {
                     expr: {
-                      value: "id"
-                    }
-                  }
-                }
-              }
+                      value: "id",
+                    },
+                  },
+                },
+              },
             },
-            as: "count_id"
-          }
-        ]
+            as: "count_id",
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -350,7 +358,7 @@ describe("sqlUtils", () => {
         column: "id",
         alias: "count_id",
         aggregationFunction: "count",
-        streamAlias: null
+        streamAlias: null,
       });
     });
 
@@ -361,23 +369,23 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: {
-                name: [{ value: "histogram" }]
+                name: [{ value: "histogram" }],
               },
               args: {
                 value: [
                   {
                     column: {
                       expr: {
-                        value: "_timestamp"
-                      }
-                    }
-                  }
-                ]
-              }
+                        value: "_timestamp",
+                      },
+                    },
+                  },
+                ],
+              },
             },
-            as: "time_bucket"
-          }
-        ]
+            as: "time_bucket",
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -386,7 +394,7 @@ describe("sqlUtils", () => {
         column: "_timestamp",
         alias: "time_bucket",
         aggregationFunction: "histogram",
-        streamAlias: null
+        streamAlias: null,
       });
     });
 
@@ -397,25 +405,25 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: {
-                name: [{ value: "approx_percentile_cont" }]
+                name: [{ value: "approx_percentile_cont" }],
               },
               args: {
                 value: [
                   {
                     column: {
                       expr: {
-                        value: "response_time"
-                      }
-                    }
+                        value: "response_time",
+                      },
+                    },
                   },
                   {
-                    value: "0.5"
-                  }
-                ]
-              }
-            }
-          }
-        ]
+                    value: "0.5",
+                  },
+                ],
+              },
+            },
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -431,7 +439,7 @@ describe("sqlUtils", () => {
         { value: "0.9", expected: "approx_percentile_cont" },
         { value: "0.95", expected: "approx_percentile_cont" },
         { value: "0.99", expected: "approx_percentile_cont" },
-        { value: "0.50", expected: "approx_percentile_cont" }
+        { value: "0.50", expected: "approx_percentile_cont" },
       ];
 
       percentileCases.forEach(({ value, expected }) => {
@@ -441,25 +449,25 @@ describe("sqlUtils", () => {
               expr: {
                 type: "function",
                 name: {
-                  name: [{ value: "approx_percentile_cont" }]
+                  name: [{ value: "approx_percentile_cont" }],
                 },
                 args: {
                   value: [
                     {
                       column: {
                         expr: {
-                          value: "response_time"
-                        }
-                      }
+                          value: "response_time",
+                        },
+                      },
                     },
                     {
-                      value: value
-                    }
-                  ]
-                }
-              }
-            }
-          ]
+                      value: value,
+                    },
+                  ],
+                },
+              },
+            },
+          ],
         };
 
         const fields = extractFields(mockAst, "_timestamp");
@@ -474,25 +482,25 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: {
-                name: [{ value: "approx_percentile_cont" }]
+                name: [{ value: "approx_percentile_cont" }],
               },
               args: {
                 value: [
                   {
                     column: {
                       expr: {
-                        value: "response_time"
-                      }
-                    }
+                        value: "response_time",
+                      },
+                    },
                   },
                   {
-                    value: "0.75" // unsupported value
-                  }
-                ]
-              }
-            }
-          }
-        ]
+                    value: "0.75", // unsupported value
+                  },
+                ],
+              },
+            },
+          },
+        ],
       };
 
       // Note: Percentile conversion removed in join PR - no longer throws error
@@ -505,10 +513,10 @@ describe("sqlUtils", () => {
         columns: [
           {
             expr: {
-              column: "*"
-            }
-          }
-        ]
+              column: "*",
+            },
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -524,12 +532,12 @@ describe("sqlUtils", () => {
               column: {
                 expr: {
                   // Missing value
-                }
-              }
+                },
+              },
             },
-            as: "test_alias"
-          }
-        ]
+            as: "test_alias",
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -549,15 +557,15 @@ describe("sqlUtils", () => {
                 expr: {
                   column: {
                     expr: {
-                      value: "id"
-                    }
-                  }
-                }
-              }
+                      value: "id",
+                    },
+                  },
+                },
+              },
             },
-            as: "test_count"
-          }
-        ]
+            as: "test_count",
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -572,22 +580,22 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: {
-                name: [] // Empty name array
+                name: [], // Empty name array
               },
               args: {
                 value: [
                   {
                     column: {
                       expr: {
-                        value: "_timestamp"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        ]
+                        value: "_timestamp",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -603,13 +611,13 @@ describe("sqlUtils", () => {
               type: "column_ref",
               column: {
                 expr: {
-                  value: "level"
-                }
-              }
-            }
+                  value: "level",
+                },
+              },
+            },
             // Missing as property
-          }
-        ]
+          },
+        ],
       };
 
       const fields = extractFields(mockAst, "_timestamp");
@@ -681,21 +689,21 @@ describe("sqlUtils", () => {
           {
             column: "_timestamp",
             alias: "x_axis_1",
-            aggregationFunction: "histogram"
+            aggregationFunction: "histogram",
           },
           {
             column: "_timestamp",
             alias: "y_axis_1",
-            aggregationFunction: "count"
-          }
+            aggregationFunction: "count",
+          },
         ],
         filters: {
           filterType: "group",
           logicalOperator: "AND",
-          conditions: []
+          conditions: [],
         },
         streamName: null,
-        joins: []
+        joins: [],
       });
     });
 
@@ -740,9 +748,9 @@ describe("sqlUtils", () => {
 
   describe("formatValue function (internal)", () => {
     it("should handle null values", () => {
-      // Testing the internal formatValue function behavior through addLabelToSQlQuery
-      expect(null == null).toBe(true);
-      expect(undefined == null).toBe(true);
+      // Testing the internal formatValue function behavior directly
+      expect(formatValue(null)).toBe(null);
+      expect(formatValue(undefined)).toBe(undefined);
     });
 
     it("should handle string values with quotes", () => {
@@ -758,13 +766,13 @@ describe("sqlUtils", () => {
     it("should test different operator types", () => {
       const operators = [
         "match_all",
-        "str_match", 
+        "str_match",
         "Contains",
         "str_match_ignore_case",
         "re_match",
         "re_not_match",
         "Not Contains",
-        "Starts With", 
+        "Starts With",
         "Ends With",
         "Is Null",
         "Is Not Null",
@@ -776,10 +784,10 @@ describe("sqlUtils", () => {
         "<",
         ">",
         "<=",
-        ">="
+        ">=",
       ];
-      
-      operators.forEach(operator => {
+
+      operators.forEach((operator) => {
         expect(typeof operator).toBe("string");
         expect(operator.length).toBeGreaterThan(0);
       });
@@ -811,17 +819,17 @@ describe("sqlUtils", () => {
       const emptyColumnsAst = { columns: [] };
       const emptyFields = extractFields(emptyColumnsAst, "_timestamp");
       expect(emptyFields).toEqual([]);
-      
+
       // Test with undefined column expr
       const undefinedColumnAst = {
         columns: [
           {
             expr: {
               type: "column_ref",
-              column: undefined
-            }
-          }
-        ]
+              column: undefined,
+            },
+          },
+        ],
       };
       const undefinedFields = extractFields(undefinedColumnAst, "_timestamp");
       expect(undefinedFields).toHaveLength(1);
@@ -845,7 +853,7 @@ describe("sqlUtils", () => {
     it("should test various operator combinations in formatValue internal logic", async () => {
       // These tests verify internal formatValue behavior through addLabelToSQlQuery
       // Test with different value types that would hit formatValue
-      
+
       try {
         // Test with different operators to exercise formatValue paths
         const operators = ["=", "!=", "<>", "<", ">", "<=", ">="];
@@ -862,7 +870,12 @@ describe("sqlUtils", () => {
     it("should test different operator scenarios for addLabelToSQlQuery", async () => {
       // Test match_all operator
       try {
-        const result1 = await addLabelToSQlQuery("SELECT * FROM table", "field", "value", "match_all");
+        const result1 = await addLabelToSQlQuery(
+          "SELECT * FROM table",
+          "field",
+          "value",
+          "match_all",
+        );
         expect(typeof result1).toBe("string");
       } catch (error) {
         expect(error).toBeDefined();
@@ -870,7 +883,12 @@ describe("sqlUtils", () => {
 
       // Test str_match operator
       try {
-        const result2 = await addLabelToSQlQuery("SELECT * FROM table", "field", "value", "str_match");
+        const result2 = await addLabelToSQlQuery(
+          "SELECT * FROM table",
+          "field",
+          "value",
+          "str_match",
+        );
         expect(typeof result2).toBe("string");
       } catch (error) {
         expect(error).toBeDefined();
@@ -878,7 +896,12 @@ describe("sqlUtils", () => {
 
       // Test Contains operator
       try {
-        const result3 = await addLabelToSQlQuery("SELECT * FROM table", "field", "value", "Contains");
+        const result3 = await addLabelToSQlQuery(
+          "SELECT * FROM table",
+          "field",
+          "value",
+          "Contains",
+        );
         expect(typeof result3).toBe("string");
       } catch (error) {
         expect(error).toBeDefined();
@@ -886,7 +909,12 @@ describe("sqlUtils", () => {
 
       // Test IN operator with array value
       try {
-        const result4 = await addLabelToSQlQuery("SELECT * FROM table", "field", "val1,val2,val3", "IN");
+        const result4 = await addLabelToSQlQuery(
+          "SELECT * FROM table",
+          "field",
+          "val1,val2,val3",
+          "IN",
+        );
         expect(typeof result4).toBe("string");
       } catch (error) {
         expect(error).toBeDefined();
@@ -894,7 +922,12 @@ describe("sqlUtils", () => {
 
       // Test NOT IN operator
       try {
-        const result5 = await addLabelToSQlQuery("SELECT * FROM table", "field", "val1,val2", "NOT IN");
+        const result5 = await addLabelToSQlQuery(
+          "SELECT * FROM table",
+          "field",
+          "val1,val2",
+          "NOT IN",
+        );
         expect(typeof result5).toBe("string");
       } catch (error) {
         expect(error).toBeDefined();
@@ -910,7 +943,12 @@ describe("sqlUtils", () => {
 
       // Test IS NOT NULL operator
       try {
-        const result7 = await addLabelToSQlQuery("SELECT * FROM table", "field", null, "Is Not Null");
+        const result7 = await addLabelToSQlQuery(
+          "SELECT * FROM table",
+          "field",
+          null,
+          "Is Not Null",
+        );
         expect(typeof result7).toBe("string");
       } catch (error) {
         expect(error).toBeDefined();
@@ -932,7 +970,7 @@ describe("sqlUtils", () => {
       const multipleLabels = [
         { name: "level", value: "ERROR", operator: "=" },
         { name: "service", value: "auth", operator: "=" },
-        { name: "message", value: "failed", operator: "Contains" }
+        { name: "message", value: "failed", operator: "Contains" },
       ];
 
       try {
@@ -974,12 +1012,17 @@ describe("sqlUtils", () => {
       const testCases = [
         { operator: "str_match_ignore_case", value: "test", field: "message" },
         { operator: "re_match", value: ".*error.*", field: "log" },
-        { operator: "re_not_match", value: "debug", field: "level" }
+        { operator: "re_not_match", value: "debug", field: "level" },
       ];
 
       for (const testCase of testCases) {
         try {
-          const result = await addLabelToSQlQuery("SELECT * FROM logs", testCase.field, testCase.value, testCase.operator);
+          const result = await addLabelToSQlQuery(
+            "SELECT * FROM logs",
+            testCase.field,
+            testCase.value,
+            testCase.operator,
+          );
           expect(typeof result).toBe("string");
         } catch (error) {
           expect(error).toBeDefined();
@@ -994,9 +1037,9 @@ describe("sqlUtils", () => {
           {
             expr: {
               type: "column_ref",
-              column: { expr: { value: "timestamp" } }
+              column: { expr: { value: "timestamp" } },
             },
-            as: "time"
+            as: "time",
           },
           {
             expr: {
@@ -1004,26 +1047,23 @@ describe("sqlUtils", () => {
               name: "SUM",
               args: {
                 expr: {
-                  column: { expr: { value: "bytes" } }
-                }
-              }
+                  column: { expr: { value: "bytes" } },
+                },
+              },
             },
-            as: "total_bytes"
+            as: "total_bytes",
           },
           {
             expr: {
               type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
               args: {
-                value: [
-                  { column: { expr: { value: "response_time" } } },
-                  { value: "0.95" }
-                ]
-              }
+                value: [{ column: { expr: { value: "response_time" } } }, { value: "0.95" }],
+              },
             },
-            as: "p95_response_time"
-          }
-        ]
+            as: "p95_response_time",
+          },
+        ],
       };
 
       const fields = extractFields(complexAst, "_timestamp");
@@ -1043,13 +1083,11 @@ describe("sqlUtils", () => {
               type: "function",
               name: { name: [] }, // Empty name array
               args: {
-                value: [
-                  { column: { expr: { value: "timestamp" } } }
-                ]
-              }
-            }
-          }
-        ]
+                value: [{ column: { expr: { value: "timestamp" } } }],
+              },
+            },
+          },
+        ],
       };
 
       const fields = extractFields(astWithMissingFunctionName, "_timestamp");
@@ -1063,13 +1101,11 @@ describe("sqlUtils", () => {
               type: "function",
               name: undefined,
               args: {
-                value: [
-                  { column: { expr: { value: "timestamp" } } }
-                ]
-              }
-            }
-          }
-        ]
+                value: [{ column: { expr: { value: "timestamp" } } }],
+              },
+            },
+          },
+        ],
       };
 
       const fieldsWithUndefinedName = extractFields(astWithUndefinedName, "_timestamp");
@@ -1086,12 +1122,12 @@ describe("sqlUtils", () => {
               name: null,
               args: {
                 expr: {
-                  column: { expr: { value: "count_field" } }
-                }
-              }
-            }
-          }
-        ]
+                  column: { expr: { value: "count_field" } },
+                },
+              },
+            },
+          },
+        ],
       };
 
       const fields = extractFields(astWithNullAggr, "_timestamp");
@@ -1104,10 +1140,10 @@ describe("sqlUtils", () => {
             expr: {
               type: "aggr_func",
               name: "MAX",
-              args: undefined
-            }
-          }
-        ]
+              args: undefined,
+            },
+          },
+        ],
       };
 
       const fieldsWithUndefinedArgs = extractFields(astWithUndefinedArgs, "_timestamp");
@@ -1116,7 +1152,10 @@ describe("sqlUtils", () => {
 
     it("should test buildSqlQuery with comprehensive edge cases", () => {
       // Test with very long field names
-      const longFields = ["very_long_field_name_that_exceeds_normal_length", "another_extremely_long_field_name"];
+      const longFields = [
+        "very_long_field_name_that_exceeds_normal_length",
+        "another_extremely_long_field_name",
+      ];
       const result1 = buildSqlQuery("test", longFields, "");
       expect(result1).toContain("very_long_field_name_that_exceeds_normal_length");
 
@@ -1134,28 +1173,28 @@ describe("sqlUtils", () => {
     it("should test importSqlParser initialization paths", async () => {
       // This will cover lines 6-14 in importSqlParser
       // The function should only initialize once and return cached parser
-      
+
       // Reset parser state for this test
       const originalParser = mockParser;
       mockParser = {
         astify: vi.fn(),
         sqlify: vi.fn(),
       };
-      
+
       // First call should initialize
       try {
         await convertQueryIntoSingleLine("test");
       } catch (error) {
         // Expected due to mock limitations
       }
-      
+
       // Second call should use cached parser
       try {
         await convertQueryIntoSingleLine("test2");
       } catch (error) {
         // Expected due to mock limitations
       }
-      
+
       mockParser = originalParser;
     });
 
@@ -1190,63 +1229,87 @@ describe("sqlUtils", () => {
       // Test match_all operator - line 99
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "match_all");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test str_match/Contains operator - line 101
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "str_match");
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "Contains");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test str_match_ignore_case - line 103
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "str_match_ignore_case");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test re_match - line 105
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", ".*pattern.*", "re_match");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test re_not_match - line 107
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "pattern", "re_not_match");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test Not Contains - lines 114-117
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "Not Contains");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test Starts With - lines 118-121
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "Starts With");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test Ends With - lines 122-125
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "Ends With");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test Is Null - lines 126-128
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", null, "Is Null");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test Is Not Null - lines 129-131
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", null, "Is Not Null");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test IN operator - lines 132-139
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "val1,val2,val3", "IN");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test NOT IN operator - lines 140-147
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "val1,val2", "NOT IN");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test comparison operators lines 148-165
       const comparisonOps = ["=", "<>", "!=", "<", ">", "<=", ">="];
@@ -1254,7 +1317,9 @@ describe("sqlUtils", () => {
         try {
           await addLabelToSQlQuery("SELECT * FROM logs", "field", "'quoted'", op);
           await addLabelToSQlQuery("SELECT * FROM logs", "field", "unquoted", op);
-        } catch (error) { /* expected */ }
+        } catch (error) {
+          /* expected */
+        }
       }
     });
 
@@ -1267,18 +1332,24 @@ describe("sqlUtils", () => {
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", null, "IS NULL");
         await addLabelToSQlQuery("SELECT * FROM logs", "field", null, "IS NOT NULL");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test regular binary expression condition - lines 183-198
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "value", "=");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
 
       // Test IN/NOT IN expression types - lines 192-195
       try {
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "val1,val2", "IN");
         await addLabelToSQlQuery("SELECT * FROM logs", "field", "val1,val2", "NOT IN");
-      } catch (error) { /* expected */ }
+      } catch (error) {
+        /* expected */
+      }
     });
 
     it("should test mocked zincutils integration", () => {
@@ -1295,7 +1366,7 @@ describe("sqlUtils", () => {
       const labels = [
         { name: "level", value: "ERROR", operator: "=" },
         { name: "service", value: "web", operator: "=" },
-        { name: "message", value: "failed", operator: "Contains" }
+        { name: "message", value: "failed", operator: "Contains" },
       ];
 
       // This should execute the loop lines 21-29 multiple times
@@ -1323,47 +1394,47 @@ describe("sqlUtils", () => {
                 expr: {
                   column: {
                     expr: {
-                      value: "response_time"
-                    }
-                  }
-                }
-              }
+                      value: "response_time",
+                    },
+                  },
+                },
+              },
             },
-            as: "avg_response"
+            as: "avg_response",
           },
           {
             expr: {
-              type: "aggr_func", 
+              type: "aggr_func",
               name: "MIN",
               args: {
                 expr: {
                   column: {
                     expr: {
-                      value: "latency"
-                    }
-                  }
-                }
-              }
+                      value: "latency",
+                    },
+                  },
+                },
+              },
             },
-            as: "min_latency"
+            as: "min_latency",
           },
           {
             expr: {
               type: "aggr_func",
-              name: "MAX", 
+              name: "MAX",
               args: {
                 expr: {
                   column: {
                     expr: {
-                      value: "memory_usage"
-                    }
-                  }
-                }
-              }
-            }
+                      value: "memory_usage",
+                    },
+                  },
+                },
+              },
+            },
             // No alias - should use column name
-          }
-        ]
+          },
+        ],
       };
 
       const aggrFields = extractFields(complexAggrAst, "_timestamp");
@@ -1383,35 +1454,33 @@ describe("sqlUtils", () => {
               type: "column_ref",
               column: {
                 expr: {
-                  value: undefined // Should fallback to timeField
-                }
-              }
+                  value: undefined, // Should fallback to timeField
+                },
+              },
             },
-            as: "fallback_field"
+            as: "fallback_field",
           },
           {
             expr: {
               type: "function",
               name: {
-                name: [
-                  { value: "date_trunc" }
-                ]
+                name: [{ value: "date_trunc" }],
               },
               args: {
                 value: [
                   {
                     column: {
                       expr: {
-                        value: "created_at"
-                      }
-                    }
-                  }
-                ]
-              }
+                        value: "created_at",
+                      },
+                    },
+                  },
+                ],
+              },
             },
-            as: "truncated_date"
-          }
-        ]
+            as: "truncated_date",
+          },
+        ],
       };
 
       const deepFields = extractFields(deepNestedAst, "_timestamp");
@@ -1427,36 +1496,36 @@ describe("sqlUtils", () => {
           {
             expr: {
               type: "aggr_func",
-              name: undefined, // Should fallback to "count" 
+              name: undefined, // Should fallback to "count"
               args: {
                 expr: {
                   column: {
                     expr: {
-                      value: "id"
-                    }
-                  }
-                }
-              }
-            }
+                      value: "id",
+                    },
+                  },
+                },
+              },
+            },
           },
           {
             expr: {
               type: "function",
               name: {
-                name: [] // Empty array should fallback to "histogram"
+                name: [], // Empty array should fallback to "histogram"
               },
               args: {
                 value: [
                   {
                     column: {
                       expr: {
-                        value: "_timestamp"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
+                        value: "_timestamp",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
           },
           {
             expr: {
@@ -1467,21 +1536,21 @@ describe("sqlUtils", () => {
                   {
                     column: {
                       expr: {
-                        value: "_timestamp" 
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          }
-        ]
+                        value: "_timestamp",
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        ],
       };
 
       const missingFields = extractFields(missingPropsAst, "_timestamp");
       expect(missingFields).toHaveLength(3);
       expect(missingFields[0].aggregationFunction).toBe("count");
-      expect(missingFields[1].aggregationFunction).toBe("histogram");  
+      expect(missingFields[1].aggregationFunction).toBe("histogram");
       expect(missingFields[2].aggregationFunction).toBe("histogram");
     });
 
@@ -1493,7 +1562,7 @@ describe("sqlUtils", () => {
         { value: "0.9", expected: "approx_percentile_cont" },
         { value: "0.90", expected: "approx_percentile_cont" },
         { value: "0.95", expected: "approx_percentile_cont" },
-        { value: "0.99", expected: "approx_percentile_cont" }
+        { value: "0.99", expected: "approx_percentile_cont" },
       ];
 
       percentileValues.forEach(({ value, expected }) => {
@@ -1503,26 +1572,26 @@ describe("sqlUtils", () => {
               expr: {
                 type: "function",
                 name: {
-                  name: [{ value: "approx_percentile_cont" }]
+                  name: [{ value: "approx_percentile_cont" }],
                 },
                 args: {
                   value: [
                     {
                       column: {
                         expr: {
-                          value: "response_time"
-                        }
-                      }
+                          value: "response_time",
+                        },
+                      },
                     },
                     {
-                      value: value
-                    }
-                  ]
-                }
+                      value: value,
+                    },
+                  ],
+                },
               },
-              as: `${expected}_response_time`
-            }
-          ]
+              as: `${expected}_response_time`,
+            },
+          ],
         };
 
         const fields = extractFields(percentileAst, "_timestamp");
@@ -1539,38 +1608,38 @@ describe("sqlUtils", () => {
               type: "column_ref",
               column: {
                 expr: {
-                  value: "valid_column"
-                }
-              }
+                  value: "valid_column",
+                },
+              },
             },
-            as: "valid_alias"
+            as: "valid_alias",
           },
           {
             expr: {
               type: "column_ref",
-              column: undefined // Should cause fallback
-            }
+              column: undefined, // Should cause fallback
+            },
           },
           {
             expr: {
               type: "aggr_func",
               name: "COUNT",
-              args: undefined // Missing args should cause fallback
+              args: undefined, // Missing args should cause fallback
             },
-            as: "count_fallback"
+            as: "count_fallback",
           },
           {
             expr: {
               type: "function",
               name: {
-                name: [{ value: "some_function" }]
+                name: [{ value: "some_function" }],
               },
               args: {
-                value: [] // Empty value array instead of undefined
-              }
-            }
-          }
-        ]
+                value: [], // Empty value array instead of undefined
+              },
+            },
+          },
+        ],
       };
 
       const mixedFields = extractFields(mixedDataAst, "_timestamp");
@@ -1591,7 +1660,7 @@ describe("sqlUtils", () => {
           throw new Error("Cannot parse empty/null/undefined query");
         }
         return {
-          from: [{ table: "test_stream" }]
+          from: [{ table: "test_stream" }],
         };
       });
     });
@@ -1603,7 +1672,7 @@ describe("sqlUtils", () => {
 
     it("should return empty string when no table found", async () => {
       mockAstify.mockReturnValue({
-        from: [{}]
+        from: [{}],
       });
       const result = await getStreamFromQuery("SELECT * FROM");
       expect(result).toBe("");
@@ -1645,11 +1714,14 @@ describe("sqlUtils", () => {
         orderby: [
           {
             expr: { column: { expr: { value: "timestamp" } } },
-            type: "ASC"
-          }
-        ]
+            type: "ASC",
+          },
+        ],
       });
-      const result = await isGivenFieldInOrderBy("SELECT * FROM logs ORDER BY timestamp ASC", "timestamp");
+      const result = await isGivenFieldInOrderBy(
+        "SELECT * FROM logs ORDER BY timestamp ASC",
+        "timestamp",
+      );
       expect(result).toBe("ASC");
     });
 
@@ -1658,11 +1730,14 @@ describe("sqlUtils", () => {
         orderby: [
           {
             expr: { column: { expr: { value: "timestamp" } } },
-            type: "DESC"
-          }
-        ]
+            type: "DESC",
+          },
+        ],
       });
-      const result = await isGivenFieldInOrderBy("SELECT * FROM logs ORDER BY timestamp DESC", "timestamp");
+      const result = await isGivenFieldInOrderBy(
+        "SELECT * FROM logs ORDER BY timestamp DESC",
+        "timestamp",
+      );
       expect(result).toBe("DESC");
     });
 
@@ -1671,17 +1746,20 @@ describe("sqlUtils", () => {
         orderby: [
           {
             expr: { column: { expr: { value: "level" } } },
-            type: "ASC"
-          }
-        ]
+            type: "ASC",
+          },
+        ],
       });
-      const result = await isGivenFieldInOrderBy("SELECT * FROM logs ORDER BY level ASC", "timestamp");
+      const result = await isGivenFieldInOrderBy(
+        "SELECT * FROM logs ORDER BY level ASC",
+        "timestamp",
+      );
       expect(result).toBe(null);
     });
 
     it("should return null when no ORDER BY clause", async () => {
       mockAstify.mockReturnValue({
-        from: [{ table: "logs" }]
+        from: [{ table: "logs" }],
       });
       const result = await isGivenFieldInOrderBy("SELECT * FROM logs", "timestamp");
       expect(result).toBe(null);
@@ -1700,15 +1778,18 @@ describe("sqlUtils", () => {
         orderby: [
           {
             expr: { column: { expr: { value: "level" } } },
-            type: "ASC"
+            type: "ASC",
           },
           {
             expr: { column: { expr: { value: "timestamp" } } },
-            type: "DESC"
-          }
-        ]
+            type: "DESC",
+          },
+        ],
       });
-      const result = await isGivenFieldInOrderBy("SELECT * FROM logs ORDER BY level ASC, timestamp DESC", "timestamp");
+      const result = await isGivenFieldInOrderBy(
+        "SELECT * FROM logs ORDER BY level ASC, timestamp DESC",
+        "timestamp",
+      );
       expect(result).toBe("DESC");
     });
 
@@ -1717,9 +1798,9 @@ describe("sqlUtils", () => {
         orderby: [
           {
             expr: { column: { expr: { value: "timestamp" } } },
-            type: "ASC"
-          }
-        ]
+            type: "ASC",
+          },
+        ],
       });
       const result = await isGivenFieldInOrderBy("SELECT * FROM logs ORDER BY timestamp ASC", "");
       expect(result).toBe(null);
@@ -1734,9 +1815,9 @@ describe("sqlUtils", () => {
         columns: [
           {
             expr: { type: "column_ref", column: { expr: { value: "level" } } },
-            as: "log_level"
-          }
-        ]
+            as: "log_level",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       expect(result).toEqual([
@@ -1744,8 +1825,8 @@ describe("sqlUtils", () => {
           column: "level",
           alias: "log_level",
           aggregationFunction: null,
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1753,14 +1834,14 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "aggr_func", 
+            expr: {
+              type: "aggr_func",
               name: "count",
-              args: { expr: { column: { expr: { value: "id" } } } }
+              args: { expr: { column: { expr: { value: "id" } } } },
             },
-            as: "count_id"
-          }
-        ]
+            as: "count_id",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       expect(result).toEqual([
@@ -1768,8 +1849,8 @@ describe("sqlUtils", () => {
           column: "id",
           alias: "count_id",
           aggregationFunction: "count",
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1777,14 +1858,14 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { 
-              type: "function", 
+            expr: {
+              type: "function",
               name: { name: [{ value: "histogram" }] },
-              args: { value: [{ column: { expr: { value: "_timestamp" } } }] }
+              args: { value: [{ column: { expr: { value: "_timestamp" } } }] },
             },
-            as: "time_hist"
-          }
-        ]
+            as: "time_hist",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       expect(result).toEqual([
@@ -1792,8 +1873,8 @@ describe("sqlUtils", () => {
           column: "_timestamp",
           alias: "time_hist",
           aggregationFunction: "histogram",
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1804,14 +1885,11 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
-              args: { value: [
-                { column: { expr: { value: "response_time" } } },
-                { value: "0.5" }
-              ] }
+              args: { value: [{ column: { expr: { value: "response_time" } } }, { value: "0.5" }] },
             },
-            as: "p50_response"
-          }
-        ]
+            as: "p50_response",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       // Note: Percentile conversion removed in join PR
@@ -1820,8 +1898,8 @@ describe("sqlUtils", () => {
           column: "response_time",
           alias: "p50_response",
           aggregationFunction: "approx_percentile_cont",
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1832,14 +1910,13 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
-              args: { value: [
-                { column: { expr: { value: "response_time" } } },
-                { value: "0.90" }
-              ] }
+              args: {
+                value: [{ column: { expr: { value: "response_time" } } }, { value: "0.90" }],
+              },
             },
-            as: "p90_response"
-          }
-        ]
+            as: "p90_response",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       // Note: Percentile conversion removed in join PR
@@ -1848,8 +1925,8 @@ describe("sqlUtils", () => {
           column: "response_time",
           alias: "p90_response",
           aggregationFunction: "approx_percentile_cont",
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1860,14 +1937,13 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
-              args: { value: [
-                { column: { expr: { value: "response_time" } } },
-                { value: "0.95" }
-              ] }
+              args: {
+                value: [{ column: { expr: { value: "response_time" } } }, { value: "0.95" }],
+              },
             },
-            as: "p95_response"
-          }
-        ]
+            as: "p95_response",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       // Note: Percentile conversion removed in join PR
@@ -1876,8 +1952,8 @@ describe("sqlUtils", () => {
           column: "response_time",
           alias: "p95_response",
           aggregationFunction: "approx_percentile_cont",
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1888,14 +1964,13 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
-              args: { value: [
-                { column: { expr: { value: "response_time" } } },
-                { value: "0.99" }
-              ] }
+              args: {
+                value: [{ column: { expr: { value: "response_time" } } }, { value: "0.99" }],
+              },
             },
-            as: "p99_response"
-          }
-        ]
+            as: "p99_response",
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       // Note: Percentile conversion removed in join PR
@@ -1904,8 +1979,8 @@ describe("sqlUtils", () => {
           column: "response_time",
           alias: "p99_response",
           aggregationFunction: "approx_percentile_cont",
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1916,13 +1991,12 @@ describe("sqlUtils", () => {
             expr: {
               type: "function",
               name: { name: [{ value: "approx_percentile_cont" }] },
-              args: { value: [
-                { column: { expr: { value: "response_time" } } },
-                { value: "0.75" }
-              ] }
-            }
-          }
-        ]
+              args: {
+                value: [{ column: { expr: { value: "response_time" } } }, { value: "0.75" }],
+              },
+            },
+          },
+        ],
       };
       // Note: Percentile conversion removed in join PR - no longer validates/throws
       const result = extractFields(parsedAst, timeField);
@@ -1933,9 +2007,9 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { column: "*", type: "column_ref" }
-          }
-        ]
+            expr: { column: "*", type: "column_ref" },
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       expect(result).toEqual([]);
@@ -1945,9 +2019,9 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { type: "column_ref" }
-          }
-        ]
+            expr: { type: "column_ref" },
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       expect(result).toEqual([
@@ -1955,8 +2029,8 @@ describe("sqlUtils", () => {
           column: timeField,
           alias: timeField,
           aggregationFunction: null,
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
@@ -1964,9 +2038,9 @@ describe("sqlUtils", () => {
       const parsedAst = {
         columns: [
           {
-            expr: { type: "column_ref", column: { expr: { value: "level" } } }
-          }
-        ]
+            expr: { type: "column_ref", column: { expr: { value: "level" } } },
+          },
+        ],
       };
       const result = extractFields(parsedAst, timeField);
       expect(result).toEqual([
@@ -1974,18 +2048,18 @@ describe("sqlUtils", () => {
           column: "level",
           alias: "level",
           aggregationFunction: null,
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
     });
 
     it("should handle CASE/WHEN expressions as raw fields with parser", () => {
       // Mock parser that can reconstruct the CASE expression
       const mockParser = {
-        sqlify: (_ast: any) => {
+        sqlify: () => {
           // Simplified mock - return a SQL string containing the CASE expression
           return "SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp";
-        }
+        },
       };
 
       const parsedAst = {
@@ -1995,11 +2069,11 @@ describe("sqlUtils", () => {
               type: "case",
               // The actual AST structure for CASE is complex, but extractFields
               // only checks the type and passes the expr to the parser
-              args: []
+              args: [],
             },
-            as: "status_category"
-          }
-        ]
+            as: "status_category",
+          },
+        ],
       };
 
       const result = extractFields(parsedAst, timeField, mockParser);
@@ -2010,8 +2084,8 @@ describe("sqlUtils", () => {
           aggregationFunction: null,
           streamAlias: null,
           type: "raw",
-          rawQuery: "CASE WHEN \"level\" = 'ERROR' THEN 'Bad' ELSE 'Good' END"
-        }
+          rawQuery: "CASE WHEN \"level\" = 'ERROR' THEN 'Bad' ELSE 'Good' END",
+        },
       ]);
     });
 
@@ -2021,11 +2095,11 @@ describe("sqlUtils", () => {
           {
             expr: {
               type: "case",
-              args: []
+              args: [],
             },
-            as: "status_category"
-          }
-        ]
+            as: "status_category",
+          },
+        ],
       };
 
       // When parser is not provided, CASE expressions don't get processed as raw
@@ -2044,14 +2118,14 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "ERROR" }
+          right: { value: "ERROR" },
         },
         right: {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "status" } } },
-          right: { value: "404" }
-        }
+          right: { value: "404" },
+        },
       };
       const result = parseCondition(condition);
       expect(Array.isArray(result)).toBe(true);
@@ -2066,14 +2140,14 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "ERROR" }
+          right: { value: "ERROR" },
         },
         right: {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "WARN" }
-        }
+          right: { value: "WARN" },
+        },
       };
       const result = parseCondition(condition);
       expect(Array.isArray(result)).toBe(true);
@@ -2085,7 +2159,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "=",
         left: { column: { expr: { value: "level" } } },
-        right: { value: "ERROR" }
+        right: { value: "ERROR" },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2095,7 +2169,7 @@ describe("sqlUtils", () => {
         operator: "=",
         value: "ERROR",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2104,7 +2178,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "!=",
         left: { column: { expr: { value: "level" } } },
-        right: { value: "DEBUG" }
+        right: { value: "DEBUG" },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2114,7 +2188,7 @@ describe("sqlUtils", () => {
         operator: "<>",
         value: "DEBUG",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2123,12 +2197,9 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "IN",
         left: { column: { expr: { value: "level" } } },
-        right: { 
-          value: [
-            { value: "ERROR" },
-            { value: "WARN" }
-          ]
-        }
+        right: {
+          value: [{ value: "ERROR" }, { value: "WARN" }],
+        },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2138,7 +2209,7 @@ describe("sqlUtils", () => {
         operator: null,
         value: null,
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2147,12 +2218,9 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "NOT IN",
         left: { column: { expr: { value: "level" } } },
-        right: { 
-          value: [
-            { value: "DEBUG" },
-            { value: "INFO" }
-          ]
-        }
+        right: {
+          value: [{ value: "DEBUG" }, { value: "INFO" }],
+        },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2162,7 +2230,7 @@ describe("sqlUtils", () => {
         operator: "NOT IN",
         value: "'DEBUG','INFO'",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2170,7 +2238,7 @@ describe("sqlUtils", () => {
       const condition = {
         type: "binary_expr",
         operator: "IS",
-        left: { column: { expr: { value: "message" } } }
+        left: { column: { expr: { value: "message" } } },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2180,7 +2248,7 @@ describe("sqlUtils", () => {
         operator: "Is Null",
         value: null,
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2188,7 +2256,7 @@ describe("sqlUtils", () => {
       const condition = {
         type: "binary_expr",
         operator: "IS NOT",
-        left: { column: { expr: { value: "message" } } }
+        left: { column: { expr: { value: "message" } } },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2198,7 +2266,7 @@ describe("sqlUtils", () => {
         operator: "Is Not Null",
         value: null,
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2207,7 +2275,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "LIKE",
         left: { column: { expr: { value: "message" } } },
-        right: { value: "%error%" }
+        right: { value: "%error%" },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2217,7 +2285,7 @@ describe("sqlUtils", () => {
         operator: "Contains",
         value: "error",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2226,7 +2294,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "LIKE",
         left: { column: { expr: { value: "message" } } },
-        right: { value: "error%" }
+        right: { value: "error%" },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2236,7 +2304,7 @@ describe("sqlUtils", () => {
         operator: "Starts With",
         value: "error",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2245,7 +2313,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "LIKE",
         left: { column: { expr: { value: "message" } } },
-        right: { value: "%error" }
+        right: { value: "%error" },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2255,7 +2323,7 @@ describe("sqlUtils", () => {
         operator: "Ends With",
         value: "error",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2264,7 +2332,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "NOT LIKE",
         left: { column: { expr: { value: "message" } } },
-        right: { value: "%debug%" }
+        right: { value: "%debug%" },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2274,7 +2342,7 @@ describe("sqlUtils", () => {
         operator: "Not Contains",
         value: "debug",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2282,12 +2350,9 @@ describe("sqlUtils", () => {
       const condition = {
         type: "function",
         name: { name: [{ value: "str_match" }] },
-        args: { 
-          value: [
-            { column: { expr: { value: "message" } } },
-            { value: "error" }
-          ]
-        }
+        args: {
+          value: [{ column: { expr: { value: "message" } } }, { value: "error" }],
+        },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2297,7 +2362,7 @@ describe("sqlUtils", () => {
         operator: "str_match",
         value: "error",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2305,11 +2370,9 @@ describe("sqlUtils", () => {
       const condition = {
         type: "function",
         name: { name: [{ value: "match_all" }] },
-        args: { 
-          value: [
-            { value: "error" }
-          ]
-        }
+        args: {
+          value: [{ value: "error" }],
+        },
       };
       const result = parseCondition(condition);
       expect(result).toEqual({
@@ -2319,7 +2382,7 @@ describe("sqlUtils", () => {
         operator: "match_all",
         value: "error",
         logicalOperator: "AND",
-        filterType: "condition"
+        filterType: "condition",
       });
     });
 
@@ -2332,28 +2395,27 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "ERROR" }
+          right: { value: "ERROR" },
         },
         right: {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "status" } } },
-          right: { value: "404" }
-        }
+          right: { value: "404" },
+        },
       };
       const result = parseCondition(condition);
       expect(result.filterType).toBe("group");
     });
 
-
     it("should handle comparison operators", () => {
       const operators = ["<", ">", "<=", ">="];
-      operators.forEach(op => {
+      operators.forEach((op) => {
         const condition = {
           type: "binary_expr",
           operator: op,
           left: { column: { expr: { value: "score" } } },
-          right: { value: "100" }
+          right: { value: "100" },
         };
         const result = parseCondition(condition);
         expect(result.operator).toBe(op);
@@ -2367,7 +2429,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         filterType: "group",
         logicalOperator: "AND",
-        conditions: []
+        conditions: [],
       });
     });
 
@@ -2376,7 +2438,7 @@ describe("sqlUtils", () => {
       expect(result).toEqual({
         filterType: "group",
         logicalOperator: "AND",
-        conditions: []
+        conditions: [],
       });
     });
 
@@ -2385,7 +2447,7 @@ describe("sqlUtils", () => {
         type: "binary_expr",
         operator: "=",
         left: { column: { expr: { value: "level" } } },
-        right: { value: "ERROR" }
+        right: { value: "ERROR" },
       };
       const result = convertWhereToFilter(where);
       expect(result.type).toBe("condition");
@@ -2400,20 +2462,19 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "ERROR" }
+          right: { value: "ERROR" },
         },
         right: {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "status" } } },
-          right: { value: "404" }
-        }
+          right: { value: "404" },
+        },
       };
       const result = convertWhereToFilter(where);
       expect(result.filterType).toBe("group");
       expect(Array.isArray(result.conditions)).toBe(true);
     });
-
   });
 
   describe("extractFilters", () => {
@@ -2423,8 +2484,8 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "ERROR" }
-        }
+          right: { value: "ERROR" },
+        },
       };
       const result = extractFilters(parsedAst);
       expect(result.type).toBe("condition");
@@ -2433,22 +2494,21 @@ describe("sqlUtils", () => {
 
     it("should handle AST without where clause", () => {
       const parsedAst = {
-        from: [{ table: "logs" }]
+        from: [{ table: "logs" }],
       };
       const result = extractFilters(parsedAst);
       expect(result).toEqual({
         filterType: "group",
         logicalOperator: "AND",
-        conditions: []
+        conditions: [],
       });
     });
-
   });
 
   describe("extractTableName", () => {
     it("should extract table name from parsed AST", () => {
       const parsedAst = {
-        from: [{ table: "logs" }]
+        from: [{ table: "logs" }],
       };
       const result = extractTableName(parsedAst);
       expect(result).toBe("logs");
@@ -2456,7 +2516,7 @@ describe("sqlUtils", () => {
 
     it("should return null when no table found", () => {
       const parsedAst = {
-        from: [{}]
+        from: [{}],
       };
       const result = extractTableName(parsedAst);
       expect(result).toBe(null);
@@ -2475,20 +2535,22 @@ describe("sqlUtils", () => {
         columns: [
           {
             expr: { type: "column_ref", column: { expr: { value: "level" } } },
-            as: "log_level"
-          }
+            as: "log_level",
+          },
         ],
         where: {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "level" } } },
-          right: { value: "ERROR" }
-        }
+          right: { value: "ERROR" },
+        },
       });
     });
 
     it("should extract fields, filters, and stream name from query", async () => {
-      const result = await getFieldsFromQuery("SELECT level AS log_level FROM logs WHERE level = 'ERROR'");
+      const result = await getFieldsFromQuery(
+        "SELECT level AS log_level FROM logs WHERE level = 'ERROR'",
+      );
 
       expect(result.streamName).toBe("logs");
       expect(result.fields).toEqual([
@@ -2496,16 +2558,15 @@ describe("sqlUtils", () => {
           column: "level",
           alias: "log_level",
           aggregationFunction: null,
-          streamAlias: null
-        }
+          streamAlias: null,
+        },
       ]);
       expect(result.filters.filterType).toBe("group");
     });
 
-
     it("should convert single condition to group filter", async () => {
       const result = await getFieldsFromQuery("SELECT level FROM logs WHERE level = 'ERROR'");
-      
+
       expect(result.filters.filterType).toBe("group");
       expect(result.filters.conditions).toHaveLength(1);
     });
@@ -2521,18 +2582,18 @@ describe("sqlUtils", () => {
         {
           column: "_timestamp",
           alias: "x_axis_1",
-          aggregationFunction: "histogram"
+          aggregationFunction: "histogram",
         },
         {
           column: "_timestamp",
           alias: "y_axis_1",
-          aggregationFunction: "count"
-        }
+          aggregationFunction: "count",
+        },
       ]);
       expect(result.filters).toEqual({
         filterType: "group",
         logicalOperator: "AND",
-        conditions: []
+        conditions: [],
       });
       expect(result.streamName).toBe(null);
       expect(result.joins).toEqual([]);
@@ -2542,9 +2603,9 @@ describe("sqlUtils", () => {
       mockAstify.mockImplementation(() => {
         throw new Error("Parse error");
       });
-      
+
       const result = await getFieldsFromQuery("invalid query");
-      
+
       expect(result.fields[0].column).toBe("_timestamp");
     });
 
@@ -2554,16 +2615,16 @@ describe("sqlUtils", () => {
         columns: [
           {
             expr: { type: "column_ref", column: { expr: { value: "timestamp" } } },
-            as: "time"
+            as: "time",
           },
           {
-            expr: { 
-              type: "aggr_func", 
+            expr: {
+              type: "aggr_func",
               name: "count",
-              args: { expr: { column: { expr: { value: "id" } } } }
+              args: { expr: { column: { expr: { value: "id" } } } },
             },
-            as: "count_events"
-          }
+            as: "count_events",
+          },
         ],
         where: {
           type: "binary_expr",
@@ -2572,18 +2633,20 @@ describe("sqlUtils", () => {
             type: "binary_expr",
             operator: "=",
             left: { column: { expr: { value: "type" } } },
-            right: { value: "login" }
+            right: { value: "login" },
           },
           right: {
             type: "binary_expr",
             operator: ">",
             left: { column: { expr: { value: "timestamp" } } },
-            right: { value: "2023-01-01" }
-          }
-        }
+            right: { value: "2023-01-01" },
+          },
+        },
       });
-      
-      const result = await getFieldsFromQuery("SELECT timestamp, COUNT(id) FROM events WHERE type = 'login' AND timestamp > '2023-01-01'");
+
+      const result = await getFieldsFromQuery(
+        "SELECT timestamp, COUNT(id) FROM events WHERE type = 'login' AND timestamp > '2023-01-01'",
+      );
 
       expect(result.fields).toHaveLength(2);
       expect(result.fields[0].aggregationFunction).toBe(null);
@@ -2593,7 +2656,9 @@ describe("sqlUtils", () => {
 
     it("should handle CASE/WHEN expressions as raw fields", async () => {
       // Mock sqlify to return a proper CASE expression SQL
-      mockSqlify.mockReturnValue("SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp");
+      mockSqlify.mockReturnValue(
+        "SELECT CASE WHEN `level` = 'ERROR' THEN 'Bad' ELSE 'Good' END FROM temp",
+      );
 
       mockAstify.mockReturnValue({
         from: [{ table: "logs" }],
@@ -2605,20 +2670,27 @@ describe("sqlUtils", () => {
               args: {
                 when: [
                   {
-                    cond: { type: "binary_expr", operator: "=", left: { type: "column_ref", column: "level" }, right: { type: "string", value: "ERROR" } },
-                    result: { type: "string", value: "Bad" }
-                  }
+                    cond: {
+                      type: "binary_expr",
+                      operator: "=",
+                      left: { type: "column_ref", column: "level" },
+                      right: { type: "string", value: "ERROR" },
+                    },
+                    result: { type: "string", value: "Bad" },
+                  },
                 ],
-                else: { type: "string", value: "Good" }
-              }
+                else: { type: "string", value: "Good" },
+              },
             },
-            as: "status_category"
-          }
+            as: "status_category",
+          },
         ],
-        where: null
+        where: null,
       });
 
-      const result = await getFieldsFromQuery("SELECT CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as status_category FROM logs");
+      const result = await getFieldsFromQuery(
+        "SELECT CASE WHEN level = 'ERROR' THEN 'Bad' ELSE 'Good' END as status_category FROM logs",
+      );
 
       expect(result.fields).toHaveLength(1);
       expect(result.fields[0].type).toBe("raw");
@@ -2638,13 +2710,11 @@ describe("sqlUtils", () => {
               name: { name: [{ value: "histogram" }] },
               args: {
                 type: "expr_list",
-                value: [
-                  { column: { expr: { value: "_timestamp" } } }
-                ]
-              }
-            }
-          }
-        ]
+                value: [{ column: { expr: { value: "_timestamp" } } }],
+              },
+            },
+          },
+        ],
       });
       mockSqlify.mockReturnValue("SELECT histogram(`_timestamp`, '5m') FROM `logs`");
     });
@@ -2675,15 +2745,15 @@ describe("sqlUtils", () => {
                 type: "expr_list",
                 value: [
                   { column: { expr: { value: "_timestamp" } } },
-                  { type: "single_quote_string", value: "1h" }
-                ]
-              }
-            }
-          }
-        ]
+                  { type: "single_quote_string", value: "1h" },
+                ],
+              },
+            },
+          },
+        ],
       });
-      
-      const result = await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", null);
+
+      await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", null);
       expect(mockSqlify).toHaveBeenCalled();
     });
 
@@ -2693,12 +2763,12 @@ describe("sqlUtils", () => {
           {
             expr: {
               type: "column_ref",
-              column: { expr: { value: "level" } }
-            }
-          }
-        ]
+              column: { expr: { value: "level" } },
+            },
+          },
+        ],
       });
-      
+
       const result = await changeHistogramInterval("SELECT level FROM logs", "5m");
       expect(result).toBe('SELECT histogram("_timestamp", \'5m\') FROM "logs"');
     });
@@ -2707,7 +2777,7 @@ describe("sqlUtils", () => {
       mockAstify.mockImplementation(() => {
         throw new Error("Parse error");
       });
-      
+
       const query = "invalid sql";
       const result = await changeHistogramInterval(query, "5m");
       expect(result).toBe(query);
@@ -2722,22 +2792,20 @@ describe("sqlUtils", () => {
               name: { name: [{ value: "histogram" }] },
               args: {
                 type: "expr_list",
-                value: [
-                  { column: { expr: { value: "_timestamp" } } }
-                ]
-              }
-            }
+                value: [{ column: { expr: { value: "_timestamp" } } }],
+              },
+            },
           },
           {
             expr: {
               type: "aggr_func",
-              name: "count"
-            }
-          }
-        ]
+              name: "count",
+            },
+          },
+        ],
       });
-      
-      const result = await changeHistogramInterval("SELECT histogram(_timestamp), COUNT(*) FROM logs", "10m");
+
+      await changeHistogramInterval("SELECT histogram(_timestamp), COUNT(*) FROM logs", "10m");
       expect(mockSqlify).toHaveBeenCalled();
     });
 
@@ -2752,15 +2820,15 @@ describe("sqlUtils", () => {
                 type: "expr_list",
                 value: [
                   { column: { expr: { value: "_timestamp" } } },
-                  { type: "single_quote_string", value: "1h" }
-                ]
-              }
-            }
-          }
-        ]
+                  { type: "single_quote_string", value: "1h" },
+                ],
+              },
+            },
+          },
+        ],
       });
-      
-      const result = await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", "5m");
+
+      await changeHistogramInterval("SELECT histogram(_timestamp, '1h') FROM logs", "5m");
       expect(mockSqlify).toHaveBeenCalled();
     });
   });
@@ -2768,13 +2836,34 @@ describe("sqlUtils", () => {
   describe("getStreamNameFromQuery", () => {
     beforeEach(() => {
       mockAstify.mockReturnValue({
-        from: [{ table: "simple_stream" }]
+        from: [{ table: "simple_stream" }],
       });
     });
 
     it("should extract stream name from simple query", async () => {
       const result = await getStreamNameFromQuery("SELECT * FROM simple_stream");
       expect(result).toBe("simple_stream");
+    });
+
+    it("should resolve a sub-query in FROM to its base table", async () => {
+      // AST shape the parser produces for `FROM (SELECT ... FROM inner_stream)`
+      mockAstify.mockReturnValue({
+        from: [{ expr: { ast: { from: [{ table: "inner_stream" }] } } }],
+      });
+      const result = await getStreamNameFromQuery(
+        "SELECT histogram(_timestamp) AS ts FROM (SELECT _timestamp FROM inner_stream) GROUP BY ts",
+      );
+      expect(result).toBe("inner_stream");
+    });
+
+    it("should return the first (main) table for a JOIN", async () => {
+      mockAstify.mockReturnValue({
+        from: [{ table: "main_stream" }, { table: "joined_stream", join: "INNER JOIN" }],
+      });
+      const result = await getStreamNameFromQuery(
+        "SELECT * FROM main_stream JOIN joined_stream ON a = b",
+      );
+      expect(result).toBe("main_stream");
     });
 
     it("should handle empty query", async () => {
@@ -2792,13 +2881,15 @@ describe("sqlUtils", () => {
         with: [
           {
             stmt: {
-              from: [{ table: "with_stream" }]
-            }
-          }
-        ]
+              from: [{ table: "with_stream" }],
+            },
+          },
+        ],
       });
-      
-      const result = await getStreamNameFromQuery("WITH temp AS (SELECT * FROM with_stream) SELECT * FROM temp");
+
+      const result = await getStreamNameFromQuery(
+        "WITH temp AS (SELECT * FROM with_stream) SELECT * FROM temp",
+      );
       expect(result).toBe("with_stream");
     });
 
@@ -2809,26 +2900,26 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: "level" },
-          right: { value: "ERROR" }
+          right: { value: "ERROR" },
         },
         columns: [
           {
             expr: {
               type: "column_ref",
-              column: "level"
-            }
-          }
-        ]
+              column: "level",
+            },
+          },
+        ],
       };
-      
+
       mockAstify.mockReturnValue({
         with: [
           {
-            stmt: mockNode
-          }
-        ]
+            stmt: mockNode,
+          },
+        ],
       });
-      
+
       const result = await getStreamNameFromQuery("Complex WITH query");
       expect(result).toBe("nested_stream");
     });
@@ -2840,46 +2931,48 @@ describe("sqlUtils", () => {
         deeplyNested = {
           where: {
             right: {
-              ast: deeplyNested
-            }
-          }
+              ast: deeplyNested,
+            },
+          },
         };
       }
-      
+
       mockAstify.mockReturnValue({
         with: [
           {
-            stmt: deeplyNested
-          }
-        ]
+            stmt: deeplyNested,
+          },
+        ],
       });
-      
+
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      
-      const result = await getStreamNameFromQuery("Deep recursion query");
-      
-      expect(consoleSpy).toHaveBeenCalledWith("Maximum recursion depth reached while parsing SQL query");
+
+      await getStreamNameFromQuery("Deep recursion query");
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "Maximum recursion depth reached while parsing SQL query",
+      );
       consoleSpy.mockRestore();
     });
 
     it("should handle circular references", async () => {
       const circularNode: any = {
-        from: [{ table: "circular_stream" }]
+        from: [{ table: "circular_stream" }],
       };
       circularNode.where = {
         right: {
-          ast: circularNode
-        }
+          ast: circularNode,
+        },
       };
-      
+
       mockAstify.mockReturnValue({
         with: [
           {
-            stmt: circularNode
-          }
-        ]
+            stmt: circularNode,
+          },
+        ],
       });
-      
+
       const result = await getStreamNameFromQuery("Circular reference query");
       expect(result).toBe("circular_stream");
     });
@@ -2888,13 +2981,13 @@ describe("sqlUtils", () => {
       mockAstify.mockImplementation(() => {
         throw new Error("Parse error");
       });
-      
+
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-      
+
       const result = await getStreamNameFromQuery("invalid query");
-      
+
       expect(result).toBe(null);
-      expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error), 'error parsing sql query');
+      expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error), "error parsing sql query");
       consoleSpy.mockRestore();
     });
 
@@ -2907,16 +3000,16 @@ describe("sqlUtils", () => {
                 {
                   expr: {
                     ast: {
-                      from: [{ table: "subquery_stream" }]
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        ]
+                      from: [{ table: "subquery_stream" }],
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
       });
-      
+
       const result = await getStreamNameFromQuery("WITH clause with subquery");
       expect(result).toBe("subquery_stream");
     });
@@ -2931,15 +3024,15 @@ describe("sqlUtils", () => {
                 {
                   expr: {
                     type: "column_ref",
-                    column: "id"
-                  }
-                }
-              ]
-            }
-          }
-        ]
+                    column: "id",
+                  },
+                },
+              ],
+            },
+          },
+        ],
       });
-      
+
       const result = await getStreamNameFromQuery("Complex nested query");
       expect(result).toBe("main_stream");
     });
@@ -2949,7 +3042,7 @@ describe("sqlUtils", () => {
       mockAstify.mockImplementation(() => {
         throw new Error("Import error");
       });
-      
+
       const result = await getStreamNameFromQuery("SELECT * FROM test");
       expect(result).toBe(null);
     });
@@ -2961,156 +3054,111 @@ describe("sqlUtils", () => {
         type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
-        where: null
+        where: null,
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE level = 'ERROR'");
     });
 
     it("should add match_all condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "", 
-        "error", 
-        "match_all"
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "", "error", "match_all");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add str_match condition", async () => {
       const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        "error", 
-        "str_match"
+        "SELECT * FROM logs",
+        "message",
+        "error",
+        "str_match",
       );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add Contains condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        "error", 
-        "Contains"
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "message", "error", "Contains");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add str_match_ignore_case condition", async () => {
       const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        "Error", 
-        "str_match_ignore_case"
+        "SELECT * FROM logs",
+        "message",
+        "Error",
+        "str_match_ignore_case",
       );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add re_match condition", async () => {
       const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        ".*error.*", 
-        "re_match"
+        "SELECT * FROM logs",
+        "message",
+        ".*error.*",
+        "re_match",
       );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add re_not_match condition", async () => {
       const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        ".*debug.*", 
-        "re_not_match"
+        "SELECT * FROM logs",
+        "message",
+        ".*debug.*",
+        "re_not_match",
       );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add equals condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "level", 
-        "ERROR", 
-        "="
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", "ERROR", "=");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add not equals condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "level", 
-        "DEBUG", 
-        "!="
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", "DEBUG", "!=");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add IN condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "level", 
-        "ERROR,WARN", 
-        "IN"
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", "ERROR,WARN", "IN");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add NOT IN condition", async () => {
       const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "level", 
-        "DEBUG,INFO", 
-        "NOT IN"
+        "SELECT * FROM logs",
+        "level",
+        "DEBUG,INFO",
+        "NOT IN",
       );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add IS NULL condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        "", 
-        "Is Null"
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "message", "", "Is Null");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add IS NOT NULL condition", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "message", 
-        "", 
-        "Is Not Null"
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "message", "", "Is Not Null");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should add LIKE conditions", async () => {
       const operators = ["Not Contains", "Starts With", "Ends With"];
-      
+
       for (const operator of operators) {
-        const result = await addLabelToSQlQuery(
-          "SELECT * FROM logs", 
-          "message", 
-          "error", 
-          operator
-        );
-        expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+        const result = await addLabelToSQlQuery("SELECT * FROM logs", "message", "error", operator);
+        expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
       }
     });
 
     it("should handle comparison operators", async () => {
       const operators = ["<", ">", "<=", ">=", "<>"];
-      
+
       for (const operator of operators) {
-        const result = await addLabelToSQlQuery(
-          "SELECT * FROM logs", 
-          "score", 
-          "100", 
-          operator
-        );
-        expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+        const result = await addLabelToSQlQuery("SELECT * FROM logs", "score", "100", operator);
+        expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
       }
     });
 
@@ -3123,37 +3171,27 @@ describe("sqlUtils", () => {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "status" } } },
-          right: { value: "200" }
-        }
+          right: { value: "200" },
+        },
       });
-      
+
       const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs WHERE status = 200", 
-        "level", 
-        "ERROR", 
-        "="
+        "SELECT * FROM logs WHERE status = 200",
+        "level",
+        "ERROR",
+        "=",
       );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should handle values with quotes in various operators", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "level", 
-        "'ERROR'", 
-        "="
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", "'ERROR'", "=");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should handle null values", async () => {
-      const result = await addLabelToSQlQuery(
-        "SELECT * FROM logs", 
-        "level", 
-        null, 
-        "="
-      );
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", null, "=");
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
   });
 
@@ -3163,66 +3201,63 @@ describe("sqlUtils", () => {
         type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
-        where: null
+        where: null,
       });
-      mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE (level = 'ERROR') AND (status = '404')");
+      mockSqlify.mockReturnValue(
+        "SELECT * FROM `logs` WHERE (level = 'ERROR') AND (status = '404')",
+      );
     });
 
     it("should add multiple labels to query", async () => {
       const labels = [
         { name: "level", value: "ERROR", operator: "=" },
-        { name: "status", value: "404", operator: "=" }
+        { name: "status", value: "404", operator: "=" },
       ];
-      
+
       const result = await addLabelsToSQlQuery("SELECT * FROM logs", labels);
-      expect(result).toBe('SELECT * FROM "logs" WHERE (level = \'ERROR\') AND (status = \'404\')');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE (level = 'ERROR') AND (status = '404')");
     });
 
     it("should handle empty labels array", async () => {
-      const result = await addLabelsToSQlQuery("SELECT * FROM logs", []);
+      await addLabelsToSQlQuery("SELECT * FROM logs", []);
       expect(mockSqlify).toHaveBeenCalled();
     });
 
     it("should handle query with existing WHERE clause", async () => {
       mockAstify.mockReturnValueOnce({
-        type: "select", 
+        type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
         where: {
           type: "binary_expr",
           operator: "=",
           left: { column: { expr: { value: "app" } } },
-          right: { value: "frontend" }
-        }
+          right: { value: "frontend" },
+        },
       });
-      
-      const labels = [
-        { name: "level", value: "ERROR", operator: "=" }
-      ];
-      
+
+      const labels = [{ name: "level", value: "ERROR", operator: "=" }];
+
       const result = await addLabelsToSQlQuery("SELECT * FROM logs WHERE app = 'frontend'", labels);
-      expect(result).toBe('SELECT * FROM "logs" WHERE (level = \'ERROR\') AND (status = \'404\')');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE (level = 'ERROR') AND (status = '404')");
     });
 
-
     it("should handle single label", async () => {
-      const labels = [
-        { name: "level", value: "WARN", operator: "=" }
-      ];
-      
+      const labels = [{ name: "level", value: "WARN", operator: "=" }];
+
       const result = await addLabelsToSQlQuery("SELECT * FROM logs", labels);
-      expect(result).toBe('SELECT * FROM "logs" WHERE (level = \'ERROR\') AND (status = \'404\')');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE (level = 'ERROR') AND (status = '404')");
     });
 
     it("should handle different operator types", async () => {
       const labels = [
         { name: "level", value: "ERROR,WARN", operator: "IN" },
         { name: "message", value: "error", operator: "str_match" },
-        { name: "timestamp", value: "2023-01-01", operator: ">" }
+        { name: "timestamp", value: "2023-01-01", operator: ">" },
       ];
-      
+
       const result = await addLabelsToSQlQuery("SELECT * FROM logs", labels);
-      expect(result).toBe('SELECT * FROM "logs" WHERE (level = \'ERROR\') AND (status = \'404\')');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE (level = 'ERROR') AND (status = '404')");
     });
   });
 
@@ -3277,12 +3312,19 @@ describe("sqlUtils", () => {
     });
 
     it("should handle fields with special characters", () => {
-      const query = buildSqlQuery("logs", ["field-with-dash", "field_with_underscore", "field.with.dots"], "");
-      expect(query).toBe('SELECT field-with-dash, field_with_underscore, field.with.dots FROM "logs"');
+      const query = buildSqlQuery(
+        "logs",
+        ["field-with-dash", "field_with_underscore", "field.with.dots"],
+        "",
+      );
+      expect(query).toBe(
+        'SELECT field-with-dash, field_with_underscore, field.with.dots FROM "logs"',
+      );
     });
 
     it("should handle complex WHERE clauses with nested conditions", () => {
-      const complexWhere = "(level = 'ERROR' OR level = 'WARN') AND (timestamp > '2023-01-01' AND timestamp < '2023-12-31')";
+      const complexWhere =
+        "(level = 'ERROR' OR level = 'WARN') AND (timestamp > '2023-01-01' AND timestamp < '2023-12-31')";
       const query = buildSqlQuery("logs", ["*"], complexWhere);
       expect(query).toBe(`SELECT * FROM "logs" WHERE ${complexWhere}`);
     });
@@ -3310,20 +3352,21 @@ describe("sqlUtils", () => {
         if (query === undefined || query === null || query === "") {
           throw new Error("Cannot parse empty/null/undefined query");
         }
-        if (typeof query === 'string' && query.trim() === '') {
+        if (typeof query === "string" && query.trim() === "") {
           throw new Error("Cannot parse whitespace-only query");
         }
         return {
           type: "select",
           columns: [{ expr: { column: "*", type: "column_ref" } }],
-          from: [{ table: "logs" }]
+          from: [{ table: "logs" }],
         };
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs`");
     });
 
     it("should handle extremely long queries", async () => {
-      const longQuery = "SELECT " + Array.from({ length: 1000 }, (_, i) => `col${i}`).join(", ") + " FROM logs";
+      const longQuery =
+        "SELECT " + Array.from({ length: 1000 }, (_, i) => `col${i}`).join(", ") + " FROM logs";
       const result = await convertQueryIntoSingleLine(longQuery);
       expect(result).toBe('SELECT * FROM "logs"');
     });
@@ -3341,7 +3384,7 @@ describe("sqlUtils", () => {
     });
 
     it("should handle queries with mixed quote types", async () => {
-      mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE `level` = \"ERROR\"");
+      mockSqlify.mockReturnValue('SELECT * FROM `logs` WHERE `level` = "ERROR"');
       const result = await convertQueryIntoSingleLine("SELECT * FROM logs");
       expect(result).toBe('SELECT * FROM "logs" WHERE "level" = "ERROR"');
     });
@@ -3353,56 +3396,83 @@ describe("sqlUtils", () => {
         type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
-        where: null
+        where: null,
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE level = 'ERROR'");
     });
 
     it("should handle BETWEEN operator simulation", async () => {
-      const result1 = await addLabelToSQlQuery("SELECT * FROM logs", "timestamp", "2023-01-01", ">=");
-      const result2 = await addLabelToSQlQuery(result1, "timestamp", "2023-12-31", "<=");
+      const result1 = await addLabelToSQlQuery(
+        "SELECT * FROM logs",
+        "timestamp",
+        "2023-01-01",
+        ">=",
+      );
+      await addLabelToSQlQuery(result1, "timestamp", "2023-12-31", "<=");
       expect(mockSqlify).toHaveBeenCalled();
     });
 
     it("should handle case-insensitive operators", async () => {
-      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", "error", "str_match_ignore_case");
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery(
+        "SELECT * FROM logs",
+        "level",
+        "error",
+        "str_match_ignore_case",
+      );
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should handle very long values", async () => {
       const longValue = "x".repeat(10000);
-      const result = await addLabelToSQlQuery("SELECT * FROM logs", "message", longValue, "Contains");
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery(
+        "SELECT * FROM logs",
+        "message",
+        longValue,
+        "Contains",
+      );
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should handle special regex patterns", async () => {
       const regexPattern = "^[A-Z]{3}\\d{4}$";
-      const result = await addLabelToSQlQuery("SELECT * FROM logs", "code", regexPattern, "re_match");
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery(
+        "SELECT * FROM logs",
+        "code",
+        regexPattern,
+        "re_match",
+      );
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should handle array values for IN operator", async () => {
-      const result = await addLabelToSQlQuery("SELECT * FROM logs", "level", "ERROR,WARN,INFO,DEBUG", "IN");
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      const result = await addLabelToSQlQuery(
+        "SELECT * FROM logs",
+        "level",
+        "ERROR,WARN,INFO,DEBUG",
+        "IN",
+      );
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
 
     it("should handle JSON-like values", async () => {
       const jsonValue = '{"key": "value", "nested": {"prop": 123}}';
       const result = await addLabelToSQlQuery("SELECT * FROM logs", "metadata", jsonValue, "=");
-      expect(result).toBe('SELECT * FROM "logs" WHERE level = \'ERROR\'');
+      expect(result).toBe("SELECT * FROM \"logs\" WHERE level = 'ERROR'");
     });
   });
 
   describe("getStreamFromQuery - Edge Cases", () => {
     it("should handle queries with subqueries in FROM clause", async () => {
       mockAstify.mockReturnValue({
-        from: [{
-          expr: {
-            ast: {
-              from: [{ table: "inner_table" }]
-            }
-          }
-        }]
+        from: [
+          {
+            expr: {
+              ast: {
+                from: [{ table: "inner_table" }],
+              },
+            },
+          },
+        ],
       });
       const result = await getStreamFromQuery("SELECT * FROM (SELECT * FROM inner_table) AS sub");
       expect(result).toBe("");
@@ -3410,24 +3480,22 @@ describe("sqlUtils", () => {
 
     it("should handle queries with multiple tables (JOIN)", async () => {
       mockAstify.mockReturnValue({
-        from: [
-          { table: "table1" },
-          { table: "table2" },
-          { table: "table3" }
-        ]
+        from: [{ table: "table1" }, { table: "table2" }, { table: "table3" }],
       });
-      const result = await getStreamFromQuery("SELECT * FROM table1 JOIN table2 ON table1.id = table2.id");
+      const result = await getStreamFromQuery(
+        "SELECT * FROM table1 JOIN table2 ON table1.id = table2.id",
+      );
       expect(result).toBe("table1");
     });
 
     it("should handle CTE (Common Table Expressions)", async () => {
       mockAstify.mockReturnValue({
-        with: [
-          { name: "temp_table", stmt: { from: [{ table: "source_table" }] } }
-        ],
-        from: [{ table: "temp_table" }]
+        with: [{ name: "temp_table", stmt: { from: [{ table: "source_table" }] } }],
+        from: [{ table: "temp_table" }],
       });
-      const result = await getStreamFromQuery("WITH temp_table AS (SELECT * FROM source_table) SELECT * FROM temp_table");
+      const result = await getStreamFromQuery(
+        "WITH temp_table AS (SELECT * FROM source_table) SELECT * FROM temp_table",
+      );
       expect(result).toBe("temp_table");
     });
   });
@@ -3438,30 +3506,32 @@ describe("sqlUtils", () => {
         type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
-        where: null
+        where: null,
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE level = 'ERROR'");
     });
     it("should handle deeply nested queries efficiently", async () => {
       const startTime = Date.now();
-      
+
       // Create a deeply nested mock structure
       let nestedAst = { from: [{ table: "deepest_table" }] };
       for (let i = 0; i < 100; i++) {
         nestedAst = {
-          from: [{
-            expr: {
-              ast: nestedAst
-            }
-          }]
+          from: [
+            {
+              expr: {
+                ast: nestedAst,
+              },
+            },
+          ],
         };
       }
-      
+
       mockAstify.mockReturnValue(nestedAst);
-      
+
       const result = await getStreamFromQuery("Deeply nested query");
       const duration = Date.now() - startTime;
-      
+
       expect(duration).toBeLessThan(1000); // Should complete within 1 second
       expect(result).toBe("");
     });
@@ -3469,11 +3539,11 @@ describe("sqlUtils", () => {
     it("should handle large number of labels efficiently", async () => {
       // Test with 10 labels to verify performance
       const startTime = Date.now();
-      
+
       for (let i = 0; i < 10; i++) {
         await addLabelToSQlQuery("SELECT * FROM logs", `field${i}`, `value${i}`, "=");
       }
-      
+
       const duration = Date.now() - startTime;
       expect(duration).toBeLessThan(1000); // Should complete within 1 second
     });
@@ -3483,9 +3553,9 @@ describe("sqlUtils", () => {
     it("should gracefully handle circular references in AST", async () => {
       const circularAst: any = { from: [{ table: "test" }] };
       circularAst.circular = circularAst;
-      
+
       mockAstify.mockReturnValue(circularAst);
-      
+
       const result = await getStreamNameFromQuery("SELECT * FROM test");
       expect(typeof result).toBe("string");
     });
@@ -3493,9 +3563,9 @@ describe("sqlUtils", () => {
     it("should handle malformed AST structures", async () => {
       mockAstify.mockReturnValue({
         malformed: true,
-        from: [{ not_a_table: "invalid" }]
+        from: [{ not_a_table: "invalid" }],
       });
-      
+
       const result = await getStreamFromQuery("Malformed query");
       expect(result).toBe("");
     });
@@ -3504,14 +3574,14 @@ describe("sqlUtils", () => {
       // Create a large object to simulate memory pressure
       const largeData = Array.from({ length: 10000 }, (_, i) => ({
         field: `data${i}`,
-        value: `value${i}`.repeat(100)
+        value: `value${i}`.repeat(100),
       }));
-      
+
       mockAstify.mockReturnValue({
         from: [{ table: "memory_test" }],
-        data: largeData
+        data: largeData,
       });
-      
+
       const result = await getStreamFromQuery("Memory pressure query");
       expect(result).toBe("memory_test");
     });
@@ -3523,14 +3593,14 @@ describe("sqlUtils", () => {
         type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
-        where: null
+        where: null,
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE level = 'ERROR'");
     });
     it("should handle complete query transformation pipeline", async () => {
       const originalQuery = "SELECT * FROM logs";
       const result = await addLabelToSQlQuery(originalQuery, "level", "ERROR", "=");
-      
+
       expect(typeof result).toBe("string");
       expect(result).toContain("FROM");
       expect(result).toContain("logs");
@@ -3547,13 +3617,13 @@ describe("sqlUtils", () => {
               args: {
                 value: [
                   {
-                    column: { expr: { value: "_timestamp" } }
+                    column: { expr: { value: "_timestamp" } },
                   },
-                  { value: "1h" }
-                ]
-              }
+                  { value: "1h" },
+                ],
+              },
             },
-            as: "time_bucket"
+            as: "time_bucket",
           },
           {
             expr: {
@@ -3561,17 +3631,19 @@ describe("sqlUtils", () => {
               name: "count",
               args: {
                 expr: {
-                  column: { expr: { value: "*" } }
-                }
-              }
+                  column: { expr: { value: "*" } },
+                },
+              },
             },
-            as: "event_count"
-          }
-        ]
+            as: "event_count",
+          },
+        ],
       });
-      
-      const result = await getFieldsFromQuery("SELECT histogram(_timestamp, '1h') as time_bucket, count(*) as event_count FROM metrics");
-      
+
+      const result = await getFieldsFromQuery(
+        "SELECT histogram(_timestamp, '1h') as time_bucket, count(*) as event_count FROM metrics",
+      );
+
       expect(result.fields).toHaveLength(2);
       expect(result.fields[0].aggregationFunction).toBe("histogram");
       expect(result.fields[1].aggregationFunction).toBe("count");
@@ -3585,13 +3657,18 @@ describe("sqlUtils", () => {
         type: "select",
         columns: [{ expr: { column: "*", type: "column_ref" } }],
         from: [{ table: "logs" }],
-        where: null
+        where: null,
       });
       mockSqlify.mockReturnValue("SELECT * FROM `logs` WHERE level = 'ERROR'");
     });
     it("should sanitize SQL injection attempts in labels", async () => {
-      const result = await addLabelToSQlQuery("SELECT * FROM logs", "id", "1; DROP TABLE users; --", "=");
-      
+      const result = await addLabelToSQlQuery(
+        "SELECT * FROM logs",
+        "id",
+        "1; DROP TABLE users; --",
+        "=",
+      );
+
       expect(typeof result).toBe("string");
       // The malicious content should be properly escaped as a value
       expect(result).toContain("logs");
@@ -3601,9 +3678,9 @@ describe("sqlUtils", () => {
       mockAstify.mockImplementation(() => {
         throw new TypeError("Cannot read property of undefined");
       });
-      
+
       const result = await getFieldsFromQuery("COMPLETELY INVALID SQL!!!@#$%");
-      
+
       expect(result.fields).toHaveLength(2);
       expect(result.streamName).toBe(null);
     });
@@ -3630,7 +3707,7 @@ describe("sqlUtils", () => {
         }
         return { from: [{ table: "test" }] };
       });
-      
+
       const result = await convertQueryIntoSingleLine("a");
       expect(result).toBe("a");
     });
@@ -3679,9 +3756,7 @@ describe("sqlUtils", () => {
 
       const result = await parseWhereClauseToFilter("status = 'error'");
 
-      expect(mockAstify).toHaveBeenCalledWith(
-        'SELECT * FROM "dummy" WHERE status = \'error\'',
-      );
+      expect(mockAstify).toHaveBeenCalledWith("SELECT * FROM \"dummy\" WHERE status = 'error'");
       // convertWhereToFilter returns a condition — parseWhereClauseToFilter
       // wraps it in a group
       expect(result.filterType).toBe("group");
@@ -3709,9 +3784,7 @@ describe("sqlUtils", () => {
       };
       mockAstify.mockReturnValue({ where: andAst });
 
-      const result = await parseWhereClauseToFilter(
-        "level = 'ERROR' AND status = '404'",
-      );
+      const result = await parseWhereClauseToFilter("level = 'ERROR' AND status = '404'");
 
       expect(result.filterType).toBe("group");
       expect(Array.isArray(result.conditions)).toBe(true);
@@ -3754,9 +3827,7 @@ describe("sqlUtils", () => {
       };
       mockAstify.mockReturnValue({ where: orAst });
 
-      const result = await parseWhereClauseToFilter(
-        "level = 'ERROR' OR level = 'WARN'",
-      );
+      const result = await parseWhereClauseToFilter("level = 'ERROR' OR level = 'WARN'");
 
       expect(result.filterType).toBe("group");
       expect(Array.isArray(result.conditions)).toBe(true);
@@ -3777,9 +3848,7 @@ describe("sqlUtils", () => {
 
     it("should return empty string for query without WHERE clause", async () => {
       mockAstify.mockReturnValue({ where: null });
-      const result = await extractWhereClause(
-        'SELECT * FROM "stream"',
-      );
+      const result = await extractWhereClause('SELECT * FROM "stream"');
       expect(result).toBe("");
     });
 
@@ -3791,9 +3860,7 @@ describe("sqlUtils", () => {
         right: { type: "single_quote_string", value: "ERROR" },
       };
       mockAstify.mockReturnValue({ where: whereAst });
-      mockSqlify.mockReturnValue(
-        "SELECT * FROM `dummy` WHERE `level` = 'ERROR'",
-      );
+      mockSqlify.mockReturnValue("SELECT * FROM `dummy` WHERE `level` = 'ERROR'");
 
       const result = await extractWhereClause(
         "SELECT histogram(_timestamp) FROM \"stream\" WHERE level = 'ERROR' GROUP BY x_axis_1",
@@ -3819,14 +3886,12 @@ describe("sqlUtils", () => {
         },
       };
       mockAstify.mockReturnValue({ where: whereAst });
-      mockSqlify.mockReturnValue(
-        "SELECT * FROM `dummy` WHERE `level` = 'ERROR' AND `code` > 500",
-      );
+      mockSqlify.mockReturnValue("SELECT * FROM `dummy` WHERE `level` = 'ERROR' AND `code` > 500");
 
       const result = await extractWhereClause(
         "SELECT histogram(_timestamp) FROM \"stream\" WHERE level = 'ERROR' AND code > 500 GROUP BY x_axis_1",
       );
-      expect(result).toBe("\"level\" = 'ERROR' AND \"code\" > 500");
+      expect(result).toBe('"level" = \'ERROR\' AND "code" > 500');
     });
 
     it("should return empty string when parser throws", async () => {

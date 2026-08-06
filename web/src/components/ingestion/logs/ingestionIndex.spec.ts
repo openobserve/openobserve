@@ -17,7 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Index from "@/components/ingestion/logs/Index.vue";
 import { copyToClipboard } from "@/utils/clipboard";
-import { nextTick, ref } from "vue";
+import { nextTick } from "vue";
 import { createRouter, createMemoryHistory } from "vue-router";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -26,15 +26,15 @@ import i18n from "@/locales";
 // Mock services and utilities
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",
-    enableAnalytics: "true"
-  }
+    enableAnalytics: "true",
+  },
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -43,17 +43,12 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     ...actual,
     getImageURL: vi.fn((path: string) => `/mocked/path/${path}`),
     verifyOrganizationStatus: vi.fn(),
-    mergeRoutes: vi.fn((route1: any, route2: any) => [...(route1 || []), ...(route2 || [])])
+    mergeRoutes: vi.fn((route1: any, route2: any) => [...(route1 || []), ...(route2 || [])]),
   };
 });
 
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
-}));
-
-// Keep a simple quasar mock to prevent import errors from transitive dependencies
-vi.mock("quasar", () => ({
-  copyToClipboard: vi.fn(),
 }));
 
 const mockCopyToClipboardOptions = {
@@ -62,21 +57,11 @@ const mockCopyToClipboardOptions = {
   timeout: 5000,
 };
 
-
 describe("IngestLogs Index Component", () => {
   let wrapper: any = null;
 
   const mockProps = {
-    currOrgIdentifier: "test-org"
-  };
-
-  const mockRouter = {
-    currentRoute: {
-      value: {
-        name: "curl"
-      }
-    },
-    push: vi.fn()
+    currOrgIdentifier: "test-org",
   };
 
   beforeEach(() => {
@@ -89,8 +74,8 @@ describe("IngestLogs Index Component", () => {
           OTabs: true,
           ORouteTab: true,
           RouterView: true,
-        }
-      }
+        },
+      },
     });
 
     // Reset mocks
@@ -127,6 +112,7 @@ describe("IngestLogs Index Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "loongcollector",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
@@ -155,7 +141,7 @@ describe("IngestLogs Index Component", () => {
       // Test by directly checking computed property logic
       const isCloudTrue = "true";
       const showCloudResult = isCloudTrue === "true"; // This will be true
-      
+
       expect(showCloudResult).toBe(true);
     });
 
@@ -178,6 +164,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test content",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -217,6 +204,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -228,6 +216,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "  test content  ",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -239,6 +228,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test@#$%^&*()content",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -250,6 +240,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "line1\nline2\nline3",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -261,6 +252,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test &amp; content &lt; &gt;",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -288,18 +280,18 @@ describe("IngestLogs Index Component", () => {
   describe("showUpdateDialogFn function", () => {
     it("should set confirmUpdate to true", () => {
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      
+
       wrapper.vm.showUpdateDialogFn();
-      
+
       expect(wrapper.vm.confirmUpdate).toBe(true);
     });
 
     it("should toggle confirmUpdate correctly multiple times", () => {
       expect(wrapper.vm.confirmUpdate).toBe(false);
-      
+
       wrapper.vm.showUpdateDialogFn();
       expect(wrapper.vm.confirmUpdate).toBe(true);
-      
+
       wrapper.vm.confirmUpdate = false;
       wrapper.vm.showUpdateDialogFn();
       expect(wrapper.vm.confirmUpdate).toBe(true);
@@ -311,12 +303,13 @@ describe("IngestLogs Index Component", () => {
     it("should include all expected ingest routes", () => {
       const expectedRoutes = [
         "curl",
-        "fluentbit", 
+        "fluentbit",
         "fluentd",
         "vector",
-        "syslogNg"
+        "syslogNg",
+        "loongcollector",
       ];
-      
+
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
     });
 
@@ -327,7 +320,7 @@ describe("IngestLogs Index Component", () => {
     it("should handle route checking logic", () => {
       const testRoutes = ["curl", "fluentbit", "vector"];
       const routeInList = testRoutes.includes("curl");
-      
+
       expect(routeInList).toBe(true);
     });
   });
@@ -366,15 +359,12 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
-      
-      expect(emptyPropWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(emptyPropWrapper.props("currOrgIdentifier")).toBe("");
       emptyPropWrapper.unmount();
     });
 
@@ -384,15 +374,12 @@ describe("IngestLogs Index Component", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            "q-splitter": true,
-            "q-tabs": true,
-            "q-route-tab": true,
-            "router-view": true
-          }
-        }
+            "router-view": true,
+          },
+        },
       });
-      
-      expect(defaultPropWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(defaultPropWrapper.props("currOrgIdentifier")).toBe("");
       defaultPropWrapper.unmount();
     });
 
@@ -400,7 +387,7 @@ describe("IngestLogs Index Component", () => {
       const initialTabs = wrapper.vm.ingestiontabs;
       wrapper.vm.ingestiontabs = "curl";
       await nextTick();
-      
+
       expect(wrapper.vm.ingestiontabs).toBe("curl");
       expect(wrapper.vm.ingestiontabs).not.toBe(initialTabs);
     });
@@ -409,7 +396,7 @@ describe("IngestLogs Index Component", () => {
       const testData = { key: "value" };
       wrapper.vm.rowData = testData;
       await nextTick();
-      
+
       expect(wrapper.vm.rowData).toEqual(testData);
     });
   });
@@ -424,7 +411,7 @@ describe("IngestLogs Index Component", () => {
     it("should call getImageURL with correct parameters", () => {
       const mockGetImageURL = wrapper.vm.getImageURL;
       const testPath = "images/test.png";
-      
+
       mockGetImageURL(testPath);
       expect(mockGetImageURL).toBeTruthy();
     });
@@ -449,6 +436,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         null,
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -460,6 +448,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         undefined,
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -471,6 +460,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         undefined,
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -483,6 +473,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         longContent,
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -491,7 +482,7 @@ describe("IngestLogs Index Component", () => {
       wrapper.vm.showUpdateDialogFn();
       wrapper.vm.showUpdateDialogFn();
       wrapper.vm.showUpdateDialogFn();
-      
+
       expect(wrapper.vm.confirmUpdate).toBe(true);
     });
   });
@@ -505,6 +496,7 @@ describe("IngestLogs Index Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "test",
+        expect.any(Function),
         mockCopyToClipboardOptions,
       );
     });
@@ -577,9 +569,7 @@ describe("IngestLogs Index Component", () => {
         },
       });
 
-      expect(pushSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "curl" }),
-      );
+      expect(pushSpy).toHaveBeenCalledWith(expect.objectContaining({ name: "curl" }));
       testWrapper.unmount();
     });
 

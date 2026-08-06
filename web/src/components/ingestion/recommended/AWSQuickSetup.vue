@@ -16,95 +16,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="setup-card tw:max-w-225 tw:mx-auto">
+    <div class="setup-card mx-auto max-w-225">
       <!-- Header -->
-      <div class="tw:mb-6 tw:p-4 tw:rounded-lg" :class="quickInstallBgClass">
-        <div class="tw:flex tw:items-start tw:gap-3">
-          <OIcon
-            name="rocket-launch"
-            size="xl"
-            class="tw:text-[var(--q-primary)]"
-          />
+      <div class="rounded-default mb-6 p-4" :class="quickInstallBgClass">
+        <div class="flex items-start gap-3">
+          <OIcon name="rocket-launch" size="xl" class="text-text-link" />
           <div>
-            <h6 class="tw:text-xl! tw:font-bold tw:m-0 tw:mb-2!">
-              Complete AWS Integration
+            <h6 class="m-0 mb-2! text-xl! font-bold">
+              {{ t("ingestion.completeAwsIntegration") }}
             </h6>
-            <p class="tw:text-sm tw:mt-0 tw:mb-0" :class="descriptionClass">
-              Deploy all selected AWS services in one click using a single
-              CloudFormation stack.
+            <p class="mt-0 mb-0 text-sm" :class="descriptionClass">
+              {{ t("ingestion.deployAwsServicesOneClick") }}
             </p>
           </div>
         </div>
       </div>
 
       <!-- Deployment Mode Toggle -->
-      <div class="tw:mb-6">
-        <div class="tw:mb-3 tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">Deployment mode</div>
-        <OToggleGroup
-          v-model="deploymentMode"
-          data-test="aws-deployment-mode-toggle"
-        >
-          <OToggleGroupItem value="single">Single Region</OToggleGroupItem>
-          <OToggleGroupItem value="stackset"
-            >Multi-Region (StackSets)</OToggleGroupItem
-          >
+      <div class="mb-6">
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+          {{ t("ingestion.deploymentMode") }}
+        </div>
+        <OToggleGroup v-model="deploymentMode" data-test="aws-deployment-mode-toggle">
+          <OToggleGroupItem value="single">{{ t("ingestion.singleRegion") }}</OToggleGroupItem>
+          <OToggleGroupItem value="stackset">{{
+            t("ingestion.multiRegionStackSets")
+          }}</OToggleGroupItem>
         </OToggleGroup>
-        <div class="tw:mt-2 tw:text-xs" :class="hintTextClass">
+        <div class="mt-2 text-xs" :class="hintTextClass">
           <span v-if="deploymentMode === 'single'">
-            Deploys a CloudFormation stack in one AWS region. Parameters are
-            pre-filled automatically.
+            {{ t("ingestion.singleRegionDeployHint") }}
           </span>
           <span v-else>
-            Deploys across multiple regions using CloudFormation StackSets.
-            Requires AWS Organizations or self-managed IAM roles. Parameters are
-            shown for copy-paste into the AWS console wizard.
+            {{ t("ingestion.stackSetDeployHint") }}
           </span>
         </div>
       </div>
 
       <!-- Step: Services -->
-      <div class="tw:mb-6">
+      <div class="mb-6">
         <div
-          class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer tw:py-2 tw:px-3 tw:rounded"
+          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
           :class="collapsibleHeaderClass"
           @click="showServices = !showServices"
         >
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <OIcon
-              :name="showServices ? 'expand-less' : 'expand-more'" size="sm"
-              color="primary"
-            />
-            <div class="tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">Select services to monitor</div>
+          <div class="flex items-center gap-2">
+            <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
+            <div class="text-sm font-semibold" :class="stepLabelClass">
+              {{ t("ingestion.selectServicesToMonitor") }}
+            </div>
             <OTag type="countChip" value="accent">
-              {{ enabledServices.length }} /
-              {{ QUICK_SETUP_SERVICES.length }} selected
+              {{ enabledServices.length }} / {{ QUICK_SETUP_SERVICES.length }}
+              {{ t("ingestion.selected") }}
             </OTag>
           </div>
-          <div class="tw:flex tw:gap-2" @click.stop>
-            <OButton variant="ghost-primary" size="xs" @click="selectAll"
-              >Select all</OButton
-            >
-            <OButton variant="ghost-primary" size="xs" @click="deselectAll"
-              >Deselect all</OButton
-            >
+          <div class="flex gap-2" @click.stop>
+            <OButton variant="ghost-primary" size="xs" @click="selectAll">{{
+              t("ingestion.selectAll")
+            }}</OButton>
+            <OButton variant="ghost-primary" size="xs" @click="deselectAll">{{
+              t("ingestion.deselectAll")
+            }}</OButton>
           </div>
         </div>
 
         <div
-          class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
-          :class="showServices ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+          class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+          :class="showServices ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
         >
-          <div class="tw:overflow-hidden tw:min-h-0">
-            <div class="tw:mt-3">
-              <div class="tw:grid tw:grid-cols-4 tw:gap-x-4 tw:gap-y-2">
-                <div
-                  v-for="service in QUICK_SETUP_SERVICES"
-                  :key="service.flag"
-                >
+          <div class="min-h-0 overflow-hidden">
+            <div class="mt-3">
+              <div class="grid grid-cols-4 gap-x-4 gap-y-2">
+                <div v-for="service in QUICK_SETUP_SERVICES" :key="service.flag">
                   <OCheckbox
                     v-model="enabledServices"
                     :value="service.flag"
-                    :label="service.label"
+                    :label="raw(service.label)"
                   />
                 </div>
               </div>
@@ -114,92 +101,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Single Region: region picker -->
-      <div v-if="deploymentMode === 'single'" class="tw:mb-6">
-        <div class="tw:mb-3 tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">Deployment region</div>
+      <div v-if="deploymentMode === 'single'" class="mb-6">
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+          {{ t("ingestion.deploymentRegion") }}
+        </div>
         <OSelect
           v-model="selectedRegion"
-          :options="AWS_REGIONS"
+          :options="regionOptions"
           valueKey="value"
           labelKey="label"
-          style="max-width: 320px"
+          class="max-w-xs"
           data-test="aws-region-select"
         />
       </div>
 
       <!-- StackSets: admin + target regions -->
       <template v-else>
-        <div class="tw:mb-6">
-          <div class="tw:mb-3 tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">
-            Admin region
-            <span class="tw:font-normal tw:text-xs tw:text-[#888]"
-              >(where the StackSet is managed)</span
-            >
+        <div class="mb-6">
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+            {{ t("ingestion.adminRegion") }}
+            <span class="text-text-muted text-xs font-normal">{{
+              t("ingestion.whereStackSetIsManaged")
+            }}</span>
           </div>
           <OSelect
             v-model="selectedRegion"
-            :options="AWS_REGIONS"
+            :options="regionOptions"
             valueKey="value"
             labelKey="label"
-            style="max-width: 320px"
+            class="max-w-xs"
             data-test="aws-admin-region-select"
           />
         </div>
 
-        <div class="tw:mb-6">
+        <div class="mb-6">
           <div
-            class="tw:flex tw:items-center tw:justify-between tw:cursor-pointer tw:py-2 tw:px-3 tw:rounded"
-          :class="collapsibleHeaderClass"
+            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
+            :class="collapsibleHeaderClass"
             @click="showTargetRegions = !showTargetRegions"
           >
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <OIcon
-                :name="showTargetRegions ? 'expand-less' : 'expand-more'" size="sm"
+                :name="showTargetRegions ? 'expand-less' : 'expand-more'"
+                size="sm"
                 color="primary"
               />
-              <div class="tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">
-                Target regions
-                <span class="tw:font-normal tw:text-xs tw:text-[#888]"
-                  >(where stacks will be deployed)</span
-                >
+              <div class="text-sm font-semibold" :class="stepLabelClass">
+                {{ t("ingestion.targetRegions") }}
+                <span class="text-text-muted text-xs font-normal">{{
+                  t("ingestion.whereStacksWillBeDeployed")
+                }}</span>
               </div>
-              <OTag
-                v-if="targetRegions.length > 0"
-                type="countChip"
-                value="accent"
-                >{{ targetRegions.length }} selected</OTag
+              <OTag v-if="targetRegions.length > 0" type="countChip" value="accent"
+                >{{ targetRegions.length }} {{ t("ingestion.selected") }}</OTag
               >
             </div>
-            <div class="tw:flex tw:gap-2" @click.stop>
-              <OButton
-                variant="ghost-primary"
-                size="xs"
-                @click="selectAllRegions"
-                >Select all</OButton
-              >
-              <OButton
-                variant="ghost-primary"
-                size="xs"
-                @click="targetRegions = []"
-                >Clear</OButton
-              >
+            <div class="flex gap-2" @click.stop>
+              <OButton variant="ghost-primary" size="xs" @click="selectAllRegions">{{
+                t("ingestion.selectAll")
+              }}</OButton>
+              <OButton variant="ghost-primary" size="xs" @click="targetRegions = []">{{
+                t("ingestion.clear")
+              }}</OButton>
             </div>
           </div>
 
           <div
-            class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
-            :class="showTargetRegions ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+            class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+            :class="showTargetRegions ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
           >
-            <div class="tw:overflow-hidden tw:min-h-0">
-              <div class="tw:mt-3">
-                <div class="tw:grid tw:grid-cols-3 tw:gap-x-4 tw:gap-y-2">
-                  <div
-                    v-for="region in AWS_REGIONS"
-                    :key="region.value"
-                  >
+            <div class="min-h-0 overflow-hidden">
+              <div class="mt-3">
+                <div class="grid grid-cols-3 gap-x-4 gap-y-2">
+                  <div v-for="region in AWS_REGIONS" :key="region.value">
                     <OCheckbox
                       v-model="targetRegions"
                       :value="region.value"
-                      :label="`${region.label} (${region.value})`"
+                      :label="raw(`${region.label} (${region.value})`)"
                     />
                   </div>
                 </div>
@@ -208,34 +186,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:mb-6">
-          <div class="tw:mb-3 tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">Deployment model</div>
-          <OToggleGroup
-            v-model="stackSetModel"
-            data-test="aws-stackset-model-toggle"
-          >
-            <OToggleGroupItem value="self">Self-managed</OToggleGroupItem>
-            <OToggleGroupItem value="service"
-              >Service-managed (AWS Organizations)</OToggleGroupItem
-            >
+        <div class="mb-6">
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+            {{ t("ingestion.deploymentModel") }}
+          </div>
+          <OToggleGroup v-model="stackSetModel" data-test="aws-stackset-model-toggle">
+            <OToggleGroupItem value="self">{{ t("ingestion.selfManaged") }}</OToggleGroupItem>
+            <OToggleGroupItem value="service">{{
+              t("ingestion.serviceManagedAwsOrganizations")
+            }}</OToggleGroupItem>
           </OToggleGroup>
-          <div class="tw:mt-2 tw:text-xs" :class="hintTextClass">
+          <div class="mt-2 text-xs" :class="hintTextClass">
             <span v-if="stackSetModel === 'self'">
-              Requires
-              <code>AWSCloudFormationStackSetAdministrationRole</code> and
-              <code>AWSCloudFormationStackSetExecutionRole</code> IAM roles in
-              your account.
+              {{ t("ingestion.requires") }}
+              <code>{{ raw("AWSCloudFormationStackSetAdministrationRole") }}</code>
+              {{ t("ingestion.and") }}
+              <code>{{ raw("AWSCloudFormationStackSetExecutionRole") }}</code>
+              {{ t("ingestion.iamRolesInYourAccount") }}
             </span>
             <span v-else>
-              Uses AWS Organizations. Your account must be the management or
-              delegated admin account.
+              {{ t("ingestion.usesAwsOrganizationsHint") }}
             </span>
           </div>
         </div>
       </template>
 
       <!-- Launch -->
-      <div class="tw:flex tw:items-center tw:gap-3 tw:mb-6">
+      <div class="mb-6 flex items-center gap-3">
         <OButton
           variant="primary"
           size="sm"
@@ -245,42 +222,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           @click="handleLaunch"
           :data-test="
-            deploymentMode === 'single'
-              ? 'aws-quick-setup-deploy-btn'
-              : 'aws-stackset-launch-btn'
+            deploymentMode === 'single' ? 'aws-quick-setup-deploy-btn' : 'aws-stackset-launch-btn'
           "
         >
-          <template #icon-left
-            ><OIcon name="cloud-upload" size="sm"
-          /></template>
+          <template #icon-left><OIcon name="cloud-upload" size="sm" /></template>
           {{
             deploymentMode === "single"
-              ? "Launch CloudFormation Stack"
-              : "Open StackSets Console"
+              ? t("ingestion.launchCloudFormationStack")
+              : t("ingestion.openStackSetsConsole")
           }}
         </OButton>
-        <span
-          v-if="enabledServices.length === 0"
-          class="tw:text-sm tw:text-red-500"
-        >
-          Select at least one service
+        <span v-if="enabledServices.length === 0" class="text-status-error-text text-sm">
+          {{ t("ingestion.selectAtLeastOneService") }}
         </span>
         <span
-          v-else-if="
-            deploymentMode === 'stackset' && targetRegions.length === 0
-          "
-          class="tw:text-sm tw:text-red-500"
+          v-else-if="deploymentMode === 'stackset' && targetRegions.length === 0"
+          class="text-status-error-text text-sm"
         >
-          Select at least one target region
+          {{ t("ingestion.selectAtLeastOneTargetRegion") }}
         </span>
-        <span v-else class="tw:text-sm" :class="hintTextClass">
-          {{ enabledServices.length }} service{{
-            enabledServices.length > 1 ? "s" : ""
-          }}
-          selected
+        <span v-else class="text-sm" :class="hintTextClass">
+          {{ t("ingestion.service", { count: enabledServices.length }, enabledServices.length) }}
+          {{ t("ingestion.selected") }}
           <template v-if="deploymentMode === 'stackset'">
-            · {{ targetRegions.length }} region{{
-              targetRegions.length > 1 ? "s" : ""
+            ·
+            {{
+              t("ingestion.region", { count: targetRegions.length }, targetRegions.length)
             }}</template
           >
         </span>
@@ -288,66 +255,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- StackSets Parameter Helper -->
       <div
-        class="tw:grid tw:transition-[grid-template-rows] tw:duration-300 tw:ease-in-out"
-        :class="(showParamHelper && deploymentMode === 'stackset') ? 'tw:grid-rows-[1fr]' : 'tw:grid-rows-[0fr]'"
+        class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        :class="
+          showParamHelper && deploymentMode === 'stackset' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        "
       >
-        <div class="tw:overflow-hidden tw:min-h-0">
-        <div>
-          <OSeparator class="tw:mb-4" />
-          <div class="tw:rounded-lg tw:p-4" :class="paramHelperClass">
-            <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
-              <div class="tw:font-semibold tw:text-[0.9rem]" :class="stepLabelClass">
-                Parameters to enter in the AWS wizard
+        <div class="min-h-0 overflow-hidden">
+          <div>
+            <OSeparator class="mb-4" />
+            <div class="rounded-default p-4" :class="paramHelperClass">
+              <div class="mb-3 flex items-center justify-between">
+                <div class="text-sm font-semibold" :class="stepLabelClass">
+                  {{ t("ingestion.parametersToEnterInAwsWizard") }}
+                </div>
+                <OButton variant="ghost" size="icon-circle-sm" @click="showParamHelper = false">
+                  <OIcon name="close" size="sm" />
+                </OButton>
               </div>
-              <OButton
-                variant="ghost"
-                size="icon-circle-sm"
-                @click="showParamHelper = false"
-              >
-                <OIcon name="close" size="sm" />
-              </OButton>
-            </div>
-            <p class="tw:text-xs tw:mb-3" :class="hintTextClass">
-              The StackSets console doesn't support URL pre-fill. Enter these
-              values as you go through the wizard.
-            </p>
-            <div class="tw:flex tw:flex-col tw:gap-[6px]">
-              <div
-                v-for="param in stackSetParams"
-                :key="param.key"
-                class="tw:flex tw:items-center tw:gap-3 tw:py-[6px] tw:px-[10px] tw:rounded tw:text-[0.8rem] tw:font-mono"
-                :class="paramRowClass"
-              >
-                <div class="tw:min-w-[240px] tw:font-semibold tw:shrink-0" :class="paramKeyClass">{{ param.key }}</div>
-                <div class="tw:flex tw:items-center tw:gap-1 tw:flex-1 tw:overflow-hidden">
-                  <span class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:flex-1" :class="paramValTextClass">{{ param.value }}</span>
-                  <OButton
-                    variant="ghost"
-                    size="icon-xs-circle"
-                    @click="copyParam(param.value)"
-                  >
-                    <OIcon name="content-copy" size="sm" />
-                    <OTooltip content="Copy" />
-                  </OButton>
+              <p class="mb-3 text-xs" :class="hintTextClass">
+                {{ t("ingestion.stackSetsNoPrefillHint") }}
+              </p>
+              <div class="flex flex-col gap-1.5">
+                <div
+                  v-for="param in stackSetParams"
+                  :key="param.key"
+                  class="rounded-default text-compact flex items-center gap-3 px-2.5 py-1.5 font-mono"
+                  :class="paramRowClass"
+                >
+                  <div class="min-w-60 shrink-0 font-semibold" :class="paramKeyClass">
+                    {{ param.key }}
+                  </div>
+                  <div class="flex flex-1 items-center gap-1 overflow-hidden">
+                    <span
+                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                      :class="paramValTextClass"
+                      >{{ param.value }}</span
+                    >
+                    <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
+                      <OIcon name="content-copy" size="sm" />
+                      <OTooltip :content="t('common.copy')" />
+                    </OButton>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="mb-1 text-xs font-semibold" :class="stepLabelClass">
+                  {{ t("ingestion.targetRegionsToEnterInDeploymentTargets") }}
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  <OTag v-for="r in targetRegions" :key="r" type="fieldTag" value="primarysm">{{
+                    r
+                  }}</OTag>
                 </div>
               </div>
             </div>
-            <div class="tw:mt-3">
-              <div class="tw:font-semibold tw:text-xs tw:mb-1" :class="stepLabelClass">
-                Target regions to enter in "Deployment targets":
-              </div>
-              <div class="tw:flex tw:flex-wrap tw:gap-1 tw:mt-1">
-                <OTag
-                  v-for="r in targetRegions"
-                  :key="r"
-                  type="fieldTag"
-                  value="primarysm"
-                  >{{ r }}</OTag
-                >
-              </div>
-            </div>
           </div>
-        </div>
         </div>
       </div>
     </div>
@@ -357,6 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
@@ -371,7 +334,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import segment from "@/services/segment_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -381,55 +344,48 @@ const COMPLETE_TEMPLATE_URL =
 
 export default defineComponent({
   name: "AWSQuickSetup",
-  components: { OSeparator, OToggleGroup, OToggleGroupItem, OButton, OSelect, OTooltip, OCheckbox,
+  components: {
+    OSeparator,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    OSelect,
+    OTooltip,
+    OCheckbox,
     OIcon,
     OTag,
-},
+  },
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
 
     const deploymentMode = ref<"single" | "stackset">("single");
     const stackSetModel = ref<"self" | "service">("self");
     const selectedRegion = ref("us-east-1");
     const targetRegions = ref<string[]>(["us-east-1"]);
-    const enabledServices = ref<string[]>(
-      QUICK_SETUP_SERVICES.map((s) => s.flag),
-    );
+    const enabledServices = ref<string[]>(QUICK_SETUP_SERVICES.map((s) => s.flag));
     const showParamHelper = ref(false);
     const showTargetRegions = ref(false);
     const showServices = ref(false);
 
-    const quickInstallBgClass = computed(() => {
-      return store.state.theme === 'dark'
-        ? 'tw:bg-gray-800 tw:border tw:border-gray-700'
-        : 'tw:bg-blue-50 tw:border tw:border-blue-200';
-    });
+    // AWS region names are AWS's own proper nouns, so they are never translated.
+    const regionOptions = AWS_REGIONS.map((region) => ({
+      value: region.value,
+      label: raw(region.label),
+    }));
 
-    const descriptionClass = computed(() => {
-      return store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-700';
-    });
-
-    // tw:dark: variants do not generate CSS in this setup, so dark-mode colors
-    // are resolved here against store.state.theme (same pattern as quickInstallBgClass).
-    const isDark = computed(() => store.state.theme === 'dark');
-    const stepLabelClass = computed(() =>
-      isDark.value ? 'tw:text-[#d0d0d0]' : 'tw:text-[#333]');
-    const hintTextClass = computed(() =>
-      isDark.value ? 'tw:text-[#b0b0b0]' : 'tw:text-[#666]');
-    const collapsibleHeaderClass = computed(() =>
-      isDark.value
-        ? 'tw:bg-[rgba(255,255,255,0.06)] tw:border tw:border-[#404040] tw:hover:bg-[rgba(255,255,255,0.09)]'
-        : 'tw:bg-[#f0f4ff] tw:border tw:border-[#d0d9f0] tw:hover:bg-[#e8eeff]');
-    const paramHelperClass = computed(() =>
-      isDark.value ? 'tw:bg-[rgba(255,255,255,0.05)]' : 'tw:bg-[#f5f5f5]');
-    const paramRowClass = computed(() =>
-      isDark.value
-        ? 'tw:bg-[rgba(255,255,255,0.03)] tw:border tw:border-[#404040]'
-        : 'tw:bg-white tw:border tw:border-(--o2-border)');
-    const paramKeyClass = computed(() =>
-      isDark.value ? 'tw:text-[#ccc]' : 'tw:text-[#333]');
-    const paramValTextClass = computed(() =>
-      isDark.value ? 'tw:text-[#aaa]' : 'tw:text-[#555]');
+    // Colors resolve via theme-aware design tokens, so these class strings are
+    // theme-independent (dark handled automatically by dark.css).
+    const quickInstallBgClass = "bg-banner-info-bg border border-banner-info-border";
+    const descriptionClass = "text-text-secondary";
+    const stepLabelClass = "text-text-body";
+    const hintTextClass = "text-text-secondary";
+    const collapsibleHeaderClass =
+      "bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover";
+    const paramHelperClass = "bg-surface-subtle";
+    const paramRowClass = "bg-surface-base border border-border-default";
+    const paramKeyClass = "text-text-body";
+    const paramValTextClass = "text-text-secondary";
 
     let endpoint: any = null;
     try {
@@ -487,8 +443,7 @@ export default defineComponent({
     });
 
     const copyParam = (value: string) => {
-      copyToClipboard(value, {
-        successMessage: "Copied to clipboard",
+      copyToClipboard(value, t, {
         timeout: 1500,
       });
     };
@@ -497,7 +452,7 @@ export default defineComponent({
       if (!endpoint?.url) {
         toast({
           variant: "error",
-          message: "Invalid ingestion endpoint. Please check configuration.",
+          message: t("toastMessages.recommended.invalidIngestionEndpointPleaseCheckConfiguration"),
         });
         return;
       }
@@ -506,7 +461,7 @@ export default defineComponent({
       if (!organizationId || !email || !passcode) {
         toast({
           variant: "error",
-          message: "Missing organization credentials. Please refresh the page.",
+          message: t("toastMessages.recommended.missingOrganizationCredentialsPleaseRefreshThe"),
         });
         return;
       }
@@ -517,7 +472,7 @@ export default defineComponent({
         if (targetRegions.value.length === 0) {
           toast({
             variant: "warning",
-            message: "Select at least one target region.",
+            message: t("toastMessages.recommended.selectAtLeastOneTargetRegion"),
           });
           return;
         }
@@ -525,11 +480,7 @@ export default defineComponent({
       }
     };
 
-    const launchSingleRegion = (
-      organizationId: string,
-      email: string,
-      passcode: string,
-    ) => {
+    const launchSingleRegion = (organizationId: string, email: string, passcode: string) => {
       const accessKey = btoa(`${email}:${passcode}`);
 
       const url = generateCloudFormationURL(
@@ -554,7 +505,7 @@ export default defineComponent({
       if (!url) {
         toast({
           variant: "warning",
-          message: "CloudFormation template not available yet",
+          message: t("toastMessages.recommended.cloudformationTemplateNotAvailableYet"),
         });
         return;
       }
@@ -567,11 +518,11 @@ export default defineComponent({
       });
       toast({
         variant: "info",
-        message: "Opening AWS Console to deploy complete integration stack",
+        message: t("toastMessages.recommended.openingAwsConsoleToDeployComplete"),
       });
     };
 
-    const launchStackSet = (organizationId: string) => {
+    const launchStackSet = (_organizationId?: string) => {
       // StackSets console doesn't support URL pre-fill — open the console and show param helper
       const consoleUrl = `https://console.aws.amazon.com/cloudformation/home?region=${selectedRegion.value}#/stacksets/create`;
       window.open(consoleUrl, "_blank", "noopener,noreferrer");
@@ -587,13 +538,14 @@ export default defineComponent({
 
       toast({
         variant: "info",
-        message:
-          "AWS StackSets console opened. Use the parameter values below to complete setup.",
+        message: t("toastMessages.recommended.awsStacksetsConsoleOpenedUseThe"),
         timeout: 5000,
       });
     };
 
     return {
+      raw,
+      t,
       quickInstallBgClass,
       descriptionClass,
       stepLabelClass,
@@ -613,6 +565,7 @@ export default defineComponent({
       showServices,
       stackSetParams,
       AWS_REGIONS,
+      regionOptions,
       QUICK_SETUP_SERVICES,
       selectAll,
       deselectAll,

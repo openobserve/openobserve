@@ -15,6 +15,28 @@
 
 import { createStore } from "vuex";
 
+// Mirror of the initial organizationData below; used by resetOrganizationData.
+const organizationObj = {
+  organizationPasscode: "",
+  allDashboardList: {},
+  rumToken: {
+    rum_token: "",
+  },
+  quotaThresholdMsg: "",
+  functions: [],
+  streams: {},
+  folders: [],
+  organizationSettings: {
+    scrape_interval: 15,
+    trace_id_field_name: "trace_id",
+    span_id_field_name: "span_id",
+  },
+  isDataIngested: false,
+  allDashboardData: {},
+  foldersByType: [],
+  allReportsListByFolderId: {},
+};
+
 const store = createStore({
   state: {
     API_ENDPOINT: "http://localhost:5080",
@@ -22,6 +44,18 @@ const store = createStore({
 
     theme: "dark",
     timezone: "UTC",
+    loggedIn: false,
+    organizations: [] as unknown[],
+    searchCollapsibleSection: 20,
+    printMode: false,
+    savedViewFlag: false,
+    savedFunctionDialog: false,
+    hiddenMenus: [] as unknown[],
+    allApiLimitsByOrgId: {} as Record<string, unknown>,
+    allRoleLimitsByOrgIdByRole: {} as Record<string, unknown>,
+    modulesToDisplay: {} as Record<string, unknown>,
+    currentChatTimestamp: null as number | null,
+    chatUpdated: false,
     selectedOrganization: {
       label: "default Organization",
       id: 159,
@@ -46,7 +80,7 @@ const store = createStore({
       iat: 1678689753,
       family_name: "example",
       email: "example@gmail.com",
-    },
+    } as Record<string, unknown>,
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
@@ -123,7 +157,8 @@ const store = createStore({
       },
       quotaThresholdMsg: "",
       functions: [],
-      streams: {},
+      actions: [],
+      streams: {} as Record<string, unknown>,
       folders: [],
       organizationSettings: {
         scrape_interval: 15,
@@ -132,8 +167,11 @@ const store = createStore({
       },
       isDataIngested: false,
       allDashboardData: {},
+      allDashboardListHash: {},
       foldersByType: [],
       allReportsListByFolderId: {},
+      allAlertsListByFolderId: {},
+      allAlertsListByNames: {},
     },
     alertListFilters: {
       searchQuery: "",
@@ -182,7 +220,7 @@ const store = createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
     },
-    resetOrganizationData(state, payload) {
+    resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
     },
     setRUMToken(state, payload) {
@@ -296,14 +334,18 @@ const store = createStore({
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
     },
-    clearPendingShortURL(state) {
+    clearPendingShortURL() {
       // Mock mutation for tests - clears pending short URL state
     },
     setAlertListFilters(state, payload) {
       state.alertListFilters = { ...state.alertListFilters, ...payload };
     },
     setGithubDashboardGallery(state, payload) {
-      state.githubDashboardGallery = { ...state.githubDashboardGallery, dashboards: payload, lastFetched: Date.now() };
+      state.githubDashboardGallery = {
+        ...state.githubDashboardGallery,
+        dashboards: payload,
+        lastFetched: Date.now(),
+      };
     },
     setDashboardJsonCache(state, payload) {
       state.githubDashboardGallery.dashboardJsonCache = {
@@ -325,7 +367,7 @@ const store = createStore({
         },
       },
       actions: {
-        setStreams(context: any, payload: any) {
+        setStreams() {
           // Mock action for setting streams
         },
       },
@@ -335,7 +377,7 @@ const store = createStore({
       state: {
         incidents: {},
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
       },
       getters: {
         getIncidents(state: any) {
@@ -366,16 +408,16 @@ const store = createStore({
       },
       actions: {
         setIncidents(context: any, incidents: any) {
-          context.commit('setIncidents', incidents);
+          context.commit("setIncidents", incidents);
         },
         setPageBeforeSearch(context: any, page: number) {
-          context.commit('setPageBeforeSearch', page);
+          context.commit("setPageBeforeSearch", page);
         },
         setIsInitialized(context: any, isInitialized: boolean) {
-          context.commit('setIsInitialized', isInitialized);
+          context.commit("setIsInitialized", isInitialized);
         },
         resetIncidents(context: any) {
-          context.commit('resetIncidents');
+          context.commit("resetIncidents");
         },
       },
     },

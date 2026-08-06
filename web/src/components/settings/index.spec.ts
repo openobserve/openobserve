@@ -17,7 +17,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import SettingsIndex from "./index.vue";
 import i18n from "@/locales";
-import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
 // Mock external dependencies
@@ -37,7 +36,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
-
 
 // Mock Vuex store
 const mockStore = {
@@ -64,6 +62,7 @@ const router = createRouter({
     { path: "/", name: "settings", component: SettingsIndex },
     { path: "/nodes", name: "nodes", component: SettingsIndex },
     { path: "/general", name: "general", component: SettingsIndex },
+    { path: "/synthetics-locations", name: "syntheticsLocations", component: SettingsIndex },
   ],
 });
 
@@ -72,11 +71,6 @@ const mockRouterPush = vi.fn();
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 router.push = mockRouterPush;
 router.replace = mockRouterReplace;
-
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn(),
-};
 
 const createWrapper = (props = {}, options = {}) => {
   return mount(SettingsIndex, {
@@ -87,13 +81,12 @@ const createWrapper = (props = {}, options = {}) => {
       plugins: [i18n, router],
       mocks: {
         $store: mockStore,
-        $q: mockQuasar,
       },
       provide: {
         store: mockStore,
       },
       stubs: {
-        PageLayout: {
+        OPageLayout: {
           template: `<div data-test-stub="page-layout">
             <slot name="sidebar"></slot>
             <slot></slot>
@@ -104,7 +97,7 @@ const createWrapper = (props = {}, options = {}) => {
           template: `<div data-test-stub="section-rail"></div>`,
           props: ["groups", "activeKey", "title"],
         },
-        AppPageHeader: {
+        OPageHeader: {
           template: `<div data-test-stub="app-page-header">
             <slot name="title"></slot>
           </div>`,
@@ -185,16 +178,31 @@ describe("SettingsIndex", () => {
       expect(items.some((i: any) => i.key === "organization")).toBe(true);
     });
 
-    it("should include alert-destinations item", () => {
+    // Notification Destinations and Templates moved to Reliability
+    // (/alerts/destinations, /alerts/templates) — they are alerting
+    // configuration, not deployment configuration. Settings keeps only
+    // Pipeline Destinations.
+    it("should not include alert-destinations or alert-templates items", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
-      expect(items.some((i: any) => i.dataTest === "alert-destinations-tab")).toBe(true);
+      expect(items.some((i: any) => i.dataTest === "alert-destinations-tab")).toBe(false);
+      expect(items.some((i: any) => i.dataTest === "alert-templates-tab")).toBe(false);
     });
 
-    it("should include alert-templates item", () => {
+    it("should still include pipeline-destinations item", () => {
       const wrapper = createWrapper();
       const items = getAllItems(wrapper);
-      expect(items.some((i: any) => i.dataTest === "alert-templates-tab")).toBe(true);
+      expect(items.some((i: any) => i.dataTest === "pipeline-destinations-tab")).toBe(true);
+    });
+
+    it("should include synthetics_locations item with correct properties", () => {
+      const wrapper = createWrapper();
+      const items = getAllItems(wrapper);
+      const item = items.find((i: any) => i.key === "synthetics_locations");
+      expect(item).toBeDefined();
+      expect(item.dataTest).toBe("synthetics-locations-tab");
+      expect(item.group).toBe("Synthetics");
+      expect(item.visible).toBe(true);
     });
 
     it("should include enterprise items when isEnterprise is true", () => {
@@ -216,12 +224,16 @@ describe("SettingsIndex", () => {
       const queryItem = items.find((i: any) => i.key === "queryManagement");
       const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const domainItem = items.find((i: any) => i.dataTest === "domain-management-tab");
-      const orgManagementItem = items.find((i: any) => i.dataTest === "organization-management-tab");
+      const orgManagementItem = items.find(
+        (i: any) => i.dataTest === "organization-management-tab",
+      );
+      const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
 
       expect(queryItem?.visible).toBe(true);
       expect(nodesItem?.visible).toBe(true);
       expect(domainItem?.visible).toBe(true);
       expect(orgManagementItem?.visible).toBe(true);
+      expect(syntheticsItem?.visible).toBe(true);
     });
   });
 
@@ -242,6 +254,21 @@ describe("SettingsIndex", () => {
           query: { org_identifier: "test-org" },
         }),
       );
+    });
+
+    it("should map syntheticsLocations route to synthetics_locations tab", () => {
+      // Save the original route reference so we can restore it after the test
+      // (router.push is mocked and won't reset currentRoute on its own).
+      const originalRoute = router.currentRoute.value;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        name: "syntheticsLocations",
+        path: "/synthetics-locations",
+      } as any;
+      const wrapper = createWrapper();
+      expect(wrapper.vm.settingsTab).toBe("synthetics_locations");
+      // Restore the original route to avoid cross-test contamination
+      router.currentRoute.value = originalRoute;
     });
   });
 
@@ -281,13 +308,33 @@ describe("SettingsIndex", () => {
       expect(generalGroup).toBeDefined();
     });
 
-    it("should contain DESTINATIONS & TEMPLATES group", () => {
+    it("should contain a Destinations group holding only Pipeline Destinations", () => {
       const wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups as any[];
-      const destGroup = groups.find(
-        (g: any) => g.label === "Destinations & Templates",
-      );
+      const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
+      expect(destGroup.items.map((i: any) => i.key)).toEqual(["pipeline_destinations"]);
+    });
+
+    it("should contain a Synthetics group", () => {
+      const wrapper = createWrapper();
+      const groups = wrapper.vm.sectionGroups as any[];
+      const syntheticsGroup = groups.find((g: any) => g.label === "Synthetics");
+      expect(syntheticsGroup).toBeDefined();
+    });
+
+    it("should place Synthetics group between Operations and Account", () => {
+      const wrapper = createWrapper();
+      const groups = wrapper.vm.sectionGroups as any[];
+      const labels = groups.map((g: any) => g.label);
+      const operationsIdx = labels.indexOf("Operations");
+      const syntheticsIdx = labels.indexOf("Synthetics");
+      const accountIdx = labels.indexOf("Account");
+      expect(operationsIdx).not.toBe(-1);
+      expect(syntheticsIdx).not.toBe(-1);
+      expect(accountIdx).not.toBe(-1);
+      expect(syntheticsIdx).toBeGreaterThan(operationsIdx);
+      expect(syntheticsIdx).toBeLessThan(accountIdx);
     });
   });
 
@@ -307,11 +354,13 @@ describe("SettingsIndex", () => {
       const nodesItem = items.find((i: any) => i.dataTest === "nodes-tab");
       const pipelineItem = items.find((i: any) => i.dataTest === "pipeline-destinations-tab");
       const regexItem = items.find((i: any) => i.dataTest === "regex-patterns-tab");
+      const syntheticsItem = items.find((i: any) => i.key === "synthetics_locations");
 
       expect(cipherItem?.visible).toBe(false);
       expect(nodesItem?.visible).toBe(false);
       expect(pipelineItem?.visible).toBe(false);
       expect(regexItem?.visible).toBe(false);
+      expect(syntheticsItem?.visible).toBe(false);
     });
 
     it("should mark cloud-only items as not visible when not cloud", async () => {
@@ -352,6 +401,38 @@ describe("SettingsIndex", () => {
       await router.push("/nodes");
       const wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should redirect syntheticsLocations to general when meta-org guard applies", async () => {
+      // Set up meta_org guard condition: store has a meta_org configured,
+      // but isEnterprise is false so the notMeta guard triggers.
+      mockStore.state.zoConfig = {
+        meta_org: "some-meta-org",
+        service_streams_enabled: true,
+      };
+
+      const awsConfig = await import("@/aws-exports");
+      vi.mocked(awsConfig.default).isEnterprise = "false";
+
+      // Set the route name to syntheticsLocations so the guard branch activates.
+      const originalRoute = router.currentRoute.value;
+      router.currentRoute.value = {
+        ...router.currentRoute.value,
+        name: "syntheticsLocations",
+        path: "/synthetics-locations",
+      } as any;
+
+      createWrapper();
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/settings/general",
+          query: { org_identifier: "test-org" },
+        }),
+      );
+
+      // Restore the original route to avoid cross-test contamination
+      router.currentRoute.value = originalRoute;
     });
   });
 });

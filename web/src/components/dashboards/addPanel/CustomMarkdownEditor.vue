@@ -17,43 +17,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-markdown-editor-container"
-    class="card-container"
-    style="width: 100%; height: 100%; overflow: hidden"
+    class="bg-card-glass-bg h-full w-full overflow-hidden"
   >
-    <div
-      data-test="dashboard-custom-markdown-editor-inner"
-      style="width: 100%; height: 100%"
-    >
+    <div class="h-full w-full" data-test="dashboard-custom-markdown-editor-inner">
       <OSplitter
         v-model="splitterModel"
-        style="width: 100%; height: 100% !important"
+        class="h-full! w-full"
         @update:modelValue="layoutSplitterUpdated"
         data-test="dashboard-markdown-editor-splitter"
       >
         <template #before>
-          <div
-            data-test="dashboard-custom-markdown-editor-flex-col"
-            class="tw:flex tw:flex-col"
-            style="height: 100%; display: flex; flex-direction: column;"
-          >
+          <div data-test="dashboard-custom-markdown-editor-flex-col" class="flex h-full flex-col">
             <CodeQueryEditor
+              class="h-full flex-1"
               language="markdown"
               v-model:query="markdownContent"
               :debounceTime="500"
               @update:query="onEditorValueChange"
               data-test="dashboard-markdown-editor"
-              style="height: 100%; flex: 1;"
             />
           </div>
         </template>
         <template #separator>
           <div
             data-test="dashboard-custom-markdown-editor-splitter-separator"
-            class="tw:w-1 tw:h-full tw:bg-[var(--o2-border,#e5e7eb)] tw:transition-colors tw:hover:bg-orange-500"
+            class="bg-border-default hover:bg-table-resize-handle h-full w-1 transition-colors"
           ></div>
         </template>
         <template #after>
-          <markdown-renderer
+          <MarkdownRenderer
             :markdown-content="markdownContent"
             :variables-data="initialVariableValues"
             :tabId="tabId"
@@ -72,9 +64,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   components: {
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     MarkdownRenderer,
     OSplitter,
   },
@@ -119,9 +109,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-</style>

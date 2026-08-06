@@ -9,6 +9,8 @@
 // the "unhealthy" count on the KPI tile, the per-config row, and the detail panel
 // agree across data types (numeric / categorical / boolean).
 
+import { raw, type I18nText } from "@/types/i18n";
+
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "./evalEntity";
 
@@ -18,8 +20,10 @@ export interface ThresholdSql {
    *  defined (we can't classify the row). */
   unhealthyExpr: string | null;
   /** Human label for the threshold, e.g. "≥ 0.7", "true", "good · great". */
-  label: string;
+  label: I18nText;
 }
+
+export type ScoreValue = number | string | boolean | null;
 
 export function escapeSqlString(s: string): string {
   return s.replace(/'/g, "''");
@@ -33,47 +37,87 @@ function valueOf<T = any>(row: any, camel: string, snake: string): T | undefined
 export function thresholdForConfig(config: ScoreConfig): ThresholdSql {
   const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
   const type = dataTypeOf(config);
-  if (!ht) return { unhealthyExpr: null, label: "" };
+  if (!ht) return { unhealthyExpr: null, label: raw("") };
 
   if (type === "numeric") {
     if (ht.value === undefined || ht.value === null || !ht.direction) {
-      return { unhealthyExpr: null, label: "" };
+      return { unhealthyExpr: null, label: raw("") };
     }
     const op = ht.direction === "gte" ? "<" : ">";
     const sym = ht.direction === "gte" ? "≥" : "≤";
     return {
       unhealthyExpr: `value_numeric ${op} ${Number(ht.value)}`,
-      label: `${sym} ${ht.value}`,
+      label: raw(`${sym} ${ht.value}`),
     };
   }
 
   if (type === "categorical") {
     const list: string[] = ht.healthy_categories || ht.healthyCategories || [];
     if (!Array.isArray(list) || list.length === 0) {
-      return { unhealthyExpr: null, label: "" };
+      return { unhealthyExpr: null, label: raw("") };
     }
-    const inList = list
-      .map((c) => `'${escapeSqlString(String(c))}'`)
-      .join(", ");
+    const inList = list.map((c) => `'${escapeSqlString(String(c))}'`).join(", ");
     return {
       unhealthyExpr: `value_categorical NOT IN (${inList})`,
-      label: list.join(" · "),
+      label: raw(list.join(" · ")),
     };
   }
 
   if (type === "boolean") {
     const healthy = ht.healthy_value ?? ht.healthyValue;
     if (healthy === undefined || healthy === null) {
-      return { unhealthyExpr: null, label: "" };
+      return { unhealthyExpr: null, label: raw("") };
     }
     const expected = healthy === true || healthy === "true";
     return {
       unhealthyExpr: `value_boolean = ${!expected}`,
-      label: String(expected),
+      label: raw(String(expected)),
     };
   }
 
-  return { unhealthyExpr: null, label: "" };
+  return { unhealthyExpr: null, label: raw("") };
+}
+
+/** Classify one concrete score using the same semantics as
+ * `thresholdForConfig()`. `null` means the score cannot be classified because
+ * the config has no usable healthy threshold (or the result has no value).
+ *
+ * Keeping the client-side run table on this helper prevents it from drifting
+ * away from the SQL aggregates that drive the overview and detail KPIs. */
+export function isScoreUnhealthy(config: ScoreConfig, score: ScoreValue): boolean | null {
+  if (score == null) return null;
+
+  const ht = valueOf<any>(config, "healthyThreshold", "healthy_threshold");
+  const type = dataTypeOf(config);
+  if (!ht) return null;
+
+  if (type === "numeric") {
+    if (ht.value === undefined || ht.value === null || !ht.direction) {
+      return null;
+    }
+    const numericScore = typeof score === "number" ? score : Number(String(score));
+    const threshold = Number(ht.value);
+    if (!Number.isFinite(numericScore) || !Number.isFinite(threshold)) {
+      return null;
+    }
+    return ht.direction === "gte" ? numericScore < threshold : numericScore > threshold;
+  }
+
+  if (type === "categorical") {
+    const healthy: string[] = ht.healthy_categories || ht.healthyCategories || [];
+    if (!Array.isArray(healthy) || healthy.length === 0) return null;
+    return !healthy.map(String).includes(String(score));
+  }
+
+  if (type === "boolean") {
+    const healthy = ht.healthy_value ?? ht.healthyValue;
+    if (healthy === undefined || healthy === null) return null;
+    const expected = healthy === true || healthy === "true";
+    const actual = score === true || score === "true";
+    return actual !== expected;
+  }
+
+  return null;
 }
 
 /** Build the per-config CASE branches that flag a `_llm_scores` row as

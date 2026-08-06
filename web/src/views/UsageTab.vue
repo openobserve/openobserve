@@ -14,17 +14,17 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="usage-tab tw:h-full">
+  <div class="usage-tab h-full">
     <!-- Main content when data exists -->
     <div
       v-if="!no_data_ingest && !isLoadingSummary"
-      class="tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-y-auto tw:[padding-right:0.625rem]"
+      class="px-page-edge flex h-full w-full flex-col overflow-y-auto pt-2 pb-1"
     >
-      <!-- Banners -->
-      <div class="banners-wrapper tw:shrink-0 tw:flex tw:flex-col tw:gap-2">
-        <div>
-          <TrialPeriod></TrialPeriod>
-        </div>
+      <!-- Banners — each component renders nothing when inactive, so this whole
+           block collapses to zero height (no reserved margin) when idle; the
+           gap below only appears when a banner is actually shown. -->
+      <div class="flex shrink-0 flex-col gap-2 not-empty:mb-3 empty:hidden">
+        <TrialPeriod></TrialPeriod>
         <LicensePeriod
           v-if="!showUsageReportBanner"
           @update-license="goToLicensePage"
@@ -33,504 +33,510 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <DatabaseDeprecationBanner></DatabaseDeprecationBanner>
       </div>
 
-      <!-- Streams overview section -->
-      <div
-        class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)]"
-        role="region"
-        aria-label="Streams overview section"
-      >
-        <div class="tw:flex tw:justify-between tw:items-center tw:mb-3">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-              <OIcon name="window" size="md" />
-            </div>
-            <div class="tw:text-(length:--text-lg) tw:font-semibold tw:[line-height:1.4]">{{ t("home.streams") }}</div>
-          </div>
-          <OButton
-            variant="ghost"
-            size="icon-circle"
-            :class="
-              store.state.theme === 'dark'
-                ? 'view-button-dark'
-                : 'view-button-light'
-            "
-            aria-label="View all streams"
-            :title="t('home.viewButton')"
-            data-test="home-usage-tab-view-streams-btn"
+      <!-- Streams — data-volume metrics. Uniform, non-clickable stat tiles; the
+           list is reached from the section header so the row stays consistent. -->
+      <div class="mb-2 flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span
+            class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+            aria-hidden="true"
           >
-            <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-            <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-            <router-link
-              exact
-              :to="{
-                name: 'logstreams',
-                query: {
-                  org_identifier:
-                    store.state.selectedOrganization?.identifier,
-                },
-              }"
-              class="tw:absolute tw:inset-0"
-              aria-label="Navigate to streams page"
-            ></router-link>
-          </OButton>
+            <OIcon name="window" size="sm" />
+          </span>
+          <span class="text-text-heading text-base font-semibold">{{ t("home.streams") }}</span>
         </div>
-
-        <!-- Tiles -->
-        <div class="tw:grid tw:[grid-template-columns:repeat(auto-fit,minmax(15rem,1fr))] tw:gap-3">
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
-            <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
-              role="article"
-              aria-label="Streams count statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.streams") }}</div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="streamsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-streams-count"
-              >
-                {{ animatedStreamsCount || summary.streams_count }}
-              </div>
-            </div>
-          </div>
-
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
-            <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
-              role="article"
-              aria-label="Events count statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.docsCountLbl") }}</div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="recordsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-events-count"
-              >
-                {{ formattedAnimatedEventsCount }}
-              </div>
-            </div>
-          </div>
-
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]">
-            <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
-              role="article"
-              aria-label="Ingested data size statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">
-                    {{ t("home.totalDataIngested") }}
-                  </div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="ingestedSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-error-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-error-text)]"
-                >
-                  <OIcon name="arrow-downward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-ingested-size"
-              >
-                {{ formattedAnimatedIngestedSize }}
-              </div>
-            </div>
-          </div>
-
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
-            <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
-              role="article"
-              aria-label="Compressed data size statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">
-                    {{ t("home.totalDataCompressed") }}
-                  </div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="compressedSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 2.89% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-compressed-size"
-              >
-                {{ formattedAnimatedCompressedSize }}
-              </div>
-            </div>
-          </div>
-
-          <div class="tw:[border-radius:0.325rem] tw:border tw:border-[var(--o2-border-color)]" v-if="config.isCloud == 'false'">
-            <div
-              class="tw:rounded-lg tw:text-center tw:flex tw:flex-col tw:justify-between tw:h-full tw:p-3 tw:gap-1 tw:[transition:all_0.3s_cubic-bezier(0.4,0,0.2,1)] tw:[contain:layout_style_paint]"
-              role="article"
-              aria-label="Index size statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div class="tw:flex tw:justify-between">
-                  <div class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.indexSizeLbl") }}</div>
-                  <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                    <img :src="indexSizeIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                </div>
-                <div
-                  v-if="false"
-                  class="tw:rounded-[3.125rem] tw:w-40 tw:px-2 tw:flex tw:items-center tw:text-xs! tw:bg-[var(--o2-status-success-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-[var(--o2-status-success-text)]"
-                >
-                  <OIcon name="arrow-upward" size="xs" /> 0.00% from last
-                  week
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-index-size"
-              >
-                {{ formattedAnimatedIndexSize }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts section -->
-      <div class="tw:grid tw:[grid-template-columns:minmax(min-content,max-content)_1fr_2fr] tw:gap-3 tw:mt-4 tw:items-stretch tw:flex-1 tw:min-h-0">
-        <!-- Functions and Dashboards tiles -->
-        <div class="tw:flex tw:flex-col tw:gap-4 tw:w-full">
-          <div class="tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
-            <div
-              class="tw:rounded tw:p-4 tw:w-full tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
-              role="article"
-              aria-label="Functions count statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
-                >
-                  <div
-                    class="tw:bg-[rgba(238,95,38,0.2)] tw:border tw:border-[rgba(238,95,38,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg tw:flex-shrink-0"
-                    aria-hidden="true"
-                  >
-                    <img :src="functionsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                  <div
-                    class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
-                  >
-                    {{ t("home.functionTitle") }}
-                  </div>
-                  <OButton
-                    variant="ghost"
-                    size="icon-circle"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'view-button-dark'
-                        : 'view-button-light'
-                    "
-                    aria-label="View all functions"
-                    class="tw:flex-shrink-0"
-                    :title="t('home.viewButton')"
-                    data-test="home-usage-tab-view-functions-btn"
-                  >
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                    <router-link
-                      exact
-                      :to="{
-                        name: 'functionList',
-                        query: {
-                          org_identifier:
-                            store.state.selectedOrganization?.identifier,
-                        },
-                      }"
-                      class="tw:absolute tw:inset-0"
-                      aria-label="Navigate to functions page"
-                    ></router-link>
-                  </OButton>
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-functions-count"
-              >
-                {{ animatedFunctionCount || summary.function_count }}
-              </div>
-            </div>
-          </div>
-
-          <div class="tw:flex-1 tw:flex tw:min-w-0 tw:w-full">
-            <div
-              class="tw:rounded tw:p-4 tw:w-full tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:text-center tw:flex tw:flex-col tw:justify-between"
-              role="article"
-              aria-label="Dashboards count statistics"
-            >
-              <div class="tw:flex tw:flex-col tw:justify-between">
-                <div
-                  class="tw:flex tw:items-center tw:gap-2 tw:flex-nowrap tw:w-full"
-                >
-                  <div
-                    class="tw:bg-[rgba(238,95,38,0.2)] tw:border tw:border-[rgba(238,95,38,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg tw:flex-shrink-0"
-                    aria-hidden="true"
-                  >
-                    <img :src="dashboardsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                  </div>
-                  <div
-                    class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex-1 tw:text-left tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis"
-                  >
-                    {{ t("home.dashboardTitle") }}
-                  </div>
-                  <OButton
-                    variant="ghost"
-                    size="icon-circle"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'view-button-dark'
-                        : 'view-button-light'
-                    "
-                    aria-label="View all dashboards"
-                    class="tw:flex-shrink-0"
-                    :title="t('home.viewButton')"
-                    data-test="home-usage-tab-view-dashboards-btn"
-                  >
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                    <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                    <router-link
-                      exact
-                      :to="{
-                        name: 'dashboards',
-                        query: {
-                          org_identifier:
-                            store.state.selectedOrganization?.identifier,
-                        },
-                      }"
-                      class="tw:absolute tw:inset-0"
-                      aria-label="Navigate to dashboards page"
-                    ></router-link>
-                  </OButton>
-                </div>
-              </div>
-              <div
-                class="tw:text-(length:--text-xl) tw:font-semibold tw:[line-height:1.3] tw:flex tw:items-end"
-                aria-live="polite"
-                data-test="home-usage-tab-dashboards-count"
-              >
-                {{ animatedDashboardCount || summary.dashboard_count }}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Alerts chart -->
-        <div
-          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:min-h-0"
-          role="region"
-          aria-label="Alerts overview section"
+        <OButton
+          v-if="canView('logstreams')"
+          variant="ghost"
+          size="icon-circle"
+          class="relative"
+          :aria-label="t('home.viewButton')"
+          :title="t('home.viewButton')"
+          data-test="home-usage-tab-view-streams-btn"
         >
-          <div class="tw:gap-2 tw:mb-3">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
-                <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                  <img :src="alertsIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                </div>
-                {{ t("home.alertTitle") }}
-              </span>
-              <OButton
-                variant="ghost"
-                size="icon-circle"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'view-button-dark'
-                    : 'view-button-light'
-                "
-                aria-label="View all alerts"
-                :title="t('home.viewButton')"
-                data-test="home-usage-tab-view-alerts-btn"
-              >
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                <router-link
-                  exact
-                  :to="{
-                    name: 'alertList',
-                    query: {
-                      org_identifier:
-                        store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  class="tw:absolute tw:inset-0"
-                  aria-label="Navigate to alerts page"
-                ></router-link>
-              </OButton>
+          <OIcon name="arrow-forward" size="sm" />
+          <router-link
+            exact
+            :to="{
+              name: 'logstreams',
+              query: { org_identifier: store.state.selectedOrganization?.identifier },
+            }"
+            class="absolute inset-0"
+            :aria-label="t('home.viewButton')"
+          ></router-link>
+        </OButton>
+      </div>
+      <KpiCardRow class="mb-4 shrink-0" min-width="12rem">
+        <!-- Streams -->
+        <KpiCard
+          :label="t('home.streams')"
+          icon="window"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
+        >
+          <template #value>
+            <span
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
+              aria-live="polite"
+              data-test="home-usage-tab-streams-count"
+              >{{ animatedStreamsCount || summary.streams_count }}</span
+            >
+          </template>
+        </KpiCard>
+
+        <!-- Events -->
+        <KpiCard
+          :label="t('home.docsCountLbl')"
+          icon="bar-chart"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-primary-bg text-icon-chip-primary-text"
+        >
+          <template #value>
+            <span
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
+              aria-live="polite"
+              data-test="home-usage-tab-events-count"
+              >{{ formattedAnimatedEventsCount }}</span
+            >
+          </template>
+        </KpiCard>
+
+        <!-- Ingested size -->
+        <KpiCard
+          :label="t('home.totalDataIngested')"
+          icon="download"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
+        >
+          <template #value>
+            <span
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
+              aria-live="polite"
+              data-test="home-usage-tab-ingested-size"
+              >{{ formattedAnimatedIngestedSize }}</span
+            >
+          </template>
+        </KpiCard>
+
+        <!-- Compressed size (self-hosted only) -->
+        <KpiCard
+          v-if="config.isCloud == 'false'"
+          :label="t('home.totalDataCompressed')"
+          icon="compress"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-success-bg text-icon-chip-success-text"
+        >
+          <template #value>
+            <span
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
+              aria-live="polite"
+              data-test="home-usage-tab-compressed-size"
+              >{{ formattedAnimatedCompressedSize }}</span
+            >
+          </template>
+        </KpiCard>
+
+        <!-- Index size (self-hosted only) -->
+        <KpiCard
+          v-if="config.isCloud == 'false'"
+          :label="t('home.indexSizeLbl')"
+          icon="save"
+          icon-size="md"
+          label-class="text-sm font-medium text-text-secondary"
+          icon-class="bg-icon-chip-warning-bg text-icon-chip-warning-text"
+        >
+          <template #value>
+            <span
+              class="text-text-heading text-2xl leading-tight font-semibold tabular-nums"
+              aria-live="polite"
+              data-test="home-usage-tab-index-size"
+              >{{ formattedAnimatedIndexSize }}</span
+            >
+          </template>
+        </KpiCard>
+      </KpiCardRow>
+
+      <!-- Main region — a filled resources rail beside the two status charts, so
+           Functions/Dashboards live somewhere purposeful and the vertical space
+           is actually used. Rail carries counts + one-click access to every area. -->
+      <div
+        class="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[16rem_minmax(0,1fr)_minmax(0,1fr)]"
+      >
+        <!-- Resources rail -->
+        <aside
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col overflow-y-auto border p-4"
+          :aria-label="t('common.resources')"
+        >
+          <!-- Resources — owned assets with live counts. Each row is gated to the
+               same route the left nav uses, so it hides when access is missing. -->
+          <template v-if="showResources">
+            <div class="text-text-heading mb-1 text-sm font-semibold">
+              {{ t("home.resources") }}
             </div>
-            <div class="tw:flex tw:pt-2 tw:gap-[1em]">
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{
-                  t("home.scheduledAlert")
+            <nav class="flex flex-col">
+              <router-link
+                v-if="canView('functionList')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'functionList',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-functions-card"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="function" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("home.functionTitle")
                 }}</span>
                 <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-scheduled-alerts-count"
-                >{{
-                  animatedScheduledAlerts || summary.scheduled_alerts
-                }}</span>
-              </div>
-              <OSeparator :vertical="true" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{ t("home.rtAlert") }}</span>
+                  class="text-text-heading text-sm font-semibold tabular-nums"
+                  data-test="home-usage-tab-functions-count"
+                  >{{ animatedFunctionCount || summary.function_count }}</span
+                >
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+              <router-link
+                v-if="canView('dashboards')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'dashboards',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-dashboards-card"
+              >
                 <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-rt-alerts-count"
-                >{{
-                  animatedRtAlerts || summary.rt_alerts
+                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="dashboard" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("home.dashboardTitle")
                 }}</span>
-              </div>
+                <span
+                  class="text-text-heading text-sm font-semibold tabular-nums"
+                  data-test="home-usage-tab-dashboards-count"
+                  >{{ animatedDashboardCount || summary.dashboard_count }}</span
+                >
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+            </nav>
+          </template>
+
+          <div
+            v-if="showResources && showExplore"
+            class="bg-border-default my-3 h-px"
+            role="separator"
+          ></div>
+
+          <!-- Explore — data surfaces. Same per-route gating as above. -->
+          <template v-if="showExplore">
+            <div class="text-text-secondary mb-1 text-xs font-semibold">
+              {{ t("home.explore") }}
+            </div>
+            <nav class="flex flex-col">
+              <router-link
+                v-if="canView('logs')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'logs',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-explore-logs"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="search" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("menu.search")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+              <router-link
+                v-if="canView('traces')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'traces',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-explore-traces"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="account-tree" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("menu.traces")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+              <router-link
+                v-if="canView('metrics')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'metrics',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-explore-metrics"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-success-bg text-icon-chip-success-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="bar-chart" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("menu.metrics")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+              <router-link
+                v-if="canView('RUM')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'RUM',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-explore-rum"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="devices" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("menu.rum")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+              <router-link
+                v-if="canView('incidentList')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'incidentList',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-explore-incidents"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="notifications-active" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("menu.incidents")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+              <router-link
+                v-if="canView('reports')"
+                class="group rounded-default hover:bg-table-row-hover-bg -mx-2 flex items-center gap-2.5 px-2 py-2 text-inherit no-underline transition-colors"
+                :to="{
+                  name: 'reports',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                data-test="home-usage-tab-explore-reports"
+              >
+                <span
+                  class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-8 w-8 shrink-0 items-center justify-center"
+                  aria-hidden="true"
+                >
+                  <OIcon name="description" size="sm" />
+                </span>
+                <span class="text-text-body min-w-0 flex-1 truncate text-sm font-medium">{{
+                  t("menu.report")
+                }}</span>
+                <OIcon
+                  name="chevron-right"
+                  size="sm"
+                  class="text-text-disabled group-hover:text-text-secondary shrink-0 transition-transform group-hover:translate-x-0.5"
+                />
+              </router-link>
+            </nav>
+          </template>
+        </aside>
+
+        <!-- Alerts -->
+        <section
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
+          :aria-label="t('home.alertsOverviewSection')"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
+              <span
+                class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text inline-flex h-10 w-10 shrink-0 items-center justify-center"
+                aria-hidden="true"
+              >
+                <OIcon name="shield-alert-outline" size="md" />
+              </span>
+              {{ t("home.alertTitle") }}
+            </span>
+            <OButton
+              v-if="canView('alertList')"
+              variant="ghost"
+              size="icon-circle"
+              class="relative"
+              :aria-label="t('home.viewButton')"
+              :title="t('home.viewButton')"
+              data-test="home-usage-tab-view-alerts-btn"
+            >
+              <OIcon name="arrow-forward" size="sm" />
+              <router-link
+                exact
+                :to="{
+                  name: 'alertList',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                class="absolute inset-0"
+                :aria-label="t('home.viewButton')"
+              ></router-link>
+            </OButton>
+          </div>
+          <div class="flex gap-4 pt-3">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.scheduledAlert") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-scheduled-alerts-count"
+                >{{ animatedScheduledAlerts || summary.scheduled_alerts }}</span
+              >
+            </div>
+            <OSeparator :vertical="true" />
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.rtAlert") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-rt-alerts-count"
+                >{{ animatedRtAlerts || summary.rt_alerts }}</span
+              >
             </div>
           </div>
-          <div
-            class="custom-first-chart tw:flex-1 tw:min-h-[200px] tw:w-full"
-          >
+          <div class="mt-3 min-h-50 w-full flex-1">
             <CustomChartRenderer
               :key="alertsPanelDataKey"
               :data="alertsPanelData"
-              class="tw:w-full tw:h-full"
+              class="h-full w-full"
             />
           </div>
-        </div>
+        </section>
 
-        <!-- Pipelines chart -->
-        <div
-          class="tw:rounded tw:p-4 tw:bg-[var(--o2-card-bg)] tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:min-h-0"
-          role="region"
-          aria-label="Pipelines overview section"
+        <!-- Pipelines -->
+        <section
+          class="rounded-default bg-card-glass-bg border-card-glass-border flex min-h-0 flex-col border p-4"
+          :aria-label="t('home.pipelinesOverviewSection')"
         >
-          <div class="tw:gap-2 tw:mb-3">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <span class="tw:text-(length:--text-base) tw:font-medium tw:[line-height:1.4] tw:[letter-spacing:0%] tw:flex tw:items-center tw:gap-2">
-                <div class="tw:bg-[rgba(57,126,246,0.2)] tw:border tw:border-[rgba(57,126,246,0.35)] tw:opacity-80 tw:flex tw:items-center tw:justify-center tw:w-[2.5rem] tw:h-[2.5rem] tw:rounded-lg" aria-hidden="true">
-                  <img :src="pipelinesIcon" alt="" class="tw:h-6 tw:dark:[filter:brightness(1.5)]" />
-                </div>
-                {{ t("home.pipelineTitle") }}
-              </span>
-              <OButton
-                variant="ghost"
-                size="icon-circle"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'view-button-dark'
-                    : 'view-button-light'
-                "
-                aria-label="View all pipelines"
-                :title="t('home.viewButton')"
-                data-test="home-usage-tab-view-pipelines-btn"
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-text-heading flex items-center gap-2 text-sm font-semibold">
+              <span
+                class="rounded-default bg-icon-chip-primary-bg text-icon-chip-primary-text inline-flex h-10 w-10 shrink-0 items-center justify-center"
+                aria-hidden="true"
               >
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon" />
-                <OIcon name="arrow-forward" size="sm" class="view-arrow-icon-in" />
-                <router-link
-                  exact
-                  :to="{
-                    name: 'pipelines',
-                    query: {
-                      org_identifier:
-                        store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  class="tw:absolute tw:inset-0"
-                  aria-label="Navigate to pipelines page"
-                ></router-link>
-              </OButton>
+                <OIcon name="lan" size="md" />
+              </span>
+              {{ t("home.pipelineTitle") }}
+            </span>
+            <OButton
+              v-if="canView('pipelines')"
+              variant="ghost"
+              size="icon-circle"
+              class="relative"
+              :aria-label="t('home.viewButton')"
+              :title="t('home.viewButton')"
+              data-test="home-usage-tab-view-pipelines-btn"
+            >
+              <OIcon name="arrow-forward" size="sm" />
+              <router-link
+                exact
+                :to="{
+                  name: 'pipelines',
+                  query: { org_identifier: store.state.selectedOrganization?.identifier },
+                }"
+                class="absolute inset-0"
+                :aria-label="t('home.viewButton')"
+              ></router-link>
+            </OButton>
+          </div>
+          <div class="flex gap-4 pt-3">
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.schedulePipelineTitle") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-scheduled-pipelines-count"
+                >{{ animatedScheduledPipelines || summary.scheduled_pipelines }}</span
+              >
             </div>
-            <div class="tw:flex tw:pt-2 tw:gap-[1em]">
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">
-                  {{ t("home.schedulePipelineTitle") }}</span
-                >
-                <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-scheduled-pipelines-count"
-                >{{
-                  animatedScheduledPipelines || summary.scheduled_pipelines
-                }}</span>
-              </div>
-              <OSeparator :vertical="true" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-(length:--text-sm) tw:font-normal tw:[line-height:1.4] tw:[letter-spacing:0%]">{{
-                  t("home.rtPipelineTitle")
-                }}</span>
-                <span
-                  class="tw:text-(length:--text-md) tw:font-semibold tw:[line-height:1.4]"
-                  aria-live="polite"
-                  data-test="home-usage-tab-rt-pipelines-count"
-                >{{
-                  animatedRtPipelines || summary.rt_pipelines
-                }}</span>
-              </div>
+            <OSeparator :vertical="true" />
+            <div class="flex flex-col gap-0.5">
+              <span class="text-text-secondary text-xs">{{ t("home.rtPipelineTitle") }}</span>
+              <span
+                class="text-text-heading text-lg leading-tight font-semibold tabular-nums"
+                aria-live="polite"
+                data-test="home-usage-tab-rt-pipelines-count"
+                >{{ animatedRtPipelines || summary.rt_pipelines }}</span
+              >
             </div>
           </div>
-          <div
-            class="custom-second-chart tw:flex-1 tw:min-h-[200px] tw:w-full"
-          >
+          <div class="mt-3 min-h-50 w-full flex-1">
             <CustomChartRenderer
               :key="pipelinesPanelDataKey"
               :data="pipelinesPanelData"
-              class="tw:w-full tw:h-full"
+              class="h-full w-full"
             />
           </div>
-        </div>
+        </section>
       </div>
     </div>
 
     <!-- Empty state when no data ingested -->
     <div
       v-if="no_data_ingest && !isLoadingSummary"
-      class="tw:flex tw:flex-col tw:h-full"
+      class="flex h-full flex-col"
       data-test="home-usage-tab-no-data"
     >
       <TrialPeriod />
@@ -538,7 +544,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading state -->
-    <div v-if="isLoadingSummary" data-test="home-usage-tab-loading">
+    <div v-if="isLoadingSummary" class="h-full" data-test="home-usage-tab-loading">
       <HomeViewSkeleton />
     </div>
   </div>
@@ -547,13 +553,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- UsageTab: self-contained home usage dashboard showing streams, functions, dashboards, alerts, and pipelines summary with animated counters and charts. -->
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import orgService from "@/services/organizations";
 import configService from "@/services/config";
 import config from "@/aws-exports";
-import { formatSizeFromMB, getImageURL } from "@/utils/zincutils";
+import { formatSizeFromMB } from "@/utils/zincutils";
+import { formatEventCount } from "@/utils/formatters";
+import { chartColor } from "@/utils/chartTheme";
 import CustomChartRenderer from "@/components/dashboards/panels/CustomChartRenderer.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -563,10 +571,12 @@ import DatabaseDeprecationBanner from "@/components/DatabaseDeprecationBanner.vu
 import HomeViewSkeleton from "@/components/shared/HomeViewSkeleton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import KpiCard from "@/components/common/KpiCard.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -593,12 +603,7 @@ const animatedRtPipelines = ref(0);
 const themeVersion = ref(0);
 
 // Count-up animation using requestAnimationFrame
-const animateValue = (
-  targetRef: any,
-  start: number,
-  end: number,
-  duration: number,
-) => {
+const animateValue = (targetRef: any, start: number, end: number, duration: number) => {
   if (start === end) {
     targetRef.value = end;
     return;
@@ -625,25 +630,13 @@ const animateValue = (
   return () => cancelAnimationFrame(animationId);
 };
 
-const formatEventCount = (num: number): string => {
-  if (num < 100000) return num.toString();
-
-  const units = ["", "K", "M", "B", "T"];
-  let tier = Math.floor(Math.log10(num) / 3);
-
-  if (tier >= units.length) tier = units.length - 1;
-
-  const scaled = num / Math.pow(10, tier * 3);
-  return scaled.toFixed(1).replace(/\.0$/, "") + units[tier];
-};
-
 const getSummary = (org_id: any) => {
   isLoadingSummary.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading summary...",
-      timeout: 0,
-});
+    message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
+    timeout: 0,
+  });
   orgService
     .get_organization_summary(org_id)
     .then((res) => {
@@ -663,8 +656,7 @@ const getSummary = (org_id: any) => {
       }
 
       const rawDocCount = res.data.streams?.total_records ?? 0;
-      const rawCompressedSize =
-        res.data.streams?.total_compressed_size ?? 0;
+      const rawCompressedSize = res.data.streams?.total_compressed_size ?? 0;
       const rawIngestedSize = res.data.streams?.total_storage_size ?? 0;
       const rawIndexSize = res.data.streams?.total_index_size ?? 0;
 
@@ -693,56 +685,16 @@ const getSummary = (org_id: any) => {
       };
 
       // Animate counters
-      animateValue(
-        animatedStreamsCount,
-        0,
-        summary.value.streams_count,
-        500,
-      );
-      animateValue(
-        animatedEventsCount,
-        0,
-        summary.value.doc_count_raw,
-        500,
-      );
-      animateValue(
-        animatedCompressedSize,
-        0,
-        summary.value.compressed_size_raw,
-        500,
-      );
-      animateValue(
-        animatedIngestedSize,
-        0,
-        summary.value.ingested_size_raw,
-        500,
-      );
+      animateValue(animatedStreamsCount, 0, summary.value.streams_count, 500);
+      animateValue(animatedEventsCount, 0, summary.value.doc_count_raw, 500);
+      animateValue(animatedCompressedSize, 0, summary.value.compressed_size_raw, 500);
+      animateValue(animatedIngestedSize, 0, summary.value.ingested_size_raw, 500);
       animateValue(animatedIndexSize, 0, summary.value.index_size_raw, 500);
-      animateValue(
-        animatedFunctionCount,
-        0,
-        summary.value.function_count,
-        500,
-      );
-      animateValue(
-        animatedDashboardCount,
-        0,
-        summary.value.dashboard_count,
-        500,
-      );
-      animateValue(
-        animatedScheduledAlerts,
-        0,
-        summary.value.scheduled_alerts,
-        500,
-      );
+      animateValue(animatedFunctionCount, 0, summary.value.function_count, 500);
+      animateValue(animatedDashboardCount, 0, summary.value.dashboard_count, 500);
+      animateValue(animatedScheduledAlerts, 0, summary.value.scheduled_alerts, 500);
       animateValue(animatedRtAlerts, 0, summary.value.rt_alerts, 500);
-      animateValue(
-        animatedScheduledPipelines,
-        0,
-        summary.value.scheduled_pipelines,
-        500,
-      );
+      animateValue(animatedScheduledPipelines, 0, summary.value.scheduled_pipelines, 500);
       animateValue(animatedRtPipelines, 0, summary.value.rt_pipelines, 500);
 
       no_data_ingest.value = false;
@@ -753,7 +705,7 @@ const getSummary = (org_id: any) => {
       dismiss();
       toast({
         variant: "error",
-        message: "Error while pulling summary.",
+        message: t("toastMessages.views.errorWhilePullingSummary"),
       });
     })
     .finally(() => {
@@ -763,11 +715,7 @@ const getSummary = (org_id: any) => {
 
 // Show usage report banner when last_usage_report_ts > 0 and elapsed > 1 hour
 const showUsageReportBanner = computed(() => {
-  if (
-    !store.state.zoConfig ||
-    !("last_usage_report_ts" in store.state.zoConfig)
-  )
-    return false;
+  if (!store.state.zoConfig || !("last_usage_report_ts" in store.state.zoConfig)) return false;
   const ts = store.state.zoConfig.last_usage_report_ts;
   if (!ts || ts === 0) return false;
   const reportedAtMs = ts / 1000;
@@ -791,7 +739,7 @@ const alertsPanelData = computed(() => {
         textStyle: {
           fontSize: 16,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: chartColor("--color-text-secondary"),
         },
       },
     };
@@ -806,7 +754,7 @@ const alertsPanelData = computed(() => {
       textStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#D9D9D9" : "#262626",
+        color: chartColor("--color-text-heading"),
       },
     },
     tooltip: {
@@ -817,7 +765,7 @@ const alertsPanelData = computed(() => {
       orient: "vertical",
       left: "65%",
       textStyle: {
-        color: store.state.theme === "dark" ? "#DCDCDC" : "#232323",
+        color: chartColor("--color-text-heading"),
       },
     },
     series: [
@@ -832,7 +780,7 @@ const alertsPanelData = computed(() => {
           formatter: "{d}%",
           show: true,
           fontSize: 14,
-          color: store.state.theme === "dark" ? "#ffffff" : "#000000",
+          color: chartColor("--color-text-heading"),
         },
         labelLine: {
           show: true,
@@ -846,14 +794,12 @@ const alertsPanelData = computed(() => {
           {
             value: healthyAlerts,
             name: "Success Alerts",
-            itemStyle: {
-            },
+            itemStyle: {},
           },
           {
             value: failedAlerts,
             name: "Failed Alerts",
-            itemStyle: {
-            },
+            itemStyle: {},
           },
         ],
       },
@@ -878,7 +824,7 @@ const pipelinesPanelData = computed(() => {
         textStyle: {
           fontSize: 16,
           fontWeight: "normal",
-          color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+          color: chartColor("--color-text-secondary"),
         },
       },
     };
@@ -895,20 +841,17 @@ const pipelinesPanelData = computed(() => {
       nameTextStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       axisLabel: {
         fontSize: 14,
-        color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+        color: chartColor("--color-text-body"),
       },
     },
     yAxis: {
       type: "value",
       min: 0,
-      max:
-        Math.ceil(
-          (healthyPipelines + failedPipelines + warningPipelines) / 3 / 10,
-        ) * 10 || 10,
+      max: Math.ceil((healthyPipelines + failedPipelines + warningPipelines) / 3 / 10) * 10 || 10,
       interval: 10,
       name: "Number of Pipelines",
       nameLocation: "middle",
@@ -917,15 +860,15 @@ const pipelinesPanelData = computed(() => {
       nameTextStyle: {
         fontSize: 16,
         fontWeight: "normal",
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       axisLabel: {
         fontSize: 12,
-        color: store.state.theme === "dark" ? "#B7B7B7" : "#72777B",
+        color: chartColor("--color-text-secondary"),
       },
       splitLine: {
         lineStyle: {
-          color: store.state.theme === "dark" ? "#444" : "#e0e0e0",
+          color: chartColor("--color-border-subtle"),
         },
       },
       offset: -20,
@@ -940,7 +883,7 @@ const pipelinesPanelData = computed(() => {
           position: "top",
           fontSize: 14,
           fontWeight: "bold",
-          color: store.state.theme === "dark" ? "#CCCFD1" : "#2E3133",
+          color: chartColor("--color-text-body"),
         },
         itemStyle: {
           color: function (params: any) {
@@ -951,70 +894,6 @@ const pipelinesPanelData = computed(() => {
       },
     ],
   };
-});
-
-const compressedSizeIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/compressed_size_dark.svg"
-      : "images/home/compressed_size.svg";
-  return getImageURL(icon);
-});
-
-const ingestedSizeIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/ingested_size_dark.svg"
-      : "images/home/ingested_size.svg";
-  return getImageURL(icon);
-});
-
-const indexSizeIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/index_size_dark.svg"
-      : "images/home/index_size.svg";
-  return getImageURL(icon);
-});
-
-const recordsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/records_dark.svg"
-      : "images/home/records.svg";
-  return getImageURL(icon);
-});
-
-const streamsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/streams_dark.svg"
-      : "images/home/streams.svg";
-  return getImageURL(icon);
-});
-
-const functionsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/function_tile_icon_dark.svg"
-      : "images/home/function_tile_icon.svg";
-  return getImageURL(icon);
-});
-
-const dashboardsIcon = computed(() => {
-  const icon =
-    store.state.theme === "dark"
-      ? "images/home/dashboards_tile_icon.svg"
-      : "images/home/dashboards_tile_icon.svg";
-  return getImageURL(icon);
-});
-
-const alertsIcon = computed(() => {
-  return getImageURL("images/home/alerts.svg");
-});
-
-const pipelinesIcon = computed(() => {
-  return getImageURL("images/home/pipeline.svg");
 });
 
 const goToLicensePage = () => {
@@ -1047,14 +926,23 @@ const formattedAnimatedIndexSize = computed(() => {
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
+// Rail visibility mirrors the left nav exactly: a route is only registered when
+// the user's edition/feature/RBAC gate allows it, so `hasRoute` is the same
+// signal the nav flyout filters its children by (see navGroups.ts). This keeps
+// the rail from ever offering a page the user has no way to reach.
+const canView = (name: string) => router.hasRoute(name);
+const showResources = computed(() => canView("functionList") || canView("dashboards"));
+const showExplore = computed(() =>
+  ["logs", "traces", "metrics", "RUM", "incidentList", "reports"].some((n) => canView(n)),
+);
+
 // Initial load
-const onThemeColorChanged = () => { themeVersion.value++; };
+const onThemeColorChanged = () => {
+  themeVersion.value++;
+};
 
 onMounted(() => {
-  if (
-    Object.keys(store.state.selectedOrganization).length > 0 &&
-    orgId.value != undefined
-  ) {
+  if (Object.keys(store.state.selectedOrganization).length > 0 && orgId.value != undefined) {
     getSummary(orgId.value);
   }
   // Refresh config so the UsageReportBanner reflects the latest
@@ -1086,149 +974,3 @@ watch(orgId, (newVal, oldVal) => {
   }
 });
 </script>
-
-<style scoped lang="scss">
-
-/*
- * UsageTab Styles
- *
- * Structure:
- * 1. CSS Variables
- * 2. Global Transitions
- * 3. Layout Components
- * 4. Interactive States
- * 5. Responsive Design
- */
-
-/* ===== 2. Global Transitions ===== */
-* {
-  transition:
-    background-color 0.3s ease,
-    color 0.3s ease,
-    border-color 0.3s ease,
-    box-shadow 0.3s ease;
-}
-
-*[class*="animation"],
-*[style*="animation"] {
-  transition: none;
-}
-
-/* ===== 3. Layout Components ===== */
-
-.banners-wrapper:has(> div) {
-  margin-bottom: 0.75rem;
-}
-
-.view-button-light {
-  cursor: pointer;
-  padding: 0;
-}
-.view-button-dark {
-  cursor: pointer;
-  padding: 0;
-  margin: 0;
-}
-.view-button-light,
-.view-button-dark {
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-
-  .router-link-active,
-  a {
-    z-index: 10;
-    pointer-events: all;
-  }
-}
-
-.view-arrow-icon {
-  font-size: var(--text-md);
-  transition:
-    transform 0.4s ease-in-out,
-    opacity 0.4s ease-in-out;
-  pointer-events: none;
-  position: relative;
-  z-index: 1;
-}
-
-.view-button-light:hover .view-arrow-icon,
-.view-button-dark:hover .view-arrow-icon {
-  transform: translateX(1.25rem);
-  opacity: 0;
-}
-
-.view-arrow-icon-in {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) translateX(-1.25rem);
-  opacity: 0;
-  transition:
-    transform 0.4s ease-in-out,
-    opacity 0.4s ease-in-out;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.view-button-light:hover .view-arrow-icon-in,
-.view-button-dark:hover .view-arrow-icon-in {
-  transform: translate(-50%, -50%) translateX(0);
-  opacity: 1;
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(1.25rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@media (max-width: 1400px) {
-  .functions-dashboards-column {
-    flex-direction: row;
-  }
-}
-
-@media (max-width: 768px) {
-  .functions-dashboards-column {
-    flex-direction: column;
-  }
-}
-
-/* ===== 4. Interactive States ===== */
-
-.view-button-light:focus-visible,
-.view-button-dark:focus-visible {
-  outline: 2px solid var(--o2-focus-ring);
-  outline-offset: 2px;
-  border-radius: 0.25rem;
-}
-
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--o2-focus-ring);
-  outline-offset: 2px;
-}
-
-*:focus:not(:focus-visible) {
-  outline: none;
-}
-
-/* ===== 5. Responsive Design & Accessibility ===== */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-</style>

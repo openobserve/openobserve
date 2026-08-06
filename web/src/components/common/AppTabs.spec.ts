@@ -2,7 +2,6 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import AppTabs from "@/components/common/AppTabs.vue";
 
-
 describe("AppTabs", () => {
   let wrapper: any = null;
 
@@ -11,15 +10,15 @@ describe("AppTabs", () => {
     { label: "Tab 2", value: "tab2" },
     { label: "Tab 3", value: "tab3", disabled: true },
     { label: "Hidden Tab", value: "tab4", hide: true },
-    { label: "Styled Tab", value: "tab5", style: { color: "red" }, title: "Custom Title" }
+    { label: "Styled Tab", value: "tab5", style: { color: "red" }, title: "Custom Title" },
   ];
 
   beforeEach(() => {
     wrapper = mount(AppTabs, {
       props: {
         tabs: mockTabs,
-        activeTab: "tab1"
-      }
+        activeTab: "tab1",
+      },
     });
   });
 
@@ -103,8 +102,8 @@ describe("AppTabs", () => {
       props: {
         tabs: mockTabs,
         activeTab: "tab1",
-        show: false
-      }
+        show: false,
+      },
     });
 
     expect(hiddenWrapper.find('[data-test^="tab-"]').exists()).toBe(false);
@@ -141,12 +140,8 @@ describe("AppTabs", () => {
         },
       });
 
-      expect(
-        dirtyWrapper.find('[data-test="tab-dirty-dirty-dot"]').exists(),
-      ).toBe(true);
-      expect(
-        dirtyWrapper.find('[data-test="tab-clean-dirty-dot"]').exists(),
-      ).toBe(false);
+      expect(dirtyWrapper.find('[data-test="tab-dirty-dirty-dot"]').exists()).toBe(true);
+      expect(dirtyWrapper.find('[data-test="tab-clean-dirty-dot"]').exists()).toBe(false);
       dirtyWrapper.unmount();
     });
 
@@ -161,9 +156,7 @@ describe("AppTabs", () => {
           activeTab: "tab",
         },
       });
-      expect(falseWrapper.find('[data-test="tab-tab-dirty-dot"]').exists()).toBe(
-        false,
-      );
+      expect(falseWrapper.find('[data-test="tab-tab-dirty-dot"]').exists()).toBe(false);
       falseWrapper.unmount();
     });
 

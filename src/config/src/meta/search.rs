@@ -74,10 +74,54 @@ pub struct Request {
     pub clear_cache: bool,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub local_mode: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub agent_options: Option<AgentOptions>,
 }
 
 pub fn default_use_cache() -> bool {
     get_config().common.result_cache_enabled
+}
+
+/// Agent-oriented response options. When absent the response is unchanged, so
+/// existing clients (UI) are unaffected.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
+#[schema(as = SearchAgentOptions)]
+pub struct AgentOptions {
+    /// Render `hits` as a compact string block in `data` instead of a JSON
+    /// array. Tabular results shrink to ~60% of their JSON token cost as csv.
+    #[serde(default)]
+    pub output_format: OutputFormat,
+    /// Query execution mode. `partition` runs the partitioned streaming pipeline
+    /// (per-partition early termination, streaming-aggs cache) and collects
+    /// the result into this single response.
+    #[serde(default)]
+    pub mode: AgentSearchMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentSearchMode {
+    /// Current behavior: single search through the result cache path.
+    #[default]
+    Default,
+    /// Partitioned execution: the SSE-era backend partition loop scans
+    /// partition by partition, stops early once enough rows are collected,
+    /// and aggregation queries accumulate streaming-aggs cache per partition.
+    Partition,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum OutputFormat {
+    /// Current behavior: `hits` is a JSON array of objects.
+    #[default]
+    Json,
+    /// `data` holds a CSV string; newlines inside cells are escaped to a
+    /// literal `\n` so every record stays on one line.
+    Csv,
+    /// `data` holds a markdown table; better column alignment for small
+    /// result sets at ~8% more tokens than csv.
+    MdTable,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -257,6 +301,16 @@ pub struct Response {
     pub query_index: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak_memory_usage: Option<f64>,
+    /// Set when `agent_options.output_format` reformatted `hits` into `data`:
+    /// "csv", "md_table", or "ndjson" (automatic fallback for sparse results).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub format: Option<String>,
+    /// Formatted result block when `format` is set; `hits` is emptied.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data: Option<String>,
+    /// Human/agent-readable note about server-side formatting decisions.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub advisory: Option<String>,
 }
 
 /// Paginated response used by list-style APIs (sessions, traces, users).
@@ -449,6 +503,9 @@ impl Response {
             is_histogram_eligible: None,
             query_index: None,
             peak_memory_usage: None,
+            format: None,
+            data: None,
+            advisory: None,
         }
     }
 
@@ -724,6 +781,7 @@ impl SearchHistoryRequest {
             use_cache: default_use_cache(),
             clear_cache: false,
             local_mode: None,
+            agent_options: None,
         };
         Ok(search_req)
     }
@@ -1342,6 +1400,7 @@ impl MultiStreamRequest {
                 use_cache: default_use_cache(),
                 clear_cache: false,
                 local_mode: None,
+                agent_options: None,
             });
         }
         res
@@ -2396,19 +2455,19 @@ mod tests {
 
     #[test]
     fn test_search_event_type_try_from() {
-        type SET = SearchEventType; // Saving line too long
-        assert_eq!(SET::try_from("ui").unwrap(), SET::UI);
-        assert_eq!(SET::try_from("dashboards").unwrap(), SET::Dashboards);
-        assert_eq!(SET::try_from("reports").unwrap(), SET::Reports);
-        assert_eq!(SET::try_from("alerts").unwrap(), SET::Alerts);
-        assert_eq!(SET::try_from("values").unwrap(), SET::Values);
-        assert_eq!(SET::try_from("_values").unwrap(), SET::Values);
-        assert_eq!(SET::try_from("other").unwrap(), SET::Other);
-        assert_eq!(SET::try_from("rum").unwrap(), SET::RUM);
-        assert_eq!(SET::try_from("derived_stream").unwrap(), SET::DerivedStream);
-        assert_eq!(SET::try_from("derivedstream").unwrap(), SET::DerivedStream);
-        assert_eq!(SET::try_from("search_job").unwrap(), SET::SearchJob);
-        assert_eq!(SET::try_from("searchjob").unwrap(), SET::SearchJob);
+        type Set = SearchEventType; // Saving line too long
+        assert_eq!(Set::try_from("ui").unwrap(), Set::UI);
+        assert_eq!(Set::try_from("dashboards").unwrap(), Set::Dashboards);
+        assert_eq!(Set::try_from("reports").unwrap(), Set::Reports);
+        assert_eq!(Set::try_from("alerts").unwrap(), Set::Alerts);
+        assert_eq!(Set::try_from("values").unwrap(), Set::Values);
+        assert_eq!(Set::try_from("_values").unwrap(), Set::Values);
+        assert_eq!(Set::try_from("other").unwrap(), Set::Other);
+        assert_eq!(Set::try_from("rum").unwrap(), Set::RUM);
+        assert_eq!(Set::try_from("derived_stream").unwrap(), Set::DerivedStream);
+        assert_eq!(Set::try_from("derivedstream").unwrap(), Set::DerivedStream);
+        assert_eq!(Set::try_from("search_job").unwrap(), Set::SearchJob);
+        assert_eq!(Set::try_from("searchjob").unwrap(), Set::SearchJob);
         assert!(SearchEventType::try_from("invalid").is_err());
     }
 
@@ -2690,29 +2749,27 @@ mod tests {
         // Find the chunk containing the oversized hit (id=11)
         let mut found_oversized_chunk = false;
         for chunk in &chunks[1..] {
-            if let ResponseChunk::Hits { hits } = chunk {
-                if hits.len() == 1 {
-                    if let Some(id) = hits[0].get("id").and_then(|v| v.as_u64()) {
-                        if id == 11 {
-                            // Verify this is indeed the oversized hit
-                            assert!(
-                                hits[0]
-                                    .get("oversized")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false),
-                                "Chunk with single hit should contain the oversized hit"
-                            );
-                            found_oversized_chunk = true;
+            if let ResponseChunk::Hits { hits } = chunk
+                && hits.len() == 1
+                && let Some(id) = hits[0].get("id").and_then(|v| v.as_u64())
+                && id == 11
+            {
+                // Verify this is indeed the oversized hit
+                assert!(
+                    hits[0]
+                        .get("oversized")
+                        .and_then(|v| v.as_bool())
+                        .unwrap_or(false),
+                    "Chunk with single hit should contain the oversized hit"
+                );
+                found_oversized_chunk = true;
 
-                            // Verify the oversized hit is sent alone (preserving order)
-                            assert_eq!(
-                                hits.len(),
-                                1,
-                                "Oversized hit should be sent alone in its own chunk"
-                            );
-                        }
-                    }
-                }
+                // Verify the oversized hit is sent alone (preserving order)
+                assert_eq!(
+                    hits.len(),
+                    1,
+                    "Oversized hit should be sent alone in its own chunk"
+                );
             }
         }
 
@@ -3572,21 +3629,23 @@ mod tests {
 
     #[test]
     fn test_response_skip_serializing_if_set_fields_present() {
-        let mut r = Response::default();
-        r.columns = vec!["col1".to_string()];
-        r.function_error = vec!["err".to_string()];
-        r.response_type = "json".to_string();
-        r.trace_id = "t1".to_string();
-        r.histogram_interval = Some(3600);
-        r.new_start_time = Some(1000);
-        r.new_end_time = Some(2000);
-        r.work_group = Some("wg".to_string());
-        r.order_by = Some(OrderBy::Desc);
-        r.converted_histogram_query = Some("SELECT ...".to_string());
-        r.histogram_breakdown_field = Some("level".to_string());
-        r.is_histogram_eligible = Some(true);
-        r.query_index = Some(3);
-        r.peak_memory_usage = Some(512.0);
+        let r = Response {
+            columns: vec!["col1".to_string()],
+            function_error: vec!["err".to_string()],
+            response_type: "json".to_string(),
+            trace_id: "t1".to_string(),
+            histogram_interval: Some(3600),
+            new_start_time: Some(1000),
+            new_end_time: Some(2000),
+            work_group: Some("wg".to_string()),
+            order_by: Some(OrderBy::Desc),
+            converted_histogram_query: Some("SELECT ...".to_string()),
+            histogram_breakdown_field: Some("level".to_string()),
+            is_histogram_eligible: Some(true),
+            query_index: Some(3),
+            peak_memory_usage: Some(512.0),
+            ..Default::default()
+        };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("columns"));

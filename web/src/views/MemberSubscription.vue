@@ -15,34 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md">
-    <div
-      style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
-    >
-      Member Subscription
+  <div class="rounded-default">
+    <div class="w-full text-center" style="font-size: var(--text-3xl); margin: 40px 0px">
+      {{ t("billing.memberSubscription.title") }}
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
-    <div
-      v-else-if="status == 'error' && error == ''"
-      style="text-align: center"
-    >
-      Error while processing member subscription request.<br /><br />
+    <div v-else-if="status == 'error' && error == ''" class="text-center">
+      {{ t("billing.memberSubscription.errorProcessing") }}<br /><br />
     </div>
 
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="tw:text-base tw:leading-7.5 tw:w-[70%] tw:mx-auto tw:text-left"
+      class="mx-auto w-[70%] text-left text-base leading-7.5"
     />
 
-    <div v-else>Thank you for your subscription.</div>
+    <div v-else>{{ t("billing.memberSubscription.thankYou") }}</div>
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
-      class="subscription_message q-btn-primary"
+      class="subscription_message"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
-      <OButton variant="primary" class="tw:mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
+      <OButton variant="primary" class="mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
   </div>
 </template>
@@ -56,6 +51,7 @@ import { useLocalOrganization, getPath } from "../utils/zincutils";
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "PageUser",
@@ -85,15 +81,15 @@ export default defineComponent({
       const params = new URLSearchParams(hash);
       const invited_org_id = params.get("org_id");
       await organizationsService
-        .process_subscription(s, action, invited_org_id)
+        .process_subscription(s, action, invited_org_id ?? "")
         .then((res) => {
           this.status = "completed";
-          const dismiss = toast({
+          toast({
             variant: "success",
             message: res.data.message,
           });
 
-          if (res.data.hasOwnProperty("data")) {
+          if (Object.prototype.hasOwnProperty.call(res.data, "data")) {
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 
@@ -112,12 +108,13 @@ export default defineComponent({
   setup() {
     const $store = useStore();
     const $router = useRouter();
+    const { t } = useI18nTyped();
 
     return {
       $router,
       $store,
+      t,
     };
   },
 });
 </script>
-

@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
 import IncidentAlertTriggersTable from "./IncidentAlertTriggersTable.vue";
-import { createI18n } from "vue-i18n";
+import incidentsService from "@/services/incidents";
+
+vi.mock("@/services/incidents", () => ({
+  default: {
+    getExternalAlertPayload: vi.fn(),
+  },
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers & factories
@@ -41,35 +48,15 @@ function makeAlerts(count = 3, overrides: Record<string, any> = {}) {
       alert_name: `Alert ${i + 1}`,
       created_at: 1700000000000000 + i,
       ...overrides,
-    })
+    }),
   );
 }
 
-function makeI18n() {
-  return createI18n({
-    legacy: false,
-    locale: "en",
-    messages: {
-      en: {
-        alerts: {
-          incidents: {
-            correlationServiceDiscovery: "Service Discovery",
-            correlationPrimaryMatch: "Primary Match",
-            correlationSecondaryMatch: "Secondary Match",
-            correlationAlertId: "Alert ID",
-            correlationServiceDiscoveryTooltip: "Tooltip SD",
-            correlationPrimaryMatchTooltip: "Tooltip PM",
-            correlationSecondaryMatchTooltip: "Tooltip SM",
-            correlationAlertIdTooltip: "Tooltip AI",
-          },
-        },
-      },
-    },
-  });
-}
-
+// No local i18n: setupTests.ts installs the real en-US messages globally.
 function mountComp(props: Record<string, any> = {}) {
-  const i18n = makeI18n();
+  const store = createStore({
+    state: { selectedOrganization: { identifier: "myorg" } },
+  });
   return mount(IncidentAlertTriggersTable, {
     props: {
       triggers: makeAlerts(3),
@@ -77,7 +64,7 @@ function mountComp(props: Record<string, any> = {}) {
       ...props,
     },
     global: {
-      plugins: [i18n],
+      plugins: [store],
       stubs: {
         OTable: {
           template: `
@@ -86,12 +73,15 @@ function mountComp(props: Record<string, any> = {}) {
                 <slot name="empty" />
               </template>
               <table v-else>
-                <thead><tr><th>Alert Name</th><th>Fired At</th><th>Reason</th></tr></thead>
+                <thead><tr><th>Alert Name</th><th>Source</th><th>Labels</th><th>Fired At</th><th>Reason</th><th>Actions</th></tr></thead>
                 <tbody>
                   <tr v-for="(row, idx) in data" :key="idx" @click="$emit('row-click', row)">
                     <td><slot :name="'cell-alert_name'" :row="row" /></td>
+                    <td><slot :name="'cell-detected_source'" :row="row" /></td>
+                    <td><slot :name="'cell-labels'" :row="row" /></td>
                     <td><slot :name="'cell-alert_fired_at'" :row="row" /></td>
                     <td><slot :name="'cell-correlation_reason'" :row="row" /></td>
+                    <td><slot :name="'cell-actions'" :row="row" /></td>
                   </tr>
                 </tbody>
               </table>
@@ -105,6 +95,11 @@ function mountComp(props: Record<string, any> = {}) {
           props: ["variant"],
         },
         OTooltip: { template: "<span />" },
+        ODialog: {
+          template: `<div data-test="trigger-payload-dialog"><slot v-if="open" /></div>`,
+          props: ["open"],
+          emits: ["update:open"],
+        },
       },
     },
   });
@@ -135,7 +130,9 @@ describe("IncidentAlertTriggersTable", () => {
     it("shows empty message when triggers is empty", () => {
       wrapper = mountComp({ triggers: [] });
       expect(wrapper.find('[data-test="no-triggers-message"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="no-triggers-message"]').text()).toContain("No triggers loaded");
+      expect(wrapper.find('[data-test="no-triggers-message"]').text()).toContain(
+        "No triggers loaded",
+      );
     });
 
     it("does not show empty message when triggers are present", () => {
@@ -187,17 +184,23 @@ describe("IncidentAlertTriggersTable", () => {
   describe("correlation reason badge", () => {
     it("shows Service Discovery label for service_discovery reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "service_discovery" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe("Service Discovery");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toBe(
+        "Service Discovery",
+      );
     });
 
     it("shows Primary Match label for primary_match reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "primary_match" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain("Primary Match");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain(
+        "Primary Match",
+      );
     });
 
     it("shows Secondary Match label for secondary_match reason", () => {
       wrapper = mountComp({ triggers: [makeAlert({ correlation_reason: "secondary_match" })] });
-      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain("Secondary Match");
+      expect(wrapper.find('[data-test="correlation-reason-badge"]').text()).toContain(
+        "Secondary Match",
+      );
     });
 
     it("shows Alert ID label for alert_id reason", () => {
@@ -264,6 +267,87 @@ describe("IncidentAlertTriggersTable", () => {
       const name = `Alert <script>alert('x')</script>`;
       wrapper = mountComp({ triggers: [makeAlert({ alert_name: name })] });
       expect(wrapper.find('[data-test="alert-name-text"]').text()).toBe(name);
+    });
+  });
+
+  describe("external source detail (source_url/labels/detected_source)", () => {
+    it("shows a source badge for external triggers", () => {
+      wrapper = mountComp({
+        triggers: [makeAlert({ alert_kind: "external", detected_source: "grafana" })],
+      });
+      expect(wrapper.find('[data-test="trigger-source-badge"]').text()).toBe("grafana");
+    });
+
+    it("shows a dash for internal triggers with no detected_source", () => {
+      wrapper = mountComp({ triggers: [makeAlert({ alert_kind: "internal" })] });
+      expect(wrapper.find('[data-test="trigger-source-badge"]').exists()).toBe(false);
+    });
+
+    it("renders a label chip per key/value pair", () => {
+      wrapper = mountComp({
+        triggers: [
+          makeAlert({
+            alert_kind: "external",
+            labels: { service: "checkout-api", region: "us-east" },
+          }),
+        ],
+      });
+      const chips = wrapper.findAll('[data-test="trigger-label-chip"]');
+      expect(chips.length).toBe(2);
+      expect(chips.map((c) => c.text())).toEqual(
+        expect.arrayContaining(["service=checkout-api", "region=us-east"]),
+      );
+    });
+
+    it("shows a dash when a trigger has no labels", () => {
+      wrapper = mountComp({ triggers: [makeAlert({ alert_kind: "external", labels: null })] });
+      expect(wrapper.findAll('[data-test="trigger-label-chip"]').length).toBe(0);
+    });
+  });
+
+  describe("view raw payload", () => {
+    it("shows the payload button only for external-kind triggers", () => {
+      wrapper = mountComp({
+        triggers: [
+          makeAlert({ alert_id: "ext-1", alert_kind: "external" }),
+          makeAlert({ alert_id: "int-1", alert_kind: "internal" }),
+        ],
+      });
+      expect(wrapper.findAll('[data-test="trigger-view-payload-btn"]').length).toBe(1);
+    });
+
+    it("fetches and displays the raw payload when clicked", async () => {
+      (incidentsService.getExternalAlertPayload as any).mockResolvedValue({
+        data: {
+          id: "ext-1",
+          detected_source: "grafana",
+          source_url: "https://grafana.example.com/alert/1",
+          first_seen_at: 1,
+          last_seen_at: 2,
+          last_payload: { alertname: "HighCPU", status: "firing" },
+        },
+      });
+      wrapper = mountComp({
+        triggers: [makeAlert({ alert_id: "ext-1", alert_kind: "external" })],
+      });
+      await wrapper.find('[data-test="trigger-view-payload-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(incidentsService.getExternalAlertPayload).toHaveBeenCalledWith("myorg", "ext-1");
+      const json = wrapper.find('[data-test="trigger-payload-json"]');
+      expect(json.text()).toContain("HighCPU");
+      expect(json.text()).toContain("firing");
+    });
+
+    it("shows an error message when the payload fetch fails", async () => {
+      (incidentsService.getExternalAlertPayload as any).mockRejectedValue(new Error("boom"));
+      wrapper = mountComp({
+        triggers: [makeAlert({ alert_id: "ext-1", alert_kind: "external" })],
+      });
+      await wrapper.find('[data-test="trigger-view-payload-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("Failed to load the raw payload for this alert");
     });
   });
 });

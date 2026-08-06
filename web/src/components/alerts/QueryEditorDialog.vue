@@ -16,77 +16,95 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Editor Dialog -->
-  <ODrawer data-test="query-editor-dialog"
+  <ODrawer
+    data-test="query-editor-dialog"
+    bleed
     v-model:open="isOpen"
     size="full"
     :show-close="false"
   >
     <template #header-left>
-        <!-- Left: back + title + stream info -->
-        <div class="tw:flex tw:items-center tw:gap-2.5">
+      <!-- Left: back + title + stream info -->
+      <div class="flex items-center gap-2.5">
+        <div
+          data-test="add-alert-back-btn"
+          class="flex size-5 flex-shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] opacity-60 transition-opacity hover:opacity-100"
+          :title="t('common.goBack')"
+          @click="closeDialog"
+        >
+          <OIcon name="arrow-back-ios-new" size="xs" />
+        </div>
+        <span class="text-dialog-header-text block truncate text-lg font-semibold">{{
+          t("alerts.addConditions")
+        }}</span>
+
+        <!-- Separator -->
+        <div class="bg-separator h-4 w-px opacity-30" />
+
+        <!-- Stream Type + Stream Name -->
+        <div class="flex items-center gap-2">
           <div
-            data-test="add-alert-back-btn"
-            class="tw:flex tw:justify-center tw:items-center tw:cursor-pointer tw:opacity-60 tw:hover:opacity-100 tw:transition-opacity tw:flex-shrink-0"
-            style="border: 1.5px solid currentColor; border-radius: 50%; width: 20px; height: 20px;"
-            :title="t('common.goBack')"
-            @click="closeDialog"
+            v-if="streamType"
+            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-info)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-info)_10%,transparent)] px-2.5 py-0.75"
           >
-            <OIcon name="arrow-back-ios-new" size="xs" />
+            <span class="text-2xs text-text-label font-semibold">{{ t("alerts.streamType") }}</span>
+            <span class="text-2xs text-text-label opacity-30">:</span>
+            <span class="text-text-link text-xs font-bold">{{ streamType }}</span>
           </div>
-          <span class="tw:text-lg tw:font-semibold tw:text-dialog-header-text tw:truncate tw:block">{{ t('alerts.addConditions') }}</span>
-
-          <!-- Separator -->
-          <div class="tw:w-px tw:h-4 tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:bg-gray-400' : 'tw:bg-gray-500'" />
-
-          <!-- Stream Type + Stream Name -->
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div v-if="streamType" class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(59,130,246,0.12)] tw:border tw:border-[rgba(59,130,246,0.3)]' : 'tw:bg-[rgba(59,130,246,0.08)] tw:border tw:border-[rgba(59,130,246,0.25)]'">
-              <span class="tw:text-[11px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#94a3b8]' : 'tw:text-[#64748b]'">Stream Type</span>
-              <span class="tw:text-[11px] tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:text-[#64748b]' : 'tw:text-[#94a3b8]'">:</span>
-              <span class="tw:text-xs tw:font-bold" :class="store.state.theme === 'dark' ? 'tw:text-[#60a5fa]' : 'tw:text-[#2563eb]'">{{ streamType }}</span>
-            </div>
-            <span v-if="streamType && streamName" class="tw:opacity-20 tw:select-none">|</span>
-            <div class="tw:inline-flex tw:flex-row tw:items-center tw:gap-[5px] tw:py-[3px] tw:px-[10px] tw:rounded-md" :class="store.state.theme === 'dark' ? 'tw:bg-[rgba(139,92,246,0.12)] tw:border tw:border-[rgba(139,92,246,0.3)]' : 'tw:bg-[rgba(139,92,246,0.08)] tw:border tw:border-[rgba(139,92,246,0.25)]'">
-              <span class="tw:text-[11px] tw:font-semibold" :class="store.state.theme === 'dark' ? 'tw:text-[#94a3b8]' : 'tw:text-[#64748b]'">Stream Name</span>
-              <span class="tw:text-[11px] tw:opacity-30" :class="store.state.theme === 'dark' ? 'tw:text-[#64748b]' : 'tw:text-[#94a3b8]'">:</span>
-              <span v-if="streamName" class="tw:text-xs tw:font-bold" :class="store.state.theme === 'dark' ? 'tw:text-[#a78bfa]' : 'tw:text-[#7c3aed]'">{{ streamName }}</span>
-              <span v-else class="tw:text-xs tw:font-bold tw:opacity-40 tw:italic" :class="store.state.theme === 'dark' ? 'tw:text-[#a78bfa]' : 'tw:text-[#7c3aed]'">none</span>
-            </div>
+          <span v-if="streamType && streamName" class="opacity-20 select-none">|</span>
+          <div
+            class="rounded-default inline-flex flex-row items-center gap-1.25 border border-[color-mix(in_srgb,var(--color-sql-accent)_28%,transparent)] bg-[color-mix(in_srgb,var(--color-sql-accent)_10%,transparent)] px-2.5 py-0.75"
+          >
+            <span class="text-2xs text-text-label font-semibold">{{
+              t("alerts.stream_name")
+            }}</span>
+            <span class="text-2xs text-text-label opacity-30">:</span>
+            <span v-if="streamName" class="text-sql-accent text-xs font-bold">{{
+              streamName
+            }}</span>
+            <span v-else class="text-sql-accent text-xs font-bold italic opacity-40">{{
+              t("alerts.queryEditor.noStream")
+            }}</span>
           </div>
         </div>
-      </template>
-      <template #header-right>
-        <!-- Right: AI -->
-        <div class="tw:flex tw:items-center tw:gap-3">
-
-          <!-- AI button -->
-          <OButton
-            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-            :ripple="false"
-            @click="toggleAIChat"
-            data-test="menu-link-ai-item"
-            variant="ghost"
-            size="icon-toolbar"
-            class="tw:[background:linear-gradient(135deg,rgba(139,92,246,0.15)_0%,rgba(236,72,153,0.15)_100%)]! tw:transition-[background,box-shadow] tw:duration-300 tw:ease-[ease] tw:hover:[background:linear-gradient(135deg,#8B5CF6_0%,#EC4899_100%)]! tw:hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] tw:group"
-            @mouseenter="isHovered = true"
-            @mouseleave="isHovered = false"
-          >
-            <img :src="getBtnLogo" class="tw:transition-transform tw:duration-[600ms] tw:ease-[ease] tw:group-hover:rotate-180" style="width: 18px; height: 18px;" />
-          </OButton>
-        </div>
-      </template>
-    <div data-test="query-editor-dialog-card" class="tw:flex tw:h-[calc(100vh-3.5rem)] tw:overflow-hidden tw:bg-(--o2-card-bg)">
-      <div
-        class="tw:h-full tw:flex tw:overflow-hidden tw:flex-1"
-      >
-        <div class="tw:h-full tw:w-full tw:flex tw:flex-col">
+      </div>
+    </template>
+    <template #header-right>
+      <!-- Right: AI -->
+      <div class="flex items-center gap-3">
+        <!-- AI button -->
+        <OButton
+          v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+          :ripple="false"
+          @click="toggleAIChat"
+          data-test="menu-link-ai-item"
+          variant="ghost"
+          size="icon-toolbar"
+          class="group transition-[background,box-shadow] duration-300 ease-[ease] [background:var(--color-gradient-ai-subtle)]! hover:shadow-[0_0.25rem_0.75rem_0_rgba(139,92,246,0.35)] hover:[background:var(--color-gradient-ai)]!"
+          @mouseenter="isHovered = true"
+          @mouseleave="isHovered = false"
+        >
+          <img
+            :src="getBtnLogo"
+            class="transition-transform duration-[600ms] ease-[ease] group-hover:rotate-180"
+            style="width: 18px; height: 18px"
+          />
+        </OButton>
+      </div>
+    </template>
+    <div
+      data-test="query-editor-dialog-card"
+      class="bg-card-glass-bg flex h-[calc(100vh-3.5rem)] overflow-hidden"
+    >
+      <div class="flex h-full flex-1 overflow-hidden">
+        <div class="flex h-full w-full flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
-          <div class="tw:grid tw:flex-1 tw:min-h-0 tw:w-full tw:grid-cols-[20fr_45fr_35fr] tw:gap-x-2 tw:px-2 tw:pr-2 tw:py-2 tw:overflow-hidden">
-
+          <div
+            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pr-2"
+          >
             <!-- Left Section (25%) — Field Browser -->
             <div
-              class="tw:h-full tw:rounded-lg tw:overflow-hidden tw:p-[10px]"
-              :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748] tw:bg-[#1a1a1a]' : 'tw:border tw:border-[#e5e7eb] tw:bg-white'"
+              class="rounded-default border-border-default bg-surface-base h-full overflow-hidden border p-2.5"
             >
               <SearchFieldList
                 :fields="fieldListItems"
@@ -100,50 +118,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Input Section (40%) -->
-            <div class="tw:flex tw:w-full tw:h-full tw:min-h-0 tw:overflow-y-auto">
-              <div ref="editorsColumnRef" class="tw:flex tw:w-full tw:flex-col tw:min-h-full tw:gap-y-2">
+            <div class="flex h-full min-h-0 w-full overflow-y-auto">
+              <div ref="editorsColumnRef" class="flex min-h-full w-full flex-col gap-y-2">
                 <!-- SQL/PromQL Editor Pane + Status Bar wrapper -->
-                <div class="tw:flex-[3] tw:w-full tw:flex tw:flex-col tw:overflow-visible" style="min-height: 220px;">
+                <div class="flex min-h-55 w-full flex-[3] flex-col overflow-visible">
                   <!-- Editor Pane (no overflow:hidden bottom clip issue for status bar) -->
                   <div
-                    class="tw:flex-1 tw:w-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
-                    :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]'"
-                    style="border-bottom: none; border-bottom-left-radius: 0; border-bottom-right-radius: 0;"
+                    class="rounded-default border-border-default flex w-full flex-1 flex-col overflow-hidden rounded-b-none border border-b-0"
                   >
                     <!-- Pane Header -->
                     <div
-                      class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                      class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                     >
-                      <div class="tw:flex tw:items-center tw:gap-2">
-                        <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-primary)" />
-                        <span class="tw:text-xs tw:font-semibold">{{ localTab === 'sql' ? 'SQL Editor' : 'PromQL Editor' }}</span>
+                      <div class="flex items-center gap-2">
+                        <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
+                        <span class="text-xs font-semibold">{{
+                          localTab === "sql" ? t("alerts.sqlEditor") : t("alerts.promqlEditor")
+                        }}</span>
                       </div>
-                      <div class="tw:flex tw:items-center tw:gap-2">
+                      <div class="flex items-center gap-2">
                         <OSwitch
                           v-if="localTab !== 'promql'"
                           :model-value="!sqlEditorMaximized"
                           class="o2-toggle-button-xs"
-                          :class="store.state.theme === 'dark' ? 'o2-toggle-button-xs-dark' : 'o2-toggle-button-xs-light'"
-                          @update:model-value="(val) => val ? restoreVrlEditor() : (sqlEditorMaximized = true)"
+                          @update:model-value="
+                            (val) => (val ? restoreVrlEditor() : (sqlEditorMaximized = true))
+                          "
                         >
-                          <OTooltip :delay="400" :content="sqlEditorMaximized ? 'show VRL editor' : 'hide VRL editor'" />
+                          <OTooltip
+                            :delay="400"
+                            :content="
+                              sqlEditorMaximized
+                                ? t('alerts.queryEditor.showVrlEditor')
+                                : t('alerts.queryEditor.hideVrlEditor')
+                            "
+                          />
                         </OSwitch>
                         <OButton
                           data-test="alert-run-query-btn"
                           variant="primary"
                           size="sm"
-                          class="tw:h-[28px] tw:text-xs tw:rounded-md tw:px-3!"
-                          :disabled="localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''"
+                          class="rounded-default h-7 px-3! text-xs"
+                          :disabled="
+                            localTab == 'sql' ? localSqlQuery == '' : localPromqlQuery == ''
+                          "
                           @click="localTab === 'sql' ? runSqlQuery() : runPromqlQuery()"
                         >
-                          <span class="tw:text-xs tw:font-semibold">{{ t('alerts.runQuery') }}</span>
+                          <span class="text-xs font-semibold">{{ t("alerts.runQuery") }}</span>
                         </OButton>
                       </div>
                     </div>
 
                     <!-- Unified Query Editor -->
-                    <div class="tw:flex-1 tw:min-h-0 tw:relative">
+                    <div class="relative min-h-0 flex-1">
                       <UnifiedQueryEditor
                         ref="queryEditorRef"
                         :languages="availableLanguages"
@@ -159,60 +186,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @blur="onBlurQueryEditor"
                         editor-height="100%"
                         data-test-prefix="alert"
-                        :keywords="autoCompleteKeywords"
-                        :suggestions="autoCompleteSuggestions"
+                        :keywords="effectiveKeywords"
+                        :suggestions="effectiveSuggestions"
+                        :field-value-resolver="resolveFieldValues"
                       />
                       <div
-                        v-if="(localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) && queryEditorPlaceholderFlag"
-                        class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:[padding:0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
+                        v-if="
+                          (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
+                          queryEditorPlaceholderFlag
+                        "
+                        class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                       >
-                        <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ fullEditorPlaceholder }}</span>
+                        <span
+                          class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+                          >{{ fullEditorPlaceholder }}</span
+                        >
                       </div>
                     </div>
                   </div>
 
                   <!-- Status bar: outside overflow:hidden pane so border-bottom is never clipped -->
                   <div
-                    class="tw:relative tw:h-[22px] tw:shrink-0 tw:text-[13px] tw:font-medium tw:cursor-default"
+                    class="text-compact relative h-5.5 shrink-0 cursor-default font-medium"
                     :class="[
                       sqlStatusBarClasses,
-                      store.state.theme === 'dark'
-                        ? 'tw:border-l tw:border-r tw:border-b tw:border-[#2d3748] tw:rounded-bl-lg tw:rounded-br-lg'
-                        : 'tw:border-l tw:border-r tw:border-b tw:border-[#e5e7eb] tw:rounded-bl-lg tw:rounded-br-lg'
+                      'border-border-default rounded-bl-default rounded-br-default border-r border-b border-l',
                     ]"
                   >
-                    <div class="tw:absolute tw:inset-0 tw:flex tw:items-center tw:gap-[5px] tw:px-[10px] tw:overflow-hidden">
+                    <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
                       <template v-if="sqlStatusState === 'sql-status-bar--error'">
-                        <OIcon name="error-outline" size="xs" style="flex-shrink:0;" />
-                        <span class="tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis tw:min-w-0 tw:flex-1">{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span>
+                        <OIcon name="error-outline" size="xs" class="shrink-0" />
+                        <span
+                          class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                          >{{ localSqlQueryErrorMsg || sqlQueryErrorMsg }}</span
+                        >
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--loading'">
-                        <OSpinner size="xs" class="tw:shrink-0" />
-                        <span>Fetching results...</span>
+                        <OSpinner size="xs" class="shrink-0" />
+                        <span>{{ t("alerts.queryEditor.fetchingResults") }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--hint'">
-                        <OIcon name="edit" size="xs" style="flex-shrink:0;opacity:0.6;" />
-                        <span>Write a query to get started</span>
+                        <OIcon name="edit" size="xs" class="shrink-0 opacity-60" />
+                        <span>{{ t("alerts.queryEditor.writeQueryHint") }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--idle'">
-                        <OIcon name="play-arrow" size="xs" style="flex-shrink:0;opacity:0.7;" />
-                        <span>Press Run Query to see results</span>
+                        <OIcon name="play-arrow" size="xs" class="shrink-0 opacity-70" />
+                        <span>{{ t("alerts.queryEditor.runQueryHint") }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--empty'">
-                        <OIcon name="search-off" size="xs" style="flex-shrink:0;" />
-                        <span>Query ran successfully — no matching events</span>
+                        <OIcon name="search-off" size="xs" class="shrink-0" />
+                        <span>{{ t("alerts.queryEditor.noMatchingEvents") }}</span>
                       </template>
                       <template v-else-if="sqlStatusState === 'sql-status-bar--success'">
-                        <OIcon name="check-circle" size="xs" style="flex-shrink:0;" />
-                        <span>{{ sqlResultCount }} event{{ sqlResultCount === 1 ? '' : 's' }} found</span>
+                        <OIcon name="check-circle" size="xs" class="shrink-0" />
+                        <span>{{ t("alerts.queryEditor.eventsFound", sqlResultCount) }}</span>
                       </template>
                     </div>
                     <OTooltip
                       v-if="sqlStatusState === 'sql-status-bar--error'"
-                      side="top" align="center"
+                      side="top"
+                      align="center"
                       :max-width="'520px'"
-                      style="font-size:11px;white-space:pre-wrap;word-break:break-word;"
-                      :content="localSqlQueryErrorMsg || sqlQueryErrorMsg"
+                      :content="raw(localSqlQueryErrorMsg || sqlQueryErrorMsg)"
                     />
                   </div>
                 </div>
@@ -220,23 +255,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- VRL Editor Pane -->
                 <div
                   v-if="localTab !== 'promql'"
-                  class="tw:w-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
+                  class="rounded-default flex w-full flex-col overflow-hidden"
                   :class="[
-                    store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]',
-                    sqlEditorMaximized ? 'tw:flex-none' : 'tw:flex-[2]'
+                    'border-border-default border',
+                    sqlEditorMaximized ? 'flex-none' : 'min-h-40 flex-[2]',
                   ]"
-                  :style="sqlEditorMaximized ? '' : 'min-height: 160px;'"
                 >
                   <!-- Pane Header -->
                   <div
-                    class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                    :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                    class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                   >
-                    <div class="tw:flex tw:items-center tw:gap-2">
-                      <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-secondary)" />
-                      <span class="tw:text-xs tw:font-semibold">VRL Editor</span>
+                    <div class="flex items-center gap-2">
+                      <div
+                        class="rounded-default bg-section-accent-secondary h-3.5 w-0.75 shrink-0"
+                      />
+                      <span class="text-xs font-semibold">{{ t("alerts.vrlEditor") }}</span>
                     </div>
-                    <div v-if="!sqlEditorMaximized" class="tw:flex tw:gap-2 tw:items-center">
+                    <div v-if="!sqlEditorMaximized" class="flex items-center gap-2">
                       <!-- Saved functions -->
                       <OSelect
                         v-model="selectedFunction"
@@ -244,16 +279,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-saved-vrl-function-select"
                         labelKey="name"
                         valueKey="name"
-                        @filter="filterFunctionOptions"
                         @update:modelValue="onFunctionSelect"
-                        class="mini-select alert-v3-select"
+                        class="mini-select alert-v3-select w-35!"
                         clearable
                         @clear="onFunctionClear"
-                        style="width: 140px;"
                         :placeholder="t('alerts.placeholders.savedFunctions')"
                       >
                         <template #empty>
-                          <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                          <div class="text-muted-foreground px-3 py-2">
                             {{ t("search.noResult") }}
                           </div>
                         </template>
@@ -263,18 +296,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-apply-vrl-btn"
                         variant="primary"
                         size="sm"
-                        class="tw:h-[28px] tw:text-xs tw:rounded-md tw:px-3!"
+                        class="rounded-default h-7 px-3! text-xs"
                         :disabled="vrlFunctionContent == ''"
                         @click="runTestFunction"
                       >
-                        <span class="tw:text-xs tw:font-semibold">{{ t('alerts.applyVRL') }}</span>
+                        <span class="text-xs font-semibold">{{ t("alerts.applyVRL") }}</span>
                       </OButton>
                     </div>
                   </div>
 
                   <!-- VRL Editor -->
-                  <div v-if="!sqlEditorMaximized && vrlContentMounted" class="tw:flex-1 tw:min-h-0 tw:relative">
-                    <unified-query-editor
+                  <div
+                    v-if="!sqlEditorMaximized && vrlContentMounted"
+                    class="relative min-h-0 flex-1"
+                  >
+                    <UnifiedQueryEditor
                       data-test="scheduled-alert-vrl-function-editor"
                       data-test-prefix="alert-dialog-vrl"
                       ref="fnEditorRef"
@@ -283,13 +319,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :query="vrlFunctionContent"
                       :hide-nl-toggle="false"
                       :disable-ai="false"
-                      :disable-ai-reason="''"
+                      :disable-ai-reason="raw('')"
                       :ai-placeholder="t('search.askAIFunctionPlaceholder')"
                       :ai-tooltip="t('search.enterFunctionPrompt')"
                       :debounce-time="300"
                       editor-height="100%"
-                      class="tw:w-full tw:h-full"
-                      :class="store.state.theme === 'dark' ? 'dark-mode-editor dark-mode' : 'light-mode-editor light-mode'"
+                      class="h-full w-full"
                       @update:query="updateVrlFunction"
                       @focus="functionEditorPlaceholderFlag = false"
                       @blur="onBlurFunctionEditor"
@@ -300,9 +335,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                     <div
                       v-if="!vrlFunctionContent && functionEditorPlaceholderFlag"
-                      class="tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:[padding:0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-[1] tw:select-none"
+                      class="pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start [padding:0.1875rem_0.5rem_0_2.15rem] select-none"
                     >
-                      <span class="tw:font-mono tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis">{{ vrlPlaceholder }}</span>
+                      <span
+                        class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+                        >{{ vrlPlaceholder }}</span
+                      >
                     </div>
                   </div>
                 </div>
@@ -310,54 +348,63 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Output Section (35%) -->
-            <div class="tw:flex tw:flex-col tw:h-full tw:min-h-0 tw:gap-y-2 tw:overflow-y-auto">
-
+            <div class="flex h-full min-h-0 flex-col gap-y-2 overflow-y-auto">
               <!-- Query Result Pane -->
               <div
-                class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
-                :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]'"
-                style="min-height: 220px;"
+                class="rounded-default border-border-default flex min-h-55 flex-1 flex-col overflow-hidden border"
               >
                 <!-- Pane Header -->
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                  :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                  class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-primary)" />
-                    <span class="tw:text-xs tw:font-semibold">Query Result</span>
+                  <div class="flex items-center gap-2">
+                    <div class="rounded-default bg-theme-accent h-3.5 w-0.75 shrink-0" />
+                    <span class="text-xs font-semibold">{{
+                      t("alerts.queryEditor.queryResult")
+                    }}</span>
                     <span
                       v-if="multiTimeRange && multiTimeRange.length > 0"
-                      class="tw:text-[10px] tw:font-bold tw:py-px tw:px-[7px] tw:rounded tw:tracking-[0.04em]"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-blue-500/[0.12] tw:border tw:border-blue-500/30 tw:text-[#60a5fa]' : 'tw:bg-blue-500/[0.08] tw:border tw:border-blue-500/25 tw:text-[#2563eb]'"
-                    >results across all time windows</span>
+                      class="text-3xs rounded-default bg-status-info-bg border-banner-info-border text-text-link border px-1.75 py-px font-bold tracking-[0.04em]"
+                      >{{ t("alerts.queryEditor.resultsAcrossWindows") }}</span
+                    >
                   </div>
                 </div>
 
                 <!-- Content -->
-                <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+                <div class="min-h-0 flex-1 overflow-hidden">
                   <!-- Idle: not yet run -->
-                  <div v-if="!tempRunQuery && outputEvents == ''" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="table-chart" class="tw:opacity-[0.18]" style="width: 48px; height: 48px;" />
-                      <span class="tw:text-xs tw:opacity-[0.45]">{{ t('alerts.runQueryForOutput') }}</span>
+                  <div
+                    v-if="!tempRunQuery && outputEvents == ''"
+                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
+                  >
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="table-chart" class="size-12! opacity-[0.18]" />
+                      <span class="text-xs opacity-[0.45]">{{
+                        t("alerts.runQueryForOutput")
+                      }}</span>
                     </div>
                   </div>
                   <!-- No results after run -->
-                  <div v-else-if="outputEvents == '' && !runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
+                  <div
+                    v-else-if="outputEvents == '' && !runQueryLoading"
+                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
+                  >
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
-                  <div v-else-if="runQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
+                  <div
+                    v-else-if="runQueryLoading"
+                    class="flex h-full flex-col items-center justify-center gap-2"
+                  >
                     <OSpinner size="md" />
-                    <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
+                    <span class="text-sm opacity-60">{{ t("search.fetchingResults") }}</span>
                   </div>
                   <!-- Results -->
                   <QueryEditor
                     v-else
-                    class="tw:w-full tw:h-full tw:overflow-y-auto"
+                    class="h-full w-full overflow-y-auto"
                     data-test="sql-output-editor"
                     ref="outputEventsEditorRef"
                     editor-id="sql-output-editor"
@@ -371,54 +418,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Combined Output Pane (SQL + VRL only) -->
               <div
                 v-if="localTab !== 'promql'"
-                class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden tw:rounded-lg"
-                :class="store.state.theme === 'dark' ? 'tw:border tw:border-[#2d3748]' : 'tw:border tw:border-[#e5e7eb]'"
-                style="min-height: 200px;"
+                class="rounded-default border-border-default flex min-h-50 flex-1 flex-col overflow-hidden border"
               >
                 <!-- Pane Header -->
                 <div
-                  class="tw:flex tw:items-center tw:justify-between tw:py-2 tw:px-3 tw:min-h-12 tw:shrink-0"
-                  :class="store.state.theme === 'dark' ? 'tw:bg-white/[0.04] tw:border-b tw:border-[#2d3748]' : 'tw:bg-[#f3f4f6] tw:border-b tw:border-[#e5e7eb]'"
+                  class="bg-surface-subtle border-border-default flex min-h-12 shrink-0 items-center justify-between border-b px-3 py-2"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2">
-                    <div class="tw:w-[3px] tw:h-[14px] tw:rounded-[2px] tw:shrink-0 tw:bg-(--q-secondary)" />
-                    <span class="tw:text-xs tw:font-semibold">Combined Output</span>
+                  <div class="flex items-center gap-2">
+                    <div
+                      class="rounded-default bg-section-accent-secondary h-3.5 w-0.75 shrink-0"
+                    />
+                    <span class="text-xs font-semibold">{{
+                      t("alerts.queryEditor.combinedOutput")
+                    }}</span>
                     <span
-                      class="tw:text-[10px] tw:font-bold tw:py-px tw:px-[7px] tw:rounded tw:tracking-[0.04em]"
-                      :class="store.state.theme === 'dark' ? 'tw:bg-violet-500/[0.15] tw:border tw:border-violet-500/30 tw:text-[#a78bfa]' : 'tw:bg-violet-500/[0.10] tw:border tw:border-violet-500/25 tw:text-[#7c3aed]'"
-                    >SQL + VRL</span>
+                      class="text-3xs rounded-default bg-badge-purple-soft-bg border-badge-purple-ol-border text-badge-purple-ol-text border px-1.75 py-px font-bold tracking-[0.04em]"
+                      >{{ t("alerts.queryEditor.sqlVrlBadge") }}</span
+                    >
                   </div>
                   <!-- Running indicator -->
-                  <div v-if="runFnQueryLoading" class="tw:flex tw:items-center tw:gap-1">
-                    <span class="tw:w-[6px] tw:h-[6px] tw:rounded-full tw:bg-emerald-500 tw:[animation:pulse_1.5s_ease-in-out_infinite]" />
-                    <span class="tw:text-[10px] tw:font-semibold tw:text-emerald-400">Running</span>
+                  <div v-if="runFnQueryLoading" class="flex items-center gap-1">
+                    <span
+                      class="query-editor-run-dot bg-status-positive h-1.5 w-1.5 rounded-full"
+                    />
+                    <span class="text-3xs text-status-positive font-semibold">{{
+                      t("alerts.queryEditor.running")
+                    }}</span>
                   </div>
                 </div>
 
                 <!-- Content -->
-                <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+                <div class="min-h-0 flex-1 overflow-hidden">
                   <!-- Idle -->
-                  <div v-if="!tempTestFunction && !runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:w-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="data-object" class="tw:opacity-[0.18]" style="width: 48px; height: 48px;" />
-                      <span class="tw:text-xs tw:opacity-[0.45]">{{ t('alerts.applyVRLForOutput') }}</span>
+                  <div
+                    v-if="!tempTestFunction && !runFnQueryLoading"
+                    class="bg-card-glass-bg flex h-full w-full flex-col items-center justify-center"
+                  >
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="data-object" class="size-12! opacity-[0.18]" />
+                      <span class="text-xs opacity-[0.45]">{{
+                        t("alerts.applyVRLForOutput")
+                      }}</span>
                     </div>
                   </div>
                   <!-- No results -->
-                  <div v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:bg-(--o2-card-bg)">
-                    <div class="tw:flex tw:flex-col tw:items-center tw:gap-2">
-                      <OIcon name="warning" size="xl" class="tw:text-orange-400 tw:opacity-60" />
+                  <div
+                    v-else-if="outputFnEvents == '' && !runFnQueryLoading && tempTestFunction"
+                    class="bg-card-glass-bg flex h-full flex-col items-center justify-center"
+                  >
+                    <div class="flex flex-col items-center gap-2">
+                      <OIcon name="warning" size="xl" class="text-warning opacity-60" />
                     </div>
                   </div>
                   <!-- Loading -->
-                  <div v-else-if="runFnQueryLoading" class="tw:flex tw:flex-col tw:justify-center tw:items-center tw:h-full tw:gap-2">
+                  <div
+                    v-else-if="runFnQueryLoading"
+                    class="flex h-full flex-col items-center justify-center gap-2"
+                  >
                     <OSpinner size="md" />
-                    <span class="tw:text-sm tw:opacity-60">{{ t('search.fetchingResults') }}</span>
+                    <span class="text-sm opacity-60">{{ t("search.fetchingResults") }}</span>
                   </div>
                   <!-- Results -->
                   <QueryEditor
                     v-else
-                    class="tw:w-full tw:h-full"
+                    class="h-full w-full"
                     data-test="vrl-function-test-events-output-editor"
                     ref="outputFnEventsEditorRef"
                     editor-id="test-function-events-output-editor"
@@ -435,15 +498,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="tw:ml-2 tw:w-[24.5vw] tw:max-w-full tw:min-w-[75px]"
+        class="bg-surface-base ml-2 w-[24.5vw] max-w-full min-w-18.75"
         v-if="store.state.isAiChatEnabled"
-        :class="store.state.theme == 'dark' ? 'tw:bg-[#1f2937]' : 'tw:bg-white'"
       >
         <O2AIChat
           :header-height="48"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
-          class="tw:h-[calc(100vh-3.5rem)]!"
+          class="h-[calc(100vh-3.5rem)]!"
         />
       </div>
     </div>
@@ -451,20 +513,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { ref, computed, watch, type PropType, onMounted, inject, type Ref } from "vue";
+import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import useTheme from "@/composables/useTheme";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
-import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import O2AIChat from "@/components/O2AIChat.vue";
 import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
 import config from "@/aws-exports";
@@ -488,7 +550,7 @@ const props = defineProps({
     required: true,
   },
   tab: {
-    type: String,
+    type: String as PropType<"sql" | "promql">,
     default: "sql",
   },
   sqlQuery: {
@@ -541,8 +603,9 @@ const emit = defineEmits([
   "validate-sql",
 ]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
+const { isDark } = useTheme();
 const { buildQueryPayload } = useQuery();
 const { sqlParser } = useParser();
 
@@ -553,35 +616,41 @@ const localSqlQueryErrorMsg = ref("");
 const suppressPropError = ref(false);
 
 const sqlStatusState = computed(() => {
-  const hasError = (localSqlQueryErrorMsg.value || (!suppressPropError.value && (props as any).sqlQueryErrorMsg)) && localTab.value === 'sql';
-  if (hasError) return 'sql-status-bar--error';
-  if (runQueryLoading.value) return 'sql-status-bar--loading';
-  const currentQuery = localTab.value === 'sql' ? localSqlQuery.value : localPromqlQuery.value;
-  if (!currentQuery) return 'sql-status-bar--hint';
-  if (!tempRunQuery.value) return 'sql-status-bar--idle';
-  if (outputEvents.value) return 'sql-status-bar--success';
-  return 'sql-status-bar--empty';
+  const hasError =
+    (localSqlQueryErrorMsg.value ||
+      (!suppressPropError.value && (props as any).sqlQueryErrorMsg)) &&
+    localTab.value === "sql";
+  if (hasError) return "sql-status-bar--error";
+  if (runQueryLoading.value) return "sql-status-bar--loading";
+  const currentQuery = localTab.value === "sql" ? localSqlQuery.value : localPromqlQuery.value;
+  if (!currentQuery) return "sql-status-bar--hint";
+  if (!tempRunQuery.value) return "sql-status-bar--idle";
+  if (outputEvents.value) return "sql-status-bar--success";
+  return "sql-status-bar--empty";
 });
 
 const sqlStatusBarClasses = computed(() => {
-  const isDark = store.state.theme === 'dark';
-  const neutralBg = isDark ? 'tw:bg-white/[0.04] tw:text-[#9ca3af]' : 'tw:bg-[#f3f4f6] tw:text-[#6b7280]';
+  const neutralBg = "bg-surface-subtle text-text-secondary";
   const map: Record<string, string> = {
-    'sql-status-bar--hint':    neutralBg,
-    'sql-status-bar--idle':    neutralBg,
-    'sql-status-bar--loading': 'tw:bg-[rgba(139,92,246,0.06)] tw:text-[#8b5cf6]',
-    'sql-status-bar--error':   'tw:bg-[rgba(239,68,68,0.08)] tw:text-[#ef4444] tw:cursor-pointer',
-    'sql-status-bar--empty':   'tw:bg-[rgba(245,158,11,0.06)] tw:text-[#f59e0b]',
-    'sql-status-bar--success': 'tw:bg-[rgba(16,185,129,0.06)] tw:text-[#10b981]',
+    "sql-status-bar--hint": neutralBg,
+    "sql-status-bar--idle": neutralBg,
+    "sql-status-bar--loading":
+      "bg-[color-mix(in_srgb,var(--color-sql-accent)_6%,transparent)] text-sql-accent",
+    "sql-status-bar--error": "bg-status-error-bg text-status-error-text cursor-pointer",
+    "sql-status-bar--empty": "bg-status-warning-bg text-status-warning-text",
+    "sql-status-bar--success": "bg-status-success-bg text-status-positive",
   };
-  return map[sqlStatusState.value] ?? '';
+  return map[sqlStatusState.value] ?? "";
 });
 
 const sqlResultCount = computed(() => queryHitCount.value);
 
-watch(() => (props as any).sqlQueryErrorMsg, () => {
-  suppressPropError.value = false;
-});
+watch(
+  () => (props as any).sqlQueryErrorMsg,
+  () => {
+    suppressPropError.value = false;
+  },
+);
 
 // Initialize SQL parser on mount
 onMounted(async () => {
@@ -609,11 +678,10 @@ const closeDialog = () => {
 
 // Local state
 // Default to SQL tab if no tab is provided, otherwise use the provided tab
-const localTab = ref(props.tab || 'sql');
+const localTab = ref<"sql" | "promql">(props.tab || "sql");
 const localSqlQuery = ref(props.sqlQuery);
 const localPromqlQuery = ref(props.promqlQuery);
 const vrlFunctionContent = ref(props.vrlFunction);
-const isFullScreen = ref(false);
 const sqlEditorMaximized = ref(false);
 // Controls whether the VRL Monaco editor is mounted. Kept false briefly when
 // restoring from maximized so Monaco mounts AFTER the flex container has
@@ -647,18 +715,18 @@ const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
 // ─── Typewriter placeholder for the full query editor ────────────────
 const streamFieldsForPlaceholder = computed(() =>
   (props.columns as any[]).map((c: any) => ({
-    name: typeof c === 'string' ? c : (c.value ?? c.label ?? ''),
-    dataType: typeof c === 'string' ? '' : (c.type ?? ''),
-  }))
+    name: typeof c === "string" ? c : (c.value ?? c.label ?? ""),
+    dataType: typeof c === "string" ? "" : (c.type ?? ""),
+  })),
 );
 const noStreamForPlaceholder = computed(() => !props.streamName);
-const isSqlModeForPlaceholder = computed(() => localTab.value === 'sql');
+const isSqlModeForPlaceholder = computed(() => localTab.value === "sql");
 const { placeholder: fullEditorPlaceholder } = useQueryPlaceholder(
   streamFieldsForPlaceholder,
   ref({}),
   isSqlModeForPlaceholder,
   noStreamForPlaceholder,
-  { noStreamText: t('pipeline.queryEditorPlaceholder') },
+  { noStreamText: t("pipeline.queryEditorPlaceholder") },
 );
 
 // Field selection
@@ -679,45 +747,48 @@ const tempTestFunction = ref(false);
 const runPromqlError = ref("");
 
 // Watch props
-watch(() => props.tab, (newVal) => {
-  localTab.value = newVal || 'sql';
-});
+watch(
+  () => props.tab,
+  (newVal) => {
+    localTab.value = newVal || "sql";
+  },
+);
 
-watch(() => props.sqlQuery, (newVal) => {
-  localSqlQuery.value = newVal;
-});
+watch(
+  () => props.sqlQuery,
+  (newVal) => {
+    localSqlQuery.value = newVal;
+  },
+);
 
-watch(() => props.promqlQuery, (newVal) => {
-  localPromqlQuery.value = newVal;
-});
+watch(
+  () => props.promqlQuery,
+  (newVal) => {
+    localPromqlQuery.value = newVal;
+  },
+);
 
 // Clear local error message when SQL query changes
-watch(() => localSqlQuery.value, () => {
-  localSqlQueryErrorMsg.value = "";
-});
+watch(
+  () => localSqlQuery.value,
+  () => {
+    localSqlQueryErrorMsg.value = "";
+  },
+);
 
-watch(() => props.vrlFunction, (newVal) => {
-  vrlFunctionContent.value = newVal;
-});
+watch(
+  () => props.vrlFunction,
+  (newVal) => {
+    vrlFunctionContent.value = newVal;
+  },
+);
 
-
-watch(() => props.savedFunctions, (newVal) => {
-  functionOptions.value = [...newVal];
-});
-
-// Filter functions
-const filterFunctionOptions = (val: string, update: any) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = [...props.savedFunctions];
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = props.savedFunctions.filter((v: any) =>
-        v.name.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
-};
+watch(
+  () => props.savedFunctions,
+  (newVal) => {
+    functionOptions.value = [...newVal];
+  },
+);
 
 // Update handlers
 const updateSqlQuery = (value: string) => {
@@ -736,15 +807,16 @@ const updateVrlFunction = (value: string) => {
 };
 
 const onBlurQueryEditor = debounce(async () => {
-  queryEditorPlaceholderFlag.value = localTab.value === 'sql' ? localSqlQuery.value === '' : localPromqlQuery.value === '';
-  if (localTab.value === 'sql') {
+  queryEditorPlaceholderFlag.value =
+    localTab.value === "sql" ? localSqlQuery.value === "" : localPromqlQuery.value === "";
+  if (localTab.value === "sql") {
     await _sqlOnBlur();
     emit("validate-sql");
   }
 }, 10);
 
 const onBlurFunctionEditor = () => {
-  functionEditorPlaceholderFlag.value = vrlFunctionContent.value === '';
+  functionEditorPlaceholderFlag.value = vrlFunctionContent.value === "";
 };
 
 /**
@@ -771,18 +843,17 @@ const handleAlertFunctionEditorGenerationEnd = () => {
 /**
  * Handle successful generation from alert function editor
  */
-const handleAlertFunctionEditorGenerationSuccess = (payload: {
-  type: string;
-  message: string;
-}) => {
+const handleAlertFunctionEditorGenerationSuccess = () => {
   // Function code is already updated via @update:query handler
 };
 
-// Column and function selection
-const onFunctionSelect = (func: any) => {
-  if (func && func.function) {
-    vrlFunctionContent.value = func.function;
-    updateVrlFunction(func.function);
+// Column and function selection.
+// OSelect emits the resolved `valueKey` (the function name), not the option
+// object — look the function up before reading its body.
+const onFunctionSelect = (name: any) => {
+  const func = props.savedFunctions.find((f: any) => f.name === name);
+  if (func) {
+    updateVrlFunction(func.function || func.body || "");
   }
 };
 
@@ -804,12 +875,12 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
   const regex = /^(\d+)([smhdwM])$/;
 
   const unitToMicroseconds: Record<string, number> = {
-    s: 1 * 1_000_000,           // seconds
-    m: 60 * 1_000_000,          // minutes
-    h: 60 * 60 * 1_000_000,     // hours
-    d: 24 * 60 * 60 * 1_000_000,// days
+    s: 1 * 1_000_000, // seconds
+    m: 60 * 1_000_000, // minutes
+    h: 60 * 60 * 1_000_000, // hours
+    d: 24 * 60 * 60 * 1_000_000, // days
     w: 7 * 24 * 60 * 60 * 1_000_000, // weeks
-    M: 30 * 24 * 60 * 60 * 1_000_000 // month
+    M: 30 * 24 * 60 * 60 * 1_000_000, // month
   };
 
   const now = Date.now() * 1000; // Current time in microseconds because we are using microseconds of unix timestamp
@@ -840,10 +911,13 @@ const buildMultiWindowQuery = (sql: string, periodInMicroseconds: number) => {
 // Query execution
 const triggerQuery = async (fn = false) => {
   try {
-    const queryReq = buildQueryPayload({
-      sqlMode: true,
-      streamName: props.streamName,
-    });
+    const queryReq = buildQueryPayload(
+      {
+        sqlMode: true,
+        streamName: props.streamName,
+      },
+      t,
+    );
     queryReq.query.sql = localSqlQuery.value;
     queryReq.query.size = 10;
 
@@ -892,15 +966,15 @@ const triggerQuery = async (fn = false) => {
       }
     }
   } catch (err: any) {
-    console.error('[QueryEditorDialog] ERROR in triggerQuery:', err);
-    console.error('[QueryEditorDialog] Error details:', {
+    console.error("[QueryEditorDialog] ERROR in triggerQuery:", err);
+    console.error("[QueryEditorDialog] Error details:", {
       message: err.message,
       response: err.response,
       stack: err.stack,
     });
     toast({
       variant: "error",
-      message: err.response?.data?.message ?? t('search.errorFetchingResults'),
+      message: err.response?.data?.message ?? t("search.errorFetchingResults"),
       timeout: 1500,
     });
   }
@@ -927,7 +1001,7 @@ const runSqlQuery = async () => {
     runQueryLoading.value = true;
     await triggerQuery();
   } catch (err) {
-    console.error('[QueryEditorDialog] Error in runSqlQuery:', err);
+    console.error("[QueryEditorDialog] Error in runSqlQuery:", err);
   } finally {
     runQueryLoading.value = false;
     suppressPropError.value = false;
@@ -948,10 +1022,13 @@ const runTestFunction = async () => {
 };
 
 const triggerPromqlQuery = async () => {
-  const queryReq = buildQueryPayload({
-    sqlMode: true,
-    streamName: props.streamName,
-  });
+  const queryReq = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: props.streamName,
+    },
+    t,
+  );
 
   const periodInMicroseconds = props.period * 60 * 1000000;
   const endTime = new Date().getTime() * 1000;
@@ -966,7 +1043,7 @@ const triggerPromqlQuery = async () => {
       query: queryReq.query,
       start_time: startTime,
       end_time: endTime,
-      step: '0'
+      step: "0",
     });
 
     const result = res?.data?.data?.result;
@@ -974,12 +1051,13 @@ const triggerPromqlQuery = async () => {
       outputEvents.value = JSON.stringify(result, null, 2);
       // Count total data points across all series so the status bar shows a meaningful number
       queryHitCount.value = result.reduce(
-        (sum: number, series: any) => sum + (Array.isArray(series.values) ? series.values.length : 0),
+        (sum: number, series: any) =>
+          sum + (Array.isArray(series.values) ? series.values.length : 0),
         0,
       );
     }
   } catch (err: any) {
-    runPromqlError.value = err.response?.data?.error ?? t('search.somethingWentWrong');
+    runPromqlError.value = err.response?.data?.error ?? t("search.somethingWentWrong");
   }
 };
 
@@ -1000,13 +1078,23 @@ const runPromqlQuery = async () => {
 // Unified Query Editor ref
 const queryEditorRef = ref<any>(null);
 
-const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-  useSqlEditorDiagnostics({
-    queryEditorRef,
-    sqlMode: computed(() => localTab.value === 'sql'),
-    query: computed(() => localSqlQuery.value ?? ""),
-    streamName: computed(() => props.streamName),
-  });
+// Server SQL-validation squiggle ranges, provided by AddAlert.vue.
+const alertSqlErrorRanges = inject<Ref<SqlErrorRange[]>>(
+  "alertSqlErrorRanges",
+  ref<SqlErrorRange[]>([]),
+);
+
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef,
+  sqlMode: computed(() => localTab.value === "sql"),
+  query: computed(() => localSqlQuery.value ?? ""),
+  streamName: computed(() => props.streamName),
+  externalErrors: alertSqlErrorRanges,
+});
 
 const onQueryEditorFocus = () => {
   queryEditorPlaceholderFlag.value = false;
@@ -1018,8 +1106,14 @@ const {
   autoCompleteData,
   autoCompleteKeywords,
   autoCompleteSuggestions,
+  // Context-aware views: these swap in stream names after FROM and field VALUES
+  // after an operator. Binding the raw lists above meant the value popup showed
+  // field names exactly where values belong.
+  effectiveKeywords,
+  effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 // Rebuild field keywords whenever columns prop changes
@@ -1028,13 +1122,13 @@ watch(
   (cols) => {
     if (cols?.length) {
       const fields = (cols as any[]).map((c: any) => ({
-        name: typeof c === 'string' ? c : (c.value ?? c.label ?? c),
-        type: c.type ?? 'Utf8',
+        name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
+        type: c.type ?? "Utf8",
       }));
       updateFieldKeywords(fields);
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true, deep: true },
 );
 
 // Transform columns (value/label pairs) → FieldList items ({ name })
@@ -1043,7 +1137,9 @@ watch(
 const fieldListWhereClause = computed(() => {
   const sql = localSqlQuery.value?.trim();
   if (!sql) return "";
-  const match = sql.match(/\bWHERE\b([\s\S]+?)(?:\bGROUP\s+BY\b|\bHAVING\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i);
+  const match = sql.match(
+    /\bWHERE\b([\s\S]+?)(?:\bGROUP\s+BY\b|\bHAVING\b|\bORDER\s+BY\b|\bLIMIT\b|$)/i,
+  );
   return match ? match[1].trim() : "";
 });
 
@@ -1051,7 +1147,7 @@ const fieldListItems = computed(() =>
   (props.columns as any[]).map((c: any) => ({
     name: typeof c === "string" ? c : (c.value ?? c.label ?? c),
     showValues: true,
-  }))
+  })),
 );
 
 const fieldListTimeStamp = computed(() => {
@@ -1071,7 +1167,8 @@ const rebuildSqlWithWhere = (newWhere: string): string => {
 
   // Now strip any existing WHERE clause from sqlBeforeTrailing
   const whereIdx = sqlBeforeTrailing.search(/\bWHERE\b/i);
-  const beforeWhere = whereIdx >= 0 ? sqlBeforeTrailing.slice(0, whereIdx).trimEnd() : sqlBeforeTrailing;
+  const beforeWhere =
+    whereIdx >= 0 ? sqlBeforeTrailing.slice(0, whereIdx).trimEnd() : sqlBeforeTrailing;
 
   return newWhere ? `${beforeWhere} WHERE ${newWhere}${trailing}` : `${beforeWhere}${trailing}`;
 };
@@ -1094,23 +1191,23 @@ const handleFieldListEvent = (event: string, value: any) => {
 };
 
 // Determine available languages based on stream type
-const availableLanguages = computed(() => {
+const availableLanguages = computed<("sql" | "promql")[]>(() => {
   // For metrics streams, only PromQL is available
-  if (props.streamType === 'metrics') {
-    return ['promql'];
+  if (props.streamType === "metrics") {
+    return ["promql"];
   }
   // For logs streams, only SQL is available
-  if (props.streamType === 'logs') {
-    return ['sql'];
+  if (props.streamType === "logs") {
+    return ["sql"];
   }
   // For other stream types, allow both SQL and PromQL
-  return ['sql', 'promql'];
+  return ["sql", "promql"];
 });
 
 // Unified Query Editor handlers
 const handleQueryUpdate = (newQuery: string) => {
   _sqlOnQueryChange();
-  if (localTab.value === 'sql') {
+  if (localTab.value === "sql") {
     updateSqlQuery(newQuery);
   } else {
     updatePromqlQuery(newQuery);
@@ -1125,28 +1222,30 @@ const handleQueryUpdate = (newQuery: string) => {
   getSuggestions();
 };
 
-const handleLanguageChange = (newLanguage: 'sql' | 'promql') => {
+const handleLanguageChange = (language: "sql" | "promql" | "vrl" | "javascript") => {
+  // Alert editor only offers sql/promql
+  const newLanguage = language as "sql" | "promql";
   localTab.value = newLanguage;
 
   // Explicitly sync the editor with the correct query after language change
   // This ensures the editor shows the right query for the selected language
   setTimeout(() => {
     if (queryEditorRef.value && queryEditorRef.value.setValue) {
-      const currentQuery = newLanguage === 'sql' ? localSqlQuery.value : localPromqlQuery.value;
+      const currentQuery = newLanguage === "sql" ? localSqlQuery.value : localPromqlQuery.value;
       queryEditorRef.value.setValue(currentQuery);
     }
   }, 50); // Small delay to ensure editor has switched language
 };
 
-const handleRunQuery = (language: 'sql' | 'promql') => {
-  if (language === 'sql') {
+const handleRunQuery = (language: "sql" | "promql") => {
+  if (language === "sql") {
     runSqlQuery();
   } else {
     runPromqlQuery();
   }
 };
 
-const handleAskAI = async (_naturalLanguage: string, _language: string) => {
+const handleAskAI = async () => {
   // The unified component handles AI generation internally
   // This event is just for parent components that may need to react
 };
@@ -1157,24 +1256,32 @@ const toggleAIChat = () => {
   store.dispatch("setIsAiChatEnabled", isEnabled);
 };
 
-const getBtnO2Logo = computed(() => {
-  return getImageURL('images/common/ai_icon_blue.svg');
-});
-
 const getBtnLogo = computed(() => {
   if (isHovered.value || store.state.isAiChatEnabled) {
-    return getImageURL('images/common/ai_icon_dark.svg')
+    return getImageURL("images/common/ai_icon_dark.svg");
   }
 
-  return store.state.theme === 'dark'
-    ? getImageURL('images/common/ai_icon_dark.svg')
-    : getImageURL('images/common/ai_icon_gradient.svg')
-})
+  return isDark.value
+    ? getImageURL("images/common/ai_icon_dark.svg")
+    : getImageURL("images/common/ai_icon_gradient.svg");
+});
 </script>
 
-<style>
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.3; }
+<style scoped>
+/* keep(keyframes): the "Running" status dot is used only by this dialog. The
+   `animation` is declared here, not as a template `[animation:…]` utility, so
+   Vue's scoped compiler renames the keyframe and this reference together. */
+.query-editor-run-dot {
+  animation: dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
 }
 </style>

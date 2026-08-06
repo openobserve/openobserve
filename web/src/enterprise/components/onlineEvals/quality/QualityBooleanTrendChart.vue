@@ -1,15 +1,15 @@
 <template>
-  <div ref="chartEl" class="tw:w-full tw:h-full tw:min-h-55" data-test="quality-boolean-trend-chart" />
+  <div ref="chartEl" class="h-full min-h-55 w-full" data-test="quality-boolean-trend-chart" />
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
-import type {
-  BooleanTrendPoint,
-  BooleanTrendSeries,
-} from "../composables/useQualityDetailCharts";
+import { chartColor } from "@/utils/chartTheme";
+import type { BooleanTrendPoint, BooleanTrendSeries } from "../composables/useQualityDetailCharts";
+import { withChartFont } from "@/utils/fonts";
 
 const props = defineProps<{
   series?: BooleanTrendSeries[];
@@ -37,17 +37,17 @@ const PALETTE = [
 function effectiveSeries(): BooleanTrendSeries[] {
   if (props.series && props.series.length > 0) return props.series;
   if (props.points && props.points.length > 0) {
-    return [{ id: "default", label: props.legendPassRate, points: props.points }];
+    return [{ id: "default", label: raw(props.legendPassRate), points: props.points }];
   }
   return [];
 }
 
 function buildOption(): echarts.EChartsOption {
-  const isDark = store.state.theme === "dark";
-  const text = isDark ? "#d4d4d4" : "#374151";
-  const grid = isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)";
+  const text = chartColor("--color-text-secondary");
+  const grid = chartColor("--color-border-subtle");
   const seriesList = effectiveSeries();
-  const isSplit = seriesList.length > 1 || seriesList.some((s) => s.id !== "__default__" && s.id !== "default");
+  const isSplit =
+    seriesList.length > 1 || seriesList.some((s) => s.id !== "__default__" && s.id !== "default");
 
   const echSeries: echarts.SeriesOption[] = seriesList.map((s, idx) => {
     const color = PALETTE[idx % PALETTE.length];
@@ -104,7 +104,7 @@ function buildOption(): echarts.EChartsOption {
 
 function render() {
   if (!chart) return;
-  chart.setOption(buildOption(), true);
+  chart.setOption(withChartFont(buildOption()), true);
 }
 
 onMounted(() => {

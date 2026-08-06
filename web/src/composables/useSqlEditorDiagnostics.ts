@@ -45,10 +45,7 @@
 
 import { watch, type Ref } from "vue";
 import { debounce } from "lodash-es";
-import {
-  validateSql,
-  type SqlErrorRange,
-} from "@/utils/query/sqlDiagnostics";
+import { validateSql, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 
 interface Options {
   queryEditorRef: Ref<any>;
@@ -57,8 +54,7 @@ interface Options {
   streamName?: Ref<string | undefined>;
   /**
    * Optional reactive array written by the server response handler.
-   * When provided, the composable watches it and forwards ranges to the editor,
-   * replacing the per-page watcher that was previously in Index.vue / parent components.
+   * When provided, the composable watches it and forwards ranges to the editor.
    */
   externalErrors?: Ref<SqlErrorRange[]>;
 }
@@ -96,7 +92,6 @@ export function useSqlEditorDiagnostics({
   }
 
   // ── Forward externalErrors (server errors) to the editor ────────────────────
-  // This replaces the per-page watcher that previously lived in Index.vue.
   if (externalErrors) {
     watch(
       externalErrors,

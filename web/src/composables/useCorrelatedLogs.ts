@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
-import type { StreamInfo } from "@/services/service_streams";
+import type { StreamInfo, FieldAlias } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildSqlCondition,
+  applyFilterOverlay,
+  buildFieldToGroupIdMap,
+} from "@/utils/telemetryCorrelation";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
 
@@ -34,12 +41,19 @@ export interface CorrelatedLogsProps {
   sourceEvent?: {
     timestamp?: number | string;
     severity?: string;
-    message?: string;
+    message?: I18nText;
   };
   logStreams: StreamInfo[];
   sourceStream: string;
   sourceType: string;
   availableDimensions?: Record<string, any>;
+  /**
+   * Semantic field groups for the org. Used to resolve a filter edit made on one
+   * stream's field name onto every other correlated stream's alias for the same
+   * semantic group (F35). Without it, edits only apply to streams that spell the
+   * field exactly the same way as the chip.
+   */
+  semanticGroups?: FieldAlias[];
   ftsFields?: string[];
   timeRange: TimeRange;
   hideViewRelatedButton?: boolean;
@@ -73,7 +87,8 @@ export interface SearchResponse {
  */
 export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const store = useStore();
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreamingSearch();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
+    useHttpStreamingSearch();
 
   // State
   const loading = ref(false);
@@ -91,7 +106,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     const merged: Record<string, string> = {};
     for (const stream of props.logStreams) {
       for (const [k, v] of Object.entries(stream.filters ?? {})) {
-        if (v && v !== SELECT_ALL_VALUE && !k.startsWith('_')) merged[k] = v;
+        if (v && v !== SELECT_ALL_VALUE && !k.startsWith("_")) merged[k] = v;
       }
     }
     // matchedDimensions and additionalDimensions take priority over stream filters
@@ -125,16 +140,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   // Number of correlated log streams available
   const logStreamsCount = computed(() => props.logStreams.length);
 
-  // REMOVED: getDefaultSemanticPatterns() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-
-  // REMOVED: loadSemanticPatterns() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-
-  // REMOVED: getSemanticToFieldMapping() function
-  // No longer needed - we use exact field names from StreamInfo.filters
-  // The /_correlate API (or fallback) provides the correct field names for each stream
-
   /**
    * Build SQL queries for ALL correlated log streams.
    * Each stream gets its own independent query using its exact field names from StreamInfo.filters.
@@ -144,38 +149,43 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
    * Since each stream has its own field names, we CANNOT use a SQL UNION — the column sets may differ.
    * Instead, independent queries are sent to _search_multi_stream which executes them in parallel.
    */
-  const buildSQLQueries = (limit: number = 100): string[] => {
+  const buildSQLQueries = (): string[] => {
     const queries: string[] = [];
+
+    // Built once per call: chip keys come from whichever stream sourced them, so
+    // an edit must be resolved onto each stream's own alias for the same group.
+    const fieldToGroupId = buildFieldToGroupIdMap(props.semanticGroups ?? []);
 
     for (const streamInfo of props.logStreams) {
       const conditions: string[] = [];
 
-      // Merge stream's base filters with user overrides from currentFilters.
-      // currentFilters keys are raw field names (same namespace as streamInfo.filters),
-      // so a key present in both takes the user-modified value.
+      // Merge the stream's base filters with the user's overrides from
+      // currentFilters, matching on exact field name first and falling back to
+      // the shared semantic group (F35).
       const baseFilters = streamInfo.filters ?? {};
-      const effectiveFilters: Record<string, string> = { ...baseFilters };
-      for (const [k, v] of Object.entries(currentFilters.value)) {
-        if (k in baseFilters) effectiveFilters[k] = v;
-      }
+      const effectiveFilters = applyFilterOverlay(
+        baseFilters,
+        currentFilters.value,
+        fieldToGroupId,
+      );
 
       for (const [field, value] of Object.entries(effectiveFilters)) {
         if (value === SELECT_ALL_VALUE) continue;
-        if (field.startsWith('_')) continue;
-        if (value === null || value === undefined || value === '') continue;
+        if (field.startsWith("_")) continue;
+        if (value === null || value === undefined || value === "") continue;
 
-        const quotedField = `"${field.replace(/"/g, '""')}"`;
-        const escapedValue = String(value).replace(/'/g, "''");
-        conditions.push(`${quotedField} = '${escapedValue}'`);
+        conditions.push(buildSqlCondition(field, String(value)));
       }
 
       // Always quote stream name to match dashboard behavior
       const quotedStream = `"${streamInfo.stream_name.replace(/"/g, '""')}"`;
 
       // Build WHERE clause
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
-      queries.push(`SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || '_timestamp'} DESC`);
+      queries.push(
+        `SELECT '${streamInfo.stream_name}' as stream_name,* FROM ${quotedStream} ${whereClause} ORDER BY ${store.state.zoConfig.timestamp_column || "_timestamp"} DESC`,
+      );
     }
 
     return queries;
@@ -197,8 +207,8 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
     // Validate that we have log streams
     if (!props.logStreams || props.logStreams.length === 0) {
-      console.error('[useCorrelatedLogs] No log streams available');
-      error.value = 'No log stream available for correlation';
+      console.error("[useCorrelatedLogs] No log streams available");
+      error.value = "No log stream available for correlation";
       return;
     }
 
@@ -221,7 +231,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
 
       // Generate trace context for streaming
       const traceContext = generateTraceContext();
-      const traceId = traceContext?.traceId || '';
+      const traceId = traceContext?.traceId || "";
       currentTraceId = traceId;
 
       // Build search query with array of SQL queries
@@ -230,7 +240,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       const searchQuery = {
         query: {
           sql: sqlQueries, // string[] — triggers multi-stream mode in useHttpStreaming
-          sql_mode: 'full',
+          sql_mode: "full",
           start_time: startTimeMicros,
           end_time: endTimeMicros,
           size: pageSize.value,
@@ -241,16 +251,16 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
       await fetchQueryDataWithHttpStream(
         {
           queryReq: searchQuery,
-          type: 'search',
+          type: "search",
           traceId: traceId,
           org_id: store.state.selectedOrganization.identifier,
-          pageType: 'logs',
-          searchType: 'UI',
+          pageType: "logs",
+          searchType: "UI",
         },
         {
           data: (_data: any, response: any) => {
             // Handle metadata event
-            if (response.type === 'search_response_metadata') {
+            if (response.type === "search_response_metadata") {
               const results = response.content?.results;
               if (results) {
                 // Accumulate across multi-stream metadata events
@@ -263,7 +273,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
             // Handle hits event (this has the actual data)
             // Raw backend response: {"hits": [{...}, {...}]}
             // After wsMapper: response.content.results = {"hits": [{...}, {...}]}
-            if (response.type === 'search_response_hits') {
+            if (response.type === "search_response_hits") {
               // The results object IS the hits container {"hits": [...]}
               const resultsObj = response.content?.results;
               const hits = resultsObj?.hits || [];
@@ -272,38 +282,37 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
               if (hits.length > 0) {
                 searchResults.value.push(...hits);
               } else {
-                console.warn('[useCorrelatedLogs] No hits found in response!');
+                console.warn("[useCorrelatedLogs] No hits found in response!");
               }
             }
           },
           error: (_data: any, response: any) => {
-            console.error('[useCorrelatedLogs] Stream error:', response);
-            error.value = response.content?.message || 'Failed to fetch correlated logs';
+            console.error("[useCorrelatedLogs] Stream error:", response);
+            error.value = response.content?.message || "Failed to fetch correlated logs";
             loading.value = false;
             searchResults.value = [];
             totalHits.value = 0;
           },
-          complete: (_data: any) => {
+          complete: () => {
             // Sort merged results from all streams by _timestamp descending
             // _search_multi_stream streams results per-query as they complete,
             // so hits arrive in arbitrary order and need a final global sort
-            const timestamp = store.state.zoConfig.timestamp_column || '_timestamp';
+            const timestamp = store.state.zoConfig.timestamp_column || "_timestamp";
             searchResults.value.sort((a, b) => b[timestamp] - a[timestamp]);
             loading.value = false;
             currentTraceId = null;
           },
-          reset: (_data: any, response: any) => {
-          },
-        }
+          reset: () => {},
+        },
       );
     } catch (e: any) {
-      console.error('[useCorrelatedLogs] Failed to fetch logs:', e);
-      console.error('[useCorrelatedLogs] Error details:', {
+      console.error("[useCorrelatedLogs] Failed to fetch logs:", e);
+      console.error("[useCorrelatedLogs] Error details:", {
         message: e.message,
         response: e?.response?.data,
-        status: e?.response?.status
+        status: e?.response?.status,
       });
-      error.value = e?.response?.data?.message || e.message || 'Failed to fetch correlated logs';
+      error.value = e?.response?.data?.message || e.message || "Failed to fetch correlated logs";
 
       // Clear results on error
       searchResults.value = [];
@@ -333,27 +342,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
    */
   const updateFilters = (newFilters: Record<string, string>) => {
     currentFilters.value = { ...newFilters };
-    currentPage.value = 1;
-    fetchCorrelatedLogs();
-  };
-
-  /**
-   * Remove a filter dimension
-   */
-  const removeFilter = (key: string) => {
-    const updatedFilters = { ...currentFilters.value };
-    delete updatedFilters[key];
-    currentFilters.value = updatedFilters;
-
-    currentPage.value = 1;
-    fetchCorrelatedLogs();
-  };
-
-  /**
-   * Reset filters to the initial per-stream filter values from _correlate
-   */
-  const resetFilters = () => {
-    currentFilters.value = { ...props.matchedDimensions };
     currentPage.value = 1;
     fetchCorrelatedLogs();
   };
@@ -389,16 +377,24 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   };
 
   // Watch for prop changes and refetch
-  watch(() => props.timeRange, (newRange) => {
-    currentTimeRange.value = { ...newRange };
-    fetchCorrelatedLogs();
-  }, { deep: true });
+  watch(
+    () => props.timeRange,
+    (newRange) => {
+      currentTimeRange.value = { ...newRange };
+      fetchCorrelatedLogs();
+    },
+    { deep: true },
+  );
 
-  watch(() => props.logStreams, () => {
-    // Re-seed currentFilters when the stream list changes (e.g. new correlation result)
-    currentFilters.value = buildInitialFilters();
-    fetchCorrelatedLogs();
-  }, { deep: true });
+  watch(
+    () => props.logStreams,
+    () => {
+      // Re-seed currentFilters when the stream list changes (e.g. new correlation result)
+      currentFilters.value = buildInitialFilters();
+      fetchCorrelatedLogs();
+    },
+    { deep: true },
+  );
 
   // Cleanup on unmount
   onUnmounted(() => {
@@ -444,8 +440,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     goToPage,
     updateFilter,
     updateFilters,
-    removeFilter,
-    resetFilters,
     updateTimeRange,
     refresh,
     isMatchedDimension,

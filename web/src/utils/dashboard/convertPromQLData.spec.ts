@@ -1,20 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { convertPromQLData } from "./convertPromQLData";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
+import { chartColor } from "@/utils/chartTheme";
+import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 
 // Mock dependencies
 vi.mock("./convertDataIntoUnitValue", () => ({
   formatUnitValue: vi.fn((value) => `${value.value}${value.unit}`),
   getUnitValue: vi.fn((value) => ({ value: value?.toString() || "0", unit: "" })),
   calculateRightLegendWidth: vi.fn(() => 120),
-  calculateBottomLegendHeight: vi.fn((legendCount, chartWidth, series, maxHeight, legendConfig, gridConfig, chartHeight) => {
-    if (legendConfig && gridConfig && chartHeight) {
-      legendConfig.top = chartHeight - 80;
-      legendConfig.height = 60;
-      gridConfig.bottom = 80;
-    }
-    return 80;
-  }),
+  calculateBottomLegendHeight: vi.fn(
+    (legendCount, chartWidth, series, maxHeight, legendConfig, gridConfig, chartHeight) => {
+      if (legendConfig && gridConfig && chartHeight) {
+        legendConfig.top = chartHeight - 80;
+        legendConfig.height = 60;
+        gridConfig.bottom = 80;
+      }
+      return 80;
+    },
+  ),
 }));
 
 vi.mock("./chartDimensionUtils", () => ({
@@ -22,6 +26,7 @@ vi.mock("./chartDimensionUtils", () => ({
   calculateWidthText: vi.fn((text) => (text?.length || 0) * 8),
   calculateDynamicNameGap: vi.fn(() => 25),
   calculateRotatedLabelBottomSpace: vi.fn(() => 0),
+  applyMeasuredYAxisLeftInset: vi.fn(),
 }));
 
 vi.mock("./chartColorUtils", () => ({
@@ -30,7 +35,7 @@ vi.mock("./chartColorUtils", () => ({
 }));
 
 vi.mock("./dateTimeUtils", () => ({
-  formatDate: vi.fn((date) => "2023-12-25 10:00:00"),
+  formatDate: vi.fn(() => "2023-12-25 10:00:00"),
 }));
 
 vi.mock("date-fns-tz", () => ({
@@ -187,6 +192,40 @@ describe("Convert PromQL Data Utils", () => {
       expect(result).toEqual({ options: null });
     });
 
+    it("should call applyMeasuredYAxisLeftInset with the final options before returning", async () => {
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
+        config: { show_legends: true, legends_position: "bottom" },
+        queries: [{ config: { promql_legend: "{{job}}" } }],
+      };
+      const searchQueryData = [
+        {
+          resultType: "matrix",
+          result: [
+            {
+              metric: { job: "test-job" },
+              values: [
+                [1640435200, "10"],
+                [1640435260, "20"],
+              ],
+            },
+          ],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        searchQueryData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      expect(applyMeasuredYAxisLeftInset).toHaveBeenCalledWith(result.options);
+    });
+
     it("should process valid line chart data", async () => {
       const panelSchema = {
         id: "panel1",
@@ -200,7 +239,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { job: "test-job", instance: "localhost:9090" },
-              values: [[1640435200, "10"], [1640435260, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640435260, "20"],
+              ],
             },
           ],
         },
@@ -229,10 +271,12 @@ describe("Convert PromQL Data Utils", () => {
       };
 
       // Create data with more series than the limit
-      const largeSeries = Array(150).fill(null).map((_, index) => ({
-        metric: { job: `job-${index}` },
-        values: [[1640435200, (index + 1).toString()]],
-      }));
+      const largeSeries = Array(150)
+        .fill(null)
+        .map((_, index) => ({
+          metric: { job: `job-${index}` },
+          values: [[1640435200, (index + 1).toString()]],
+        }));
 
       const searchQueryData = [
         {
@@ -253,7 +297,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance"
+        "Limiting the displayed series to ensure optimal performance",
       );
     });
 
@@ -314,10 +358,12 @@ describe("Convert PromQL Data Utils", () => {
       };
 
       // Create 100 series (at the limit)
-      const seriesAtLimit = Array(100).fill(null).map((_, index) => ({
-        metric: { job: `job-${index}` },
-        values: [[1640435200, (index + 1).toString()]],
-      }));
+      const seriesAtLimit = Array(100)
+        .fill(null)
+        .map((_, index) => ({
+          metric: { job: `job-${index}` },
+          values: [[1640435200, (index + 1).toString()]],
+        }));
 
       const searchQueryData = [
         {
@@ -348,7 +394,7 @@ describe("Convert PromQL Data Utils", () => {
 
       // Should show warning because we hit the limit and dropped metrics
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance"
+        "Limiting the displayed series to ensure optimal performance",
       );
     });
 
@@ -398,7 +444,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { job: "test-job" },
-              values: [[1640435200, "42"], [1640435260, "45"]],
+              values: [
+                [1640435200, "42"],
+                [1640435260, "45"],
+              ],
             },
           ],
         },
@@ -431,7 +480,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { job: "test-job" },
-              values: [[1640435200, "42"], [1640435260, "45"]],
+              values: [
+                [1640435200, "42"],
+                [1640435260, "45"],
+              ],
             },
           ],
         },
@@ -459,7 +511,6 @@ describe("Convert PromQL Data Utils", () => {
         cy: 150,
       });
     });
-
 
     it("should handle bar chart type", async () => {
       const panelSchema = {
@@ -658,10 +709,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          show_legends: true, 
+        config: {
+          show_legends: true,
           legends_position: "right",
-          legend_width: { value: 100, unit: "px" }
+          legend_width: { value: 100, unit: "px" },
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -695,10 +746,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          show_legends: true, 
+        config: {
+          show_legends: true,
           legends_position: "right",
-          legend_width: { value: 20, unit: "%" }
+          legend_width: { value: 20, unit: "%" },
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -733,7 +784,7 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           axis_width: 10,
           axis_border_show: true,
           connect_nulls: true,
@@ -806,8 +857,8 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.options).toBeDefined();
-      expect(result.options.tooltip.textStyle.color).toBe("#fff");
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
+      expect(result.options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
+      expect(result.options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
     });
 
     it("should handle non-UTC timezone", async () => {
@@ -873,19 +924,19 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     it("should handle mark line data with xAxis type", async () => {
-      const panelSchema = { 
-        id: "panel1", 
-        type: "line", 
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
         config: {
           mark_line: [
             {
               name: "Test Mark Line",
               type: "xAxis",
-              value: "10:00"
-            }
-          ]
+              value: "10:00",
+            },
+          ],
         },
-        queries: [{ config: { promql_legend: "" } }]
+        queries: [{ config: { promql_legend: "" } }],
       };
       const searchQueryData = [
         {
@@ -893,7 +944,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "15"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "15"],
+              ],
             },
           ],
         },
@@ -911,7 +965,9 @@ describe("Convert PromQL Data Utils", () => {
       expect(result).toBeDefined();
       expect(result.options.series).toBeDefined();
       expect(result.options.series.length).toBeGreaterThan(1);
-      const dataSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const dataSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(dataSeries.markLine).toBeDefined();
       expect(dataSeries.markLine.data).toHaveLength(1);
       expect(dataSeries.markLine.data[0]).toEqual({
@@ -920,6 +976,7 @@ describe("Convert PromQL Data Utils", () => {
         xAxis: "10:00",
         yAxis: null,
         label: {
+          show: true,
           formatter: "{b}:{c}",
           position: "insideEndTop",
         },
@@ -927,19 +984,19 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     it("should handle mark line data with yAxis type", async () => {
-      const panelSchema = { 
-        id: "panel1", 
-        type: "line", 
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
         config: {
           mark_line: [
             {
               name: "Y Axis Mark",
               type: "yAxis",
-              value: 20
-            }
-          ]
+              value: 20,
+            },
+          ],
         },
-        queries: [{ config: { promql_legend: "" } }]
+        queries: [{ config: { promql_legend: "" } }],
       };
       const searchQueryData = [
         {
@@ -947,7 +1004,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "15"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "15"],
+              ],
             },
           ],
         },
@@ -962,13 +1022,16 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const dataSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const dataSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(dataSeries.markLine.data[0]).toEqual({
         name: "Y Axis Mark",
         type: "yAxis",
         xAxis: null,
         yAxis: 20,
         label: {
+          show: true,
           formatter: "{b}:{c}",
           position: "insideEndTop",
         },
@@ -976,18 +1039,18 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     it("should handle mark line data without name", async () => {
-      const panelSchema = { 
-        id: "panel1", 
-        type: "line", 
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
         config: {
           mark_line: [
             {
               type: "yAxis",
-              value: 25
-            }
-          ]
+              value: 25,
+            },
+          ],
         },
-        queries: [{ config: { promql_legend: "" } }]
+        queries: [{ config: { promql_legend: "" } }],
       };
       const searchQueryData = [
         {
@@ -995,7 +1058,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "15"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "15"],
+              ],
             },
           ],
         },
@@ -1010,13 +1076,16 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const dataSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const dataSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(dataSeries.markLine.data[0]).toEqual({
         name: undefined,
         type: "yAxis",
         xAxis: null,
         yAxis: 25,
         label: {
+          show: true,
           formatter: "{c}",
           position: "insideEndTop",
         },
@@ -1024,11 +1093,11 @@ describe("Convert PromQL Data Utils", () => {
     });
 
     it("should handle empty mark line configuration", async () => {
-      const panelSchema = { 
-        id: "panel1", 
-        type: "line", 
+      const panelSchema = {
+        id: "panel1",
+        type: "line",
         config: {},
-        queries: [{ config: { promql_legend: "" } }]
+        queries: [{ config: { promql_legend: "" } }],
       };
       const searchQueryData = [
         {
@@ -1036,7 +1105,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "15"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "15"],
+              ],
             },
           ],
         },
@@ -1051,7 +1123,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const dataSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const dataSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(dataSeries.markLine.data).toEqual([]);
     });
 
@@ -1070,7 +1144,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "very_long_metric_name_for_width_calculation" },
-              values: [[1640435200, "10"], [1640438800, "15"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "15"],
+              ],
             },
           ],
         },
@@ -1211,12 +1288,15 @@ describe("Convert PromQL Data Utils", () => {
           resultType: "matrix",
           result: [
             {
-              metric: { 
-                __name__: "http_requests_total", 
-                service_name: "web-server", 
-                instance: "localhost:8080" 
+              metric: {
+                __name__: "http_requests_total",
+                service_name: "web-server",
+                instance: "localhost:8080",
               },
-              values: [[1640435200, "10"], [1640438800, "15"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "15"],
+              ],
             },
           ],
         },
@@ -1232,7 +1312,9 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       expect(result.options.series.length).toBeGreaterThan(1);
-      const dataSeries = result.options.series.find((s: any) => s.name === "Service: web-server - Instance: localhost:8080");
+      const dataSeries = result.options.series.find(
+        (s: any) => s.name === "Service: web-server - Instance: localhost:8080",
+      );
       expect(dataSeries).toBeDefined();
       expect(dataSeries.name).toBe("Service: web-server - Instance: localhost:8080");
     });
@@ -1242,18 +1324,23 @@ describe("Convert PromQL Data Utils", () => {
         id: "panel1",
         type: "line",
         config: {},
-        queries: [{ config: { promql_legend: "Metric: {__name__} - Unknown: {nonexistent_field}" } }],
+        queries: [
+          { config: { promql_legend: "Metric: {__name__} - Unknown: {nonexistent_field}" } },
+        ],
       };
       const searchQueryData = [
         {
           resultType: "matrix",
           result: [
             {
-              metric: { 
-                __name__: "cpu_usage", 
-                instance: "server-1" 
+              metric: {
+                __name__: "cpu_usage",
+                instance: "server-1",
               },
-              values: [[1640435200, "50"], [1640438800, "75"]],
+              values: [
+                [1640435200, "50"],
+                [1640438800, "75"],
+              ],
             },
           ],
         },
@@ -1268,7 +1355,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const dataSeries = result.options.series.find((s: any) => s.name === "Metric: cpu_usage - Unknown: {nonexistent_field}");
+      const dataSeries = result.options.series.find(
+        (s: any) => s.name === "Metric: cpu_usage - Unknown: {nonexistent_field}",
+      );
       expect(dataSeries).toBeDefined();
       // Should replace existing placeholders but leave non-existent ones as-is
     });
@@ -1285,12 +1374,15 @@ describe("Convert PromQL Data Utils", () => {
           resultType: "matrix",
           result: [
             {
-              metric: { 
-                __name__: "memory_usage", 
+              metric: {
+                __name__: "memory_usage",
                 job: "prometheus",
-                instance: "localhost:9090" 
+                instance: "localhost:9090",
               },
-              values: [[1640435200, "1024"], [1640438800, "2048"]],
+              values: [
+                [1640435200, "1024"],
+                [1640438800, "2048"],
+              ],
             },
           ],
         },
@@ -1305,7 +1397,8 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const expectedName = '{"__name__":"memory_usage","job":"prometheus","instance":"localhost:9090"}';
+      const expectedName =
+        '{"__name__":"memory_usage","job":"prometheus","instance":"localhost:9090"}';
       const dataSeries = result.options.series.find((s: any) => s.name === expectedName);
       expect(dataSeries).toBeDefined();
     });
@@ -1322,8 +1415,8 @@ describe("Convert PromQL Data Utils", () => {
           resultType: "matrix",
           result: [
             {
-              metric: { 
-                __name__: "disk_usage"
+              metric: {
+                __name__: "disk_usage",
               },
               values: [[1640435200, "100"]],
             },
@@ -1356,8 +1449,8 @@ describe("Convert PromQL Data Utils", () => {
           resultType: "matrix",
           result: [
             {
-              metric: { 
-                __name__: "network_bytes"
+              metric: {
+                __name__: "network_bytes",
               },
               values: [[1640435200, "500"]],
             },
@@ -1394,7 +1487,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "20"],
+              ],
             },
           ],
         },
@@ -1427,7 +1523,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "20"],
+              ],
             },
           ],
         },
@@ -1461,7 +1560,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "20"],
+              ],
             },
           ],
         },
@@ -1496,7 +1598,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "15"], [1640438800, "25"]],
+              values: [
+                [1640435200, "15"],
+                [1640438800, "25"],
+              ],
             },
           ],
         },
@@ -1530,7 +1635,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "50"], [1640438800, "100"]],
+              values: [
+                [1640435200, "50"],
+                [1640438800, "100"],
+              ],
             },
           ],
         },
@@ -1563,7 +1671,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "50"], [1640438800, "100"]],
+              values: [
+                [1640435200, "50"],
+                [1640438800, "100"],
+              ],
             },
           ],
         },
@@ -1584,18 +1695,25 @@ describe("Convert PromQL Data Utils", () => {
     it("should use getPropsByChartTypeForSeries function - testing through existing chart types", async () => {
       // This test verifies that getPropsByChartTypeForSeries is working by checking
       // that different chart types get different properties applied
-      
+
       // Test line chart properties
       const lineResult = await convertPromQLData(
         { id: "panel1", type: "line", config: {}, queries: [{ config: { promql_legend: "" } }] },
-        [{ resultType: "matrix", result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }] }],
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
         mockAnnotations,
       );
-      
-      const lineSeries = lineResult.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+
+      const lineSeries = lineResult.options.series.find(
+        (s: any) => s.name === '{"__name__":"test"}',
+      );
       expect(lineSeries.type).toBe("line");
       expect(lineSeries.emphasis.focus).toBe("series");
       expect(lineSeries.lineStyle.width).toBe(1.5);
@@ -1603,13 +1721,18 @@ describe("Convert PromQL Data Utils", () => {
       // Test bar chart properties
       const barResult = await convertPromQLData(
         { id: "panel1", type: "bar", config: {}, queries: [{ config: { promql_legend: "" } }] },
-        [{ resultType: "matrix", result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }] }],
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
         mockAnnotations,
       );
-      
+
       const barSeries = barResult.options.series.find((s: any) => s.name === '{"__name__":"test"}');
       expect(barSeries.type).toBe("bar");
       expect(barSeries.emphasis.focus).toBe("series");
@@ -1618,14 +1741,21 @@ describe("Convert PromQL Data Utils", () => {
       // Test area chart properties
       const areaResult = await convertPromQLData(
         { id: "panel1", type: "area", config: {}, queries: [{ config: { promql_legend: "" } }] },
-        [{ resultType: "matrix", result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }] }],
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
         mockAnnotations,
       );
-      
-      const areaSeries = areaResult.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+
+      const areaSeries = areaResult.options.series.find(
+        (s: any) => s.name === '{"__name__":"test"}',
+      );
       expect(areaSeries.type).toBe("line");
       expect(areaSeries.areaStyle).toBeDefined();
       expect(areaSeries.emphasis.focus).toBe("series");
@@ -1634,14 +1764,21 @@ describe("Convert PromQL Data Utils", () => {
       // Test scatter chart properties
       const scatterResult = await convertPromQLData(
         { id: "panel1", type: "scatter", config: {}, queries: [{ config: { promql_legend: "" } }] },
-        [{ resultType: "matrix", result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }] }],
+        [
+          {
+            resultType: "matrix",
+            result: [{ metric: { __name__: "test" }, values: [[1640435200, "10"]] }],
+          },
+        ],
         mockStore,
         mockChartPanelRef,
         mockHoveredSeriesState,
         mockAnnotations,
       );
-      
-      const scatterSeries = scatterResult.options.series.find((s: any) => s.name === '{"__name__":"test"}');
+
+      const scatterSeries = scatterResult.options.series.find(
+        (s: any) => s.name === '{"__name__":"test"}',
+      );
       expect(scatterSeries.type).toBe("scatter");
       expect(scatterSeries.emphasis.focus).toBe("series");
       expect(scatterSeries.symbolSize).toBe(5);
@@ -1662,7 +1799,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640438800, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "20"],
+              ],
             },
           ],
         },
@@ -1697,7 +1837,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "15"], [1640438800, "25"]],
+              values: [
+                [1640435200, "15"],
+                [1640438800, "25"],
+              ],
             },
           ],
         },
@@ -1733,7 +1876,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "30"], [1640438800, "40"]],
+              values: [
+                [1640435200, "30"],
+                [1640438800, "40"],
+              ],
             },
           ],
         },
@@ -1769,7 +1915,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "35"], [1640438800, "45"]],
+              values: [
+                [1640435200, "35"],
+                [1640438800, "45"],
+              ],
             },
           ],
         },
@@ -1807,7 +1956,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "1024"], [1640438800, "2048"]],
+              values: [
+                [1640435200, "1024"],
+                [1640438800, "2048"],
+              ],
             },
           ],
         },
@@ -1859,8 +2011,8 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
-      expect(result.options.tooltip.textStyle.color).toBe("#fff");
+      expect(result.options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+      expect(result.options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
     });
 
     it("should configure tooltip backgroundColor for light theme", async () => {
@@ -1894,8 +2046,8 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      expect(result.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
-      expect(result.options.tooltip.textStyle.color).toBe("#000");
+      expect(result.options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
+      expect(result.options.tooltip.textStyle.color).toBe(chartColor("--color-tooltip-text"));
     });
 
     it("should handle legend width calculation without explicit configuration", async () => {
@@ -1914,7 +2066,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "very_long_metric_name_to_trigger_width_calculation_logic" },
-              values: [[1640435200, "10"], [1640438800, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640438800, "20"],
+              ],
             },
           ],
         },
@@ -1937,8 +2092,8 @@ describe("Convert PromQL Data Utils", () => {
 
     it("should test getPropsByChartTypeForSeries for pie chart type (lines 971-975)", () => {
       // Test getPropsByChartTypeForSeries directly since pie charts don't create series in main conversion
-      const props = getPropsByChartTypeForSeries('pie');
-      
+      const props = getPropsByChartTypeForSeries("pie");
+
       expect(props.type).toBe("pie");
       expect(props.emphasis.focus).toBe("series");
       expect(props.lineStyle.width).toBe(1.5);
@@ -1946,8 +2101,8 @@ describe("Convert PromQL Data Utils", () => {
 
     it("should test getPropsByChartTypeForSeries for donut chart type (lines 977-981)", () => {
       // Test getPropsByChartTypeForSeries directly since donut charts don't create series in main conversion
-      const props = getPropsByChartTypeForSeries('donut');
-      
+      const props = getPropsByChartTypeForSeries("donut");
+
       expect(props.type).toBe("pie");
       expect(props.emphasis.focus).toBe("series");
       expect(props.lineStyle.width).toBe(1.5);
@@ -1955,8 +2110,8 @@ describe("Convert PromQL Data Utils", () => {
 
     it("should test getPropsByChartTypeForSeries for h-bar chart type (lines 983-988)", () => {
       // Test getPropsByChartTypeForSeries directly since h-bar charts don't create series in main conversion
-      const props = getPropsByChartTypeForSeries('h-bar');
-      
+      const props = getPropsByChartTypeForSeries("h-bar");
+
       expect(props.type).toBe("bar");
       expect(props.orientation).toBe("h");
       expect(props.emphasis.focus).toBe("series");
@@ -1965,8 +2120,8 @@ describe("Convert PromQL Data Utils", () => {
 
     it("should test getPropsByChartTypeForSeries for stacked chart type (lines 997-1001)", () => {
       // Test getPropsByChartTypeForSeries directly since stacked charts don't create series in main conversion
-      const props = getPropsByChartTypeForSeries('stacked');
-      
+      const props = getPropsByChartTypeForSeries("stacked");
+
       expect(props.type).toBe("bar");
       expect(props.emphasis.focus).toBe("series");
       expect(props.lineStyle.width).toBe(1.5);
@@ -1974,8 +2129,8 @@ describe("Convert PromQL Data Utils", () => {
 
     it("should test getPropsByChartTypeForSeries for h-stacked chart type (lines 1036-1041)", () => {
       // Test getPropsByChartTypeForSeries directly since h-stacked charts don't create series in main conversion
-      const props = getPropsByChartTypeForSeries('h-stacked');
-      
+      const props = getPropsByChartTypeForSeries("h-stacked");
+
       expect(props.type).toBe("bar");
       expect(props.orientation).toBe("h");
       expect(props.emphasis.focus).toBe("series");
@@ -1986,13 +2141,13 @@ describe("Convert PromQL Data Utils", () => {
       // The vector case (lines 545-556) creates traces with name, x, y properties
       // Since vector results have compatibility issues with xAxisData collection,
       // we test the logic indirectly by verifying the code paths exist
-      
+
       // Test the properties that would be applied to vector results
-      const props = getPropsByChartTypeForSeries('line');
-      expect(props.type).toBe('line');
-      expect(props.emphasis.focus).toBe('series');
+      const props = getPropsByChartTypeForSeries("line");
+      expect(props.type).toBe("line");
+      expect(props.emphasis.focus).toBe("series");
       expect(props.lineStyle.width).toBe(1.5);
-      
+
       // Vector case creates traces with these properties:
       // - name: JSON.stringify(metric.metric)
       // - x: values mapped with moment conversion
@@ -2017,7 +2172,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "gauge_metric" },
-              values: [[1640435200, "75.5"], [1640438800, "80.2"]],
+              values: [
+                [1640435200, "75.5"],
+                [1640438800, "80.2"],
+              ],
             },
           ],
         },
@@ -2036,11 +2194,11 @@ describe("Convert PromQL Data Utils", () => {
       const gaugeSeries = result.options.series[0];
       expect(gaugeSeries).toBeDefined();
       expect(gaugeSeries.type).toBe("gauge");
-      
+
       // Test the detail formatter function (lines 605-612)
       const detailFormatter = gaugeSeries.data[0].detail.formatter;
       expect(detailFormatter).toBeDefined();
-      
+
       // Call the formatter function with a test value
       const formattedValue = detailFormatter(75.5);
       expect(formattedValue).toBe("75.5"); // Based on our mock getUnitValue
@@ -2080,7 +2238,7 @@ describe("Convert PromQL Data Utils", () => {
 
       // Test the tooltip valueFormatter function (lines 650-658)
       expect(result.options.tooltip.valueFormatter).toBeDefined();
-      
+
       // Call the valueFormatter function with a test value
       const formattedValue = result.options.tooltip.valueFormatter(85.3);
       expect(formattedValue).toBe("85.3"); // Based on our mock formatUnitValue
@@ -2124,7 +2282,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that dark theme sets correct backgroundColor (line 662)
-      expect(resultDark.options.tooltip.backgroundColor).toBe("rgba(22,23,25,0.97)");
+      expect(resultDark.options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
 
       // Test light theme
       const mockStoreLight = {
@@ -2145,7 +2303,7 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test that light theme sets correct backgroundColor (line 662)
-      expect(resultLight.options.tooltip.backgroundColor).toBe("rgba(255,255,255,0.97)");
+      expect(resultLight.options.tooltip.backgroundColor).toBe(chartColor("--color-tooltip-bg"));
     });
 
     it("should test metric chart renderItem function (lines 704-724)", async () => {
@@ -2170,7 +2328,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "metric_value" },
-              values: [[1640435200, "123.4"], [1640438800, "456.7"]],
+              values: [
+                [1640435200, "123.4"],
+                [1640438800, "456.7"],
+              ],
             },
           ],
         },
@@ -2200,11 +2361,11 @@ describe("Convert PromQL Data Utils", () => {
       };
 
       const renderResult = metricSeries.renderItem(mockParams);
-      
+
       // Verify renderItem returns correct structure
       expect(renderResult.type).toBe("text");
       expect(renderResult.style.text).toBe("456.7"); // Based on our mock formatUnitValue (latest value)
-      expect(renderResult.style.fontSize).toBe(14); // Based on our mock calculateOptimalFontSize  
+      expect(renderResult.style.fontSize).toBe(14); // Based on our mock calculateOptimalFontSize
       expect(renderResult.style.fontWeight).toBe(500);
       expect(renderResult.style.align).toBe("center");
       expect(renderResult.style.verticalAlign).toBe("middle");
@@ -2216,35 +2377,34 @@ describe("Convert PromQL Data Utils", () => {
     it("should test metric chart vector result processing logic (lines 745-754)", () => {
       // The vector case (lines 745-754) in metric charts creates traces with specific properties
       // Due to xAxisData processing limitations with vector results, test the code logic indirectly
-      
+
       // Test that the metric type properties are correctly applied
-      const metricProps = getPropsByChartTypeForSeries('metric');
-      expect(metricProps.type).toBe('custom');
-      expect(metricProps.coordinateSystem).toBe('polar');
-      
+      const metricProps = getPropsByChartTypeForSeries("metric");
+      expect(metricProps.type).toBe("custom");
+      expect(metricProps.coordinateSystem).toBe("polar");
+
       // The vector case in metric charts (lines 745-754) would create objects with:
       // - name: JSON.stringify(metric.metric)
       // - value: metric?.value?.length > 1 ? metric.value[1] : ""
       // - ...getPropsByChartTypeForSeries(panelSchema.type)
-      
+
       // Mock the logic that would occur in lines 745-754
       const mockMetric = {
         metric: { __name__: "test_metric", job: "test" },
-        value: [1640435200, "123"]
+        value: [1640435200, "123"],
       };
-      
+
       const expectedTrace = {
         name: JSON.stringify(mockMetric.metric),
         value: mockMetric?.value?.length > 1 ? mockMetric.value[1] : "",
-        ...metricProps
+        ...metricProps,
       };
-      
+
       expect(expectedTrace.name).toBe('{"__name__":"test_metric","job":"test"}');
       expect(expectedTrace.value).toBe("123");
       expect(expectedTrace.type).toBe("custom");
       expect(expectedTrace.coordinateSystem).toBe("polar");
     });
-
   });
 
   describe("Show Gridlines Configuration", () => {
@@ -2284,8 +2444,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          show_gridlines: true 
+        config: {
+          show_gridlines: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2318,8 +2478,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          show_gridlines: false 
+        config: {
+          show_gridlines: false,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2352,8 +2512,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "gauge",
-        config: { 
-          show_gridlines: false 
+        config: {
+          show_gridlines: false,
         },
         queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
       };
@@ -2387,8 +2547,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "metric",
-        config: { 
-          show_gridlines: true 
+        config: {
+          show_gridlines: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2422,8 +2582,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          show_gridlines: null 
+        config: {
+          show_gridlines: null,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2470,7 +2630,11 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640435260, null],
+                [1640435320, "20"],
+              ],
             },
           ],
         },
@@ -2485,7 +2649,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const lineSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const lineSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(lineSeries.connectNulls).toBe(false);
     });
 
@@ -2493,8 +2659,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          connect_nulls: true 
+        config: {
+          connect_nulls: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2504,7 +2670,11 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640435260, null],
+                [1640435320, "20"],
+              ],
             },
           ],
         },
@@ -2519,7 +2689,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const lineSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const lineSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(lineSeries.connectNulls).toBe(true);
     });
 
@@ -2527,8 +2699,8 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
-          connect_nulls: false 
+        config: {
+          connect_nulls: false,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2538,7 +2710,11 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "test_metric" },
-              values: [[1640435200, "15"], [1640435260, null], [1640435320, "25"]],
+              values: [
+                [1640435200, "15"],
+                [1640435260, null],
+                [1640435320, "25"],
+              ],
             },
           ],
         },
@@ -2553,19 +2729,21 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const lineSeries = result.options.series.find((s: any) => s.name === '{"__name__":"test_metric"}');
+      const lineSeries = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"test_metric"}',
+      );
       expect(lineSeries.connectNulls).toBe(false);
     });
 
     it("should apply connect_nulls to all chart types that support it", async () => {
       const supportedTypes = ["line", "area", "area-stacked"];
-      
+
       for (const chartType of supportedTypes) {
         const panelSchema = {
           id: "panel1",
           type: chartType,
-          config: { 
-            connect_nulls: true 
+          config: {
+            connect_nulls: true,
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -2575,7 +2753,11 @@ describe("Convert PromQL Data Utils", () => {
             result: [
               {
                 metric: { __name__: `${chartType}_metric` },
-                values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+                values: [
+                  [1640435200, "10"],
+                  [1640435260, null],
+                  [1640435320, "20"],
+                ],
               },
             ],
           },
@@ -2590,7 +2772,9 @@ describe("Convert PromQL Data Utils", () => {
           mockAnnotations,
         );
 
-        const series = result.options.series.find((s: any) => s.name === `{"__name__":"${chartType}_metric"}`);
+        const series = result.options.series.find(
+          (s: any) => s.name === `{"__name__":"${chartType}_metric"}`,
+        );
         expect(series.connectNulls).toBe(true);
       }
     });
@@ -2601,10 +2785,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_position: "right",
-          legends_type: "plain"
+          legends_type: "plain",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2643,10 +2827,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_position: "right",
-          legends_type: "scroll"
+          legends_type: "scroll",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2678,10 +2862,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_position: "right",
-          legend_width: { value: "invalid", unit: "px" }
+          legend_width: { value: "invalid", unit: "px" },
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2722,9 +2906,9 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
-          legends_position: "right"
+          legends_position: "right",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2760,10 +2944,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_type: "plain",
-          legends_position: "bottom"
+          legends_position: "bottom",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2796,10 +2980,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_type: "plain",
-          legends_position: null // Auto position
+          legends_position: null, // Auto position
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2832,10 +3016,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_type: "scroll",
-          legends_position: "bottom"
+          legends_position: "bottom",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2870,10 +3054,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: false,
           legends_type: "plain",
-          legends_position: "bottom"
+          legends_position: "bottom",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -2908,12 +3092,12 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_gridlines: false,
           connect_nulls: true,
           show_legends: true,
           legends_position: "right",
-          legends_type: "plain"
+          legends_type: "plain",
         },
         queries: [{ config: { promql_legend: "Service: {service}" } }],
       };
@@ -2923,11 +3107,19 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "cpu_usage", service: "web-server" },
-              values: [[1640435200, "50"], [1640435260, null], [1640435320, "75"]],
+              values: [
+                [1640435200, "50"],
+                [1640435260, null],
+                [1640435320, "75"],
+              ],
             },
             {
               metric: { __name__: "memory_usage", service: "database" },
-              values: [[1640435200, "80"], [1640435260, "85"], [1640435320, "90"]],
+              values: [
+                [1640435200, "80"],
+                [1640435260, "85"],
+                [1640435320, "90"],
+              ],
             },
           ],
         },
@@ -2959,12 +3151,12 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "area",
-        config: { 
+        config: {
           show_legends: true,
           legends_type: "plain",
           legends_position: "bottom",
           show_gridlines: true,
-          connect_nulls: false
+          connect_nulls: false,
         },
         queries: [{ config: { promql_legend: "{__name__} on {instance}" } }],
       };
@@ -2972,12 +3164,15 @@ describe("Convert PromQL Data Utils", () => {
         {
           resultType: "matrix",
           result: Array.from({ length: 12 }, (_, i) => ({
-            metric: { 
-              __name__: `metric_${i}`, 
+            metric: {
+              __name__: `metric_${i}`,
               instance: `server-${i}.example.com`,
-              job: `job-${i}`
+              job: `job-${i}`,
             },
-            values: [[1640435200, (i * 15).toString()], [1640435260, ((i * 15) + 5).toString()]],
+            values: [
+              [1640435200, (i * 15).toString()],
+              [1640435260, (i * 15 + 5).toString()],
+            ],
           })),
         },
       ];
@@ -2997,29 +3192,31 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.options.grid.bottom).toBeGreaterThan(0);
 
       // Verify series names are properly formatted
-      expect(result.options.series.some((s: any) => 
-        s.name && s.name.includes("metric_0 on server-0.example.com")
-      )).toBe(true);
+      expect(
+        result.options.series.some(
+          (s: any) => s.name && s.name.includes("metric_0 on server-0.example.com"),
+        ),
+      ).toBe(true);
     });
 
     it("should handle edge case with very large number of series and legend calculations", async () => {
       const panelSchema = {
         id: "panel1",
         type: "bar",
-        config: { 
+        config: {
           show_legends: true,
           legends_position: "right",
-          legends_type: "scroll"
+          legends_type: "scroll",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
-      
+
       // Create 200 series (exceeds default limit of 100)
       const largeSeries = Array.from({ length: 200 }, (_, i) => ({
-        metric: { 
-          __name__: `large_metric_${i}`, 
+        metric: {
+          __name__: `large_metric_${i}`,
           instance: `instance_${i}`,
-          datacenter: i < 100 ? "us-east" : "us-west"
+          datacenter: i < 100 ? "us-east" : "us-west",
         },
         values: [[1640435200, (i * 2).toString()]],
       }));
@@ -3042,7 +3239,7 @@ describe("Convert PromQL Data Utils", () => {
 
       // Should limit series and show warning
       expect(result.extras.limitNumberOfSeriesWarningMessage).toBe(
-        "Limiting the displayed series to ensure optimal performance"
+        "Limiting the displayed series to ensure optimal performance",
       );
 
       // Should still calculate legend width for limited series
@@ -3054,10 +3251,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_gridlines: true,
           connect_nulls: false,
-          show_legends: false
+          show_legends: false,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3067,7 +3264,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "matrix_metric" },
-              values: [[1640435200, "30"], [1640435260, "35"]],
+              values: [
+                [1640435200, "30"],
+                [1640435260, "35"],
+              ],
             },
           ],
         },
@@ -3091,10 +3291,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_position: "right",
-          legend_width: { value: 150, unit: "px" }
+          legend_width: { value: 150, unit: "px" },
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3131,12 +3331,12 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "area",
-        config: { 
+        config: {
           show_gridlines: false,
           connect_nulls: true,
           show_legends: true,
           legends_position: "bottom",
-          legends_type: "plain"
+          legends_type: "plain",
         },
         queries: [{ config: { promql_legend: "{__name__}[{instance}] - {job} ({mode})" } }],
       };
@@ -3145,22 +3345,30 @@ describe("Convert PromQL Data Utils", () => {
           resultType: "matrix",
           result: [
             {
-              metric: { 
+              metric: {
                 __name__: "http_requests_total",
                 instance: "web-1:8080",
                 job: "web-server",
-                mode: "production"
+                mode: "production",
               },
-              values: [[1640435200, "100"], [1640435260, null], [1640435320, "150"]],
+              values: [
+                [1640435200, "100"],
+                [1640435260, null],
+                [1640435320, "150"],
+              ],
             },
             {
-              metric: { 
+              metric: {
                 __name__: "http_requests_total",
-                instance: "web-2:8080", 
+                instance: "web-2:8080",
                 job: "web-server",
-                mode: "staging"
+                mode: "staging",
               },
-              values: [[1640435200, "50"], [1640435260, "60"], [1640435320, "70"]],
+              values: [
+                [1640435200, "50"],
+                [1640435260, "60"],
+                [1640435320, "70"],
+              ],
             },
           ],
         },
@@ -3176,16 +3384,20 @@ describe("Convert PromQL Data Utils", () => {
       );
 
       // Test complex legend name formatting
-      expect(result.options.series.some((s: any) => 
-        s.name === "http_requests_total[web-1:8080] - web-server (production)"
-      )).toBe(true);
-      expect(result.options.series.some((s: any) => 
-        s.name === "http_requests_total[web-2:8080] - web-server (staging)"
-      )).toBe(true);
+      expect(
+        result.options.series.some(
+          (s: any) => s.name === "http_requests_total[web-1:8080] - web-server (production)",
+        ),
+      ).toBe(true);
+      expect(
+        result.options.series.some(
+          (s: any) => s.name === "http_requests_total[web-2:8080] - web-server (staging)",
+        ),
+      ).toBe(true);
 
       // Test connect nulls
-      const series1 = result.options.series.find((s: any) => 
-        s.name === "http_requests_total[web-1:8080] - web-server (production)"
+      const series1 = result.options.series.find(
+        (s: any) => s.name === "http_requests_total[web-1:8080] - web-server (production)",
       );
       expect(series1.connectNulls).toBe(true);
 
@@ -3198,7 +3410,7 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_gridlines: true,
           connect_nulls: false,
           show_legends: true,
@@ -3206,21 +3418,21 @@ describe("Convert PromQL Data Utils", () => {
           legends_type: null, // Should default to scroll behavior
           axis_width: 15,
           y_axis_min: 0,
-          y_axis_max: 1000
+          y_axis_max: 1000,
         },
         queries: [{ config: { promql_legend: "{__name__}_{instance}_{job}" } }],
       };
 
       // Create maximum allowed series (100)
       const maxSeries = Array.from({ length: 100 }, (_, i) => ({
-        metric: { 
+        metric: {
           __name__: `performance_metric_${i}`,
           instance: `performance_instance_${i}`,
-          job: `performance_job_${i}`
+          job: `performance_job_${i}`,
         },
         values: Array.from({ length: 100 }, (_, j) => [
-          1640435200 + (j * 60), 
-          (Math.random() * 1000).toString()
+          1640435200 + j * 60,
+          (Math.random() * 1000).toString(),
         ]),
       }));
 
@@ -3253,11 +3465,11 @@ describe("Convert PromQL Data Utils", () => {
     it("should properly integrate calculateRightLegendWidth function call", async () => {
       const panelSchema = {
         id: "panel1",
-        type: "line", 
-        config: { 
+        type: "line",
+        config: {
           show_legends: true,
           legends_position: "right",
-          legends_type: "plain"
+          legends_type: "plain",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3291,10 +3503,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_legends: true,
           legends_type: "plain",
-          legends_position: "bottom"
+          legends_position: "bottom",
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3329,9 +3541,9 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_gridlines: true,
-          axis_border_show: true
+          axis_border_show: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3367,9 +3579,9 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           show_gridlines: false,
-          connect_nulls: true
+          connect_nulls: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3398,14 +3610,14 @@ describe("Convert PromQL Data Utils", () => {
 
     it("should validate all chart types work with new gridlines configuration", async () => {
       const chartTypes = ["line", "bar", "area", "scatter", "area-stacked"];
-      
+
       for (const chartType of chartTypes) {
         const panelSchema = {
           id: "panel1",
           type: chartType,
-          config: { 
+          config: {
             show_gridlines: false,
-            connect_nulls: chartType.includes("area") || chartType === "line"
+            connect_nulls: chartType.includes("area") || chartType === "line",
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3433,7 +3645,7 @@ describe("Convert PromQL Data Utils", () => {
         // All chart types should respect gridlines configuration
         expect(result.options.xAxis.splitLine.show).toBe(false);
         expect(result.options.yAxis.splitLine.show).toBe(false);
-        
+
         // Verify chart-specific properties are preserved
         expect(result.options.series.length).toBeGreaterThan(0);
         expect(result.extras.isTimeSeries).toBe(true);
@@ -3444,11 +3656,11 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           unit: "bytes",
           unit_custom: "MB",
           decimals: 3,
-          show_gridlines: true
+          show_gridlines: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3458,7 +3670,10 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "byte_metric" },
-              values: [[1640435200, "1048576"], [1640435260, "2097152"]],
+              values: [
+                [1640435200, "1048576"],
+                [1640435260, "2097152"],
+              ],
             },
           ],
         },
@@ -3492,10 +3707,10 @@ describe("Convert PromQL Data Utils", () => {
       const panelSchema = {
         id: "panel1",
         type: "line",
-        config: { 
+        config: {
           line_interpolation: "step-start",
           connect_nulls: false,
-          show_gridlines: true
+          show_gridlines: true,
         },
         queries: [{ config: { promql_legend: "" } }],
       };
@@ -3505,7 +3720,11 @@ describe("Convert PromQL Data Utils", () => {
           result: [
             {
               metric: { __name__: "step_metric" },
-              values: [[1640435200, "10"], [1640435260, null], [1640435320, "20"]],
+              values: [
+                [1640435200, "10"],
+                [1640435260, null],
+                [1640435320, "20"],
+              ],
             },
           ],
         },
@@ -3520,7 +3739,9 @@ describe("Convert PromQL Data Utils", () => {
         mockAnnotations,
       );
 
-      const series = result.options.series.find((s: any) => s.name === '{"__name__":"step_metric"}');
+      const series = result.options.series.find(
+        (s: any) => s.name === '{"__name__":"step_metric"}',
+      );
       expect(series.step).toBe("start"); // step-start becomes "start"
       expect(series.smooth).toBe(false); // Should not be smooth with step
       expect(series.connectNulls).toBe(false);
@@ -3533,8 +3754,8 @@ describe("Convert PromQL Data Utils", () => {
           type: "line",
           config: {
             trellis: {
-              layout: true
-            }
+              layout: true,
+            },
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3560,7 +3781,9 @@ describe("Convert PromQL Data Utils", () => {
         );
 
         // When trellis layout is enabled, mark line/area should not be added
-        const markLineSeries = result.options.series.find((s: any) => s.markLine && s.markLine.data?.length > 0);
+        const markLineSeries = result.options.series.find(
+          (s: any) => s.markLine && s.markLine.data?.length > 0,
+        );
         expect(markLineSeries).toBeUndefined();
       });
 
@@ -3573,9 +3796,9 @@ describe("Convert PromQL Data Utils", () => {
             decimals: 2,
             background: {
               value: {
-                color: "#ff0000"
-              }
-            }
+                color: "#ff0000",
+              },
+            },
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3611,7 +3834,7 @@ describe("Convert PromQL Data Utils", () => {
           id: "panel1",
           type: "line",
           config: {
-            axis_border_show: true
+            axis_border_show: true,
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3645,7 +3868,7 @@ describe("Convert PromQL Data Utils", () => {
           id: "panel1",
           type: "line",
           config: {
-            axis_width: 50
+            axis_width: 50,
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3680,8 +3903,8 @@ describe("Convert PromQL Data Utils", () => {
           type: "line",
           config: {
             color: {
-              mode: "invalid_mode" // This should cause getSeriesColor to throw
-            }
+              mode: "invalid_mode", // This should cause getSeriesColor to throw
+            },
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3719,7 +3942,7 @@ describe("Convert PromQL Data Utils", () => {
           type: "line",
           config: {
             show_legends: true,
-            legends_position: "right"
+            legends_position: "right",
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3759,8 +3982,8 @@ describe("Convert PromQL Data Utils", () => {
             legends_type: "scroll",
             legend_height: {
               value: 80,
-              unit: "px"
-            }
+              unit: "px",
+            },
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3800,8 +4023,8 @@ describe("Convert PromQL Data Utils", () => {
             legends_type: null, // null means auto, which can be scroll
             legend_height: {
               value: 60,
-              unit: "%"
-            }
+              unit: "%",
+            },
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -3894,7 +4117,7 @@ describe("Convert PromQL Data Utils", () => {
           id: "panel1",
           type: "gauge",
           config: {
-            color: { mode: "palette" }
+            color: { mode: "palette" },
           },
           queries: [{ config: { promql_legend: "", min: 0, max: 100 } }],
         };
@@ -3960,8 +4183,8 @@ describe("Convert PromQL Data Utils", () => {
           {
             data: [1640435200 * 1000, 100],
             seriesName: "test_series",
-            marker: "●"
-          }
+            marker: "●",
+          },
         ];
 
         const tooltipResult = tooltipFormatter(mockTooltipData);
@@ -4010,7 +4233,7 @@ describe("Convert PromQL Data Utils", () => {
           type: "line",
           config: {
             unit: "bytes",
-            decimals: 2
+            decimals: 2,
           },
           queries: [{ config: { promql_legend: "" } }],
         };
@@ -4041,8 +4264,8 @@ describe("Convert PromQL Data Utils", () => {
           {
             data: [1640435200 * 1000, null], // null value
             seriesName: "test_series",
-            marker: "●"
-          }
+            marker: "●",
+          },
         ];
 
         const tooltipResult = tooltipFormatter(nullDataTooltip);
@@ -4079,8 +4302,8 @@ describe("Convert PromQL Data Utils", () => {
         const metadata = {
           queries: [
             {
-              startTime: String(50 * 1_000_000),  // 50s in µs
-              endTime: String(450 * 1_000_000),    // 450s in µs
+              startTime: String(50 * 1_000_000), // 50s in µs
+              endTime: String(450 * 1_000_000), // 450s in µs
             },
           ],
         };
@@ -4103,9 +4326,7 @@ describe("Convert PromQL Data Utils", () => {
         // PromQL uses xAxis type "time" — data is in each series' .data array.
         // The first series (non-annotation) should have more than 3 data points
         // because gap filling inserts null values at missing timestamps.
-        const dataSeries = result.options.series.find(
-          (s: any) => s.name != null,
-        );
+        const dataSeries = result.options.series.find((s: any) => s.name != null);
         expect(dataSeries).toBeDefined();
         expect(dataSeries.data.length).toBeGreaterThan(3);
       });
@@ -4159,9 +4380,7 @@ describe("Convert PromQL Data Utils", () => {
 
         expect(result.options).toBeDefined();
         // During streaming, gap filling is skipped — series has only original 3 points
-        const dataSeries = result.options.series.find(
-          (s: any) => s.name != null,
-        );
+        const dataSeries = result.options.series.find((s: any) => s.name != null);
         expect(dataSeries).toBeDefined();
         expect(dataSeries.data.length).toBe(3);
       });
@@ -4202,7 +4421,7 @@ describe("Convert PromQL Data Utils", () => {
           mockAnnotations,
           metadata,
           undefined, // resultMetaData
-          true,      // loading — enables x-axis pinning during streaming
+          true, // loading — enables x-axis pinning during streaming
         );
 
         expect(result.options).toBeDefined();
@@ -4247,7 +4466,7 @@ describe("Convert PromQL Data Utils", () => {
           mockAnnotations,
           metadata,
           undefined, // resultMetaData
-          false,     // loading=false — final render, no x-axis pinning
+          false, // loading=false — final render, no x-axis pinning
         );
 
         expect(result.options).toBeDefined();
@@ -4283,7 +4502,7 @@ describe("Convert PromQL Data Utils", () => {
           mockChartPanelRef,
           mockHoveredSeriesState,
           mockAnnotations,
-          null,  // no metadata
+          null, // no metadata
         );
 
         expect(result.options).toBeDefined();

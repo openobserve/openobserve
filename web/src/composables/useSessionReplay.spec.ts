@@ -12,46 +12,46 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect } from 'vitest';
-import useSession from './useSessionReplay';
+import { describe, it, expect } from "vitest";
+import useSession from "./useSessionReplay";
 
-describe('useSessionReplay', () => {
-  it('should return sessionState and resetSessionState function', () => {
+describe("useSessionReplay", () => {
+  it("should return sessionState and resetSessionState function", () => {
     const { sessionState, resetSessionState } = useSession();
 
     expect(sessionState).toBeDefined();
     expect(resetSessionState).toBeInstanceOf(Function);
   });
 
-  it('should have default session state structure', () => {
+  it("should have default session state structure", () => {
     const { sessionState } = useSession();
 
-    expect(sessionState).toHaveProperty('loading');
-    expect(sessionState).toHaveProperty('config');
-    expect(sessionState).toHaveProperty('meta');
-    expect(sessionState).toHaveProperty('data');
+    expect(sessionState).toHaveProperty("loading");
+    expect(sessionState).toHaveProperty("config");
+    expect(sessionState).toHaveProperty("meta");
+    expect(sessionState).toHaveProperty("data");
     expect(Array.isArray(sessionState.loading)).toBe(true);
   });
 
-  it('should have config with expected properties', () => {
+  it("should have config with expected properties", () => {
     const { sessionState } = useSession();
 
-    expect(sessionState.config).toHaveProperty('splitterModel');
-    expect(sessionState.config).toHaveProperty('refreshTimes');
+    expect(sessionState.config).toHaveProperty("splitterModel");
+    expect(sessionState.config).toHaveProperty("refreshTimes");
     expect(Array.isArray(sessionState.config.refreshTimes)).toBe(true);
   });
 
-  it('should have data with stream and datetime properties', () => {
+  it("should have data with stream and datetime properties", () => {
     const { sessionState } = useSession();
 
-    expect(sessionState.data).toHaveProperty('stream');
-    expect(sessionState.data).toHaveProperty('datetime');
-    expect(sessionState.data).toHaveProperty('sessions');
-    expect(sessionState.data.stream).toHaveProperty('logStream');
-    expect(sessionState.data.stream).toHaveProperty('sessionStream');
+    expect(sessionState.data).toHaveProperty("stream");
+    expect(sessionState.data).toHaveProperty("datetime");
+    expect(sessionState.data).toHaveProperty("sessions");
+    expect(sessionState.data.stream).toHaveProperty("logStream");
+    expect(sessionState.data.stream).toHaveProperty("sessionStream");
   });
 
-  it('should call resetSessionState without errors', () => {
+  it("should call resetSessionState without errors", () => {
     const { resetSessionState } = useSession();
 
     // Should execute without throwing errors

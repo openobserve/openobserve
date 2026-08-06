@@ -18,7 +18,7 @@
  * dashboards' IndexedDB panel cache can't cover: the **KPI strip** (fetched by
  * the dashboard via `useLLMInsights`) and the **error table** (fetched by the
  * table via `useLLMStreamQuery`). The chart panels reuse the dashboards'
- * own IndexedDB cache instead — see `llminsights-caching.md`.
+ * own IndexedDB cache instead.
  *
  * Both caches key identically — stream + agent + time window — via
  * `selectionKey`, so a tab toggle back to the same selection is an instant hit
@@ -53,12 +53,7 @@ export interface KpiSnapshot {
  * identity per selection. (The KPI strip also calls this directly with the same
  * name/placeholder.)
  */
-export function selectionKey(
-  stream: string,
-  agent: string,
-  start: number,
-  end: number,
-): string {
+export function selectionKey(stream: string, agent: string, start: number, end: number): string {
   return `${stream}::${agent}::${start}-${end}`;
 }
 

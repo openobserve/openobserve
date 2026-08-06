@@ -34,8 +34,7 @@ if (config.enableAnalytics == "true") {
     });
 
     // Register the ready callback after load
-    rudderanalytics.ready(() => {
-    });
+    rudderanalytics.ready(() => {});
   } catch (error) {
     // Silently handle initialization errors - analytics is not critical
     // These errors typically occur when:

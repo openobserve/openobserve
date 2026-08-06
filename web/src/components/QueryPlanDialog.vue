@@ -22,40 +22,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('search.queryPlan')"
     @update:open="(v) => !v && onClose()"
   >
-    <div class="tw:overflow-hidden tw:h-full tw:p-0">
+    <div class="h-full overflow-hidden p-0">
       <OSplitter
         v-model="splitterPosition"
         :horizontal="false"
-        separator-class="query-plan-splitter"
-        class="tw:h-full"
+        separator-class="relative before:content-[''] before:absolute before:left-1/2 before:inset-y-0 before:w-px before:bg-card-glass-border before:-translate-x-1/2 before:transition-[background-color,width] before:duration-200 hover:before:bg-accent hover:before:w-0.5"
+        class="h-full"
       >
         <!-- Left Pane: SQL Query -->
         <template #before>
-          <section class="tw:flex tw:flex-col tw:overflow-hidden tw:bg-(--o2-card-background) tw:h-full">
-            <header class="tw:shrink-0 tw:flex tw:items-center tw:gap-2 tw:h-11 tw:px-4 tw:bg-(--o2-card-bg) tw:border-b tw:border-solid tw:border-(--o2-border-color)">
-              <div class="tw:flex tw:items-center tw:gap-2">
-                <OIcon name="code" size="sm" class="tw:text-(--o2-text-secondary)" />
-                <h3 class="tw:text-(length:--text-sm) tw:font-(--font-semibold) tw:text-(--o2-text-heading) tw:m-0 tw:tracking-[0.01em]">SQL Query</h3>
+          <section class="bg-surface-base flex h-full flex-col overflow-hidden">
+            <header
+              class="bg-card-glass-bg border-card-glass-border flex h-11 shrink-0 items-center gap-2 border-b border-solid px-4"
+            >
+              <div class="flex items-center gap-2">
+                <OIcon name="code" size="sm" class="text-text-secondary" />
+                <h3
+                  class="text-text-heading m-0 text-(length:--text-sm) font-(--font-semibold) tracking-[0.01em]"
+                >
+                  {{ t("search.sqlQuery") }}
+                </h3>
               </div>
             </header>
-            <div class="tw:flex-1 tw:overflow-y-auto tw:p-4">
-              <pre class="sql-query-text tw:[font-family:var(--font-mono)] tw:text-[0.8125rem] tw:leading-[1.6] tw:m-0 tw:py-3.5 tw:px-4 tw:whitespace-pre-wrap tw:wrap-break-word tw:bg-(--o2-code-bg) tw:border tw:border-solid tw:border-(--o2-border-color) tw:rounded-md tw:text-(--o2-text-code) tw:min-h-full tw:box-border"><code class="tw:[font-family:inherit] tw:text-inherit tw:bg-transparent tw:p-0">{{ sqlQuery }}</code></pre>
+            <div class="flex-1 overflow-y-auto p-4">
+              <pre
+                class="sql-query-text text-compact bg-code-bg border-card-glass-border rounded-default text-text-code m-0 box-border min-h-full border border-solid px-4 py-3.5 [font-family:var(--font-mono)] leading-[1.6] wrap-break-word whitespace-pre-wrap"
+              ><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
             </div>
           </section>
         </template>
 
         <!-- Right Pane: Explain/Analyze Results -->
         <template #after>
-          <section class="tw:flex tw:flex-col tw:overflow-hidden tw:bg-(--o2-card-background) tw:h-full">
-            <header class="tw:shrink-0 tw:flex tw:items-center tw:gap-2 tw:h-11 tw:px-4 tw:bg-(--o2-card-bg) tw:border-b tw:border-solid tw:border-(--o2-border-color)">
-              <h3 class="tw:text-(length:--text-sm) tw:font-(--font-semibold) tw:text-(--o2-text-heading) tw:m-0 tw:tracking-[0.01em]">
-                {{
-                  showAnalyzeResults
-                    ? t("search.analyzeResults")
-                    : t("search.explainResults")
-                }}
+          <section class="bg-surface-base flex h-full flex-col overflow-hidden">
+            <header
+              class="bg-card-glass-bg border-card-glass-border flex h-11 shrink-0 items-center gap-2 border-b border-solid px-4"
+            >
+              <h3
+                class="text-text-heading m-0 text-(length:--text-sm) font-(--font-semibold) tracking-[0.01em]"
+              >
+                {{ showAnalyzeResults ? t("search.analyzeResults") : t("search.explainResults") }}
               </h3>
-              <div class="tw:flex-1" />
+              <div class="flex-1" />
               <OButton
                 v-if="!isAnalyzing && !showAnalyzeResults"
                 variant="primary"
@@ -68,42 +76,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </header>
 
-            <div v-if="loading" class="tw:flex-1 tw:flex tw:items-center tw:justify-center tw:p-6">
-              <div class="tw:text-center">
+            <div v-if="loading" class="flex flex-1 items-center justify-center p-6">
+              <div class="text-center">
                 <OSpinner variant="dots" size="lg" />
-                <div class="tw:mt-3 tw:text-(--o2-text-secondary) tw:text-(length:--text-sm)">
-                  {{
-                    isAnalyzing
-                      ? t("search.runningAnalyze")
-                      : t("search.loadingPlan")
-                  }}
+                <div class="text-text-secondary mt-3 text-(length:--text-sm)">
+                  {{ isAnalyzing ? t("search.runningAnalyze") : t("search.loadingPlan") }}
                 </div>
               </div>
             </div>
 
-            <div v-else-if="error" class="tw:p-4">
-              <OBanner variant="error" icon="error" :content="error" />
+            <div v-else-if="error" class="p-4">
+              <OBanner variant="error" icon="error" :content="raw(error)" />
             </div>
 
             <!-- EXPLAIN ANALYZE view -->
-            <div v-else-if="showAnalyzeResults" class="tw:flex-1 tw:overflow-y-auto tw:flex tw:flex-col tw:p-4 tw:gap-3">
-              <MetricsSummaryCard
-                v-if="summaryMetrics"
-                :metrics="summaryMetrics"
-                class="tw:mb-3"
-              />
+            <div
+              v-else-if="showAnalyzeResults"
+              class="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+            >
+              <MetricsSummaryCard v-if="summaryMetrics" :metrics="summaryMetrics" class="mb-3" />
 
-              <div class="plan-surface tw:flex-1 tw:flex tw:flex-col tw:bg-(--o2-card-bg) tw:border tw:border-solid tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-                <div class="tw:px-4 tw:py-2.5 tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:bg-(--o2-card-background)">
-                  <span class="tw:text-(length:--text-xs) tw:font-(--font-semibold) tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-label)">{{ t("search.executionPlan") }}</span>
+              <div
+                class="plan-surface bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
+              >
+                <div
+                  class="border-card-glass-border bg-surface-base border-b border-solid px-4 py-2.5"
+                >
+                  <span
+                    class="text-text-label text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase"
+                    >{{ t("search.executionPlan") }}</span
+                  >
                 </div>
-                <div class="tw:flex-1 tw:overflow-y-auto tw:py-3 tw:px-4">
-                  <QueryPlanTree
-                    v-if="planTree"
-                    :tree="planTree"
-                    :is-analyze="true"
-                  />
-                  <div v-else class="tw:py-6 tw:px-4 tw:text-center tw:text-(length:--text-sm) tw:text-(--o2-text-muted)">
+                <div class="flex-1 overflow-y-auto px-4 py-3">
+                  <QueryPlanTree v-if="planTree" :tree="planTree" :is-analyze="true" />
+                  <div v-else class="text-text-muted px-4 py-6 text-center text-(length:--text-sm)">
                     {{ t("search.noAnalyzePlanFound") }}
                   </div>
                 </div>
@@ -111,9 +117,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- EXPLAIN view (tabs for logical/physical) -->
-            <div v-else class="tw:flex-1 tw:overflow-y-auto tw:flex tw:flex-col tw:p-4 tw:gap-3">
-              <div class="plan-surface tw:flex-1 tw:flex tw:flex-col tw:bg-(--o2-card-bg) tw:border tw:border-solid tw:border-(--o2-border-color) tw:rounded-lg tw:overflow-hidden">
-                <div class="tw:border-b tw:border-solid tw:border-(--o2-border-color) tw:px-2">
+            <div v-else class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
+              <div
+                class="plan-surface bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
+              >
+                <div class="border-card-glass-border border-b border-solid px-2">
                   <OTabs v-model="activeTab" dense align="left">
                     <OTab name="logical" :label="t('search.logicalPlan')" />
                     <OTab name="physical" :label="t('search.physicalPlan')" />
@@ -122,26 +130,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <OTabPanels v-model="activeTab" animated>
                   <OTabPanel name="logical">
-                    <div class="tw:flex-1 tw:overflow-y-auto tw:py-3 tw:px-4">
+                    <div class="flex-1 overflow-y-auto px-4 py-3">
                       <QueryPlanTree
                         v-if="logicalPlanTree"
                         :tree="logicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="tw:py-6 tw:px-4 tw:text-center tw:text-(length:--text-sm) tw:text-(--o2-text-muted)">
+                      <div
+                        v-else
+                        class="text-text-muted px-4 py-6 text-center text-(length:--text-sm)"
+                      >
                         {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
                   </OTabPanel>
 
                   <OTabPanel name="physical">
-                    <div class="tw:flex-1 tw:overflow-y-auto tw:py-3 tw:px-4">
+                    <div class="flex-1 overflow-y-auto px-4 py-3">
                       <QueryPlanTree
                         v-if="physicalPlanTree"
                         :tree="physicalPlanTree"
                         :is-analyze="false"
                       />
-                      <div v-else class="tw:py-6 tw:px-4 tw:text-center tw:text-(length:--text-sm) tw:text-(--o2-text-muted)">
+                      <div
+                        v-else
+                        class="text-text-muted px-4 py-6 text-center text-(length:--text-sm)"
+                      >
                         {{ t("search.noPhysicalPlan") }}
                       </div>
                     </div>
@@ -166,7 +180,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -214,9 +228,9 @@ export default defineComponent({
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const { getSearchQueryPayload } = useSearchStream();
+    const { getSearchQueryPayload } = useSearchStream(t);
 
     const loading = ref(false);
     const error = ref("");
@@ -227,7 +241,7 @@ export default defineComponent({
     const activeTab = ref("logical");
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
-    const splitterPosition = ref(50); // Split at 50%
+    const splitterPosition = ref(50);
 
     let { searchObj } = searchState();
 
@@ -236,7 +250,6 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    // Get SQL query from searchObj
     const sqlQuery = computed(() => {
       return props.searchObj?.data?.query || "";
     });
@@ -288,12 +301,8 @@ export default defineComponent({
         // We need to nest Phase 1+ plans as children of Phase 0 RemoteExec
 
         // Separate phases
-        const phase0Hits = responseData.hits.filter(
-          (hit: any) => hit.phase === 0,
-        );
-        const phase1Hits = responseData.hits.filter(
-          (hit: any) => hit.phase === 1,
-        );
+        const phase0Hits = responseData.hits.filter((hit: any) => hit.phase === 0);
+        const phase1Hits = responseData.hits.filter((hit: any) => hit.phase === 1);
 
         if (phase0Hits.length > 0 && phase1Hits.length > 0) {
           // Parse phase 0
@@ -361,19 +370,13 @@ export default defineComponent({
         });
 
         // Fallback: if no plan_type, try to parse from combined text
-        if (
-          !logicalPlan.value &&
-          !physicalPlan.value &&
-          responseData.hits.length > 0
-        ) {
+        if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
           const combined = responseData.hits
             .map((h: any) => h.plan || JSON.stringify(h))
             .join("\n");
 
           // Try to split by plan_type markers
-          const logicalMatch = combined.match(
-            /logical_plan[:\s]+(.+?)(?=physical_plan|$)/is,
-          );
+          const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
           const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
 
           if (logicalMatch) {
@@ -410,10 +413,7 @@ export default defineComponent({
             try {
               const parsed = JSON.parse(dataContent);
               // Look for actual search results with hits
-              if (
-                parsed &&
-                (parsed.hits !== undefined || parsed.total !== undefined)
-              ) {
+              if (parsed && (parsed.hits !== undefined || parsed.total !== undefined)) {
                 result = parsed;
               }
             } catch (e) {
@@ -483,10 +483,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error fetching explain plan:", err);
-        error.value =
-          err.response?.data?.message ||
-          err.message ||
-          t("search.errorFetchingPlan");
+        error.value = err.response?.data?.message || err.message || t("search.errorFetchingPlan");
       } finally {
         loading.value = false;
       }
@@ -546,10 +543,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error running analyze:", err);
-        error.value =
-          err.response?.data?.message ||
-          err.message ||
-          t("search.errorRunningAnalyze");
+        error.value = err.response?.data?.message || err.message || t("search.errorRunningAnalyze");
       } finally {
         loading.value = false;
         isAnalyzing.value = false;
@@ -602,6 +596,7 @@ export default defineComponent({
     );
 
     return {
+      raw,
       t,
       showDialog,
       loading,
@@ -622,40 +617,20 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.plan-surface .o-tab-panels {
+<style scoped>
+/* keep(lib-override): stretch OTabPanels/OTabPanel library-internal DOM to fill the plan surface height */
+.plan-surface :deep(.o-tab-panels) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.plan-surface .o-tab-panel {
+.plan-surface :deep(.o-tab-panel) {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.query-plan-splitter {
-  position: relative;
-}
-
-.query-plan-splitter::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background-color: var(--o2-border-color);
-  transform: translateX(-50%);
-  transition: background-color 0.2s ease, width 0.2s ease;
-}
-
-.query-plan-splitter:hover::before {
-  background-color: var(--o2-primary-color);
-  width: 2px;
 }
 </style>

@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import config from "../aws-exports";
 
 const organizations = {
   os_list: (
@@ -23,19 +22,13 @@ const organizations = {
     sort_by: string,
     desc: boolean,
     name: string,
-    org_identifier: string,
+    _org_identifier: string,
   ) => {
     return http().get(
       `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
   },
-  list: (
-    page_num: number,
-    page_size: number,
-    sort_by: string,
-    desc: boolean,
-    name: string,
-  ) => {
+  list: (page_num: number, page_size: number, sort_by: string, desc: boolean, name: string) => {
     return http().get(
       `/api/organizations?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
@@ -50,10 +43,7 @@ const organizations = {
     return http().delete(`api/${orgIdentifier}/invites/${token}`);
   },
   process_subscription: (s: string, action: string, orgIdentifier: string) => {
-    return http().put(
-      `api/${orgIdentifier}/member_subscription/${s}?action=${action}`,
-      {},
-    );
+    return http().put(`api/${orgIdentifier}/member_subscription/${s}?action=${action}`, {});
   },
   decline_subscription: (s: string) => {
     return http().delete(`api/invites/${s}`, {});
@@ -88,6 +78,9 @@ const organizations = {
   extend_trial_period: (orgIdentifier: string, data: any) => {
     return http().put(`/api/${orgIdentifier}/extend_trial_period`, data);
   },
+  set_ai_usage_limit: (orgIdentifier: string, data: { org_id: string; credits_limit: number }) => {
+    return http().put(`/api/${orgIdentifier}/ai/usage_limit`, data);
+  },
   rename_organization: (orgIdentifier: string, newOrgName: string) => {
     return http().put(`/api/${orgIdentifier}/rename`, {
       new_name: newOrgName,
@@ -103,6 +96,16 @@ const organizations = {
     return http().delete(`/api/${orgIdentifier}/external_contract/${targetOrgId}`);
   },
 
+  get_cleanup_tasks: (targetOrgId: string) => {
+    return http().get(`/api/_meta/org_cleanup_tasks/${targetOrgId}`);
+  },
+  delete_org: (orgIdentifier: string) => {
+    return http().delete(`/api/${orgIdentifier}/organizations`);
+  },
+  resurrect_org: (metaOrg: string, targetOrg: string) => {
+    return http().post(`/api/${metaOrg}/organizations/${targetOrg}/resurrect`);
+  },
+
   // Org ingestion tokens
   list_org_ingestion_tokens: (orgIdentifier: string) => {
     return http().get(`/api/${orgIdentifier}/ingestion-tokens`);
@@ -113,15 +116,10 @@ const organizations = {
   ) => {
     return http().post(`/api/${orgIdentifier}/ingestion-tokens`, data);
   },
-  enable_disable_org_ingestion_token: (
-    orgIdentifier: string,
-    name: string,
-    enabled: boolean,
-  ) => {
-    return http().patch(
-      `/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`,
-      { enabled },
-    );
+  enable_disable_org_ingestion_token: (orgIdentifier: string, name: string, enabled: boolean) => {
+    return http().patch(`/api/${orgIdentifier}/ingestion-tokens/${encodeURIComponent(name)}`, {
+      enabled,
+    });
   },
 };
 

@@ -7,21 +7,23 @@
     data-test="confirm-dialog-provider"
     size="sm"
     :title="currentDialog.title"
-    :primary-button-label="currentDialog.confirmLabel || 'OK'"
-    :secondary-button-label="currentDialog.cancelLabel || 'Cancel'"
+    :primary-button-label="raw(currentDialog.confirmLabel) || t('common.ok')"
+    :secondary-button-label="raw(currentDialog.cancelLabel) || t('common.cancel')"
     :persistent="currentDialog.persistent ?? true"
     @click:primary="handleConfirm"
     @click:secondary="handleCancel"
     @update:open="handleUpdateOpen"
   >
-    <div class="tw:text-center">{{ currentDialog.message }}</div>
+    <div class="text-center">{{ currentDialog.message }}</div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { raw, useI18nTyped } from "@/types/i18n";
 
-const { currentDialog, handleConfirm, handleCancel, handleUpdateOpen } =
-  useConfirmDialog();
+const { currentDialog, handleConfirm, handleCancel, handleUpdateOpen } = useConfirmDialog();
+
+const { t } = useI18nTyped();
 </script>

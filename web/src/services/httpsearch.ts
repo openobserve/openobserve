@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
-import router from "../router";
 import axios from "axios";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw } from "@/types/i18n";
 
 const http = () => {
   const instance = axios.create({
@@ -34,9 +34,7 @@ const http = () => {
         switch (error.response.status) {
           case 400:
             toast({
-              message: JSON.stringify(
-                error.response.data["error"] || "Bad Request"
-              ),
+              message: raw(JSON.stringify(error.response.data["error"] || "Bad Request")),
               variant: "error",
             });
             break;
@@ -58,9 +56,7 @@ const http = () => {
             break;
           case 500:
             toast({
-              message: JSON.stringify(
-                error.response.data["error"] || "Internal ServerError"
-              ),
+              message: raw(JSON.stringify(error.response.data["error"] || "Internal ServerError")),
               variant: "error",
             });
             break;
@@ -69,7 +65,7 @@ const http = () => {
         }
       }
       return Promise.reject(error);
-    }
+    },
   );
 
   return instance;

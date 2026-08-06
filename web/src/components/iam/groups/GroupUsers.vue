@@ -15,21 +15,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex h-full flex-col">
     <div
       data-test="iam-users-selection-filters"
-      class="tw:flex tw:justify-start tw:px-3 tw:py-2 card-container tw:flex-shrink-0"
+      class="bg-card-glass-bg flex flex-shrink-0 justify-start px-3 py-2"
     >
-      <div data-test="iam-users-selection-show-toggle" class="tw:mr-3">
-        <div class="tw:flex tw:items-center">
-          <span
-            data-test="iam-users-selection-show-text"
-            style="font-size: 14px"
-          >
-            Show
+      <div data-test="iam-users-selection-show-toggle" class="mr-3">
+        <div class="flex items-center">
+          <span data-test="iam-users-selection-show-text" style="font-size: var(--text-sm)">
+            {{ t("iam.groupUsers.show") }}
           </span>
           <OToggleGroup
-            class="tw:ml-1"
+            class="ml-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -45,40 +42,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div
-        data-test="iam-users-selection-search-input"
-        class="tw:mr-3"
-      >
+      <div data-test="iam-users-selection-search-input" class="mr-3">
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          class="tw:h-[36px] tw:w-[200px]"
-          placeholder="Search User"
+          class="h-9 w-50"
+          :placeholder="t('iam.groupUsers.searchUser')"
         />
       </div>
 
-      <div
-          class="tw:mx-2 current-organization"
-        >
+      <div class="current-organization mx-2">
         <OSelect
           v-if="
-            store.state.selectedOrganization.identifier ===
-              store.state.zoConfig.meta_org &&
+            store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org &&
             usersDisplay == 'all'
           "
-          v-model="selectedOrg"
+          v-model="selectedOrgValue"
           :options="orgOptions"
           labelKey="label"
           valueKey="value"
           searchable
           class="organizationlist"
           @update:model-value="updateOrganization"
-          placeholder="Select Organization"
+          :placeholder="t('iam.groupUsers.selectOrganization')"
         />
-
-        </div>
+      </div>
     </div>
-    <div data-test="iam-users-selection-table" class="tw:flex-1 tw:min-h-0 card-container">
+    <div data-test="iam-users-selection-table" class="bg-card-glass-bg min-h-0 flex-1">
       <OTable
         :data="rows"
         :columns="columns"
@@ -101,24 +91,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OCheckbox
             :data-test="`iam-users-selection-table-body-row-${row.email}-checkbox`"
             :model-value="row.isInGroup"
-            class="filter-check-box tw:cursor-pointer"
+            class="filter-check-box cursor-pointer"
             @update:model-value="toggleUserSelection(row)"
           />
         </template>
         <template #cell-email="{ row }">
-          <div class="tw:flex tw:items-center">
+          <div class="flex items-center">
             <OUserCell :value="row.email" />
             <OTooltip v-if="shouldShowWarning(row)" side="right">
               <OIcon
                 name="info"
                 size="sm"
-                class="tw:ml-1 tw:cursor-pointer"
+                class="ml-1 cursor-pointer"
                 :data-test="`iam-external-user-warning-icon-${row.email}`"
               />
               <template #content>
-                <div style="font-size: 12px; line-height: 1.5;">
+                <div style="font-size: var(--text-xs); line-height: 1.5">
                   <strong>{{ t("iam.externalUserWarningTitle") }}</strong>
-                  <div class="tw:mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
+                  <div class="mt-1">{{ t("iam.externalUserWarningMessage") }}</div>
                 </div>
               </template>
             </OTooltip>
@@ -130,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             preset="no-users"
             :filtered="!!userSearchKey"
             :hide-action="!userSearchKey"
-            @action="(id) => id === 'clear-filters' ? (userSearchKey = '') : null"
+            @action="(id) => (id === 'clear-filters' ? (userSearchKey = '') : null)"
           />
         </template>
       </OTable>
@@ -148,16 +138,17 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import { computed, watch } from "vue";
 import type { Ref } from "vue";
 import { ref, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 // show selected users in the table
 // Add is_selected to the user object
 const props = defineProps({
@@ -194,16 +185,40 @@ const rows: Ref<any[]> = ref([]);
 const usersDisplay = ref("selected");
 
 const store = useStore();
-const orgOptions = ref([{ label: "All", value: "all" }]);
-const selectedOrg = ref(orgOptions.value[0]);
-const orgList = ref([...orgOptions.value]);
+const { t } = useI18nTyped();
+// Org option rows: the "All" entry carries a `value`; real-org entries carry
+// identifier/id and other metadata, so every non-label field is optional.
+interface OrgOption {
+  label: I18nText;
+  value?: string;
+  id?: string;
+  identifier?: string;
+  user_email?: string;
+  ingest_threshold?: number;
+  search_threshold?: number;
+  subscription_type?: string;
+  status?: string;
+  note?: string;
+}
+const orgOptions = ref<OrgOption[]>([{ label: t("iam.groupUsers.all"), value: "all" }]);
+const selectedOrg = ref<OrgOption>(orgOptions.value[0]);
+// OSelect's v-model is the primitive option value; keep `selectedOrg` (the full
+// option object) as the source of truth and bridge the two here.
+const selectedOrgValue = computed<SelectModelValue>({
+  get: () => selectedOrg.value?.value,
+  set: (val) => {
+    const match = orgOptions.value.find((org) => org.value === val);
+    if (match) selectedOrg.value = match;
+  },
+});
+const orgList = ref<OrgOption[]>([...orgOptions.value]);
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupUsers.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupUsers.selected"),
     value: "selected",
   },
 ];
@@ -211,12 +226,9 @@ const filterOrganizations = (val: string, update: (fn: () => void) => void) => {
   // Filter logic
   update(() => {
     const needle = val.toLowerCase();
-    orgList.value = orgOptions.value.filter((org) =>
-      org.label.toLowerCase().includes(needle)
-    );
+    orgList.value = orgOptions.value.filter((org) => org.label.toLowerCase().includes(needle));
   });
 };
-const { t } = useI18n();
 
 const userSearchKey = ref("");
 
@@ -226,16 +238,14 @@ const groupUsersMap = ref(new Set());
 
 const { usersState } = usePermissions();
 
-
-
 const columns = computed<OTableColumnDef[]>(() => {
   const baseColumns: OTableColumnDef[] = [
     {
       id: "select",
-      header: "",
+      header: raw(""),
       accessorKey: "isInGroup",
-    cell: (info: any) => info.getValue(),
-    size: TABLE_INDEX_COL_SIZE,
+      cell: (info: any) => info.getValue(),
+      size: TABLE_CHECKBOX_COL_SIZE,
       minSize: 32,
       maxSize: 40,
       meta: { align: "center", compactPadding: true },
@@ -249,7 +259,7 @@ const columns = computed<OTableColumnDef[]>(() => {
       hideable: true,
       size: COL.email,
       minSize: 160,
-      meta: { align: "left" , flex: true},
+      meta: { align: "left", flex: true },
     },
   ];
 
@@ -257,7 +267,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   if (store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org) {
     baseColumns.push({
       id: "organization",
-      header: "Organizations",
+      header: t("iam.groupUsers.organizations"),
       accessorKey: "org",
       sortable: true,
       resizable: true,
@@ -270,8 +280,7 @@ const columns = computed<OTableColumnDef[]>(() => {
   return baseColumns;
 });
 
-
-onBeforeMount(async () => {  
+onBeforeMount(async () => {
   groupUsersMap.value = new Set(props.groupUsers);
   await getchOrgUsers();
   updateUserTable(usersDisplay.value);
@@ -290,14 +299,13 @@ onBeforeMount(async () => {
     }));
 
     // Sort the organization options alphabetically by label
-    otherOrgOptions.sort((a:any, b:any) => a.label.localeCompare(b.label));
+    otherOrgOptions.sort((a: any, b: any) => a.label.localeCompare(b.label));
 
     // Prepend "All" option to the sorted list
-    orgOptions.value = [{ label: "All", value: "all" }, ...otherOrgOptions];
+    orgOptions.value = [{ label: t("iam.groupUsers.all"), value: "all" }, ...otherOrgOptions];
   }
   selectedOrg.value = orgOptions.value[0]; // Default to "All"
 });
-
 
 watch(
   () => props.groupUsers,
@@ -310,7 +318,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const updateUserTable = async (value: string) => {
@@ -331,9 +339,7 @@ const updateOrganization = () => {
   if (selectedOrg.value.value === "all") {
     // Show all users when "All" is selected
     rows.value =
-      usersDisplay.value === "all"
-        ? users.value
-        : users.value.filter((user) => user.isInGroup);
+      usersDisplay.value === "all" ? users.value : users.value.filter((user) => user.isInGroup);
   } else {
     // Filter users based on selected organization or root role
     rows.value = users.value.filter((user) => {
@@ -347,37 +353,38 @@ const updateOrganization = () => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
-    const data: any = await usersState.getOrgUsers(
-      store.state.selectedOrganization.identifier , { list_all: true }
-    );
+  return new Promise((resolve, reject) => {
+    (async () => {
+      const data: any = await usersState.getOrgUsers(store.state.selectedOrganization.identifier, {
+        list_all: true,
+      });
 
-    usersState.users = cloneDeep(
-      data.map((user: any, index: number) => {
-        return {
-          email: user.email,
-          "#": index + 1,
-          isInGroup: groupUsersMap.value.has(user.email),
-          org: user.orgs?.length > 0 ? user.orgs.map((org:{ org_name: string }) => org.org_name).join(", ") : "", // Set default "N/A" for users with no orgs
-          role: user.role,
-          is_external: user.is_external || false
-        };
-      })
-    );
+      usersState.users = cloneDeep(
+        data.map((user: any) => {
+          return {
+            email: user.email,
+            isInGroup: groupUsersMap.value.has(user.email),
+            org:
+              user.orgs?.length > 0
+                ? user.orgs.map((org: { org_name: string }) => org.org_name).join(", ")
+                : "", // Set default "N/A" for users with no orgs
+            role: user.role,
+            is_external: user.is_external || false,
+          };
+        }),
+      );
 
-    users.value = cloneDeep(usersState.users).map(
-      (user: any, index: number) => {
+      users.value = cloneDeep(usersState.users).map((user: any) => {
         return {
-          "#": index + 1,
           email: user.email,
           isInGroup: groupUsersMap.value.has(user.email),
           org: user.org,
           role: user.role,
-          is_external: user.is_external || false
+          is_external: user.is_external || false,
         };
-      }
-    );
-    resolve(true);
+      });
+      resolve(true);
+    })().catch(reject);
   });
 };
 
@@ -422,6 +429,4 @@ const shouldShowWarning = (user: any) => {
     !groupUsersMap.value.has(user.email)
   );
 };
-
 </script>
-

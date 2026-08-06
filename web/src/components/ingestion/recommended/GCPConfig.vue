@@ -14,81 +14,19 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Google Cloud setup page. Content lives in setupCard/content/gcp.ts and renders
+  through the shared DataSourceSetupCard.
+-->
 <template>
-  <div class="tw:m-3 tw:mt-1">
-    <CopyContent :content="content" />
-    <div class="tw:text-[16px]">
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Check further documentation at:
-      </div>
-      <ol class="tw:list-decimal tw:pl-3">
-        <li class="tw:py-1">
-          <a
-            href="https://openobserve.ai/blog/send-gcp-logs-to-openobserve"
-            class="tw:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-          {{ t("ingestion.pubsub") }}
-          </a>
-        </li>
-        <li class="tw:py-1">
-          <a
-            href="https://short.openobserve.ai/security/google-workspace"
-            class="tw:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-          {{ t("ingestion.gworkspace") }}
-          </a>
-        </li>
-      </ol>
-    </div>
-  </div>
+  <DataSourceSetupCard slug="gcp" />
 </template>
 
-<script lang="ts">
-import { defineComponent, ref } from "vue";
-import config from "../../../aws-exports";
-import { useStore } from "vuex";
-import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
-import { useI18n } from "vue-i18n";
+<script setup lang="ts">
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 
-export default defineComponent({
-  name: "GCPConfig",
-  props: {
-    currOrgIdentifier: {
-      type: String,
-    },
-    currUserEmail: {
-      type: String,
-    },
-  },
-  components: { CopyContent },
-  setup(props) {
-    const { t } = useI18n();
-    const store = useStore();
-    const endpoint: any = ref({
-      url: "",
-      host: "",
-      port: "",
-      protocol: "",
-      tls: "",
-    });
-    
-    const ingestionURL = getIngestionURL();
-    endpoint.value = getEndPoint(ingestionURL);
-
-    const content = `URL: ${endpoint.value.url}/gcp/${store.state.selectedOrganization.identifier}/default/_sub?API-Key=[BASIC_PASSCODE]`;
-    return {
-      t,
-      store,
-      config,
-      endpoint,
-      content,
-      getImageURL,
-    };
-  },
-});
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
 </script>

@@ -26,33 +26,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Listening for data"
+    :aria-label="t('emptyState.illustrations.listeningForData')"
   >
     <ellipse cx="104" cy="82" rx="86" ry="52" fill="var(--color-primary-500)" opacity="0.06" />
 
     <!-- expanding ripples (staggered) -->
     <g v-for="(begin, i) in rippleBegins" :key="i">
-      <circle cx="104" cy="82" r="10" fill="none" stroke="var(--color-primary-500)" stroke-width="2">
-        <animate v-if="animated" attributeName="r" values="10;58" dur="3s" :begin="begin" repeatCount="indefinite" calcMode="spline" keySplines="0.2 0.6 0.3 1" />
-        <animate v-if="animated" attributeName="opacity" values="0.55;0" dur="3s" :begin="begin" repeatCount="indefinite" />
-        <animate v-if="animated" attributeName="stroke-width" values="2.5;0.5" dur="3s" :begin="begin" repeatCount="indefinite" />
+      <circle
+        cx="104"
+        cy="82"
+        r="10"
+        fill="none"
+        stroke="var(--color-primary-500)"
+        stroke-width="2"
+      >
+        <animate
+          v-if="animated"
+          attributeName="r"
+          values="10;58"
+          dur="3s"
+          :begin="begin"
+          repeatCount="indefinite"
+          calcMode="spline"
+          keySplines="0.2 0.6 0.3 1"
+        />
+        <animate
+          v-if="animated"
+          attributeName="opacity"
+          values="0.55;0"
+          dur="3s"
+          :begin="begin"
+          repeatCount="indefinite"
+        />
+        <animate
+          v-if="animated"
+          attributeName="stroke-width"
+          values="2.5;0.5"
+          dur="3s"
+          :begin="begin"
+          repeatCount="indefinite"
+        />
       </circle>
     </g>
 
     <!-- static halo + core -->
     <circle cx="104" cy="82" r="20" fill="var(--color-primary-500)" opacity="0.1" />
     <circle cx="104" cy="82" r="11" fill="var(--color-primary-600)">
-      <animate v-if="animated" attributeName="r" values="11;13;11" dur="3s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="11;13;11"
+        dur="3s"
+        repeatCount="indefinite"
+      />
     </circle>
     <circle cx="104" cy="82" r="4.5" fill="var(--color-white)" opacity="0.9" />
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 
 // three ripples evenly phased across the 3s loop
 const rippleBegins = ["0s", "1s", "2s"];

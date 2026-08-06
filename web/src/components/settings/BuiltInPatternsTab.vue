@@ -15,20 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="built-in-patterns-container card-container tw:h-full tw:flex tw:flex-col">
+  <div class="built-in-patterns-container bg-card-glass-bg flex h-full flex-col">
     <!-- Search and Filter Bar -->
-    <div class="filters-bar tw:p-3 tw:shrink-0 tw:border-b tw:border-(--o2-border-color)">
-      <div class="tw:flex tw:gap-3">
-        <div class="tw:w-full col-md-6">
+    <div class="filters-bar border-card-glass-border shrink-0 border-b p-3">
+      <div class="flex gap-3">
+        <div class="col-md-6 w-full">
           <OSearchInput
             v-model="searchQuery"
             :placeholder="t('regex_patterns.search')"
             clearable
-            class="tw:w-full"
+            class="w-full"
             data-test="built-in-pattern-search"
           />
         </div>
-        <div class="tw:w-full col-md-4">
+        <div class="col-md-4 w-full">
           <OSelect
             v-model="selectedTags"
             :options="tagOptions"
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="built-in-pattern-tag-filter"
           />
         </div>
-        <div class="tw:w-full col-md-2">
+        <div class="col-md-2 w-full">
           <OButton
             variant="outline"
             size="sm"
@@ -46,9 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :loading="loading"
             data-test="built-in-pattern-refresh-btn"
           >
-            <template #icon-left
-              ><OIcon name="refresh" size="sm"
-            /></template>
+            <template #icon-left><OIcon name="refresh" size="sm" /></template>
             {{ t("regex_patterns.refresh") }}
           </OButton>
         </div>
@@ -56,26 +54,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading && patterns.length === 0" class="tw:text-center tw:p-6">
+    <div v-if="loading && patterns.length === 0" class="p-6 text-center">
       <OSpinner size="lg" />
-      <div class="tw:mt-3">{{ t("regex_patterns.loading_patterns") }}</div>
+      <div class="mt-3">{{ t("regex_patterns.loading_patterns") }}</div>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="tw:text-center tw:p-6">
-      <OIcon name="error" style="width: 50px; height: 50px;" />
-      <div class="tw:mt-3 tw:text-red-500">{{ error }}</div>
-      <span class="tw:mt-2">
-        <OButton variant="ghost-primary" size="sm" @click="fetchPatterns">
+    <div v-else-if="error" class="p-6 text-center">
+      <OIcon name="error" style="width: 50px; height: 50px" />
+      <div class="text-status-error-text mt-3">{{ error }}</div>
+      <span class="mt-2">
+        <OButton variant="ghost-primary" size="sm" @click="() => fetchPatterns()">
           {{ t("regex_patterns.try_again") }}
         </OButton>
       </span>
     </div>
 
     <!-- Patterns List -->
-    <div v-else class="patterns-list tw:flex-1 tw:overflow-y-auto tw:min-h-0">
-      <div class="tw:p-3">
-        <div class="tw:text-sm tw:font-medium tw:mb-3">
+    <div v-else class="patterns-list min-h-0 flex-1 overflow-y-auto">
+      <div class="p-3">
+        <div class="mb-3 text-sm font-medium">
           {{
             t("regex_patterns.showing_patterns", {
               count: filteredPatterns.length,
@@ -84,14 +82,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Pattern Cards -->
-        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+        <ul class="divide-border rounded-default flex flex-col divide-y border">
           <li
             v-for="(pattern, index) in filteredPatterns"
             :key="`${pattern.name}-${pattern.pattern.substring(0, 20)}`"
-            class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-3 tw:transition-colors tw:duration-150 tw:hover:bg-(--color-interactive-hover-bg)"
+            class="hover:bg-interactive-hover-bg flex items-center gap-3 px-4 py-3 transition-colors duration-150"
             :data-test="`pattern-item-${index}`"
           >
-            <div class="tw:flex tw:items-center tw:shrink-0">
+            <div class="flex shrink-0 items-center">
               <OCheckbox
                 v-model="pattern.selected"
                 @update:model-value="updateSelection"
@@ -99,11 +97,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
 
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:gap-1.5">
-              <span class="tw:text-sm tw:font-semibold tw:leading-snug">
+            <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+              <span class="text-sm leading-snug font-semibold">
                 {{ pattern.name }}
               </span>
-              <div class="tw:flex tw:flex-wrap tw:gap-1">
+              <div class="flex flex-wrap gap-1">
                 <OTag
                   v-for="tag in pattern.tags.slice(0, 3)"
                   :key="tag"
@@ -116,13 +114,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   +{{ pattern.tags.length - 3 }}
                 </OTag>
               </div>
-              <div class="tw:font-mono tw:text-[0.8125rem] tw:leading-[1.4] tw:text-(--o2-text-secondary) tw:break-all tw:line-clamp-1">
+              <div
+                class="text-compact text-text-secondary line-clamp-1 font-mono leading-[1.4] break-all"
+              >
                 {{ pattern.pattern.substring(0, 100)
                 }}{{ pattern.pattern.length > 100 ? "..." : "" }}
               </div>
             </div>
 
-            <div class="tw:flex tw:items-center tw:shrink-0 tw:ms-auto">
+            <div class="ms-auto flex shrink-0 items-center">
               <OButton
                 variant="ghost"
                 size="icon"
@@ -135,11 +135,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </li>
 
-          <li v-if="filteredPatterns.length === 0" class="tw:flex tw:items-center tw:px-3 tw:py-2">
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:text-center tw:text-gray-400">
-              <div class="tw:p-6">
-                <OIcon name="search-off" style="width: 50px; height: 50px;" />
-                <div class="tw:mt-3">
+          <li v-if="filteredPatterns.length === 0" class="flex items-center px-3 py-2">
+            <div class="text-text-muted flex min-w-0 flex-1 flex-col text-center">
+              <div class="p-6">
+                <OIcon name="search-off" style="width: 50px; height: 50px" />
+                <div class="mt-3">
                   {{ t("regex_patterns.no_patterns_found") }}
                 </div>
               </div>
@@ -153,35 +153,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ODialog
       v-model:open="showPreview"
       size="md"
-      :title="previewedPattern?.name"
+      :title="raw(previewedPattern?.name)"
       data-test="pattern-preview-dialog"
       :secondary-button-label="t('regex_patterns.close')"
       :primary-button-label="t('regex_patterns.import_this_pattern')"
       @click:secondary="showPreview = false"
       @click:primary="importSinglePattern"
     >
-      <div style="max-height: 60vh; overflow-y: auto">
-        <div class="tw:mb-3">
-          <div class="text-weight-bold tw:mb-1">
-            {{ t('regex_patterns.description') }}
+      <div style="max-height: 60vh" class="overflow-y-auto">
+        <div class="mb-3">
+          <div class="mb-1 font-bold">
+            {{ t("regex_patterns.description") }}
           </div>
           <div>
-            {{ previewedPattern?.description || t('regex_patterns.no_description') }}
+            {{ previewedPattern?.description || t("regex_patterns.no_description") }}
           </div>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.pattern') }}</div>
-          <OTextarea
-            :model-value="previewedPattern?.pattern"
-            readonly
-            rows="3"
-          />
+        <div class="mb-3">
+          <div class="mb-1 font-bold">{{ t("regex_patterns.pattern") }}</div>
+          <OTextarea :model-value="previewedPattern?.pattern" readonly :rows="3" />
         </div>
 
-        <div class="tw:mb-3">
-          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.tags') }}</div>
-          <div class="tw:flex tw:flex-wrap tw:gap-2">
+        <div class="mb-3">
+          <div class="mb-1 font-bold">{{ t("regex_patterns.tags") }}</div>
+          <div class="flex flex-wrap gap-2">
             <OTag
               v-for="tag in previewedPattern?.tags"
               :key="tag"
@@ -193,30 +189,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="text-weight-bold tw:mb-1">{{ t('regex_patterns.rarity') }}</div>
+        <div class="mb-3">
+          <div class="mb-1 font-bold">{{ t("regex_patterns.rarity") }}</div>
           <div>{{ previewedPattern?.rarity }}</div>
         </div>
 
-        <div
-          v-if="previewedPattern?.examples?.Valid?.length > 0"
-          class="tw:mb-3"
-        >
-          <div class="text-weight-bold tw:mb-1">
-            {{ t('regex_patterns.valid_examples') }}
+        <div v-if="(previewedPattern?.examples?.Valid?.length ?? 0) > 0" class="mb-3">
+          <div class="mb-1 font-bold">
+            {{ t("regex_patterns.valid_examples") }}
           </div>
-          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border tw:border tw:rounded-md">
+          <ul class="divide-border rounded-default flex flex-col divide-y border">
             <li
-              v-for="(example, idx) in previewedPattern.examples.Valid.slice(0, 3)"
+              v-for="(example, idx) in previewedPattern?.examples?.Valid?.slice(0, 3)"
               :key="idx"
-              class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1"
+              class="flex items-center gap-2 px-3 py-1"
             >
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+              <div class="flex min-w-0 flex-1 flex-col">
                 <span
-                  class="tw:block tw:text-xs tw:text-muted-foreground tw:text-wrap"
+                  class="text-muted-foreground block text-xs text-wrap"
                   style="word-break: break-all"
                 >
-                  {{ example.substring(0, 200) }}{{ example.length > 200 ? '...' : '' }}
+                  {{ example.substring(0, 200) }}{{ example.length > 200 ? "..." : "" }}
                 </span>
               </div>
             </li>
@@ -228,8 +221,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, onMounted } from "vue";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
@@ -253,7 +246,7 @@ interface PatternExample {
 interface BuiltInPattern {
   name: string;
   pattern: string;
-  description: string;
+  description: I18nText;
   tags: string[];
   rarity: number;
   url: string | null;
@@ -263,10 +256,21 @@ interface BuiltInPattern {
 
 export default defineComponent({
   name: "BuiltInPatternsTab",
-  components: { OButton, ODialog, OSpinner, OIcon, OTag, OSelect, OSearchInput, OCheckbox, OTooltip, OTextarea },
+  components: {
+    OButton,
+    ODialog,
+    OSpinner,
+    OIcon,
+    OTag,
+    OSelect,
+    OSearchInput,
+    OCheckbox,
+    OTooltip,
+    OTextarea,
+  },
   emits: ["import-patterns"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const patterns = ref<BuiltInPattern[]>([]);
@@ -287,7 +291,7 @@ export default defineComponent({
     });
 
     const tagOptions = computed(() =>
-      availableTags.value.map((tag) => ({ label: tag, value: tag }))
+      availableTags.value.map((tag) => ({ label: raw(tag), value: tag })),
     );
 
     const filteredPatterns = computed(() => {
@@ -306,9 +310,7 @@ export default defineComponent({
 
       // Apply tag filter
       if (selectedTags.value.length > 0) {
-        filtered = filtered.filter((p) =>
-          selectedTags.value.some((tag) => p.tags.includes(tag)),
-        );
+        filtered = filtered.filter((p) => selectedTags.value.some((tag) => p.tags.includes(tag)));
       }
 
       return filtered;
@@ -377,12 +379,9 @@ export default defineComponent({
           variant: "success",
         });
       } catch (e: any) {
-        error.value =
-          e.response?.data?.message ||
-          e.message ||
-          t("regex_patterns.failed_to_load");
+        error.value = e.response?.data?.message || e.message || t("regex_patterns.failed_to_load");
         toast({
-          message: error.value,
+          message: raw(error.value),
           variant: "error",
         });
       } finally {
@@ -438,6 +437,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       patterns,
       loading,
@@ -460,4 +460,3 @@ export default defineComponent({
   },
 });
 </script>
-

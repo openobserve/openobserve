@@ -14,23 +14,23 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { nextTick, ref } from "vue";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import Stream from "./Stream.vue";
 import useDnD from "@/plugins/pipelines/useDnD";
 
-
 // ---------------------------------------------------------------------------
 // Module mocks
 // ---------------------------------------------------------------------------
-const mockAddNode            = vi.fn();
+const mockAddNode = vi.fn();
 const mockDeletePipelineNode = vi.fn();
 const mockCheckIfDefaultDestinationNode = vi.fn().mockReturnValue(false);
 
-const { mockToast } = vi.hoisted(() => ({
+const { mockToast, mockGetUsedStreamsList } = vi.hoisted(() => ({
   mockToast: vi.fn(),
+  mockGetUsedStreamsList: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -45,8 +45,8 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn().mockResolvedValue({
       list: [
-        { name: "logs_stream_1", stream_type: "logs"    },
-        { name: "logs_stream_2", stream_type: "logs"    },
+        { name: "logs_stream_1", stream_type: "logs" },
+        { name: "logs_stream_2", stream_type: "logs" },
         { name: "metrics_stream", stream_type: "metrics" },
       ],
     }),
@@ -55,7 +55,7 @@ vi.mock("@/composables/useStreams", () => ({
 
 vi.mock("@/composables/usePipelines", () => ({
   default: () => ({
-    getUsedStreamsList: vi.fn().mockResolvedValue([]),
+    getUsedStreamsList: mockGetUsedStreamsList,
     getPipelineDestinations: vi.fn().mockResolvedValue([]),
   }),
 }));
@@ -85,20 +85,30 @@ function makePipelineObj(overrides = {}) {
   };
 }
 
-// ODrawer stub — renders slot content so inner elements are accessible in tests.
-// The real ODrawer is a portal/teleport; stubbing it keeps tests fast and isolated.
+// ODrawer stub — renders slot content (so the REAL <OForm> mounts inside it and
+// the schema actually runs) plus the footer buttons. The footer Save is wired to
+// the form via form-id; in tests we drive the form's own handleSubmit() so the
+// validate → @submit → save chain is awaited deterministically.
 const ODrawerStub = {
   name: "ODrawer",
   props: [
-    "open", "size", "showClose", "title", "width", "persistent",
-    "primaryButtonLabel", "secondaryButtonLabel", "neutralButtonLabel",
+    "open",
+    "size",
+    "showClose",
+    "title",
+    "width",
+    "persistent",
+    "formId",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
   ],
-  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  emits: ["update:open", "click:secondary", "click:neutral"],
   template: `<div class="o-drawer-stub">
     <slot />
     <button v-if="neutralButtonLabel" data-test="o-drawer-neutral-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
     <button v-if="secondaryButtonLabel" data-test="o-drawer-secondary-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
-    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+    <button v-if="primaryButtonLabel" data-test="o-drawer-primary-btn" type="submit" form="stream-node-form">{{ primaryButtonLabel }}</button>
   </div>`,
 };
 
@@ -113,16 +123,26 @@ function createWrapper(pipelineObjOverrides = {}) {
   }));
 
   return mount(Stream, {
+    props: { open: true },
     global: {
       plugins: [i18n, store],
       stubs: {
-        AddStream:     true,
+        AddStream: true,
         ConfirmDialog: true,
-        ODrawer:       ODrawerStub,
+        ODrawer: ODrawerStub,
       },
     },
   });
 }
+
+// Form helpers — drive/read the real OForm now that stream_type/stream_name/
+// appendData are form-owned.
+const setField = (w, name, val) => w.vm.form.setFieldValue(name, val);
+const formVals = (w) => w.vm.form.state.values;
+const submitForm = async (w) => {
+  await w.vm.form.handleSubmit();
+  await flushPromises();
+};
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -143,9 +163,9 @@ describe("Stream Component", () => {
     it("renders outer section with data-test attribute", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="add-stream-input-stream-routing-section"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="add-stream-input-stream-routing-section"]').exists()).toBe(
+        true,
+      );
     });
 
     it("initializes createNewStream as false", async () => {
@@ -166,7 +186,7 @@ describe("Stream Component", () => {
       expect(wrapper.vm.isFetchingStreams).toBe(false);
     });
 
-    it("initializes stream_type from pipelineObj node data", async () => {
+    it("seeds form stream_type from pipelineObj node data", async () => {
       const wrapper = createWrapper({
         currentSelectedNodeData: {
           data: { stream_type: "metrics" },
@@ -175,30 +195,65 @@ describe("Stream Component", () => {
         },
       });
       await flushPromises();
-      expect(wrapper.vm.stream_type).toBe("metrics");
+      expect(formVals(wrapper).stream_type).toBe("metrics");
     });
 
-    it("defaults stream_type to 'logs' when not in node data", async () => {
+    it("defaults form stream_type to 'logs' when not in node data", async () => {
       const wrapper = createWrapper({
         currentSelectedNodeData: { data: {}, io_type: "input", type: "input" },
       });
       await flushPromises();
-      expect(wrapper.vm.stream_type).toBe("logs");
+      expect(formVals(wrapper).stream_type).toBe("logs");
     });
 
     it("clears userSelectedNode on mount", async () => {
-      const wrapper = createWrapper();
+      createWrapper();
       await flushPromises();
       expect(mockPipelineObj.userSelectedNode).toEqual({});
+    });
+
+    it("reuses pipelineObj.usedStreams (resolved array) and skips the pipelines/streams API", async () => {
+      const cached = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
+      const wrapper = createWrapper({ usedStreams: cached });
+      await flushPromises();
+      // The editor already fetched the list on mount — the drawer must not
+      // re-hit the API on every node drag (source of the "No options" flash).
+      expect(mockGetUsedStreamsList).not.toHaveBeenCalled();
+      expect(wrapper.vm.usedStreams).toEqual(cached);
+    });
+
+    it("awaits the editor's in-flight promise instead of issuing its own request", async () => {
+      const cached = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
+      // Editor kicked the fetch off but it hasn't resolved yet — the drawer must
+      // reuse the SAME request rather than firing a duplicate pipelines/streams.
+      const inflight = Promise.resolve(cached);
+      const wrapper = createWrapper({ usedStreams: inflight });
+      await flushPromises();
+      expect(mockGetUsedStreamsList).not.toHaveBeenCalled();
+      expect(wrapper.vm.usedStreams).toEqual(cached);
+    });
+
+    it("falls back to the pipelines/streams API when usedStreams isn't shared yet", async () => {
+      createWrapper({ usedStreams: null });
+      await flushPromises();
+      expect(mockGetUsedStreamsList).toHaveBeenCalledTimes(1);
     });
 
     it("all required functions are exposed", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       const fns = [
-        "sanitizeStreamName", "sanitizeStaticPart", "getStreamList", "updateStreams",
-        "handleCreateStreamName", "getLogStream",
-        "openCancelDialog", "openDeleteDialog", "deleteNode", "saveStream",
+        "sanitizeStreamName",
+        "sanitizeStaticPart",
+        "getStreamList",
+        "updateStreams",
+        "handleCreateStreamName",
+        "getLogStream",
+        "handleSecondaryClick",
+        "openCancelDialog",
+        "openDeleteDialog",
+        "deleteNode",
+        "onSubmit",
         "filterColumns",
       ];
       fns.forEach((fn) => expect(typeof wrapper.vm[fn]).toBe("function"));
@@ -233,7 +288,10 @@ describe("Stream Component", () => {
       wrapper.vm.selectedNodeType = "output";
       await nextTick();
       expect(wrapper.vm.filteredStreamTypes).toEqual([
-        "logs", "metrics", "traces", "enrichment_tables",
+        "logs",
+        "metrics",
+        "traces",
+        "enrichment_tables",
       ]);
     });
   });
@@ -241,13 +299,13 @@ describe("Stream Component", () => {
   // -------------------------------------------------------------------------
   describe("sanitizeStreamName", () => {
     const cases = [
-      { input: "test_stream",         expected: "test_stream"          },
-      { input: "test-stream",         expected: "test_stream"          },
-      { input: "test@stream",         expected: "test_stream"          },
-      { input: "test{field}stream",   expected: "test{field}stream"    },
-      { input: "test{field}@stream",  expected: "test{field}_stream"   },
-      { input: "abc123",              expected: "abc123"               },
-      { input: "CamelCase",           expected: "CamelCase"            },
+      { input: "test_stream", expected: "test_stream" },
+      { input: "test-stream", expected: "test_stream" },
+      { input: "test@stream", expected: "test_stream" },
+      { input: "test{field}stream", expected: "test{field}stream" },
+      { input: "test{field}@stream", expected: "test{field}_stream" },
+      { input: "abc123", expected: "abc123" },
+      { input: "CamelCase", expected: "CamelCase" },
     ];
 
     cases.forEach(({ input, expected }) => {
@@ -267,7 +325,7 @@ describe("Stream Component", () => {
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
           message: "Stream name should be less than 100 characters",
-        })
+        }),
       );
     });
 
@@ -294,12 +352,12 @@ describe("Stream Component", () => {
   // -------------------------------------------------------------------------
   describe("sanitizeStaticPart", () => {
     const cases = [
-      { input: "abc",    expected: ["a", "b", "c"]             },
-      { input: "a@b#c",  expected: ["a", "_", "b", "_", "c"]   },
-      { input: "123",    expected: ["1", "2", "3"]             },
-      { input: "a-b",    expected: ["a", "_", "b"]             },
-      { input: "a_b",    expected: ["a", "_", "b"]             },
-      { input: "",       expected: []                          },
+      { input: "abc", expected: ["a", "b", "c"] },
+      { input: "a@b#c", expected: ["a", "_", "b", "_", "c"] },
+      { input: "123", expected: ["1", "2", "3"] },
+      { input: "a-b", expected: ["a", "_", "b"] },
+      { input: "a_b", expected: ["a", "_", "b"] },
+      { input: "", expected: [] },
     ];
 
     cases.forEach(({ input, expected }) => {
@@ -317,38 +375,40 @@ describe("Stream Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.handleCreateStreamName("test-stream-name");
-      expect(wrapper.vm.stream_name).toBe("test_stream_name");
+      expect(formVals(wrapper).stream_name).toBe("test_stream_name");
     });
 
     it("leaves names without hyphens unchanged", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.handleCreateStreamName("testStream");
-      expect(wrapper.vm.stream_name).toBe("testStream");
+      expect(formVals(wrapper).stream_name).toBe("testStream");
     });
 
     it("sanitizes special characters in the new name", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       wrapper.vm.handleCreateStreamName("my-stream@bad");
-      expect(wrapper.vm.stream_name).toBe("my_stream_bad");
+      expect(formVals(wrapper).stream_name).toBe("my_stream_bad");
     });
   });
 
   // -------------------------------------------------------------------------
   describe("getLogStream", () => {
-    it("sets stream_name to sanitized name from stream data", async () => {
+    it("persists node with sanitized stream_name from stream data", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       await wrapper.vm.getLogStream({ name: "test-stream", stream_type: "logs" });
-      expect(wrapper.vm.stream_name).toBe("test_stream");
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({ stream_name: "test_stream" }),
+      );
     });
 
-    it("sets stream_type from stream data", async () => {
+    it("persists node with stream_type from stream data", async () => {
       const wrapper = createWrapper();
       await flushPromises();
       await wrapper.vm.getLogStream({ name: "metricsStream", stream_type: "metrics" });
-      expect(wrapper.vm.stream_type).toBe("metrics");
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ stream_type: "metrics" }));
     });
 
     it("turns off createNewStream after stream is added", async () => {
@@ -362,10 +422,11 @@ describe("Stream Component", () => {
     it("does not crash when name has no hyphens", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      // Use the same stream_type as the initial to avoid the watch reset
       await wrapper.vm.getLogStream({ name: "my_stream", stream_type: "logs" });
       await flushPromises();
-      expect(wrapper.vm.stream_name).toBe("my_stream");
+      expect(mockAddNode).toHaveBeenCalledWith(
+        expect.objectContaining({ stream_name: "my_stream" }),
+      );
     });
   });
 
@@ -401,9 +462,7 @@ describe("Stream Component", () => {
       wrapper.vm.usedStreams = [{ stream_name: "logs_stream_1", stream_type: "logs" }];
       await wrapper.vm.getStreamList();
       await flushPromises();
-      const stream = wrapper.vm.streams.logs?.find(
-        (s) => s.name === "logs_stream_1"
-      );
+      const stream = wrapper.vm.streams.logs?.find((s) => s.name === "logs_stream_1");
       expect(stream?.isDisable).toBe(true);
     });
 
@@ -420,9 +479,7 @@ describe("Stream Component", () => {
       await wrapper.vm.getStreamList();
       await flushPromises();
       // For output node the disable logic isn't applied; isDisable may be undefined
-      const stream = wrapper.vm.streams.logs?.find(
-        (s) => s.name === "logs_stream_1"
-      );
+      const stream = wrapper.vm.streams.logs?.find((s) => s.name === "logs_stream_1");
       expect(stream?.isDisable).toBeFalsy();
     });
   });
@@ -452,8 +509,7 @@ describe("Stream Component", () => {
       const wrapper = createWrapper();
       await flushPromises();
       const opts = ["timestamp", "message", "level"];
-      let captured = [];
-      const update = vi.fn((cb) => { cb(); captured = wrapper.vm.filterColumns.toString(); });
+      const update = vi.fn((cb) => cb());
       wrapper.vm.filterColumns(opts, "time", update);
       expect(update).toHaveBeenCalled();
     });
@@ -463,7 +519,7 @@ describe("Stream Component", () => {
       await flushPromises();
       const opts = ["TIMESTAMP", "message"];
       const update = vi.fn((cb) => cb());
-      const result = wrapper.vm.filterColumns(opts, "MESS", update);
+      wrapper.vm.filterColumns(opts, "MESS", update);
       // update is called; filtered result contains "message"
       expect(update).toHaveBeenCalled();
     });
@@ -479,65 +535,77 @@ describe("Stream Component", () => {
   });
 
   // -------------------------------------------------------------------------
-  describe("saveStream", () => {
-    it("sets validation error and does NOT call addNode when stream_name is empty", async () => {
+  // Submit / schema validation (real OForm). The select-existing branch is
+  // gated by the Zod schema: BOTH stream_type AND stream_name are required
+  // (the stream_type rule is RESTORED from the BEFORE baseline).
+  describe("schema validation + submit", () => {
+    it("blocks submit and does NOT call addNode when stream_name is empty", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_name = "";
-      await wrapper.vm.saveStream();
-      expect(wrapper.vm.streamNameError).toBeTruthy();
+      setField(wrapper, "stream_name", "");
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
+      expect(mockAddNode).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit and does NOT call addNode when stream_type is empty (restored rule)", async () => {
+      const wrapper = createWrapper();
+      await flushPromises();
+      setField(wrapper, "stream_name", "my_stream");
+      setField(wrapper, "stream_type", "");
+      await submitForm(wrapper);
+      expect(wrapper.vm.form.state.isValid).toBe(false);
       expect(mockAddNode).not.toHaveBeenCalled();
     });
 
     it("calls addNode with node_type 'stream' when stream_name is valid", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_name  = "my_stream";
-      wrapper.vm.stream_type  = "logs";
-      await wrapper.vm.saveStream();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ node_type: "stream" })
-      );
+      setField(wrapper, "stream_type", "logs");
+      setField(wrapper, "stream_name", "my_stream");
+      await submitForm(wrapper);
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ node_type: "stream" }));
     });
 
     it("emits cancel:hideform after successful save", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_name = { label: "my_stream", value: "my_stream", isDisable: false };
-      await wrapper.vm.saveStream();
+      setField(wrapper, "stream_type", "logs");
+      setField(wrapper, "stream_name", "my_stream");
+      await submitForm(wrapper);
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
 
     it("includes org_id in the addNode payload", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_name = "s";
-      await wrapper.vm.saveStream();
-      expect(mockAddNode).toHaveBeenCalledWith(
-        expect.objectContaining({ org_id: "default" })
-      );
+      setField(wrapper, "stream_type", "logs");
+      setField(wrapper, "stream_name", "s");
+      await submitForm(wrapper);
+      expect(mockAddNode).toHaveBeenCalledWith(expect.objectContaining({ org_id: "default" }));
     });
 
     it("includes meta.append_data for enrichment_tables stream type", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_type = "enrichment_tables";
-      wrapper.vm.stream_name = "enrich";
-      wrapper.vm.appendData  = true;
-      await wrapper.vm.saveStream();
+      // Set stream_type first (the change resets stream_name), then the rest.
+      setField(wrapper, "stream_type", "enrichment_tables");
+      setField(wrapper, "stream_name", "enrich");
+      setField(wrapper, "appendData", true);
+      await submitForm(wrapper);
       expect(mockAddNode).toHaveBeenCalledWith(
         expect.objectContaining({
           meta: { append_data: "true" },
-        })
+        }),
       );
     });
 
     it("does NOT include meta for logs stream type", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_type = "logs";
-      wrapper.vm.stream_name = "logs_s";
-      await wrapper.vm.saveStream();
+      setField(wrapper, "stream_type", "logs");
+      setField(wrapper, "stream_name", "logs_s");
+      await submitForm(wrapper);
       const payload = mockAddNode.mock.calls[0][0];
       expect(payload.meta).toBeUndefined();
     });
@@ -562,16 +630,6 @@ describe("Stream Component", () => {
       await nextTick();
       expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
     });
-
-    it("resets userClickedNode and userSelectedNode", async () => {
-      const wrapper = createWrapper();
-      await flushPromises();
-      mockPipelineObj.userClickedNode = { id: "x" };
-      mockPipelineObj.userSelectedNode = { id: "y" };
-      wrapper.vm.openCancelDialog();
-      expect(mockPipelineObj.userClickedNode).toEqual({});
-      expect(mockPipelineObj.userSelectedNode).toEqual({});
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -582,9 +640,7 @@ describe("Stream Component", () => {
       wrapper.vm.openDeleteDialog();
       expect(wrapper.vm.dialog.show).toBe(true);
       expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe(
-        "Are you sure you want to delete stream association?"
-      );
+      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete stream association?");
     });
 
     it("sets warningMessage when deleting a default destination node", async () => {
@@ -650,7 +706,7 @@ describe("Stream Component", () => {
 
   // -------------------------------------------------------------------------
   describe("appendData toggle (enrichment_tables)", () => {
-    it("initializes appendData from node meta", async () => {
+    it("seeds form appendData from node meta", async () => {
       const wrapper = createWrapper({
         currentSelectedNodeData: {
           data: { stream_type: "enrichment_tables" },
@@ -660,13 +716,13 @@ describe("Stream Component", () => {
         },
       });
       await flushPromises();
-      expect(wrapper.vm.appendData).toBe(true);
+      expect(formVals(wrapper).appendData).toBe(true);
     });
 
-    it("initializes appendData as false when meta is absent", async () => {
+    it("seeds form appendData as false when meta is absent", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      expect(wrapper.vm.appendData).toBe(false);
+      expect(formVals(wrapper).appendData).toBe(false);
     });
   });
 
@@ -675,11 +731,11 @@ describe("Stream Component", () => {
     it("resets stream_name when stream_type changes (and createNewStream stays same)", async () => {
       const wrapper = createWrapper();
       await flushPromises();
-      wrapper.vm.stream_name = "old_stream";
-      wrapper.vm.stream_type = "metrics";
+      setField(wrapper, "stream_name", "old_stream");
+      setField(wrapper, "stream_type", "metrics");
       await flushPromises();
       // After stream_type changes, stream_name should reset
-      expect(wrapper.vm.stream_name).toBe("");
+      expect(formVals(wrapper).stream_name).toBe("");
     });
   });
 
@@ -715,17 +771,13 @@ describe("Stream Component", () => {
     it("shows delete button when pipelineObj.isEditNode is true", async () => {
       const wrapper = createWrapper({ isEditNode: true });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(true);
     });
 
     it("hides delete button when pipelineObj.isEditNode is false", async () => {
       const wrapper = createWrapper({ isEditNode: false });
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()
-      ).toBe(false);
+      expect(wrapper.find('[data-test="o-drawer-neutral-btn"]').exists()).toBe(false);
     });
   });
 

@@ -18,17 +18,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <OCollapsible
     :model-value="isExpanded"
     @update:model-value="handleToggle"
-    class="field-expansion-item tw:w-full tw:rounded tw:overflow-hidden"
-    trigger-class="tw:px-0! tw:py-0!"
+    class="field-expansion-item rounded-default w-full overflow-hidden"
+    trigger-class="px-0! py-0!"
   >
     <template #trigger>
       <OFieldRow
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="tw:w-[0.55rem] tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:mr-1">
+        <span class="mr-1 flex w-[0.55rem] shrink-0 items-center justify-center">
           <OIcon
-            class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-4 tw:text-[var(--o2-text-muted)]"
+            class="text-text-muted inline-flex w-4 shrink-0 items-center justify-center"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
             size="sm"
           />
@@ -43,11 +43,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode"
           variant="ghost-neutral"
-          class="tw:gap-0! tw:mr-1"
+          class="mr-1 gap-0!"
           :title="
             field.isInterestingField
-              ? 'Remove from interesting fields'
-              : 'Add to interesting fields'
+              ? t('logStream.removeFromInterestingFields')
+              : t('logStream.addToInterestingFields')
           "
           size="icon"
           @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="showVisibilityToggle && !isFieldSelected"
             variant="ghost-neutral"
             size="icon"
-            class="tw:gap-0!"
+            class="gap-0!"
             @click.stop="$emit('toggle-field', field)"
           >
             <OIcon name="visibility" size="sm" />
@@ -79,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`log-search-index-list-remove-${field.name}-field-btn`"
             v-if="showVisibilityToggle && isFieldSelected"
             variant="ghost-neutral"
-            class="tw:gap-0!"
+            class="gap-0!"
             size="icon"
             @click.stop="$emit('toggle-field', field)"
           >
@@ -89,11 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
             v-if="showQuickMode"
             variant="ghost-neutral"
-            class="tw:gap-0!"
+            class="gap-0!"
             :title="
               field.isInterestingField
-                ? 'Remove from interesting fields'
-                : 'Add to interesting fields'
+                ? t('logStream.removeFromInterestingFields')
+                : t('logStream.addToInterestingFields')
             "
             size="icon"
             @click.stop="$emit('toggle-interesting', field, field.isInterestingField)"
@@ -104,24 +104,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="tw:pl-4 tw:pr-0 tw:py-0">
-        <slot name="body">
-          <FieldValuesPanel
-            ref="fieldValuesPanelRef"
-            :field-name="field.name"
-            :field-values="mappedFieldValues"
-            :show-multi-select="effectiveShowMultiSelect"
-            :default-values-count="defaultValuesCount"
-            :theme="theme"
-            :active-include-values="activeIncludeValues"
-            :active-exclude-values="activeExcludeValues"
-            @add-search-term="(fn: string, v: string, a: string) => emit('add-search-term', fn, v, a)"
-            @add-multiple-search-terms="(fn: string, vs: string[], a: string) => emit('add-multiple-search-terms', fn, vs, a)"
-            @remove-field-filter="(fn: string) => emit('remove-field-filter', fn)"
-            @load-more-values="(fn: string) => emit('load-more-values', fn)"
-            @search-field-values="(fn: string, t: string) => emit('search-field-values', fn, t)"
-          />
-        </slot>
+    <div class="py-0 pr-2 pl-4">
+      <slot name="body">
+        <FieldValuesPanel
+          ref="fieldValuesPanelRef"
+          :field-name="field.name"
+          :field-values="mappedFieldValues"
+          :show-multi-select="effectiveShowMultiSelect"
+          :default-values-count="defaultValuesCount"
+          :theme="theme"
+          :active-include-values="activeIncludeValues"
+          :active-exclude-values="activeExcludeValues"
+          @add-search-term="(fn: string, v: string, a: string) => emit('add-search-term', fn, v, a)"
+          @add-multiple-search-terms="
+            (fn: string, vs: string[], a: string) => emit('add-multiple-search-terms', fn, vs, a)
+          "
+          @remove-field-filter="(fn: string) => emit('remove-field-filter', fn)"
+          @load-more-values="(fn: string) => emit('load-more-values', fn)"
+          @search-field-values="(fn: string, t: string) => emit('search-field-values', fn, t)"
+        />
+      </slot>
     </div>
   </OCollapsible>
 </template>
@@ -134,6 +136,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OFieldRow from "@/lib/lists/FieldList/OFieldRow.vue";
 import OFieldLabel from "@/lib/lists/FieldList/OFieldLabel.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 interface Props {
   field: any;
@@ -181,11 +184,7 @@ const emit = defineEmits<{
   "toggle-field": [field: any];
   "toggle-interesting": [field: any, isInteresting: boolean];
   "add-search-term": [fieldName: string, value: string, action: string];
-  "add-multiple-search-terms": [
-    fieldName: string,
-    values: string[],
-    action: string,
-  ];
+  "add-multiple-search-terms": [fieldName: string, values: string[], action: string];
   "remove-field-filter": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
   "load-more-values": [fieldName: string];
@@ -203,15 +202,10 @@ watch(
   },
 );
 
-const isFieldSelected = computed(() =>
-  (props.selectedFields ?? []).includes(props.field.name),
-);
+const isFieldSelected = computed(() => (props.selectedFields ?? []).includes(props.field.name));
 
 const effectiveShowMultiSelect = computed(() => {
-  if (
-    props.selectedStreamsCount !== undefined &&
-    props.field.streams !== undefined
-  ) {
+  if (props.selectedStreamsCount !== undefined && props.field.streams !== undefined) {
     return props.selectedStreamsCount === props.field.streams.length;
   }
   return props.showMultiSelect;
@@ -246,19 +240,22 @@ const handleToggle = (val: boolean) => {
 };
 
 defineExpose({ reset: () => fieldValuesPanelRef.value?.reset() });
+
+const { t } = useI18nTyped();
 </script>
 
-<style>
-.field-expansion-item button[data-state]:not([role="checkbox"]) {
-  min-height: 24px !important;
+<style scoped>
+/* keep(complex-state): :deep overrides of the child collapsible's trigger button
+   and content wrapper; the [data-state] rule targets this component's own item. */
+.field-expansion-item :deep(button[data-state]:not([role="checkbox"])) {
+  min-height: 1.5rem !important;
 }
 
-.field-expansion-item .o-collapsible-content {
+.field-expansion-item :deep(.o-collapsible-content) {
   width: 100%;
 }
 
 .field-expansion-item[data-state="open"] {
   margin-bottom: 0.375rem;
 }
-
 </style>

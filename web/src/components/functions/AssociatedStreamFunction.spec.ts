@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-
 // Hoist mocks so they are available when vi.mock factories are hoisted
 const {
   mockGetStreams,
@@ -107,12 +106,11 @@ describe("AssociatedStreamFunction", () => {
     inheritAttrs: false,
     props: ["open", "size", "persistent", "title", "subTitle", "showClose", "width"],
     emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
-    template:
-      '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
+    template: '<div data-test="o-drawer-stub" :data-open="open" :data-size="size"><slot /></div>',
   };
 
   const globalStubs = {
-    QTablePagination: true,
+    Pagination: true,
     SchemaIndex: true,
     NoData: true,
     ODrawer: ODrawerStub,
@@ -356,25 +354,8 @@ describe("AssociatedStreamFunction", () => {
       expect(vm.logStream[0].storage_size).toBe("--");
     });
 
-    it("should format row number with leading zero for first 9 items", async () => {
-      mockGetStreams.mockResolvedValue({
-        list: Array.from({ length: 10 }, (_, i) => ({
-          name: `stream${i + 1}`,
-          stream_type: "logs",
-          stats: null,
-        })),
-      });
-
-      const wrapper = mount(AssociatedStreamFunction, {
-        global: { plugins: [i18n, store, router], stubs: globalStubs },
-      });
-
-      await flushPromises();
-
-      const vm = wrapper.vm as any;
-      expect(vm.logStream[0]["#"]).toBe("01");
-      expect(vm.logStream[8]["#"]).toBe("09");
-    });
+    // Zero-padded row numbering is now OTable's built-in `show-index`
+    // (covered by OTable's own spec); `logStream` no longer carries a "#" field.
   });
 
   describe("Row Expansion (toggleStreamRow)", () => {
@@ -524,12 +505,7 @@ describe("AssociatedStreamFunction", () => {
       await vm.deleteFunctionFromStream("func1");
       await flushPromises();
 
-      expect(mockRemoveStreamFunction).toHaveBeenCalledWith(
-        "test-org",
-        "stream1",
-        "logs",
-        "func1"
-      );
+      expect(mockRemoveStreamFunction).toHaveBeenCalledWith("test-org", "stream1", "logs", "func1");
     });
 
     it("should refresh stream functions after delete", async () => {
@@ -573,7 +549,7 @@ describe("AssociatedStreamFunction", () => {
         "stream1",
         "logs",
         "func1",
-        func
+        func,
       );
     });
 

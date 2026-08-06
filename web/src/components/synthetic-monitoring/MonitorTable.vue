@@ -1,0 +1,863 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <OTable
+    v-model:selected-ids="localSelectedIds"
+    :columns="columns"
+    :data="data"
+    :loading="loading"
+    pagination="client"
+    :page-size="20"
+    :page-size-options="[10, 20, 25, 50]"
+    row-key="id"
+    selection="multiple"
+    :show-global-filter="false"
+    :persist-columns="true"
+    table-id="synthetic-monitoring-table"
+    :enable-column-resize="true"
+    :footer-title="resolvedFooterTitle"
+    :empty-message="resolvedEmptyMessage"
+    :data-test="dataTest"
+    :horizontal-scroll="true"
+    :row-class="monitorRowClass"
+    :get-row-style="monitorRowStyle"
+    show-index
+    @row-click="(row: any) => emit('row-click', row)"
+  >
+    <!-- Summary strip supplied by the parent (it owns the status facet). -->
+    <template v-if="$slots.subheader" #subheader>
+      <slot name="subheader" />
+    </template>
+
+    <!-- Toolbar slots (passthrough to parent) -->
+    <template #toolbar>
+      <slot name="toolbar" />
+    </template>
+    <template #toolbar-trailing>
+      <slot name="toolbar-trailing" />
+    </template>
+
+    <!-- Status badge -->
+    <template #cell-status="{ row }">
+      <OBadge
+        :variant="resolveBadge('serviceStatus', (row as any).status).variant"
+        :dot="true"
+        size="sm"
+      >
+        {{ resolveBadge("serviceStatus", (row as any).status).label }}
+      </OBadge>
+    </template>
+
+    <!-- Monitor name -->
+    <template #cell-name="{ row }">
+      <OTooltip
+        v-if="(row as any).name"
+        :content="(row as any).name"
+        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
+      >
+        <div class="flex min-w-0 items-center gap-1.5 overflow-hidden">
+          <span class="cursor-pointer truncate">{{ (row as any).name || "—" }}</span>
+        </div>
+      </OTooltip>
+      <span v-else class="truncate">—</span>
+    </template>
+
+    <!-- URL / Endpoint -->
+    <template #cell-url="{ row }">
+      <OTooltip
+        v-if="(row as any).url"
+        :content="(row as any).url"
+        content-class="max-w-[25rem] whitespace-normal break-words text-xs"
+      >
+        <span class="cursor-pointer truncate">{{ (row as any).url }}</span>
+      </OTooltip>
+      <span v-else class="truncate">—</span>
+    </template>
+
+    <!-- HTTP Method badge (API mode) -->
+    <template #cell-method="{ row }">
+      <OBadge :variant="resolveBadge('httpMethod', (row as any).method).variant" size="sm">
+        {{ String((row as any).method).toUpperCase() }}
+      </OBadge>
+    </template>
+
+    <!-- Steps count (Browser mode) -->
+    <template #cell-steps="{ row }">
+      <span class="truncate">{{
+        (row as any).steps ? `${(row as any).steps} ${t("synthetics.table.stepsSuffix")}` : "—"
+      }}</span>
+    </template>
+
+    <!-- Assertions count (API mode) -->
+    <template #cell-assertions="{ row }">
+      <span class="truncate">{{
+        (row as any).assertions
+          ? `${(row as any).assertions} ${t("synthetics.table.checksSuffix")}`
+          : "—"
+      }}</span>
+    </template>
+
+    <!-- Folder name (cross-folder search mode) — click navigates sidebar to that folder -->
+    <template #cell-folder_name="{ row }">
+      <div class="cursor-pointer" @click.stop="emit('navigate-to-folder', (row as any).folderId)">
+        {{ (row as any).folder_name || "—" }}
+      </div>
+    </template>
+
+    <!-- Type badge (monitors mode) -->
+    <template #cell-type="{ row }">
+      <OBadge :variant="resolveBadge('syntheticType', (row as any).type).variant" size="sm">
+        {{ resolveBadge("syntheticType", (row as any).type).label }}
+      </OBadge>
+    </template>
+
+    <!-- History sparkbars -->
+    <template #cell-history="{ row }">
+      <div class="flex h-5 items-end gap-px">
+        <span
+          v-for="(tick, i) in (row as any).history"
+          :key="i"
+          class="rounded-default h-full w-1 shrink-0 cursor-pointer"
+          :class="
+            tick.status === 'up'
+              ? 'bg-success-500'
+              : tick.status === 'down'
+                ? 'bg-error-500'
+                : 'bg-warning-500'
+          "
+          @mouseenter="showSparkTip($event, tick)"
+          @mouseleave="hideSparkTip"
+        />
+      </div>
+    </template>
+
+    <!-- Response time -->
+    <template #cell-responseTime="{ row }">
+      <span
+        v-if="(row as any).responseTime"
+        class="font-mono text-sm font-semibold"
+        :class="
+          parseFloat((row as any).responseTime) < 300
+            ? 'text-status-success-text'
+            : parseFloat((row as any).responseTime) < 1000
+              ? 'text-status-warning-text'
+              : 'text-status-error-text'
+        "
+        >{{ (row as any).responseTime }}</span
+      >
+      <span v-else class="text-sm">—</span>
+    </template>
+
+    <!-- Uptime with progress bar -->
+    <template #cell-uptime="{ row }">
+      <template v-if="(row as any).uptime !== null">
+        <div class="flex items-center justify-end gap-2">
+          <OProgressBar
+            :value="(row as any).uptime / 100"
+            :variant="
+              (row as any).uptime >= 99
+                ? 'default'
+                : (row as any).uptime >= 95
+                  ? 'warning'
+                  : 'danger'
+            "
+            size="xs"
+            class="flex-1"
+          />
+          <span
+            :class="
+              'min-w-11 text-right font-mono text-sm text-xs font-semibold ' +
+              ((row as any).uptime >= 99
+                ? 'text-status-success-text'
+                : (row as any).uptime >= 95
+                  ? 'text-status-warning-text'
+                  : 'text-status-error-text')
+            "
+            >{{ (row as any).uptime }}%</span
+          >
+        </div>
+      </template>
+      <span v-else class="text-text-secondary text-xs">—</span>
+    </template>
+
+    <!-- Locations with tooltip (monitors mode) -->
+    <template #cell-locations="{ row }">
+      <OTooltip
+        v-if="(row as any).locations?.length"
+        :content="raw(formatLocationsList((row as any).locations))"
+        content-class="max-w-[20rem] whitespace-pre-wrap text-xs"
+        :delay="0"
+      >
+        <div class="flex cursor-pointer items-center gap-1">
+          <span class="max-w-[4.375rem] truncate text-xs">{{
+            locationLabel((row as any).locations[0])
+          }}</span>
+          <span
+            v-if="(row as any).locations.length > 1"
+            class="rounded-default bg-surface-subtle shrink-0 px-1 py-0.5 text-xs font-bold whitespace-nowrap"
+            >+{{ (row as any).locations.length - 1 }}</span
+          >
+        </div>
+      </OTooltip>
+      <span v-else class="text-xs">—</span>
+    </template>
+
+    <!-- Interval (monitors mode) -->
+    <template #cell-interval="{ row }">
+      <span class="truncate">{{ (row as any).interval || "—" }}</span>
+    </template>
+
+    <!-- Last check -->
+    <!-- Relative age from the RAW microsecond timestamp — the same renderer every
+         other table uses, so "3m ago" reads identically across the app. -->
+    <template #cell-lastCheck="{ row }">
+      <OTimeCell :value="(row as any).lastCheckAt" unit="us" mode="relative" :timezone="timezone" />
+    </template>
+
+    <!-- Row actions -->
+    <template #cell-actions="{ row }">
+      <div class="flex items-center gap-0.5" @click.stop>
+        <!-- Enable/Pause toggle with per-row spinner -->
+        <div
+          v-if="props.toggleLoadingMap[(row as any).id]"
+          class="flex h-8 w-7 items-center justify-center"
+          :data-test="`${dataTest}-toggle-spinner`"
+        >
+          <OSpinner size="xs" />
+          <OTooltip
+            side="bottom"
+            :content="
+              (row as any).enabled ? t('synthetics.table.pausing') : t('synthetics.table.enabling')
+            "
+          />
+        </div>
+        <OButton
+          v-else
+          :variant="(row as any).enabled ? 'ghost-destructive' : 'ghost'"
+          size="icon-sm"
+          :icon-left="(row as any).enabled ? 'pause' : 'play-arrow'"
+          :data-test="`${dataTest}-${(row as any).enabled ? 'pause' : 'enable'}-btn`"
+          @click.stop="emit('toggle-enabled', row)"
+        >
+          <OTooltip
+            side="bottom"
+            :content="
+              (row as any).enabled ? t('synthetics.table.pause') : t('synthetics.table.enable')
+            "
+          />
+        </OButton>
+
+        <!-- Edit -->
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          :data-test="`${dataTest}-edit-btn`"
+          @click.stop="emit('edit', row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.table.edit')" />
+        </OButton>
+
+        <!-- Duplicate -->
+        <OButton
+          variant="ghost"
+          size="icon-sm"
+          icon-left="content-copy"
+          :data-test="`${dataTest}-duplicate-btn`"
+          @click.stop="emit('duplicate', row)"
+        >
+          <OTooltip side="bottom" :content="t('synthetics.table.duplicate')" />
+        </OButton>
+
+        <!-- More menu: Trigger + Delete -->
+        <ODropdown>
+          <template #trigger>
+            <!-- Show spinner when trigger is in flight for this row -->
+            <div
+              v-if="props.triggerLoadingMap[(row as any).id]"
+              class="flex h-8 w-7 items-center justify-center"
+              :data-test="`${dataTest}-trigger-spinner`"
+            >
+              <OSpinner size="xs" />
+              <OTooltip side="bottom" :content="t('synthetics.table.triggering')" />
+            </div>
+            <OButton
+              v-else
+              variant="ghost"
+              size="icon-sm"
+              icon-left="more-vert"
+              :data-test="`${dataTest}-more-btn`"
+              @click.stop
+            >
+              <OTooltip side="bottom" :content="t('synthetics.table.more')" />
+            </OButton>
+          </template>
+
+          <ODropdownItem :data-test="`${dataTest}-move-item`" @select="emit('move', row)">
+            <template #icon-left>
+              <OIcon name="drive-file-move" size="sm" />
+            </template>
+            {{ t("synthetics.table.move") }}
+          </ODropdownItem>
+
+          <ODropdownSeparator />
+
+          <ODropdownItem
+            variant="destructive"
+            shortcut-id="alertsRowDelete"
+            :data-test="`${dataTest}-delete-item`"
+            @select="emit('delete', row)"
+          >
+            <template #icon-left>
+              <OIcon name="delete" size="sm" />
+            </template>
+            {{ t("synthetics.table.delete") }}
+          </ODropdownItem>
+
+          <ODropdownSeparator />
+
+          <ODropdownItem
+            :data-test="`${dataTest}-run-item`"
+            :disabled="!!props.triggerLoadingMap[(row as any).id]"
+            @select="emit('run', row)"
+          >
+            <template #icon-left>
+              <OIcon name="sound-sampler" size="sm" />
+            </template>
+            {{ t("synthetics.table.trigger") }}
+          </ODropdownItem>
+        </ODropdown>
+      </div>
+    </template>
+
+    <!-- Empty state -->
+    <template #empty>
+      <OEmptyState
+        size="block"
+        preset="no-synthetic-monitors"
+        :filtered="props.hasFilters"
+        columns
+        :description="t('synthetics.table.noResults')"
+        :data-test="`${dataTest}-empty-state`"
+        @action="
+          (id?: string) => {
+            if (!id) return;
+            emit('empty-action', id);
+          }
+        "
+      />
+    </template>
+
+    <!-- Footer with count + bulk action buttons -->
+    <template #bottom>
+      <div class="flex h-12 w-full items-center justify-between gap-1">
+        <span class="text-secondary min-w-25 text-xs">
+          <template v-if="localSelectedIds.length > 0">{{
+            t("synthetics.table.selectedCount", {
+              selected: localSelectedIds.length,
+              total: data.length,
+            })
+          }}</template>
+          <template v-else>{{ data.length }} {{ resolvedFooterTitle }}</template>
+        </span>
+        <template v-if="localSelectedIds.length > 0">
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="pause"
+            :data-test="`${dataTest}-pause-selected-btn`"
+            :disabled="!!props.bulkActionLoading"
+            @click="emit('pause-selected')"
+            >{{ t("synthetics.table.pause") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="play-arrow"
+            :data-test="`${dataTest}-enable-selected-btn`"
+            :disabled="!!props.bulkActionLoading"
+            @click="emit('enable-selected')"
+            >{{ t("synthetics.table.enable") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="sound-sampler"
+            :data-test="`${dataTest}-trigger-selected-btn`"
+            :disabled="!!props.bulkActionLoading"
+            @click="emit('trigger-selected')"
+            >{{ t("synthetics.table.trigger") }}</OButton
+          >
+          <OButton
+            variant="outline"
+            size="sm"
+            icon-left="drive-file-move"
+            :data-test="`${dataTest}-move-selected-btn`"
+            @click="emit('move-selected')"
+            >{{ t("synthetics.table.move") }}</OButton
+          >
+          <OButton
+            variant="outline-destructive"
+            size="sm"
+            icon-left="delete"
+            :data-test="`${dataTest}-delete-selected-btn`"
+            :loading="!!props.bulkActionLoading"
+            @click="emit('delete-selected')"
+            >{{ t("synthetics.table.delete") }}</OButton
+          >
+        </template>
+      </div>
+    </template>
+  </OTable>
+
+  <!-- Spark bar detail tooltip -->
+  <Teleport to="body">
+    <div
+      v-if="sparkTip.show && sparkTip.tick"
+      class="rounded-surface bg-surface-overlay border-border-default text-text-body pointer-events-auto fixed z-50 flex w-56 flex-col gap-2 border p-3 text-xs shadow-lg"
+      :style="{ left: sparkTip.x + 'px', top: sparkTip.y + 'px' }"
+      @mouseenter="keepSparkTip"
+      @mouseleave="hideSparkTip"
+    >
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-text-secondary"
+          >{{ sparkTip.tick.hour }} – {{ sparkTip.tick.nextHour }}</span
+        >
+        <OBadge
+          size="sm"
+          :variant="
+            sparkTip.tick.status === 'up'
+              ? 'success-soft'
+              : sparkTip.tick.status === 'down'
+                ? 'error-soft'
+                : 'warning-soft'
+          "
+        >
+          {{
+            sparkTip.tick.status === "up"
+              ? t("synthetics.table.statusUp")
+              : sparkTip.tick.status === "down"
+                ? t("synthetics.table.statusDown")
+                : t("synthetics.table.statusDegraded")
+          }}
+        </OBadge>
+      </div>
+      <div class="border-border-default border-t" />
+      <div class="flex flex-col gap-1">
+        <div v-for="c in sparkTip.tick.checks" :key="c.loc" class="flex items-center gap-1.5">
+          <span
+            class="h-1.5 w-1.5 shrink-0 rounded-full"
+            :class="c.ok ? 'bg-success-500' : 'bg-error-500'"
+          />
+          <span class="min-w-0 flex-1 truncate">{{ c.loc }}</span>
+          <span class="text-text-secondary shrink-0 tabular-nums">{{
+            c.ms !== null ? c.ms + t("synthetics.table.ms") : t("synthetics.table.timeout")
+          }}</span>
+        </div>
+      </div>
+      <div v-if="sparkTip.tick.avgMs !== null" class="text-text-secondary tabular-nums">
+        {{ t("synthetics.table.avg") }} · {{ sparkTip.tick.avgMs }}{{ t("synthetics.table.ms") }}
+      </div>
+    </div>
+  </Teleport>
+</template>
+
+<script setup lang="ts">
+import { computed, onUnmounted, ref } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+
+type Mode = "all" | "browser";
+
+// Extreme-left health rail — inset box-shadow so it paints regardless of
+// border-collapse; rem width + token colour keep it theme-aware. Same vocabulary
+// as Alerts and Pipelines: red = failing, amber = degrading, green = passing,
+// grey = never reported.
+// Full-row wash for the two rows that are not "just not green":
+//   failing  → light red, because a failing check is the reason this page exists
+//              and it is rare in a healthy estate;
+//   paused   → muted grey, de-emphasis rather than alarm.
+// A DEGRADED monitor keeps a clean row and reads from the amber rail: it is worth
+// noticing, not worth acting on this second, and washing it too would put most of
+// a wobbly estate in colour.
+const monitorRowClass = (row: any): string => {
+  if (String(row?.status ?? "").toLowerCase() === "failed") return "!bg-status-error-bg";
+  return row?.enabled === false ? "!bg-surface-panel" : "";
+};
+
+const monitorRowStyle = (row: any): Record<string, string> => {
+  const status = String(row?.status ?? "").toLowerCase();
+  const color =
+    status === "failed"
+      ? "var(--color-error-500)"
+      : status === "warning"
+        ? "var(--color-warning-500)"
+        : status === "passed"
+          ? "var(--color-success-500)"
+          : "var(--color-grey-400)";
+  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+};
+
+const props = withDefaults(
+  defineProps<{
+    mode: Mode;
+    data: any[];
+    loading?: boolean;
+    /** IANA zone for the Last Check tooltip. Passed in: this table is a leaf
+     *  component and must not reach into the store for it. */
+    timezone?: string;
+    footerTitle?: I18nText;
+    emptyMessage?: I18nText;
+    dataTest?: string;
+    toggleLoadingMap?: Record<string, boolean>;
+    triggerLoadingMap?: Record<string, boolean>;
+    selectedIds?: string[];
+    showFolderColumn?: boolean;
+    bulkActionLoading?: boolean;
+    hasFilters?: boolean;
+    /** location id -> "Name (region)", for resolving `check.locations` ids to a
+     *  human label. Falls back to the raw id when a location isn't in the map
+     *  (e.g. deleted since the check last ran). */
+    locationNames?: Record<string, string>;
+  }>(),
+  {
+    loading: false,
+    dataTest: "monitor-table",
+    toggleLoadingMap: () => ({}),
+    triggerLoadingMap: () => ({}),
+    selectedIds: () => [],
+    showFolderColumn: false,
+    bulkActionLoading: false,
+    hasFilters: false,
+    locationNames: () => ({}),
+  },
+);
+
+function locationLabel(id: string): string {
+  return props.locationNames[id] ?? id;
+}
+
+const emit = defineEmits<{
+  "row-click": [row: any];
+  edit: [row: any];
+  "toggle-enabled": [row: any];
+  duplicate: [row: any];
+  run: [row: any];
+  delete: [row: any];
+  move: [row: any];
+  "update:selectedIds": [ids: string[]];
+  "delete-selected": [];
+  "move-selected": [];
+  "pause-selected": [];
+  "enable-selected": [];
+  "trigger-selected": [];
+  "navigate-to-folder": [folderId: string];
+  "empty-action": [actionId: string];
+}>();
+
+const { t } = useI18nTyped();
+
+// Not `withDefaults` defaults: those are evaluated once at module scope, which
+// would freeze the copy in whatever locale was active at first load.
+const resolvedFooterTitle = computed(
+  () => props.footerTitle ?? t("synthetics.table.checksFooterTitle"),
+);
+const resolvedEmptyMessage = computed(() => props.emptyMessage ?? t("search.noResult"));
+
+const localSelectedIds = computed({
+  get: () => props.selectedIds ?? [],
+  set: (val: string[]) => emit("update:selectedIds", val),
+});
+
+// ── Column definitions per mode ─────────────────────────────────────
+
+const STATUS_COL: OTableColumnDef = {
+  id: "status",
+  header: t("synthetics.table.status"),
+  accessorKey: "status",
+  size: COL.status,
+  minSize: 72,
+  sortable: true,
+  meta: { align: "left" },
+};
+const NAME_COL: OTableColumnDef = {
+  id: "name",
+  header: t("synthetics.table.check"),
+  accessorKey: "name",
+  size: COL.name,
+  minSize: 120,
+  sortable: true,
+  hideable: true,
+  meta: { isName: true, flex: true },
+};
+const TEST_NAME_COL: OTableColumnDef = {
+  id: "name",
+  header: t("synthetics.table.testName"),
+  accessorKey: "name",
+  size: COL.name,
+  minSize: 120,
+  sortable: true,
+  hideable: true,
+  meta: { isName: true, flex: true },
+};
+const URL_COL: OTableColumnDef = {
+  id: "url",
+  header: t("synthetics.table.url"),
+  accessorKey: "url",
+  size: COL.url,
+  minSize: 140,
+  sortable: false,
+  hideable: true,
+};
+const ENDPOINT_COL: OTableColumnDef = {
+  id: "url",
+  header: t("synthetics.table.endpoint"),
+  accessorKey: "url",
+  size: COL.url,
+  minSize: 140,
+  sortable: false,
+  hideable: true,
+};
+const TYPE_COL: OTableColumnDef = {
+  id: "type",
+  header: t("synthetics.table.type"),
+  accessorKey: "type",
+  size: COL.type,
+  minSize: 72,
+  sortable: true,
+  hideable: true,
+};
+const HISTORY_COL: OTableColumnDef = {
+  id: "history",
+  header: t("synthetics.table.history"),
+  accessorKey: "history",
+  size: COL.history,
+  minSize: 140,
+  sortable: false,
+  hideable: true,
+};
+const RESPONSE_TIME_COL: OTableColumnDef = {
+  id: "responseTime",
+  header: t("synthetics.table.response"),
+  accessorKey: "responseTime",
+  size: COL.responseTime,
+  minSize: 72,
+  sortable: true,
+  meta: { align: "right" },
+  hideable: true,
+};
+const PAGE_LOAD_COL: OTableColumnDef = {
+  id: "responseTime",
+  header: t("synthetics.table.pageLoad"),
+  accessorKey: "responseTime",
+  size: COL.responseTime,
+  minSize: 80,
+  sortable: true,
+  meta: { align: "right" },
+  hideable: true,
+};
+const P50_COL: OTableColumnDef = {
+  id: "responseTime",
+  header: t("synthetics.table.p50"),
+  accessorKey: "responseTime",
+  size: COL.responseTime,
+  minSize: 64,
+  sortable: true,
+  meta: { align: "right" },
+  hideable: true,
+};
+const UPTIME_COL: OTableColumnDef = {
+  id: "uptime",
+  header: t("synthetics.table.uptime"),
+  accessorKey: "uptime",
+  size: COL.uptime,
+  minSize: 100,
+  sortable: true,
+  meta: { align: "right" },
+  hideable: true,
+};
+const LOCATIONS_COL: OTableColumnDef = {
+  id: "locations",
+  header: t("synthetics.table.locations"),
+  accessorKey: "locations",
+  size: COL.locations,
+  minSize: 90,
+  sortable: false,
+  hideable: true,
+};
+const INTERVAL_COL: OTableColumnDef = {
+  id: "interval",
+  header: t("synthetics.table.interval"),
+  accessorKey: "interval",
+  size: COL.interval,
+  minSize: 60,
+  sortable: false,
+  hideable: true,
+};
+const LAST_CHECK_COL: OTableColumnDef = {
+  id: "lastCheck",
+  header: t("synthetics.table.lastCheck"),
+  accessorKey: "lastCheck",
+  size: COL.lastCheck,
+  minSize: 72,
+  sortable: false,
+  hideable: true,
+};
+const LAST_RUN_COL: OTableColumnDef = {
+  id: "lastCheck",
+  header: t("synthetics.table.lastCheck"),
+  accessorKey: "lastCheck",
+  size: COL.lastCheck,
+  minSize: 72,
+  sortable: false,
+  hideable: true,
+};
+const STEPS_COL: OTableColumnDef = {
+  id: "steps",
+  header: t("synthetics.table.steps"),
+  accessorKey: "steps",
+  size: COL.steps,
+  minSize: 60,
+  sortable: false,
+  hideable: true,
+};
+const METHOD_COL: OTableColumnDef = {
+  id: "method",
+  header: t("synthetics.table.method"),
+  accessorKey: "method",
+  size: COL.method,
+  minSize: 56,
+  sortable: false,
+  hideable: true,
+};
+const ASSERTIONS_COL: OTableColumnDef = {
+  id: "assertions",
+  header: t("synthetics.table.assertions"),
+  accessorKey: "assertions",
+  size: COL.assertions,
+  minSize: 72,
+  sortable: false,
+  hideable: true,
+};
+const ACTIONS_COL: OTableColumnDef = {
+  id: "actions",
+  header: raw(""),
+  accessorKey: "id",
+  size: 160,
+  minSize: 160,
+  sortable: false,
+  isAction: true,
+};
+const FOLDER_COL: OTableColumnDef = {
+  id: "folder_name",
+  header: t("synthetics.table.folder"),
+  accessorKey: "folder_name",
+  size: COL.folder,
+  minSize: 90,
+  sortable: true,
+  hideable: true,
+};
+
+const columns = computed<OTableColumnDef[]>(() => {
+  let cols: OTableColumnDef[];
+  if (props.mode === "browser") {
+    cols = [
+      TEST_NAME_COL,
+      URL_COL,
+      STEPS_COL,
+      HISTORY_COL,
+      PAGE_LOAD_COL,
+      UPTIME_COL,
+      LAST_RUN_COL,
+      STATUS_COL,
+      ACTIONS_COL,
+    ];
+  } else {
+    cols = [
+      NAME_COL,
+      URL_COL,
+      TYPE_COL,
+      STATUS_COL,
+      RESPONSE_TIME_COL,
+      LOCATIONS_COL,
+      INTERVAL_COL,
+      LAST_CHECK_COL,
+      ACTIONS_COL,
+    ];
+  }
+  if (props.showFolderColumn) {
+    const nameIdx = cols.findIndex((c) => c.id === "name");
+    cols.splice(nameIdx + 1, 0, FOLDER_COL);
+  }
+  return cols;
+});
+
+function formatLocationsList(locations: string[]): string {
+  return locations.map((l) => locationLabel(l)).join("\n");
+}
+
+// ── Spark tooltip ─────────────────────────────────────────────────────
+
+interface HistoryTick {
+  hour: string;
+  nextHour: string;
+  status: "up" | "down" | "deg";
+  avgMs: number | null;
+  checks: { loc: string; ok: boolean; ms: number | null }[];
+}
+
+const sparkTip = ref({ show: false, x: 0, y: 0, tick: null as HistoryTick | null });
+let sparkHideTimer: ReturnType<typeof setTimeout> | null = null;
+
+const showSparkTip = (e: MouseEvent, tick: HistoryTick) => {
+  if (sparkHideTimer) {
+    clearTimeout(sparkHideTimer);
+    sparkHideTimer = null;
+  }
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  sparkTip.value = { show: true, x: rect.left + rect.width / 2, y: rect.top - 10, tick };
+};
+const hideSparkTip = () => {
+  sparkHideTimer = setTimeout(() => {
+    sparkTip.value.show = false;
+  }, 80);
+};
+const keepSparkTip = () => {
+  if (sparkHideTimer) {
+    clearTimeout(sparkHideTimer);
+    sparkHideTimer = null;
+  }
+};
+
+onUnmounted(() => {
+  if (sparkHideTimer) clearTimeout(sparkHideTimer);
+});
+</script>

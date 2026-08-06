@@ -1,5 +1,5 @@
 ﻿<template>
-  <div data-test="llm-providers-settings" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
+  <div data-test="llm-providers-settings" class="flex h-full min-h-0 flex-col">
     <ProviderFormPage
       v-if="formPage"
       :org-id="orgId"
@@ -9,35 +9,27 @@
       @cancel="closeForm"
     />
 
-    <template v-else>
-      <AppPageHeader
-        icon="smart-toy"
-        :subtitle="'LLM providers for online evaluations'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-      >
-        <template #title>
-          <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
-        </template>
-        <template #actions>
-          <OButton
-            data-test="llm-providers-add-btn"
-            variant="primary"
-            size="sm"
-            @click="openCreate"
-          >
-            {{ t("llmProviders.newButton") }}
-          </OButton>
-        </template>
-      </AppPageHeader>
+    <OPageLayout
+      v-else
+      icon="smart-toy"
+      :subtitle="t('settings.llmProvidersSettings.subtitle')"
+      bleed
+      :scroll="false"
+    >
+      <template #title>
+        <span data-test="llm-providers-settings-title">{{ t("llmProviders.title") }}</span>
+      </template>
+      <template #actions>
+        <OButton data-test="llm-providers-add-btn" variant="primary" size="sm" @click="openCreate">
+          {{ t("llmProviders.newButton") }}
+        </OButton>
+      </template>
 
-      <div v-if="isLoading" class="tw:flex tw:flex-1 tw:items-center tw:justify-center">
+      <div v-if="isLoading" class="flex flex-1 items-center justify-center">
         <OSpinner size="md" />
       </div>
 
-      <div
-        v-else-if="!providers.length"
-        class="tw:flex tw:flex-1 tw:items-center tw:justify-center"
-      >
+      <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
              surface in this page reads consistently with the rest of the
@@ -52,7 +44,7 @@
         />
       </div>
 
-      <div v-else class="tw:flex-1 tw:min-h-0">
+      <div v-else class="min-h-0 flex-1">
         <OTable
           data-test="llm-providers-table"
           :data="filteredProviders"
@@ -63,22 +55,39 @@
           :global-filter="searchQuery"
           :show-global-filter="false"
           :default-columns="false"
+          show-index
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="settings-llm-providers"
           :page-size="20"
           :page-size-options="[20, 50, 100]"
           width="100%"
-          class="tw:w-full tw:h-full"
+          class="h-full w-full"
           @row-click="(row: any) => openEdit(row)"
         >
           <template #toolbar>
             <OSearchInput
               v-model="searchQuery"
-              class="tw:flex-1"
+              class="flex-1"
               :placeholder="t('llmProviders.searchPlaceholder')"
               data-test="llm-providers-search-input"
             />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="isLoading"
+              data-test="llm-providers-list-refresh-btn"
+              @click="loadProviders"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="llmProvidersRefresh"
+              />
+            </OButton>
           </template>
           <template #empty>
             <OEmptyState
@@ -90,28 +99,19 @@
             />
           </template>
           <template #cell-type="{ row }">
-            <OTag type="providerType" class="tw:lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
+            <OTag type="providerType" class="lowercase">{{ providerTypeOf(row) || "—" }}</OTag>
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="tw:font-mono tw:text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
+            <span class="font-mono text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
           </template>
 
           <template #cell-defaultModel="{ row }">
-            <span class="tw:font-mono tw:text-xs">{{ defaultModelOf(row) || "—" }}</span>
-          </template>
-
-          <template #cell-isDefault="{ row }">
-            <OTag
-              v-if="booleanOf(row, 'isDefault', 'is_default')"
-              type="providerDefaultFlag"
-              value="default"
-            />
-            <span v-else class="tw:text-text-primary">—</span>
+            <span class="font-mono text-xs">{{ defaultModelOf(row) || "—" }}</span>
           </template>
 
           <template #cell-actions="{ row }">
-            <div class="tw:flex tw:items-center actions-container">
+            <div class="actions-container flex items-center">
               <OButton
                 :data-test="`llm-providers-${row.name}-edit-btn`"
                 data-row-action="edit"
@@ -134,7 +134,7 @@
           </template>
         </OTable>
       </div>
-    </template>
+    </OPageLayout>
 
     <ConfirmDialog
       v-model="confirmDeleteOpen"
@@ -148,20 +148,18 @@
 
 <script setup lang="ts">
 import { computed, onBeforeMount, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
-  type Provider,
-} from "@/services/online-evals.service";
+import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
 import {
-  booleanOf,
   defaultModelOf,
   providerTypeOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
@@ -169,10 +167,12 @@ import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat"
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -188,14 +188,6 @@ const pendingDeleteRow = ref<Provider | null>(null);
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
 const columns = computed(() => [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    sortable: false,
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("llmProviders.columns.name"),
@@ -238,16 +230,6 @@ const columns = computed(() => [
     meta: { align: "left" },
   },
   {
-    id: "isDefault",
-    header: t("llmProviders.columns.default"),
-    accessorFn: (row: Provider) => booleanOf(row, "isDefault", "is_default"),
-    sortable: true,
-    resizable: true,
-    hideable: true,
-    size: COL.toggle,
-    meta: { align: "left" },
-  },
-  {
     id: "actions",
     header: t("onlineEvals.scoreConfig.columns.actions"),
     sortable: false,
@@ -266,10 +248,7 @@ const filteredProviders = computed(() => {
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(query)),
       );
-  return filtered.map((row, index) => ({
-    ...row,
-    "#": index + 1 <= 9 ? `0${index + 1}` : String(index + 1),
-  }));
+  return filtered;
 });
 
 onBeforeMount(async () => {
@@ -378,9 +357,21 @@ async function performDelete() {
     });
     await loadProviders();
   } catch (err: any) {
-    showError(err, t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }));
+    showError(
+      err,
+      t("onlineEvals.deleteError", { label: t("onlineEvals.singular.providers").toLowerCase() }),
+    );
   } finally {
     pendingDeleteRow.value = null;
   }
 }
+
+useShortcuts([
+  {
+    id: "llmProvidersRefresh",
+    handler: () => {
+      if (!isInputFocused()) loadProviders();
+    },
+  },
+]);
 </script>

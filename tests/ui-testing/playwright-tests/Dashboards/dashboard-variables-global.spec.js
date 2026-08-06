@@ -70,7 +70,7 @@ test.describe("Dashboard Variables - Global Level", { tag: ['@dashboards', '@das
 
     // Verify variable scope is global in the settings
     await pm.dashboardSetting.openSetting();
-    // Wait for the settings ODrawer to be visible (replaced legacy .q-dialog selector)
+    // Wait for the settings ODrawer to be visible
     const settingsDrawer = page.locator('[data-test="dashboard-settings-drawer"]');
     await settingsDrawer.waitFor({ state: "visible", timeout: 5000 });
     await pm.dashboardSetting.openVariables();

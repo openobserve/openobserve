@@ -15,7 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="custom-chart-confirm-dialog"
+  <ODialog
+    data-test="custom-chart-confirm-dialog"
     v-model:open="open"
     :size="warningMessage?.length ? 'md' : 'sm'"
     :title="title"
@@ -25,20 +26,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:primary="onConfirm"
   >
     <div data-test="dialog-box">
-      <div class="para tw:text-center">{{ message }}</div>
-      <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4">
+      <div class="para text-center">{{ message }}</div>
+      <div v-if="warningMessage && warningMessage.length > 0" class="mt-4">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
-      <div v-if="hasQuery" class="tw:mt-4">
+      <div v-if="hasQuery" class="mt-4">
         <OCheckbox
           v-model="replaceQuery"
-          label="Also replace query with example query"
+          :label="t('dashboard.customChartConfirmDialog.alsoReplaceQuery')"
           data-test="replace-query-checkbox"
         />
-        <div
-          class="tw:text-xs tw:mt-1 tw:ml-7 tw:text-gray-500 tw:dark:text-gray-400"
-        >
-          The example query will be inserted into the query editor
+        <div class="text-text-secondary mt-1 ml-7 text-xs">
+          {{ t("dashboard.customChartConfirmDialog.exampleQueryInserted") }}
         </div>
       </div>
     </div>
@@ -47,8 +46,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, type PropType } from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -59,11 +58,11 @@ export default defineComponent({
   emits: ["update:ok", "update:cancel", "update:modelValue"],
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     message: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     warningMessage: {
@@ -80,7 +79,7 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const open = computed({
       get: () => props.modelValue ?? false,

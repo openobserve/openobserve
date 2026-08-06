@@ -16,19 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    style="width: 100%; height: 100%"
+    class="h-full w-full"
     @mouseleave="hidePopupsAndOverlays"
     @mouseenter="showPopupsAndOverlays"
   >
-    <div
-      ref="chartPanelRef"
-      style="height: 100%; position: relative"
-      :class="chartPanelClass"
-    >
-      <div
-        v-if="!errorDetail?.message"
-        :style="{ height: chartPanelHeight, width: '100%' }"
-      >
+    <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
+      <div v-if="!errorDetail?.message" :style="{ height: chartPanelHeight, width: '100%' }">
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -42,9 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <PromQLTableChart
-          v-else-if="
-            panelSchema.type == 'table' && panelSchema.queryType === 'promql'
-          "
+          v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
           ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
@@ -53,30 +44,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
+          :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
-          :show-pagination="
-            panelSchema.config?.table_pagination && !store.state.printMode
-          "
+          :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="tw:flex tw:flex-col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="column flex h-full w-full flex-1 flex-col"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
-            style="width: 100%; height: 100%"
-            class="tw:flex tw:flex-col"
+            class="flex h-full w-full flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -84,13 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="tw:flex tw:flex-col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="column flex h-full w-full flex-1 flex-col"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
-            style="width: 100%; height: 100%"
-            class="tw:flex tw:flex-col"
+            class="flex h-full w-full flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -100,8 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
-          style="width: 100%; height: 100%"
-          class="tw:flex tw:flex-col"
+          class="flex h-full w-full flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
@@ -109,6 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ref="chartRendererRef"
           :data="chartRendererData"
           :height="chartPanelHeight"
+          :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
@@ -118,31 +99,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-if="metricItems.length && !noData && !loading"
-        style="position: absolute; inset: 0; pointer-events: none; z-index: 8"
+        class="pointer-events-none absolute inset-0 z-8"
         data-test="dashboard-metric-copy-overlay"
       >
         <div
+          class="pointer-events-auto absolute"
           v-for="m in metricItems"
           :key="m.idx"
-          style="position: absolute; pointer-events: auto"
           :style="metricZoneStyle(m)"
           @mouseenter="hoveredMetricIdx = m.idx"
           @mouseleave="hoveredMetricIdx = null"
         >
           <OButton
+            class="absolute"
             v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
             variant="ghost"
             size="icon-xs-sq"
-            style="position: absolute"
-            :style="metricIconStyle(m)"
+            :style="m.iconStyle"
             @click="copyMetricItem(m)"
             data-test="dashboard-metric-copy-btn"
             :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
           >
-            <OIcon
-              :name="metricCopiedIdx === m.idx ? 'check' : 'content-copy'"
-              size="sm"
-            />
+            <OIcon :name="metricCopiedIdx === m.idx ? 'check' : 'content-copy'" size="sm" />
           </OButton>
         </div>
       </div>
@@ -152,29 +130,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
+          panelSchema.type != 'table' &&
           !loading
         "
         size="inline"
         icon="bar-chart"
-        :title="noData"
+        :title="t('panel.noData')"
         :backdrop="false"
         data-test="no-data"
-        class="noData tw:absolute! tw:inset-0 tw:w-full tw:h-full tw:!min-h-0 tw:!p-2 tw:[container-type:size]"
+        class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
       />
       <div
-        v-if="
-          errorDetail?.message &&
-          !panelSchema?.error_config?.custom_error_handeling
-        "
-        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
+        v-if="errorDetail?.message && !panelSchema?.error_config?.custom_error_handeling"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-error-message"
       >
         <OIcon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">
+        <div class="h-4/5 w-full">
           {{
             errorDetail?.code?.toString().startsWith("4")
               ? errorDetail.message
-              : "Error Loading Data"
+              : t("common.errorLoadingData")
           }}
         </div>
       </div>
@@ -185,15 +161,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="tw:absolute tw:top-[20%] tw:w-full tw:h-[80%] tw:overflow-hidden tw:text-center tw:text-ellipsis"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
         data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
-      <div
-        class="tw:flex"
-        style="position: absolute; top: 0px; width: 100%; z-index: 999"
-      >
+      <div class="absolute top-0 z-999 flex w-full">
         <LoadingProgress
           :loading="loading"
           :loadingProgressPercentage="loadingProgressPercentage"
@@ -201,71 +174,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="tw:absolute tw:z-9999999 tw:min-w-50 tw:py-1 tw:px-0 tw:hidden tw:whitespace-nowrap tw:top-0 tw:left-0 tw:rounded tw:border tw:border-(--o2-border) tw:shadow-[0_2px_8px_rgba(0,0,0,0.15)]"
-        :class="{
-          'tw:group/menu tw:bg-[#2c2c2c] tw:border-[#404040] tw:shadow-[0_2px_8px_rgba(0,0,0,0.4)] crosslink-drilldown-menu--dark': store.state.theme === 'dark',
-          'tw:bg-white': store.state.theme !== 'dark',
-        }"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
-        <template
-          v-for="(drilldown, index) in drilldownArray"
-          :key="JSON.stringify(drilldown)"
-        >
+        <template v-for="(drilldown, index) in drilldownArray" :key="JSON.stringify(drilldown)">
           <OSeparator
             v-if="
               drilldown._isCrossLink &&
-              index > 0 &&
-              !drilldownArray[index - 1]._isCrossLink
+              Number(index) > 0 &&
+              !drilldownArray[Number(index) - 1]._isCrossLink
             "
           />
           <div
-            class="tw:flex tw:items-center tw:py-2 tw:px-4 tw:cursor-pointer tw:transition-colors tw:duration-200 tw:text-sm tw:text-[#333] tw:hover:bg-[#f5f5f5] tw:active:bg-(--o2-border) tw:group-[.crosslink-drilldown-menu--dark]/menu:text-[var(--o2-border)] tw:group-[.crosslink-drilldown-menu--dark]/menu:hover:bg-[#383838] tw:group-[.crosslink-drilldown-menu--dark]/menu:active:bg-[#444444]"
+            class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
-            <OIcon
-              size="xs"
-              class="tw:mr-2"
-              :name="drilldown._isCrossLink ? 'open-in-new' : 'link'"
-            />
-            <span class="tw:select-none">{{ drilldown.name }}</span>
+            <OIcon size="xs" class="mr-2" :name="drilldown._isCrossLink ? 'open-in-new' : 'link'" />
+            <span class="select-none">{{ drilldown.name }}</span>
           </div>
         </template>
       </div>
       <div
-        style="
-          border: 1px solid gray;
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          max-width: 200px;
-          white-space: normal;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-bg-card-dark,#1a1a1a)' : 'tw:bg-white'"
+        class="border-border-default rounded-default bg-surface-base absolute top-0 left-0 z-9999999 hidden max-w-50 border p-0.75 [overflow-wrap:break-word] whitespace-normal [word-wrap:break-word]"
         ref="annotationPopupRef"
       >
-        <div
-          class="tw:px-2 tw:py-1"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-            word-break: break-word;
-          "
-        >
-          <span style="word-break: break-word">{{
-            selectedAnnotationData.text
-          }}</span>
+        <div class="relative flex flex-row items-center px-2 py-1 break-words">
+          <span class="break-words">{{ selectedAnnotationData.text }}</span>
         </div>
       </div>
       <!-- Annotation Dialog -->
@@ -304,6 +241,9 @@ import {
   onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
+import { useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
 import { getDataValue } from "@/utils/dashboard/aliasUtils";
@@ -313,15 +253,9 @@ import useNotifications from "@/composables/useNotifications";
 import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import {
-  usePanelAlertCreation,
-  usePanelDownload,
-} from "@/composables/dashboard/usePanelActions";
+import { usePanelAlertCreation, usePanelDownload } from "@/composables/dashboard/usePanelActions";
 import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
-import {
-  overlayNewDataOnOldOptions,
-  isOverlayEligible,
-} from "@/utils/dashboard/streaming";
+import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
 import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 
 const ChartRenderer = defineAsyncComponent(() => {
@@ -365,8 +299,7 @@ const AlertContextMenu = defineAsyncComponent(() => {
 });
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -388,7 +321,6 @@ export default defineComponent({
     LoadingProgress,
     OButton,
     OIcon,
-    OTooltip,
     OEmptyState,
   },
   props: {
@@ -496,6 +428,19 @@ export default defineComponent({
       required: false,
       default: undefined,
     },
+    /**
+     * Pre-fetched PromQL results to render instead of the panel running its own
+     * query. `{ data, metadata?, resultMetaData? }`, where `data` is one entry
+     * per query (the shape the PromQL executor writes to `state.data`). Used by
+     * the metrics explorer, which owns the fetch lifecycle via its preview
+     * queue but still wants to render through this component. Undefined for
+     * normal dashboard panels, which fetch their own data.
+     */
+    injectedPromqlData: {
+      type: Object,
+      required: false,
+      default: undefined,
+    },
   },
   emits: [
     "updated:data-zoom",
@@ -515,6 +460,8 @@ export default defineComponent({
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
 
@@ -533,11 +480,6 @@ export default defineComponent({
     // - PreviewAlert.vue (no page key) - doesn't need it
     // - PanelContainer.vue (no page key) - doesn't need it
     // - PreviewPromqlQuery.vue (no page key) - doesn't need it
-    //
-    // To avoid breaking these other contexts, we:
-    // 1. Inject with null default to detect if page key was explicitly provided
-    // 2. Only call useDashboardPanelData if a page key exists
-    // 3. Return empty array [] if no hiddenQueries (no filtering applied)
     // ============================================================================
 
     const dashboardPanelDataPageKey: any = inject(
@@ -550,7 +492,7 @@ export default defineComponent({
     // wrong panel data in contexts that don't need the hiding feature
     let dashboardPanelDataForHiding: any = null;
     if (dashboardPanelDataPageKey) {
-      const result = useDashboardPanelData(dashboardPanelDataPageKey);
+      const result = useDashboardPanelData(dashboardPanelDataPageKey, t);
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
@@ -560,7 +502,6 @@ export default defineComponent({
       return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
     });
 
-    // stores the converted data which can be directly used for rendering different types of panels
     const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
     const chartRendererRef: any = ref(null); // holds the ref to the ChartRenderer component
@@ -584,6 +525,8 @@ export default defineComponent({
     // Metric chart: one copy icon per rendered value (multi-SQL renders many).
     // Values are already unit/decimal/timestamp formatted at the metric level;
     // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    // Values whose cell has no overlap-free spot for the icon are dropped —
+    // no copy affordance beats covering the digits.
     const metricItems = computed(() => {
       if (props.panelSchema?.type !== "metric") return [];
       const series = panelData.value?.options?.series ?? [];
@@ -594,42 +537,75 @@ export default defineComponent({
           layout: s?._metricLayout,
         }))
         .filter((m: any) => {
-          if (!m.layout || m.text == null || String(m.text).trim() === "")
-            return false;
+          if (!m.layout || m.text == null || String(m.text).trim() === "") return false;
           const num = parseFloat(
-            String(m.text).replace(/,/g, "").replace(/[^0-9.eE+-]/g, ""),
+            String(m.text)
+              .replace(/,/g, "")
+              .replace(/[^0-9.eE+-]/g, ""),
           );
           return Number.isNaN(num) || num !== 0;
-        });
+        })
+        .map((m: any) => ({ ...m, iconStyle: metricIconStyle(m) }))
+        .filter((m: any) => m?.iconStyle !== null);
     });
     // Hover zone = each value's grid cell.
     const metricZoneStyle = (m: any) => ({
-      left: `${m.layout.left}px`,
-      top: `${m.layout.top}px`,
-      width: `${m.layout.width}px`,
-      height: `${m.layout.height}px`,
+      left: `${m?.layout?.left ?? 0}px`,
+      top: `${m?.layout?.top ?? 0}px`,
+      width: `${m?.layout?.width ?? 0}px`,
+      height: `${m?.layout?.height ?? 0}px`,
     });
-    // Fixed copy-button width (icon-xs-sq), matching the table chart.
+    // Fixed copy-button size (icon-xs-sq), matching the table chart.
     const COPY_BTN_PX = 28;
-    // Sit just past the number's measured right edge, clamped inside the cell.
-    // Measuring (vs estimating) keeps the icon off the digits for any value.
+    // Icon placement: beside the value (the font fit reserves the slot),
+    // else wrapped below/above it, else docked at the right edge (tiny cells).
     const metricIconStyle = (m: any) => {
-      const fs = m.layout?.fontSize || 24;
-      const textWidth = calculateWidthText(String(m.text), `${fs}px`);
-      const left = m.layout.cx - m.layout.left + textWidth / 2 + 2;
-      const maxLeft = m.layout.width - COPY_BTN_PX - 2;
+      const layout = m?.layout;
+      if (!layout) return null;
+      const fs = layout?.fontSize || 24;
+      const width = layout?.width ?? 0;
+      const height = layout?.height ?? 0;
+      const cxLocal = (layout?.cx ?? 0) - (layout?.left ?? 0);
+      const cyLocal = (layout?.cy ?? 0) - (layout?.top ?? 0);
+      const textWidth = calculateWidthText(String(m?.text ?? ""), `${fs}px`);
+
+      const besideLeft = cxLocal + textWidth / 2 + 2;
+      if (besideLeft + COPY_BTN_PX + 2 <= width && height >= COPY_BTN_PX) {
+        return {
+          left: `${besideLeft}px`,
+          top: `${Math.min(Math.max(cyLocal, COPY_BTN_PX / 2), height - COPY_BTN_PX / 2)}px`,
+          transform: "translateY(-50%)",
+        };
+      }
+
+      const centeredLeft = Math.max(0, Math.min(cxLocal - COPY_BTN_PX / 2, width - COPY_BTN_PX));
+      // rendered line is ~1.2em tall around the vertical center
+      const halfTextHeight = (fs * 1.2) / 2;
+      const belowTop = cyLocal + halfTextHeight + (layout?.labelClearance ?? 0) + 2;
+      if (belowTop + COPY_BTN_PX <= height) {
+        return { left: `${centeredLeft}px`, top: `${belowTop}px` };
+      }
+      const aboveTop = cyLocal - halfTextHeight - 2 - COPY_BTN_PX;
+      if (aboveTop >= 0) {
+        return { left: `${centeredLeft}px`, top: `${aboveTop}px` };
+      }
+
+      // cell too small for any clean spot — dock at the right edge with a
+      // solid background so the icon stays legible over the value's edge
       return {
-        left: `${Math.min(left, maxLeft)}px`,
-        top: `${m.layout.cy - m.layout.top}px`,
+        left: `${Math.max(0, width - COPY_BTN_PX - 2)}px`,
+        top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
+        backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
+        boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };
     const hoveredMetricIdx = ref<number | null>(null);
     const metricCopiedIdx = ref<number | null>(null);
     const copyMetricItem = (m: any) => {
-      if (m.text == null) return;
-      copyToClipboard(String(m.text), { silent: true }).then(() => {
-        metricCopiedIdx.value = m.idx;
+      if (m?.text == null) return;
+      copyToClipboard(String(m.text), t, { silent: true }).then(() => {
+        metricCopiedIdx.value = m?.idx;
         setTimeout(() => {
           if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
         }, 3000);
@@ -657,8 +633,8 @@ export default defineComponent({
       searchResponse,
       is_ui_histogram,
       shouldRefreshWithoutCache,
-      showLegendsButton,
       regionClusterParams,
+      injectedPromqlData,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -693,6 +669,7 @@ export default defineComponent({
       shouldRefreshWithoutCache,
       regionClusterParams,
       allowAnnotationsAPI,
+      injectedPromqlData,
     );
 
     const {
@@ -711,6 +688,7 @@ export default defineComponent({
       dashboardId.value,
       panelSchema.value.id,
       folderId.value,
+      t,
     );
 
     // Filter data based on hiddenQueries for PromQL panels
@@ -721,11 +699,7 @@ export default defineComponent({
       }
 
       // If no hidden queries or empty array, return as is
-      if (
-        !hiddenQueries.value ||
-        hiddenQueries.value.length === 0 ||
-        !Array.isArray(data.value)
-      ) {
+      if (!hiddenQueries.value || hiddenQueries.value.length === 0 || !Array.isArray(data.value)) {
         return data.value;
       }
 
@@ -737,7 +711,7 @@ export default defineComponent({
       return filtered;
     });
 
-    // E2: Also filter panelSchema.queries in sync with filteredData
+    // Also filter panelSchema.queries in sync with filteredData
     // to keep data[i] aligned with queries[i] in convertMultiSQLData
     const filteredPanelSchema = computed(() => {
       if (
@@ -849,14 +823,7 @@ export default defineComponent({
             ? "X-Axis"
             : "Y-Axis";
 
-      validateSQLPanelFields(
-        panelSchema.value,
-        0,
-        currentXLabel,
-        currentYLabel,
-        errors,
-        true,
-      );
+      validateSQLPanelFields(panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
 
       return errors;
     });
@@ -865,10 +832,11 @@ export default defineComponent({
 
     //inject variablesAndPanelsDataLoadingState from parent
     // default values will be empty object of panels and variablesData
-    const variablesAndPanelsDataLoadingState: any = inject(
-      "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
-    );
+    const variablesAndPanelsDataLoadingState: any = inject("variablesAndPanelsDataLoadingState", {
+      panels: {},
+      variablesData: {},
+      searchRequestTraceIds: {},
+    });
 
     // Watch loading state changes and emit them to parent
     watch(loading, (newLoadingState) => {
@@ -902,7 +870,6 @@ export default defineComponent({
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
-      panelsList.value = panelsList.value;
     });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -941,10 +908,7 @@ export default defineComponent({
         return;
       }
 
-      if (
-        !errorDetail?.value?.message &&
-        validatePanelData?.value?.length === 0
-      ) {
+      if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
         try {
           const result = await convertPanelData(
             filteredPanelSchema.value,
@@ -984,7 +948,7 @@ export default defineComponent({
             // 2. localStorage saved color
             // 3. Org settings color
             // 4. Default theme color from store
-            const _themeMode = store.state.theme === "dark" ? "dark" : "light";
+            const _themeMode = isDark.value ? "dark" : "light";
             const primaryColor: string =
               (_themeMode === "dark"
                 ? store.state.tempThemeColors?.dark
@@ -993,10 +957,8 @@ export default defineComponent({
                 _themeMode === "dark" ? "customDarkColor" : "customLightColor",
               ) ||
               (_themeMode === "dark"
-                ? store.state?.organizationData?.organizationSettings
-                    ?.dark_mode_theme_color
-                : store.state?.organizationData?.organizationSettings
-                    ?.light_mode_theme_color) ||
+                ? store.state?.organizationData?.organizationSettings?.dark_mode_theme_color
+                : store.state?.organizationData?.organizationSettings?.light_mode_theme_color) ||
               (_themeMode === "dark"
                 ? store.state.defaultThemeColors?.dark
                 : store.state.defaultThemeColors?.light) ||
@@ -1015,14 +977,10 @@ export default defineComponent({
             let { boundaryTime } = boundaryInfo;
             if (!boundaryTime && boundaryInfo.isLTR && result.options?.series) {
               for (const s of result.options.series) {
-                if (!s.name || !Array.isArray(s.data) || !s.data.length)
-                  continue;
+                if (!s.name || !Array.isArray(s.data) || !s.data.length) continue;
                 const lastPt = s.data[s.data.length - 1];
                 if (!Array.isArray(lastPt)) continue;
-                const t =
-                  typeof lastPt[0] === "number"
-                    ? lastPt[0]
-                    : new Date(lastPt[0]).getTime();
+                const t = typeof lastPt[0] === "number" ? lastPt[0] : new Date(lastPt[0]).getTime();
                 if (!isNaN(t) && t * 1000 > boundaryTime) {
                   boundaryTime = t * 1000; // ms → µs
                 }
@@ -1037,9 +995,7 @@ export default defineComponent({
               try {
                 const chartInstance = chartRendererRef.value?.chart;
                 if (chartInstance) {
-                  const gridModel = chartInstance
-                    ?.getModel()
-                    ?.getComponent("grid");
+                  const gridModel = chartInstance?.getModel()?.getComponent("grid");
                   const freshRect = gridModel?.coordinateSystem?.getRect();
                   if (freshRect) {
                     previousOptionsSnapshot._gridRect = {
@@ -1091,9 +1047,7 @@ export default defineComponent({
           panelSchema.value?.error_config?.custom_error_handeling &&
           panelSchema.value?.error_config?.default_data_on_error
         ) {
-          data.value = JSON.parse(
-            panelSchema.value?.error_config?.default_data_on_error,
-          );
+          data.value = JSON.parse(panelSchema.value?.error_config?.default_data_on_error);
           errorDetail.value = {
             message: "",
             code: "",
@@ -1150,12 +1104,7 @@ export default defineComponent({
     );
 
     watch(
-      [
-        data,
-        () => store?.state?.theme,
-        () => store?.state?.timezone,
-        annotations,
-      ],
+      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations],
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
@@ -1170,17 +1119,10 @@ export default defineComponent({
           // Size the array to cover BOTH the panel's queries and the actual
           // data results (data.value can have more entries than panel queries,
           // e.g. time-shift expansion), so no query's fields are dropped.
-          const totalQueries = Math.max(
-            panelSchema.value?.queries?.length ?? 0,
-            data.value.length,
-          );
-          const perQueryFields: string[][] = Array.from(
-            { length: totalQueries },
-            () => [],
-          );
+          const totalQueries = Math.max(panelSchema.value?.queries?.length ?? 0, data.value.length);
+          const perQueryFields: string[][] = Array.from({ length: totalQueries }, () => []);
           for (let qi = 0; qi < data.value.length; qi++) {
-            const panelIdx =
-              metadata.value?.queries?.[qi]?.panelQueryIndex ?? qi;
+            const panelIdx = metadata.value?.queries?.[qi]?.panelQueryIndex ?? qi;
             const queryData = data.value[qi];
             if (
               queryData &&
@@ -1197,15 +1139,11 @@ export default defineComponent({
                 ) => {
                   const numAttributes = Object.keys(obj).length;
                   const maxNumAttributes = Object.keys(array[maxIndex]).length;
-                  return numAttributes > maxNumAttributes
-                    ? currentIndex
-                    : maxIndex;
+                  return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
                 },
                 0,
               );
-              perQueryFields[panelIdx] = Object.keys(
-                queryData[maxAttributesIndex],
-              );
+              perQueryFields[panelIdx] = Object.keys(queryData[maxAttributesIndex]);
             }
           }
           emit("updated:vrlFunctionFieldList", perQueryFields);
@@ -1275,12 +1213,9 @@ export default defineComponent({
       if (oldLoading === false && newLoading === true) {
         const hasOldChart = panelData.value?.options?.series?.length > 0;
         if (hasOldChart) {
-          previousOptionsSnapshot = JSON.parse(
-            JSON.stringify(panelData.value.options),
-          );
+          previousOptionsSnapshot = JSON.parse(JSON.stringify(panelData.value.options));
           previousOptionsSnapshot._chartType = panelSchema.value?.type;
-          previousOptionsSnapshot._queryCount =
-            panelSchema.value?.queries?.length;
+          previousOptionsSnapshot._queryCount = panelSchema.value?.queries?.length;
 
           // Capture actual grid pixel rect from the ECharts instance.
           // With containLabel: true, the actual plot area differs from raw grid config.
@@ -1342,7 +1277,7 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
-    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
@@ -1443,9 +1378,7 @@ export default defineComponent({
         // stream in. Keep showing the previously rendered chart while loading
         // (matching the SQL branch below); only show "No Data" once the load
         // completes with no results.
-        return loading.value && panelData.value?.options?.series?.length > 0
-          ? ""
-          : "No Data";
+        return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No Data";
       }
 
       const hasRawData = data.value?.length && data.value[0]?.length;
@@ -1481,12 +1414,8 @@ export default defineComponent({
       // (they use renderItem, not data arrays), so check the raw Y value.
       if (type === "metric" || type === "gauge") {
         const firstRow = data.value[0]?.[0];
-        const yAlias = panelSchema.value.queries[0].fields.y.map(
-          (it: any) => it.alias || [],
-        );
-        return yAlias.every((y: any) => getDataValue(firstRow, y) != null)
-          ? ""
-          : "No Data";
+        const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias || []);
+        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No Data";
       }
 
       // For all other chart types (line, area, bar, scatter, heatmap, etc.),
@@ -1521,38 +1450,33 @@ export default defineComponent({
       emit("error", errorDetail.value);
     });
 
-    const { showErrorNotification, showPositiveNotification } =
-      useNotifications();
+    const { showErrorNotification, showPositiveNotification } = useNotifications();
 
-    const {
-      drilldownArray,
-      onChartClick,
-      openDrilldown,
-      hidePopupsAndOverlays,
-    } = usePanelDrilldown({
-      panelSchema,
-      variablesData,
-      selectedTimeObj,
-      metadata,
-      data,
-      panelData,
-      filteredData,
-      resultMetaData,
-      store,
-      route,
-      router,
-      emit,
-      allowAnnotationsAdd,
-      isAddAnnotationMode,
-      editAnnotation,
-      handleAddAnnotation,
-      chartPanelRef,
-      drilldownPopUpRef,
-      annotationPopupRef,
-      selectedAnnotationData,
-      isCursorOverPanel,
-      showErrorNotification,
-    });
+    const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
+      usePanelDrilldown({
+        panelSchema,
+        variablesData,
+        selectedTimeObj,
+        metadata,
+        data,
+        panelData,
+        filteredData,
+        resultMetaData,
+        store,
+        route,
+        router,
+        emit,
+        allowAnnotationsAdd,
+        isAddAnnotationMode,
+        editAnnotation,
+        handleAddAnnotation,
+        chartPanelRef,
+        drilldownPopUpRef,
+        annotationPopupRef,
+        selectedAnnotationData,
+        isCursorOverPanel,
+        showErrorNotification,
+      });
 
     const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
       panelSchema,
@@ -1568,9 +1492,7 @@ export default defineComponent({
     const allQueriesHaveBreakdown = computed(
       () =>
         (panelSchema.value?.queries?.length ?? 0) > 0 &&
-        panelSchema.value.queries.every(
-          (q: any) => (q?.fields?.breakdown?.length ?? 0) > 0,
-        ),
+        panelSchema.value.queries.every((q: any) => (q?.fields?.breakdown?.length ?? 0) > 0),
     );
 
     const chartPanelHeight = computed(() => {
@@ -1591,7 +1513,7 @@ export default defineComponent({
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
-        return "tw:overflow-auto";
+        return "overflow-auto";
       }
 
       return "";
@@ -1604,6 +1526,14 @@ export default defineComponent({
 
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
+        // Once the underlying data is cleared (e.g. required columns removed
+        // after a successful run), convertPanelDataCommon bails on validation
+        // and never refreshes panelData — so guard on noData here to avoid
+        // rendering the stale converted rows behind the "No Data" state.
+        // Mirrors chartRendererData's noData guard for the chart path.
+        if (noData.value === "No Data") {
+          return { rows: [], columns: [] };
+        }
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
@@ -1617,6 +1547,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       chartPanelRef,
       chartRendererRef,
@@ -1667,10 +1598,6 @@ export default defineComponent({
         };
       },
       logDataAsJSON: (title: string) => {
-        const chartData =
-          panelSchema.value?.queryType === "promql"
-            ? filteredData.value
-            : data.value;
         console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
         console.groupEnd();
       },
@@ -1688,12 +1615,8 @@ export default defineComponent({
   },
 });
 </script>
-<style lang="scss" scoped>
-// When the panel is too short to comfortably fit the icon, hide it and show
-// just the centered "No Data" message. Kept as scoped CSS because this is a
-// container query targeting a deep descendant rendered by OEmptyState — it
-// cannot be expressed as an inline Tailwind utility. The container itself and
-// its min-height/padding overrides are applied inline on the OEmptyState above.
+<style scoped>
+/* keep(lib-override:o2-empty-state): container query hides OEmptyState's internally-rendered icon when the panel is too short — targets a deep descendant of the lib component, not expressible as a utility on this template */
 @container (max-height: 5rem) {
   .noData :deep(.o2-empty-state__inline-icon) {
     display: none;

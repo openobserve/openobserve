@@ -15,71 +15,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full">
+  <div class="flex h-full flex-col">
     <DashboardHeader :title="t('dashboard.generalSettingsTitle')" />
     <div>
-    <OForm ref="formRef" :schema="generalSettingsSchema" :default-values="generalSettingsDefaults()" @submit="onSubmit" v-slot="{ isSubmitting }">
-    <div class="tw:flex tw:flex-col tw:gap-3 tw:px-3 tw:py-3">
-        <OFormInput
-          name="name"
-          :label="t('dashboard.name')"
-          required
-          data-test="dashboard-general-setting-name"
-        />
-        <OFormInput
-          name="description"
-          :label="t('dashboard.typeDesc')"
-          data-test="dashboard-general-setting-description"
-        />
-        <div
-          v-if="dateTimeValue"
-          data-test="dashboard-general-setting-datetime-picker"
-        >
-          <label>{{ t('dashboard.defaultDuration') }}</label>
-          <DateTimePickerDashboard
-            v-show="store.state.printMode === false"
-            ref="dateTimePicker"
-            class="tw:h-7.5 tw:my-2"
-            size="sm"
-            :initialTimezone="initialTimezone"
-            v-model="dateTimeValue"
-            :auto-apply-dashboard="true"
-            menu-align="start"
+      <OForm
+        ref="formRef"
+        :schema="generalSettingsSchema"
+        :default-values="generalSettingsDefaults()"
+        @submit="onSubmit"
+        v-slot="{ isSubmitting }"
+      >
+        <div class="flex flex-col gap-3 px-3 py-3">
+          <OFormInput
+            name="name"
+            :label="t('dashboard.name')"
+            required
+            data-test="dashboard-general-setting-name"
           />
+          <OFormInput
+            name="description"
+            :label="t('dashboard.typeDesc')"
+            data-test="dashboard-general-setting-description"
+          />
+          <div v-if="dateTimeValue" data-test="dashboard-general-setting-datetime-picker">
+            <label>{{ t("dashboard.defaultDuration") }}</label>
+            <DateTimePickerDashboard
+              v-show="store.state.printMode === false"
+              ref="dateTimePicker"
+              class="my-2 h-7.5"
+              size="sm"
+              :initialTimezone="initialTimezone"
+              v-model="dateTimeValue"
+              :auto-apply-dashboard="true"
+              menu-align="start"
+            />
+          </div>
+          <OFormSwitch
+            name="showDynamicFilters"
+            :label="t('dashboard.showDynamicFilters')"
+            data-test="dashboard-general-setting-dynamic-filter"
+            size="lg"
+          />
+          <div class="flex justify-center gap-2">
+            <OButton
+              @click="$emit('close')"
+              variant="outline"
+              size="sm-action"
+              :disabled="isSubmitting"
+              data-test="dashboard-general-setting-cancel-btn"
+              >{{ t("dashboard.cancel") }}</OButton
+            >
+            <OButton
+              variant="primary"
+              size="sm-action"
+              type="submit"
+              :loading="isSubmitting"
+              data-test="dashboard-general-setting-save-btn"
+              >{{ t("dashboard.save") }}</OButton
+            >
+          </div>
         </div>
-        <OFormSwitch
-          name="showDynamicFilters"
-          :label="t('dashboard.showDynamicFilters')"
-          data-test="dashboard-general-setting-dynamic-filter"
-          size="lg"
-        />
-        <div class="tw:flex tw:justify-center tw:gap-2">
-          <OButton
-            @click="$emit('close')"
-            variant="outline"
-            size="sm-action"
-            :disabled="isSubmitting"
-            data-test="dashboard-general-setting-cancel-btn"
-            >{{ t("dashboard.cancel") }}</OButton
-          >
-          <OButton
-            variant="primary"
-            size="sm-action"
-            type="submit"
-            :loading="isSubmitting"
-            data-test="dashboard-general-setting-save-btn"
-            >{{ t("dashboard.save") }}</OButton
-          >
-        </div>
-      </div>
-    </OForm>
+      </OForm>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted, ref, nextTick, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
@@ -109,7 +112,7 @@ export default defineComponent({
   emits: ["save", "close"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     const route = useRoute();
     const {
@@ -159,11 +162,7 @@ export default defineComponent({
         // get the latest dashboard data and update the title and description
         const data = JSON.parse(
           JSON.stringify(
-            await getDashboard(
-              store,
-              route.query.dashboard,
-              route.query.folder ?? "default",
-            ),
+            await getDashboard(store, route.query.dashboard, route.query.folder ?? "default"),
           ),
         );
 
@@ -197,7 +196,7 @@ export default defineComponent({
           route?.query?.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification(t("dashboard.generalSettingsPage.updatedSuccessfully"));
 
         emit("save");
       } catch (error: any) {
@@ -205,12 +204,16 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Dashboard updation failed",
+              t("dashboard.generalSettingsPage.updationFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Dashboard updation failed", {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ?? t("dashboard.generalSettingsPage.updationFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
       }
     };
@@ -237,4 +240,3 @@ export default defineComponent({
   },
 });
 </script>
-

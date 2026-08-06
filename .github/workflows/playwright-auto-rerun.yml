@@ -155,7 +155,6 @@ jobs:
             echo "::notice::✅ Successfully triggered rerun of failed jobs"
             echo "::notice::Run ID: $RUN_ID"
             echo "::notice::Only failed and cancelled jobs will be rerun"
-            echo "::notice::TestDino will optimize the rerun to only execute failed tests"
             echo "$RERUN_OUTPUT"
           else
             echo "::error::❌ Failed to trigger rerun (exit code: $RERUN_EXIT_CODE)"

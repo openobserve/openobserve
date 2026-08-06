@@ -8,7 +8,11 @@ import type {
   SelectValue as SelectPrimitiveValue,
   SelectModelValue,
 } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
+import {
+  SELECT_VALUE_MAP_KEY,
+  SELECT_PARENT_DATA_TEST_KEY,
+  NULL_VALUE_SENTINEL,
+} from "./OSelect.types";
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -49,9 +53,12 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 type NormalizedOption = {
-  label: string;
+  label: I18nText;
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
@@ -60,13 +67,21 @@ type NormalizedOption = {
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
   /** Secondary description text shown below the label in the dropdown item. */
-  subLabel?: string;
+  subLabel?: I18nText;
   /** When true, renders subLabel on the same line as the label (name – url style). */
   subLabelInline?: boolean;
   /** Array of CSS color strings used to render a gradient swatch below the label. */
   colorPalette?: string[];
   /** Optional badge/chip text rendered inline next to the label (e.g. "recommended"). */
   badge?: string;
+  /** Tooltip for the badge. Use when the badge is abbreviated (e.g. `C` → "Counter"). */
+  badgeTitle?: string;
+  /**
+   * Per-option badge colours, e.g. `{ color, background }`. A styled badge renders
+   * as a filled pill in that option's own colour, right-aligned into a single
+   * column; a bare (unstyled) badge stays inline next to the label.
+   */
+  badgeStyle?: Record<string, string>;
 };
 
 const DEFAULT_OPTION_LABEL = "label";
@@ -75,6 +90,7 @@ const DEFAULT_OPTION_DISABLED = "disabled";
 
 const props = withDefaults(defineProps<SelectProps>(), {
   size: "md",
+  appearance: "field",
   disabled: false,
   clearable: false,
   error: false,
@@ -82,8 +98,8 @@ const props = withDefaults(defineProps<SelectProps>(), {
   searchable: true,
   searchDebounce: 0,
   hideSelected: false,
+  collapsibleGroups: false,
   creatable: false,
-  searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
@@ -99,14 +115,13 @@ const props = withDefaults(defineProps<SelectProps>(), {
 // (Same pattern as ODialog / OInput.)
 defineOptions({ inheritAttrs: false });
 const $attrs = useAttrs();
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 // Forward tabindex to the real trigger; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
   const { tabindex, ...rest } = $attrs;
+  void tabindex;
   return rest;
 });
 
@@ -139,9 +154,7 @@ provide(SELECT_VALUE_MAP_KEY, valueMap);
 // auto-derive `<parent>-option` data-test attributes (non-listbox mode).
 provide(SELECT_PARENT_DATA_TEST_KEY, parentDataTest);
 
-const isPrimitiveSelectValue = (
-  value: unknown,
-): value is SelectPrimitiveValue =>
+const isPrimitiveSelectValue = (value: unknown): value is SelectPrimitiveValue =>
   value === null || ["string", "number", "boolean"].includes(typeof value);
 
 /** Map null ↔ sentinel so Reka UI receives a valid string */
@@ -150,27 +163,26 @@ function toRekaString(v: SelectPrimitiveValue): string {
   return String(v);
 }
 
-function normalizeOption(raw: unknown): NormalizedOption | null {
-  if (isPrimitiveSelectValue(raw)) {
+function normalizeOption(input: unknown): NormalizedOption | null {
+  if (isPrimitiveSelectValue(input)) {
     return {
-      label: String(raw),
-      value: raw,
+      label: raw(String(input)),
+      value: input,
       disabled: false,
       header: false,
     };
   }
 
-  if (!raw || typeof raw !== "object") return null;
+  if (!input || typeof input !== "object") return null;
 
-  const option = raw as Record<string, unknown>;
+  const option = input as Record<string, unknown>;
   const rawLabel = option[props.labelKey];
 
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
     return {
-      label:
-        rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
+      label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
@@ -189,28 +201,29 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawSubLabelInline = option["subLabelInline"];
   const rawColorPalette = option["colorPalette"];
   return {
-    label:
-      rawLabel === undefined || rawLabel === null
-        ? String(rawValue)
-        : String(rawLabel),
+    label: raw(rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel)),
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
     iconComponent: rawIconComponent ?? undefined,
-    subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
+    subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
-    colorPalette: Array.isArray(rawColorPalette)
-      ? (rawColorPalette as string[])
-      : undefined,
+    colorPalette: Array.isArray(rawColorPalette) ? (rawColorPalette as string[]) : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
+    badgeTitle:
+      typeof option["badgeTitle"] === "string" ? (option["badgeTitle"] as string) : undefined,
+    badgeStyle:
+      option["badgeStyle"] && typeof option["badgeStyle"] === "object"
+        ? (option["badgeStyle"] as Record<string, string>)
+        : undefined,
   };
 }
 
 const normalizedOptions = computed<NormalizedOption[]>(() => {
   if (!props.options?.length) return [];
   return props.options
-    .map((raw) => normalizeOption(raw))
+    .map((option) => normalizeOption(option))
     .filter((opt): opt is NormalizedOption => opt !== null);
 });
 
@@ -236,15 +249,19 @@ const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
 
-const filteredOptions = computed(() => {
+// Not a `withDefaults` default: that is evaluated once at module scope, which
+// would freeze the placeholder in whatever locale was active at first load.
+const resolvedSearchPlaceholder = computed(
+  () => props.searchPlaceholder ?? t("common.searchEllipsis"),
+);
+
+const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
   const term = searchTerm.value.trim().toLowerCase();
   let options = normalizedOptions.value;
 
   if (props.hideSelected && props.multiple && selectedValues.value.length > 0) {
-    options = options.filter(
-      (opt) => opt.header || !selectedValues.value.includes(opt.value),
-    );
+    options = options.filter((opt) => opt.header || !selectedValues.value.includes(opt.value));
     // Drop headers that no longer have any following non-header items
     options = options.filter((opt, i) => {
       if (!opt.header) return true;
@@ -258,11 +275,7 @@ const filteredOptions = computed(() => {
     // can immediately see and manage their current choices on re-open.
     // Only applies when there is a non-empty pin set and no headers in the list
     // (headers imply grouped options where reordering would break visual grouping).
-    if (
-      props.multiple &&
-      pinnedSelected.value.size > 0 &&
-      !options.some((o) => o.header)
-    ) {
+    if (props.multiple && pinnedSelected.value.size > 0 && !options.some((o) => o.header)) {
       const pinned = pinnedSelected.value;
       const top = options.filter((o) => pinned.has(toRekaString(o.value)));
       const rest = options.filter((o) => !pinned.has(toRekaString(o.value)));
@@ -294,6 +307,56 @@ const filteredOptions = computed(() => {
   return result;
 });
 
+// ── Collapsible groups (opt-in via `collapsibleGroups`) ──────────────────────
+// Group headers become accordion toggles: collapsing a group hides its items
+// (the header stays, so it can be re-expanded). Keyed by header label — group
+// labels are unique in practice. Ignored while searching so matches always show.
+const collapsedGroups = ref<Set<string>>(new Set());
+const isGroupCollapsed = (label: string) => collapsedGroups.value.has(label);
+const toggleGroup = (label: string) => {
+  const next = new Set(collapsedGroups.value);
+  next.has(label) ? next.delete(label) : next.add(label);
+  collapsedGroups.value = next;
+};
+
+// The final option list the dropdown renders — the single source of truth that
+// feeds the virtualizer, keyboard navigation, and the empty-state check. It
+// layers the accordion collapse on top of `baseFilteredOptions` (which has
+// already applied the search + hide-selected filters), one step before render.
+//
+// `baseFilteredOptions` is a FLAT array where each group header
+// (`{ header: true, label }`) is followed by that group's items, e.g.
+//   [Destinations(header), dest1, dest2, Workflows(header), wf1, wf2]
+// Collapsing a group must hide its items but KEEP the header (so the bar stays
+// visible and clickable to re-expand).
+//
+// Two early exits leave `base` untouched:
+//   1. Not in collapsible mode, or nothing collapsed — every other select in the
+//      app hits this, so the feature is invisible unless opted in.
+//   2. An active search term — collapse is bypassed so a match inside a collapsed
+//      group still shows (otherwise search would look broken).
+//
+// Otherwise walk the flat list: on a header, remember whether ITS group is
+// collapsed (and always keep the header); on an item, keep it only while the
+// current group isn't collapsed. `hidden` carries forward until the next header
+// resets it.
+const filteredOptions = computed(() => {
+  const base = baseFilteredOptions.value;
+  if (!props.collapsibleGroups || collapsedGroups.value.size === 0) return base;
+  if (searchTerm.value.trim()) return base; // search spans every group
+  const out: NormalizedOption[] = [];
+  let hidden = false;
+  for (const opt of base) {
+    if (opt.header) {
+      hidden = collapsedGroups.value.has(opt.label);
+      out.push(opt);
+    } else if (!hidden) {
+      out.push(opt);
+    }
+  }
+  return out;
+});
+
 const listboxModeEnabled = computed(
   () =>
     !slots.default &&
@@ -301,8 +364,7 @@ const listboxModeEnabled = computed(
       props.searchable ||
       props.creatable ||
       (!!props.options?.length &&
-        (props.labelKey !== DEFAULT_OPTION_LABEL ||
-          props.valueKey !== DEFAULT_OPTION_VALUE))),
+        (props.labelKey !== DEFAULT_OPTION_LABEL || props.valueKey !== DEFAULT_OPTION_VALUE))),
 );
 
 const selectedValues = computed<SelectPrimitiveValue[]>(() => {
@@ -312,30 +374,24 @@ const selectedValues = computed<SelectPrimitiveValue[]>(() => {
   }
   if (props.modelValue === null) {
     // null is a valid selection when a null-valued option exists (e.g. "Auto", "None", "Default")
-    const hasNullOption = normalizedOptions.value.some(
-      (opt) => !opt.header && opt.value === null,
-    );
+    const hasNullOption = normalizedOptions.value.some((opt) => !opt.header && opt.value === null);
     return hasNullOption ? [null] : [];
   }
   return [props.modelValue];
 });
 
-const hasSelection = computed(() =>
-  selectedValues.value.some((v) => v !== undefined),
-);
+const hasSelection = computed(() => selectedValues.value.some((v) => v !== undefined));
 
 const selectedLabels = computed(() => {
   return selectedValues.value
     .map((selectedValue) => {
-      const option = normalizedOptions.value.find(
-        (opt) => opt.value === selectedValue,
-      );
+      const option = normalizedOptions.value.find((opt) => opt.value === selectedValue);
       if (option) return option.label;
       // Don't render "null" for unmatched null values — treat as empty/placeholder
       if (selectedValue === null) return null;
       return String(selectedValue);
     })
-    .filter(Boolean);
+    .filter((label): label is string => Boolean(label));
 });
 
 const triggerDisplayLabel = computed(() => {
@@ -348,10 +404,7 @@ watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
   if ((props.searchDebounce ?? 0) > 0) {
     if (filterDebounceTimer.value) clearTimeout(filterDebounceTimer.value);
-    filterDebounceTimer.value = setTimeout(
-      () => emit("search", value),
-      props.searchDebounce,
-    );
+    filterDebounceTimer.value = setTimeout(() => emit("search", value), props.searchDebounce);
     return;
   }
   emit("search", value);
@@ -365,19 +418,14 @@ watch(popoverOpen, (open) => {
   if (!open) {
     searchTerm.value = "";
   } else if (props.multiple) {
-    pinnedSelected.value = new Set(
-      selectedValues.value.map((v) => toRekaString(v)),
-    );
+    pinnedSelected.value = new Set(selectedValues.value.map((v) => toRekaString(v)));
   }
 });
 
 // ── Error state ────────────────────────────────────────────────────────────
-// The error message is only shown when `props.error` is true. Previously this
-// computed returned `props.errorMessage || (props.error ? " " : null)`, which
-// meant a static (non-conditional) error-message prop would render the error
-// permanently regardless of `props.error` — so a select with valid defaults
-// still showed "X is required". Now `error` is the single source of truth
-// for whether the error is visible; `errorMessage` only controls the text.
+// The error message is only shown when `props.error` is true. `error` is the
+// single source of truth for whether the error is visible; `errorMessage` only
+// controls the text.
 const effectiveError = computed(() => {
   if (!props.error) return null;
   return props.errorMessage || " ";
@@ -390,7 +438,12 @@ const stringValue = computed(() =>
     : undefined,
 );
 
-function handleUpdate(value: string) {
+function handleUpdate(value: string | null) {
+  // Reka's SelectRoot types the value as nullable; null means no selection here.
+  if (value === null) {
+    emit("update:modelValue", undefined);
+    return;
+  }
   // Recover the original type: prefer props.options, then the slot-item registry
   const opt = normalizedOptions.value.find((o) => String(o.value) === value);
   let resolved: SelectPrimitiveValue;
@@ -411,9 +464,7 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     }
     return value.map((item) => {
       const key = String(item);
-      return valueMap.has(key)
-        ? (valueMap.get(key) as SelectPrimitiveValue)
-        : key;
+      return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
     });
   }
 
@@ -421,9 +472,7 @@ function resolveListboxValue(value: unknown): SelectModelValue {
     const first = value[0];
     if (first === undefined || first === null) return undefined;
     const key = String(first);
-    return valueMap.has(key)
-      ? (valueMap.get(key) as SelectPrimitiveValue)
-      : key;
+    return valueMap.has(key) ? (valueMap.get(key) as SelectPrimitiveValue) : key;
   }
 
   if (value === undefined || value === null) return undefined;
@@ -466,7 +515,9 @@ function handleItemClickCapture(event: MouseEvent, rekaStringValue: string) {
   // Find the separator line rendered inside this item. Anything clicked at or
   // to the left of the separator is the "checkbox zone" — let Reka toggle normally.
   // Anything to the right is the "label zone" — single-select and close.
-  const separator = (event.currentTarget as HTMLElement | null)?.querySelector("[data-select-separator]");
+  const separator = (event.currentTarget as HTMLElement | null)?.querySelector(
+    "[data-select-separator]",
+  );
 
   if (separator) {
     const { right } = separator.getBoundingClientRect();
@@ -501,17 +552,13 @@ function handleClear() {
 // filtered subset — so the master state stays predictable regardless of the
 // search term.
 const selectableOptions = computed<NormalizedOption[]>(() =>
-  normalizedOptions.value.filter(
-    (o: NormalizedOption) => !o.header && !o.disabled,
-  ),
+  normalizedOptions.value.filter((o: NormalizedOption) => !o.header && !o.disabled),
 );
 
 const allSelected = computed(() => {
   const all = selectableOptions.value;
   if (all.length === 0) return false;
-  return all.every((o: NormalizedOption) =>
-    selectedValues.value.includes(o.value),
-  );
+  return all.every((o: NormalizedOption) => selectedValues.value.includes(o.value));
 });
 
 const partiallySelected = computed(() => {
@@ -555,7 +602,27 @@ function close() {
   searchTerm.value = "";
 }
 
-defineExpose({ close });
+/** Focus the trigger programmatically (both listbox and native-select modes). */
+function focus() {
+  if (typeof document === "undefined") return;
+  document.getElementById(inputId.value)?.focus();
+}
+
+defineExpose({ close, focus });
+
+// Type-to-search on the closed trigger: a printable keystroke opens the
+// dropdown and seeds the filter, mirroring native <select> typeahead. The
+// event is consumed here so page-level single-letter shortcuts (logs "s",
+// "r", "h", …) never fire while the select has keyboard focus.
+function handleTriggerKeydown(e: KeyboardEvent) {
+  if (props.disabled) return;
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key.length !== 1 || e.key === " ") return;
+  e.preventDefault();
+  e.stopPropagation();
+  popoverOpen.value = true;
+  if (inputEnabled.value) searchTerm.value = searchTerm.value + e.key;
+}
 
 // ── Virtual scroll (listbox mode) ─────────────────────────────────────────
 // Items are virtualised whenever the listbox has more than 50 entries, keeping
@@ -595,8 +662,7 @@ watch(filteredOptions, () => {
 
 function scrollHighlightedIntoView() {
   if (highlightedIndex.value < 0 || !listboxScrollEl.value) return;
-  const rows =
-    listboxScrollEl.value.querySelectorAll<HTMLElement>("[data-vrow]");
+  const rows = listboxScrollEl.value.querySelectorAll<HTMLElement>("[data-vrow]");
   for (const row of rows) {
     if (Number(row.dataset.vrow) === highlightedIndex.value) {
       row.scrollIntoView({ block: "nearest" });
@@ -656,7 +722,7 @@ const virtualizer = useVirtualizer(
       if (!opt) return 28;
       const hasSubLabel = !!opt.subLabel;
       const isInline = !!opt.subLabelInline;
-      const hasPalette = !!(opt.colorPalette?.length);
+      const hasPalette = !!opt.colorPalette?.length;
       const hasBadge = !!opt.badge;
       // Inline subLabel renders on the same line — single-row height.
       if (hasSubLabel && isInline) return 28;
@@ -681,10 +747,10 @@ function getPaletteGradient(colors: string[]): string {
   return `linear-gradient(to right, ${colors.join(", ")})`;
 }
 
-// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at Quasar's 14px base.
+// Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
-  sm: "tw:h-6 tw:text-sm",
-  md: "tw:h-[2.125rem] tw:text-sm",
+  sm: "h-6 text-sm",
+  md: "h-[2.125rem] text-sm",
 };
 
 // Open-state tracking. Reka's PopoverTrigger / SelectTrigger expose
@@ -693,10 +759,20 @@ const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
 // bind the chevron's rotation class to it.
 const selectOpen = ref(false);
 
-const isOpen = computed(() =>
-  listboxModeEnabled.value ? popoverOpen.value : selectOpen.value,
-);
+const isOpen = computed(() => (listboxModeEnabled.value ? popoverOpen.value : selectOpen.value));
 
+// Clicking the field label opens the dropdown — mirroring how clicking an
+// OInput's label focuses its input. Reka's triggers open on `pointerdown`, so
+// the `click` a native <label for> forwards never opens them; open explicitly.
+// `.prevent` (on the template handler) stops the redundant native forwarding.
+function handleLabelClick() {
+  if (props.disabled) return;
+  if (listboxModeEnabled.value) {
+    popoverOpen.value = true;
+  } else {
+    selectOpen.value = true;
+  }
+}
 
 // When this OSelect is nested inside an ODropdown, signal its
 // open/close so the parent ignores the pointer event that closes us.
@@ -741,7 +817,7 @@ if (!parentDropdownRegistry) {
 
 // Close when the sidebar scroll container scrolls, preventing the portal
 // from floating disconnected at the top of the screen.
-const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+const sidebarScrollTick = inject<Ref<number> | null>("sidebarScrollTick", null);
 if (sidebarScrollTick) {
   watch(sidebarScrollTick, () => {
     if (popoverOpen.value) popoverOpen.value = false;
@@ -761,8 +837,7 @@ function handleViewportScroll(event: Event) {
   // Ignore scrolls that originate inside the option list so it stays scrollable.
   if (
     target instanceof Element &&
-    (listboxScrollEl.value?.contains(target) ||
-      target.closest?.('[role="listbox"]'))
+    (listboxScrollEl.value?.contains(target) || target.closest?.('[role="listbox"]'))
   ) {
     return;
   }
@@ -850,7 +925,7 @@ onBeforeUnmount(() => {
 
 /**
  * Estimate a chip's rendered width in pixels from its label.
- * Chip styling: `tw:px-2 tw:py-0.5 tw:text-xs` (12px font), max-w-40 = 160px.
+ * Chip styling: `px-2 py-0.5 text-xs` (12px font), max-w-40 = 160px.
  * Roughly 6.5px per character at 12px font + 16px horizontal padding.
  */
 function estimateChipWidth(label: string): number {
@@ -869,7 +944,7 @@ const reservedTriggerSpace = computed(() => {
 });
 
 const overflowChipEstimatedWidth = 70; // "+N more" pill width approximation
-const chipGap = 4; // tw:gap-1 between chips
+const chipGap = 4; // gap-1 between chips
 
 /**
  * Number of chips that actually fit in the current trigger width. If
@@ -886,20 +961,16 @@ const dynamicMaxChips = computed(() => {
     return Math.min(props.maxVisibleChips ?? 3, total);
   }
 
-  const available = Math.max(
-    0,
-    triggerWidth.value - reservedTriggerSpace.value,
-  );
+  const available = Math.max(0, triggerWidth.value - reservedTriggerSpace.value);
   let used = 0;
   let count = 0;
 
   for (let i = 0; i < total; i++) {
     const chipW = estimateChipWidth(selectedLabels.value[i]);
     const remaining = total - i - 1;
-    // If there'll be tw:hidden chips after this one, reserve space for the
+    // If there'll be hidden chips after this one, reserve space for the
     // "+N more" pill so it can still fit on the row.
-    const overflowReserve =
-      remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
+    const overflowReserve = remaining > 0 ? overflowChipEstimatedWidth + chipGap : 0;
     const needed = chipW + (i > 0 ? chipGap : 0) + overflowReserve;
     if (used + needed > available) break;
     used += chipW + (i > 0 ? chipGap : 0);
@@ -914,9 +985,7 @@ const dynamicMaxChips = computed(() => {
   return fit;
 });
 
-const visibleSelectedLabels = computed(() =>
-  selectedLabels.value.slice(0, dynamicMaxChips.value),
-);
+const visibleSelectedLabels = computed(() => selectedLabels.value.slice(0, dynamicMaxChips.value));
 const overflowSelectedCount = computed(() =>
   Math.max(0, selectedLabels.value.length - dynamicMaxChips.value),
 );
@@ -925,22 +994,44 @@ const overflowSelectedCount = computed(() =>
 // flex container at the trigger's right edge, so changing this padding only
 // squeezes the content area — it does not shift the chevron position when the
 // clear button toggles into view.
+const isInlineAppearance = computed(() => props.appearance === "inline");
+
+/**
+ * Inline-appearance trigger chrome. Deliberately contributes NOTHING to the
+ * line box it sits in: the hover boundary is an inset ring (painted inside the
+ * box, no size) and the negative margins cancel the padding — so dropping this
+ * into a fixed-height description band does not stretch it.
+ */
+const inlineTriggerClasses = computed(() => [
+  "rounded-default relative -mx-1 -my-0.5 flex w-auto shrink-0 items-center px-1 pe-6 py-0.5",
+  "text-text-body text-xs font-medium",
+  "ring-1 ring-inset transition-[color,background-color,box-shadow] duration-150",
+  "focus:outline-none focus-visible:outline-accent/40 focus-visible:outline-2",
+  // The hover ring is gated on !hasError so it can't override the resting error
+  // ring on hover (equal specificity, later class wins) and hide the error.
+  props.disabled
+    ? "ring-transparent cursor-not-allowed opacity-60"
+    : hasError.value
+      ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
+      : "ring-transparent cursor-pointer hover:bg-surface-subtle hover:text-text-heading hover:ring-border-default",
+]);
+
 const triggerEndPadding = computed(() =>
-  props.clearable && hasSelection.value ? "tw:pe-12" : "tw:pe-7",
+  props.clearable && hasSelection.value ? "pe-12" : "pe-7",
 );
 
 const fieldWidthClass = computed(() => {
   switch (props.width) {
     case "xs":
-      return "tw:w-[var(--spacing-field-width-xs)]";
+      return "w-field-width-xs";
     case "sm":
-      return "tw:w-[var(--spacing-field-width-sm)]";
+      return "w-field-width-sm";
     case "md":
-      return "tw:w-[var(--spacing-field-width-md)]";
+      return "w-field-width-md";
     case "lg":
-      return "tw:w-[var(--spacing-field-width-lg)]";
+      return "w-field-width-lg";
     default:
-      return "tw:w-full";
+      return "w-full";
   }
 });
 </script>
@@ -949,9 +1040,9 @@ const fieldWidthClass = computed(() => {
   <div
     v-bind="wrapperAttrs"
     :class="[
-      'tw:flex tw:flex-col tw:gap-1',
-      fieldWidthClass,
-      labelPosition === 'inside' ? 'tw:min-w-0' : '',
+      'flex flex-col gap-1',
+      isInlineAppearance ? 'w-auto' : fieldWidthClass,
+      labelPosition === 'inside' ? 'min-w-0' : '',
     ]"
   >
     <!-- Label -->
@@ -959,17 +1050,20 @@ const fieldWidthClass = computed(() => {
       v-if="(label || $slots.tooltip) && labelPosition !== 'inside'"
       :for="inputId"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:leading-tight tw:flex tw:items-center tw:gap-1',
-        disabled && 'o-input-label--disabled',
+        'o-input-label text-compact flex items-center gap-1 leading-tight',
+        disabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text cursor-pointer font-medium',
       ]"
+      @click.prevent="handleLabelClick"
     >
-      {{ label }}<span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+      {{ label }}<span v-if="required" aria-hidden="true" class="select-none">*</span>
       <OIcon
         v-if="$slots.tooltip"
         name="info-outline"
         size="sm"
         :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-        class="tw:cursor-help"
+        class="cursor-help"
         ><slot name="tooltip"
       /></OIcon>
     </label>
@@ -977,21 +1071,20 @@ const fieldWidthClass = computed(() => {
     <template v-if="listboxModeEnabled">
       <PopoverRoot
         v-model:open="popoverOpen"
-        @update:open="(v) => emit(v ? 'open' : 'close')"
+        @update:open="(v) => (v ? emit('open') : emit('close'))"
       >
-        <div
-          ref="triggerWrapperRef"
-          class="tw:relative tw:flex tw:items-center"
-        >
+        <div ref="triggerWrapperRef" class="relative flex items-center">
           <PopoverTrigger
             type="button"
             :id="inputId"
             :name="name"
             :disabled="disabled"
             :tabindex="inputTabindex"
-            :data-test="
-              parentDataTest ? `${parentDataTest}-trigger` : undefined
-            "
+            role="combobox"
+            :aria-expanded="popoverOpen"
+            :aria-invalid="hasError || undefined"
+            @keydown="handleTriggerKeydown"
+            :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
             :data-test-selected-value="
               multiple
                 ? selectedValues.map((v) => String(v)).join(',')
@@ -1000,52 +1093,61 @@ const fieldWidthClass = computed(() => {
                   : ''
             "
             :data-test-selected-label="triggerDisplayLabel"
-            :class="[
-              'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
-              // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
-              labelPosition === 'inside' && label ? '' : ($slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3'),
-              'tw:bg-select-bg',
-              hasError
-                ? 'tw:border-select-border-error'
-                : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
-              /* Keep the red error border on focus; focus border color applies only when there's no error. */
-              'tw:focus:outline-none',
-              'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-              'tw:disabled:bg-select-disabled-bg tw:disabled:cursor-not-allowed tw:disabled:border-dashed',
-              labelPosition === 'inside' && label
-                ? [
-                    'tw:flex-col tw:justify-between tw:py-0.5',
-                    heightClasses[size ?? 'md'],
+            :class="
+              isInlineAppearance
+                ? inlineTriggerClasses
+                : [
+                    'rounded-default relative flex w-full border',
+                    // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
+                    labelPosition === 'inside' && label
+                      ? ''
+                      : $slots['icon-left']
+                        ? 'ps-2'
+                        : 'ps-3',
+                    'bg-select-bg',
+                    hasError
+                      ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
+                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                    /* Keep the red error border on focus; focus border color applies only when there's no error. */
+                    'focus:outline-none',
+                    'transition-[color,background-color,border-color,box-shadow] duration-150',
+                    'disabled:bg-select-disabled-bg disabled:cursor-not-allowed disabled:border-dashed',
+                    labelPosition === 'inside' && label
+                      ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
+                      : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
                   ]
-                : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
-            ]"
+            "
           >
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
               v-if="label && labelPosition === 'inside'"
-              class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
+              class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
               >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
             >
 
             <!-- Content row: flex-row for inside-label; display:contents (transparent) for normal mode -->
             <div
-              :class="labelPosition === 'inside' && label
-                ? ['tw:flex tw:items-center tw:flex-1 tw:w-full tw:min-w-0', triggerEndPadding, $slots['icon-left'] ? 'tw:ps-2' : 'tw:ps-3']
-                : 'tw:contents'"
+              :class="
+                labelPosition === 'inside' && label
+                  ? [
+                      'flex w-full min-w-0 flex-1 items-center',
+                      triggerEndPadding,
+                      $slots['icon-left'] ? 'ps-2' : 'ps-3',
+                    ]
+                  : 'contents'
+              "
             >
               <!-- Icon-left slot (inside trigger, left — matches OButton #icon-left) -->
               <span
                 v-if="$slots['icon-left']"
-                class="tw:flex tw:items-center tw:me-1.5 tw:text-select-placeholder tw:shrink-0"
+                class="text-select-placeholder me-1.5 flex shrink-0 items-center"
               >
                 <slot name="icon-left" />
               </span>
 
               <slot name="trigger" :value="modelValue">
                 <template v-if="multiple && selectedLabels.length > 0">
-                  <div
-                    class="tw:flex-1 tw:flex tw:flex-nowrap tw:items-center tw:gap-1 tw:overflow-hidden tw:pe-2"
-                  >
+                  <div class="flex flex-1 flex-nowrap items-center gap-1 overflow-hidden pe-2">
                     <slot
                       v-for="(labelText, idx) in visibleSelectedLabels"
                       name="chip"
@@ -1054,17 +1156,17 @@ const fieldWidthClass = computed(() => {
                     >
                       <span
                         :key="`${idx}-${String(labelText ?? '')}`"
-                        class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:leading-none tw:bg-select-item-selected-bg tw:text-select-item-selected-text tw:max-w-40 tw:truncate tw:shrink-0"
+                        class="rounded-default bg-select-item-selected-bg text-select-item-selected-text inline-flex max-w-40 shrink-0 items-center truncate px-2 py-0.5 text-xs leading-none"
                       >
                         {{ labelText }}
                       </span>
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
-                      class="tw:inline-flex tw:items-center tw:rounded tw:px-2 tw:py-0.5 tw:text-xs tw:bg-select-item-hover-bg tw:text-select-text tw:shrink-0"
+                      class="rounded-default bg-select-item-hover-bg text-select-text inline-flex shrink-0 items-center px-2 py-0.5 text-xs"
                       data-test="o-select-overflow-chip"
                     >
-                      +{{ overflowSelectedCount }} more
+                      +{{ overflowSelectedCount }} {{ t("components.select.more") }}
                     </span>
                   </div>
                 </template>
@@ -1072,15 +1174,17 @@ const fieldWidthClass = computed(() => {
                   v-else
                   :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
-                    'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
-                    labelPosition === 'inside' && label
-                      ? 'tw:text-xs tw:leading-4'
-                      : '',
+                    'text-start',
+                    // An inline trigger is a word in a sentence: it grows to fit
+                    // its value. `truncate` would also zero its min-content
+                    // width, letting any ancestor squeeze it to a lone ellipsis.
+                    isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
+                    labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                     disabled
-                      ? 'tw:text-select-disabled-text'
+                      ? 'text-select-disabled-text'
                       : hasSelection
-                        ? 'tw:text-select-text'
-                        : 'tw:text-select-placeholder',
+                        ? 'text-select-text'
+                        : 'text-select-placeholder',
                   ]"
                 >
                   {{ hasSelection ? triggerDisplayLabel : placeholder }}
@@ -1098,17 +1202,20 @@ const fieldWidthClass = computed(() => {
             button in or out does not shift the chevron.
           -->
           <div
-            class="tw:absolute tw:end-2.5 tw:flex tw:items-center tw:gap-1.5 tw:pointer-events-none"
+            :class="[
+              'pointer-events-none absolute flex items-center gap-1.5',
+              isInlineAppearance ? 'end-1' : 'end-2.5',
+            ]"
           >
             <button
-              v-if="clearable && hasSelection"
+              v-if="clearable && hasSelection && !isInlineAppearance"
               type="button"
               tabindex="-1"
-              aria-label="Clear selection"
+              :aria-label="t('components.select.clearSelection')"
               :class="[
-                'tw:flex tw:items-center tw:justify-center tw:size-3.5',
-                'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
-                'tw:transition-colors tw:pointer-events-auto',
+                'flex size-3.5 items-center justify-center',
+                'text-input-clear-btn hover:text-input-clear-btn-hover',
+                'pointer-events-auto transition-colors',
               ]"
               @click.stop="handleClear"
             >
@@ -1116,7 +1223,7 @@ const fieldWidthClass = computed(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-3.5"
+                class="size-3.5"
                 aria-hidden="true"
               >
                 <path
@@ -1130,9 +1237,9 @@ const fieldWidthClass = computed(() => {
               v-else
               aria-hidden="true"
               :class="[
-                'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
-                'tw:transition-transform tw:duration-150',
-                isOpen ? 'tw:rotate-180' : '',
+                'text-select-icon flex items-center justify-center',
+                'transition-transform duration-150',
+                isOpen ? 'rotate-180' : '',
               ]"
             >
               <!-- chevron-down — rotates 180° when the popover is open -->
@@ -1140,7 +1247,7 @@ const fieldWidthClass = computed(() => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 16 16"
                 fill="currentColor"
-                class="tw:size-4"
+                class="size-4"
               >
                 <path
                   fill-rule="evenodd"
@@ -1159,47 +1266,45 @@ const fieldWidthClass = computed(() => {
             :trap-focus="false"
             :disable-outside-pointer-events="false"
             :hide-when-detached="true"
-            :data-test="
-              parentDataTest ? `${parentDataTest}-popover` : undefined
-            "
+            :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
             :class="[
-              'tw:z-[10001] tw:min-w-(--reka-popover-trigger-width)',
-              'tw:overflow-hidden tw:flex tw:flex-col',
-              'tw:rounded-md tw:shadow-lg',
-              'tw:bg-select-content-bg',
+              'z-10001 min-w-(--reka-popover-trigger-width)',
+              'flex flex-col overflow-hidden',
+              'rounded-default shadow-lg',
+              'bg-select-content-bg',
             ]"
-            :style="[dropdownStyle, { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' }]"
+            :style="[
+              dropdownStyle,
+              { maxHeight: 'min(18rem, var(--reka-popover-content-available-height, 18rem))' },
+            ]"
             @click.stop
-            @pointerdown.stop
           >
             <ListboxRoot
               :model-value="listboxStringModelValue"
               :multiple="multiple"
               :disabled="disabled"
-              class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+              class="flex min-h-0 flex-1 flex-col"
               @update:model-value="handleListboxUpdate"
             >
               <!-- Single bordered container wrapping search + list -->
               <div
                 :class="[
-                  'tw:rounded-md tw:border tw:border-input-border tw:overflow-hidden',
-                  'tw:bg-select-content-bg tw:flex tw:flex-col tw:flex-1 tw:min-h-0',
+                  'rounded-default border-input-border overflow-hidden border',
+                  'bg-select-content-bg flex min-h-0 flex-1 flex-col',
                 ]"
               >
                 <ListboxFilter
                   v-if="inputEnabled"
                   v-model="searchTerm"
                   auto-focus
-                  :data-test="
-                    parentDataTest ? `${parentDataTest}-search` : undefined
-                  "
+                  :data-test="parentDataTest ? `${parentDataTest}-search` : undefined"
                   :class="[
-                    'tw:w-full tw:px-3 tw:bg-transparent tw:text-input-text tw:shrink-0',
-                    'tw:placeholder:text-input-placeholder tw:outline-none',
-                    'tw:border-b tw:border-input-border',
+                    'text-input-text w-full shrink-0 bg-transparent px-3',
+                    'placeholder:text-input-placeholder outline-none',
+                    'border-input-border border-b',
                     heightClasses[size ?? 'md'],
                   ]"
-                  :placeholder="searchPlaceholder"
+                  :placeholder="resolvedSearchPlaceholder"
                   @keydown="handleDropdownKeydown"
                 />
 
@@ -1214,19 +1319,17 @@ const fieldWidthClass = computed(() => {
                   v-if="selectAll && multiple && selectableOptions.length > 0"
                   role="button"
                   tabindex="0"
-                  aria-label="Toggle all options"
-                  :aria-checked="
-                    allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'
-                  "
+                  :aria-label="t('components.select.toggleAllOptions')"
+                  :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
                   :class="[
-                    'tw:relative tw:flex tw:items-center tw:w-full tw:gap-2 tw:shrink-0',
-                    'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
-                    'tw:text-select-item-text tw:rounded-sm',
-                    'tw:cursor-pointer tw:select-none tw:outline-none',
-                    'tw:hover:bg-select-item-hover-bg',
-                    'tw:focus-visible:bg-select-item-hover-bg',
-                    'tw:transition-colors tw:duration-100',
-                    'tw:border-b tw:border-select-content-border tw:mb-1 tw:pb-1.5',
+                    'relative flex w-full shrink-0 items-center gap-2',
+                    'py-1.5 ps-3 pe-3 text-sm',
+                    'text-select-item-text',
+                    'cursor-pointer outline-none select-none',
+                    'hover:bg-select-item-hover-bg',
+                    'focus-visible:bg-select-item-hover-bg',
+                    'transition-colors duration-100',
+                    'border-select-content-border mb-1 border-b pb-1.5',
                   ]"
                   data-test="o-select-all"
                   @click="toggleAllSelections"
@@ -1235,11 +1338,11 @@ const fieldWidthClass = computed(() => {
                 >
                   <span
                     :class="[
-                      'tw:flex tw:items-center tw:justify-center tw:shrink-0',
-                      'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
+                      'flex shrink-0 items-center justify-center',
+                      'rounded-checkbox size-3.5 border transition-colors',
                       allSelected
-                        ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
-                        : 'tw:bg-checkbox-bg tw:border-checkbox-border',
+                        ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
+                        : 'bg-checkbox-bg border-checkbox-border',
                     ]"
                     aria-hidden="true"
                   >
@@ -1252,25 +1355,36 @@ const fieldWidthClass = computed(() => {
                       stroke-width="2"
                       stroke-linecap="round"
                       stroke-linejoin="round"
-                      class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
+                      class="text-checkbox-checked-fg size-full p-0.5"
                     >
                       <polyline points="2,6 5,9 10,3" />
                     </svg>
                   </span>
-                  <span class="tw:truncate tw:font-medium">Select all</span>
+                  <span class="truncate font-medium">{{
+                    t("components.select.selectAllLabel")
+                  }}</span>
                 </div>
 
                 <!-- Consumer-supplied rows rendered above the option list -->
                 <slot name="before-options" />
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
-                   on the ListboxFilter input above. Items are index-highlighted reactively. -->
-                <div ref="listboxScrollEl" :class="['tw:overflow-auto', multiple && rowClickSingleSelect ? 'tw:flex-1 tw:min-h-[6rem]' : 'tw:max-h-60']">
+                   on the ListboxFilter input above. Items are index-highlighted reactively.
+                   max-h-72 matches the popover's own 18rem cap exactly, so this inner limit
+                   is never the binding constraint (max-h-60 used to clip a 9-option list
+                   48px short of the space the popover actually had). -->
+                <div
+                  ref="listboxScrollEl"
+                  :class="[
+                    'overflow-auto',
+                    multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : 'max-h-72',
+                  ]"
+                >
                   <div
                     v-if="filteredOptions.length === 0"
-                    class="tw:px-3 tw:py-2 tw:text-sm tw:text-select-placeholder"
+                    class="text-select-placeholder px-3 py-2 text-sm"
                   >
-                    <slot name="empty">No options found</slot>
+                    <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
                   </div>
 
                   <!-- Virtualised list — spacer div with absolutely positioned rows -->
@@ -1295,17 +1409,32 @@ const fieldWidthClass = computed(() => {
                       }"
                     >
                       <!-- Group header — non-interactive label. Virtualisation
-                         renders each tw:flex as a sibling, so a real ListboxGroup
+                         renders each flex as a sibling, so a real ListboxGroup
                          can't wrap its items. Render a plain styled header
                          instead of misusing ListboxGroup/Label ARIA roles. -->
                       <div
                         v-if="filteredOptions[vRow.index].header"
                         :class="[
-                          'tw:flex tw:w-full tw:h-full tw:px-3 tw:py-1 tw:text-xs tw:font-bold',
-                          'tw:text-select-item-text tw:bg-select-content-bg',
-                          'tw:select-none tw:pointer-events-none',
+                          'text-select-item-text flex h-full w-full px-3 py-1 text-xs font-bold select-none',
+                          collapsibleGroups
+                            ? 'bg-surface-subtle cursor-pointer items-center gap-1'
+                            : 'bg-select-content-bg pointer-events-none',
                         ]"
+                        @click.stop="
+                          collapsibleGroups && toggleGroup(filteredOptions[vRow.index].label)
+                        "
                       >
+                        <OIcon
+                          v-if="collapsibleGroups"
+                          name="keyboard-arrow-up"
+                          size="sm"
+                          :class="[
+                            'shrink-0 transition-transform duration-150',
+                            !isGroupCollapsed(filteredOptions[vRow.index].label)
+                              ? 'rotate-180'
+                              : '',
+                          ]"
+                        />
                         {{ filteredOptions[vRow.index].label }}
                       </div>
 
@@ -1316,191 +1445,235 @@ const fieldWidthClass = computed(() => {
                            the whole selection with just this item and close the dropdown. -->
                       <div
                         v-else
-                        class="tw:contents"
-                        @click.capture="handleItemClickCapture($event, toRekaString(filteredOptions[vRow.index].value))"
+                        class="contents"
+                        @click.capture="
+                          handleItemClickCapture(
+                            $event,
+                            toRekaString(filteredOptions[vRow.index].value),
+                          )
+                        "
                       >
-                      <ListboxItem
-                        :value="toRekaString(filteredOptions[vRow.index].value)"
-                        :disabled="filteredOptions[vRow.index].disabled"
-                        :data-test="
-                          parentDataTest
-                            ? `${parentDataTest}-option`
-                            : undefined
-                        "
-                        :data-test-value="
-                          toRekaString(filteredOptions[vRow.index].value)
-                        "
-                        :data-test-label="
-                          String(filteredOptions[vRow.index].label ?? '')
-                        "
-                        :class="[
-                          'tw:relative tw:flex tw:w-full tw:h-full tw:gap-2',
-                          'tw:ps-3 tw:pe-3 tw:text-sm',
-                          'tw:text-select-item-text tw:rounded-sm',
-                          'tw:cursor-pointer tw:select-none tw:outline-none',
-                          'tw:transition-colors tw:duration-100',
-                          // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
-                          (filteredOptions[vRow.index].subLabel && !filteredOptions[vRow.index].subLabelInline) || filteredOptions[vRow.index].colorPalette?.length
-                            ? 'tw:flex-col tw:items-start tw:py-2'
-                            : 'tw:flex-row tw:items-center',
-                          // highlightedIndex-based highlight — works with virtualised items.
-                          // Reka's data-highlighted only fires for direct DOM children of
-                          // ListboxRoot; virtual rows are not, so we track highlight ourselves.
-                          vRow.index === highlightedIndex
-                            ? 'tw:bg-select-item-hover-bg'
-                            : 'tw:hover:bg-select-item-hover-bg',
-                          multiple
-                            ? ''
-                            : 'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-                          'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
-                        ]"
-                      >
-                        <!-- Multi-select: always-visible checkbox indicator -->
-                        <template v-if="multiple">
-                          <span
-                            :class="[
-                              'tw:flex tw:items-center tw:justify-center tw:shrink-0',
-                              'tw:size-3.5 tw:rounded-sm tw:border tw:transition-colors',
-                              selectedValues.includes(
-                                filteredOptions[vRow.index].value,
-                              )
-                                ? 'tw:bg-checkbox-checked-bg tw:border-checkbox-checked-border'
-                                : 'tw:bg-checkbox-bg tw:border-checkbox-border',
-                            ]"
-                            aria-hidden="true"
-                            data-select-checkbox
-                          >
-
-                            <svg
-                              v-if="
-                                selectedValues.includes(
-                                  filteredOptions[vRow.index].value,
-                                )
-                              "
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 12 12"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              class="tw:size-full tw:p-0.5 tw:text-checkbox-checked-fg"
-                            >
-                              <polyline points="2,6 5,9 10,3" />
-                            </svg>
-                          </span>
-                          <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
-                          <span
-                            v-if="rowClickSingleSelect"
-                            class="tw:w-px tw:shrink-0 tw:bg-[var(--o2-border-color)] tw:mx-1 tw:my-1"
-                            style="align-self: stretch"
-                            aria-hidden="true"
-                            data-select-separator
-                          />
-                        </template>
-
-                        <!-- Inline subLabel: name – url on a single row -->
-                        <template
-                          v-if="filteredOptions[vRow.index].subLabel && filteredOptions[vRow.index].subLabelInline"
+                        <ListboxItem
+                          :value="toRekaString(filteredOptions[vRow.index].value)"
+                          :disabled="filteredOptions[vRow.index].disabled"
+                          :data-test="parentDataTest ? `${parentDataTest}-option` : undefined"
+                          :data-test-value="toRekaString(filteredOptions[vRow.index].value)"
+                          :data-test-label="String(filteredOptions[vRow.index].label ?? '')"
+                          :class="[
+                            'relative flex h-full w-full gap-2',
+                            'ps-3 pe-3 text-sm',
+                            'text-select-item-text',
+                            'cursor-pointer outline-none select-none',
+                            'transition-colors duration-100',
+                            // Use flex-col for stacked rich items; flex-row for inline subLabel or simple items
+                            (filteredOptions[vRow.index].subLabel &&
+                              !filteredOptions[vRow.index].subLabelInline) ||
+                            filteredOptions[vRow.index].colorPalette?.length
+                              ? 'flex-col items-start py-2'
+                              : 'flex-row items-center',
+                            // highlightedIndex-based highlight — works with virtualised items.
+                            // Reka's data-highlighted only fires for direct DOM children of
+                            // ListboxRoot; virtual rows are not, so we track highlight ourselves.
+                            vRow.index === highlightedIndex
+                              ? 'bg-select-item-hover-bg'
+                              : 'hover:bg-select-item-hover-bg',
+                            multiple
+                              ? ''
+                              : 'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
+                            'data-disabled:text-select-item-disabled data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
+                          ]"
                         >
-                          <span class="tw:font-medium tw:shrink-0">{{ filteredOptions[vRow.index].label }}</span>
-                          <span class="tw:text-select-placeholder tw:shrink-0 tw:mx-1">–</span>
-                          <span class="tw:text-text-secondary tw:truncate tw:text-xs">{{ filteredOptions[vRow.index].subLabel }}</span>
-                        </template>
+                          <!-- Multi-select: always-visible checkbox indicator -->
+                          <template v-if="multiple">
+                            <span
+                              :class="[
+                                'flex shrink-0 items-center justify-center',
+                                'rounded-checkbox size-3.5 border transition-colors',
+                                selectedValues.includes(filteredOptions[vRow.index].value)
+                                  ? 'bg-checkbox-checked-bg border-checkbox-checked-border'
+                                  : 'bg-checkbox-bg border-checkbox-border',
+                              ]"
+                              aria-hidden="true"
+                              data-select-checkbox
+                            >
+                              <svg
+                                v-if="selectedValues.includes(filteredOptions[vRow.index].value)"
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 12 12"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="text-checkbox-checked-fg size-full p-0.5"
+                              >
+                                <polyline points="2,6 5,9 10,3" />
+                              </svg>
+                            </span>
+                            <!-- Separator between checkbox zone and label zone (rowClickSingleSelect only) -->
+                            <span
+                              v-if="rowClickSingleSelect"
+                              class="bg-card-glass-border mx-1 my-1 w-px shrink-0 self-stretch"
+                              aria-hidden="true"
+                              data-select-separator
+                            />
+                          </template>
 
-                        <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
+                          <!-- Inline subLabel: name – url on a single row -->
+                          <template
+                            v-if="
+                              filteredOptions[vRow.index].subLabel &&
+                              filteredOptions[vRow.index].subLabelInline
+                            "
+                          >
+                            <span class="shrink-0 font-medium">{{
+                              filteredOptions[vRow.index].label
+                            }}</span>
+                            <span class="text-select-placeholder mx-1 shrink-0">–</span>
+                            <span class="text-text-secondary truncate text-xs">{{
+                              filteredOptions[vRow.index].subLabel
+                            }}</span>
+                          </template>
+
+                          <!-- Rich item: label + optional badge + optional subLabel + optional color palette swatch.
                              Wrapped in a single div so ListboxItem's gap-2 does not
                              add unexpected space between each child and overflow the fixed height. -->
-                        <template
-                          v-else-if="filteredOptions[vRow.index].subLabel || filteredOptions[vRow.index].colorPalette?.length || filteredOptions[vRow.index].badge"
-                        >
-                          <div class="tw:flex tw:flex-col tw:gap-1 tw:w-full tw:overflow-hidden">
-                            <span class="tw:flex tw:items-center tw:gap-1.5 tw:w-full tw:leading-snug">
-                              <span class="tw:truncate tw:font-medium" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{ filteredOptions[vRow.index].label }}</span>
+                          <template
+                            v-else-if="
+                              filteredOptions[vRow.index].subLabel ||
+                              filteredOptions[vRow.index].colorPalette?.length ||
+                              filteredOptions[vRow.index].badge
+                            "
+                          >
+                            <div class="flex w-full flex-col gap-1 overflow-hidden">
+                              <span class="flex w-full items-center gap-1.5 leading-snug">
+                                <span
+                                  class="truncate font-medium"
+                                  :title="
+                                    optionTooltip ? filteredOptions[vRow.index].label : undefined
+                                  "
+                                  >{{ filteredOptions[vRow.index].label }}</span
+                                >
+                                <span
+                                  v-if="filteredOptions[vRow.index].badge"
+                                  class="rounded-default shrink-0 border border-solid"
+                                  :class="[
+                                    filteredOptions[vRow.index].badgeTitle
+                                      ? 'cursor-help'
+                                      : undefined,
+                                    filteredOptions[vRow.index].badgeStyle
+                                      ? 'ml-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
+                                      : 'text-3xs px-1 py-px leading-tight font-medium',
+                                  ]"
+                                  :title="filteredOptions[vRow.index].badgeTitle"
+                                  :style="
+                                    filteredOptions[vRow.index].badgeStyle ?? {
+                                      color: 'var(--color-status-positive)',
+                                      borderColor: 'var(--color-status-positive)',
+                                    }
+                                  "
+                                  >{{ filteredOptions[vRow.index].badge }}</span
+                                >
+                              </span>
                               <span
-                                v-if="filteredOptions[vRow.index].badge"
-                                class="tw:shrink-0 tw:text-[10px] tw:font-medium tw:px-1 tw:py-px tw:rounded tw:border tw:border-solid tw:leading-tight"
-                                style="color: var(--o2-positive); border-color: var(--o2-positive);"
-                              >{{ filteredOptions[vRow.index].badge }}</span>
-                            </span>
-                            <span
-                              v-if="filteredOptions[vRow.index].subLabel"
-                              class="tw:text-xs tw:text-text-secondary tw:line-clamp-2 tw:whitespace-normal tw:w-full tw:leading-snug"
-                            >{{ filteredOptions[vRow.index].subLabel }}</span>
-                            <div
-                              v-if="filteredOptions[vRow.index].colorPalette?.length"
-                              class="tw:h-1.5 tw:w-full tw:rounded-sm"
-                              :style="{
-                                background: getPaletteGradient(
-                                  filteredOptions[vRow.index].colorPalette!,
-                                ),
-                              }"
-                            />
-                          </div>
-                        </template>
+                                v-if="filteredOptions[vRow.index].subLabel"
+                                class="text-text-secondary line-clamp-2 w-full text-xs leading-snug whitespace-normal"
+                                >{{ filteredOptions[vRow.index].subLabel }}</span
+                              >
+                              <div
+                                v-if="filteredOptions[vRow.index].colorPalette?.length"
+                                class="rounded-default h-1.5 w-full"
+                                :style="{
+                                  background: getPaletteGradient(
+                                    filteredOptions[vRow.index].colorPalette!,
+                                  ),
+                                }"
+                              />
+                            </div>
+                          </template>
 
-                        <!-- Simple item: optional icon + label -->
-                        <template v-else>
-                          <!-- Per-option icon: prefer a raw Vue component (iconComponent),
+                          <!-- Simple item: optional icon + label -->
+                          <template v-else>
+                            <!-- Per-option icon: prefer a raw Vue component (iconComponent),
                              fall back to a string name (icon) resolved via OIcon registry.
                              When iconKey is set but this option has no icon, reserve the
                              same space with a blank spacer so labels stay aligned. -->
-                          <component
-                            v-if="filteredOptions[vRow.index].iconComponent"
-                            :is="filteredOptions[vRow.index].iconComponent"
-                            class="tw:shrink-0 tw:size-4"
-                          />
-                          <OIcon
-                            v-else-if="filteredOptions[vRow.index].icon"
-                            :name="filteredOptions[vRow.index].icon"
-                            size="sm"
-                            class="tw:shrink-0"
-                          />
-                          <span
-                            v-else-if="iconKey"
-                            class="tw:shrink-0 tw:size-4"
-                          />
-                          <span class="tw:truncate" :title="optionTooltip ? filteredOptions[vRow.index].label : undefined">{{
-                            filteredOptions[vRow.index].label
-                          }}</span>
-                        </template>
-                      </ListboxItem>
+                            <component
+                              v-if="filteredOptions[vRow.index].iconComponent"
+                              :is="filteredOptions[vRow.index].iconComponent"
+                              class="size-4 shrink-0"
+                            />
+                            <OIcon
+                              v-else-if="filteredOptions[vRow.index].icon"
+                              :name="filteredOptions[vRow.index].icon"
+                              size="sm"
+                              class="shrink-0"
+                            />
+                            <span v-else-if="iconKey" class="size-4 shrink-0" />
+                            <span
+                              class="truncate"
+                              :title="optionTooltip ? filteredOptions[vRow.index].label : undefined"
+                              >{{ filteredOptions[vRow.index].label }}</span
+                            >
+                          </template>
+                        </ListboxItem>
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <slot name="after-options" />
-              <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
-              <template v-if="multiple && rowClickSingleSelect">
-              <div class="tw:mx-2 tw:mt-1 tw:h-px tw:bg-input-border tw:shrink-0" aria-hidden="true" />
-              <div
-                class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2 tw:select-none tw:pointer-events-none tw:shrink-0"
-              >
-                <!-- Checkbox zone hint -->
-                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                  <span
-                    class="tw:inline-flex tw:items-center tw:justify-center tw:size-3.5 tw:rounded-sm tw:border tw:border-select-placeholder tw:shrink-0"
-                    aria-hidden="true"
+                <!-- rowClickSingleSelect hint bar — inside bordered container so the border wraps it -->
+                <template v-if="multiple && rowClickSingleSelect">
+                  <div class="bg-input-border mx-2 mt-1 h-px shrink-0" aria-hidden="true" />
+                  <div
+                    class="pointer-events-none flex shrink-0 items-center gap-2 px-3 py-2 select-none"
                   >
-                    <svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="tw:size-2.5 tw:p-px">
-                      <polyline points="1.5,5 4,8 8.5,2" />
-                    </svg>
-                  </span>
-                  <span>Multi select</span>
-                </span>
+                    <!-- Checkbox zone hint -->
+                    <span
+                      class="text-2xs text-select-placeholder flex shrink-0 items-center gap-1.5"
+                    >
+                      <span
+                        class="rounded-checkbox border-select-placeholder inline-flex size-3.5 shrink-0 items-center justify-center border"
+                        aria-hidden="true"
+                      >
+                        <svg
+                          viewBox="0 0 10 10"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          class="size-2.5 p-px"
+                        >
+                          <polyline points="1.5,5 4,8 8.5,2" />
+                        </svg>
+                      </span>
+                      <span>{{ t("components.select.multiSelect") }}</span>
+                    </span>
 
-                <span class="tw:w-px tw:h-3.5 tw:bg-input-border tw:shrink-0" aria-hidden="true" />
+                    <span class="bg-input-border h-3.5 w-px shrink-0" aria-hidden="true" />
 
-                <!-- Name zone hint -->
-                <span class="tw:flex tw:items-center tw:gap-1.5 tw:text-[0.6875rem] tw:text-select-placeholder tw:shrink-0">
-                  <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="tw:size-3 tw:shrink-0" aria-hidden="true">
-                    <path d="M4 2h6M4 5h6M4 8h3" />
-                  </svg>
-                  <span>Single select</span>
-                </span>
-              </div>
-              </template>
+                    <!-- Name zone hint -->
+                    <span
+                      class="text-2xs text-select-placeholder flex shrink-0 items-center gap-1.5"
+                    >
+                      <svg
+                        viewBox="0 0 14 14"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        class="size-3 shrink-0"
+                        aria-hidden="true"
+                      >
+                        <path d="M4 2h6M4 5h6M4 8h3" />
+                      </svg>
+                      <span>{{ t("components.select.singleSelect") }}</span>
+                    </span>
+                  </div>
+                </template>
               </div>
               <!-- end bordered container -->
             </ListboxRoot>
@@ -1519,65 +1692,63 @@ const fieldWidthClass = computed(() => {
       @update:open="
         (v) => {
           selectOpen = v;
-          emit(v ? 'open' : 'close');
+          if (v) emit('open');
+          else emit('close');
         }
       "
     >
-      <div
-        ref="selectTriggerWrapperRef"
-        class="tw:relative tw:flex tw:items-center"
-      >
+      <div ref="selectTriggerWrapperRef" class="relative flex items-center">
         <SelectTrigger
           :id="inputId"
           :tabindex="inputTabindex"
-          :data-test="
-            parentDataTest ? `${parentDataTest}-trigger` : undefined
-          "
-          :class="[
-            'tw:relative tw:flex tw:w-full tw:rounded-md tw:border',
-            // In inside-label mode padding is handled per-row
-            labelPosition === 'inside' && label ? '' : 'tw:ps-3',
-            'tw:bg-select-bg',
-            hasError
-              ? 'tw:border-select-border-error'
-              : 'tw:border-select-border tw:hover:border-select-border-hover tw:focus:border-select-border-focus',
-            /* Keep the red error border on focus; focus border color applies only when there's no error. */
-            'tw:focus:outline-none',
-            'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
-            'tw:data-disabled:bg-select-disabled-bg tw:data-disabled:cursor-not-allowed tw:data-disabled:border-dashed',
-            labelPosition === 'inside' && label
-              ? [
-                  'tw:flex-col tw:justify-between tw:py-0.5',
-                  heightClasses[size ?? 'md'],
+          :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
+          :class="
+            isInlineAppearance
+              ? inlineTriggerClasses
+              : [
+                  'rounded-default relative flex w-full border',
+                  // In inside-label mode padding is handled per-row
+                  labelPosition === 'inside' && label ? '' : 'ps-3',
+                  'bg-select-bg',
+                  hasError
+                    ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
+                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                  /* Keep the red error border on focus; focus border color applies only when there's no error. */
+                  'focus:outline-none',
+                  'transition-[color,background-color,border-color,box-shadow] duration-150',
+                  'data-disabled:bg-select-disabled-bg data-disabled:cursor-not-allowed data-disabled:border-dashed',
+                  labelPosition === 'inside' && label
+                    ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
+                    : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
                 ]
-              : ['tw:items-center', triggerEndPadding, heightClasses[size ?? 'md']],
-          ]"
+          "
         >
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
             v-if="label && labelPosition === 'inside'"
-            class="tw:text-[0.625rem] tw:leading-none tw:whitespace-nowrap tw:text-start tw:text-select-placeholder tw:select-none tw:pointer-events-none tw:ps-3 tw:pe-7"
+            class="text-3xs text-text-secondary pointer-events-none ps-3 pe-7 text-start leading-none whitespace-nowrap select-none"
             >{{ label }}<span v-if="required" aria-hidden="true">&nbsp;*</span></span
           >
 
           <!-- Content row: flex-row for inside-label; display:contents for normal mode -->
           <div
-            :class="labelPosition === 'inside' && label
-              ? ['tw:flex tw:items-center tw:flex-1 tw:w-full tw:min-w-0', triggerEndPadding, 'tw:ps-3']
-              : 'tw:contents'"
+            :class="
+              labelPosition === 'inside' && label
+                ? ['flex w-full min-w-0 flex-1 items-center', triggerEndPadding, 'ps-3']
+                : 'contents'
+            "
           >
             <SelectValue
               :placeholder="placeholder"
               :class="[
-                'tw:flex-1 tw:text-start tw:truncate tw:text-sm',
-                labelPosition === 'inside' && label
-                  ? 'tw:text-xs tw:leading-4'
-                  : '',
+                'text-start',
+                isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
+                labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                 disabled
-                  ? 'tw:text-select-disabled-text'
+                  ? 'text-select-disabled-text'
                   : hasSelection
-                    ? 'tw:text-select-text'
-                    : 'tw:text-select-placeholder',
+                    ? 'text-select-text'
+                    : 'text-select-placeholder',
               ]"
             >
               <slot name="trigger" :value="modelValue" />
@@ -1588,17 +1759,20 @@ const fieldWidthClass = computed(() => {
         <!-- Trailing icons: clear (left) then chevron (right). See note in
              the listbox branch above for the pointer-events strategy. -->
         <div
-          class="tw:absolute tw:end-2.5 tw:flex tw:items-center tw:gap-1.5 tw:pointer-events-none"
+          :class="[
+            'pointer-events-none absolute flex items-center gap-1.5',
+            isInlineAppearance ? 'end-1' : 'end-2.5',
+          ]"
         >
           <button
-            v-if="clearable && hasSelection"
+            v-if="clearable && hasSelection && !isInlineAppearance"
             type="button"
             tabindex="-1"
-            aria-label="Clear selection"
+            :aria-label="t('components.select.clearSelection')"
             :class="[
-              'tw:flex tw:items-center tw:justify-center tw:size-3.5',
-              'tw:text-input-clear-btn tw:hover:text-input-clear-btn-hover',
-              'tw:transition-colors tw:pointer-events-auto',
+              'flex size-3.5 items-center justify-center',
+              'text-input-clear-btn hover:text-input-clear-btn-hover',
+              'pointer-events-auto transition-colors',
             ]"
             @click.stop="handleClear"
           >
@@ -1606,7 +1780,7 @@ const fieldWidthClass = computed(() => {
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-3.5"
+              class="size-3.5"
               aria-hidden="true"
             >
               <path
@@ -1620,9 +1794,9 @@ const fieldWidthClass = computed(() => {
             v-else
             aria-hidden="true"
             :class="[
-              'tw:flex tw:items-center tw:justify-center tw:text-select-icon',
-              'tw:transition-transform tw:duration-150',
-              isOpen ? 'tw:rotate-180' : '',
+              'text-select-icon flex items-center justify-center',
+              'transition-transform duration-150',
+              isOpen ? 'rotate-180' : '',
             ]"
           >
             <!-- chevron-down — rotates 180° when the dropdown is open -->
@@ -1630,7 +1804,7 @@ const fieldWidthClass = computed(() => {
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-4"
+              class="size-4"
             >
               <path
                 fill-rule="evenodd"
@@ -1649,30 +1823,31 @@ const fieldWidthClass = computed(() => {
           :hide-when-detached="true"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'tw:z-[10001] tw:min-w-(--reka-select-trigger-width)',
-            'tw:overflow-hidden',
-            'tw:rounded-md tw:border tw:shadow-md',
-            'tw:bg-select-content-bg tw:border-select-content-border',
+            'z-10001 min-w-(--reka-select-trigger-width)',
+            'overflow-hidden',
+            'rounded-default border shadow-md',
+            'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no
             // scale/squish). Wipes down by default; top-placed wipes up. Soft
             // ease-out-expo in (200ms), quick wipe out (140ms).
-            'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-            'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-            'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+            'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+            'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           ]"
-          :style="[dropdownStyle, { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' }]"
+          :style="[
+            dropdownStyle,
+            { maxHeight: 'min(15rem, var(--reka-select-content-available-height, 15rem))' },
+          ]"
           @click.stop
           @pointerdown.stop
         >
-          <SelectScrollUpButton
-            class="tw:flex tw:items-center tw:justify-center tw:h-6 tw:text-select-icon"
-          >
+          <SelectScrollUpButton class="text-select-icon flex h-6 items-center justify-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-4"
+              class="size-4"
               aria-hidden="true"
             >
               <path
@@ -1683,7 +1858,7 @@ const fieldWidthClass = computed(() => {
             </svg>
           </SelectScrollUpButton>
 
-          <SelectViewport class="tw:p-1">
+          <SelectViewport class="p-1">
             <template v-if="normalizedOptions.length && !slots.default">
               <OSelectItem
                 v-for="opt in normalizedOptions"
@@ -1697,14 +1872,12 @@ const fieldWidthClass = computed(() => {
             <slot />
           </SelectViewport>
 
-          <SelectScrollDownButton
-            class="tw:flex tw:items-center tw:justify-center tw:h-6 tw:text-select-icon"
-          >
+          <SelectScrollDownButton class="text-select-icon flex h-6 items-center justify-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 16 16"
               fill="currentColor"
-              class="tw:size-4"
+              class="size-4"
               aria-hidden="true"
             >
               <path
@@ -1722,16 +1895,13 @@ const fieldWidthClass = computed(() => {
     <span
       v-if="effectiveError && effectiveError.trim()"
       :data-test="parentDataTest ? `${parentDataTest}-error` : undefined"
-      class="tw:text-xs tw:text-select-error-text tw:leading-none"
+      class="text-select-error-text text-xs leading-none"
       role="alert"
     >
       {{ effectiveError }}
     </span>
     <!-- Help text -->
-    <span
-      v-else-if="helpText"
-      class="tw:text-xs tw:text-input-help-text tw:leading-none"
-    >
+    <span v-else-if="helpText" class="text-input-help-text text-xs leading-none">
       {{ helpText }}
     </span>
   </div>

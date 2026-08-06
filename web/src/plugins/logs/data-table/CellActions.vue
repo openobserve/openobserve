@@ -1,47 +1,43 @@
 <template>
   <div
-    class="field_overlay tw:absolute tw:right-0 tw:top-[50%] table-cell-actions tw:translate-y-[-50%] tw:h-full! tw:flex! tw:items-center tw:justify-center tw:rounded tw:max-h-10! tw:px-2"
+    class="field_overlay table-cell-actions rounded-default absolute top-[50%] right-0 flex! h-full! max-h-10! translate-y-[-50%] items-center justify-center px-2"
     :class="backgroundClass"
     :title="row[column.id]"
     :data-test="`log-add-data-from-column-${row[column.id]}`"
   >
-    <span class="tw:mx-1">
+    <span class="mx-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
         @click.prevent.stop="copyLogToClipboard(row[column.id])"
-        title="Copy"
+        :title="t('logs.cellActions.copy')"
       >
         <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="
-          addSearchTerm(column.id, row[column.id], 'include')
-        "
+        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'include')"
         :data-test="`log-details-include-field-${row[column.id]}`"
-        title="Include Term"
+        :title="t('logs.cellActions.includeTerm')"
       >
-        <OIcon style="height: 8px; width: 8px">
-          <EqualIcon class="tw:size-full" />
+        <OIcon name="" style="height: 8px; width: 8px">
+          <EqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="tw:mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
-        @click.prevent.stop="
-          addSearchTerm(column.id, row[column.id], 'exclude')
-        "
-        title="Exclude Term"
+        @click.prevent.stop="addSearchTerm(column.id, row[column.id], 'exclude')"
+        :title="t('logs.cellActions.excludeTerm')"
         :data-test="`log-details-exclude-field-${row[column.id]}`"
       >
-        <OIcon style="height: 8px; width: 8px">
-          <NotEqualIcon class="tw:size-full" />
+        <OIcon name="" style="height: 8px; width: 8px">
+          <NotEqualIcon class="size-full" />
         </OIcon>
       </OButton>
     </span>
@@ -50,7 +46,7 @@
     <O2AIContextAddBtn
       v-if="!hideAi"
       @send-to-ai-chat="sendToAiChat(JSON.stringify(row[column.id]))"
-      :style="'border: 1px solid #fff;'"
+      class="border border-solid border-white"
       :size="'6px'"
       :imageHeight="'16px'"
       :imageWidth="'16px'"
@@ -61,7 +57,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PropType } from "vue";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
@@ -92,37 +88,24 @@ const props = defineProps({
   },
 });
 
-const store = useStore();
+const { t } = useI18nTyped();
 
-const emit = defineEmits([
-  "copy",
-  "addSearchTerm",
-  "addFieldToTable",
-  "sendToAiChat",
-]);
+const emit = defineEmits(["copy", "addSearchTerm", "addFieldToTable", "sendToAiChat"]);
 
 const copyLogToClipboard = (value: any) => {
   emit("copy", value);
 };
-const addSearchTerm = (
-  field: string,
-  field_value: string | number | boolean,
-  action: string,
-) => {
+const addSearchTerm = (field: string, field_value: string | number | boolean, action: string) => {
   emit("addSearchTerm", field, field_value, action);
 };
 
-const backgroundClass = computed(() =>
-  store.state.theme === "dark" ? "tw:bg-black" : "tw:bg-white",
-);
+const backgroundClass = "bg-surface-base";
 const sendToAiChat = (value: any) => {
   emit("sendToAiChat", value);
 };
 
 const isStreamField = computed(() => {
-  const field: any = props.selectedStreamFields?.find(
-    (item: any) => item.name === props.column.id,
-  );
+  const field: any = props.selectedStreamFields?.find((item: any) => item.name === props.column.id);
   return field?.isSchemaField ?? false;
 });
 </script>

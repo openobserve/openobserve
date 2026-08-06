@@ -24,40 +24,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:h-16 tw:ps-3 tw:pe-3.5 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow,transform] tw:duration-150 tw:outline-none tw:hover:shadow-md tw:hover:border-primary-400 tw:hover:bg-tabs-hover-bg tw:focus-visible:ring-[0.125rem] tw:focus-visible:ring-primary-500/40"
+    class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex h-16 w-64 max-w-full cursor-pointer items-center gap-3 border ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none hover:shadow-md focus-visible:ring-[0.125rem]"
   >
     <span
-      class="tw:relative tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text tw:transition-colors tw:group-hover:bg-primary-600 tw:group-hover:text-white"
+      class="rounded-default bg-tabs-active-bg text-tabs-active-text group-hover:bg-accent group-hover:text-text-inverse relative inline-flex h-10 w-10 shrink-0 items-center justify-center transition-colors"
     >
       <OIcon :name="icon" size="md" />
     </span>
 
-    <span class="tw:relative tw:flex-1 tw:min-w-0">
-      <span class="tw:block tw:text-sm tw:font-semibold tw:truncate tw:text-text-primary">{{
-        label
-      }}</span>
-      <span
-        v-if="sublabel"
-        class="tw:block tw:text-xs tw:truncate tw:text-text-secondary"
-        >{{ sublabel }}</span
-      >
+    <span class="relative min-w-0 flex-1">
+      <span class="text-text-heading block truncate text-sm font-semibold">{{ label }}</span>
+      <span v-if="sublabel" class="text-text-secondary block truncate text-xs">{{ sublabel }}</span>
     </span>
 
     <OIcon
       name="chevron-right"
       size="sm"
-      class="tw:relative tw:shrink-0 tw:text-text-disabled tw:transition-transform tw:group-hover:translate-x-0.5 tw:group-hover:text-primary-600"
+      class="text-text-disabled group-hover:text-accent relative shrink-0 transition-transform group-hover:translate-x-0.5"
     />
   </button>
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 defineProps<{
   icon: IconName;
-  label: string;
-  sublabel?: string;
+  label: I18nText;
+  sublabel?: I18nText;
 }>();
 </script>

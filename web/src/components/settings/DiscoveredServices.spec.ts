@@ -20,22 +20,12 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import DiscoveredServices from "./DiscoveredServices.vue";
 
-
 vi.mock("@/services/service_streams", () => ({
   default: {
     getServicesList: vi.fn(),
     resetServices: vi.fn(),
   },
 }));
-
-const notifyMock = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<any>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: notifyMock }),
-  };
-});
 
 vi.mock("@/components/common/GroupHeader.vue", () => ({
   default: {
@@ -172,22 +162,7 @@ const mockI18n = createI18n({
 });
 
 const globalStubs = {
-  "OIcon": { template: "<span />", props: ["name", "size", "color"] },
-  "q-btn": { template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\')"><slot /></button>', props: ["label", "flat", "dense", "color", "loading", "icon"], emits: ["click"] },
-  "q-btn-toggle": { template: "<div />", props: ["modelValue", "options", "dense", "unelevated"] },
-  "q-input": { template: '<input :placeholder="placeholder" />', props: ["modelValue", "dense", "filled", "placeholder", "clearable"] },
-  "q-select": { template: "<select />", props: ["modelValue", "dense", "filled", "options", "emitValue", "mapOptions"] },
-  "q-table": { template: '<div class="q-table"><slot name="no-data" /></div>', props: ["rows", "columns", "pagination", "filter", "loading", "dense"] },
-  "q-tooltip": { template: "<span><slot /></span>" },
-  "q-card": { template: "<div><slot /></div>" },
-  "q-card-section": { template: "<div><slot /></div>" },
-  "q-card-actions": { template: "<div><slot /></div>" },
-  "q-list": { template: "<div><slot /></div>" },
-  "q-item": { template: "<div><slot /></div>" },
-  "q-item-section": { template: "<div><slot /></div>" },
-  "q-item-label": { template: "<div><slot /></div>" },
-  "q-separator": true,
-  "q-expansion-item": { template: "<div><slot /></div>", props: ["label", "icon", "dense"] },
+  OIcon: { template: "<span />", props: ["name", "size", "color"] },
   "i18n-t": { template: "<span><slot /></span>", props: ["keypath", "tag"] },
   ODrawer: ODrawerStub,
   ConfirmDialog: ConfirmDialogStub,
@@ -305,9 +280,7 @@ describe("DiscoveredServices", () => {
     });
 
     it("should clear error on retry", async () => {
-      vi.mocked(serviceStreamsService.getServicesList).mockRejectedValueOnce(
-        new Error("fail"),
-      );
+      vi.mocked(serviceStreamsService.getServicesList).mockRejectedValueOnce(new Error("fail"));
       wrapper = mountComponent();
       await flushPromises();
       expect(wrapper.vm.error).toBeTruthy();
@@ -375,7 +348,9 @@ describe("DiscoveredServices", () => {
       await wrapper.vm.loadServices();
       await flushPromises();
 
-      expect(vi.mocked(serviceStreamsService.getServicesList).mock.calls.length).toBe(callCount + 1);
+      expect(vi.mocked(serviceStreamsService.getServicesList).mock.calls.length).toBe(
+        callCount + 1,
+      );
     });
   });
 
@@ -464,13 +439,17 @@ describe("DiscoveredServices", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="confirm-dialog-stub"]').attributes("data-open")).toBe("false");
+      expect(wrapper.find('[data-test="confirm-dialog-stub"]').attributes("data-open")).toBe(
+        "false",
+      );
 
       wrapper.vm.confirmResetServices();
       await flushPromises();
 
       expect(wrapper.vm.confirmResetOpen).toBe(true);
-      expect(wrapper.find('[data-test="confirm-dialog-stub"]').attributes("data-open")).toBe("true");
+      expect(wrapper.find('[data-test="confirm-dialog-stub"]').attributes("data-open")).toBe(
+        "true",
+      );
     });
 
     it("should call resetServices when ConfirmDialog emits update:ok", async () => {
@@ -513,9 +492,7 @@ describe("DiscoveredServices", () => {
     });
 
     it("should not throw and reset resetting flag when resetServices fails", async () => {
-      vi.mocked(serviceStreamsService.resetServices).mockRejectedValueOnce(
-        new Error("boom"),
-      );
+      vi.mocked(serviceStreamsService.resetServices).mockRejectedValueOnce(new Error("boom"));
       wrapper = mountComponent();
       await flushPromises();
 

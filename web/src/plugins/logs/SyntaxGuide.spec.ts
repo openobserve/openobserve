@@ -21,16 +21,15 @@ import store from "@/test/unit/helpers/store";
 
 // Mock i18n translations
 const mockTranslations = {
-  "search.syntaxGuideLabel": "Syntax Guide"
+  "search.syntaxGuideLabel": "Syntax Guide",
 };
 
 const i18n = createI18n({
   locale: "en",
   messages: {
-    en: mockTranslations
-  }
+    en: mockTranslations,
+  },
 });
-
 
 describe("SyntaxGuide.vue", () => {
   let wrapper: any;
@@ -39,11 +38,8 @@ describe("SyntaxGuide.vue", () => {
     return mount(SyntaxGuide, {
       props,
       global: {
-        plugins: [
-          i18n,
-          store
-        ]
-      }
+        plugins: [i18n, store],
+      },
     });
   };
 
@@ -73,7 +69,7 @@ describe("SyntaxGuide.vue", () => {
   it("should accept and react to sqlmode prop", async () => {
     wrapper = createWrapper({ sqlmode: true });
     expect(wrapper.props().sqlmode).toBe(true);
-    
+
     await wrapper.setProps({ sqlmode: false });
     expect(wrapper.props().sqlmode).toBe(false);
   });
@@ -99,7 +95,7 @@ describe("SyntaxGuide.vue", () => {
     const button = wrapper.findComponent({ name: "OButton" });
     expect(button.exists()).toBe(true);
     expect(button.attributes("data-cy")).toBe("syntax-guide-button");
-    // OButton uses variant/size props instead of Quasar's dense/flat/icon props
+    // OButton uses variant/size props instead of dense/flat/icon props
     expect(button.props("variant")).toBe("ghost");
   });
 
@@ -141,7 +137,7 @@ describe("SyntaxGuide.vue", () => {
   it("should have theme-dark class when store theme is dark", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    // q-menu was replaced by ODropdown; verify the wrapper exists.
+    // ODropdown wrapper exists.
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
     // The theme class is bound on the content wrapper div inside the dropdown.
@@ -178,8 +174,7 @@ describe("SyntaxGuide.vue", () => {
   // Test 16: Menu content structure exists
   it("should have menu with card components", () => {
     wrapper = createWrapper({ sqlmode: false });
-    // The migrated component drops q-card/q-card-section in favor of native
-    // divs inside the ODropdown default slot.
+    // The migrated component uses native divs inside the ODropdown default slot.
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
     expect(dropdown.exists()).toBe(true);
   });
@@ -189,7 +184,6 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ sqlmode: true });
     const button = wrapper.findComponent({ name: "OButton" });
     const dropdown = wrapper.findComponent({ name: "ODropdown" });
-    // QTooltip is replaced by OTooltip in the migration.
     const tooltip = wrapper.findComponent({ name: "OTooltip" });
 
     expect(button.exists()).toBe(true);
@@ -201,10 +195,10 @@ describe("SyntaxGuide.vue", () => {
   it("should have different template content based on sqlmode", () => {
     wrapper = createWrapper({ sqlmode: false });
     const normalModeComponent = wrapper.html();
-    
+
     wrapper = createWrapper({ sqlmode: true });
     const sqlModeComponent = wrapper.html();
-    
+
     // Both should have button but with different classes
     expect(normalModeComponent).toContain("normal-mode");
     expect(sqlModeComponent).toContain("sql-mode");
@@ -213,7 +207,6 @@ describe("SyntaxGuide.vue", () => {
   // Test 19: Tooltip exists and uses translation key
   it("should have tooltip with translation", () => {
     wrapper = createWrapper();
-    // QTooltip was replaced by OTooltip in the migration.
     const tooltip = wrapper.findComponent({ name: "OTooltip" });
     expect(tooltip.exists()).toBe(true);
     // Tooltip should use the translation function
@@ -233,7 +226,7 @@ describe("SyntaxGuide.vue", () => {
     expect(() => {
       wrapper = createWrapper({ sqlmode: false });
     }).not.toThrow();
-    
+
     expect(() => {
       wrapper = createWrapper({ sqlmode: true });
     }).not.toThrow();
@@ -291,7 +284,7 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ sqlmode: false });
     const button = wrapper.findComponent({ name: "OButton" });
 
-    // OButton uses normal-mode class; syntax-guide-button and q-pa-xs were removed in migration
+    // OButton uses normal-mode class; syntax-guide-button and the legacy padding class were removed in migration
     expect(button.classes()).toContain("normal-mode");
   });
 
@@ -334,8 +327,8 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ noBorder: true });
     const button = wrapper.findComponent({ name: "OButton" });
     // noBorder now toggles Tailwind utility classes instead of a scoped class
-    expect(button.classes()).toContain("tw:border-0!");
-    expect(button.classes()).not.toContain("tw:ml-1");
+    expect(button.classes()).toContain("border-0!");
+    expect(button.classes()).not.toContain("ml-1");
   });
 
   // Test 32: noBorder false keeps standard spacing classes
@@ -343,8 +336,8 @@ describe("SyntaxGuide.vue", () => {
     wrapper = createWrapper({ noBorder: false });
     const button = wrapper.findComponent({ name: "OButton" });
     // noBorder false keeps the standard inline margin utility
-    expect(button.classes()).not.toContain("tw:border-0!");
-    expect(button.classes()).toContain("tw:ml-1");
+    expect(button.classes()).not.toContain("border-0!");
+    expect(button.classes()).toContain("ml-1");
   });
 
   // Test 33: label prop renders on button when noBorder is false
@@ -366,7 +359,7 @@ describe("SyntaxGuide.vue", () => {
   it("should have undefined label when noBorder is true and no label prop given", () => {
     wrapper = createWrapper({ noBorder: true });
     // OButton renders label as slot text; the component prop 'label' defaults to ''
-    expect(wrapper.props().label).toBe('');
+    expect(wrapper.props().label).toBe("");
   });
 
   // Test 36: button renders in dark theme with normal mode

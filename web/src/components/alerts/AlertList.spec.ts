@@ -57,8 +57,6 @@ import AlertService from "@/services/alerts";
 import TemplateService from "@/services/alert_templates";
 import DestinationService from "@/services/alert_destination";
 
-// Ensure Quasar plugin
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -71,10 +69,10 @@ if (!navigator.clipboard) {
 }
 
 // Mock window.open to prevent window reference errors
-if (typeof window !== 'undefined') {
-  Object.defineProperty(window, 'open', {
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "open", {
     value: vi.fn(),
-    configurable: true
+    configurable: true,
   });
 }
 
@@ -105,11 +103,11 @@ const ODialogStub = {
   name: "ODialog",
   template:
     '<div class="o-dialog-stub" :data-test-id="$attrs[\'data-test\']" :data-open="open">' +
-      '<slot name="header-left" />' +
-      '<slot name="header-right" />' +
-      '<slot />' +
-      '<slot name="footer" />' +
-    '</div>',
+    '<slot name="header-left" />' +
+    '<slot name="header-right" />' +
+    "<slot />" +
+    '<slot name="footer" />' +
+    "</div>",
   props: O_OVERLAY_PROPS,
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
@@ -133,7 +131,12 @@ type AlertV2 = {
   condition: any;
   description?: string;
   owner?: string;
-  trigger_condition?: { period?: number; frequency?: number; cron?: string; frequency_type?: string };
+  trigger_condition?: {
+    period?: number;
+    frequency?: number;
+    cron?: string;
+    frequency_type?: string;
+  };
   last_triggered_at?: number;
   last_satisfied_at?: number;
   folder_id?: string;
@@ -143,17 +146,14 @@ type AlertV2 = {
 const makeAlert = (idx: number, overrides: Partial<AlertV2> = {}): AlertV2 => ({
   alert_id: `alert-${idx}`,
   name: overrides.name ?? `Alert ${idx}`,
-  is_real_time: overrides.is_real_time ?? (idx % 2 === 0),
+  is_real_time: overrides.is_real_time ?? idx % 2 === 0,
   stream_name: overrides.stream_name ?? "default",
   stream_type: overrides.stream_type ?? "logs",
   enabled: overrides.enabled ?? true,
   condition:
-    overrides.condition ??
-    ({ type: "sql", sql: idx % 2 === 0 ? "select 1" : "select 2" } as any),
+    overrides.condition ?? ({ type: "sql", sql: idx % 2 === 0 ? "select 1" : "select 2" } as any),
   description: overrides.description ?? (idx % 2 === 0 ? "Test desc" : ""),
-  owner:
-    overrides.owner ??
-    (idx % 2 === 0 ? "longownername@example.com" : "o@ex.com"),
+  owner: overrides.owner ?? (idx % 2 === 0 ? "longownername@example.com" : "o@ex.com"),
   trigger_condition:
     overrides.trigger_condition ??
     (idx % 2 === 0
@@ -190,8 +190,7 @@ async function mountAlertList() {
         },
         ImportAlert: true,
         AddAlert: true,
-        QTablePagination: true,
-        QDrawer: true,
+        Pagination: true,
         ODialog: ODialogStub,
         ODrawer: ODrawerStub,
         ConfirmDialog: {
@@ -206,7 +205,7 @@ async function mountAlertList() {
           template:
             '<div class="app-tabs-stub">' +
             '<button v-for="tab in tabs" :key="tab.value" :class="`tab-${tab.value}`" @click="$emit(\'update:active-tab\', tab.value)">{{tab.label}}</button>' +
-            '</div>',
+            "</div>",
         },
         SelectFolderDropDown: true,
       },
@@ -232,13 +231,24 @@ beforeEach(() => {
 
   // align store shape expected by component watchers
   // ensure foldersByType has 'alerts' key and alerts map exists
-  (store.state as any).organizationData.foldersByType = [{ type: 'alerts', folders: [{ id: 'default', name: 'Default' }] }];
+  (store.state as any).organizationData.foldersByType = [
+    { type: "alerts", folders: [{ id: "default", name: "Default" }] },
+  ];
   (store.state as any).organizationData.allAlertsListByFolderId = {};
   // Reset alert list filters to prevent leaking between tests
-  (store.state as any).alertListFilters = { searchQuery: "", filterQuery: "", searchAcrossFolders: false };
+  (store.state as any).alertListFilters = {
+    searchQuery: "",
+    filterQuery: "",
+    searchAcrossFolders: false,
+  };
 
   alertsDB = [
-    makeAlert(1, { is_real_time: false, enabled: true, name: "Scheduled Alert A", owner: "averylongownername@example.com" }),
+    makeAlert(1, {
+      is_real_time: false,
+      enabled: true,
+      name: "Scheduled Alert A",
+      owner: "averylongownername@example.com",
+    }),
     makeAlert(2, { is_real_time: true, enabled: false, name: "RealTime Alert B" }),
     makeAlert(3, { is_real_time: false, enabled: true, name: "Scheduled Alert C" }),
     makeAlert(4, { is_real_time: true, enabled: true, name: "RealTime Alert D" }),
@@ -247,27 +257,41 @@ beforeEach(() => {
   ];
 
   // Default mocks with immediate resolution to prevent timeout
-  templatesSvc.list.mockImplementation(() => Promise.resolve({ data: [{ name: "template1" }] } as any));
-  destinationsSvc.list.mockImplementation(() => Promise.resolve({ data: [{ name: "dest1" }] } as any));
+  templatesSvc.list.mockImplementation(() =>
+    Promise.resolve({ data: [{ name: "template1" }] } as any),
+  );
+  destinationsSvc.list.mockImplementation(() =>
+    Promise.resolve({ data: [{ name: "dest1" }] } as any),
+  );
 
-  (alertsSvc.listByFolderId as any) = vi.fn().mockImplementation(() => Promise.resolve({
-    data: { list: alertsDB },
-  }) as any);
+  (alertsSvc.listByFolderId as any) = vi.fn().mockImplementation(
+    () =>
+      Promise.resolve({
+        data: { list: alertsDB },
+      }) as any,
+  );
 
-  (alertsSvc.get_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, id: string) => Promise.resolve({
-    data: { ...(alertsDB.find((a) => a.alert_id === id) as any), id },
-  }) as any);
+  (alertsSvc.get_by_alert_id as any) = vi.fn().mockImplementation(
+    async (_org: any, id: string) =>
+      Promise.resolve({
+        data: { ...(alertsDB.find((a) => a.alert_id === id) as any), id },
+      }) as any,
+  );
 
-  (alertsSvc.toggle_state_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, id: string, enable: boolean) => {
-    const idx = alertsDB.findIndex((a) => a.alert_id === id);
-    if (idx >= 0) alertsDB[idx].enabled = enable;
-    return Promise.resolve({ data: { enabled: enable } } as any);
-  });
+  (alertsSvc.toggle_state_by_alert_id as any) = vi
+    .fn()
+    .mockImplementation(async (_org: any, id: string, enable: boolean) => {
+      const idx = alertsDB.findIndex((a) => a.alert_id === id);
+      if (idx >= 0) alertsDB[idx].enabled = enable;
+      return Promise.resolve({ data: { enabled: enable } } as any);
+    });
 
-  (alertsSvc.delete_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, id: string) => {
-    alertsDB = alertsDB.filter((a) => a.alert_id !== id);
-    return Promise.resolve({ data: { code: 200, message: "deleted" } } as any);
-  });
+  (alertsSvc.delete_by_alert_id as any) = vi
+    .fn()
+    .mockImplementation(async (_org: any, id: string) => {
+      alertsDB = alertsDB.filter((a) => a.alert_id !== id);
+      return Promise.resolve({ data: { code: 200, message: "deleted" } } as any);
+    });
 
   (alertsSvc.getHistory as any) = vi.fn().mockImplementation(async () => {
     return Promise.resolve({ data: { total: 0, hits: [] } } as any);
@@ -282,18 +306,20 @@ beforeEach(() => {
     return Promise.resolve({ data: { code: 200 } } as any);
   });
 
-  (alertsSvc.create_by_alert_id as any) = vi.fn().mockImplementation(async (_org: any, body: any, folder?: string) => {
-    const newId = `alert-${Math.floor(Math.random() * 100000)}`;
-    const cloned: AlertV2 = makeAlert(999, {
-      ...body,
-      alert_id: newId,
-      name: body.name ?? `Cloned ${newId}`,
-      is_real_time: Boolean(body?.is_real_time),
-      folder_id: folder ?? "default",
+  (alertsSvc.create_by_alert_id as any) = vi
+    .fn()
+    .mockImplementation(async (_org: any, body: any, folder?: string) => {
+      const newId = `alert-${Math.floor(Math.random() * 100000)}`;
+      const cloned: AlertV2 = makeAlert(999, {
+        ...body,
+        alert_id: newId,
+        name: body.name ?? `Cloned ${newId}`,
+        is_real_time: Boolean(body?.is_real_time),
+        folder_id: folder ?? "default",
+      });
+      alertsDB.push(cloned);
+      return Promise.resolve({ data: { code: 200, id: newId } } as any);
     });
-    alertsDB.push(cloned);
-    return Promise.resolve({ data: { code: 200, id: newId } } as any);
-  });
 });
 
 afterEach(() => {
@@ -304,10 +330,10 @@ afterEach(() => {
 const waitData = async (wrapper: any) => {
   // Ensure initial state
   await flushPromises();
-  
+
   // Pre-populate store data to avoid API calls during tests
   (wrapper.vm.store.state.organizationData as any).allAlertsListByFolderId = { default: alertsDB };
-  
+
   // Transform alerts data to match component expectations (with conditions field)
   const transformedAlerts = alertsDB.map((alert, counter) => {
     let conditions = "--";
@@ -316,7 +342,7 @@ const waitData = async (wrapper: any) => {
     } else if (alert.condition && alert.condition.conditions) {
       conditions = JSON.stringify(alert.condition.conditions);
     }
-    
+
     let frequency = "";
     if (alert.trigger_condition?.frequency_type == "cron") {
       frequency = alert.trigger_condition.cron;
@@ -344,39 +370,39 @@ const waitData = async (wrapper: any) => {
       type: alert.condition?.type || "sql",
       folder_id: alert.folder_id || "default",
       folder_name: alert.folder_name || "Default",
-      is_real_time: alert.is_real_time
+      is_real_time: alert.is_real_time,
     };
   });
-  
+
   // Direct assignment to avoid waiting for async operations
   wrapper.vm.allAlerts = transformedAlerts;
   wrapper.vm.filteredResults = [...transformedAlerts]; // shallow copy
-  wrapper.vm.activeFolderId = 'default';
+  wrapper.vm.activeFolderId = "default";
   // `loading` starts true (so the table shows the skeleton instead of flashing
   // the empty state); this helper simulates the loaded state, so clear it to
   // let the table render rows.
   wrapper.vm.loading = false;
-  
+
   // Trigger Vue's reactivity and ensure all watchers are processed
   await wrapper.vm.$nextTick();
   await flushPromises();
-  
+
   // Force update the component to ensure all reactive properties are synchronized
   wrapper.vm.$forceUpdate();
   await wrapper.vm.$nextTick();
-  
+
   // Process router query parameters after data is loaded
   const routeQuery = wrapper.vm.router.currentRoute.value.query;
   if (routeQuery.action === "import") {
     wrapper.vm.showImportAlertDialog = true;
   }
   // Note: For "add" action, we let the test manually trigger showAddUpdateFn to test the full flow
-  
+
   // Give a short wait for any remaining async operations and reactive updates.
   // OTable holds its loading skeleton for MIN_SKELETON_MS (50ms) after loading
   // starts; `loading` begins true on mount, so we must wait past that hold for
   // the table to render real rows (and their row-action buttons).
-  await new Promise(resolve => setTimeout(resolve, 80));
+  await new Promise((resolve) => setTimeout(resolve, 80));
   await flushPromises();
 };
 
@@ -392,7 +418,9 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find('[data-test="alert-list-search-input"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="alert-list-search-across-folders-toggle"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-list-search-across-folders-toggle"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders import and add buttons", async () => {
@@ -417,37 +445,67 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
-  it("shows period & frequency columns for all/scheduled tabs and hides in realTime", async () => {
+  // period ("Look back window"), frequency ("Check every"), state, level and
+  // last_trained_at were removed from the list: they are configuration detail
+  // or duplicate a neighbouring column, and the row was too wide to scan.
+  // They remain on the alert detail/edit views.
+  it("no longer renders the removed configuration columns on any tab", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    // Ensure we're in alerts view mode first
-    wrapper.vm.viewMode = 'alerts';
+    wrapper.vm.viewMode = "alerts";
     await flushPromises();
 
-    // default tab: all
-    // OTableColumnDef uses `id` field (not `name`)
-    wrapper.vm.activeTab = 'all';
-    await flushPromises();
-    let ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("period");
-    expect(ids).toContain("frequency");
-
-    // switch to realTime
-    wrapper.vm.activeTab = 'realTime';
-    await flushPromises();
-    ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).not.toContain("period");
-    expect(ids).not.toContain("frequency");
-
-    // switch to scheduled
-    wrapper.vm.activeTab = 'scheduled';
-    await flushPromises();
-    ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
-    expect(ids).toContain("period");
-    expect(ids).toContain("frequency");
+    for (const tab of ["all", "scheduled", "realTime", "anomalyDetection"]) {
+      wrapper.vm.activeTab = tab;
+      await flushPromises();
+      const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+      for (const removed of ["period", "frequency", "state", "level", "last_trained_at"]) {
+        expect(ids, `tab=${tab} must not show "${removed}"`).not.toContain(removed);
+      }
+    }
   });
 
+  // Feature 2 (PT-3/PT-6): the columns that REPLACED them.
+  it("renders the priority and tags columns", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    const ids = wrapper.vm.columns.map((c: any) => c.id ?? c.name);
+    expect(ids).toContain("priority");
+    expect(ids).toContain("tags");
+  });
+
+  it("renders the summary strip with operational counts", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    // NOTE: the State *column* was removed from the table, but the derived
+    // counts still drive the summary strip above it — that is the whole reason
+    // the column was redundant.
+
+    // Drive the counts from an explicit set so the assertion is deterministic
+    // regardless of cross-test store state.
+    wrapper.vm.filteredResults = [
+      { enabled: true, name: "a", is_real_time: false },
+      { enabled: false, name: "b", is_real_time: false },
+      { enabled: true, name: "c", is_real_time: "anomaly", status: "failed" },
+    ];
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.stateCounts.total).toBe(3);
+    expect(wrapper.vm.stateCounts.active).toBe(2);
+    expect(wrapper.vm.stateCounts.paused).toBe(1);
+    expect(wrapper.vm.stateCounts.failed).toBe(1);
+
+    // Summary strip renders (via OTable's #top slot) when rows are present.
+    const summary = wrapper.find('[data-test="alert-list-summary"]');
+    expect(summary.exists()).toBe(true);
+    // The KpiCards inside must actually render their content — guards against
+    // the components being imported but not registered (renders as empty
+    // unknown elements, which the exists() check alone would not catch).
+    expect(wrapper.find('[data-test="alert-summary-active"]').exists()).toBe(true);
+    expect(summary.text()).toContain(String(wrapper.vm.stateCounts.total));
+  });
 
   it("dynamicQueryModel binds to filterQuery by default and to searchQuery when across-folders toggled", async () => {
     const wrapper: any = await mountAlertList();
@@ -474,11 +532,11 @@ describe("AlertList - filtering behaviors", () => {
     await waitData(wrapper);
 
     // Ensure we're in alerts view mode
-    wrapper.vm.viewMode = 'alerts';
+    wrapper.vm.viewMode = "alerts";
     await flushPromises();
 
     // Set activeTab and trigger filtering
-    wrapper.vm.activeTab = 'scheduled';
+    wrapper.vm.activeTab = "scheduled";
     wrapper.vm.filterAlertsByTab(true);
     await flushPromises();
 
@@ -490,11 +548,11 @@ describe("AlertList - filtering behaviors", () => {
     await waitData(wrapper);
 
     // Ensure we're in alerts view mode
-    wrapper.vm.viewMode = 'alerts';
+    wrapper.vm.viewMode = "alerts";
     await flushPromises();
 
     // Set activeTab and trigger filtering
-    wrapper.vm.activeTab = 'realTime';
+    wrapper.vm.activeTab = "realTime";
     wrapper.vm.filterAlertsByTab(true);
     await flushPromises();
 
@@ -520,11 +578,11 @@ describe("AlertList - filtering behaviors", () => {
     await waitData(wrapper);
 
     // Ensure we're in alerts view mode
-    wrapper.vm.viewMode = 'alerts';
+    wrapper.vm.viewMode = "alerts";
     await flushPromises();
 
     // Set activeTab and trigger filtering
-    wrapper.vm.activeTab = 'scheduled';
+    wrapper.vm.activeTab = "scheduled";
     wrapper.vm.filterAlertsByTab(true);
     await flushPromises();
 
@@ -546,9 +604,7 @@ describe("AlertList - row actions", () => {
     // Click the pause/start button for this row. OButton forwards $attrs
     // (including data-test) to its root element, so a DOM click triggers the
     // bound @click handler.
-    const btn = wrapper.find(
-      `[data-test="alert-list-${first.name}-pause-start-alert"]`,
-    );
+    const btn = wrapper.find(`[data-test="alert-list-${first.name}-pause-start-alert"]`);
     expect(btn.exists()).toBe(true);
     await btn.trigger("click");
     await flushPromises();
@@ -595,7 +651,9 @@ describe("AlertList - row actions", () => {
     await wrapper.vm.deleteAlertByAlertId();
     await flushPromises();
 
-    expect(wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id)).toBeUndefined();
+    expect(
+      wrapper.vm.filteredResults.find((r: any) => r.alert_id === row.alert_id),
+    ).toBeUndefined();
   });
 
   it("edit action navigates to update route (sets query action=update)", async () => {
@@ -647,7 +705,7 @@ describe("AlertList - router query behaviors", () => {
     // Use router.push to trigger the watcher properly
     await router.push({
       name: "alertList",
-      query: { action: "import" }
+      query: { action: "import" },
     });
     await flushPromises();
     await wrapper.vm.$nextTick();
@@ -659,7 +717,7 @@ describe("AlertList - router query behaviors", () => {
     const wrapper: any = await mountAlertList();
     wrapper.vm.router.currentRoute.value.query = { action: "add" };
     await waitData(wrapper);
-    
+
     // Directly set the dialog state and call router.push to simulate the component behavior
     wrapper.vm.showAddAlertDialog = true;
     await router.push({
@@ -668,10 +726,10 @@ describe("AlertList - router query behaviors", () => {
         action: "add",
         org_identifier: "test-org",
         folder: "default",
-        alert_type: "all"
+        alert_type: "all",
       },
     });
-    
+
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
     expect(pushSpy).toHaveBeenCalled();
   });
@@ -691,12 +749,10 @@ describe("AlertList - search behaviors", () => {
     wrapper.vm.clearSearchHistory();
     expect(wrapper.vm.searchQuery).toBe("");
   });
-
 });
 
 // 7. Clipboard, computed helpers, selection label
 describe("AlertList - helpers and utilities", () => {
-
   it("computedOwner masks long owners and shows short owners as-is", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -725,7 +781,6 @@ describe("AlertList - helpers and utilities", () => {
 
 // 8. Folder interactions & state resets
 describe("AlertList - folder and state interactions", () => {
-
   it("moveMultipleAlerts opens move dialog and sets ids", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
@@ -763,7 +818,6 @@ describe("AlertList - folder and state interactions", () => {
 
 // 9. Tabs and search interactions (additional, parameterized)
 describe("AlertList - additional validations", () => {
-
   // Parameterized tests for tabs count
   const cases: Array<[string, (r: any) => boolean]> = [
     ["all", () => true],
@@ -776,7 +830,7 @@ describe("AlertList - additional validations", () => {
       await waitData(wrapper);
 
       // Ensure we're in alerts view mode
-      wrapper.vm.viewMode = 'alerts';
+      wrapper.vm.viewMode = "alerts";
       await flushPromises();
 
       // Set activeTab and trigger filtering
@@ -809,7 +863,7 @@ describe("AlertList - micro validations", () => {
   it("pageSize has a default value", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
-    // OTable-based component uses pageSize ref instead of Quasar pagination object
+    // OTable-based component uses pageSize ref instead of a pagination object
     expect(typeof wrapper.vm.pageSize).toBe("number");
     expect(wrapper.vm.pageSize).toBeGreaterThan(0);
   });
@@ -835,7 +889,12 @@ describe("AlertList - micro validations", () => {
   it("transformToExpression builds grouped conditions", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
-    const expr = wrapper.vm.transformToExpression({ or: [{ column: "a", operator: "=", value: 1 }, { and: [{ column: "b", operator: ">", value: 2 }] }] });
+    const expr = wrapper.vm.transformToExpression({
+      or: [
+        { column: "a", operator: "=", value: 1 },
+        { and: [{ column: "b", operator: ">", value: 2 }] },
+      ],
+    });
     expect(typeof expr).toBe("string");
     expect(expr).toContain("OR");
   });
@@ -1171,71 +1230,50 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it("AlertHistoryDrawer is rendered with v-model:open bound to showAlertDetailsDrawer", async () => {
+  // The alert details side panel was removed: a multi-alert's per-group table,
+  // its group history and the cap banner do not fit a drawer, and a routed
+  // page is linkable and back-navigable. Clicking a row now navigates.
+  it("row click routes to the alert detail page instead of opening a drawer", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.exists()).toBe(true);
-    expect(drawer.props("open")).toBe(false);
+    expect(wrapper.findComponent({ name: "AlertHistoryDrawer" }).exists()).toBe(false);
 
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-    expect(drawer.props("open")).toBe(true);
-  });
-
-  it("AlertHistoryDrawer receives alertId and alertType bound from selectedAlertDetails", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    wrapper.vm.selectedAlertDetails = {
-      alert_id: "alert-1",
-      alert_type: "Scheduled",
-    };
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.props("alertId")).toBe("alert-1");
-    expect(drawer.props("alertType")).toBe("Scheduled");
-  });
-
-  it("AlertHistoryDrawer renders empty alertId fallback when no selectedAlertDetails", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
-    wrapper.vm.selectedAlertDetails = null;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    expect(drawer.props("alertId")).toBe("");
-  });
-
-  it("AlertHistoryDrawer 'edit' event invokes editAlertFromDrawer handler", async () => {
-    const wrapper: any = await mountAlertList();
-    await waitData(wrapper);
-
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
     const row = wrapper.vm.filteredResults[0];
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    // ensure handler exists and does not throw
-    expect(typeof wrapper.vm.editAlertFromDrawer).toBe("function");
-    await drawer.vm.$emit("edit", row);
+    wrapper.vm.triggerExpand(row);
     await flushPromises();
-    // After firing edit the details drawer should close
-    expect(wrapper.vm.showAlertDetailsDrawer).toBe(false);
+
+    expect(push).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "alertDetail",
+        params: { alert_id: row.alert_id },
+      }),
+    );
+    push.mockRestore();
   });
 
-  it("AlertHistoryDrawer update:open=false closes showAlertDetailsDrawer", async () => {
+  it("row click without an alert id does not navigate", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
 
-    wrapper.vm.showAlertDetailsDrawer = true;
-    await wrapper.vm.$nextTick();
-
-    const drawer = wrapper.findComponent({ name: "AlertHistoryDrawer" });
-    await drawer.vm.$emit("update:open", false);
+    const push = vi.spyOn(wrapper.vm.router, "push").mockResolvedValue(undefined as any);
+    wrapper.vm.triggerExpand({});
     await flushPromises();
-    expect(wrapper.vm.showAlertDetailsDrawer).toBe(false);
+
+    expect(push).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
+  it("formatGroupCount marks a lower-bound count with the >= it was persisted with", async () => {
+    // The marker is not decoration: past the M-6 cap the stored number is the
+    // most the evaluation could see, so printing it bare understates an
+    // incident.
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+
+    expect(wrapper.vm.formatGroupCount(3, false)).toBe("3");
+    expect(wrapper.vm.formatGroupCount(3, true)).toBe("\u22653");
+    expect(wrapper.vm.formatGroupCount(0, undefined)).toBe("0");
   });
 });
-

@@ -15,10 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <OButtonGroup
-    :class="store.state.theme === 'dark' ? 'dark-theme' : ''"
-    class="tw:p-0 float-left tw:mr-1 function-selector element-box-shadow tw:border tw:border-button-outline-border"
+    class="function-selector element-box-shadow border-button-outline-border float-left mr-1 border p-0"
   >
-    <div v-if="!hideToggle" class="tw:flex tw:items-center tw:px-1">
+    <div v-if="!hideToggle" class="flex items-center px-1">
       <OSwitch
         data-test="logs-search-bar-show-query-toggle-btn"
         v-model="searchObj.meta.showTransformEditor"
@@ -31,15 +30,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           data-test="logs-search-bar-function-dropdown"
           variant="ghost"
-          class="tw:ml-1!"
+          class="ml-1!"
           size="icon-toolbar"
         >
-          <img :src="functionIconUrl" alt="Function" class="tw:size-4" />
-          <OIcon name="arrow-drop-down" size="sm" class="tw:-ml-0.5" />
-          <OTooltip :content="selectedFunctionTooltip" :side-offset="2" />
+          <img :src="functionIconUrl" :alt="t('logs.functionSelector.function')" class="size-4" />
+          <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+          <OTooltip :content="raw(selectedFunctionTooltip)" :side-offset="2" />
         </OButton>
       </template>
-      <div data-test="logs-search-saved-function-list" class="tw:py-0">
+      <div data-test="logs-search-saved-function-list" class="py-0">
         <!-- Search Input -->
         <div>
           <OSearchInput
@@ -51,23 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div v-if="filteredFunctionOptions.length" class="tw:max-h-72 tw:overflow-y-auto">
+        <div v-if="filteredFunctionOptions.length" class="max-h-72 overflow-y-auto">
           <ODropdownItem
             v-for="(item, i) in filteredFunctionOptions"
             :key="'saved-view-' + i"
             :data-test="`logs-search-saved-function-${item.name}`"
-            class="saved-view-item tw:border-b tw:border-(--o2-border-color) tw:rounded-none tw:last:border-none"
+            class="saved-view-item border-card-glass-border rounded-none border-b last:border-none"
             @select="applyFunction(item, true)"
           >
             {{ item.name }}
           </ODropdownItem>
         </div>
         <div v-else>
-          <div class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-2">
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-              <span class="tw:text-sm">{{
-                t("search.savedFunctionNotFound")
-              }}</span>
+          <div class="flex items-center gap-2 px-3 py-2">
+            <div class="flex min-w-0 flex-1 flex-col">
+              <span class="text-sm">{{ t("search.savedFunctionNotFound") }}</span>
             </div>
           </div>
         </div>
@@ -95,29 +92,34 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import { getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
-const props = withDefaults(defineProps<{
-  functionOptions: { name: string; function: string }[];
-  hideToggle?: boolean;
-}>(), {
-  hideToggle: false,
-});
+import { useTheme } from "@/composables/useTheme";
+const props = withDefaults(
+  defineProps<{
+    functionOptions: { name: string; function: string }[];
+    hideToggle?: boolean;
+  }>(),
+  {
+    hideToggle: false,
+  },
+);
 
 const emit = defineEmits(["select:function", "save:function"]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { searchObj } = searchState();
 
 const store = useStore();
+const { isDark } = useTheme();
 
 const functionToggleIcon = computed(() => {
   return (
     "img:" +
-    (store.state.theme == "dark"
+    (isDark.value
       ? getImageURL("images/common/function_dark.svg")
       : getImageURL("images/common/function.svg"))
   );
@@ -126,11 +128,7 @@ const functionToggleIcon = computed(() => {
 const iconRight = computed(() => {
   return (
     "img:" +
-    getImageURL(
-      store.state.theme === "dark"
-        ? "images/common/function_dark.svg"
-        : "images/common/function.svg",
-    )
+    getImageURL(isDark.value ? "images/common/function_dark.svg" : "images/common/function.svg")
   );
 });
 
@@ -158,12 +156,17 @@ const selectedFunctionTooltip = computed(() => {
   return t("search.functionPlaceholder");
 });
 
-const applyFunction = (
-  item: { name: string; function: string },
-  flag = false,
-) => {
+const applyFunction = (item: { name: string; function: string }, flag = false) => {
   functionModel.value = false;
   emit("select:function", item, flag);
 };
 </script>
 
+<style scoped>
+/* keep(lib-override:obuttongroup): rounds OButtonGroup's own root, which this
+   component only receives as a class — not settable from the template without
+   losing to the group's internal radius. */
+.function-selector {
+  border-radius: 0.375rem;
+}
+</style>

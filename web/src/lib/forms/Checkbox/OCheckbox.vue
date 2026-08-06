@@ -24,13 +24,9 @@ defineSlots<CheckboxSlots>();
 // ── Group context ──────────────────────────────────────────────────────────
 const groupContext = inject(CHECKBOX_GROUP_KEY, null);
 
-const resolvedValue = computed<CheckboxPrimitive | undefined>(
-  () => props.value ?? props.val,
-);
+const resolvedValue = computed<CheckboxPrimitive | undefined>(() => props.value ?? props.val);
 
-const isGroupMember = computed(
-  () => groupContext !== null && resolvedValue.value !== undefined,
-);
+const isGroupMember = computed(() => groupContext !== null && resolvedValue.value !== undefined);
 
 const isArrayModel = computed(
   () => Array.isArray(props.modelValue) && resolvedValue.value !== undefined,
@@ -42,25 +38,16 @@ const hasCustomValues = computed(
 
 /** Whether this checkbox is checked, considering the group context if present */
 const checked = computed((): boolean | "indeterminate" => {
-  if (
-    isGroupMember.value &&
-    groupContext &&
-    resolvedValue.value !== undefined
-  ) {
+  if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     return groupContext.isChecked(resolvedValue.value);
   }
 
   if (isArrayModel.value && resolvedValue.value !== undefined) {
-    return (props.modelValue as CheckboxPrimitive[]).includes(
-      resolvedValue.value,
-    );
+    return (props.modelValue as CheckboxPrimitive[]).includes(resolvedValue.value);
   }
 
   if (hasCustomValues.value) {
-    if (
-      props.indeterminateValue !== undefined &&
-      props.modelValue === props.indeterminateValue
-    ) {
+    if (props.indeterminateValue !== undefined && props.modelValue === props.indeterminateValue) {
       return "indeterminate";
     }
     if (props.trueValue !== undefined) {
@@ -73,18 +60,14 @@ const checked = computed((): boolean | "indeterminate" => {
   return Boolean(props.modelValue);
 });
 
-const isDisabled = computed(
-  () => props.disabled || (groupContext?.disabled ?? false),
-);
+const isDisabled = computed(() => props.disabled || (groupContext?.disabled ?? false));
 
 const dataState = computed<"checked" | "unchecked" | "indeterminate">(() => {
   if (checked.value === "indeterminate") return "indeterminate";
   return checked.value ? "checked" : "unchecked";
 });
 
-function mapToCustomValue(
-  value: boolean | "indeterminate",
-): CheckboxModelValue {
+function mapToCustomValue(value: boolean | "indeterminate"): CheckboxModelValue {
   if (!hasCustomValues.value) return value;
   if (value === "indeterminate") {
     return props.indeterminateValue ?? "indeterminate";
@@ -98,11 +81,7 @@ function mapToCustomValue(
 function toggle() {
   if (isDisabled.value) return;
 
-  if (
-    isGroupMember.value &&
-    groupContext &&
-    resolvedValue.value !== undefined
-  ) {
+  if (isGroupMember.value && groupContext && resolvedValue.value !== undefined) {
     groupContext.toggle(resolvedValue.value);
     emit("change", !groupContext.isChecked(resolvedValue.value));
     return;
@@ -127,23 +106,17 @@ function toggle() {
 
 // ── Style ──────────────────────────────────────────────────────────────────
 const boxSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "tw:size-3",
-  sm: "tw:size-3.5",
-  md: "tw:size-4",
-};
-
-const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
-  xs: "tw:text-xs",
-  sm: "tw:text-xs",
-  md: "tw:text-sm",
+  xs: "size-3",
+  sm: "size-3.5",
+  md: "size-4",
 };
 </script>
 
 <template>
   <label
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-2',
-      isDisabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
+      'inline-flex items-center gap-2',
+      isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
     ]"
     @click.stop
   >
@@ -157,37 +130,37 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       :data-state="dataState"
       :disabled="isDisabled"
       :class="[
-        'tw:shrink-0 tw:rounded-sm tw:border tw:cursor-[inherit]',
+        'rounded-checkbox shrink-0 cursor-[inherit] border',
         boxSizeClasses[size ?? 'md'],
         // Base / unchecked
-        'tw:bg-checkbox-bg tw:border-checkbox-border',
+        'bg-checkbox-bg border-checkbox-border',
         // Hover
-        'tw:enabled:hover:border-checkbox-hover-border',
+        'enabled:hover:border-checkbox-hover-border',
         // Checked
-        color === 'primary' && 'tw:data-[state=checked]:bg-checkbox-checked-bg',
-        color === 'primary' && 'tw:data-[state=checked]:border-checkbox-checked-border',
-        color === 'negative' && 'tw:data-[state=checked]:bg-error-600',
-        color === 'negative' && 'tw:data-[state=checked]:border-error-600',
+        color === 'primary' && 'data-[state=checked]:bg-checkbox-checked-bg',
+        color === 'primary' && 'data-[state=checked]:border-checkbox-checked-border',
+        color === 'negative' && 'data-[state=checked]:bg-error-600',
+        color === 'negative' && 'data-[state=checked]:border-error-600',
         // Indeterminate
-        color === 'primary' && 'tw:data-[state=indeterminate]:bg-checkbox-checked-bg',
-        color === 'primary' && 'tw:data-[state=indeterminate]:border-checkbox-checked-border',
-        color === 'negative' && 'tw:data-[state=indeterminate]:bg-error-600',
-        color === 'negative' && 'tw:data-[state=indeterminate]:border-error-600',
+        color === 'primary' && 'data-[state=indeterminate]:bg-checkbox-checked-bg',
+        color === 'primary' && 'data-[state=indeterminate]:border-checkbox-checked-border',
+        color === 'negative' && 'data-[state=indeterminate]:bg-error-600',
+        color === 'negative' && 'data-[state=indeterminate]:border-error-600',
         // Disabled
-        'tw:disabled:bg-checkbox-disabled-bg',
-        'tw:disabled:border-checkbox-disabled-border',
+        'disabled:bg-checkbox-disabled-bg',
+        'disabled:border-checkbox-disabled-border',
         // Focus
-        'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-checkbox-focus-ring',
+        'ring-offset-surface-base focus-visible:ring-checkbox-focus-ring ring-offset-1 outline-none focus-visible:ring-2',
         // Transition
-        'tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150',
+        'transition-[color,background-color,border-color,box-shadow] duration-150',
         // Centering for indicator
-        'tw:flex tw:items-center tw:justify-center',
+        'flex items-center justify-center',
       ]"
       @click="toggle"
     >
       <span
         v-if="checked === true"
-        class="tw:flex tw:items-center tw:justify-center tw:text-checkbox-checked-fg tw:size-full"
+        class="text-checkbox-checked-fg flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -197,7 +170,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="tw:size-full tw:p-0.5"
+          class="size-full p-0.5"
           aria-hidden="true"
         >
           <polyline points="2,6 5,9 10,3" />
@@ -205,7 +178,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
       </span>
       <span
         v-else-if="checked === 'indeterminate'"
-        class="tw:flex tw:items-center tw:justify-center tw:text-checkbox-checked-fg tw:size-full"
+        class="text-checkbox-checked-fg flex size-full items-center justify-center"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -214,7 +187,7 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
           stroke="currentColor"
           stroke-width="2.5"
           stroke-linecap="round"
-          class="tw:size-full tw:p-0.5"
+          class="size-full p-0.5"
           aria-hidden="true"
         >
           <line x1="2" y1="6" x2="10" y2="6" />
@@ -225,11 +198,14 @@ const labelSizeClasses: Record<NonNullable<CheckboxProps["size"]>, string> = {
     <span
       v-if="$slots.label || label"
       :class="[
-        'o-input-label tw:text-sm tw:font-semibold tw:select-none tw:leading-tight',
-        isDisabled && 'o-input-label--disabled',
+        'o-input-label text-compact leading-tight select-none',
+        isDisabled
+          ? 'text-input-label-text-disabled font-normal'
+          : 'text-input-label-text font-medium',
       ]"
     >
-      <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true">&nbsp;*</span>
+      <slot name="label">{{ label }}</slot
+      ><span v-if="required" aria-hidden="true">&nbsp;*</span>
     </span>
   </label>
 </template>

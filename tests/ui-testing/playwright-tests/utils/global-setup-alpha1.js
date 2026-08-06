@@ -4,7 +4,14 @@ const fs = require('fs');
 const testLogger = require('./test-logger.js');
 const logsdata = require('../../../test-data/logs_data.json');
 
-// Auth storage paths
+// Auth storage paths. Filenames stay canonical (user.json / cloud-config.json)
+// because ~20 spec files and shared utils (cloud-auth.js, enhanced-baseFixtures.js)
+// read these exact paths. Multi-user splitting (ALPHA1_USER_INDEX, 1|2|3) is
+// achieved at the CI layer instead: each shard runs on its own runner and
+// downloads only ITS user's artifact into this dir, so the canonical file always
+// holds the right user's session. USER_INDEX here only selects which Dex user to
+// log in as (email resolution below).
+const USER_INDEX = (process.env.ALPHA1_USER_INDEX || '1').trim();
 const AUTH_DIR = path.join(__dirname, 'auth');
 const AUTH_FILE = path.join(AUTH_DIR, 'user.json');
 const CLOUD_CONFIG_FILE = path.join(AUTH_DIR, 'cloud-config.json');
@@ -28,11 +35,17 @@ async function globalSetup() {
   if (!baseUrl) {
     throw new Error('ZO_BASE_URL must be set');
   }
-  const userEmail = (process.env.ALPHA1_USER_EMAIL || '').trim();
+  // Resolve this shard's Dex user by index: ALPHA1_USER_EMAIL_<N> when provided,
+  // else fall back to the base ALPHA1_USER_EMAIL. This keeps the workflow safe to
+  // roll out incrementally — if _2/_3 aren't set yet, every shard just uses user 1.
+  // Password is shared across all users (single ALPHA1_USER_PASSWORD secret).
+  const userEmail = (process.env[`ALPHA1_USER_EMAIL_${USER_INDEX}`]
+    || process.env.ALPHA1_USER_EMAIL || '').trim();
   const userPassword = (process.env.ALPHA1_USER_PASSWORD || '').trim();
   if (!userEmail || !userPassword) {
     throw new Error('ALPHA1_USER_EMAIL and ALPHA1_USER_PASSWORD must be set');
   }
+  testLogger.info(`[alpha1] Using Dex user index ${USER_INDEX} (${userEmail})`);
 
   // Check if shared auth state exists (downloaded from cleanup job artifact)
   // If valid, skip the entire Dex login flow — just verify and ingest
@@ -385,22 +398,26 @@ async function switchOrgViaDropdown(page, targetOrgId) {
 
   // Open dropdown → search-filter → click menu item
   // (search-input + menu-item-label is more reliable than role=option matching)
-  const dropdown = page.locator('[data-test="navbar-organizations-select"]');
+  // Post-UX-revamp: the org selector opens via a dedicated trigger button
+  // ([data-test="navbar-organizations-select-trigger"]); the old inline
+  // 'arrow_drop_down' text no longer exists (now an SVG icon).
+  const dropdown = page.locator('[data-test="navbar-organizations-select-trigger"]');
   await dropdown.waitFor({ state: 'visible', timeout: 15000 });
-  await dropdown.getByText('arrow_drop_down').click({ force: true });
+  await dropdown.click();
   await page.waitForTimeout(1500);
 
-  const searchInput = page.locator('[data-test="organization-search-input"]');
+  // Post-UX-revamp: data-test moved to the OSearchInput wrapper <div>;
+  // the real editable element is the nested native <input>.
+  const searchInput = page.locator('[data-test="organization-search-input"] input');
   await searchInput.waitFor({ state: 'visible', timeout: 10000 });
   await searchInput.fill(target.name);
   await page.waitForTimeout(1500);
 
-  // Filter menu items by exact org name (regex anchors prevent partial matches
-  // — e.g. an org "Foo" would otherwise also match a row containing "Foo Bar")
-  const escapedName = target.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Post-UX-revamp: each org row carries its identifier on a
+  // data-test-org-identifier attribute — match that exactly instead of
+  // parsing "name | id" row text (whose format changed in the revamp).
   const menuItem = page
-    .locator('[data-test="organization-menu-item-label-item-label"]')
-    .filter({ hasText: new RegExp(`^\\s*${escapedName}\\s*\\|`) })
+    .locator(`[data-test-org-identifier="${targetOrgId}"]`)
     .first();
   await menuItem.waitFor({ state: 'visible', timeout: 5000 });
   await menuItem.click();
@@ -480,7 +497,11 @@ async function performGlobalIngestion(page) {
 
   try {
     const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    orgId = cloudConfig.orgIdentifier;
+    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
+    // cloud-config.json by the shared-auth barrier. The passcode is user-level
+    // (identity), so it authorizes any org the user is a member of — only the
+    // target org differs per shard. Enables per-shard org isolation.
+    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
     const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
     headers = {
       'Authorization': `Basic ${basicAuth}`,
@@ -491,9 +512,12 @@ async function performGlobalIngestion(page) {
     return;
   }
 
+  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
+  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
+  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
+  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -535,12 +559,11 @@ async function performGlobalIngestion(page) {
 
       if (streamsResult.ok) {
         const hasE2e = streamsResult.names.includes('e2e_automate');
-        const hasAuto = streamsResult.names.includes('auto_playwright_stream');
-        if (hasE2e && hasAuto) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        if (hasE2e) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           break;
         }
-        testLogger.debug(`[alpha1] Streams not yet indexed (e2e_automate=${hasE2e}, auto_playwright_stream=${hasAuto}), waiting...`);
+        testLogger.debug(`[alpha1] e2e_automate not yet indexed, waiting...`);
       } else {
         testLogger.debug(`[alpha1] Streams API returned ${streamsResult.status}, retrying...`);
       }
@@ -591,16 +614,19 @@ async function verifySharedAuth(baseUrl) {
     await menuItem.waitFor({ state: 'visible', timeout: 15000 });
     testLogger.info('[alpha1] Shared auth verified — menu visible');
 
-    // Re-apply org switch + persist if active org doesn't match target
-    if (targetOrg && targetOrg !== 'default') {
-      const activeOrg = new URL(page.url()).searchParams.get('org_identifier');
-      if (activeOrg !== targetOrg) {
-        testLogger.info(`[alpha1] Active org (${activeOrg}) != target (${targetOrg}); re-switching`);
-        await switchOrgViaDropdown(page, targetOrg);
-        await context.storageState({ path: AUTH_FILE });
-        testLogger.info(`[alpha1] Auth state re-saved with target org active`);
-      }
-    }
+    // Note: no dropdown org-switch needed here. Each test pins its own org by
+    // navigating to /web/?org_identifier=<ORGNAME> (see navigateToBase), which the
+    // app honours on a fresh page load. Forcing a dropdown switch here is both
+    // redundant and flaky (the virtualized selector under load), so we rely on the
+    // per-test URL instead. The passcode below is still fetched per shard org.
+
+    // Re-fetch THIS shard's own org passcode via the session. The downloaded
+    // cloud-config.json holds the shared-auth barrier org's ingestion token,
+    // which 401s against any other org — each org has its own o2oi_ default
+    // ingestion token (see core/organization.rs get_passcode). Overwrite
+    // cloud-config.json with ORGNAME's passcode so per-shard ingestion succeeds.
+    await fetchCloudConfig(page);
+
     return true;
   } catch (e) {
     testLogger.warn(`[alpha1] Shared auth verification error: ${e.message}`);
@@ -622,7 +648,11 @@ async function performGlobalIngestionWithFetch() {
 
   try {
     const cloudConfig = JSON.parse(fs.readFileSync(CLOUD_CONFIG_FILE, 'utf-8'));
-    orgId = cloudConfig.orgIdentifier;
+    // Ingest into THIS shard's org (ORGNAME) rather than the org baked into
+    // cloud-config.json by the shared-auth barrier. The passcode is user-level
+    // (identity), so it authorizes any org the user is a member of — only the
+    // target org differs per shard. Enables per-shard org isolation.
+    orgId = process.env.ORGNAME || cloudConfig.orgIdentifier;
     const basicAuth = Buffer.from(`${cloudConfig.userEmail}:${cloudConfig.passcode}`).toString('base64');
     headers = {
       'Authorization': `Basic ${basicAuth}`,
@@ -634,9 +664,12 @@ async function performGlobalIngestionWithFetch() {
     return;
   }
 
+  // Only e2e_automate is pre-provisioned as a shared fixture. The Alerts ui-operations
+  // tests that used to rely on a shared 'auto_playwright_stream' now self-ingest their
+  // own unique per-run streams, so we no longer pre-create (or wait on) that stream —
+  // on the shared cloud org it was routinely stuck "being deleted" by other branch runs.
   const streams = [
     { name: 'e2e_automate', data: logsdata },
-    { name: 'auto_playwright_stream', data: [{ level: 'info', job: 'test', log: 'test message for openobserve' }] },
   ];
 
   for (const stream of streams) {
@@ -669,8 +702,8 @@ async function performGlobalIngestionWithFetch() {
       if (r.ok) {
         const data = await r.json();
         const names = (data.list || []).map(s => s.name);
-        if (names.includes('e2e_automate') && names.includes('auto_playwright_stream')) {
-          testLogger.info(`[alpha1] Both streams indexed after ${Date.now() - startTime}ms`);
+        if (names.includes('e2e_automate')) {
+          testLogger.info(`[alpha1] e2e_automate indexed after ${Date.now() - startTime}ms`);
           return;
         }
       }
@@ -684,3 +717,8 @@ async function performGlobalIngestionWithFetch() {
 }
 
 module.exports = globalSetup;
+// Named helpers reused by mid-run re-authentication (reauth-alpha1.js). Attaching
+// them as properties keeps the default export the globalSetup function Playwright calls.
+module.exports.performDexLogin = performDexLogin;
+module.exports.switchOrgViaDropdown = switchOrgViaDropdown;
+module.exports.fetchCloudConfig = fetchCloudConfig;

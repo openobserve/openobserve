@@ -24,18 +24,19 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
 import { parseCard } from "./parseCard";
 import { renderCardSegments, safeHttpUrl, type CardSubstitutions } from "./renderMarkdown";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   /** Raw `data-source-ui.md` content for this integration. */
-  content: string;
+  content: I18nText;
   /** Optional documentation URL shown as a footer link. */
   docUrl?: string;
 }>();
 
 const store = useStore();
 const { endpoint } = useIngestion();
-
-const isDark = computed(() => store.state?.theme === "dark");
 
 // The {url}/{org}/{token} the snippets are substituted with. `token` is the
 // base64 of email:password (the same value used for ingest tokens), WITHOUT the
@@ -67,12 +68,12 @@ const renderedSections = computed(() =>
 </script>
 
 <template>
-  <div class="o2-card tw:min-w-0" data-test="ai-integration-card">
-    <div class="o2-card-inner tw:min-w-0">
+  <div class="o2-card min-w-0" data-test="ai-integration-card">
+    <div class="o2-card-inner min-w-0">
       <!-- Header chrome -->
-      <header class="tw:mb-5">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap">
-          <h2 class="tw:text-xl tw:font-semibold tw:m-0 tw:leading-tight">
+      <header class="mb-5">
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="m-0 text-xl leading-tight font-semibold">
             {{ metadata.displayName }}
           </h2>
           <OTag v-if="metadata.category" type="integrationMeta" value="category">
@@ -82,10 +83,7 @@ const renderedSections = computed(() =>
             {{ metadata.runtime }}
           </OTag>
         </div>
-        <p
-          v-if="metadata.tagline"
-          class="tw:text-sm tw:opacity-60 tw:mt-1.5 tw:mb-0"
-        >
+        <p v-if="metadata.tagline" class="mt-1.5 mb-0 text-sm opacity-60">
           {{ metadata.tagline }}
         </p>
       </header>
@@ -95,22 +93,17 @@ const renderedSections = computed(() =>
         v-for="(w, i) in warnings"
         :key="`warn-${i}`"
         variant="warning"
-        :content="w"
-        class="tw:mb-5"
+        :content="raw(w)"
+        class="mb-5"
       />
 
       <!-- Sections (all open — install guides read top to bottom) -->
-      <section
-        v-for="section in renderedSections"
-        :key="section.title"
-        class="o2-section tw:min-w-0"
-      >
+      <section v-for="section in renderedSections" :key="section.title" class="o2-section min-w-0">
         <h3 class="o2-section-title">{{ section.title }}</h3>
         <template v-for="(seg, j) in section.segments" :key="j">
           <div
             v-if="seg.type === 'html'"
-            class="o2-card-md tw:prose tw:prose-sm tw:max-w-none tw:min-w-0"
-            :class="{ 'tw:prose-invert': isDark }"
+            class="o2-card-md prose prose-sm dark:prose-invert max-w-none min-w-0"
             v-html="seg.html"
           ></div>
           <OCodeBlock v-else :code="seg.code" :lang="seg.lang" data-test="ai-md-code" />
@@ -119,34 +112,37 @@ const renderedSections = computed(() =>
 
       <!-- Documentation link — identical markup to the legacy ingestion cards
            (AIIntegrationDetail.vue) so it looks the same across all sections. -->
-      <div v-if="docUrl" class="tw:font-bold tw:pt-6 tw:pb-2">
-        Click
+      <div v-if="docUrl" class="pt-6 pb-2 font-bold">
+        {{ t("ingestion.docLinkClick") }}
         <a
           :href="safeHttpUrl(docUrl)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-blue-500 hover:text-blue-600"
+          class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.docLinkHere") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.docLinkDefaultText") }}
       </div>
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
+/* keep(generated-content): .o2-card-md wraps markdown rendered at runtime — the
+   :deep(:not(pre) > code)::before/::after backtick strip and :deep(table) rules
+   target nodes this template never writes, so they cannot be utilities. */
 .o2-card {
   padding: 1.5rem 1.75rem;
 }
 
 .o2-card-inner {
-  max-width: 980px;
+  max-width: 61.25rem;
 }
 
 .o2-section {
   padding: 1.25rem 0;
-  border-top: 1px solid rgba(136, 136, 136, 0.18);
+  border-top: 1px solid var(--color-border-default);
 
   &:first-of-type {
     border-top: none;
@@ -155,7 +151,7 @@ const renderedSections = computed(() =>
 }
 
 .o2-section-title {
-  font-size: 0.95rem;
+  font-size: var(--text-base);
   font-weight: 600;
   margin: 0 0 0.5rem;
   letter-spacing: 0.01em;
@@ -174,9 +170,9 @@ const renderedSections = computed(() =>
 }
 
 .o2-card-md :deep(:not(pre) > code) {
-  background: rgba(136, 136, 136, 0.16);
+  background: var(--color-code-bg);
   padding: 0.1rem 0.35rem;
-  border-radius: 4px;
+  border-radius: var(--radius-default);
   font-weight: 400;
 }
 
@@ -185,6 +181,6 @@ const renderedSections = computed(() =>
   display: block;
   width: 100%;
   overflow-x: auto;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
 }
 </style>

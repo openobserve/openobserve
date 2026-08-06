@@ -21,7 +21,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock toast so tests don't need $q
+// Mock toast
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToast(...args),
@@ -51,14 +51,16 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
 import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
-import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import incidentsService, {
+  Incident,
+  IncidentWithAlerts,
+  IncidentAlert,
+} from "@/services/incidents";
 import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
-
-// Install Quasar globally
 
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
@@ -78,7 +80,9 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   topology_context: overrides.topology_context,
 });
 
-const createIncidentWithAlerts = (overrides: Partial<IncidentWithAlerts> = {}): IncidentWithAlerts => ({
+const createIncidentWithAlerts = (
+  overrides: Partial<IncidentWithAlerts> = {},
+): IncidentWithAlerts => ({
   ...createIncident(overrides),
   alerts: overrides.alerts || [],
   triggers: overrides.triggers || [],
@@ -123,15 +127,41 @@ describe("IncidentDetailDrawer.vue", () => {
           SREChat: true,
           // Use custom stubs that accept props so we can test them
           TelemetryCorrelationDashboard: {
-            name: 'TelemetryCorrelationDashboard',
+            name: "TelemetryCorrelationDashboard",
             template: '<div class="telemetry-stub"></div>',
-            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'matchedSetId', 'chipDimensions', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
+            props: [
+              "mode",
+              "externalActiveTab",
+              "serviceName",
+              "matchedDimensions",
+              "additionalDimensions",
+              "matchedSetId",
+              "chipDimensions",
+              "logStreams",
+              "metricStreams",
+              "traceStreams",
+              "timeRange",
+              "hideDimensionFilters",
+            ],
           },
           CorrelatedLogsTable: {
-            name: 'CorrelatedLogsTable',
+            name: "CorrelatedLogsTable",
             template: '<div class="logs-stub"></div>',
-            props: ['serviceName', 'sourceStream', 'sourceType', 'hideViewRelatedButton', 'hideDimensionFilters', 'matchedDimensions', 'availableDimensions', 'additionalDimensions', 'logStreams', 'ftsFields', 'timeRange', 'hideSearchTermActions'],
-            emits: ['sendToAiChat']
+            props: [
+              "serviceName",
+              "sourceStream",
+              "sourceType",
+              "hideViewRelatedButton",
+              "hideDimensionFilters",
+              "matchedDimensions",
+              "availableDimensions",
+              "additionalDimensions",
+              "logStreams",
+              "ftsFields",
+              "timeRange",
+              "hideSearchTermActions",
+            ],
+            emits: ["sendToAiChat"],
           },
         },
       },
@@ -222,13 +252,16 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("URL-based Incident Loading", () => {
     it("should emit close when drawer closes", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -342,21 +375,13 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should acknowledge incident", async () => {
       await wrapper.vm.acknowledgeIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "acknowledged"
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "acknowledged");
     });
 
     it("should resolve incident", async () => {
       await wrapper.vm.resolveIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "resolved"
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "resolved");
     });
 
     it("should reopen incident", async () => {
@@ -365,11 +390,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
       await wrapper.vm.reopenIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "open"
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
     });
 
     it("should set updating state during status update", async () => {
@@ -417,7 +438,6 @@ describe("IncidentDetailDrawer.vue", () => {
         data: { status: "acknowledged", updated_at: 1700000001000000 },
       });
 
-      const originalStatus = wrapper.vm.incidentDetails.status;
       await wrapper.vm.acknowledgeIncident();
 
       expect(wrapper.vm.incidentDetails.status).toBe("acknowledged");
@@ -464,7 +484,12 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should trigger RCA analysis", async () => {
       await wrapper.vm.triggerRca();
 
-      expect(incidentsService.triggerRca).toHaveBeenCalledWith("default", "1");
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "default",
+        "1",
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
+      );
     });
 
     it("should set loading state during RCA", async () => {
@@ -692,23 +717,26 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">bold</strong>');
+      expect(formatted).toContain('<strong class="font-semibold">bold</strong>');
     });
 
     it("should format h2 headers", () => {
       const content = "## Header 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-bold");
-      expect(formatted).toContain("tw:text-lg");
-      expect(formatted).toContain("tw:text-blue-600");
+      expect(formatted).toContain("font-bold");
+      expect(formatted).toContain("text-lg");
+      // Colour comes from the `:deep(.rca-report-content) .rca-h2` rule in
+      // IncidentRCAAnalysis.vue (unlayered, so it beat the old text-blue-600
+      // utility anyway) — the hook class is what this renderer must emit.
+      expect(formatted).toContain("rca-h2");
     });
 
     it("should format h3 headers", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-semibold");
+      expect(formatted).toContain("font-semibold");
     });
 
     it("should format unordered lists", () => {
@@ -732,8 +760,8 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">Issue</strong>');
-      expect(formatted).toContain("tw:font-bold");
+      expect(formatted).toContain('<strong class="font-semibold">Issue</strong>');
+      expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
     });
   });
@@ -806,7 +834,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should display topology edges", () => {
       expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
-      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe("service_dependency");
+      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe(
+        "service_dependency",
+      );
     });
   });
 
@@ -885,24 +915,30 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("Close Functionality", () => {
     it("should close drawer", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("should navigate back to incident list on close", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Verify navigation to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
   });
 
@@ -911,7 +947,7 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper(
         {},
         { selectedOrganization: { identifier: "custom-org" } },
-        "test-123"
+        "test-123",
       );
 
       await nextTick();
@@ -923,11 +959,7 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should use organization in status updates", async () => {
       (incidentsService.updateStatus as any).mockResolvedValue({});
 
-      wrapper = await createWrapper(
-        {},
-        { selectedOrganization: { identifier: "org-123" } },
-        "1"
-      );
+      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-123" } }, "1");
 
       await nextTick();
       await flushPromises();
@@ -937,16 +969,12 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "org-123",
         expect.any(String),
-        "acknowledged"
+        "acknowledged",
       );
     });
 
     it("should use organization in RCA trigger", async () => {
-      wrapper = await createWrapper(
-        {},
-        { selectedOrganization: { identifier: "org-456" } },
-        "1"
-      );
+      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-456" } }, "1");
 
       await nextTick();
       await flushPromises();
@@ -955,7 +983,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
         "org-456",
-        expect.any(String)
+        expect.any(String),
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
       );
     });
   });
@@ -1057,9 +1087,9 @@ describe("IncidentDetailDrawer.vue", () => {
       // This test verifies the fix: uniqueness should be by alert_id, not alert_name
       const triggers = [
         createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }), // Same name, different ID
         createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }), // Same name, different ID
       ];
 
       (incidentsService.get as any).mockResolvedValue({
@@ -1149,9 +1179,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should derive alerts from triggers instead of API alerts array", async () => {
-      const triggers = [
-        createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" }),
-      ];
+      const triggers = [createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" })];
 
       (incidentsService.get as any).mockResolvedValue({
         data: {
@@ -1205,8 +1233,9 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should have translation for fired times with parameter", () => {
-      const translation = wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 });
-      expect(translation).toBe("Fired 5 time(s)");
+      // Pipe plural: `count` in the named bag selects the branch AND fills {count}.
+      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 })).toBe("Fired 5 times");
+      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 1 })).toBe("Fired 1 time");
     });
 
     it("should have translation for refresh correlated data", () => {
@@ -1245,7 +1274,11 @@ describe("IncidentDetailDrawer.vue", () => {
       additionalDimensions: {},
       logStreams: [],
       metricStreams: [
-        { stream_name: "k8s_metrics", stream_type: "Metrics", filters: { k8s_pod_name: "pod-abc" } },
+        {
+          stream_name: "k8s_metrics",
+          stream_type: "Metrics",
+          filters: { k8s_pod_name: "pod-abc" },
+        },
       ],
       traceStreams: [],
       correlationData: {
@@ -1255,7 +1288,11 @@ describe("IncidentDetailDrawer.vue", () => {
         related_streams: {
           logs: [],
           metrics: [
-            { stream_name: "k8s_metrics", stream_type: "Metrics", filters: { k8s_pod_name: "pod-abc" } },
+            {
+              stream_name: "k8s_metrics",
+              stream_type: "Metrics",
+              filters: { k8s_pod_name: "pod-abc" },
+            },
           ],
           traces: [],
         },
@@ -1368,7 +1405,11 @@ describe("IncidentDetailDrawer.vue", () => {
         data: {
           events: [
             { type: "ai_analysis_begin", timestamp: 100 },
-            { type: "ai_analysis_failed", timestamp: 200, data: { reason: "timeout", error_details: "Query timed out" } },
+            {
+              type: "ai_analysis_failed",
+              timestamp: 200,
+              data: { reason: "timeout", error_details: "Query timed out" },
+            },
           ],
         },
       });
@@ -1384,12 +1425,14 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(wrapper.vm.analysisInFlight).toBe(false);
     });
 
-    it("handles API error gracefully and sets analysisInFlight to false", async () => {
+    it("handles API error gracefully and preserves last known analysisInFlight state", async () => {
       (incidentsService.getEvents as any).mockRejectedValue(new Error("fetch failed"));
       wrapper.vm.analysisInFlight = true; // set to true first
       await wrapper.vm.checkAnalysisInFlight("1");
       await flushPromises();
-      expect(wrapper.vm.analysisInFlight).toBe(false);
+      // A failed events fetch says nothing about the run — the last known in-flight
+      // state is preserved rather than being cleared to a phantom "not running".
+      expect(wrapper.vm.analysisInFlight).toBe(true);
     });
 
     it("calls getEvents with correct org and incidentId", async () => {
@@ -1409,7 +1452,9 @@ describe("IncidentDetailDrawer.vue", () => {
     it("calls updateIncident with correct org, id and severity", async () => {
       await wrapper.vm.updateSeverity("P3");
       await flushPromises();
-      expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", { severity: "P3" });
+      expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", {
+        severity: "P3",
+      });
     });
 
     it("updates local severity after successful save", async () => {

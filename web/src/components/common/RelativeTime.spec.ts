@@ -20,7 +20,7 @@ import { createStore } from "vuex";
 
 // Mock zincutils
 vi.mock("@/utils/zincutils", () => ({
-  timestampToTimezoneDate: vi.fn((timestamp, timezone, format) => {
+  timestampToTimezoneDate: vi.fn(() => {
     return "2024-01-15 10:30:45.123";
   }),
 }));
@@ -181,8 +181,6 @@ describe("RelativeTime", () => {
         plugins: [store],
       },
     });
-
-    const initialText = wrapper.text();
 
     const timestamp2 = Date.now() - 120000;
     await wrapper.setProps({ timestamp: timestamp2 });

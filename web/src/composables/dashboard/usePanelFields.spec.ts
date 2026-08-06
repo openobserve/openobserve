@@ -54,10 +54,7 @@ const makePanelData = (type = "bar") =>
       currentQueryIndex: 0,
     },
     meta: {
-      queryFields: {} as Record<
-        number,
-        { customQueryFields: any[]; vrlFunctionFieldList: any[] }
-      >,
+      queryFields: {} as Record<number, { customQueryFields: any[]; vrlFunctionFieldList: any[] }>,
       stream: {
         vrlFunctionFieldList: [] as any[],
         customQueryFields: [] as any[],
@@ -96,9 +93,7 @@ describe("usePanelFields", () => {
     });
 
     it("handles multi-word name with mixed separators", () => {
-      expect(fields.generateLabelFromName("request_count_total")).toBe(
-        "Request Count Total",
-      );
+      expect(fields.generateLabelFromName("request_count_total")).toBe("Request Count Total");
     });
   });
 

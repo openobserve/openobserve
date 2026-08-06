@@ -2,7 +2,7 @@
 import type { OSeparatorProps } from "./OSeparator.types";
 import { Separator } from "reka-ui";
 
-const props = withDefaults(defineProps<OSeparatorProps>(), {
+withDefaults(defineProps<OSeparatorProps>(), {
   vertical: false,
 });
 </script>
@@ -12,8 +12,8 @@ const props = withDefaults(defineProps<OSeparatorProps>(), {
     :orientation="vertical ? 'vertical' : 'horizontal'"
     :class="
       vertical
-        ? 'tw:block tw:self-stretch tw:w-separator tw:min-h-0 tw:border-0 tw:bg-separator'
-        : 'tw:block tw:w-full tw:h-separator tw:border-0 tw:bg-separator'
+        ? 'w-separator bg-separator block min-h-0 self-stretch border-0'
+        : 'h-separator bg-separator block w-full border-0'
     "
   />
 </template>

@@ -15,10 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="backfill-jobs-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
-  >
+  <div data-test="backfill-jobs-list-page" class="flex h-full min-h-0 flex-col">
     <!-- Filters live in the shell header (Functions.vue #o2-page-actions),
          next to the "Pipelines › Backfill Jobs" breadcrumb.
          `defer` (Vue 3.5+) waits for the target to be rendered in the same
@@ -29,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OSelect
         v-model="filters.status"
         :options="allStatusOptions"
-        placeholder="Status"
+        :placeholder="t('common.status')"
         clearable
         searchable
-        class="tw:w-[150px]"
+        class="w-37.5"
         data-test="status-filter"
       />
       <OSelect
@@ -40,201 +37,201 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :options="allPipelineOptions"
         labelKey="label"
         valueKey="value"
-        placeholder="Pipeline"
+        :placeholder="t('pipeline.pipelineLabel')"
         clearable
         searchable
-        class="tw:w-[250px]"
+        class="w-62.5"
         data-test="pipeline-filter"
+      />
+      <OButton variant="outline" size="sm" @click="clearFilters" data-test="clear-filters-btn">
+        {{ t("pipeline.clearFilters") }}
+      </OButton>
+      <OTableColumnToggle
+        :columns="columns"
+        :column-visibility="columnVisibility"
+        @update:column-visibility="setColumnVisibility"
       />
       <OButton
         variant="outline"
-        size="sm"
-        @click="clearFilters"
-        data-test="clear-filters-btn"
-      >
-        Clear Filters
-      </OButton>
-      <OButton
-        variant="ghost-muted"
         size="icon-sm"
+        class="shrink-0"
         @click="refreshJobs"
         :disabled="loading"
         data-test="refresh-btn"
         icon-left="refresh"
       >
-        <OTooltip content="Refresh" side="top" />
+        <OTooltip :content="t('common.refresh')" side="top" />
       </OButton>
     </Teleport>
 
     <!-- Jobs Table -->
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <div class="tw:rounded-lg tw:h-full">
-          <OTable
-            ref="qTableRef"
-            :frame="false"
-            :data="filteredJobs"
-            :columns="columns"
-            :default-columns="false"
-            row-key="job_id"
-            :loading="loading"
-            pagination="client"
-            :page-size="selectedPerPage"
-            :page-size-options="perPageOptionsList"
-            sorting="client"
-            filter-mode="client"
-            :show-global-filter="false"
-            width="100%"
-            class="tw:w-full tw:h-full"
-            data-test="backfill-jobs-table"
-          >
-            <!-- Empty State -->
-            <template #empty>
-              <OEmptyState
-                size="hero"
-                preset="no-backfill-jobs"
-                :filtered="!!(filters.status || filters.pipelineId)"
-                :hide-action="!(filters.status || filters.pipelineId)"
-                @action="(id) => id === 'clear-filters' && ((filters.status = ''), (filters.pipelineId = ''))"
-              />
-            </template>
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <div class="rounded-default h-full">
+        <OTable
+          ref="qTableRef"
+          :frame="false"
+          :data="filteredJobs"
+          :columns="columns"
+          :column-visibility="columnVisibility"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="pipelines-backfill-jobs-list"
+          row-key="job_id"
+          :loading="loading"
+          pagination="client"
+          :page-size="selectedPerPage"
+          :page-size-options="perPageOptionsList"
+          sorting="client"
+          filter-mode="client"
+          :show-global-filter="false"
+          width="100%"
+          class="h-full w-full"
+          data-test="backfill-jobs-table"
+        >
+          <!-- Empty State -->
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-backfill-jobs"
+              :filtered="!!(filters.status || filters.pipelineId)"
+              :hide-action="!(filters.status || filters.pipelineId)"
+              @action="
+                (id) => id === 'clear-filters' && ((filters.status = ''), (filters.pipelineId = ''))
+              "
+            />
+          </template>
 
-            <!-- Bottom footer -->
-            <template #bottom="{ totalRows }">
-              <div
-                class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4 tw:py-2"
+          <!-- Bottom footer -->
+          <template #bottom="{ totalRows }">
+            <div class="mr-4 flex items-center py-2 text-xs font-normal">
+              {{ t("pipeline.backfillJobLabel", { count: totalRows }, totalRows) }}
+            </div>
+          </template>
+
+          <!-- Pipeline Name Column -->
+          <template #cell-pipeline_name="{ row }">
+            <div class="font-medium">
+              {{ row.pipeline_name || row.pipeline_id }}
+            </div>
+          </template>
+
+          <!-- Time Range Column -->
+          <template #cell-time_range="{ row }">
+            <div class="text-xs">
+              {{ formatTimeRange(row.start_time, row.end_time) }}
+            </div>
+          </template>
+
+          <!-- Progress Column -->
+          <template #cell-progress_percent="{ row }">
+            <div class="flex w-full items-center gap-2">
+              <div class="relative flex-1">
+                <OProgressBar
+                  :value="row.progress_percent / 100"
+                  variant="default"
+                  size="lg"
+                  data-test="progress-bar"
+                >
+                  {{ row.progress_percent }}%
+                </OProgressBar>
+              </div>
+              <div class="text-text-body w-24 shrink-0 pr-2 text-xs whitespace-nowrap">
+                <template v-if="row.chunks_total">
+                  {{ row.chunks_completed || 0 }}/{{ row.chunks_total }}
+                  {{ t("pipeline.chunksUnit") }}
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- Created At Column -->
+          <template #cell-created_at="{ row }">
+            <OTimeCell
+              :value="row.created_at"
+              unit="us"
+              :timezone="store.state.timezone"
+              :empty-label="t('pipeline.notAvailable')"
+            />
+          </template>
+
+          <!-- Last Triggered At Column -->
+          <template #cell-last_triggered_at="{ row }">
+            <OTimeCell
+              :value="row.last_triggered_at"
+              unit="us"
+              mode="absolute"
+              :timezone="store.state.timezone"
+              :empty-label="t('pipeline.never')"
+            />
+          </template>
+
+          <!-- Actions Column -->
+          <template #cell-actions="{ row }">
+            <div class="flex items-center justify-center">
+              <OButton
+                v-if="canPauseJob(row)"
+                variant="ghost-destructive"
+                size="icon-sm"
+                @click="confirmPauseJob(row)"
+                data-test="pause-job-btn"
+                icon-left="pause"
               >
-                {{ totalRows }} Backfill Job{{ totalRows === 1 ? "" : "s" }}
-              </div>
-            </template>
-
-            <!-- Pipeline Name Column -->
-            <template #cell-pipeline_name="{ row }">
-              <div class="tw:font-medium">
-                {{ row.pipeline_name || row.pipeline_id }}
-              </div>
-            </template>
-
-            <!-- Time Range Column -->
-            <template #cell-time_range="{ row }">
-              <div class="tw:text-xs">
-                {{
-                  formatTimeRange(row.start_time, row.end_time)
-                }}
-              </div>
-            </template>
-
-            <!-- Progress Column -->
-            <template #cell-progress_percent="{ row }">
-              <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                <div class="tw:flex-1 tw:relative">
-                  <OProgressBar
-                    :value="row.progress_percent / 100"
-                    variant="default"
-                    size="lg"
-                    data-test="progress-bar"
-                  >
-                    {{ row.progress_percent }}%
-                  </OProgressBar>
-                </div>
-                <div
-                  v-if="row.chunks_total"
-                  class="tw:text-xs tw:text-text-primary tw:whitespace-nowrap tw:pr-8"
-                >
-                  {{ row.chunks_completed || 0 }}/{{
-                    row.chunks_total
-                  }}
-                  chunks
-                </div>
-              </div>
-            </template>
-
-            <!-- Created At Column -->
-            <template #cell-created_at="{ row }">
-              <OTimeCell
-                :value="row.created_at"
-                unit="us"
-                :timezone="store.state.timezone"
-                empty-label="N/A"
-              />
-            </template>
-
-            <!-- Last Triggered At Column -->
-            <template #cell-last_triggered_at="{ row }">
-              <OTimeCell
-                :value="row.last_triggered_at"
-                unit="us"
-                mode="absolute"
-                :timezone="store.state.timezone"
-                empty-label="Never"
-              />
-            </template>
-
-            <!-- Actions Column -->
-            <template #cell-actions="{ row }">
-              <div class="tw:flex tw:items-center tw:justify-center">
-                <OButton
-                  v-if="canPauseJob(row)"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  @click="confirmPauseJob(row)"
-                  data-test="pause-job-btn"
-                  icon-left="pause"
-                >
-                  <OTooltip content="Job" />
-                </OButton>
-                <OButton
-                  v-if="canResumeJob(row)"
-                  variant="ghost-success"
-                  size="icon-sm"
-                  @click="confirmResumeJob(row)"
-                  data-test="resume-job-btn"
-                  icon-left="play-arrow"
-                >
-                  <OTooltip content="Resume Job" />
-                </OButton>
-                <OButton
-                  v-if="canEditJob(row.status)"
-                  variant="ghost"
-                  size="icon-sm"
-                  @click="editJob(row)"
-                  data-test="edit-job-btn"
-                  icon-left="edit"
-                >
-                  <OTooltip content="Edit Job" />
-                </OButton>
-                <OButton
-                  variant="ghost"
-                  size="icon-sm"
-                  @click="viewJob(row)"
-                  data-test="view-job-btn"
-                  icon-left="visibility"
-                >
-                  <OTooltip content="View Details" />
-                </OButton>
-                <OButton
-                  v-if="canDeleteJob(row.status)"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  @click="confirmDeleteJob(row)"
-                  data-test="delete-job-btn"
-                  icon-left="delete"
-                >
-                  <OTooltip content="Delete Job" />
-                </OButton>
-                <OButton
-                  v-if="row.error"
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  @click="showErrorDialog(row)"
-                  data-test="error-indicator-btn"
-                  icon-left="error"
-                >
-                  <OTooltip :content="`Error: ${row.error}`" />
-                </OButton>
-              </div>
-            </template>
-          </OTable>
-        </div>
+                <OTooltip :content="t('pipeline.jobTooltipLabel')" />
+              </OButton>
+              <OButton
+                v-if="canResumeJob(row)"
+                variant="ghost-success"
+                size="icon-sm"
+                @click="confirmResumeJob(row)"
+                data-test="resume-job-btn"
+                icon-left="play-arrow"
+              >
+                <OTooltip :content="t('pipeline.resumeJob')" />
+              </OButton>
+              <OButton
+                v-if="canEditJob(row.status)"
+                variant="ghost"
+                size="icon-sm"
+                @click="editJob(row)"
+                data-test="edit-job-btn"
+                icon-left="edit"
+              >
+                <OTooltip :content="t('pipeline.editJob')" />
+              </OButton>
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                @click="viewJob(row)"
+                data-test="view-job-btn"
+                icon-left="visibility"
+              >
+                <OTooltip :content="t('pipeline.viewDetails')" />
+              </OButton>
+              <OButton
+                v-if="canDeleteJob(row.status)"
+                variant="ghost-destructive"
+                size="icon-sm"
+                @click="confirmDeleteJob(row)"
+                data-test="delete-job-btn"
+                icon-left="delete"
+              >
+                <OTooltip :content="t('pipeline.deleteJobTooltip')" />
+              </OButton>
+              <OButton
+                v-if="row.error"
+                variant="ghost-destructive"
+                size="icon-sm"
+                @click="showErrorDialog(row)"
+                data-test="error-indicator-btn"
+                icon-left="error"
+              >
+                <OTooltip :content="t('common.errorPrefix', { message: row.error })" />
+              </OButton>
+            </div>
+          </template>
+        </OTable>
+      </div>
     </div>
 
     <!-- Job Details Dialog -->
@@ -253,41 +250,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Error Dialog -->
-    <ODialog data-test="backfill-jobs-list-error-dialog"
+    <ODialog
+      data-test="backfill-jobs-list-error-dialog"
       v-model:open="errorDialogVisible"
       size="md"
-      title="Backfill Job Error"
-      primary-button-label="Close"
+      :title="t('pipeline.backfillJobErrorTitle')"
+      :primary-button-label="t('common.close')"
       @update:open="(v) => !v && closeErrorDialog()"
-      @click:primary="errorDialogVisible = false; closeErrorDialog()"
+      @click:primary="
+        errorDialogVisible = false;
+        closeErrorDialog();
+      "
     >
       <template #header-left>
         <OIcon name="error" size="sm" />
       </template>
 
       <div v-if="errorDialogData">
-        <div class="tw:mb-3">
-          <div class="tw:text-xs tw:text-gray-400">Job ID</div>
-          <div class="tw:text-sm text-weight-medium">
+        <div class="mb-3">
+          <div class="text-text-label text-xs">{{ t("pipeline.jobIdLabel") }}</div>
+          <div class="text-sm font-medium">
             {{ errorDialogData.job_id }}
           </div>
         </div>
 
-        <div class="tw:mb-3">
-          <div class="tw:text-xs tw:text-gray-400">Pipeline</div>
-          <div class="tw:text-sm">
+        <div class="mb-3">
+          <div class="text-text-label text-xs">{{ t("pipeline.pipelineLabel") }}</div>
+          <div class="text-sm">
             {{ errorDialogData.pipeline_name || errorDialogData.pipeline_id }}
           </div>
         </div>
 
         <div>
-          <div class="tw:text-xs tw:text-gray-400 tw:mb-2">Error Message</div>
-          <div class="tw:p-3 tw:rounded-md tw:bg-[rgba(239,68,68,0.08)] tw:border-l-[3px] tw:border-l-[#ef4444] tw:font-mono tw:text-[13px] tw:leading-[1.6] tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#991b1b]">
+          <div class="text-text-label mb-2 text-xs">{{ t("pipeline.errorMessageLabel") }}</div>
+          <div
+            class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-[3px] p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
+          >
             {{ errorDialogData.error }}
           </div>
         </div>
       </div>
-
     </ODialog>
 
     <!-- Confirm Dialog -->
@@ -303,7 +305,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { formatDate } from "@/utils/date";
 import { useStore } from "vuex";
 import backfillService, { type BackfillJob } from "../../services/backfill";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -312,6 +313,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -322,8 +325,10 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import { timestampToTimezoneDate } from "../../utils/zincutils";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
 const store = useStore();
+const { t } = useI18nTyped();
 
 // Refs
 const qTableRef = ref();
@@ -355,17 +360,67 @@ const selectedPerPage = ref(10);
 
 const perPageOptionsList = [10, 20, 50, 100];
 
+const { columnVisibility, setColumnVisibility } = useExternalColumnToggle(
+  "pipelines-backfill-jobs-list",
+);
+
 const columns: OTableColumnDef[] = [
-  { id: "pipeline_name", header: "Pipeline", accessorKey: "pipeline_name", sortable: true, size: COL.streamName, meta: { align: "left", autoWidth: true } },
-  { id: "time_range", header: "Time Range", accessorKey: "start_time", sortable: true, size: COL.date, meta: { align: "left" } },
-  { id: "progress_percent", header: "Progress", accessorKey: "progress_percent", sortable: true, size: 400, meta: { align: "left" } },
-  { id: "created_at", header: "Created", accessorKey: "created_at", sortable: true, size: COL.createdAt, meta: { align: "left" } },
-  { id: "last_triggered_at", header: "Last Triggered", accessorKey: "last_triggered_at", sortable: true, size: COL.dateAbsolute, meta: { align: "left" } },
-  { id: "actions", header: "Actions", accessorKey: "actions", meta: { align: "center", actionCount: 4 }, isAction: true, size: 128 },
+  {
+    id: "pipeline_name",
+    header: t("pipeline.pipelineLabel"),
+    accessorKey: "pipeline_name",
+    sortable: true,
+    hideable: true,
+    size: COL.streamName,
+    meta: { align: "left", flex: true },
+  },
+  {
+    id: "time_range",
+    header: t("pipeline.timeRange"),
+    accessorKey: "start_time",
+    sortable: true,
+    hideable: true,
+    size: COL.date,
+    meta: { align: "left" },
+  },
+  {
+    id: "progress_percent",
+    header: t("pipeline.progressLabel"),
+    accessorKey: "progress_percent",
+    sortable: true,
+    hideable: true,
+    size: 400,
+    meta: { align: "left" },
+  },
+  {
+    id: "created_at",
+    header: t("pipeline.created"),
+    accessorKey: "created_at",
+    sortable: true,
+    hideable: true,
+    size: COL.createdAt,
+    meta: { align: "left" },
+  },
+  {
+    id: "last_triggered_at",
+    header: t("pipeline.lastTriggered"),
+    accessorKey: "last_triggered_at",
+    sortable: true,
+    hideable: true,
+    size: COL.dateAbsolute,
+    meta: { align: "left" },
+  },
+  {
+    id: "actions",
+    header: t("common.actions"),
+    accessorKey: "actions",
+    meta: { align: "center", actionCount: 4 },
+    isAction: true,
+    size: 128,
+  },
 ];
 
 const allStatusOptions = ["running", "completed", "paused", "failed"];
-const statusOptions = ref<string[]>([...allStatusOptions]);
 const pipelineOptions = ref<any[]>([]);
 const allPipelineOptions = ref<any[]>([]);
 
@@ -386,7 +441,7 @@ const loadJobs = async () => {
     console.error("Error loading backfill jobs:", error);
     toast({
       variant: "error",
-      message: "Failed to load backfill jobs",
+      message: t("toastMessages.pipelines.failedToLoadBackfillJobs"),
     });
   } finally {
     loading.value = false;
@@ -410,24 +465,6 @@ const loadPipelineOptions = () => {
   pipelineOptions.value = uniquePipelines;
 };
 
-const filterPipelines = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    pipelineOptions.value = allPipelineOptions.value.filter(
-      (v) => v.label.toLowerCase().indexOf(needle) > -1,
-    );
-  });
-};
-
-const filterStatuses = (val: string, update: any) => {
-  update(() => {
-    const needle = val.toLowerCase();
-    statusOptions.value = allStatusOptions.filter(
-      (v) => v.toLowerCase().indexOf(needle) > -1,
-    );
-  });
-};
-
 const filteredJobs = computed(() => {
   let filtered = jobs.value;
 
@@ -444,9 +481,7 @@ const filteredJobs = computed(() => {
   }
 
   if (filters.value.pipelineId) {
-    filtered = filtered.filter(
-      (job) => job.pipeline_id === filters.value.pipelineId,
-    );
+    filtered = filtered.filter((job) => job.pipeline_id === filters.value.pipelineId);
   }
 
   return filtered;
@@ -494,10 +529,7 @@ const canEditJob = (status: string) => {
 
 const canDeleteJob = (status: string) => {
   return (
-    status === "completed" ||
-    status === "failed" ||
-    status === "canceled" ||
-    status === "paused"
+    status === "completed" || status === "failed" || status === "canceled" || status === "paused"
   );
 };
 
@@ -548,7 +580,7 @@ const pauseJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job paused successfully",
+      message: t("toastMessages.pipelines.backfillJobPausedSuccessfully"),
     });
 
     loadJobs();
@@ -573,7 +605,7 @@ const resumeJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job resumed successfully",
+      message: t("toastMessages.pipelines.backfillJobResumedSuccessfully"),
     });
 
     loadJobs();
@@ -597,7 +629,7 @@ const deleteJob = async (pipelineId: string, jobId: string) => {
 
     toast({
       variant: "success",
-      message: "Backfill job deleted successfully",
+      message: t("toastMessages.pipelines.backfillJobDeletedSuccessfully"),
     });
 
     loadJobs();
@@ -626,36 +658,11 @@ const closeErrorDialog = () => {
 };
 
 // Helper functions
-const getProgressColor = (deletionStatus?: any) => {
-  if (deletionStatus && ["pending", "in_progress"].includes(deletionStatus)) {
-    return "blue";
-  }
-  return "positive";
-};
-
 const formatTimeRange = (startTime: number, endTime: number) => {
-  const userTimezone =
-    store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   // Convert from microseconds to milliseconds
-  const start = timestampToTimezoneDate(
-    startTime / 1000,
-    userTimezone,
-    "MMM dd, yyyy",
-  );
-  const end = timestampToTimezoneDate(
-    endTime / 1000,
-    userTimezone,
-    "MMM dd, yyyy",
-  );
+  const start = timestampToTimezoneDate(startTime / 1000, userTimezone, "MMM dd, yyyy");
+  const end = timestampToTimezoneDate(endTime / 1000, userTimezone, "MMM dd, yyyy");
   return `${start} - ${end}`;
 };
-
-const formatTimestamp = (timestamp?: number) => {
-  if (!timestamp) return "N/A";
-  const unixSeconds = timestamp / 1e6; // Convert from microseconds to seconds
-  const dateToFormat = new Date(unixSeconds * 1000);
-  const formattedDate = dateToFormat.toISOString();
-  return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-};
 </script>
-

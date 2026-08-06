@@ -90,11 +90,7 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
   };
 });
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "window": "outlined_window",
-}));
-
-// Mock Toast — replaces quasar notify
+// Mock Toast
 const mockNotifyDismiss = vi.fn();
 const mockNotify = vi.fn().mockReturnValue(mockNotifyDismiss);
 
@@ -106,7 +102,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import orgService from "@/services/organizations";
 import UsageTab from "./UsageTab.vue";
-
 
 // ── Mount factory ───────────────────────────────────────────────────────────
 
@@ -121,12 +116,10 @@ function mountUsageTab() {
         UsageReportBanner: true,
         DatabaseDeprecationBanner: true,
         HomeViewSkeleton: {
-          template:
-            '<div data-test="usage-tab-loading-skeleton">Loading skeleton</div>',
+          template: '<div data-test="usage-tab-loading-skeleton">Loading skeleton</div>',
         },
         CustomChartRenderer: {
-          template:
-            '<div data-test="usage-tab-custom-chart-renderer"></div>',
+          template: '<div data-test="usage-tab-custom-chart-renderer"></div>',
           props: ["data"],
         },
         OButton: {
@@ -141,7 +134,7 @@ function mountUsageTab() {
           template: '<a data-test="usage-tab-router-link"><slot /></a>',
           props: ["to", "exact"],
         },
-        "OIcon": {
+        OIcon: {
           template: '<span class="OIcon-stub"></span>',
           props: ["name", "size"],
         },
@@ -201,12 +194,10 @@ describe("UsageTab", () => {
       wrapper = mountUsageTab();
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').text(),
-      ).toBe("Loading skeleton");
+      expect(wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="usage-tab-loading-skeleton"]').text()).toBe(
+        "Loading skeleton",
+      );
 
       // Resolve and clean up
       resolvePromise!({ data: mockSummaryData });
@@ -216,9 +207,7 @@ describe("UsageTab", () => {
     it("should hide the skeleton once loading completes", async () => {
       wrapper = mountUsageTab();
       await flushPromises();
-      expect(
-        wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="usage-tab-loading-skeleton"]').exists()).toBe(false);
     });
   });
 
@@ -247,9 +236,7 @@ describe("UsageTab", () => {
       const panel = wrapper.find('[data-test="home-usage-tab-no-data"]');
       expect(panel.exists()).toBe(true);
       expect(panel.text()).toContain("No data ingested yet");
-      expect(panel.text()).toContain(
-        "This organization hasn't received any data",
-      );
+      expect(panel.text()).toContain("This organization hasn't received any data");
     });
   });
 
@@ -262,54 +249,40 @@ describe("UsageTab", () => {
     });
 
     it("should render the streams overview section", () => {
-      const streamsSection = wrapper.find(
-        '[aria-label="Streams overview section"]',
-      );
-      expect(streamsSection.exists()).toBe(true);
+      // The streams section renders the KPI tile row carrying the streams count
+      expect(wrapper.find('[data-test="home-usage-tab-streams-count"]').exists()).toBe(true);
     });
 
     it("should render streams count tile", () => {
-      const tile = wrapper.find('[aria-label="Streams count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-streams-count"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-streams-count"]').text(),
-      ).toBe("5");
+      expect(tile.text()).toBe("5");
     });
 
     it("should render events count tile", () => {
-      const tile = wrapper.find('[aria-label="Events count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-events-count"]');
       expect(tile.exists()).toBe(true);
       // formatEventCount(10000) -> "10000" (falls back to summary.doc_count)
-      expect(
-        tile.find('[data-test="home-usage-tab-events-count"]').text(),
-      ).toBe("10000");
+      expect(tile.text()).toBe("10000");
     });
 
     it("should render ingested data size tile", () => {
-      const tile = wrapper.find(
-        '[aria-label="Ingested data size statistics"]',
-      );
+      const tile = wrapper.find('[data-test="home-usage-tab-ingested-size"]');
       expect(tile.exists()).toBe(true);
       // fallback: summary.value.ingested_data = formatSizeFromMB(2000) -> "2000 MB"
-      expect(
-        tile.find('[data-test="home-usage-tab-ingested-size"]').text(),
-      ).toBe("2000 MB");
+      expect(tile.text()).toBe("2000 MB");
     });
 
     it("should render the functions tile", () => {
-      const tile = wrapper.find('[aria-label="Functions count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-functions-count"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-functions-count"]').text(),
-      ).toBe("3");
+      expect(tile.text()).toBe("3");
     });
 
     it("should render the dashboards tile", () => {
-      const tile = wrapper.find('[aria-label="Dashboards count statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-dashboards-count"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-dashboards-count"]').text(),
-      ).toBe("4");
+      expect(tile.text()).toBe("4");
     });
 
     it("should render the alerts overview section", () => {
@@ -318,9 +291,7 @@ describe("UsageTab", () => {
     });
 
     it("should render the pipelines overview section", () => {
-      const section = wrapper.find(
-        '[aria-label="Pipelines overview section"]',
-      );
+      const section = wrapper.find('[aria-label="Pipelines overview section"]');
       expect(section.exists()).toBe(true);
     });
 
@@ -331,25 +302,17 @@ describe("UsageTab", () => {
     it("should show scheduled and real-time alert counts", () => {
       const section = wrapper.find('[aria-label="Alerts overview section"]');
       // animated counts are 0, so fallback to summary values
-      expect(
-        section.find('[data-test="home-usage-tab-scheduled-alerts-count"]').text(),
-      ).toBe("3");
-      expect(
-        section.find('[data-test="home-usage-tab-rt-alerts-count"]').text(),
-      ).toBe("2");
+      expect(section.find('[data-test="home-usage-tab-scheduled-alerts-count"]').text()).toBe("3");
+      expect(section.find('[data-test="home-usage-tab-rt-alerts-count"]').text()).toBe("2");
     });
 
     it("should show scheduled and real-time pipeline counts", () => {
-      const section = wrapper.find(
-        '[aria-label="Pipelines overview section"]',
-      );
+      const section = wrapper.find('[aria-label="Pipelines overview section"]');
       // animated counts are 0, so fallback to summary values
-      expect(
-        section.find('[data-test="home-usage-tab-scheduled-pipelines-count"]').text(),
-      ).toBe("2");
-      expect(
-        section.find('[data-test="home-usage-tab-rt-pipelines-count"]').text(),
-      ).toBe("1");
+      expect(section.find('[data-test="home-usage-tab-scheduled-pipelines-count"]').text()).toBe(
+        "2",
+      );
+      expect(section.find('[data-test="home-usage-tab-rt-pipelines-count"]').text()).toBe("1");
     });
 
     it("should not show the empty-state panel when data exists", () => {
@@ -370,21 +333,15 @@ describe("UsageTab", () => {
     });
 
     it("should render compressed data size tile when isCloud is false", () => {
-      const tile = wrapper.find(
-        '[aria-label="Compressed data size statistics"]',
-      );
+      const tile = wrapper.find('[data-test="home-usage-tab-compressed-size"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-compressed-size"]').text(),
-      ).toBe("500 MB");
+      expect(tile.text()).toBe("500 MB");
     });
 
     it("should render index size tile when isCloud is false", () => {
-      const tile = wrapper.find('[aria-label="Index size statistics"]');
+      const tile = wrapper.find('[data-test="home-usage-tab-index-size"]');
       expect(tile.exists()).toBe(true);
-      expect(
-        tile.find('[data-test="home-usage-tab-index-size"]').text(),
-      ).toBe("100 MB");
+      expect(tile.text()).toBe("100 MB");
     });
   });
 
@@ -396,9 +353,7 @@ describe("UsageTab", () => {
       await flushPromises();
 
       expect(orgService.get_organization_summary).toHaveBeenCalledTimes(1);
-      expect(orgService.get_organization_summary).toHaveBeenCalledWith(
-        "default",
-      );
+      expect(orgService.get_organization_summary).toHaveBeenCalledWith("default");
     });
 
     it("should show a loading notification while fetching", async () => {
@@ -425,9 +380,7 @@ describe("UsageTab", () => {
       await flushPromises();
 
       expect(orgService.get_organization_summary).toHaveBeenCalledTimes(2);
-      expect(orgService.get_organization_summary).toHaveBeenLastCalledWith(
-        "new-org",
-      );
+      expect(orgService.get_organization_summary).toHaveBeenLastCalledWith("new-org");
     });
 
     it("should re-fetch when org changes and summary was previously empty", async () => {

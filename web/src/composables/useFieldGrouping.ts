@@ -36,8 +36,7 @@ import {
  * can apply the exact same grouping mechanism without duplicating the wiring.
  */
 export default function useFieldGrouping() {
-  const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } =
-    useServiceCorrelation();
+  const { loadSemanticGroups, loadKeyFields, loadFieldGrouping } = useServiceCorrelation();
 
   const semanticIndex = ref<SemanticIndex | null>(null);
   const keyFieldSet = ref<Set<string>>(new Set());
@@ -49,8 +48,7 @@ export default function useFieldGrouping() {
    * those builds the index stays null and grouping is a no-op (flat fallback).
    */
   async function loadGroupingContext(streamType = "logs"): Promise<void> {
-    const isEnterprise =
-      config.isEnterprise === "true" || config.isCloud === "true";
+    const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
 
     const [semanticAliases, keyFieldsConfig, fieldGrouping] = await Promise.all([
       isEnterprise ? loadSemanticGroups() : Promise.resolve([]),
@@ -62,9 +60,7 @@ export default function useFieldGrouping() {
       ? (fieldGrouping as FieldGroupingConfig)
       : null;
     semanticIndex.value =
-      semanticAliases.length > 0
-        ? buildSemanticIndex(semanticAliases, grouping)
-        : null;
+      semanticAliases.length > 0 ? buildSemanticIndex(semanticAliases, grouping) : null;
 
     const keySpec = (keyFieldsConfig as KeyFieldsConfig)[streamType] ?? {
       fields: [],
@@ -79,12 +75,7 @@ export default function useFieldGrouping() {
    * Returns the input unchanged when no semantic index is configured.
    */
   function groupFields(fields: FieldObj[]): FieldObj[] {
-    return applyFieldGrouping(
-      fields,
-      semanticIndex.value,
-      keyFieldSet.value,
-      keyGroupSet.value,
-    );
+    return applyFieldGrouping(fields, semanticIndex.value, keyFieldSet.value, keyGroupSet.value);
   }
 
   return {

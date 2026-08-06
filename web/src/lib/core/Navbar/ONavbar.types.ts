@@ -13,8 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { ComputedRef, InjectionKey } from "vue";
+import type { I18nKey, I18nText } from "@/types/i18n";
+
 export interface NavItem {
-  title: string;
+  title: I18nText;
   icon: string;
   link: string;
   exact?: boolean;
@@ -25,6 +28,18 @@ export interface NavItem {
 }
 
 /**
+ * Provided by ONavbar, injected by each MenuLink. True once the rail's single
+ * sliding-selection pill is positioned and visible — while true, an active
+ * MenuLink defers its fill (background + left accent) to that pill and keeps only
+ * its active text/icon colour. False (e.g. before first measure, or while the
+ * rail is hidden) means each active tile paints its own pill as before, so the
+ * nav never renders without a visible selection.
+ */
+export const RailIndicatorActiveKey: InjectionKey<ComputedRef<boolean>> = Symbol(
+  "o-navbar-rail-indicator-active",
+);
+
+/**
  * A flyout sub-item. These mirror the target page's own in-page section nav
  * EXACTLY — same label (i18n key), same icon, same category grouping — so the
  * rail flyout and the page's SectionRail stay in sync. Navigation is by route
@@ -33,7 +48,7 @@ export interface NavItem {
  */
 export interface SubnavChild {
   /** i18n key for the label, translated in the flyout. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** OIcon registry name — matches the sub-page's own icon. */
   icon: string;
   /** Route name — used for navigation, active-state, and hasRoute gating. */
@@ -85,7 +100,7 @@ export type RailEntry =
   | {
       type: "group";
       key: string;
-      title: string;
+      title: I18nText;
       icon: string;
       children: SubnavChild[];
       pinBottom: boolean;

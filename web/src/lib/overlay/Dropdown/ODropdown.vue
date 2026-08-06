@@ -3,20 +3,28 @@
 // Shared across all ODropdown instances (only one is open at a time).
 let lastWasPointer = false;
 // Guard prevents duplicate listeners on HMR re-execution of this module block.
-const _oDdKey = '__oDropdownListenersRegistered__';
-if (typeof document !== 'undefined' && !(globalThis as any)[_oDdKey]) {
+const _oDdKey = "__oDropdownListenersRegistered__";
+if (typeof document !== "undefined" && !(globalThis as any)[_oDdKey]) {
   (globalThis as any)[_oDdKey] = true;
-  document.addEventListener('pointerdown', () => { lastWasPointer = true; }, true);
-  document.addEventListener('keydown', () => { lastWasPointer = false; }, true);
+  document.addEventListener(
+    "pointerdown",
+    () => {
+      lastWasPointer = true;
+    },
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    () => {
+      lastWasPointer = false;
+    },
+    true,
+  );
 }
 </script>
 
 <script setup lang="ts">
-import type {
-  DropdownProps,
-  DropdownEmits,
-  DropdownSlots,
-} from "./ODropdown.types";
+import type { DropdownProps, DropdownEmits, DropdownSlots } from "./ODropdown.types";
 import {
   DropdownMenuRoot,
   DropdownMenuTrigger,
@@ -71,18 +79,21 @@ function handleOpenChange(v: boolean) {
   if (!v && lastWasPointer) {
     const el = document.activeElement;
     if (el instanceof HTMLElement) {
-      el.dataset.noFocusVisible = 'true';
-      el.addEventListener('blur', () => { delete el.dataset.noFocusVisible; }, { once: true });
+      el.dataset.noFocusVisible = "true";
+      el.addEventListener(
+        "blur",
+        () => {
+          delete el.dataset.noFocusVisible;
+        },
+        { once: true },
+      );
     }
   }
 }
 
 // Register with the nearest ancestor ODropdown while this dropdown is open
 // so the ancestor's pointer-down-outside handler ignores clicks from our portal.
-const parentDropdownRegistry = inject<DropdownNestedRegistry | null>(
-  O_DROPDOWN_NESTED_KEY,
-  null,
-);
+const parentDropdownRegistry = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
 let closeNestedRegistration: ((skipGrace?: boolean) => void) | null = null;
 // Set to true in handlePointerDownOutside when this dropdown is about to close
 // from a real outside click so the parent skips the grace period and also closes.
@@ -218,7 +229,7 @@ function handleFocusOutside(event: Event) {
 
 // Close this dropdown when the nearest sidebar scroll container scrolls,
 // preventing the portal from floating disconnected at the top of the screen.
-const sidebarScrollTick = inject<Ref<number> | null>('sidebarScrollTick', null);
+const sidebarScrollTick = inject<Ref<number> | null>("sidebarScrollTick", null);
 if (sidebarScrollTick) {
   watch(sidebarScrollTick, () => {
     if (internalOpen.value) handleOpenChange(false);
@@ -264,11 +275,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <DropdownMenuRoot
-    :open="internalOpen"
-    :modal="modal"
-    @update:open="handleOpenChange"
-  >
+  <DropdownMenuRoot :open="internalOpen" :modal="modal" @update:open="handleOpenChange">
     <DropdownMenuTrigger ref="triggerRef" as-child>
       <slot name="trigger" />
     </DropdownMenuTrigger>
@@ -282,19 +289,20 @@ onBeforeUnmount(() => {
         @pointer-down-outside="handlePointerDownOutside"
         @focus-outside="handleFocusOutside"
         :class="[
-          // Layout + stacking (must be above Quasar header/drawer: 2000/3000)
-          'tw:min-w-40 tw:p-1 tw:z-[6000]',
+          // Layout + stacking — overlay layer 6000 (clears header 2000; ties with
+          // drawer/dialog content broken by later DOM order). See tokens/base.css.
+          'z-6000 min-w-40 p-1',
           // Surface
-          'tw:bg-dropdown-bg tw:border tw:border-dropdown-border tw:rounded-lg tw:shadow-md',
+          'bg-dropdown-bg border-dropdown-border rounded-default border shadow-md',
           // Typography
-          'tw:text-sm tw:text-dropdown-item-text',
+          'text-dropdown-item-text text-sm',
           // Animation — clip-path reveal: the menu is unveiled at full size from
           // its trigger edge (no scale/squish). Wipes down by default; top-placed
           // menus wipe up. Soft ease-out-expo in (200ms), quick wipe out (140ms).
-          'tw:data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
-          'tw:data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
-          'tw:data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[state=open]:animate-[o2-reveal-down-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[state=closed]:animate-[o2-reveal-down-out_100ms_cubic-bezier(0.4,0,1,1)]',
+          'data-[side=top]:data-[state=open]:animate-[o2-reveal-up-in_140ms_cubic-bezier(0.16,1,0.3,1)]',
+          'data-[side=top]:data-[state=closed]:animate-[o2-reveal-up-out_100ms_cubic-bezier(0.4,0,1,1)]',
           props.contentClass,
         ]"
       >

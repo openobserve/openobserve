@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,72 +15,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
-    title="Import Destination"
+    :title="t('alert_destinations.import.title')"
     test-prefix="destination"
     :is-importing="isDestinationImporting"
     container-class=""
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 128px)',
-    }"
     @back="arrowBackFn"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Output Section with Destination-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
         <div
           v-if="destinationErrorsToDisplay.length > 0 || destinationCreators.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
-          {{ destinationErrorsToDisplay.length > 0 ? 'Error Validations' : 'Output Messages' }}
+          {{
+            destinationErrorsToDisplay.length > 0
+              ? t("alert_destinations.import.errorValidations")
+              : t("alert_destinations.import.outputMessages")
+          }}
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="tw:h-[calc(60vh-8px)] tw:overflow-auto [resize:none] tw:w-full tw:min-w-100">
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+          {{ t("alert_destinations.import.outputMessages") }}
+        </div>
+        <OSeparator class="mt-1 shrink-0" />
+        <div class="min-h-0 w-full min-w-100 flex-1 [resize:none] overflow-auto">
           <!-- Destination Errors Section -->
-          <div
-            class="error-section tw:p-2.5 tw:mb-2.5"
-            v-if="destinationErrorsToDisplay.length > 0"
-          >
+          <div class="error-section mb-2.5 p-2.5" v-if="destinationErrorsToDisplay.length > 0">
             <div class="error-list">
               <!-- Iterate through the outer array -->
-              <div
-                v-for="(errorGroup, index) in destinationErrorsToDisplay"
-                :key="index"
-              >
+              <div v-for="(errorGroup, index) in destinationErrorsToDisplay" :key="index">
                 <!-- Iterate through each inner array (the individual error message) -->
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word"
+                  class="px-0 py-1.25 text-sm wrap-break-word"
                   :data-test="`destination-import-error-${index}-${errorIndex}`"
                 >
                   <!-- Destination Name Error -->
                   <span
                     data-test="destination-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'destination_name'
+                      typeof errorMessage === 'object' && errorMessage.field == 'destination_name'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-name-input"
                         :model-value="userSelectedDestinationName[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationName[index] = val;
-                          updateDestinationName(val, index);
-                        }"
-                        :label="'Destination Name *'"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationName[index] = val;
+                            updateDestinationName(val, index);
+                          }
+                        "
+                        :label="raw(t('alert_destinations.import.destinationName') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -89,22 +83,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- URL Error -->
                   <span
-                    class="text-red"
-                    v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'url'
-                    "
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'url'"
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-url-input"
                         :model-value="userSelectedDestinationUrl[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationUrl[index] = val;
-                          updateDestinationUrl(val, index);
-                        }"
-                        :label="'Destination URL *'"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationUrl[index] = val;
+                            updateDestinationUrl(val, index);
+                          }
+                        "
+                        :label="raw(t('alert_destinations.import.destinationUrl') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -113,58 +106,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Type Error -->
                   <span
-                    class="text-red"
-                    v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'type'
-                    "
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'type'"
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSelect
                         data-test="destination-import-type-input"
                         :model-value="userSelectedDestinationType[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationType[index] = val;
-                          updateDestinationType(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationType[index] = val;
+                            updateDestinationType(val, index);
+                          }
+                        "
                         :options="destinationTypes"
-                        :label="'Destination Type *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        :label="raw(t('alert_destinations.destination_type') + ' *')"
+                        class="showLabelOnTop no-case py-2"
                       />
                     </div>
                   </span>
 
                   <!-- Method Error -->
                   <span
-                    class="text-red"
-                    v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'method'
-                    "
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'method'"
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSelect
                         data-test="destination-import-method-input"
                         :model-value="userSelectedDestinationMethod[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedDestinationMethod[index] = val;
-                          updateDestinationMethod(val, index);
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinationMethod[index] = val;
+                            updateDestinationMethod(val, index);
+                          }
+                        "
                         :options="destinationMethods"
-                        :label="'Destination Method *'"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        :label="raw(t('alert_destinations.import.destinationMethod') + ' *')"
+                        class="showLabelOnTop no-case py-2"
                       />
                     </div>
                   </span>
 
                   <!-- Template Name Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'template_name'
+                      typeof errorMessage === 'object' && errorMessage.field == 'template_name'
                     "
                   >
                     {{ errorMessage.message }}
@@ -172,40 +162,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         data-test="destination-import-template-input"
                         :model-value="userSelectedTemplates[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedTemplates[index] = val;
-                          updateDestinationTemplate(val, index);
-                          templateErrors[index] = val ? '' : 'Field is required!';
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTemplates[index] = val;
+                            updateDestinationTemplate(val, index);
+                            templateErrors[index] = getCorrectionRequiredError(val);
+                          }
+                        "
                         :options="filteredTemplates"
-                        label="Templates *"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        :label="raw(t('alert_destinations.import.templates') + ' *')"
+                        class="showLabelOnTop no-case py-2"
                         :error="!!templateErrors[index]"
-                        :error-message="templateErrors[index]"
+                        :error-message="raw(templateErrors[index])"
                         @search="filterTemplates"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
 
                   <!-- Email Input Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'email_input'
+                      typeof errorMessage === 'object' && errorMessage.field == 'email_input'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OInput
                         data-test="destination-import-emails-input"
                         :model-value="userSelectedEmails[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedEmails[index] = val;
-                          updateDestinationEmails(val, index);
-                        }"
-                        :label="'Emails (comma separated) *'"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedEmails[index] = val;
+                            updateDestinationEmails(val, index);
+                          }
+                        "
+                        :label="raw(t('alert_destinations.import.emails') + ' *')"
                         class="showLabelOnTop"
                         tabindex="0"
                       />
@@ -214,10 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Action ID Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'action_id'
+                      typeof errorMessage === 'object' && errorMessage.field == 'action_id'
                     "
                   >
                     {{ errorMessage.message }}
@@ -225,57 +216,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OSelect
                         data-test="destination-import-action-input"
                         :model-value="userSelectedActionId[index] || ''"
-                        @update:model-value="(val) => {
-                          userSelectedActionId[index] = val;
-                          updateDestinationAction(val, index);
-                          actionErrors[index] = val ? '' : 'Field is required!';
-                        }"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedActionId[index] = val;
+                            updateDestinationAction(val, index);
+                            actionErrors[index] = getCorrectionRequiredError(val);
+                          }
+                        "
                         :options="filteredActions"
-                        label="Actions *"
+                        :label="raw(t('alert_destinations.import.actions') + ' *')"
                         labelKey="label"
                         valueKey="value"
-                        class="tw:py-2 showLabelOnTop no-case"
+                        class="showLabelOnTop no-case w-75! py-2"
                         :error="!!actionErrors[index]"
-                        :error-message="actionErrors[index]"
+                        :error-message="raw(actionErrors[index])"
                         @search="filterActions"
-                        style="width: 300px"
                       />
                     </div>
                   </span>
 
                   <!-- Skip TLS Verify Error -->
                   <span
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'skip_tls_verify'
+                      typeof errorMessage === 'object' && errorMessage.field == 'skip_tls_verify'
                     "
                   >
                     {{ errorMessage.message }}
-                    <div style="width: 300px">
+                    <div class="w-75">
                       <OSwitch
                         data-test="destination-import-skip-tls-verify-input"
                         :model-value="userSelectedSkipTlsVerify[index] ?? false"
                         :label="t('alert_destinations.skip_tls_verify')"
-                        class="tw:mt-2"
+                        class="mt-2"
                         @update:model-value="updateSkipTlsVerify($event, index)"
                       />
                     </div>
                   </span>
 
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Destination Creation Success Messages -->
-          <div class="error-section tw:p-2.5 tw:mb-2.5" v-if="destinationCreators.length > 0">
+          <div class="error-section mb-2.5 p-2.5" v-if="destinationCreators.length > 0">
             <div
-              class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="destination-import-creation-title"
             >
-              Destination Creation
+              {{ t("alert_destinations.import.destinationCreation") }}
             </div>
             <div
               class="error-list"
@@ -285,31 +276,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'tw:font-bold tw:py-1.25 tw:px-0 tw:text-sm tw:wrap-break-word': true,
-                  'text-green ': val.success,
-                  'text-red': !val.success,
+                  'px-0 py-1.25 text-sm font-bold wrap-break-word': true,
+                  'text-green': val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`destination-import-creation-${index}-message`"
               >
-                <pre class="tw:[white-space:pre-wrap] tw:[word-wrap:break-word] tw:[word-break:break-word] tw:[overflow-wrap:break-word] tw:font-[inherit] tw:m-0">{{ val.message }}</pre>
+                <pre
+                  class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
+                  >{{ val.message }}</pre
+                >
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  reactive,
-  onMounted,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, reactive, onMounted } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import destinationService from "@/services/alert_destination";
@@ -317,9 +305,11 @@ import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "ImportDestination",
@@ -341,15 +331,15 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type destinationCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
     type destinationErrors = (ErrorMessage | string)[][];
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const { isActionsEnabled } = useActions();
@@ -362,14 +352,14 @@ export default defineComponent({
     const destinationTypes = ["http", "email"];
     const destinationMethods = ["post", "get", "put"];
 
-    const userSelectedTemplates = ref<string[]>([]);
+    const userSelectedTemplates = ref<SelectModelValue[]>([]);
     const userSelectedDestinationType = ref<any[]>([]);
     const userSelectedDestinationMethod = ref<any[]>([]);
     const userSelectedDestinationName = ref<any[]>([]);
     const userSelectedDestinationUrl = ref<any[]>([]);
     const userSelectedEmails = ref<any[]>([]);
     const userSelectedActionId = ref<any[]>([]);
-    const userSelectedSkipTlsVerify = ref<boolean[]>([]);
+    const userSelectedSkipTlsVerify = ref<SwitchValue[]>([]);
     const filteredTemplates = ref<string[]>([]);
     const filteredActions = ref<any[]>([]);
     const templateErrors = reactive<Record<number, string>>({});
@@ -382,15 +372,14 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
 
     const getFormattedTemplates = computed(() => {
       return props.templates
         .filter((template: any) => {
           const currentDestinationType =
-            jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]
-              ?.type;
+            jsonArrayOfObj.value[destinationErrorsToDisplay.value.length - 1]?.type;
 
           if (currentDestinationType === "email" && template.type === "email") {
             return true;
@@ -413,7 +402,7 @@ export default defineComponent({
         userSelectedActionOptions.value = actionsData.list
           .filter((action: any) => action.execution_details_type === "service")
           .map((action: any) => ({
-            label: action.name,
+            label: raw(action.name),
             value: action.id,
           }));
         filteredActions.value = userSelectedActionOptions.value;
@@ -434,11 +423,7 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].type = type;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -446,23 +431,15 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].method = method;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateDestinationName = (destinationName: string, index: number) => {
+    const updateDestinationName = (destinationName: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = destinationName;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -470,62 +447,43 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].url = url;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateDestinationTemplate = (template: string, index: number) => {
+    const updateDestinationTemplate = (template: SelectModelValue, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].template = template;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateDestinationAction = (id: string, index: number) => {
+    const updateDestinationAction = (id: SelectModelValue, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].action_id = id;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateDestinationEmails = (emails: string, index: number) => {
+    const updateDestinationEmails = (emails: string | number, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
-        baseImportRef.value.jsonArrayOfObj[index].emails = emails
+        // OInput is a text field here, so the emitted value is always a string.
+        baseImportRef.value.jsonArrayOfObj[index].emails = (emails as string)
           .split(",")
           .map((email) => email.trim());
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
-    const updateSkipTlsVerify = (value: boolean, index: number) => {
+    const updateSkipTlsVerify = (value: SwitchValue, index: number) => {
       userSelectedSkipTlsVerify.value[index] = value;
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].skip_tls_verify = value;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -556,14 +514,20 @@ export default defineComponent({
       let hasCorrectionErrors = false;
       destinationErrorsToDisplay.value.forEach((errorGroup, idx) => {
         for (const msg of errorGroup) {
-          if (typeof msg === 'object') {
-            if (msg.field === 'template_name' && !userSelectedTemplates.value[idx]) {
-              templateErrors[idx] = 'Field is required!';
-              hasCorrectionErrors = true;
+          if (typeof msg === "object") {
+            if (msg.field === "template_name") {
+              const requiredError = getCorrectionRequiredError(userSelectedTemplates.value[idx]);
+              if (requiredError) {
+                templateErrors[idx] = requiredError;
+                hasCorrectionErrors = true;
+              }
             }
-            if (msg.field === 'action_id' && !userSelectedActionId.value[idx]) {
-              actionErrors[idx] = 'Field is required!';
-              hasCorrectionErrors = true;
+            if (msg.field === "action_id") {
+              const requiredError = getCorrectionRequiredError(userSelectedActionId.value[idx]);
+              if (requiredError) {
+                actionErrors[idx] = requiredError;
+                hasCorrectionErrors = true;
+              }
             }
           }
         }
@@ -578,16 +542,14 @@ export default defineComponent({
 
       try {
         if (!jsonString || jsonString.trim() === "") {
-          throw new Error("JSON string is empty");
+          throw new Error(t("alert_destinations.import.jsonStringEmpty"));
         }
 
         const parsedJson = JSON.parse(jsonString);
-        jsonArrayOfObj.value = Array.isArray(parsedJson)
-          ? parsedJson
-          : [parsedJson];
+        jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
-          message: e.message || "Invalid JSON format",
+          message: e.message || t("alert_destinations.import.invalidJsonFormat"),
           variant: "error",
         });
         // Reset BaseImport's importing flag on validation error
@@ -610,7 +572,7 @@ export default defineComponent({
 
       if (successCount === totalCount) {
         toast({
-          message: `Successfully imported destination(s)`,
+          message: t("alert_destinations.import.importSuccess"),
           variant: "success",
         });
 
@@ -633,10 +595,7 @@ export default defineComponent({
 
     const processJsonObject = async (jsonObj: any, index: number) => {
       try {
-        const isValidDestination = await validateDestinationInputs(
-          jsonObj,
-          index,
-        );
+        const isValidDestination = await validateDestinationInputs(jsonObj, index);
         if (!isValidDestination) {
           return false;
         }
@@ -648,34 +607,35 @@ export default defineComponent({
         return false;
       } catch (e: any) {
         toast({
-          message: "Error importing Destination please check the JSON",
+          message: t("alert_destinations.import.importError"),
           variant: "error",
         });
         return false;
       }
     };
 
+    // Single source of truth for the correction "required" rule. The template
+    // and action correction controls plus the pre-import correction gate below
+    // all defer to this instead of re-deriving the required message inline, so
+    // the destination JS validator owns the rule in one place.
+    const getCorrectionRequiredError = (value: any): string =>
+      value ? "" : t("alerts.validation.fieldRequired");
+
     const validateDestinationInputs = async (input: any, index: number) => {
-      let destinationErrors: (string | { message: string; field: string })[] =
-        [];
+      let destinationErrors: (string | ErrorMessage)[] = [];
 
       // Validate name
-      if (
-        !input.name ||
-        typeof input.name !== "string" ||
-        input.name.trim() === ""
-      ) {
+      if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         destinationErrors.push({
-          message: `Destination - ${index}: The "name" field is required and should be a valid string.`,
+          message: t("alert_destinations.import.nameRequired", { index }),
           field: "destination_name",
         });
-      } else if (
-        props.destinations.some(
-          (destination: any) => destination.name === input.name,
-        )
-      ) {
+      } else if (props.destinations.some((destination: any) => destination.name === input.name)) {
         destinationErrors.push({
-          message: `Destination - ${index}: "${input.name}" already exists`,
+          message: t("alert_destinations.import.nameExists", {
+            index,
+            name: input.name,
+          }),
           field: "destination_name",
         });
       }
@@ -683,27 +643,21 @@ export default defineComponent({
       // Validate type
       if (
         !input.type ||
-        (input.type !== "email" &&
-         input.type !== "http" &&
-         input.type !== "action")
+        (input.type !== "email" && input.type !== "http" && input.type !== "action")
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: The "type" field must be either "email", "http", or "action"`,
+          message: t("alert_destinations.import.typeInvalid", { index }),
           field: "type",
         });
       }
 
       // Check if action type is supported when actions are not enabled
       if (input.type === "action" && !isActionsEnabled.value) {
-        destinationErrors.push(
-          `Destination - ${index}: 'action' type is not supported.`,
-        );
+        destinationErrors.push(t("alert_destinations.import.actionTypeNotSupported", { index }));
       }
 
       // Validate action_id exists when type is action
-      const availableActions = getServiceActions().map(
-        (action: any) => action.id,
-      );
+      const availableActions = getServiceActions().map((action: any) => action.id);
 
       if (
         isActionsEnabled.value &&
@@ -711,7 +665,11 @@ export default defineComponent({
         !availableActions.includes(input.action_id)
       ) {
         destinationErrors.push({
-          message: `Destination - ${index}: action "${input.action_id}" does not exist for type "${input.type}"`,
+          message: t("alert_destinations.import.actionNotFound", {
+            index,
+            actionId: input.action_id,
+            type: input.type,
+          }),
           field: "action_id",
         });
       }
@@ -720,35 +678,29 @@ export default defineComponent({
       if (input.type === "http") {
         if (!input.url || typeof input.url !== "string" || input.url.trim() === "") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "url" field is required for http type destinations.`,
+            message: t("alert_destinations.import.urlRequired", { index }),
             field: "url",
           });
         }
 
-        if (
-          !input.method ||
-          !["post", "get", "put"].includes(input.method.toLowerCase())
-        ) {
+        if (!input.method || !["post", "get", "put"].includes(input.method.toLowerCase())) {
           destinationErrors.push({
-            message: `Destination - ${index}: The "method" field must be one of "post", "get", or "put"`,
+            message: t("alert_destinations.import.methodInvalid", { index }),
             field: "method",
           });
         }
 
         if (!input.template || typeof input.template !== "string") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "template" field is required for http type destinations.`,
+            message: t("alert_destinations.import.templateRequiredHttp", { index }),
             field: "template_name",
           });
         }
 
         // Validate skip_tls_verify is required and must be boolean
-        if (
-          input.skip_tls_verify === undefined ||
-          typeof input.skip_tls_verify !== "boolean"
-        ) {
+        if (input.skip_tls_verify === undefined || typeof input.skip_tls_verify !== "boolean") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "skip_tls_verify" field is required and should be a boolean value`,
+            message: t("alert_destinations.import.skipTlsVerifyRequired", { index }),
             field: "skip_tls_verify",
           });
         }
@@ -756,9 +708,7 @@ export default defineComponent({
         // Validate headers should be an object if present
         if (input.headers !== undefined) {
           if (typeof input.headers !== "object" || Array.isArray(input.headers)) {
-            destinationErrors.push(
-              `Destination - ${index}: 'headers' should be an object for http type`,
-            );
+            destinationErrors.push(t("alert_destinations.import.headersMustBeObject", { index }));
           }
         }
       }
@@ -767,37 +717,33 @@ export default defineComponent({
       if (input.type === "email") {
         // Validate URL should not be present for email type
         if (input.url) {
-          destinationErrors.push(
-            `Destination - ${index}: 'url' should not be provided for email type`,
-          );
+          destinationErrors.push(t("alert_destinations.import.urlNotAllowedEmail", { index }));
         }
 
         // Validate headers should not be present for email type
         if (
-          input.hasOwnProperty("headers") &&
+          Object.prototype.hasOwnProperty.call(input, "headers") &&
           Object.keys(input.headers).length !== 0
         ) {
-          destinationErrors.push(
-            `Destination - ${index}: 'headers' should not be provided for email type`,
-          );
+          destinationErrors.push(t("alert_destinations.import.headersNotAllowedEmail", { index }));
         }
 
         // Validate emails array with stricter validation
         if (!input.emails || !Array.isArray(input.emails) || input.emails.length === 0) {
           destinationErrors.push({
-            message: `Destination - ${index}: The "emails" field is required and should be an array for email type destinations.`,
+            message: t("alert_destinations.import.emailsRequired", { index }),
             field: "email_input",
           });
         } else if (input.emails.some((email: any) => typeof email !== "string")) {
           destinationErrors.push({
-            message: `Destination - ${index}: 'emails' should be an array of strings for email type`,
+            message: t("alert_destinations.import.emailsMustBeStrings", { index }),
             field: "email_input",
           });
         }
 
         if (!input.template || typeof input.template !== "string") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "template" field is required for email type destinations.`,
+            message: t("alert_destinations.import.templateRequiredEmail", { index }),
             field: "template_name",
           });
         }
@@ -815,7 +761,11 @@ export default defineComponent({
 
         if (!availableTemplates.includes(input.template)) {
           destinationErrors.push({
-            message: `Destination - ${index}: template "${input.template}" does not exist for type "${input.type}"`,
+            message: t("alert_destinations.import.templateNotFound", {
+              index,
+              template: input.template,
+              type: input.type,
+            }),
             field: "template_name",
           });
         }
@@ -825,7 +775,7 @@ export default defineComponent({
       if (isActionsEnabled.value) {
         if (input.action_id && typeof input.action_id !== "string") {
           destinationErrors.push({
-            message: `Destination - ${index}: The "action_id" field must be a valid string.`,
+            message: t("alert_destinations.import.actionIdInvalid", { index }),
             field: "action_id",
           });
         }
@@ -848,7 +798,10 @@ export default defineComponent({
         });
 
         destinationCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" created successfully \nNote: please remove the created destination object ${input.name} from the json file `,
+          message: t("alert_destinations.import.createSuccess", {
+            index,
+            name: input.name,
+          }),
           success: true,
         });
 
@@ -857,7 +810,11 @@ export default defineComponent({
         return true;
       } catch (error: any) {
         destinationCreators.value.push({
-          message: `Destination - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alert_destinations.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alert_destinations.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -874,6 +831,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       importJson,
       router,
@@ -906,6 +864,7 @@ export default defineComponent({
       filterTemplates,
       filterActions,
       getServiceActions,
+      getCorrectionRequiredError,
       arrowBackFn,
       isDestinationImporting,
       store,

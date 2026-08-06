@@ -18,10 +18,7 @@ function mountItem(
 
 describe("OToggleGroupItem", () => {
   it("renders slot content", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      { default: () => h("span", "Option") },
-    );
+    const wrapper = mountItem({ value: "x" }, { default: () => h("span", "Option") });
     expect(wrapper.text()).toContain("Option");
   });
 
@@ -46,12 +43,9 @@ describe("OToggleGroupItem", () => {
   });
 
   it("applies base item classes", () => {
-    const wrapper = mountItem(
-      { value: "x" },
-      { default: () => h("span", "A") },
-    );
+    const wrapper = mountItem({ value: "x" }, { default: () => h("span", "A") });
     const btn = wrapper.find("button");
-    expect(btn.classes().join(" ")).toContain("tw:bg-toggle-item-bg");
+    expect(btn.classes().join(" ")).toContain("bg-toggle-item-bg");
   });
 
   it("sets data-disabled when disabled=true", () => {
@@ -65,15 +59,15 @@ describe("OToggleGroupItem", () => {
   it("applies md size classes by default", () => {
     const wrapper = mountItem({ value: "x" });
     const classes = wrapper.find("button").classes().join(" ");
-    expect(classes).toContain("tw:h-9");
-    expect(classes).toContain("tw:px-3");
+    expect(classes).toContain("h-9");
+    expect(classes).toContain("px-3");
   });
 
   it('applies xs size classes when size="xs"', () => {
     const wrapper = mountItem({ value: "x", size: "xs" });
     const classes = wrapper.find("button").classes().join(" ");
-    expect(classes).toContain("tw:h-5");
-    expect(classes).toContain("tw:px-1.5");
-    expect(classes).toContain("tw:text-xs");
+    expect(classes).toContain("h-5");
+    expect(classes).toContain("px-1.5");
+    expect(classes).toContain("text-xs");
   });
 });

@@ -29,8 +29,7 @@ vi.mock("./shared/dataProcessor", () => ({
       const sum = values.reduce((a: number, b: number) => a + b, 0);
       return sum / values.length;
     }
-    if (aggregation === "sum")
-      return values.reduce((a: number, b: number) => a + b, 0);
+    if (aggregation === "sum") return values.reduce((a: number, b: number) => a + b, 0);
     return values[values.length - 1];
   }),
 }));
@@ -100,12 +99,7 @@ describe("MetricConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.type).toBe("metric");
       expect(result.metrics).toHaveLength(1);
@@ -135,12 +129,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].rawValue).toBe(30); // average
     });
@@ -165,12 +154,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].rawValue).toBe(50);
     });
@@ -195,12 +179,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].rawValue).toBe(5);
     });
@@ -225,12 +204,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].rawValue).toBe(60);
     });
@@ -256,12 +230,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].value).toBe("1.00KB");
       expect(result.metrics[0].unit).toBe("KB");
@@ -289,12 +258,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].value).toBe("150.5req/s");
     });
@@ -321,12 +285,7 @@ describe("MetricConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics).toHaveLength(2);
       expect(result.metrics[0].name).toBe("series1");
@@ -361,12 +320,7 @@ describe("MetricConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics).toHaveLength(2);
     });
@@ -395,12 +349,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.type).toBe("metric");
       expect(result.value).toBeDefined();
@@ -433,12 +382,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       // The total is 300, avg is 150
       expect(result.value).toBe("150.00");
@@ -468,12 +412,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       // The total is 300 (sum)
       expect(result.value).toBe("300.00");
@@ -504,12 +443,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.label).toBe("Custom Metric");
     });
@@ -539,12 +473,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.fontSize).toBe(48);
     });
@@ -573,12 +502,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.fontSize).toBe(32);
     });
@@ -603,12 +527,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.fontColor).toBe("#FF0000");
     });
@@ -633,12 +552,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.backgroundColor).toBe("#0000FF");
     });
@@ -663,12 +577,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.layout).toBe("vertical");
     });
@@ -697,12 +606,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.showTrend).toBe(true);
     });
@@ -732,12 +636,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.showTrend).toBe(false);
     });
@@ -762,12 +661,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       // Should return multi-metric format since only one metric
       expect(result.metrics).toHaveLength(1);
@@ -781,12 +675,7 @@ describe("MetricConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics).toEqual([]);
     });
@@ -804,12 +693,7 @@ describe("MetricConverter", () => {
         config: {},
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics).toEqual([]);
     });
@@ -830,12 +714,7 @@ describe("MetricConverter", () => {
 
       const panelSchema = {};
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.type).toBe("metric");
       expect(result.metrics).toHaveLength(1);
@@ -861,12 +740,7 @@ describe("MetricConverter", () => {
         },
       };
 
-      const result = converter.convert(
-        processedData,
-        panelSchema,
-        mockStore,
-        mockExtras,
-      );
+      const result = converter.convert(processedData, panelSchema, mockStore, mockExtras);
 
       expect(result.metrics[0].value).toBe("123.457");
     });

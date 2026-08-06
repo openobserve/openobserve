@@ -94,6 +94,7 @@ const defaultObject = {
       timestamp: 0,
       type: "",
       time_spent: 0,
+      source: "",
     },
   },
 };

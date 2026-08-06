@@ -15,42 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="height: 100%">
-    <div class="tw:p-0" style="width: 100px">
-      <ul class="tw:flex tw:flex-wrap tw:list-none tw:p-0 tw:m-0">
+  <div class="h-full">
+    <div class="w-25 p-0">
+      <ul class="m-0 flex list-none flex-wrap p-0">
         <li
+          class="w-12.5"
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
-            'dashboard-chart-border',
-            'tw:transition-colors tw:duration-150 tw:ease-in-out tw:hover:bg-surface-subtle',
-            selectedChartType === item.id ? 'tw:bg-label-chip-url-bg' : '',
-            isChartDisabled(item)
-              ? 'tw:opacity-50 tw:cursor-not-allowed'
-              : 'tw:cursor-pointer',
+            'border-card-glass-border border-r border-b',
+            'hover:bg-surface-subtle transition-colors duration-150 ease-in-out',
+            selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
+            isChartDisabled(item) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           ]"
           @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
-          style="width: 50px"
           data-test="dashboard-addpanel-chart-selection-item"
           :data-test-selected="selectedChartType === item.id ? item.id : undefined"
         >
           <div
             :data-test="`selected-chart-${item.id}-item`"
             :data-selected="selectedChartType === item.id ? 'true' : 'false'"
-            class="tw:flex tw:flex-col tw:items-center tw:relative"
+            class="relative flex flex-col items-center"
           >
             <img
               :src="item.image.replace('img:', '')"
               :alt="item.title"
-              class="tw:mx-auto tw:my-2"
-              style="width: 24px; height: 24px;"
+              class="mx-auto my-2 h-6 w-6"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <OTooltip
-              style="text-align: center"
-              :content="item.title"
-              data-test="dashboard-addpanel-chart-selection-tooltip"
-            />
+            <OTooltip class="text-center" :content="item.title" />
           </div>
         </li>
       </ul>
@@ -63,9 +56,8 @@ import { defineComponent, inject, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ChartSelection",
@@ -74,7 +66,7 @@ export default defineComponent({
 
   setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // array of charts
     const chartsArray = ref([
       {
@@ -103,8 +95,7 @@ export default defineComponent({
         id: "line",
       },
       {
-        image:
-          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
         title: t("dashboard.scatterLabel"),
         id: "scatter",
       },
@@ -155,38 +146,33 @@ export default defineComponent({
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
+        title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
-        title: "HTML",
+        title: t("dashboard.chartSelection.html"),
         id: "html",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
-        title: "Markdown",
+        title: t("dashboard.chartSelection.markdown"),
         id: "markdown",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
-        title: "Sankey",
+        title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
-        title: "Custom Chart",
+        title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },
     ]);
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { promqlMode, dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const promqlAllowedCharts = new Set([
       "line",
@@ -233,6 +219,6 @@ export default defineComponent({
       isChartDisabled,
     };
   },
-  components: { OIcon , OTooltip },
+  components: { OTooltip },
 });
 </script>

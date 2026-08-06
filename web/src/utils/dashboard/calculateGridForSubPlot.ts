@@ -99,11 +99,7 @@ export function getTrellisGrid(
   let numCols = 1;
 
   try {
-    const optionalGrid = calculateOptimalGrid(
-      numGrids,
-      aspectRatio,
-      numOfColumns,
-    );
+    const optionalGrid = calculateOptimalGrid(numGrids, aspectRatio, numOfColumns);
     numRows = optionalGrid.numRows;
     numCols = optionalGrid.numCols;
   } catch (err: any) {
@@ -112,24 +108,18 @@ export function getTrellisGrid(
 
   const xSpacingBetweenInPx = SPACING_CONFIG.horizontal * (numCols - 1);
   // How many cols
-  const xSpacingBetween =
-    ((SPACING_CONFIG.horizontal * (numCols - 1)) / width) * 100;
+  const xSpacingBetween = ((SPACING_CONFIG.horizontal * (numCols - 1)) / width) * 100;
 
-  const leftPaddingInPx =
-    Math.max(leftMargin, axisWidth || 0) + SPACING_CONFIG.padding.extraLeft;
+  const leftPaddingInPx = Math.max(leftMargin, axisWidth || 0) + SPACING_CONFIG.padding.extraLeft;
 
   const leftPadding = (leftPaddingInPx / width) * 100;
   const rightPadding = (SPACING_CONFIG.padding.right / width) * 100;
 
   // width and height for single gauge
   const cellWidthInPx =
-    (width -
-      (SPACING_CONFIG.padding.right + leftPaddingInPx) -
-      xSpacingBetweenInPx) /
-    numCols;
+    (width - (SPACING_CONFIG.padding.right + leftPaddingInPx) - xSpacingBetweenInPx) / numCols;
 
-  const cellWidth =
-    (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
+  const cellWidth = (100 - (xSpacingBetween + rightPadding + leftPadding)) / numCols;
 
   // Calculate cell height based on cell width (preferred aspect ratio)
   let cellHeightInPx = cellWidthInPx * 0.4;

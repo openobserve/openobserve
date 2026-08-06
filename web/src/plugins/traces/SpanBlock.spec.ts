@@ -20,7 +20,6 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-
 const mockStore = createStore({
   state: {
     theme: "light",
@@ -165,9 +164,7 @@ describe("SpanBlock", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          "q-resize-observer": true,
-        },
+        stubs: {},
       },
     });
 
@@ -195,9 +192,7 @@ describe("SpanBlock", () => {
     expect(spanMarker().exists()).toBe(true);
     expect(spanMarker().attributes("style")).toContain(`width: 91.72%`);
     expect(spanMarker().attributes("style")).toContain(`left: 0%`);
-    expect(spanMarker().attributes("style")).toContain(
-      `height: ${mockSpanDimensions.barHeight}px`,
-    );
+    expect(spanMarker().attributes("style")).toContain(`height: ${mockSpanDimensions.barHeight}px`);
   });
 
   it("should display duration text", () => {
@@ -273,9 +268,7 @@ describe("SpanBlock", () => {
           provide: {
             store: mockStore,
           },
-          stubs: {
-            "q-resize-observer": true,
-          },
+          stubs: {},
         },
       });
     });
@@ -287,10 +280,8 @@ describe("SpanBlock", () => {
 
     it("should apply defocus class when span is not selected", async () => {
       await flushPromises();
-      const spanBlock = newWrapper.find(
-        '[data-test="span-block-select-trigger"]',
-      );
-      expect(spanBlock.classes()).toContain("tw:opacity-30");
+      const spanBlock = newWrapper.find('[data-test="span-block-select-trigger"]');
+      expect(spanBlock.classes()).toContain("opacity-30");
     });
 
     it("Should not show border when span is not selected", async () => {
@@ -302,9 +293,7 @@ describe("SpanBlock", () => {
 
     describe("When span is clicked", async () => {
       beforeEach(async () => {
-        const spanBlock = newWrapper.find(
-          '[data-test="span-block-select-trigger"]',
-        );
+        const spanBlock = newWrapper.find('[data-test="span-block-select-trigger"]');
         await spanBlock.trigger("click");
       });
 
@@ -446,8 +435,6 @@ describe("SpanBlock", () => {
     });
 
     it("should update durationStyle when spanBlockWidth changes via onResize", async () => {
-      const beforeStyle = { ...wrapper.vm.durationStyle };
-
       const el = wrapper.find('[data-test="span-block"]').element;
       Object.defineProperty(el, "clientWidth", {
         configurable: true,
@@ -523,9 +510,7 @@ describe("SpanBlock", () => {
 
     it("span-marker height should match spanDimensions.barHeight", () => {
       const marker = wrapper.find('[data-test="span-marker"]');
-      expect(marker.attributes("style")).toContain(
-        `height: ${mockSpanDimensions.barHeight}px`,
-      );
+      expect(marker.attributes("style")).toContain(`height: ${mockSpanDimensions.barHeight}px`);
     });
 
     it("inner color div should use span.style.color as background", () => {
@@ -537,6 +522,56 @@ describe("SpanBlock", () => {
       const hasHex = style.includes(`background-color: ${mockSpan.style.color}`);
       const hasRgb = style.includes("background-color: rgb(26, 184, 190)");
       expect(hasHex || hasRgb).toBe(true);
+    });
+  });
+
+  describe("pre-selected span_id scroll behavior", () => {
+    let scrollSpy: ReturnType<typeof vi.fn>;
+    let originalScrollIntoView: any;
+
+    beforeEach(() => {
+      scrollSpy = vi.fn();
+      // jsdom does not implement scrollIntoView — install a spy.
+      originalScrollIntoView = (Element.prototype as any).scrollIntoView;
+      (Element.prototype as any).scrollIntoView = scrollSpy;
+    });
+
+    afterEach(async () => {
+      (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+      await router.push({ query: {} });
+    });
+
+    // Regression: with virtualized rows, a SpanBlock remounts every time it
+    // scrolls into the viewport. It must NOT scroll the URL's span_id back into
+    // view on each mount (that fought the user's scroll). Centering the
+    // pre-selected span is owned by TraceTree via the virtualizer.
+    it("should not scroll the span into view on mount when span_id is in the route query", async () => {
+      await router.push({ query: { span_id: mockSpan.spanId } });
+
+      const localWrapper = mount(SpanBlock, {
+        attachTo: document.body,
+        props: {
+          span: mockSpan,
+          baseTracePosition: mockBaseTracePosition,
+          depth: 0,
+          styleObj: mockStyle,
+          showCollapse: true,
+          isCollapsed: false,
+          spanDimensions: mockSpanDimensions,
+          spanData: mockSpanData,
+        },
+        global: {
+          plugins: [i18n, router],
+          provide: { store: mockStore },
+          stubs: {},
+        },
+      });
+
+      await flushPromises();
+
+      expect(scrollSpy).not.toHaveBeenCalled();
+
+      localWrapper.unmount();
     });
   });
 });

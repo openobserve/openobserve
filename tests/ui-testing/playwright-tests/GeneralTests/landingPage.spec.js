@@ -100,9 +100,22 @@ test.describe("Landing Page Test Cases", () => {
   /**
    * Returns to logs page via sidebar with retry logic
    */
+  // Fatal, non-recoverable page/context death (worker browser crash, e.g. OOM).
+  // Retrying navigation against a dead target only masks the real failure and
+  // burns three timeout cycles, so we detect it and fail fast.
+  function isFatalClosedError(page, error) {
+    return page.isClosed()
+      || /has been closed|Target (page|frame)?.*closed|Target closed/i.test(error.message || '');
+  }
+
   async function returnToLogs(page, pm) {
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Fail fast: never retry against a dead page/context. A closed page means
+      // the worker's browser crashed — surface it immediately instead of looping.
+      if (page.isClosed()) {
+        throw new Error('Cannot return to logs page: page/context already closed (browser likely crashed).');
+      }
       try {
         // Wait for the sidebar logs menu to be visible/interactive before clicking.
         await pm.homePage.getLogsMenuItem().waitFor({ state: 'visible', timeout: 5000 });
@@ -121,6 +134,12 @@ test.describe("Landing Page Test Cases", () => {
         testLogger.info(`Successfully returned to logs page on attempt ${attempt}`);
         return; // Success, exit function
       } catch (error) {
+        // A closed page/context is fatal and non-recoverable — surface it now
+        // rather than retrying (and eventually reporting a misleading
+        // "Failed after 3 attempts" that hides the real crash).
+        if (isFatalClosedError(page, error)) {
+          throw new Error(`Return to logs aborted: page/context closed (browser crashed): ${error.message}`);
+        }
         testLogger.warn(`Return to logs attempt ${attempt} failed`, { error: error.message });
         if (attempt === maxRetries) {
           throw new Error(`Failed to return to logs page after ${maxRetries} attempts`);
@@ -304,14 +323,14 @@ test.describe("Landing Page Test Cases", () => {
         }
       },
       {
-        name: 'Settings - Alert Destinations',
+        name: 'Reliability - Notification Destinations',
         navigate: async () => {
           await pm.homePage.navigateToAlertDestinations();
         },
-        urlPattern: /alert_destinations/,
+        urlPattern: /alert-destinations/,
         uiChecks: async () => {
           await pm.homePage.validateSettingsAlertDestinationsPageElements();
-          testLogger.info('Settings - Alert Destinations: Validated add destination button');
+          testLogger.info('Reliability - Notification Destinations: Validated add destination button');
         }
       },
       {
@@ -331,14 +350,14 @@ test.describe("Landing Page Test Cases", () => {
         skipIfNotVisible: true
       },
       {
-        name: 'Settings - Templates',
+        name: 'Reliability - Templates',
         navigate: async () => {
           await pm.homePage.navigateToTemplates();
         },
-        urlPattern: /templates/,
+        urlPattern: /alert-templates/,
         uiChecks: async () => {
           await pm.homePage.validateSettingsTemplatesPageElements();
-          testLogger.info('Settings - Templates: Validated add template button');
+          testLogger.info('Reliability - Templates: Validated add template button');
         }
       },
       {

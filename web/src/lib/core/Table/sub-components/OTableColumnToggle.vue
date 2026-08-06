@@ -2,12 +2,15 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "../OTable.types";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   columns: OTableColumnDef[];
@@ -26,10 +29,7 @@ const toggleableColumns = computed(() =>
 );
 
 const hiddenCount = computed(
-  () =>
-    toggleableColumns.value.filter(
-      (col) => props.columnVisibility[col.id] === false,
-    ).length,
+  () => toggleableColumns.value.filter((col) => props.columnVisibility[col.id] === false).length,
 );
 
 function isVisible(columnId: string): boolean {
@@ -57,24 +57,32 @@ function resetToDefault(): void {
 <template>
   <ODropdown align="end" side="bottom" :side-offset="4">
     <template #trigger>
-      <div class="tw:relative tw:inline-flex">
+      <div class="relative inline-flex">
         <OButton
           variant="outline"
           size="icon-sm"
-          :aria-label="`Manage columns${hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}`"
+          :aria-label="
+            hiddenCount > 0
+              ? t('common.manageColumnsHidden', { count: hiddenCount })
+              : t('common.manageColumns')
+          "
           data-test="o2-table-column-toggle-btn"
         >
           <template #icon-left>
             <OIcon name="view-column" size="sm" />
           </template>
           <OTooltip
-            :content="hiddenCount > 0 ? `Columns (${hiddenCount} hidden)` : 'Columns'"
+            :content="
+              hiddenCount > 0
+                ? t('common.columnsHidden', { count: hiddenCount })
+                : t('common.columns')
+            "
             side="bottom"
           />
         </OButton>
         <span
           v-if="hiddenCount > 0"
-          class="tw:absolute tw:-top-1 tw:-right-1 tw:inline-flex tw:items-center tw:justify-center tw:rounded-full tw:bg-[var(--color-primary-600)] tw:text-white tw:text-[10px] tw:font-medium tw:w-4 tw:h-4 tw:leading-none tw:pointer-events-none"
+          class="bg-count-badge-bg text-3xs pointer-events-none absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full leading-none font-medium text-white"
           data-test="o2-table-column-toggle-hidden-badge"
         >
           {{ hiddenCount }}
@@ -83,30 +91,35 @@ function resetToDefault(): void {
     </template>
 
     <!-- Column list panel -->
-    <div
-      class="tw:py-1 tw:min-w-44"
-      data-test="o2-table-column-toggle-panel"
-    >
-      <p class="tw:px-3 tw:py-1 tw:text-xs tw:font-medium tw:text-[var(--color-text-secondary)]">
-        Columns
+    <div class="min-w-44 py-1" data-test="o2-table-column-toggle-panel">
+      <p class="text-text-secondary px-3 py-1 text-xs font-medium">
+        {{ t("components.table.columnToggle.columns") }}
       </p>
 
-      <ul role="listbox" aria-label="Toggle column visibility" aria-multiselectable="true">
+      <ul
+        role="listbox"
+        :aria-label="t('components.table.columnToggle.toggleVisibilityAria')"
+        aria-multiselectable="true"
+      >
         <li
           v-for="col in toggleableColumns"
           :key="col.id"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:cursor-pointer tw:rounded tw:hover:bg-surface-panel tw:transition-colors"
+          class="rounded-default hover:bg-surface-panel flex cursor-pointer items-center gap-2 px-3 py-1.5 transition-colors"
           :data-test="`o2-table-column-toggle-item-${col.id}`"
           @click.stop="toggleColumn(col.id)"
         >
           <OCheckbox
             :model-value="isVisible(col.id)"
             size="sm"
-            :aria-label="`Toggle ${typeof col.header === 'string' ? col.header : col.id} column`"
+            :aria-label="
+              t('common.toggleColumn', {
+                name: typeof col.header === 'string' ? col.header : col.id,
+              })
+            "
             @update:model-value="toggleColumn(col.id)"
             @click.stop
           />
-          <span class="tw:text-sm tw:text-text-primary tw:select-none tw:flex-1">
+          <span class="text-text-body flex-1 text-sm select-none">
             {{ typeof col.header === "string" ? col.header : col.id }}
           </span>
         </li>
@@ -115,25 +128,27 @@ function resetToDefault(): void {
       <!-- Reset buttons — same px-3 gap-2 structure as list items for alignment -->
       <div
         v-if="hiddenCount > 0 || props.hasResizedColumns"
-        class="tw:border-t tw:border-[var(--color-border-default)] tw:mt-1 tw:pt-1 tw:pb-1"
+        class="border-border-default mt-1 border-t pt-1 pb-1"
       >
         <button
           v-if="hiddenCount > 0"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:w-full tw:text-sm tw:cursor-pointer tw:rounded tw:hover:bg-surface-panel tw:transition-colors tw:text-text-primary"
+          class="rounded-default hover:bg-surface-panel text-text-body flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors"
           data-test="o2-table-column-toggle-reset-btn"
           @click="resetToDefault"
         >
-          <OIcon name="refresh" size="sm" class="tw:shrink-0" />
-          <span class="tw:select-none">Reset to default</span>
+          <OIcon name="refresh" size="sm" class="shrink-0" />
+          <span class="select-none">{{ t("components.table.columnToggle.resetToDefault") }}</span>
         </button>
         <button
           v-if="props.hasResizedColumns"
-          class="tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1.5 tw:w-full tw:text-sm tw:cursor-pointer tw:rounded tw:hover:bg-surface-panel tw:transition-colors tw:text-text-primary"
+          class="rounded-default hover:bg-surface-panel text-text-body flex w-full cursor-pointer items-center gap-2 px-3 py-1.5 text-sm transition-colors"
           data-test="o2-table-column-resize-reset-btn"
           @click="emit('reset:columnSizes')"
         >
-          <OIcon name="refresh" size="sm" class="tw:shrink-0" />
-          <span class="tw:select-none">Reset column widths</span>
+          <OIcon name="refresh" size="sm" class="shrink-0" />
+          <span class="select-none">{{
+            t("components.table.columnToggle.resetColumnWidths")
+          }}</span>
         </button>
       </div>
     </div>

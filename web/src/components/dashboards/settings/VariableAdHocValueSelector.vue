@@ -1,8 +1,7 @@
 <template>
-  <div class="tw:flex tw:flex-wrap tw:items-center">
-    <!-- <div class="tw:mb-2 title" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'" no-caps no-outline rounded>{{ variableItem?.name }}</div> -->
+  <div class="flex flex-wrap items-center">
     <div
-      class="tw:flex tw:flex-nowrap tw:items-center tw:mb-1 tw:gap-x-1"
+      class="mr-4 mb-2 flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -10,44 +9,44 @@
         v-model="adhocVariables[index].name"
         :debounce="1000"
         data-test="dashboard-variable-adhoc-name-selector"
-        placeholder="Enter Name"
+        :placeholder="t('dashboard.variableAdHocValueSelector.enterName')"
         @update:model-value="updateModelValueOfSelect(index, $event)"
-        class="tw:flex-1"
+        class="flex-1"
       />
       <OSelect
+        class="w-auto"
         v-model="adhocVariables[index].operator"
         :options="operatorOptions"
-        style="width: auto"
         data-test="dashboard-variable-adhoc-operator-selector"
       />
       <OInput
+        class="w-31.25"
         v-model="adhocVariables[index].value"
-        placeholder="Enter Value"
+        :placeholder="t('dashboard.variableAdHocValueSelector.enterValue')"
         :debounce="1000"
-        style="width: 125px"
         data-test="dashboard-variable-adhoc-value-selector"
         @update:model-value="emitValue()"
       />
       <OButton
         variant="ghost"
         size="icon"
-        class="tw:ml-1"
+        class="ml-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="tw:ml-2 and-border" :class="store.state.theme === 'dark' ? 'tw:bg-gray-600' : 'tw:bg-gray-300'">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"
       size="sm"
-      class="tw:ml-1 tw:mb-2 hideOnPrintMode"
+      class="hideOnPrintMode mb-2 ml-1"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >
       <DynamicFilterIcon />
-      <OTooltip content="Add Dynamic Filter" />
+      <OTooltip :content="t('dashboard.variableAdHocValueSelector.addDynamicFilter')" />
     </OButton>
   </div>
 </template>
@@ -56,11 +55,19 @@
 import { defineComponent, ref, toRef, watch, type Ref, toRefs } from "vue";
 import { useSelectAutoComplete } from "../../../composables/useSelectAutocomplete";
 import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DynamicFilterIcon from "../../icons/DynamicFilterIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+
+interface AdHocVariable {
+  name: string;
+  operator: string;
+  value: string;
+  streams: string[];
+}
 
 export default defineComponent({
   name: "VariableAdHocValueSelector",
@@ -70,12 +77,15 @@ export default defineComponent({
 
   setup(props: any, { emit }) {
     const store = useStore();
+    const { t } = useI18nTyped();
     const operatorOptions = [
-      { label: "=", value: "=" },
-      { label: "!=", value: "!=" },
+      { label: raw("="), value: "=" },
+      { label: raw("!="), value: "!=" },
     ];
     const options = toRef(props.variableItem, "options");
-    const { modelValue: adhocVariables } = toRefs(props);
+    const { modelValue: adhocVariables } = toRefs(props) as {
+      modelValue: Ref<AdHocVariable[]>;
+    };
     const { filterFn: fieldsFilterFn, filteredOptions: fieldsFilteredOptions } =
       useSelectAutoComplete(options, "name");
 
@@ -107,13 +117,11 @@ export default defineComponent({
     };
 
     const emitValue = () => {
-      emit(
-        "update:modelValue",
-        JSON.parse(JSON.stringify(adhocVariables.value)),
-      );
+      emit("update:modelValue", JSON.parse(JSON.stringify(adhocVariables.value)));
     };
 
     return {
+      raw,
       fieldsFilterFn,
       fieldsFilteredOptions,
       addFields,
@@ -121,14 +129,10 @@ export default defineComponent({
       adhocVariables,
       removeField,
       updateModelValueOfSelect,
+      emitValue,
       store,
+      t,
     };
   },
 });
 </script>
-
-<style>
-.printMode .hideOnPrintMode {
-  display: none;
-}
-</style>

@@ -15,6 +15,7 @@
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { getSeriesColor } from "../../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 import {
   getChartDimensions,
   applyPieDonutChartAlignment,
@@ -26,7 +27,7 @@ import { type SQLContext } from "../shared/types";
 /**
  * Applies chart-specific options for: pie AND donut
  *
- * Mutates `ctx.options` in place, exactly as the original switch cases did.
+ * Mutates `ctx.options` in place.
  */
 export function applyPieDonutChart(ctx: SQLContext): void {
   const {
@@ -55,11 +56,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.tooltip = {
       trigger: "item",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
       formatter: function (name: any) {
         try {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -160,10 +160,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             case "left": {
               // Position chart to the left within ONLY the chart area
               const leftPositionInChartArea = chartAreaWidth * 0.25; // 25% into chart area
-              centerX = Math.max(
-                minSafeXInChartArea,
-                (leftPositionInChartArea / chartWidth) * 100,
-              );
+              centerX = Math.max(minSafeXInChartArea, (leftPositionInChartArea / chartWidth) * 100);
               break;
             }
             case "center":
@@ -182,12 +179,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
           options.series[0].center = ["50%", "50%"];
         }
       } else {
-        applyPieDonutCenterAdjustment(
-          panelSchema,
-          options,
-          chartWidth,
-          chartHeight,
-        );
+        applyPieDonutCenterAdjustment(panelSchema, options, chartWidth, chartHeight);
       }
     }
 
@@ -206,11 +198,10 @@ export function applyPieDonutChart(ctx: SQLContext): void {
     options.tooltip = {
       trigger: "item",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
       formatter: function (name: any) {
         try {
           // show tooltip for hovered panel only for other we only need axis so just return empty string
@@ -281,12 +272,7 @@ export function applyPieDonutChart(ctx: SQLContext): void {
       options.series[0].radius = [`${innterRadius}%`, `${outerRadius}%`];
 
       // Apply chart alignment and center positioning using centralized function
-      applyPieDonutChartAlignment(
-        panelSchema,
-        options,
-        chartWidth,
-        chartHeight,
-      );
+      applyPieDonutChartAlignment(panelSchema, options, chartWidth, chartHeight);
     }
 
     options.xAxis = [];

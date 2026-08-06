@@ -20,7 +20,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import ModelPricingList from "./ModelPricingList.vue";
 
-
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
 vi.mock("@/services/model_pricing", () => ({
@@ -35,15 +34,6 @@ vi.mock("@/services/model_pricing", () => ({
     test: vi.fn(),
   },
 }));
-
-const notifyMock = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual<any>("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: notifyMock }),
-  };
-});
 
 const mockToastFn = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -166,11 +156,11 @@ const AppTabsStub = {
   template: `<div data-test="app-tabs-stub" :data-active="activeTab" />`,
 };
 
-const QTablePaginationStub = {
-  name: "QTablePagination",
+const PaginationStub = {
+  name: "Pagination",
   props: ["scope", "position", "resultTotal", "perPageOptions"],
   emits: ["update:changeRecordPerPage"],
-  template: `<div data-test="q-table-pagination-stub" />`,
+  template: `<div data-test="table-pagination-stub" />`,
 };
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
@@ -182,9 +172,7 @@ const orgModel = (overrides: Partial<any> = {}) => ({
   source: "org",
   org_id: "test-org",
   enabled: true,
-  tiers: [
-    { condition: null, prices: { input: 0.0000025, output: 0.00001 } },
-  ],
+  tiers: [{ condition: null, prices: { input: 0.0000025, output: 0.00001 } }],
   children: [],
   ...overrides,
 });
@@ -196,9 +184,7 @@ const metaOrgModel = (overrides: Partial<any> = {}) => ({
   source: "meta_org",
   org_id: "_meta_org_",
   enabled: true,
-  tiers: [
-    { condition: null, prices: { input: 0.000003, output: 0.000015 } },
-  ],
+  tiers: [{ condition: null, prices: { input: 0.000003, output: 0.000015 } }],
   children: [],
   ...overrides,
 });
@@ -210,9 +196,7 @@ const builtInModel = (overrides: Partial<any> = {}) => ({
   source: "built_in",
   org_id: "_built_in_",
   enabled: true,
-  tiers: [
-    { condition: null, prices: { input: 0.0000005, output: 0.0000015 } },
-  ],
+  tiers: [{ condition: null, prices: { input: 0.0000005, output: 0.0000015 } }],
   children: [],
   ...overrides,
 });
@@ -297,49 +281,17 @@ const mockI18n = createI18n({
 // ── Global stubs ─────────────────────────────────────────────────────────────
 
 const globalStubs: Record<string, any> = {
-  "q-page": { template: "<div><slot /></div>" },
-  "q-table": {
-    name: "q-table",
-    props: ["rows", "columns", "pagination", "sortMethod"],
-    template: `
-      <div class="q-table">
-        <slot name="header" :cols="columns" />
-        <template v-for="(row, idx) in rows" :key="row.id">
-          <slot name="body" :row="row" :rowIndex="idx" :cols="columns" />
-        </template>
-        <slot name="no-data" />
-        <slot name="bottom" />
-      </div>
-    `,
-  },
-  "q-tr": { template: "<tr><slot /></tr>" },
-  "q-th": { template: "<th><slot /></th>" },
-  "q-td": { template: "<td><slot /></td>" },
-  "OIcon": {
+  OIcon: {
     template: '<span class="OIcon"><slot /></span>',
     props: ["name", "size", "color"],
   },
-  "q-tooltip": { template: "<span><slot /></span>" },
-  "q-checkbox": {
-    name: "q-checkbox",
-    props: ["modelValue", "indeterminate", "size"],
-    emits: ["update:modelValue"],
-    template: `<input type="checkbox" :checked="modelValue" @change="$emit('update:modelValue', !modelValue)" />`,
-  },
-  "q-input": {
-    name: "q-input",
-    props: ["modelValue", "placeholder", "borderless", "dense"],
-    emits: ["update:modelValue"],
-    template: `<input :value="modelValue" :placeholder="placeholder" @input="$emit('update:modelValue', $event.target.value)" />`,
-  },
-  "q-separator": true,
   ODrawer: ODrawerStub,
   OButton: OButtonStub,
   ConfirmDialog: ConfirmDialogStub,
   ImportModelPricing: ImportModelPricingStub,
   TestModelMatchDialog: TestModelMatchDialogStub,
   AppTabs: AppTabsStub,
-  QTablePagination: QTablePaginationStub,
+  Pagination: PaginationStub,
 };
 
 // ── Test helpers ─────────────────────────────────────────────────────────────
@@ -430,7 +382,7 @@ describe("ModelPricingList.vue", () => {
     it("should render the list header when not showing the import page", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      // Title now lives in the standard AppPageHeader (row 1).
+      // Title now lives in the standard OPageHeader (row 1).
       expect(wrapper.find(".app-page-header h1").exists()).toBe(true);
     });
 
@@ -726,7 +678,6 @@ describe("ModelPricingList.vue", () => {
     });
   });
 
-
   describe("getDefaultTier", () => {
     it("returns the first unconditional tier", async () => {
       wrapper = mountComponent();
@@ -890,15 +841,11 @@ describe("ModelPricingList.vue", () => {
       await flushPromises();
 
       expect(modelPricingService.delete).toHaveBeenCalledWith("test-org", "org-1");
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("notifies error (and skips success notify) when delete fails", async () => {
-      vi.mocked(modelPricingService.delete).mockRejectedValueOnce(
-        new Error("boom"),
-      );
+      vi.mocked(modelPricingService.delete).mockRejectedValueOnce(new Error("boom"));
       wrapper = mountComponent();
       await flushPromises();
 
@@ -907,9 +854,7 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
 
     it("does not notify when API returns 403 (silenced by global interceptor)", async () => {
@@ -924,9 +869,7 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.confirmDialogMeta.onConfirm();
       await flushPromises();
 
-      const negativeCalls = mockToastFn.mock.calls.filter(
-        (c) => c[0]?.variant === "error",
-      );
+      const negativeCalls = mockToastFn.mock.calls.filter((c) => c[0]?.variant === "error");
       expect(negativeCalls).toHaveLength(0);
     });
   });
@@ -989,24 +932,18 @@ describe("ModelPricingList.vue", () => {
       await wrapper.vm.toggleEnabled(mockModels[0], true);
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("notifies negative when update fails", async () => {
-      vi.mocked(modelPricingService.update).mockRejectedValueOnce(
-        new Error("update fail"),
-      );
+      vi.mocked(modelPricingService.update).mockRejectedValueOnce(new Error("update fail"));
       wrapper = mountComponent();
       await flushPromises();
 
       await wrapper.vm.toggleEnabled(mockModels[0], false);
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
     });
   });
 
@@ -1041,24 +978,18 @@ describe("ModelPricingList.vue", () => {
 
       expect(modelPricingService.refreshBuiltIn).toHaveBeenCalledWith("test-org");
       expect(modelPricingService.list).toHaveBeenCalled();
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "success" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("notifies negative when refresh fails", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      vi.mocked(modelPricingService.refreshBuiltIn).mockRejectedValueOnce(
-        new Error("nope"),
-      );
+      vi.mocked(modelPricingService.refreshBuiltIn).mockRejectedValueOnce(new Error("nope"));
 
       await wrapper.vm.refreshBuiltIn();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(wrapper.vm.refreshing).toBe(false);
     });
   });
@@ -1067,15 +998,11 @@ describe("ModelPricingList.vue", () => {
 
   describe("fetchModels errors", () => {
     it("notifies negative when list() rejects", async () => {
-      vi.mocked(modelPricingService.list).mockRejectedValueOnce(
-        new Error("network"),
-      );
+      vi.mocked(modelPricingService.list).mockRejectedValueOnce(new Error("network"));
       wrapper = mountComponent();
       await flushPromises();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "error" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
       expect(wrapper.vm.loading).toBe(false);
     });
 
@@ -1086,9 +1013,7 @@ describe("ModelPricingList.vue", () => {
       wrapper = mountComponent();
       await flushPromises();
 
-      const negativeCalls = mockToastFn.mock.calls.filter(
-        (c) => c[0]?.variant === "error",
-      );
+      const negativeCalls = mockToastFn.mock.calls.filter((c) => c[0]?.variant === "error");
       expect(negativeCalls).toHaveLength(0);
     });
   });
@@ -1102,12 +1027,8 @@ describe("ModelPricingList.vue", () => {
     let origCreateElement: any;
 
     beforeEach(() => {
-      createObjectURLSpy = vi
-        .spyOn(URL, "createObjectURL")
-        .mockReturnValue("blob://mock");
-      revokeObjectURLSpy = vi
-        .spyOn(URL, "revokeObjectURL")
-        .mockImplementation(() => {});
+      createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob://mock");
+      revokeObjectURLSpy = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
       clickMock = vi.fn();
       origCreateElement = document.createElement.bind(document);
       vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
@@ -1130,9 +1051,7 @@ describe("ModelPricingList.vue", () => {
 
       wrapper.vm.exportSelected();
 
-      expect(mockToastFn).toHaveBeenCalledWith(
-        expect.objectContaining({ variant: "warning" }),
-      );
+      expect(mockToastFn).toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
       expect(clickMock).not.toHaveBeenCalled();
     });
 

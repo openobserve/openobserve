@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { applyPieDonutChart } from "@/utils/dashboard/sql/charts/convertSQLPieDonutChart";
 
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue", () => ({
@@ -29,7 +29,12 @@ vi.mock("@/utils/dashboard/legendConfiguration", () => ({
   getChartDimensions: vi.fn(() => ({ chartWidth: 800, chartHeight: 400 })),
   applyPieDonutChartAlignment: vi.fn(),
   applyPieDonutCenterAdjustment: vi.fn(),
-  calculatePieChartContainer: vi.fn(() => ({ left: "15%", right: "15%", top: "15%", bottom: "15%" })),
+  calculatePieChartContainer: vi.fn(() => ({
+    left: "15%",
+    right: "15%",
+    top: "15%",
+    bottom: "15%",
+  })),
 }));
 
 function makeMockContext(overrides: Partial<any> = {}): any {

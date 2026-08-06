@@ -15,6 +15,7 @@
 
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
+import searchService from "@/services/search";
 import { useStore } from "vuex";
 
 /**
@@ -46,8 +47,7 @@ import { useStore } from "vuex";
  */
 export function useLLMStreamQuery() {
   const store = useStore();
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const activeTraceIds = new Set<string>();
 
@@ -59,6 +59,45 @@ export function useLLMStreamQuery() {
       });
     });
     activeTraceIds.clear();
+  }
+
+  function querySize(sql: string): number {
+    const limitMatch = sql.match(/\bLIMIT\s+(\d+)\b/i);
+    return limitMatch ? parseInt(limitMatch[1], 10) : 1000;
+  }
+
+  /**
+   * Execute one full-range search without time-slice streaming.
+   *
+   * Window functions such as ROW_NUMBER() must see the complete selected time
+   * range to choose a single latest record. The streaming endpoint evaluates
+   * non-streamable SQL independently for each time slice, which can reintroduce
+   * duplicates and can reduce a histogram to only its final slice. Use this
+   * path for queries whose correctness depends on a global window.
+   */
+  async function executeQueryOnce(
+    sql: string,
+    startTime: number,
+    endTime: number,
+    pageType: "traces" | "logs" | "metrics" = "traces",
+  ): Promise<any[]> {
+    const useBase64 = store.state.zoConfig?.sql_base64_enabled;
+    const response = await searchService.search({
+      org_identifier: store.state.selectedOrganization.identifier,
+      query: {
+        query: {
+          sql: useBase64 ? b64EncodeUnicode(sql) : sql,
+          start_time: startTime,
+          end_time: endTime,
+          from: 0,
+          size: querySize(sql),
+        },
+        ...(useBase64 ? { encoding: "base64" } : {}),
+      },
+      page_type: pageType,
+    });
+
+    return response?.data?.hits ?? response?.data?.results?.hits ?? [];
   }
 
   function executeQuery(
@@ -74,13 +113,13 @@ export function useLLMStreamQuery() {
       const traceId = generateTraceContext().traceId;
       activeTraceIds.add(traceId);
       const accumulated: any[] = [];
+      const metadataHits: any[] = [];
 
       // Honour the SQL's own LIMIT as the request `size` so the
       // backend doesn't scan more rows than the panel actually wants.
       // Recent-errors panel uses LIMIT 10; latency raw uses LIMIT
       // 50000. Falls back to 1000 for queries without LIMIT.
-      const limitMatch = sql.match(/\bLIMIT\s+(\d+)\b/i);
-      const size = limitMatch ? parseInt(limitMatch[1], 10) : 1000;
+      const size = querySize(sql);
 
       // Match the rest of the codebase: only base64-encode when the
       // org/instance has sql_base64_enabled. Plain SQL is fine otherwise.
@@ -105,10 +144,21 @@ export function useLLMStreamQuery() {
         },
         {
           data: (_payload: any, response: any) => {
+            // Hits arrive on `search_response_hits` events; the preceding
+            // `search_response_metadata` event can carry the same hits again
+            // (e.g. cached results). Accumulating from both duplicates every
+            // row — the dashboard SQL executor appends only on hits events.
+            // Metadata hits are kept separately as a fallback for responses
+            // that never emit a hits event.
             const hits: any[] = response.content?.results?.hits || [];
-            if (hits.length > 0) accumulated.push(...hits);
+            if (hits.length === 0) return;
+            if (response.type === "search_response_hits") {
+              accumulated.push(...hits);
+            } else {
+              metadataHits.push(...hits);
+            }
           },
-          error: (response: any, _traceId: any) => {
+          error: (response: any) => {
             activeTraceIds.delete(traceId);
             // useStreamingSearch wraps the server error body as
             // `{ content: { ...errorBody, trace_id }, type: "error" }`.
@@ -129,7 +179,7 @@ export function useLLMStreamQuery() {
           },
           complete: () => {
             activeTraceIds.delete(traceId);
-            resolve(accumulated);
+            resolve(accumulated.length > 0 ? accumulated : metadataHits);
           },
           reset: () => {},
         },
@@ -137,5 +187,5 @@ export function useLLMStreamQuery() {
     });
   }
 
-  return { executeQuery, cancelAll };
+  return { executeQuery, executeQueryOnce, cancelAll };
 }

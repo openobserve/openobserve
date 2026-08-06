@@ -15,415 +15,513 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full">
-
+  <!-- AddAlert OWNS the ONE form (Rule ③ owner pattern): `form` is created in
+       setup() via useAlertForm's useOForm and handed to <OForm :form> so the
+       topbar OForm* fields and the already-migrated descendant steps
+       (QueryConfig / AlertSettings) bind by nested `name=` into it. -->
+  <OForm :form="form" v-slot="{ isSubmitting }" class="h-full w-full">
     <!-- ═══════════════════════════════════════════════════════════════════ -->
     <!-- V3 "Single Pane of Glass" Layout (All alert types)                -->
     <!-- ═══════════════════════════════════════════════════════════════════ -->
-      <div class="tw:flex tw:flex-col tw:h-full">
-      <AppPageHeader
-        class="alert-v3-topbar tw:[container-type:inline-size] tw:[container-name:topbar] tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-        :back="{
-          label: activeFolderName || t('alerts.header'),
-          onClick: goBackToAlertsList,
-          dataTest: 'add-alert-back-btn',
-        }"
-      >
-        <!-- Inline title editing (name + folder), kept in the header per the
-             AddPanel convention (#tabs slot renders inline beside the back tile). -->
-        <template #tabs>
-          <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0">
+    <OPageLayout bleed>
+      <template #header>
+        <OPageHeader
+          class="alert-v3-topbar border-border-default [container-type:inline-size] shrink-0 border-b [container-name:topbar]"
+          :back="{
+            label: activeFolderName || t('alerts.header'),
+            onClick: goBackToAlertsList,
+            dataTest: 'add-alert-back-btn',
+          }"
+          title-overflow="visible"
+        >
+          <!-- The name IS the title in both modes, so creating no longer means
+             filling a boxed field wedged into the toolbar: it renders as heading
+             text and swaps to an input on click. Create mode also gets a
+             generated name that tracks the stream + condition until the user
+             types (see alertAutoName / useAutoName). EDIT mode is readonly —
+             OInlineEdit then renders the saved name as plain heading text with
+             no affordance, which is exactly what this header showed before.
+             Anomaly and alert names bind the SAME `name` field — see the note on
+             the folder select below for why the anomaly path never binds
+             anomalyConfig.name directly. -->
+          <template #title>
+            <OFormInlineEdit
+              ref="step1Ref"
+              name="name"
+              :readonly="beingUpdated || anomalyEditMode"
+              :data-test="isAnomalyMode ? 'add-anomaly-name-input' : 'add-alert-name-input'"
+              :placeholder="
+                isAnomalyMode
+                  ? t('alerts.anomalyNamePlaceholder')
+                  : t('alerts.alertNamePlaceholder')
+              "
+              :aria-label="
+                isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName')
+              "
+              :edit-hint="
+                alertAutoName.isAuto.value
+                  ? t('common.inlineEdit.autoHint')
+                  : t('alerts.renameHint')
+              "
+              @update:model-value="alertAutoName.markManual"
+              @commit="alertAutoName.onCommit"
+              @cancel="alertAutoName.onCommit"
+            />
+          </template>
 
-          <!-- EDIT MODE: (folder → chevron → name) -->
-          <template v-if="beingUpdated || anomalyEditMode">
-            <span
-              class="alert-folder-name tw:text-xl tw:tracking-[0.005em] tw:px-2 tw:cursor-pointer tw:transition-all tw:rounded-sm tw:text-(--o2-menu-color)! tw:hover:rounded-[0.325rem] tw:hover:bg-(--o2-tab-bg)!"
-              @click="goBackToAlertsList"
-            >{{ activeFolderName }}</span>
-            <OIcon name="chevron-right" size="sm" class="tw:text-gray-400 tw:mt-0.5 tw:shrink-0" />
-            <template v-if="!isAnomalyMode">
-              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
-                {{ formData.name }}
-                <OTooltip v-if="formData.name?.length > 24" :content="formData.name" />
-              </span>
-            </template>
-            <template v-else>
-              <span class="tw:text-xl tw:tracking-[0.005em] tw:truncate tw:max-w-[200px]">
-                {{ anomalyConfig.name }}
-                <OTooltip v-if="anomalyConfig.name?.length > 24" :content="anomalyConfig.name" />
-              </span>
-              <OTag v-if="anomalyConfig.status" type="anomalyStatus" :value="anomalyConfig.status" />
+          <!-- EDIT MODE (anomaly): status + last-run + retry trail the name -->
+          <template #title-trail>
+            <div
+              v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
+              class="flex items-center gap-1.5"
+            >
+              <OTooltip
+                :content="raw(anomalyConfig.last_error)"
+                :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
+              >
+                <OTag
+                  v-if="anomalyConfig.status"
+                  type="anomalyStatus"
+                  :value="anomalyConfig.status"
+                />
+              </OTooltip>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
-                class="tw:text-[11px] tw:whitespace-nowrap tw:text-text-secondary"
+                class="text-2xs text-text-secondary whitespace-nowrap"
               >
-                Last run: {{ anomalyFormatTs(anomalyConfig.last_detection_run) }}
+                {{
+                  t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
+                }}
               </span>
-              <OButton v-if="anomalyConfig.status === 'failed'" variant="ghost-destructive" size="xs" :loading="anomalyRetraining" @click="anomalyTriggerRetrain" icon-left="replay">
-                  {{ t('alerts.retry') }}
+              <OTooltip
+                v-if="anomalyConfig.status === 'failed'"
+                :content="t('alerts.retryTraining')"
+              >
+                <OButton
+                  variant="ghost-destructive"
+                  size="xs"
+                  :loading="anomalyRetraining"
+                  @click="anomalyTriggerRetrain"
+                  icon-left="replay"
+                >
+                  {{ t("alerts.retry") }}
                 </OButton>
-            </template>
+              </OTooltip>
+            </div>
           </template>
 
-          <!-- CREATE MODE: Alert Name + Folder -->
-          <template v-else>
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ isAnomalyMode ? t('alerts.anomalyName') : t('alerts.incidents.alertName') }} <span class="tw:text-text-primary">*</span></div>
-              <OInput
-                v-if="!isAnomalyMode"
-                ref="step1Ref"
-                v-model="formData.name"
-                data-test="add-alert-name-input"
-                :placeholder="t('alerts.alertNamePlaceholder')"
-                class="topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
-                :class="alertNameError ? 'field-error' : ''"
-                @update:model-value="alertNameError = false"
-              />
-              <OInput
-                v-else
-                ref="anomalyNameRef"
-                v-model="anomalyConfig.name"
-                :placeholder="t('alerts.anomalyNamePlaceholder')"
-                class="topbar-name-input tw:text-sm tw:h-[28px]! tw:min-h-[28px]! tw:min-w-[120px] tw:max-w-[150px]"
-              />
-            </div>
-
-            <!-- Folder -->
-            <div class="tw:flex tw:items-center tw:gap-1.5 tw:shrink-0">
-              <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t('alerts.folder') }}</div>
+          <!-- The description line states what this page is AND where the alert
+             will land: "Add Alert in <folder>", the folder being a text-styled
+             dropdown. Parked on the right of the header it was invisible; read
+             as part of the sentence directly under the name it is exactly where
+             someone looks to answer "where is this being saved?". Edit mode
+             prints the folder as plain text — an alert does not move folders
+             from here.
+             (The anomaly name binds the SAME `name` field as the alert name,
+             not `anomalyConfig.name`: a bare input has no field for the schema
+             to paint, so a blank name could only ever toast. The
+             formData.name → anomalyConfig.name watcher in useAlertForm still
+             feeds the value saveAnomalyDetection reads, and anomaly edit-load
+             seeds it via setF("name", data.name).) -->
+          <template #subtitle>
+            <span class="flex min-w-0 items-center gap-1 leading-normal">
+              <span class="whitespace-nowrap">
+                {{ t("alerts.modeInFolder", { mode: headerModeLabel }) }}
+              </span>
               <InlineSelectFolderDropdown
-                :model-value="activeFolderId"
+                v-if="!(beingUpdated || anomalyEditMode)"
+                variant="inline"
+                :model-value="activeFolderId as string"
                 type="alerts"
-                class="topbar-folder-select"
                 @update:model-value="updateActiveFolderId({ value: $event })"
               />
-            </div>
-          </template>
-
-          </div>
-        </template>
-      </AppPageHeader>
-
-      <div class="tw:flex tw:flex-1 tw:min-h-0">
-
-      <!-- LEFT column wrapper (flex: 6.5) -->
-      <div style="flex: 6.5; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px 0;">
-
-      <!-- Stream Name & Stream Type -->
-      <div class="card-container tw:shrink-0 stream-config-card tw:[container-type:inline-size] tw:[container-name:stream-config]">
-        <div class="tw:flex tw:items-center tw:gap-0 tw:py-[10px] tw:px-3 tw:border-b tw:border-[#e6e6e6] tw:dark:border-[var(--color-border-default)]">
-          <div class="tw:w-[3px] tw:h-4 tw:rounded-sm tw:mr-2 tw:shrink-0 tw:bg-[var(--q-primary)]" />
-          <span class="tw:text-[13px] tw:font-semibold tw:tracking-[0.01em]">{{ t('alerts.streamConfig') }} <span class="tw:text-text-primary">*</span></span>
-        </div>
-        <div class="tw:flex tw:items-center tw:gap-4 tw:px-3 tw:py-2">
-        <!-- Stream Type -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.streamType") }} <span class="tw:text-text-primary">*</span></div>
-          <OSelect
-            ref="streamTypeRef"
-            data-test="add-alert-stream-type-select-dropdown"
-            v-model="formData.stream_type"
-            :options="streamTypes"
-            :searchable="false"
-            class="stream-type-select tw:h-[28px]! tw:min-h-[28px]!"
-            :class="streamTypeError ? 'field-error' : ''"
-            :disabled="beingUpdated || anomalyEditMode"
-            @update:model-value="streamTypeError = false; updateStreams()"
-          />
-        </div>
-
-        <!-- Stream Name -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.stream_name") }} <span class="tw:text-text-primary">*</span></div>
-          <OSelect
-            ref="streamNameRef"
-            data-test="add-alert-stream-name-select-dropdown"
-            v-model="formData.stream_name"
-            :options="indexOptions"
-            :loading="isFetchingStreams"
-            class="stream-name-select tw:h-[28px]! tw:min-h-[28px]!"
-            :class="streamNameError ? 'field-error' : ''"
-            :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
-            @update:model-value="streamNameError = false; updateStreamFields($event)"
-          />
-          <OTooltip v-if="!formData.stream_type" :content="t('alerts.selectStreamTypeFirst')" />
-        </div>
-
-        <!-- Alert Type -->
-        <div class="tw:flex tw:items-center tw:gap-1.5">
-          <div class="tw:text-xs tw:font-semibold tw:whitespace-nowrap" :class="store.state.theme === 'dark' ? 'tw:text-[rgba(255,255,255,0.7)]' : 'tw:text-[rgba(0,0,0,0.72)]'">{{ t("alerts.alertType") || 'Alert Type' }}</div>
-          <OSelect
-            data-test="add-alert-type-select-dropdown"
-            v-model="formData.is_real_time"
-            :options="alertTypeOptions"
-            :disabled="beingUpdated || anomalyEditMode"
-            class="alert-type-select tw:h-[28px]! tw:min-h-[28px]!"
-            :searchable="false"
-          />
-        </div>
-        </div>
-      </div>
-
-      <!-- TIER 3: Configuration Tabs -->
-      <div class="alert-v3-tabs card-container" style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin: 0 8px;">
-        <!-- Tab Headers -->
-        <OToggleGroup
-          :model-value="activeTab"
-          @update:model-value="activeTab = ($event as string)"
-          class="tw:shrink-0"
-        >
-          <OToggleGroupItem
-            v-for="tab in alertTabs"
-            :key="tab.key"
-            :value="tab.key"
-            size="sm"
-            :data-test="`add-alert-tab-${tab.key}`"
-          >
-            <template #icon-left>
-              <OIcon v-if="tab.key === 'condition'" name="shield" size="sm" />
-              <OIcon v-else-if="tab.key === 'advanced'" name="tune" size="sm" />
-              <OIcon v-else-if="tab.key === 'anomaly-config'" name="trending-up" size="sm" />
-              <OIcon v-else-if="tab.key === 'anomaly-alerting'" name="notifications" size="sm" />
-            </template>
-            {{ tab.label }}{{ tab.required ? ' *' : '' }}
-          </OToggleGroupItem>
-        </OToggleGroup>
-
-        <!-- Tab Content -->
-        <div class="tw:flex-1 tw:overflow-auto">
-          <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
-          <div v-show="activeTab === 'condition'" class="tw:flex tw:flex-col tw:gap-4">
-            <div>
-              <QueryConfig
-              ref="step2Ref"
-              :tab="formData.query_condition.type || 'custom'"
-              :multiTimeRange="formData.query_condition.multi_time_range"
-              :columns="filteredColumns"
-              :streamFieldsMap="streamFieldsMap"
-              :generatedSqlQuery="generatedSqlQuery"
-              :inputData="formData.query_condition"
-              :streamType="formData.stream_type"
-              :isRealTime="formData.is_real_time"
-              :sqlQuery="formData.query_condition.sql"
-              :promqlQuery="formData.query_condition.promql"
-              :vrlFunction="decodedVrlFunction"
-              :streamName="formData.stream_name"
-              :sqlQueryErrorMsg="sqlQueryErrorMsg"
-              :isAggregationEnabled="isAggregationEnabled"
-              :beingUpdated="beingUpdated"
-              :promqlCondition="formData.query_condition.promql_condition"
-              :triggerCondition="formData.trigger_condition"
-              @update:tab="updateTab"
-              @update-group="updateGroup"
-              @remove-group="removeConditionGroup"
-              @input:update="onInputUpdate"
-              @update:sqlQuery="(value) => (formData.query_condition.sql = value)"
-              @update:promqlQuery="(value) => (formData.query_condition.promql = value)"
-              @update:vrlFunction="(value) => (formData.query_condition.vrl_function = value)"
-              @validate-sql="validateSqlQuery"
-              @clear-multi-windows="clearMultiWindows"
-              @editor-closed="handleEditorClosed"
-              @editor-state-changed="handleEditorStateChanged"
-              @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
-              @update:aggregation="(value) => (formData.query_condition.aggregation = value)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
-              @update:triggerCondition="(val) => (formData.trigger_condition = val)"
-            />
-            </div>
-
-            <div>
-              <AlertSettings
-              ref="step4Ref"
-              :formData="formData"
-              :isRealTime="formData.is_real_time"
-              :columns="filteredColumns"
-              :isAggregationEnabled="isAggregationEnabled"
-              :destinations="formData.destinations"
-              :formattedDestinations="getFormattedDestinations"
-              @update:trigger="(val) => (formData.trigger_condition = val)"
-              @update:aggregation="(val) => (formData.query_condition.aggregation = val)"
-              @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
-              @update:promqlCondition="(val) => (formData.query_condition.promql_condition = val)"
-              @update:destinations="updateDestinations"
-              @refresh:destinations="refreshDestinations"
-            />
-            </div>
-          </div>
-
-          <div v-show="activeTab === 'advanced'" class="tw:flex tw:flex-col tw:gap-4">
-
-            <!-- Additional Settings (first) -->
-            <div>
-              <Advanced
-                :template="formData.template"
-                :templates="templates"
-                :contextAttributes="formData.context_attributes"
-                :description="formData.description"
-                :rowTemplate="formData.row_template"
-                :rowTemplateType="formData.row_template_type"
-                :destinations="destinations"
-                :selectedDestinations="formData.destinations"
-                :alertName="formData.name"
-                :streamName="formData.stream_name"
-                :streamType="formData.stream_type"
-                :triggerCondition="formData.trigger_condition"
-                :streamFields="filteredColumns"
-                @update:template="(val) => (formData.template = val)"
-                @refresh:templates="refreshTemplates"
-                @update:contextAttributes="(val) => (formData.context_attributes = val)"
-                @update:description="(val) => (formData.description = val)"
-                @update:rowTemplate="(val) => (formData.row_template = val)"
-                @update:rowTemplateType="(val) => (formData.row_template_type = val)"
-              />
-            </div>
-
-            <!-- Compare with Past (scheduled only) -->
-            <div v-if="formData.is_real_time === 'false'">
-              <CompareWithPast
-                ref="step3Ref"
-                :multiTimeRange="formData.query_condition.multi_time_range"
-                :period="formData.trigger_condition.period"
-                :frequency="formData.trigger_condition.frequency"
-                :frequencyType="formData.trigger_condition.frequency_type"
-                :cron="formData.trigger_condition.cron"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                @update:multiTimeRange="(val) => (formData.query_condition.multi_time_range = val)"
-              />
-            </div>
-
-            <!-- Deduplication (scheduled only) -->
-            <div v-if="formData.is_real_time === 'false'">
-              <Deduplication
-                :deduplication="formData.deduplication"
-                :columns="filteredColumns"
-                @update:deduplication="(val) => (formData.deduplication = val)"
-              />
-            </div>
-          </div>
-
-          <div v-show="activeTab === 'anomaly-config'">
-            <AnomalyDetectionConfig
-              ref="anomalyStep2Ref"
-              :config="anomalyConfig"
-            />
-          </div>
-
-          <div v-show="activeTab === 'anomaly-alerting'">
-            <AnomalyAlerting
-              :config="anomalyConfig"
-              :destinations="destinations"
-              @refresh:destinations="$emit('refresh:destinations')"
-            />
-          </div>
-        </div>
-      </div><!-- end TIER 3 card -->
-
-      <!-- Footer: Cancel / Save (left column, separate card) -->
-      <div
-        class="card-container tw:flex tw:items-center tw:justify-end tw:px-3 tw:py-2.5 tw:shrink-0 tw:gap-2 tw:border-t tw:border-border-default"
-      >
-        <OButton
-          data-test="add-alert-cancel-btn"
-          variant="outline"
-          size="sm-action"
-          @click="$emit('cancel:hideform')"
-        >{{ t('alerts.cancel') }}</OButton>
-        <OButton
-          data-test="add-alert-submit-btn"
-          variant="primary"
-          size="sm-action"
-          :loading="isAnomalyMode ? anomalySaving : false"
-          :disabled="isAnomalyMode ? !canSaveAlert : false"
-          @click="handleSave"
-        >{{ isAnomalyMode && !anomalyEditMode ? t('alerts.saveAndTrain') : t('alerts.save') }}</OButton>
-      </div>
-
-      </div><!-- end LEFT column wrapper -->
-
-      <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
-      <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
-      <div class="tw:flex tw:flex-col tw:gap-2 tw:border-l tw:border-border-default tw:pt-2 tw:pb-2" style="flex: 3.5; min-width: 0; min-height: 0; overflow: hidden;">
-        <!-- Preview Card -->
-        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
-          <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0 tw:gap-2"
-          >
-            <span class="tw:text-sm tw:font-medium">{{ isAnomalyMode ? t('alerts.sqlPreview') : (t('alerts.preview') || 'Preview') }}</span>
-            <template v-if="!isAnomalyMode && activeEvaluationStatus">
-              <div class="tw:w-px tw:h-4 tw:bg-border-default" />
-              <OIcon :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'" size="sm" />
-              <span class="tw:text-xs tw:font-semibold" :class="activeEvaluationStatus.wouldTrigger ? 'tw:text-[var(--o2-positive)]' : 'tw:text-[var(--o2-gray)]'">
-                {{ activeEvaluationStatus.wouldTrigger ? t('alerts.wouldTrigger') : t('alerts.wouldNotTrigger') }}
+              <span v-else class="text-text-body min-w-0 truncate font-medium">
+                {{ activeFolderName }}
               </span>
-              <span class="tw:text-xs tw:opacity-60">{{ activeEvaluationStatus.reason }}</span>
-            </template>
-          </div>
-          <div class="tw:flex-1 tw:min-h-0" style="overflow: hidden;">
-            <template v-if="isAnomalyMode">
-              <QueryEditor editor-id="anomaly-sql-preview" language="sql" :read-only="true" :show-auto-complete="false" :hide-nl-toggle="true" :query="anomalyPreviewSql" style="height: 100%" />
-            </template>
-            <template v-else>
-              <div v-if="!formData.stream_name" class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:gap-2">
-                <OIcon name="query-stats" size="lg" class="tw:opacity-20" />
-                <span class="tw:text-sm tw:font-medium tw:text-text-secondary">
-                  {{ t('alerts.previewEmptyState') }}
-                </span>
-              </div>
-              <preview-alert
-                v-else
-                ref="previewAlertRef"
-                style="width: 100%; height: 100%;"
-                :formData="formData"
-                :query="previewQuery"
-                :selectedTab="formData.query_condition.type || 'custom'"
-                :isAggregationEnabled="isAggregationEnabled"
-                :isUsingBackendSql="isUsingBackendSql"
-                :isEditorOpen="isEditorOpen"
-                :previewDateTime="previewDateTimeValue"
-              />
-            </template>
-          </div>
-        </div>
+            </span>
+          </template>
+        </OPageHeader>
+      </template>
 
-        <!-- Summary Card -->
-        <div class="card-container tw:overflow-hidden tw:flex tw:flex-col" style="flex: 1; min-height: 0;">
+      <div class="flex min-h-0 flex-1">
+        <!-- LEFT column wrapper (flex: 6.5) -->
+        <div class="flex min-h-0 min-w-0 flex-[6.5] flex-col gap-2 py-2">
+          <!-- Stream Name & Stream Type -->
           <div
-            class="tw:flex tw:items-center tw:px-3 tw:py-[0.625rem] tw:select-none tw:border-b tw:border-border-default tw:shrink-0"
+            class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
-            <span class="tw:text-sm tw:font-medium">{{ t('alerts.summary.title') || 'Summary' }}</span>
+            <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
+              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact font-semibold tracking-[0.01em]"
+                >{{ t("alerts.streamConfig") }} <span class="text-text-body">*</span></span
+              >
+            </div>
+            <div class="flex items-center gap-4 px-3 py-2">
+              <!-- Alert Type -->
+              <div class="flex items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                  {{ t("alerts.alertType") }}
+                </div>
+                <OFormSelect
+                  data-test="add-alert-type-select-dropdown"
+                  name="is_real_time"
+                  :options="alertTypeOptions"
+                  :disabled="beingUpdated || anomalyEditMode"
+                  class="alert-type-select min-w-27.5 @max-[900px]/stream-config:min-w-23.75 @max-[750px]/stream-config:min-w-21.25 @max-[600px]/stream-config:min-w-18.75"
+                  :searchable="false"
+                />
+              </div>
+
+              <!-- Stream Type -->
+              <div class="flex items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                  {{ t("alerts.streamType") }} <span class="text-text-body">*</span>
+                </div>
+                <OFormSelect
+                  ref="streamTypeRef"
+                  name="stream_type"
+                  data-test="add-alert-stream-type-select-dropdown"
+                  :options="streamTypes"
+                  :searchable="false"
+                  class="stream-type-select w-37.5! @max-[900px]/stream-config:w-27.5! @max-[600px]/stream-config:w-17.5!"
+                  :disabled="beingUpdated || anomalyEditMode"
+                  @update:model-value="onStreamTypeChange"
+                />
+              </div>
+
+              <!-- Stream Name -->
+              <div class="flex min-w-0 flex-1 items-center gap-1.5">
+                <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
+                  {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
+                </div>
+                <OFormSelect
+                  ref="streamNameRef"
+                  name="stream_name"
+                  data-test="add-alert-stream-name-select-dropdown"
+                  :options="indexOptions"
+                  :loading="isFetchingStreams"
+                  class="stream-name-select w-full! min-w-0"
+                  :disabled="beingUpdated || anomalyEditMode || !formData.stream_type"
+                  @update:model-value="updateStreamFields($event)"
+                />
+                <OTooltip
+                  v-if="!formData.stream_type"
+                  :content="t('alerts.selectStreamTypeFirst')"
+                />
+              </div>
+            </div>
           </div>
-          <div class="tw:flex-1 tw:min-h-0" style="overflow: auto;">
-            <AnomalySummary
-              v-if="isAnomalyMode"
-              style="height: 100%; overflow: auto;"
-              :config="anomalyConfig"
-              :destinations="destinations"
-              :wizard-step="3"
-            />
-            <alert-summary
-              v-else
-              style="height: 100%;"
-              :formData="formData"
-              :destinations="destinations"
-              :previewQuery="previewQuery"
-              :generatedSqlQuery="generatedSqlQuery"
-            />
+
+          <!-- TIER 3: Configuration Tabs -->
+          <div class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col">
+            <!-- Tab Headers -->
+            <OToggleGroup
+              :model-value="activeTab"
+              @update:model-value="activeTab = $event as string"
+              class="shrink-0"
+            >
+              <OToggleGroupItem
+                v-for="tab in alertTabs"
+                :key="tab.key"
+                :value="tab.key"
+                size="sm"
+                :data-test="`add-alert-tab-${tab.key}`"
+              >
+                <template #icon-left>
+                  <OIcon v-if="tab.key === 'condition'" name="shield" size="sm" />
+                  <OIcon v-else-if="tab.key === 'advanced'" name="tune" size="sm" />
+                  <OIcon v-else-if="tab.key === 'anomaly-config'" name="trending-up" size="sm" />
+                  <OIcon
+                    v-else-if="tab.key === 'anomaly-alerting'"
+                    name="notifications"
+                    size="sm"
+                  />
+                </template>
+                {{ tab.label }}{{ tab.required ? " *" : "" }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+
+            <!-- Tab Content -->
+            <div class="flex-1 overflow-auto">
+              <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
+              <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
+               invalid field and bring it forward before focusing it. -->
+              <div
+                v-show="activeTab === 'condition'"
+                data-tab-pane="condition"
+                class="flex flex-col gap-4"
+              >
+                <div>
+                  <QueryConfig
+                    ref="step2Ref"
+                    :tab="formData.query_condition.type || 'custom'"
+                    :multiTimeRange="formData.query_condition.multi_time_range"
+                    :columns="filteredColumns"
+                    :streamFieldsMap="streamFieldsMap"
+                    :generatedSqlQuery="generatedSqlQuery"
+                    :inputData="formData.query_condition"
+                    :streamType="formData.stream_type"
+                    :isRealTime="formData.is_real_time"
+                    :sqlQuery="formData.query_condition.sql"
+                    :promqlQuery="formData.query_condition.promql"
+                    :vrlFunction="decodedVrlFunction"
+                    :streamName="formData.stream_name"
+                    :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                    :isAggregationEnabled="isAggregationEnabled"
+                    :beingUpdated="beingUpdated"
+                    :promqlCondition="formData.query_condition.promql_condition"
+                    :triggerCondition="formData.trigger_condition"
+                    @update:tab="updateTab"
+                    @update-group="updateGroup"
+                    @remove-group="removeConditionGroup"
+                    @input:update="onInputUpdate"
+                    @update:sqlQuery="updateSqlQuery"
+                    @update:promqlQuery="updatePromqlQuery"
+                    @update:vrlFunction="updateVrlFunction"
+                    @validate-sql="validateSqlQuery"
+                    @clear-multi-windows="clearMultiWindows"
+                    @editor-closed="handleEditorClosed"
+                    @editor-state-changed="handleEditorStateChanged"
+                    @update:isAggregationEnabled="(value) => (isAggregationEnabled = value)"
+                    @update:aggregation="updateAggregation"
+                    @update:promqlCondition="updatePromqlCondition"
+                    @update:triggerCondition="updateTriggerCondition"
+                  />
+                </div>
+
+                <div>
+                  <AlertSettings
+                    ref="step4Ref"
+                    :formData="formData"
+                    :isRealTime="formData.is_real_time"
+                    :columns="filteredColumns"
+                    :isAggregationEnabled="isAggregationEnabled"
+                    :destinations="formData.destinations"
+                    :formattedDestinations="getFormattedDestinations"
+                    :workflows="formData.workflows"
+                    @update:trigger="updateTriggerCondition"
+                    @update:aggregation="updateAggregation"
+                    @update:isAggregationEnabled="(val) => (isAggregationEnabled = val)"
+                    @update:promqlCondition="updatePromqlCondition"
+                    @update:destinations="updateDestinations"
+                    @refresh:destinations="refreshDestinations"
+                    @update:workflows="updateWorkflows"
+                  />
+                </div>
+              </div>
+
+              <div
+                v-show="activeTab === 'advanced'"
+                data-tab-pane="advanced"
+                class="flex flex-col gap-4"
+              >
+                <!-- Additional Settings (first) -->
+                <div>
+                  <Advanced
+                    :template="formData.template"
+                    :templates="templates"
+                    :contextAttributes="formData.context_attributes"
+                    :description="formData.description"
+                    :rowTemplate="formData.row_template"
+                    :rowTemplateType="formData.row_template_type"
+                    :destinations="destinations"
+                    :selectedDestinations="formData.destinations"
+                    :alertName="formData.name"
+                    :streamName="formData.stream_name"
+                    :streamType="formData.stream_type"
+                    :triggerCondition="formData.trigger_condition"
+                    :streamFields="filteredColumns"
+                    @update:template="updateTemplate"
+                    @refresh:templates="refreshTemplates"
+                    @update:contextAttributes="updateContextAttributes"
+                    @update:description="updateDescription"
+                    @update:rowTemplate="updateRowTemplate"
+                    @update:rowTemplateType="updateRowTemplateType"
+                  />
+                </div>
+
+                <!-- Compare with Past (scheduled only) -->
+                <div v-if="formData.is_real_time === 'false'">
+                  <CompareWithPast
+                    ref="step3Ref"
+                    :multiTimeRange="formData.query_condition.multi_time_range"
+                    :period="formData.trigger_condition.period"
+                    :frequency="formData.trigger_condition.frequency"
+                    :frequencyType="formData.trigger_condition.frequency_type"
+                    :cron="formData.trigger_condition.cron"
+                    :selectedTab="formData.query_condition.type || 'custom'"
+                    @update:multiTimeRange="updateMultiTimeRange"
+                  />
+                </div>
+
+                <!-- Deduplication (scheduled only) -->
+                <div v-if="formData.is_real_time === 'false'">
+                  <Deduplication
+                    :deduplication="formData.deduplication"
+                    :columns="filteredColumns"
+                    @update:deduplication="updateDeduplication"
+                  />
+                </div>
+              </div>
+
+              <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
+                <AnomalyDetectionConfig ref="anomalyStep2Ref" :config="anomalyConfig" />
+              </div>
+
+              <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
+                <AnomalyAlerting
+                  :config="anomalyConfig"
+                  :destinations="destinations as (SelectOption & { name: string })[]"
+                  @refresh:destinations="$emit('refresh:destinations')"
+                />
+              </div>
+            </div>
+          </div>
+          <!-- end TIER 3 card -->
+
+          <!-- Footer: Cancel / Save (left column, separate card) -->
+          <div
+            class="bg-card-glass-bg border-border-default flex shrink-0 items-center justify-end gap-2 border-t px-3 py-2.5"
+          >
+            <OButton
+              data-test="add-alert-cancel-btn"
+              variant="outline"
+              size="sm-action"
+              :disabled="isSubmitting"
+              @click="$emit('cancel:hideform')"
+              >{{ t("alerts.cancel") }}</OButton
+            >
+            <OButton
+              data-test="add-alert-submit-btn"
+              variant="primary"
+              size="sm-action"
+              :loading="isSubmitting || (isAnomalyMode && anomalySaving)"
+              @click="handleSave"
+              >{{
+                isAnomalyMode && !anomalyEditMode ? t("alerts.saveAndTrain") : t("alerts.save")
+              }}</OButton
+            >
+          </div>
+        </div>
+        <!-- end LEFT column wrapper -->
+
+        <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
+        <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
+        <div
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
+        >
+          <!-- Preview Card -->
+          <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div
+              class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
+            >
+              <span class="text-sm font-medium">{{
+                isAnomalyMode ? t("alerts.sqlPreview") : t("alerts.preview")
+              }}</span>
+              <template v-if="!isAnomalyMode && activeEvaluationStatus">
+                <div class="bg-border-default h-4 w-px" />
+                <OIcon
+                  :name="activeEvaluationStatus.wouldTrigger ? 'check-circle' : 'cancel'"
+                  :class="
+                    activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'
+                  "
+                  size="sm"
+                />
+                <span
+                  class="text-xs font-semibold"
+                  :class="
+                    activeEvaluationStatus.wouldTrigger ? 'text-status-positive' : 'text-gray'
+                  "
+                >
+                  {{
+                    activeEvaluationStatus.wouldTrigger
+                      ? t("alerts.wouldTrigger")
+                      : t("alerts.wouldNotTrigger")
+                  }}
+                </span>
+                <span class="text-xs opacity-60">{{ activeEvaluationStatus.reason }}</span>
+              </template>
+            </div>
+            <div class="min-h-0 flex-1 overflow-hidden">
+              <template v-if="isAnomalyMode">
+                <!-- editor-height is QueryEditor's own API for this; a class cannot
+                   win against the inline height its rootStyle always sets. -->
+                <QueryEditor
+                  editor-id="anomaly-sql-preview"
+                  language="sql"
+                  :read-only="true"
+                  :show-auto-complete="false"
+                  :hide-nl-toggle="true"
+                  :query="anomalyPreviewSql"
+                  editor-height="100%"
+                />
+              </template>
+              <template v-else>
+                <div
+                  v-if="!formData.stream_name"
+                  class="flex h-full flex-col items-center justify-center gap-2"
+                >
+                  <OIcon name="query-stats" size="lg" class="opacity-20" />
+                  <span class="text-text-secondary text-sm font-medium">
+                    {{ t("alerts.previewEmptyState") }}
+                  </span>
+                </div>
+                <PreviewAlert
+                  class="h-full w-full"
+                  v-else
+                  ref="previewAlertRef"
+                  :formData="formData"
+                  :query="previewQuery"
+                  :selectedTab="formData.query_condition.type || 'custom'"
+                  :isAggregationEnabled="isAggregationEnabled"
+                  :isUsingBackendSql="isUsingBackendSql"
+                  :isEditorOpen="isEditorOpen"
+                  :previewDateTime="previewDateTimeValue"
+                />
+              </template>
+            </div>
+          </div>
+
+          <!-- Summary Card -->
+          <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div
+              class="border-border-default flex shrink-0 items-center border-b px-3 py-2.5 select-none"
+            >
+              <span class="text-sm font-medium">{{ t("alerts.summary.title") }}</span>
+            </div>
+            <div class="min-h-0 flex-1 overflow-auto">
+              <AnomalySummary
+                class="h-full overflow-auto"
+                v-if="isAnomalyMode"
+                :config="anomalyConfig"
+                :destinations="destinations"
+                :wizard-step="3"
+              />
+              <AlertSummary
+                class="h-full"
+                v-else
+                :formData="formData"
+                :destinations="destinations"
+                :previewQuery="previewQuery"
+                :generatedSqlQuery="generatedSqlQuery"
+              />
+            </div>
           </div>
         </div>
       </div>
+    </OPageLayout>
+  </OForm>
 
-      </div>
-      </div>
-  </div>
-
-  <ODrawer data-test="add-alert-json-editor-drawer"
+  <ODrawer
+    data-test="add-alert-json-editor-drawer"
+    bleed
     v-model:open="showJsonEditorDialog"
     size="lg"
     :title="t('alerts.editJson')"
     persistent
   >
     <JsonEditor
-      :data="formData"
+      :data="jsonEditorData"
       :title="t('alerts.editJson')"
       :type="'alerts'"
       :validation-errors="validationErrors"
@@ -435,11 +533,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, watch } from "vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import OToggleGroup from '@/lib/core/ToggleGroup/OToggleGroup.vue';
-import OToggleGroupItem from '@/lib/core/ToggleGroup/OToggleGroupItem.vue';
-import OIcon from '@/lib/core/Icon/OIcon.vue';
+import { raw } from "@/types/i18n";
+import { defineComponent, computed, watch, provide } from "vue";
+import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 import JsonEditor from "../common/JsonEditor.vue";
 import QueryConfig from "./steps/QueryConfig.vue";
@@ -457,10 +557,14 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import { useAutoName } from "@/composables/useAutoName";
+import { buildAlertAutoName } from "@/utils/autoName";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "ComponentAddUpdateAlert",
@@ -482,14 +586,10 @@ export default defineComponent({
       default: () => [],
     },
   },
-  emits: [
-    "update:list",
-    "cancel:hideform",
-    "refresh:destinations",
-    "refresh:templates",
-  ],
+  emits: ["update:list", "cancel:hideform", "refresh:destinations", "refresh:templates"],
   components: {
     OIcon,
+    OPageLayout,
     JsonEditor,
     QueryConfig,
     AlertSettings,
@@ -509,12 +609,17 @@ export default defineComponent({
     ODrawer,
     OTag,
     OTooltip,
-    OInput,
-    OSelect,
-    AppPageHeader,
+    OForm,
+    OFormInlineEdit,
+    OFormSelect,
+    OPageHeader,
   },
   setup(props, { emit }) {
     const alertForm = useAlertForm(props, emit);
+
+    // Share server SQL-validation squiggle ranges with the descendant query
+    // editors (QueryEditorDialog / QueryConfig) via inject.
+    provide("alertSqlErrorRanges", alertForm.sqlErrorRanges);
 
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
@@ -525,23 +630,23 @@ export default defineComponent({
       () => alertForm.formData.value.stream_name,
       (newVal) => {
         alertForm.chartCollapsed.value = !newVal;
-      }
+      },
     );
 
     // Switch activeTab when alert type changes to/from anomaly
     watch(
       () => alertForm.formData.value.is_real_time,
       (newVal) => {
-        if (newVal === 'anomaly') {
-          alertForm.activeTab.value = 'anomaly-config';
-        } else if (alertForm.activeTab.value.startsWith('anomaly-')) {
-          alertForm.activeTab.value = 'condition';
+        if (newVal === "anomaly") {
+          alertForm.activeTab.value = "anomaly-config";
+        } else if (alertForm.activeTab.value.startsWith("anomaly-")) {
+          alertForm.activeTab.value = "condition";
         }
-      }
+      },
     );
 
-    const activeEvaluationStatus = computed(() =>
-      alertForm.previewAlertRef.value?.evaluationStatus || null
+    const activeEvaluationStatus = computed(
+      () => alertForm.previewAlertRef.value?.evaluationStatus || null,
     );
     const alertTypeOptions = computed(() => [
       { label: alertForm.t("alerts.scheduled"), value: "false" },
@@ -554,14 +659,36 @@ export default defineComponent({
     const alertTabs = computed(() => {
       const tabs = alertForm.isAnomalyMode.value
         ? [
-            { key: "anomaly-config", label: alertForm.t("alerts.anomalyDetectionConfig"), required: true },
-            { key: "anomaly-alerting", label: alertForm.t("alerts.alerting") || "Alerting", required: alertForm.anomalyConfig.value.alert_enabled },
+            {
+              key: "anomaly-config",
+              label: alertForm.t("alerts.anomalyDetectionConfig"),
+              required: true,
+            },
+            {
+              key: "anomaly-alerting",
+              label: alertForm.t("alerts.alerting"),
+              required: alertForm.anomalyConfig.value.alert_enabled,
+            },
           ]
         : [
             { key: "condition", label: alertForm.t("alerts.alertRules"), required: true },
             { key: "advanced", label: alertForm.t("alerts.steps.advanced") },
           ];
       return tabs.filter((tab: any) => (tab as any).show !== false);
+    });
+
+    // Mode as the subtitle, exactly as AddPanel does it ("Add Panel" / "Edit
+    // Panel"): the header then reads NAME first, what-you're-doing second, and
+    // the two pages have the same shape. The containing folder is already the
+    // back button's label, so the subtitle no longer repeats it.
+    const headerModeLabel = computed(() => {
+      const editing = alertForm.beingUpdated.value || alertForm.anomalyEditMode.value;
+      if (alertForm.isAnomalyMode.value) {
+        return editing
+          ? alertForm.t("alerts.editAnomalyMode")
+          : alertForm.t("alerts.addAnomalyMode");
+      }
+      return editing ? alertForm.t("alerts.editAlertMode") : alertForm.t("alerts.addAlertMode");
     });
 
     const activeFolderName = computed(() => {
@@ -579,65 +706,91 @@ export default defineComponent({
       });
     };
 
+    // Stream-type change: write the value into the ONE form explicitly (so the
+    // synchronous form store is current before updateStreams reads it — not
+    // relying on the OFormSelect field-change flush order), then refresh streams
+    // (which also resets stream_name via setF).
+    const onStreamTypeChange = (value: any) => {
+      alertForm.setF("stream_type", value);
+      alertForm.updateStreams();
+    };
+
+    // ── Smart alert name ─────────────────────────────────────────────────────
+    // A new alert names itself after what it actually watches ("k8s_logs where
+    // status >= 500") and keeps re-deriving that as the stream and condition
+    // change — until the first keystroke in the header, after which the name is
+    // the user's. Editing an existing alert (or anomaly) is excluded outright:
+    // a saved name is never regenerated behind the user's back.
+    const alertNameSuggestion = computed(() =>
+      buildAlertAutoName(alertForm.formData.value, alertForm.t),
+    );
+    const alertAutoName = useAutoName({
+      suggestion: alertNameSuggestion,
+      currentValue: () => (alertForm.formData.value?.name ?? "") as string,
+      apply: (name: string) => alertForm.setF("name", name),
+      enabled: () => !alertForm.beingUpdated.value && !alertForm.anomalyEditMode.value,
+    });
+
     return {
+      raw,
       ...alertForm,
+      alertAutoName,
+      headerModeLabel,
       isAnomalyDetectionEnabled,
       alertTypeOptions,
       alertTabs,
       activeFolderName,
       goBackToAlertsList,
+      onStreamTypeChange,
       activeEvaluationStatus,
     };
   },
-
 });
 </script>
 
-<style>
-@container topbar (max-width: 1300px) {
-  .topbar-name-input  { min-width: 100px; }
+<style scoped>
+/* keep(lib-override:o2-form): float each control's validation message out of
+   flow. A class passed to OInput/OFormSelect lands on the ROOT wrapper — the
+   flex-col holding the control AND its message — so an in-flow message would
+   grow these fixed-height topbar rows, escape the card, and be painted over by
+   the next card. `top:100%` resolves against the wrapper. The selects
+   deliberately carry NO height clamp (it only ever shrank the wrapper box,
+   never the 2.125rem trigger, which mis-anchored the floating message).
+   pointer-events:none so the floating text can't swallow clicks on the tab bar
+   it overlaps. `:deep` because [role="alert"] renders inside the child
+   component. All widths and container-query steps are template utilities.
+   The alert-name field is NOT listed here: OInlineEdit renders its message
+   BESIDE the name (below is the subtitle band), so it adds no height either and
+   needs no wrapper override. */
+.stream-type-select,
+.stream-name-select {
+  position: relative;
 }
 
-/* Compact — AI chat open or narrow viewport */
-@container topbar (max-width: 850px) {
-  .topbar-name-input  { min-width: 90px; }
+.stream-type-select :deep([role="alert"]),
+.stream-name-select :deep([role="alert"]) {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.125rem;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
 }
+</style>
 
-/* Minimum — very narrow */
-@container topbar (max-width: 680px) {
-  .topbar-name-input  { min-width: 70px; }
-}
-
-.topbar-folder-select {
-  min-width: 60px;
-  max-width: 140px;
-}
-.topbar-folder-select .q-field__control { padding: 0; }
-.topbar-folder-select .q-field__native {
-  font-size: 1.25rem;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.stream-type-select { width: 150px; }
-.stream-name-select { width: 160px; }
-.alert-type-select  { min-width: 110px; }
-
-@container stream-config (max-width: 900px) {
-  .stream-type-select { width: 110px; }
-  .stream-name-select { width: 120px; }
-  .alert-type-select  { min-width: 95px; }
-}
-
-@container stream-config (max-width: 750px) {
-  .stream-type-select { width: 110px; }
-  .stream-name-select { width: 110px; }
-  .alert-type-select  { min-width: 85px; }
-}
-
-@container stream-config (max-width: 600px) {
-  .stream-type-select { width: 70px; }
-  .stream-name-select { width: 80px; }
-  .alert-type-select  { min-width: 75px; }
+<style scoped>
+/* keep(complex-state): `.alert-field-highlight` is a transient state class that
+   AlertFocusManager (utils/alerts/focusManager.ts) adds/removes at RUNTIME via
+   classList on refs registered from useAlertForm — no template ever writes it,
+   so it cannot become a template utility. AddAlert is the alert-form root and
+   owns every registered field's DOM (incl. the QueryConfig subtree, which
+   instantiates its own focusManager), so one `:deep()` here covers them all.
+   `!important` is preserved: it must beat the field components' own border
+   utilities, exactly as the previous global rule did. */
+:deep(.alert-field-highlight) {
+  border: 0.125rem solid var(--color-accent) !important;
+  border-radius: 0.25rem;
+  transition: border 0.3s ease;
 }
 </style>

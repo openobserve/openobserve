@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { InjectionKey } from "vue";
 
 export type CheckboxSize = "xs" | "sm" | "md";
@@ -26,10 +28,10 @@ export interface CheckboxProps {
    * of the group's checked-values array.
    */
   value?: CheckboxPrimitive;
-  /** q-checkbox compatibility alias for `value` */
+  /** Compatibility alias for `value` */
   val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
-  label?: string;
+  label?: I18nText;
   /** Control size */
   size?: CheckboxSize;
   /** Value to emit when checked in custom-value mode */
@@ -73,8 +75,7 @@ export interface CheckboxGroupContext {
   isChecked(_value: CheckboxPrimitive): boolean;
 }
 
-export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> =
-  Symbol("CheckboxGroup");
+export const CHECKBOX_GROUP_KEY: InjectionKey<CheckboxGroupContext> = Symbol("CheckboxGroup");
 
 export interface CheckboxGroupProps {
   /** Array of currently checked values */

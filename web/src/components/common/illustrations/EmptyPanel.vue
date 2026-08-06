@@ -17,7 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   EmptyPanel — a calm, modern empty-state illustration for a dashboard with no
   panels: an empty chart frame whose bars rise from a dashed baseline on a slow
-  loop, with a small "+" badge hinting that a panel can be added. Pure SMIL
+  loop. No "+" badge — the actual "Add panel" action lives in the CTA below the
+  illustration, and a decorative "+" here read as a clickable button. Pure SMIL
   animation (no CSS/SCSS); token colors keep it correct in light and dark.
 -->
 <template>
@@ -28,44 +29,117 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="No panels yet"
+    :aria-label="t('emptyState.noPanelsYet')"
   >
     <!-- soft brand glow -->
     <ellipse cx="104" cy="84" rx="90" ry="56" fill="var(--color-primary-500)" opacity="0.06" />
 
     <!-- chart frame -->
-    <rect x="44" y="34" width="120" height="90" rx="12" fill="var(--color-surface-base)" stroke="var(--color-border-default)" stroke-width="1.5" />
+    <rect
+      x="44"
+      y="34"
+      width="120"
+      height="90"
+      rx="12"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+    />
 
     <!-- y/x axes -->
-    <line x1="62" y1="48" x2="62" y2="108" stroke="var(--color-border-default)" stroke-width="1.5" stroke-linecap="round" />
-    <line x1="62" y1="108" x2="148" y2="108" stroke="var(--color-border-default)" stroke-width="1.5" stroke-linecap="round" />
+    <line
+      x1="62"
+      y1="48"
+      x2="62"
+      y2="108"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+      stroke-linecap="round"
+    />
+    <line
+      x1="62"
+      y1="108"
+      x2="148"
+      y2="108"
+      stroke="var(--color-border-default)"
+      stroke-width="1.5"
+      stroke-linecap="round"
+    />
 
     <!-- dashed baseline -->
-    <line x1="62" y1="86" x2="148" y2="86" stroke="var(--color-border-strong)" stroke-width="1" stroke-dasharray="3 4" opacity="0.7" />
+    <line
+      x1="62"
+      y1="86"
+      x2="148"
+      y2="86"
+      stroke="var(--color-border-strong)"
+      stroke-width="1"
+      stroke-dasharray="3 4"
+      opacity="0.7"
+    />
 
     <!-- bars rising from the baseline -->
     <g>
       <rect x="74" y="108" width="12" height="0" rx="2.5" fill="var(--color-primary-400)">
-        <animate attributeName="height" values="0;30;30;0" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0s" />
-        <animate attributeName="y" values="108;78;78;108" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0s" />
+        <animate
+          attributeName="height"
+          values="0;30;30;0"
+          keyTimes="0;0.35;0.85;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          begin="0s"
+        />
+        <animate
+          attributeName="y"
+          values="108;78;78;108"
+          keyTimes="0;0.35;0.85;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          begin="0s"
+        />
       </rect>
       <rect x="94" y="108" width="12" height="0" rx="2.5" fill="var(--color-primary-500)">
-        <animate attributeName="height" values="0;46;46;0" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0.25s" />
-        <animate attributeName="y" values="108;62;62;108" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0.25s" />
+        <animate
+          attributeName="height"
+          values="0;46;46;0"
+          keyTimes="0;0.35;0.85;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          begin="0.25s"
+        />
+        <animate
+          attributeName="y"
+          values="108;62;62;108"
+          keyTimes="0;0.35;0.85;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          begin="0.25s"
+        />
       </rect>
       <rect x="114" y="108" width="12" height="0" rx="2.5" fill="var(--color-primary-400)">
-        <animate attributeName="height" values="0;22;22;0" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0.5s" />
-        <animate attributeName="y" values="108;86;86;108" keyTimes="0;0.35;0.85;1" dur="3.4s" repeatCount="indefinite" begin="0.5s" />
+        <animate
+          attributeName="height"
+          values="0;22;22;0"
+          keyTimes="0;0.35;0.85;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          begin="0.5s"
+        />
+        <animate
+          attributeName="y"
+          values="108;86;86;108"
+          keyTimes="0;0.35;0.85;1"
+          dur="3.4s"
+          repeatCount="indefinite"
+          begin="0.5s"
+        />
       </rect>
-    </g>
-
-    <!-- "add panel" badge -->
-    <g>
-      <circle cx="150" cy="44" r="13" fill="var(--color-primary-600)">
-        <animate attributeName="r" values="13;14;13" dur="2.8s" repeatCount="indefinite" />
-      </circle>
-      <line x1="150" y1="39" x2="150" y2="49" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
-      <line x1="145" y1="44" x2="155" y2="44" stroke="var(--color-white)" stroke-width="2.5" stroke-linecap="round" />
     </g>
   </svg>
 </template>
+
+<script setup lang="ts">
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+</script>

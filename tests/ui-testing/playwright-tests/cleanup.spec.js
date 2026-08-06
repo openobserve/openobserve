@@ -36,7 +36,12 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
-        /^destination\d{1,3}$/     // destination4, destination44, destination444, etc.
+        'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite destinations)
+        'test_fv_alerts_dest_',    // alerts-form-validation.spec.js (custom destinations created by the test cases)
+        'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
+        /^destination\d{1,3}$/,    // destination4, destination44, destination444, etc.
+        'wf_auto_dest_',           // Workflows v1 test destinations
+        'wf_auto_'                 // Workflows v1 generic test destinations
       ],
       // Template prefixes to clean up
       [
@@ -58,11 +63,23 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_promql_',             // alerts-regression.spec.js (Bug #9967 PromQL tests)
         'e2e_vrl_',                // alerts-vrl-encoding.spec.js (VRL encoding tests)
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
-        'e2e_metrics_'            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
+        'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
+        'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
       ],
       // Folder prefixes to clean up
-      ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ']
+      ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ', 'wf_auto_']
+      // NOTE: 4th arg (workflowPrefixes) defaults to ['wf_auto_'] inside completeCascadeCleanup;
+      // STEP 5 there deletes workflows AFTER their linked alerts are removed (delete-protection).
     );
+
+    // Clean up Workflows-feature functions & streams in the ACTIVE org (ORGNAME).
+    // Workflows E2E specs run in their own org; completeCascadeCleanup already handled
+    // alerts/destinations/folders/workflows there, but functions & streams need explicit sweeps.
+    const { getOrgIdentifier } = require('./utils/cloud-auth.js');
+    const activeOrg = getOrgIdentifier();
+    await pm.apiCleanup.cleanupFunctionsInOrg(activeOrg, [/^wf_auto_fn_/, /^wf_auto_/]);
+    await pm.apiCleanup.cleanupStreams([/^wf_auto_stream_/, /^wf_auto_sink_/], ['default']);
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -212,11 +229,13 @@ test.describe("Pre-Test Cleanup", () => {
       /^cancel_test_[a-f0-9]{8}$/,                                                           // cancel_test_<uuid> (cancel form test)
       /^toggle_test_[a-f0-9]{8}$/,                                                           // toggle_test_<uuid> (source toggle test)
       /^edit_form_[a-f0-9]{8}$/,                                                             // edit_form_<uuid> (edit form test)
-      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test)
+      /^schema_view_[a-f0-9]{8}$/,                                                           // schema_view_<uuid> (schema view test, legacy prefix)
+      /^view_schema_[a-f0-9]{8}$/,                                                           // view_schema_<uuid> (schema view test — renamed: "schema" prefix hits backend not-an-ingester bug)
       /^duplicate_test_[a-f0-9]{8}$/,                                                        // duplicate_test_<uuid> (duplicate name test)
       /^empty_url_[a-f0-9]{8}$/,                                                             // empty_url_<uuid> (empty URL validation test)
       /^url_404_[a-f0-9]{8}$/,                                                               // url_404_<uuid> (invalid URL 404 test)
-      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test)
+      /^schema_mismatch_[a-f0-9]{8}$/,                                                        // schema_mismatch_<uuid> (schema mismatch test, legacy prefix)
+      /^mismatch_schema_[a-f0-9]{8}$/,                                                        // mismatch_schema_<uuid> (schema mismatch test — renamed off "schema" prefix)
       // Pytest API tests (test_enrichment_table_url.py) - uses api_url_<test>_<uuid8> naming
       /^api_url_create_[a-f0-9]{8}$/,                                                         // api_url_create_<uuid> (create test)
       /^api_url_status_[a-f0-9]{8}$/,                                                         // api_url_status_<uuid> (status test)
@@ -248,8 +267,10 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up URL-based enrichment tables (those showing "NaN MB" in UI)
     // These are tracked separately in /api/{org}/enrichment_tables/status
     await pm.apiCleanup.cleanupUrlEnrichmentTables([
-      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests)
-      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests)
+      /^schema_mismatch_[a-f0-9]{8}$/,    // schema_mismatch_<uuid> (schema mismatch URL tests, legacy prefix)
+      /^mismatch_schema_[a-f0-9]{8}$/,    // mismatch_schema_<uuid> (schema mismatch URL tests, renamed)
+      /^schema_view_[a-f0-9]{8}$/,        // schema_view_<uuid> (schema view URL tests, legacy prefix)
+      /^view_schema_[a-f0-9]{8}$/,        // view_schema_<uuid> (schema view URL tests, renamed)
       /^url_404_[a-f0-9]{8}$/,            // url_404_<uuid> (404 error URL tests)
       /^url_lifecycle_[a-f0-9]{8}$/,      // url_lifecycle_<uuid> (lifecycle URL tests)
       /^invalid_url_[a-f0-9]{8}$/,        // invalid_url_<uuid> (invalid URL tests)
@@ -264,12 +285,13 @@ test.describe("Pre-Test Cleanup", () => {
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
-        /^sdr_/,                       // sdr_* (SDR test streams)
+        /^sdr_/,                       // sdr_* (SDR logs test streams; traces SDR streams are swept separately by type below)
         /^e2e_join_/,                  // e2e_join_* (UNION test streams)
         /^e2e_conditions_/,            // e2e_conditions_* (Pipeline conditions UI test streams)
         /^e2e_apostrophe_/,            // e2e_apostrophe_* (Bug #9475 apostrophe test streams from logs-regression.spec.js)
         /^e2e_highlighting_test$/,     // e2e_highlighting_test (Bug #9754 logs highlighting test stream from logs-9754.spec.js)
         /^e2e_streamcreation_/,        // e2e_streamcreation_* (Stream creation UI test streams)
+        /^e2e_qp_more_stream_/,        // e2e_qp_more_stream_* (logsQuickPick.spec.js more-footer seed streams)
         /^e2e_MyUpperStream/i,         // e2e_MyUpperStream* (Stream name casing test streams)
         /^e2e_mylowerstream/i,         // e2e_mylowerstream* (Stream name casing test streams)
         /^[a-z]{8,9}$/,                // Random 8-9 char lowercase strings
@@ -301,7 +323,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^dedup_test_/,                                // Dedup test streams (dedup_test_*)
         /^dedup_src_/,                                 // Dedup source streams (dedup_src_*)
         /^alert_validation_stream$/,                   // Alert validation stream
-        /^auto_playwright_stream$/,                    // Auto playwright stream
+        /^auto_pw_stream_/,                            // Per-run alerts-ui-operations streams (auto_pw_stream_<suffix>)
         /^incident_e2e_/,                              // Incident e2e test streams (incident_e2e_*)
         /ellipsis_testing/,                            // Bug #7468 ellipsis test streams (long stream names)
         /^e2e_test_cpu_usage$/,                        // Pipeline regression test metrics stream (Issue #9901)
@@ -315,6 +337,17 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
+    );
+
+    // Clean up TRACES streams created by the traces SDR suite (sdr_traces_* — one
+    // per run, unique testRunId suffix). These are type=traces, so the logs sweep
+    // above (type=logs) never lists them; sweep them with streamType: 'traces'.
+    await pm.apiCleanup.cleanupStreams(
+      [
+        /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
+      ],
+      ['default'],                     // protect the default traces stream
+      { streamType: 'traces' }
     );
 
     // Note: Pipeline regression test streams (e2e_test_cpu_usage for metrics, e2e_test_traces for traces)

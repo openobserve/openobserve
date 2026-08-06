@@ -55,7 +55,9 @@ vi.mock("@/views/StreamExplorer.vue", () => ({ default: { name: "StreamExplorer"
 // Dynamic component mocks
 // ---------------------------------------------------------------------------
 vi.mock("@/plugins/logs/Index.vue", () => ({ default: { name: "Search" } }));
-vi.mock("@/plugins/logs/SearchJobInspector.vue", () => ({ default: { name: "SearchJobInspector" } }));
+vi.mock("@/plugins/logs/SearchJobInspector.vue", () => ({
+  default: { name: "SearchJobInspector" },
+}));
 vi.mock("@/plugins/metrics/Index.vue", () => ({ default: { name: "AppMetrics" } }));
 vi.mock("@/plugins/traces/Index.vue", () => ({ default: { name: "AppTraces" } }));
 vi.mock("@/plugins/traces/TraceDetails.vue", () => ({ default: { name: "TraceDetails" } }));
@@ -66,8 +68,12 @@ vi.mock("@/views/Dashboards/Dashboards.vue", () => ({ default: { name: "Dashboar
 vi.mock("@/components/alerts/AlertList.vue", () => ({ default: { name: "AlertList" } }));
 vi.mock("@/components/settings/index.vue", () => ({ default: { name: "Settings" } }));
 vi.mock("@/components/functions/FunctionList.vue", () => ({ default: { name: "FunctionList" } }));
-vi.mock("@/components/functions/AssociatedStreamFunction.vue", () => ({ default: { name: "AssociatedStreamFunction" } }));
-vi.mock("@/components/functions/EnrichmentTableList.vue", () => ({ default: { name: "EnrichmentTableList" } }));
+vi.mock("@/components/functions/AssociatedStreamFunction.vue", () => ({
+  default: { name: "AssociatedStreamFunction" },
+}));
+vi.mock("@/components/functions/EnrichmentTableList.vue", () => ({
+  default: { name: "EnrichmentTableList" },
+}));
 vi.mock("@/views/RUM/RealUserMonitoring.vue", () => ({ default: { name: "RealUserMonitoring" } }));
 vi.mock("@/views/RUM/SessionViewer.vue", () => ({ default: { name: "SessionViewer" } }));
 vi.mock("@/views/RUM/ErrorViewer.vue", () => ({ default: { name: "ErrorViewer" } }));
@@ -76,19 +82,37 @@ vi.mock("@/views/RUM/AppErrors.vue", () => ({ default: { name: "AppErrors" } }))
 vi.mock("@/views/RUM/AppSessions.vue", () => ({ default: { name: "AppSessions" } }));
 vi.mock("@/components/reports/ReportList.vue", () => ({ default: { name: "ReportList" } }));
 vi.mock("@/components/reports/CreateReport.vue", () => ({ default: { name: "CreateReport" } }));
-vi.mock("@/components/rum/performance/PerformanceSummary.vue", () => ({ default: { name: "PerformanceSummary" } }));
-vi.mock("@/components/rum/performance/WebVitalsDashboard.vue", () => ({ default: { name: "WebVitalsDashboard" } }));
-vi.mock("@/components/rum/performance/ErrorsDashboard.vue", () => ({ default: { name: "ErrorsDashboard" } }));
-vi.mock("@/components/rum/performance/ApiDashboard.vue", () => ({ default: { name: "ApiDashboard" } }));
-vi.mock("@/components/pipeline/PipelineEditor.vue", () => ({ default: { name: "PipelineEditor" } }));
+vi.mock("@/components/rum/performance/PerformanceSummary.vue", () => ({
+  default: { name: "PerformanceSummary" },
+}));
+vi.mock("@/components/rum/performance/WebVitalsDashboard.vue", () => ({
+  default: { name: "WebVitalsDashboard" },
+}));
+vi.mock("@/components/rum/performance/ErrorsDashboard.vue", () => ({
+  default: { name: "ErrorsDashboard" },
+}));
+vi.mock("@/components/rum/performance/ApiDashboard.vue", () => ({
+  default: { name: "ApiDashboard" },
+}));
+vi.mock("@/components/pipeline/PipelineEditor.vue", () => ({
+  default: { name: "PipelineEditor" },
+}));
 vi.mock("@/components/pipeline/PipelinesList.vue", () => ({ default: { name: "PipelinesList" } }));
-vi.mock("@/components/pipeline/ImportPipeline.vue", () => ({ default: { name: "ImportPipeline" } }));
+vi.mock("@/components/pipeline/ImportPipeline.vue", () => ({
+  default: { name: "ImportPipeline" },
+}));
 vi.mock("@/views/AddAlertView.vue", () => ({ default: { name: "AddAlertView" } }));
 vi.mock("@/components/alerts/AlertHistory.vue", () => ({ default: { name: "AlertHistory" } }));
 vi.mock("@/components/alerts/AlertInsights.vue", () => ({ default: { name: "AlertInsights" } }));
-vi.mock("@/components/alerts/ImportSemanticGroups.vue", () => ({ default: { name: "ImportSemanticGroups" } }));
-vi.mock("@/components/pipelines/PipelineHistory.vue", () => ({ default: { name: "PipelineHistory" } }));
-vi.mock("@/components/pipelines/BackfillJobsList.vue", () => ({ default: { name: "BackfillJobsList" } }));
+vi.mock("@/components/alerts/ImportSemanticGroups.vue", () => ({
+  default: { name: "ImportSemanticGroups" },
+}));
+vi.mock("@/components/pipelines/PipelineHistory.vue", () => ({
+  default: { name: "PipelineHistory" },
+}));
+vi.mock("@/components/pipelines/BackfillJobsList.vue", () => ({
+  default: { name: "BackfillJobsList" },
+}));
 
 // ---------------------------------------------------------------------------
 // Sub-composable mocks — return empty arrays so counts are deterministic
@@ -455,6 +479,78 @@ describe("useRoutes (router.ts)", () => {
       const mockNext = vi.fn();
       metricsRoute.beforeEnter({}, {}, mockNext);
       expect(routeGuard).toHaveBeenCalledTimes(1);
+    });
+
+    // The back-compat redirect and its Visualize exception. routeGuard is mocked
+    // to pass its next() straight through, so a redirect surfaces as next() being
+    // called with a `{ name: "metricsEditor" }` target, and a plain admit as
+    // next() with no args.
+    it("redirects a legacy metrics_data deep link (no mode) to the editor route", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter({ query: { metrics_data: "abc" }, hash: "" }, {}, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "metricsEditor",
+          query: { metrics_data: "abc" },
+          replace: true,
+        }),
+      );
+    });
+
+    it("redirects other editor params (e.g. stream_name) to the editor route", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter({ query: { stream_name: "cpu" }, hash: "" }, {}, next);
+
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: "metricsEditor" }));
+    });
+
+    it("keeps a mode=visualize link in the explorer — no editor redirect", () => {
+      // The explorer's in-page Visualize owns metrics_data and rehydrates it
+      // itself; redirecting would kick the user out on every refresh.
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter(
+        { query: { metrics_data: "abc", mode: "visualize" }, hash: "" },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(next).toHaveBeenCalledWith(); // admitted, not redirected
+    });
+
+    it("does not redirect a plain /metrics visit", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter({ query: {}, hash: "" }, {}, next);
+
+      expect(next).toHaveBeenCalledWith();
+    });
+
+    it("does not redirect an explore/workspace link (no editor params)", () => {
+      const { homeChildRoutes } = useRoutes();
+      const metricsRoute = findRoute(homeChildRoutes, "metrics");
+
+      const next = vi.fn();
+      metricsRoute.beforeEnter(
+        { query: { mode: "workspace", sort_by: "z-a" }, hash: "" },
+        {},
+        next,
+      );
+
+      expect(next).toHaveBeenCalledWith();
     });
 
     it("should include promqlBuilder route", () => {

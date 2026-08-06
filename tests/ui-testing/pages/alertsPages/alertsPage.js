@@ -63,8 +63,12 @@ export class AlertsPage {
             // Alert creation locators - Alerts 2.0 Wizard UI
             addAlertButton: '[data-test="alert-list-add-alert-btn"]',
             alertNameInput: '[data-test="add-alert-name-input"]',
-            // OInput inner native input - always use the `-field` variant for fill/clear operations (§4)
-            alertNameInputField: '[data-test="add-alert-name-input-field"]',
+            // Alert name is an inline-edited title (OFormInlineEdit): a display
+            // trigger swaps to an input on click. -trigger opens, -input edits.
+            alertNameTrigger: '[data-test="add-alert-name-input-trigger"]',
+            alertNameInputField: '[data-test="add-alert-name-input-input"]',
+            // Display-mode value of the inline-edit title (present when NOT editing).
+            alertNameValue: '[data-test="add-alert-name-input-value"]',
             alertSubmitButton: '[data-test="add-alert-submit-btn"]',
             alertBackButton: '[data-test="add-alert-back-btn"]',
 
@@ -98,10 +102,12 @@ export class AlertsPage {
             multiTimeRangeDeleteButton: '[data-test="multi-time-range-alerts-delete-btn"]',
             goToViewEditorButton: '[data-test="go-to-view-editor-btn"]',
 
-            // Step 5: Deduplication (Scheduled only, v3 UI — in Advanced tab)
-            stepDeduplication: '.step-deduplication',
-            stepDeduplicationFingerprintSelect: '.step-deduplication .alert-v3-select',
-            stepDeduplicationTimeWindowInput: '.step-deduplication input[type="number"]',
+            // Step 5: Deduplication (Scheduled only — in Advanced tab). Use data-test
+            // hooks from Deduplication.vue; the old `.step-deduplication .alert-v3-select`
+            // class chain no longer exists on newer builds (e.g. alpha pre-cloud).
+            stepDeduplication: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationFingerprintSelect: '[data-test="alert-dedup-fingerprint-fields"]',
+            stepDeduplicationTimeWindowInput: '[data-test="alert-dedup-time-window-field"]',
 
             // Step 6: Advanced settings
             contextAttributesAddButton: '[data-test="alert-variables-add-btn"]',
@@ -113,6 +119,11 @@ export class AlertsPage {
             advancedTemplateOverrideSelect: '[data-test="advanced-template-override-select"]',
             // Alert destinations select (in AlertSettings.vue, condition tab)
             alertDestinationsSelect: '[data-test="alert-destinations-select"]',
+            // Alerts 4.0 (multi-alerts) — Simple/Multi toggle choice group
+            alertMultiToggleChoice: '[data-test="alerts-alertmultitoggle-choice"]',
+            // Alerts 4.0 — priority & tags (Feature 2)
+            prioritySelect: '[data-test="alert-priority-select"]',
+            tagsInput: '[data-test="alert-tags-input"]',
             advancedTabBtn: '[data-test="add-alert-tab-advanced"]',
             // ODropdown content carries data-test="o-dropdown-content"
             visibleDropdownMenu: '[data-test="o-dropdown-content"]:visible',
@@ -148,14 +159,14 @@ export class AlertsPage {
             alertConditionOperatorSelectOption: '[data-test="alert-condition-operator-select-option"]',
             alertTriggerThresholdInputField: '[data-test="alert-trigger-threshold-input-field"]',
 
-            // Alert Details Dialog (PR #10470 - rewritten from drawer to dialog)
-            alertDetailsDialog: '[data-test="alert-details-dialog"]',
-            alertDetailsTitle: '[data-test="alert-details-title"]',
-            alertDetailsEditButton: '[data-test="alert-details-edit-btn"]',
-            alertDetailsRefreshButton: '[data-test="alert-history-refresh-btn"]',
-            alertDetailsCloseButton: '[data-test="o-drawer-close-btn"]',
+            // Alert detail page (Alerts 2.0 replaced the row-click drawer with a route)
+            alertDetailsDialog: '[data-test="alerts-alertdetail-title"]',
+            alertDetailsTitle: '[data-test="alerts-alertdetail-title"]',
+            alertDetailsEditButton: '[data-test="alerts-alertdetail-edit"]',
+            alertDetailsRefreshButton: '[data-test="alerts-alertevaluationhistory-refresh"]',
             alertDetailsCopyConditionsButton: '[data-test="alert-details-copy-conditions-btn"]',
-            alertDetailsHistoryTable: '[data-test="alert-details-history-table"]',
+            alertDetailsHistoryTable: '[data-test="alerts-alertevaluationhistory-table"]',
+            alertDetailsHistoryEmpty: '[data-test="alerts-alertevaluationhistory-empty"]',
 
             // Evaluation Status Indicator (v3 UI - rendered in AlertWizardRightColumn with data-test)
             alertStatusIndicator: '[data-test="alert-status-indicator"]',
@@ -235,7 +246,7 @@ export class AlertsPage {
 
             // Incident detail — Overview tab locators
             relatedAlertsContainer: '.o2-incident-card-bg',
-            relatedAlertItem: '[class*="tw:py-2"]',
+            relatedAlertItem: '[class*="py-2"]',
             relatedAlertName: '.tw\\:truncate',
             relatedAlertCountText: '[style*="width: 120px"]',
             severityBadge: '[data-test*="badge"], [data-test*="chip"], .severity-badge',
@@ -339,6 +350,11 @@ export class AlertsPage {
         if (this.creationWizard) {
             this.creationWizard.currentAlertName = value;
         }
+    }
+
+    /** Wait for the Add Alert button to render — the readiness gate before creating an alert. */
+    async waitForAddAlertButton() {
+        await this.page.locator(this.locators.addAlertButton).waitFor({ state: 'visible', timeout: 30000 });
     }
 
     async createAlert(streamName, column, value, destinationName, randomValue) {
@@ -505,21 +521,21 @@ export class AlertsPage {
         return this.management.submitAlertEdit();
     }
 
-    // ==================== ALERT DETAILS DIALOG (PR #10470) ====================
+    // ==================== ALERT DETAIL PAGE ====================
 
     /**
-     * Open alert details dialog by clicking alert name in the list
+     * Open the alert detail page by clicking the alert name in the list
      */
     async openAlertDetailsDialog(alertName) {
         return this.management.openAlertDetailsDialog(alertName);
     }
 
     /**
-     * Verify alert details dialog is visible
+     * Verify the alert detail page is visible
      */
     async expectAlertDetailsDialogVisible() {
         await expect(this.page.locator(this.locators.alertDetailsDialog)).toBeVisible({ timeout: 10000 });
-        testLogger.info('Alert details dialog is visible');
+        testLogger.info('Alert detail page is visible');
     }
 
     /**
@@ -527,15 +543,15 @@ export class AlertsPage {
      * Returns 'table' if history table is visible, 'empty' if empty state is shown
      */
     async expectAlertDetailsHistorySectionVisible() {
-        // The history section shows either a q-table (when history exists) or an empty state
         const table = this.page.locator(this.locators.alertDetailsHistoryTable);
-        const emptyState = this.page.locator('text=No history available').or(this.page.locator('.OIcon:has-text("history")'));
+        const historyEntry = table.locator('[data-test="alerts-alertevaluationhistory-status"]').first();
+        const emptyState = this.page.locator(this.locators.alertDetailsHistoryEmpty);
 
-        // Wait for either to appear — use .first() because .or() can match multiple elements
-        // (e.g. the history icon may appear in the dialog AND in navigation)
-        await expect(table.or(emptyState).first()).toBeVisible({ timeout: 10000 });
+        // The table shell renders before its async history request completes. Wait for
+        // actual row content or the explicit empty state so callers cannot race the fetch.
+        await expect(historyEntry.or(emptyState).first()).toBeVisible({ timeout: 15000 });
 
-        if (await table.isVisible({ timeout: 1000 }).catch(() => false)) {
+        if (await historyEntry.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info('Alert details history table is visible');
             return 'table';
         }
@@ -544,18 +560,18 @@ export class AlertsPage {
     }
 
     /**
-     * Get the alert details dialog title text
+     * Get the alert detail page title text
      */
     async getAlertDetailsTitleText() {
         const title = this.page.locator(this.locators.alertDetailsTitle);
         await expect(title).toBeVisible({ timeout: 5000 });
         const text = await title.textContent();
         testLogger.info('Alert details title', { text });
-        return text.trim();
+        return (text || '').trim();
     }
 
     /**
-     * Click the edit button in alert details dialog
+     * Click the edit button on the alert detail page
      */
     async clickAlertDetailsEditButton() {
         await this.page.locator(this.locators.alertDetailsEditButton).click();
@@ -565,7 +581,7 @@ export class AlertsPage {
     }
 
     /**
-     * Click the refresh button in alert details dialog
+     * Click the history refresh button on the alert detail page
      */
     async clickAlertDetailsRefreshButton() {
         await this.page.locator(this.locators.alertDetailsRefreshButton).click();
@@ -583,20 +599,12 @@ export class AlertsPage {
     }
 
     /**
-     * Close the alert details dialog
+     * Return from the alert detail page to the alert list
      */
     async closeAlertDetailsDialog() {
-        const closeBtn = this.page.locator(this.locators.alertDetailsCloseButton);
-        if (await closeBtn.isVisible({ timeout: 3000 })) {
-            await closeBtn.click();
-            await this.page.waitForTimeout(500);
-            testLogger.info('Closed alert details dialog');
-        } else {
-            await this.page.locator('[data-test="o-dialog-close-btn"]').first().click().catch(() => {
-                this.page.locator('body').click({ position: { x: 10, y: 10 } });
-            });
-            testLogger.info('Closed alert details dialog via close button');
-        }
+        await this.page.goBack();
+        await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible({ timeout: 10000 });
+        testLogger.info('Returned from alert detail page to alert list');
     }
 
     /**
@@ -651,7 +659,7 @@ export class AlertsPage {
     async expectNoChartError() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
         // Assert no error-class banner is visible within the chart container
-        const errorBanner = chartArea.locator('[class*="error"], .q-banner--negative').first();
+        const errorBanner = chartArea.locator('[class*="error"]').first();
         await expect(errorBanner).not.toBeVisible({ timeout: 5000 });
         // Assert no error text pattern is visible anywhere in the chart area.
         // Do NOT swallow — a "Schema error" / "No field named" banner must fail the test.
@@ -659,7 +667,7 @@ export class AlertsPage {
         await expect(errorText).not.toBeAttached({ timeout: 3000 });
 
         // Also check page-level error toasts/banners rendered outside the chart container
-        const pageError = this.page.locator('[role="alert"][class*="bg-negative"], .q-banner--negative').first();
+        const pageError = this.page.locator('[role="alert"][class*="bg-negative"]').first();
         await expect(pageError).not.toBeVisible({ timeout: 5000 });
 
         testLogger.info('No chart error detected');
@@ -671,7 +679,7 @@ export class AlertsPage {
      */
     async getChartErrorMessage() {
         const chartArea = this.page.locator(this.locators.alertPreviewChart);
-        const errorEl = chartArea.locator('[class*="error"], .q-banner--negative, [role="alert"][class*="bg-negative"]').first();
+        const errorEl = chartArea.locator('[class*="error"], [role="alert"][class*="bg-negative"]').first();
         if (await errorEl.isVisible({ timeout: 2000 }).catch(() => false)) {
             return await errorEl.textContent();
         }
@@ -721,23 +729,23 @@ export class AlertsPage {
     }
 
     /**
-     * Verify action buttons (close, optional refresh) are visible in the alert details dialog
-     * Note: Edit button was removed from the UI in alert history sidebar refactoring
+     * Verify action buttons are visible on the alert detail page
      */
     async expectAlertDetailsActionButtonsVisible() {
         // Refresh button may not be present on all deployments (absent on alpha1 cloud)
         const refreshVisible = await this.page.locator(this.locators.alertDetailsRefreshButton)
             .isVisible({ timeout: 3000 }).catch(() => false);
-        await expect(this.page.locator(this.locators.alertDetailsCloseButton)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.alertDetailsEditButton)).toBeVisible({ timeout: 10000 });
         testLogger.info('Alert details action buttons visible', { refreshButton: refreshVisible });
     }
 
     /**
-     * Verify the alert details dialog is closed / not visible
+     * Verify the alert detail page is closed / not visible
      */
     async expectAlertDetailsDialogClosed() {
         await expect(this.page.locator(this.locators.alertDetailsDialog)).not.toBeVisible({ timeout: 5000 });
-        testLogger.info('Alert details dialog is closed');
+        await expect(this.page.locator('[data-test="alert-list-page"]')).toBeVisible({ timeout: 5000 });
+        testLogger.info('Alert detail page is closed');
     }
 
     // ==================== DELEGATE TO BULK OPERATIONS ====================
@@ -774,8 +782,8 @@ export class AlertsPage {
         return this.bulkOperations.pauseAllSelectedAlerts();
     }
 
-    async moveAllAlertsToFolder(targetFolderName) {
-        return this.bulkOperations.moveAllAlertsToFolder(targetFolderName);
+    async moveAllAlertsToFolder(targetFolderName, options = {}) {
+        return this.bulkOperations.moveAllAlertsToFolder(targetFolderName, options);
     }
 
     async deleteAllAlertsInFolder() {
@@ -812,10 +820,28 @@ export class AlertsPage {
      * @param {string} name - Alert name
      */
     async fillAlertName(name) {
-        // OInput renders data-test on outer <div>; wait on wrapper for visibility, fill on inner -field input
-        await this.page.locator(this.locators.alertNameInput).waitFor({ state: 'visible', timeout: 3000 });
+        // Inline-edit title: click the trigger to open the editor, then fill the input.
+        await this.page.locator(this.locators.alertNameTrigger).waitFor({ state: 'visible', timeout: 3000 });
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill(name);
         testLogger.info(`Filled alert name: ${name}`);
+    }
+
+    /**
+     * Read the current alert name from the inline-edit title (OFormInlineEdit).
+     * In display mode the value is the `-value` span; only in edit mode is there
+     * an `-input`. Reads the committed display value, falling back to the live
+     * input value if the editor happens to be open.
+     * @returns {Promise<string>}
+     */
+    async getAlertName() {
+        const valueSpan = this.page.locator(this.locators.alertNameValue).first();
+        if (await valueSpan.count() > 0) {
+            return (await valueSpan.innerText()).trim();
+        }
+        // Editor is open (edit mode) — read the live input value instead.
+        return (await this.page.locator(this.locators.alertNameInputField).inputValue()).trim();
     }
 
     /**
@@ -835,6 +861,155 @@ export class AlertsPage {
      */
     getAdvancedTemplateOverrideSelect() {
         return this.page.locator(this.locators.advancedTemplateOverrideSelect).first();
+    }
+
+    // ==================== ALERTS 4.0 (MULTI-ALERT) FORM HELPERS ====================
+
+    /**
+     * Select an alert destination by name in the create/edit form.
+     * @param {string} destinationName
+     */
+    async selectDestinationByName(destinationName) {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        await this.page
+            .locator(`[data-test="alert-destinations-select-option"][data-test-value="dest:${destinationName}"]`)
+            .first()
+            .click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected alert destination', { destinationName });
+    }
+
+    /**
+     * Submit the alert create/edit form. The submit button sits in a scroll
+     * container that can clip it from the viewport, so a native DOM click is used.
+     */
+    async submitAlertForm() {
+        await this.page.evaluate((sel) => {
+            const btn = document.querySelector(sel);
+            if (btn) btn.click();
+        }, this.locators.alertSubmitButton);
+        testLogger.info('Submitted alert form');
+    }
+
+    /**
+     * Assert an alert with the given name is visible on the list table.
+     * @param {string} name
+     */
+    async expectAlertVisibleInList(name) {
+        const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+        await expect(row).toBeVisible({ timeout: 15000 });
+        testLogger.info('Alert visible on list', { name });
+    }
+
+    /**
+     * Assert the Simple/Multi toggle has "Multi alert" (value "true") selected.
+     * Reka-ui renders options as <button role="radio" data-test-value> carrying
+     * aria-checked (NOT native input.checked).
+     */
+    async expectMultiAlertSelected() {
+        const choice = this.page.locator(this.locators.alertMultiToggleChoice);
+        await expect(choice).toBeVisible({ timeout: 15000 });
+        await expect(choice.locator('[role="radio"][data-test-value="true"]')).toHaveAttribute('aria-checked', 'true', { timeout: 10000 });
+        await expect(choice.locator('[role="radio"][data-test-value="false"]')).toHaveAttribute('aria-checked', 'false');
+    }
+
+    // ==================== ALERTS 4.0 (PRIORITY & TAGS) HELPERS ====================
+
+    /**
+     * Switch to the "Alert Rules" (condition) tab — where stream, threshold and destination live.
+     * Uses a normal click (waits for actionability) rather than the force-click in
+     * `_switchToTab`, which can fire before a just-closed popover settles and miss the tab.
+     */
+    async openConditionTab() {
+        await this.page.locator(this.locators.addAlertTabCondition).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    /** Assert the Advanced-panel priority select and tag input are both present. */
+    async expectPriorityAndTagControlsVisible() {
+        await expect(this.page.locator(this.locators.prioritySelect)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.locators.tagsInput)).toBeVisible({ timeout: 10000 });
+    }
+
+    /** Open the priority select and assert every given label is offered (e.g. P1..P5). */
+    async expectPriorityOptions(labels) {
+        await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
+        for (const label of labels) {
+            await expect(
+                this.page.locator('[data-test$="-popover"] [data-test$="-option"]').filter({ hasText: label }).first()
+            ).toBeVisible({ timeout: 5000 });
+        }
+    }
+
+    /** Select a priority by its label (e.g. "P3"). */
+    async selectPriority(label) {
+        await openOSelectDropdown(this.page, this.page.locator(this.locators.prioritySelect));
+        await this.page
+            .locator('[data-test$="-popover"] [data-test$="-option"]')
+            .filter({ hasText: label })
+            .first()
+            .click();
+        testLogger.info('Selected alert priority', { label });
+    }
+
+    /** Type a tag into the tag input and commit it with Enter. */
+    async addTag(value) {
+        const input = this.page.locator(`${this.locators.tagsInput} input`).first();
+        await input.fill(value);
+        await input.press('Enter');
+    }
+
+    /**
+     * Add one "Additional Variable" (context attribute) on the Advanced tab.
+     * The empty-state "Add Variable" button creates the first key/value row; the key
+     * and value inputs share a data-test across rows, so `.last()` targets the newest.
+     */
+    async addAlertVariable(key, value) {
+        await this.page.locator(this.locators.contextAttributesAddButton).click();
+        await this.page.locator(`${this.locators.contextAttributeKeyInput} input`).last().fill(key);
+        await this.page.locator(`${this.locators.contextAttributeValueInput} input`).last().fill(value);
+        testLogger.info('Added alert variable', { key });
+    }
+
+    /** Open the destinations select and pick the first available option. */
+    async selectFirstDestination() {
+        const dropdown = this.page.locator(this.locators.alertDestinationsSelect);
+        await dropdown.waitFor({ state: 'visible', timeout: 10000 });
+        await openOSelectDropdown(this.page, dropdown);
+        const options = this.page.locator('[data-test$="-popover"] [data-test$="-option"]');
+        await expect(options.first()).toBeVisible({ timeout: 5000 });
+        await options.first().click();
+        await this.page.keyboard.press('Escape');
+        testLogger.info('Selected first available destination');
+    }
+
+    /** Assert the list row for `name` renders the given priority (string or RegExp). */
+    async expectAlertPriorityInList(name, matcher) {
+        const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+        await expect(row.locator(`[data-test="alert-list-${name}-priority"]`)).toHaveText(matcher, { timeout: 10000 });
+    }
+
+    /** Assert the list row for `name` renders exactly the given normalized tag chips. */
+    async expectAlertTagsInList(name, tags) {
+        const row = this.page.locator('tbody tr').filter({ hasText: name }).first();
+        const chips = row.locator(`[data-test="alert-list-${name}-tag"]`);
+        await expect(chips).toHaveCount(tags.length, { timeout: 10000 });
+        for (let i = 0; i < tags.length; i++) {
+            await expect(chips.nth(i)).toHaveText(tags[i]);
+        }
+    }
+
+    /** Assert the alert-list header includes all `present` columns and none of the `absent` ones. */
+    async expectListColumns({ present = [], absent = [] } = {}) {
+        const headerText = await this.page.locator('thead').first().innerText();
+        for (const col of present) {
+            expect(headerText, `"${col}" column must be on the alert list`).toContain(col);
+        }
+        for (const col of absent) {
+            expect(headerText, `"${col}" column must NOT be on the alert list`).not.toContain(col);
+        }
     }
 
     /**
@@ -870,10 +1045,6 @@ export class AlertsPage {
         await this.commonActions.navigateToAlerts();
         await this.page.waitForTimeout(1000);
 
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
         await this.page.waitForTimeout(500);
 
         await this.page.locator(this.locators.newFolderButton).click();
@@ -905,14 +1076,38 @@ export class AlertsPage {
             await this.navigateToAlertsPage();
         }
 
-        // Use specific folder-item selector to avoid matching unrelated text
-        const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
-        const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
-        if (folderVisible) {
-            await folderItem.click();
+        // The folder list is reka OTabs. The clickable element is the [role="tab"] TabsTrigger
+        // that wraps the folder-name cell (data-test="dashboard-folder-tab-name-<name>"); it is
+        // the element that carries data-state="active" AND, via OTabs' v-model, drives
+        // activeFolderId — the folder the "New alert" wizard writes the alert into.
+        //
+        // Two bugs made the old approach silently switch to the wrong folder:
+        //   1. It clicked the inner .folder-item <div>, not the tab. The list is virtualized/
+        //      animated, so a force-click can land mid-reflow and never flip the reka tab.
+        //   2. It then gated only on the alert table OR empty-state being visible. The DEFAULT
+        //      folder's table is already on screen, so that gate is a FALSE success: the method
+        //      returned while still on "default", and any alert created next landed in "default"
+        //      instead of the intended folder (target folder then reads empty at export/move,
+        //      timing out the row wait). Trace confirmed POST /alerts?folder=default here.
+        // Fix: click the tab itself and gate on it actually becoming active before returning.
+        const folderTab = this.page.locator(
+            `[role="tab"]:has([data-test="dashboard-folder-tab-name-${folderName}"])`
+        ).first();
+        const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
+        if (tabVisible) {
+            // Force-click past the reflow, retrying, until the tab reports data-state="active".
+            // Re-clicking each iteration self-heals a click that landed mid-animation; the
+            // active-state assertion is the real completion signal (activeFolderId switched).
+            await expect(async () => {
+                if ((await folderTab.getAttribute('data-state')) !== 'active') {
+                    await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                    await folderTab.click({ force: true, timeout: 5000 });
+                }
+                await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+            }).toPass({ timeout: 30000 });
         } else {
-            // Fallback to generic text selector
-            await this.page.getByText(folderName).first().click();
+            // Fallback to generic text selector for any legacy markup, then still verify below.
+            await this.page.getByText(folderName).first().click({ force: true });
         }
         try {
             await Promise.race([
@@ -1001,17 +1196,37 @@ export class AlertsPage {
             testLogger.info('Alert not immediately visible, navigating to alerts and searching', { alertName: nameToVerify });
             await this.page.locator(this.locators.alertMenuItem).click();
             await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-            await this.page.waitForTimeout(2000);
 
-            // Search for the alert
+            // Re-search across attempts: under concurrent load the alerts-list refetch after a
+            // fresh create can lag, so a single search + one long wait intermittently missed the
+            // row. Re-type the filter each attempt — and reload once to force a fresh list fetch —
+            // until the row renders. Deterministic (each probe waits for the actual cell); no
+            // reliance on one slow fetch landing inside a fixed window.
             const inputField = this.page.locator(this.locators.alertSearchInputField);
-            await inputField.waitFor({ state: 'attached', timeout: 10000 });
-            await inputField.fill(nameToVerify, { force: true });
-            await this.page.waitForTimeout(2000);
+            const listSkeleton = this.page.locator('[data-test="o2-table-skeleton-body"]');
+            let found = false;
+            for (let attempt = 1; attempt <= 4 && !found; attempt++) {
+                if (attempt === 3) {
+                    // Force a fresh list fetch before the final attempts.
+                    await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
+                    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+                }
+                await inputField.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
+                await inputField.fill('', { force: true }).catch(() => {});
+                await inputField.fill(nameToVerify, { force: true });
+                // The OTable shows a loading skeleton while the alerts list fetches — real rows
+                // aren't in the DOM yet, so checking now races an all-placeholder table. Wait for
+                // the skeleton to clear first.
+                await listSkeleton.first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+                found = await this.page.getByRole('cell', { name: nameToVerify }).first()
+                    .isVisible({ timeout: 10000 }).catch(() => false);
+                if (!found) testLogger.warn('Alert row not visible after search, re-searching', { alertName: nameToVerify, attempt });
+            }
         }
 
-        // Use a longer timeout since the alert list may take time to reload
-        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 30000 });
+        // Final deterministic assertions (the row is present by now under normal + slow paths).
+        await this.page.locator('[data-test="o2-table-skeleton-body"]').first().waitFor({ state: 'hidden', timeout: 20000 }).catch(() => {});
+        await expect(this.page.getByRole('cell', { name: nameToVerify }).first()).toBeVisible({ timeout: 15000 });
         await expect(this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', nameToVerify)).first()).toBeVisible({ timeout: 10000 });
     }
 
@@ -1083,25 +1298,26 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        // v3 UI validates non-empty name — clear input and submit to trigger validation
-        await this.page.locator(this.locators.alertNameInputField).click();
+        // v3 UI validates non-empty name — open the inline editor, clear it, then
+        // submit to trigger validation.
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).clear();
 
         // Click Save to trigger required-field validation
         await this.page.locator(this.locators.alertSubmitButton).click();
         await this.page.waitForTimeout(500);
 
-        // v3 shows a toast notification when name is empty
-        // OToast renders the message in 3 elements (sr-only ARIA span, sr-only title div,
-        // visible message div) — scope to the visible `o-toast-message` data-test to avoid
-        // strict-mode violation per AGENT_RULES §2.
-        await expect(
-            this.page
-                .locator('[data-test="o-toast-message"]')
-                .filter({ hasText: 'Alert name is required.' })
-                .first()
-        ).toBeVisible({ timeout: 10000 });
-        testLogger.info('Invalid alert name validation working');
+        // An empty-name Save is rejected with a toast reading "Alert name is required."
+        // (alerts.nameRequired); the name OFormInput may additionally surface an inline field
+        // error (add-alert-name-input-error). Assert whichever signal is present — both
+        // confirm the empty-name save was blocked, which is what this validation verifies.
+        const nameError = this.page.locator('[data-test="add-alert-name-input-error"]');
+        const nameRequiredToast = this.page
+            .locator('[data-test="o-toast-message"]')
+            .filter({ hasText: 'Alert name is required.' });
+        await expect(nameError.or(nameRequiredToast).first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('Invalid alert name validation working (empty-name save blocked)');
 
         // Close with robust handling for dialog backdrops
         await this._closeAlertWizard();
@@ -1112,7 +1328,8 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await this.page.waitForTimeout(1000);
 
-        await this.page.locator(this.locators.alertNameInput).click();
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill('abc');
 
         // Click Save to trigger field validation (v3 UI — no Continue button)
@@ -1120,12 +1337,12 @@ export class AlertsPage {
         await this.page.waitForTimeout(500);
 
         // v3 wizard may handle validation differently:
-        //   A) Show inline q-field--error on missing fields
+        //   A) Show inline field error on missing fields
         //   B) Show a toast/notification at the top of the form
         //   C) Submit successfully (if optional fields have defaults)
         // Wait for any of these outcomes within the timeout window.
-        const errorFields = this.page.locator('.q-field--error');
-        const anyToast = this.page.locator('[role="alert"], .q-alert, .notifications');
+        const errorFields = this.page.locator('[aria-invalid="true"]');
+        const anyToast = this.page.locator('[role="alert"], .notifications');
         const successMsg = this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: this.locators.alertSuccessMessage });
 
         const outcomes = await Promise.race([
@@ -1463,9 +1680,17 @@ export class AlertsPage {
     async typeInAlertSearchInput(query) {
         const searchInput = this.page.locator(this.locators.alertSearchInputField);
         await searchInput.waitFor({ state: 'visible', timeout: 10000 });
-        await searchInput.click();
-        await searchInput.pressSequentially(query, { delay: 100 });
-        // wait until the typed value is reflected on the input
+        // Re-type if the value doesn't stick: under concurrent load pressSequentially can
+        // drop keystrokes or the input re-renders mid-type, leaving a mismatched value.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await searchInput.click().catch(() => {});
+            await searchInput.fill('').catch(() => {});
+            await searchInput.pressSequentially(query, { delay: 80 });
+            if ((await searchInput.inputValue().catch(() => '')) === query) return;
+            testLogger.warn('Alert search value did not stick, retrying', { query, attempt });
+            await this.page.waitForTimeout(400);
+        }
+        // Final assertion so a genuine failure still surfaces clearly.
         await expect(searchInput).toHaveValue(query, { timeout: 5000 });
     }
 
@@ -1951,12 +2176,12 @@ export class AlertsPage {
     /**
      * Get severity badge text from incident detail header.
      * Header has 3 badges: Status (icon=info), Severity (icon=warning), Alert Count (icon=notifications_active).
-     * Quasar renders OIcon name as <i> text content, NOT as an HTML attribute.
+     * OIcon renders its name as <i> text content, NOT as an HTML attribute.
      * We match the badge that contains a P1/P2/P3/P4 span.
      * @returns {Promise<string>} e.g. "P1", "P2", "P3", "P4"
      */
     async getSeverityBadgeText() {
-        // Match the q-badge that contains P1, P2, P3, or P4 text
+        // Match the badge that contains P1, P2, P3, or P4 text
         const badge = this.page.locator(this.locators.severityBadge).filter({ hasText: /^.*P[1-4].*$/ });
         await badge.first().waitFor({ state: 'visible', timeout: 10000 });
         // Get just the span with the severity value (first span inside the inner div)
@@ -2019,7 +2244,7 @@ export class AlertsPage {
 
     /**
      * Verify the service graph tab content rendered.
-     * Tabs are v-if gated (no q-tab-panel wrapper). The serviceGraph tab
+     * Tabs are v-if gated (no tab-panel wrapper). The serviceGraph tab
      * renders IncidentServiceGraph inside an absolute-positioned div.
      * Checks for the .incident-service-graph container OR the detail page
      * still being visible (confirming no crash).
@@ -2090,7 +2315,7 @@ export class AlertsPage {
         }
 
         // Check for error icon (also acceptable — just means no correlation data)
-        // Note: Quasar renders OIcon name as text content, not HTML attribute
+        // Note: OIcon renders its name as text content, not HTML attribute
         const errorIcon = this.page.locator('.OIcon:has-text("error_outline"), .OIcon:has-text("info_outline")');
         if (await errorIcon.isVisible({ timeout: 1000 }).catch(() => false)) {
             testLogger.info(`Telemetry tab ${tabName}: info/error state`);
@@ -2171,6 +2396,12 @@ export class AlertsPage {
     async exportAlerts() {
         const headerCheckbox = this.page.locator(this.locators.alertListHeaderCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for at least one alert ROW to render before select-all. After navigating to a
+        // folder the OTable can still be loading; clicking select-all over a not-yet-populated
+        // table selects nothing, so the selection-gated Export button never appears (the 30s
+        // toPass timeout in CI). OTable renders rows as [data-test^="o2-table-row-"].
+        await this.page.locator('[data-test^="o2-table-row-"]').first()
+            .waitFor({ state: 'visible', timeout: 15000 });
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 
@@ -2188,7 +2419,19 @@ export class AlertsPage {
             };
         });
 
-        await this.page.locator(this.locators.alertExportButton).click();
+        // The Export button is disabled until at least one alert is selected. The select-all
+        // click above can race the row render (nothing ends up selected), so the button never
+        // becomes actionable and a plain click 45s-timed-out. Ensure the selection took and the
+        // button is ready (re-selecting if needed) before clicking.
+        const exportBtn = this.page.locator(this.locators.alertExportButton);
+        await expect(async () => {
+            if (!(await exportBtn.isEnabled().catch(() => false))) {
+                await headerCheckbox.click().catch(() => {});
+            }
+            await expect(exportBtn).toBeVisible({ timeout: 3000 });
+            await expect(exportBtn).toBeEnabled({ timeout: 3000 });
+        }).toPass({ timeout: 30000 });
+        await exportBtn.click();
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 
@@ -2290,7 +2533,14 @@ export class AlertsPage {
 
         const baseUrl = process.env["ZO_BASE_URL"];
         const orgName = process.env["ORGNAME"];
-        const validationDestinationUrl = `${baseUrl}/api/${orgName}/${streamName}/_json`;
+        // On cloud the backend's SSRF guard rejects the self-referencing ingestion URL
+        // (the cluster's own domain resolves to a private IP), so use an inert public
+        // sink instead. Round-trip validation-stream checks are unavailable on cloud —
+        // tests that poll the validation stream must skip there.
+        const isCloud = isCloudEnvironment();
+        const validationDestinationUrl = isCloud
+            ? 'https://httpbin.org/post'
+            : `${baseUrl}/api/${orgName}/${streamName}/_json`;
 
         // Ensure validation template exists with proper JSON array format for ingestion API
         await pm.alertTemplatesPage.ensureValidationTemplateExists(templateName);
@@ -2303,23 +2553,24 @@ export class AlertsPage {
         const destinationFound = await pm.alertDestinationsPage.findDestinationAcrossPages(destinationName);
 
         if (!destinationFound) {
-            // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
-            const headers = getAuthHeaders();
-            const authHeader = headers['Authorization'] || (() => {
-                if (isCloudEnvironment()) {
-                    testLogger.warn('alertsPage: no cloud passcode available for destination creation - Basic auth will not work on cloud OIDC endpoints');
-                }
-                return this.commonActions.constructor.generateBasicAuthHeader(
+            // Self-referencing ingestion needs auth; never attach credentials when the
+            // destination points at the external sink (would leak the passcode).
+            let destinationHeaders = {};
+            if (!isCloud) {
+                // Generate Basic auth header using getAuthHeaders (supports cloud passcode)
+                const headers = getAuthHeaders();
+                const authHeader = headers['Authorization'] || this.commonActions.constructor.generateBasicAuthHeader(
                     process.env["ZO_ROOT_USER_EMAIL"],
                     process.env["ZO_ROOT_USER_PASSWORD"]
                 );
-            })();
+                destinationHeaders = { 'Authorization': authHeader };
+            }
 
             await pm.alertDestinationsPage.createDestinationWithHeaders(
                 destinationName,
                 validationDestinationUrl,
                 templateName,
-                { 'Authorization': authHeader }
+                destinationHeaders
             );
             testLogger.info('Created validation destination', {
                 destinationName,
@@ -2420,7 +2671,9 @@ export class AlertsPage {
      * Fill the alert name input
      */
     async fillAlertName(alertName) {
-        // OInput renders data-test on outer <div>; use -field suffix for the native input
+        // Inline-edit title: click the trigger to open the editor, then fill the input.
+        await this.page.locator(this.locators.alertNameTrigger).click();
+        await this.page.locator(this.locators.alertNameInputField).waitFor({ state: 'visible', timeout: 3000 });
         await this.page.locator(this.locators.alertNameInputField).fill(alertName);
         testLogger.info('Filled alert name', { alertName });
     }
@@ -2516,7 +2769,7 @@ export class AlertsPage {
 
     /**
      * Select a stream by name from the dropdown, using keyboard typing to filter
-     * through Quasar's virtual scroll (only rendered items are in the DOM).
+     * through the virtual scroll (only rendered items are in the DOM).
      * @param {string} streamName - Exact stream name to select
      */
     async selectStreamByName(streamName) {
@@ -2829,12 +3082,12 @@ export class AlertsPage {
     }
 
     /**
-     * Force-remove residual q-portal elements that occasionally intercept clicks
+     * Force-remove residual portal overlays that occasionally intercept clicks
      * after closing the SQL editor dialog. Used in scheduled feature tests.
      */
     async removeResidualPortals() {
         await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => el.remove());
+            document.querySelectorAll('div[data-reka-dialog-overlay], div[data-reka-portalled]').forEach(el => el.remove());
         }).catch(() => {});
     }
 
@@ -2852,7 +3105,7 @@ export class AlertsPage {
      * @param {number} stepIndex - 0-based step index
      */
     async clickStepIndicator(stepIndex) {
-        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"] .q-stepper__nav-item, .alert-v3-steps > div > div');
+        const indicators = this.page.locator('.alert-v3-steps .step-indicator, [data-test*="step-indicator"], .alert-v3-steps > div > div');
         const target = indicators.nth(stepIndex);
         await target.waitFor({ state: 'visible', timeout: 10000 });
         await target.click({ force: true });
@@ -3103,11 +3356,6 @@ export class AlertsPage {
      * Click the update button for a specific alert
      */
     async clickAlertUpdateButton(alertName) {
-        // Clean up any q-portal overlays that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         // Search for the alert first
         await this.searchAlert(alertName);
         await this.page.waitForTimeout(1000);
@@ -3542,7 +3790,7 @@ export class AlertsPage {
 
     /**
      * Get autocomplete suggestions dropdown items
-     * Scoped to menu context to avoid matching all q-items on page
+     * Scoped to menu context to avoid matching all option items on page
      * @returns {Locator}
      */
     getAutocompleteSuggestions() {
@@ -3565,8 +3813,8 @@ export class AlertsPage {
      * In v3, aggregation is controlled by selecting a measure function from a dropdown:
      * - "total events" (default) = no aggregation, no group-by
      * - "count", "avg", "sum", etc. = aggregation enabled, group-by appears
-     * This replaces the v2 q-toggle for aggregation.
-     * @returns {Locator} The function dropdown q-select element
+     * This replaces the v2 toggle for aggregation.
+     * @returns {Locator} The function dropdown select element
      */
     getAggregationToggle() {
         // The aggregation function OSelect has no data-test. Its trigger is the first
@@ -3597,7 +3845,7 @@ export class AlertsPage {
 
     /**
      * Enable aggregation by selecting 'count' from the function dropdown (v3 UI).
-     * This replaces the v2 behavior of clicking a q-toggle.
+     * This replaces the v2 behavior of clicking a toggle.
      */
     async enableAggregation() {
         const toggle = this.getAggregationToggle();
@@ -3609,7 +3857,7 @@ export class AlertsPage {
 
     /**
      * Disable aggregation by selecting 'total events' from the function dropdown (v3 UI).
-     * This replaces the v2 behavior of clicking a q-toggle off.
+     * This replaces the v2 behavior of clicking a toggle off.
      */
     async disableAggregation() {
         const toggle = this.getAggregationToggle();
@@ -3823,6 +4071,6 @@ export class AlertsPage {
      * @returns {Locator}
      */
     getErrorMessageBanner() {
-        return this.page.locator('[class*="error"], .q-banner--negative, [data-test*="error"]');
+        return this.page.locator('[class*="error"], [data-test*="error"]');
     }
 }

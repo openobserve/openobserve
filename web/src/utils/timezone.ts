@@ -24,31 +24,19 @@ export const timestampToTimezoneDate = (
     unixMilliTimestamp = Math.floor(unixMilliTimestamp / 1000);
   }
 
-  return DateTime.fromMillis(Math.floor(unixMilliTimestamp))
-    .setZone(timezone)
-    .toFormat(format);
+  return DateTime.fromMillis(Math.floor(unixMilliTimestamp)).setZone(timezone).toFormat(format);
 };
 
-export const histogramDateTimezone: any = (
-  utcTime: any,
-  timezone: string = "UTC",
-) => {
+export const histogramDateTimezone: any = (utcTime: any, timezone: string = "UTC") => {
   if (timezone == "UTC") return Math.floor(new Date(utcTime).getTime());
   else {
     return (
-      Math.floor(
-        DateTime.fromISO(utcTime, { zone: "UTC" })
-          .setZone(timezone)
-          .toSeconds(),
-      ) * 1000
+      Math.floor(DateTime.fromISO(utcTime, { zone: "UTC" }).setZone(timezone).toSeconds()) * 1000
     );
   }
 };
 
-export const convertToUtcTimestamp = (
-  inputDatetime: string,
-  inputTimezone: string,
-) => {
+export const convertToUtcTimestamp = (inputDatetime: string, inputTimezone: string) => {
   const dt = DateTime.fromFormat(inputDatetime, "yyyy/MM/dd HH:mm:ss", {
     zone: inputTimezone,
   });
@@ -58,10 +46,7 @@ export const convertToUtcTimestamp = (
   return utcTimestamp * 1000;
 };
 
-export const localTimeSelectedTimezoneUTCTime = async (
-  time: any,
-  timezone: string,
-) => {
+export const localTimeSelectedTimezoneUTCTime = async (time: any, timezone: string) => {
   await importMoment();
   const date = new Date(time);
 
@@ -72,10 +57,7 @@ export const localTimeSelectedTimezoneUTCTime = async (
   const minute = date.getMinutes();
   const second = date.getSeconds();
 
-  const convertedDate = moment.tz(
-    { year, month, day, hour, minute, second },
-    timezone,
-  );
+  const convertedDate = moment.tz({ year, month, day, hour, minute, second }, timezone);
 
   return convertedDate.unix() * 1000000;
 };
@@ -103,16 +85,27 @@ export const getLocalTime = (datetime: string) => {
     }
   } catch (e) {
     console.log(`Error: Error while covert localtime ${datetime}`);
+    return undefined;
   }
 };
 
-export const convertDateToTimestamp = (
-  date: string,
-  time: string,
-  timezone: string,
-) => {
-  const browserTime =
-    "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+/**
+ * "Browser Time (<zone>)" is a display-only label that some schedule pickers
+ * historically persisted (e.g. alerts created on older releases). It is NOT a
+ * valid IANA zone, so passing it to Luxon/the backend yields a NaN tz_offset.
+ * Resolve it to the plain IANA zone named inside the parentheses. Any other
+ * value (a real IANA zone, "UTC", empty) is returned unchanged.
+ */
+export const resolveBrowserTimezone = (timezone: string): string => {
+  if (typeof timezone === "string" && timezone.toLowerCase().startsWith("browser time")) {
+    const inner = timezone.match(/\(([^)]+)\)/)?.[1]?.trim();
+    return inner || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  }
+  return timezone;
+};
+
+export const convertDateToTimestamp = (date: string, time: string, timezone: string) => {
+  const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
   const [day, month, year] = date.split("-");
   const [hour, minute] = time.split(":");
@@ -150,27 +143,18 @@ export const getTimezoneOffset = (timezone: string | null = null) => {
 
   const scheduleTime = `${hours}:${minutes}`;
 
-  const ScheduleTimezone = timezone
-    ? timezone
-    : Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const ScheduleTimezone = timezone ? timezone : Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const convertedDateTime = convertDateToTimestamp(
-    scheduleDate,
-    scheduleTime,
-    ScheduleTimezone,
-  );
+  const convertedDateTime = convertDateToTimestamp(scheduleDate, scheduleTime, ScheduleTimezone);
 
   return convertedDateTime.offset;
 };
 
-export const convertTimeFromMicroToMilli = (time: number) =>
-  Math.floor(time / 1000);
+export const convertTimeFromMicroToMilli = (time: number) => Math.floor(time / 1000);
 
-export const convertTimeFromNsToMs = (time: number) =>
-  Math.floor(time / 1000000);
+export const convertTimeFromNsToMs = (time: number) => Math.floor(time / 1000000);
 
-export const convertTimeFromNsToUs = (time: number) =>
-  Math.floor(time / 1000);
+export const convertTimeFromNsToUs = (time: number) => Math.floor(time / 1000);
 
 export const getTimezonesByOffset = async (offsetMinutes: number) => {
   await importMoment();
@@ -225,10 +209,7 @@ export const getFunctionErrorMessage = (
   }
 };
 
-export const calculateRelativeTimePeriod = (
-  startTime: number,
-  endTime: number,
-): string => {
+export const calculateRelativeTimePeriod = (startTime: number, endTime: number): string => {
   const diffInMicroseconds = endTime - startTime;
   const diffInSeconds = Math.floor(diffInMicroseconds / 1000000);
 
@@ -299,10 +280,7 @@ export const buildDateTimeObject = (
   };
 
   if (type === "relative") {
-    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(
-      startTime,
-      endTime,
-    );
+    baseObj.relativeTimePeriod = calculateRelativeTimePeriod(startTime, endTime);
   } else if (type === "absolute") {
     const absoluteDateTime = calculateAbsoluteDateTime(startTime, endTime);
     baseObj.selectedDate = absoluteDateTime.selectedDate;

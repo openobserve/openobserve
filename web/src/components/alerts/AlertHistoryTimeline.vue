@@ -15,156 +15,216 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-1.5 tw:w-full tw:shrink-0 tw:px-1 tw:py-2">
+  <div class="flex w-full shrink-0 flex-col gap-1.5 px-1 py-2">
     <!-- Header row: oldest … legend … newest -->
-    <div class="tw:flex tw:items-center tw:justify-between tw:px-1">
-      <span class="tw:text-[11px] tw:tabular-nums" style="color: var(--color-text-caption)">
+    <div class="flex items-center justify-between px-1">
+      <span class="text-2xs text-text-secondary tabular-nums">
         {{ oldestLabel }}
       </span>
 
-      <div class="tw:flex tw:items-center tw:gap-3">
-        <span v-if="firingCount > 0" class="tw:flex tw:items-center tw:gap-1 tw:text-[11px]">
-          <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: var(--color-badge-error-solid-bg)" />
-          <span class="tw:font-medium" style="color: var(--color-badge-error-soft-text)">{{ firingCount }} Firing</span>
+      <div class="flex items-center gap-3">
+        <span v-if="firingCount > 0" class="text-2xs flex items-center gap-1">
+          <span class="rounded-default bg-badge-error-solid-bg inline-block h-2 w-2" />
+          <span class="text-badge-error-soft-text font-medium"
+            >{{ firingCount }} {{ firingLabel }}</span
+          >
         </span>
-        <span class="tw:flex tw:items-center tw:gap-1 tw:text-[11px]" style="color: var(--color-text-secondary)">
-          <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: var(--color-badge-success-solid-bg)" />
-          {{ okCount }} Ok
+        <span class="text-2xs text-text-secondary flex items-center gap-1">
+          <span class="rounded-default bg-badge-success-solid-bg inline-block h-2 w-2" />
+          {{ okCount }} {{ okLabel }}
         </span>
-        <span v-if="skippedCount > 0" class="tw:flex tw:items-center tw:gap-1 tw:text-[11px]" style="color: var(--color-text-muted)">
-          <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm" style="background: var(--color-border-default)" />
-          {{ skippedCount }} Skipped
+        <span v-if="errorCount > 0" class="text-2xs flex items-center gap-1">
+          <span class="rounded-default bg-badge-warning-solid-bg inline-block h-2 w-2" />
+          <span class="text-badge-warning-soft-text font-medium"
+            >{{ errorCount }} {{ errorLabel }}</span
+          >
         </span>
-        <span v-if="hasFlappingZone" class="tw:flex tw:items-center tw:gap-1 tw:text-[11px] tw:font-semibold" style="color: #7c3aed; filter: brightness(0.9)">
-          <span class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm o2-flap-swatch" />
-          Flapping
+        <span v-if="skippedCount > 0" class="text-2xs text-text-muted flex items-center gap-1">
+          <span class="rounded-default bg-border-default inline-block h-2 w-2" />
+          {{ skippedCount }} {{ t("alerts.historyTimeline.skipped") }}
+        </span>
+        <span
+          v-if="hasFlappingZone"
+          class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
+        >
+          <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
+          {{ t("alerts.historyTimeline.flapping") }}
         </span>
       </div>
 
-      <span class="tw:text-[11px] tw:tabular-nums" style="color: var(--color-text-caption)">
+      <span class="text-2xs text-text-secondary tabular-nums">
         {{ newestLabel }}
       </span>
     </div>
 
     <!-- Timeline strip + transition labels -->
-    <div class="tw:flex tw:flex-col tw:gap-[3px] tw:w-full tw:px-1">
-
-    <!-- Strip -->
-    <div class="tw:flex tw:gap-[2px] tw:w-full tw:h-6 tw:items-stretch" style="overflow: visible">
-      <template v-for="(seg, i) in segments" :key="i">
-        <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
-        <div
-          v-if="seg.type === 'flapping'"
-          class="tw:flex tw:gap-[2px] tw:items-stretch tw:relative"
-          :style="{ flex: seg.weight, minWidth: '12px' }"
-          @mouseenter="hoveredIndex = i"
-          @mouseleave="hoveredIndex = null"
-        >
-          <!-- Persistent callout pill above the zone -->
-          <div class="o2-flap-pill">
-            <span class="tw:font-semibold">⚡ Flapping</span>
-            <span class="o2-flap-pill-dot">•</span>{{ seg.flips }} flips
-            <span class="o2-flap-pill-dot">•</span>{{ seg.durationLabel }}
-          </div>
+    <div class="flex w-full flex-col gap-0.75 px-1">
+      <!-- Strip -->
+      <div class="flex h-6 w-full items-stretch gap-0.5 overflow-visible">
+        <template v-for="(seg, i) in segments" :key="i">
+          <!-- Flapping zone — alternating hatched red/green cells + callout pill -->
           <div
-            v-for="(cell, c) in seg.cells"
-            :key="c"
-            class="tw:flex-1 tw:rounded-sm tw:min-w-[6px]"
-            :style="flapCellStyle(cell.status)"
-          />
-        </div>
-
-        <!-- Normal block -->
-        <div
-          v-else
-          class="tw:flex-1 tw:rounded-sm tw:min-w-[4px] tw:cursor-default tw:relative tw:transition-opacity tw:duration-100 hover:tw:opacity-75"
-          :style="{ flex: seg.weight, background: blockColor(seg.status) }"
-          @mouseenter="hoveredIndex = i"
-          @mouseleave="hoveredIndex = null"
-        >
-          <div v-if="hoveredIndex === i" class="o2-timeline-tooltip">
-            <div class="tw:font-semibold tw:capitalize tw:flex tw:items-center tw:gap-1.5">
-              <span
-                class="tw:inline-block tw:w-2 tw:h-2 tw:rounded-sm tw:shrink-0"
-                :style="{ background: blockColor(seg.status) }"
-              />
-              {{ normalizeStatus(seg.status) }}
+            v-if="seg.type === 'flapping'"
+            class="relative flex min-w-3 items-stretch gap-0.5"
+            :style="{ flex: seg.weight }"
+            @mouseenter="hoveredIndex = i"
+            @mouseleave="hoveredIndex = null"
+          >
+            <!-- Persistent callout pill above the zone -->
+            <div
+              class="o2-flap-pill text-badge-purple-solid-text bg-badge-purple-solid-bg pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1.25 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap shadow-md"
+            >
+              <span class="font-semibold"
+                >{{ "⚡" }} {{ t("alerts.historyTimeline.flapping") }}</span
+              >
+              <span class="font-normal opacity-60">•</span>{{ seg.flips }}
+              {{ t("alerts.historyTimeline.flipsSuffix") }}
+              <span class="font-normal opacity-60">•</span>{{ seg.durationLabel }}
             </div>
-            <div class="tw:opacity-60 tw:mt-0.5">{{ seg.startLabel }}</div>
-            <div v-if="seg.count > 1" class="tw:opacity-50 tw:text-[10px]">{{ seg.count }} evaluations</div>
+            <div
+              v-for="(cell, c) in seg.cells"
+              :key="c"
+              class="rounded-default o2-flap-cell min-w-1.5 flex-1"
+              :style="{ backgroundColor: blockColor(cell.status) }"
+            />
           </div>
-        </div>
-      </template>
-    </div><!-- /strip -->
 
-    <!-- Transition tick labels — placed by cumulative width; labels that would
+          <!-- Normal block -->
+          <div
+            v-else
+            class="rounded-default relative min-w-1 flex-1 cursor-default transition-opacity duration-100 hover:opacity-75"
+            :style="{ flex: seg.weight, background: blockColor(seg.status) }"
+            @mouseenter="hoveredIndex = i"
+            @mouseleave="hoveredIndex = null"
+          >
+            <!-- Render ABOVE the strip (like the flapping pill) so the tooltip
+               never collides with — or gets clipped by — the history table that
+               sits directly below the timeline. -->
+            <div
+              v-if="hoveredIndex === i"
+              class="rounded-default text-2xs bg-surface-overlay border-border-default text-text-body pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 border px-2.5 py-1.5 leading-[1.4] whitespace-nowrap shadow-md"
+            >
+              <div class="flex items-center gap-1.5 font-semibold capitalize">
+                <span
+                  class="rounded-default inline-block h-2 w-2 shrink-0"
+                  :style="{ background: blockColor(seg.status) }"
+                />
+                {{ normalizeStatus(seg.status) }}
+              </div>
+              <div class="mt-0.5 opacity-60">{{ seg.startLabel }}</div>
+              <div v-if="seg.count > 1" class="text-3xs opacity-50">
+                {{ seg.count }} {{ t("alerts.historyTimeline.evaluationsSuffix") }}
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <!-- /strip -->
+
+      <!-- Transition tick labels — placed by cumulative width; labels that would
          overlap the previously shown one are skipped to keep them readable. -->
-    <div class="tw:w-full tw:relative tw:h-[14px]">
-      <span
-        v-for="(tick, i) in tickLabels"
-        :key="i"
-        class="tw:absolute tw:top-0 tw:text-[10px] tw:tabular-nums tw:whitespace-nowrap tw:translate-x-[-50%]"
-        :style="{ left: tick.leftPct + '%', color: 'var(--color-text-caption)' }"
-      >
-        {{ tick.label }}
-      </span>
-    </div><!-- /tick labels -->
-
-    </div><!-- /strip + labels wrapper -->
+      <div class="relative h-3.5 w-full">
+        <span
+          v-for="(tick, i) in tickLabels"
+          :key="i"
+          class="text-3xs text-text-secondary absolute top-0 -translate-x-1/2 whitespace-nowrap tabular-nums"
+          :style="{ left: tick.leftPct + '%' }"
+        >
+          {{ tick.label }}
+        </span>
+      </div>
+      <!-- /tick labels -->
+    </div>
+    <!-- /strip + labels wrapper -->
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import {
+  isErrorOutcome,
+  isFiringOutcome,
+  isOkOutcome,
+  outcomeLabel,
+} from "@/utils/alerts/runOutcome";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   history: Array<{ status: string; timestamp: number }>;
+  // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
+  // workflows pass "Failed"/"Success".
+  firingLabel?: I18nText;
+  okLabel?: I18nText;
+  errorLabel?: I18nText;
 }>();
+
+// Not `withDefaults`: a default is evaluated once at module scope, which would
+// freeze the wording in whatever locale was active when the module loaded.
+const firingLabel = computed(() => props.firingLabel ?? t("alerts.historyTimeline.firing"));
+const okLabel = computed(() => props.okLabel ?? t("alerts.historyTimeline.ok"));
+const errorLabel = computed(() => props.errorLabel ?? t("alerts.historyTimeline.error"));
 
 const hoveredIndex = ref<number | null>(null);
 
 // ── Status helpers ──────────────────────────────────────────────────────────
+// Classification lives in utils/alerts/runOutcome so the timeline, the history
+// drawer and the overview cannot drift apart again.
 
 function isFiring(s: string) {
-  const v = s?.toLowerCase();
-  return v === "firing" || v === "error" || v === "anomaly" || v === "completed";
+  return isFiringOutcome(s);
 }
 
 function isOk(s: string) {
-  const v = s?.toLowerCase();
-  return v === "ok" || v === "success" || v === "normal" || v === "condition_not_satisfied";
+  return isOkOutcome(s);
+}
+
+/** An evaluation that errored: not firing, but not healthy either. */
+function isError(s: string) {
+  return isErrorOutcome(s);
 }
 
 function normalizeStatus(s: string): string {
-  const v = s?.toLowerCase();
-  if (isFiring(v)) return "Firing";
-  if (isOk(v)) return "Ok";
-  if (v === "skipped") return "Skipped";
-  return s?.replace(/_/g, " ") ?? "Unknown";
+  return outcomeLabel(
+    s,
+    firingLabel.value,
+    okLabel.value,
+    errorLabel.value,
+    t("alerts.historyTimeline.skipped"),
+    t("alerts.historyTimeline.unknown"),
+  );
 }
 
 function blockColor(status: string): string {
   if (isFiring(status)) return "var(--color-badge-error-solid-bg)";
   if (isOk(status)) return "var(--color-badge-success-solid-bg)";
+  // An errored evaluation is not a firing, but it must not read as "no data"
+  // either — give it its own tone rather than the neutral border colour.
+  if (isError(status)) return "var(--color-badge-warning-solid-bg)";
   return "var(--color-border-default)";
 }
 
 // ── Sorted rows ─────────────────────────────────────────────────────────────
 
-const sorted = computed(() =>
-  [...props.history].sort((a, b) => a.timestamp - b.timestamp),
-);
+const sorted = computed(() => [...props.history].sort((a, b) => a.timestamp - b.timestamp));
 
 // ── Stats ───────────────────────────────────────────────────────────────────
 
 const firingCount = computed(() => props.history.filter((r) => isFiring(r.status)).length);
-const okCount     = computed(() => props.history.filter((r) => isOk(r.status)).length);
-const skippedCount = computed(() =>
-  props.history.filter((r) => !isFiring(r.status) && !isOk(r.status)).length,
+const okCount = computed(() => props.history.filter((r) => isOk(r.status)).length);
+// Errored evaluations are counted separately. They are neither firing (the
+// alert did not trigger) nor healthy — previously they fell into the catch-all
+// bucket and were mislabelled "Skipped".
+const errorCount = computed(() => props.history.filter((r) => isError(r.status)).length);
+const skippedCount = computed(
+  () =>
+    props.history.filter((r) => !isFiring(r.status) && !isOk(r.status) && !isError(r.status))
+      .length,
 );
 
 // ── Flapping detection ───────────────────────────────────────────────────────
-const MIN_WINDOW      = 4;
+const MIN_WINDOW = 4;
 const MIN_TRANSITIONS = 3;
 const MAX_STABLE_TAIL = 2;
 
@@ -189,18 +249,30 @@ const flappingMask = computed<boolean[]>(() => {
       const cur = rowState(rows[j].status);
       if (cur !== "other" && prev !== "other" && cur !== prev) transitions++;
       if (cur !== "other") prev = cur;
-      if (transitions >= MIN_TRANSITIONS) { windowEnd = j; break; }
+      if (transitions >= MIN_TRANSITIONS) {
+        windowEnd = j;
+        break;
+      }
     }
-    if (windowEnd === -1) { i++; continue; }
+    if (windowEnd === -1) {
+      i++;
+      continue;
+    }
 
     let zoneEnd = windowEnd;
     let stableTail = 0;
     let lastState = rowState(rows[zoneEnd].status);
     for (let j = zoneEnd + 1; j < n; j++) {
       const cur = rowState(rows[j].status);
-      if (cur === "other") { zoneEnd = j; stableTail = 0; continue; }
+      if (cur === "other") {
+        zoneEnd = j;
+        stableTail = 0;
+        continue;
+      }
       if (cur !== lastState) {
-        lastState = cur; zoneEnd = j; stableTail = 0;
+        lastState = cur;
+        zoneEnd = j;
+        stableTail = 0;
       } else {
         stableTail++;
         if (stableTail >= MAX_STABLE_TAIL) break;
@@ -208,7 +280,10 @@ const flappingMask = computed<boolean[]>(() => {
       }
     }
     // trim stable tail
-    while (zoneEnd > windowEnd && rowState(rows[zoneEnd].status) === rowState(rows[zoneEnd - 1].status)) {
+    while (
+      zoneEnd > windowEnd &&
+      rowState(rows[zoneEnd].status) === rowState(rows[zoneEnd - 1].status)
+    ) {
       zoneEnd--;
     }
 
@@ -235,7 +310,7 @@ type Segment =
       startLabel: string;
       endLabel: string;
     }
-  | { type: "normal";   weight: number; count: number; status: string; startLabel: string };
+  | { type: "normal"; weight: number; count: number; status: string; startLabel: string };
 
 const MAX_BLOCKS = 60;
 
@@ -256,7 +331,7 @@ const segments = computed<Segment[]>(() => {
     const bucketSize = rows.length / MAX_BLOCKS;
     displayRows = Array.from({ length: MAX_BLOCKS }, (_, b) => {
       const start = Math.floor(b * bucketSize);
-      const end   = Math.min(Math.floor((b + 1) * bucketSize), rows.length);
+      const end = Math.min(Math.floor((b + 1) * bucketSize), rows.length);
       const bucket = rows.slice(start, end);
       const bucketFlapping = flappingMask.value.slice(start, end).some(Boolean);
       // worst status in bucket
@@ -304,7 +379,8 @@ const segments = computed<Segment[]>(() => {
     } else {
       const status = cur.status;
       let j = i;
-      while (j < displayRows.length && !displayRows[j].flapping && displayRows[j].status === status) j++;
+      while (j < displayRows.length && !displayRows[j].flapping && displayRows[j].status === status)
+        j++;
       segs.push({
         type: "normal",
         weight: j - i,
@@ -360,8 +436,10 @@ function toMs(ts: number): number {
 function formatTimestamp(ts: number): string {
   if (!ts) return "";
   return new Date(toMs(ts)).toLocaleString([], {
-    month: "short", day: "numeric",
-    hour: "2-digit", minute: "2-digit",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -373,81 +451,46 @@ function formatDuration(ms: number): string {
   if (h) return `${h}h`;
   return `${m}m`;
 }
-
-// Diagonal-hatch fill for a flapping cell, tinted by its real status colour.
-function flapCellStyle(status: string) {
-  return {
-    background:
-      "repeating-linear-gradient(45deg, rgba(255,255,255,0.32) 0, rgba(255,255,255,0.32) 2px, transparent 2px, transparent 6px), " +
-      blockColor(status),
-    boxShadow: "inset 0 0 0 1px rgba(124, 58, 237, 0.55)",
-  };
-}
 </script>
 
 <style scoped>
+/* keep(generated-content): the pill's ::after arrow and the two repeating-linear-gradient hatch fills — a pseudo-element and multi-stop gradients have no utility equivalent. */
+
 /* Hatched purple swatch used in the legend for the flapping key */
 .o2-flap-swatch {
   background:
     repeating-linear-gradient(
       45deg,
-      rgba(255, 255, 255, 0.4) 0,
-      rgba(255, 255, 255, 0.4) 1px,
+      color-mix(in srgb, var(--color-white) 40%, transparent) 0,
+      color-mix(in srgb, var(--color-white) 40%, transparent) 1px,
       transparent 1px,
-      transparent 3px
+      transparent 0.1875rem
     ),
-    #7c3aed;
+    var(--color-badge-purple-solid-bg);
 }
 
-/* Persistent purple callout pill above a flapping zone */
-.o2-flap-pill {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 30;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 12px;
-  border-radius: 9999px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-  background: #7c3aed;
-  box-shadow: var(--shadow-md);
-  pointer-events: none;
+/* Diagonal-hatch overlay for a flapping cell. The base colour is bound
+   per-instance inline (status-derived); this only paints the hatch on top. */
+.o2-flap-cell {
+  background-image: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--color-white) 32%, transparent) 0,
+    color-mix(in srgb, var(--color-white) 32%, transparent) 0.125rem,
+    transparent 0.125rem,
+    transparent 0.375rem
+  );
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--color-badge-purple-solid-bg) 55%, transparent);
 }
-.o2-flap-pill-dot {
-  opacity: 0.6;
-  font-weight: 400;
-}
+
+/* Downward arrow under the flapping callout pill */
 .o2-flap-pill::after {
   content: "";
   position: absolute;
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: #7c3aed;
-}
-
-.o2-timeline-tooltip {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  white-space: nowrap;
-  border-radius: var(--radius-md);
-  padding: 6px 10px;
-  font-size: 11px;
-  line-height: 1.4;
-  box-shadow: var(--shadow-md);
-  pointer-events: none;
-  background: var(--color-surface-overlay);
-  border: 1px solid var(--color-border-default);
-  color: var(--color-text-body);
+  border: 0.3125rem solid transparent;
+  border-top-color: var(--color-badge-purple-solid-bg);
 }
 </style>

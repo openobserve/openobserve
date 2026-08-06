@@ -15,730 +15,901 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="session-details-page tw:h-[calc(100vh-2.6rem)]"
-  >
-  <div
-    class="session-details card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:bg-[var(--o2-card-bg-solid)]"
-  >
-    <!-- Header — fixed top bar (back button + title + session identity +
-         status/turns badges, trace-explorer action pinned right). Sits above the
-         scrolling body as a flex-shrink-0 sibling, mirroring IncidentDetailDrawer.
-         The card owns no horizontal padding, so the border spans edge-to-edge and
-         the header pads its own content. -->
-    <AppPageHeader
+  <div class="session-details-page h-[calc(100vh-2.6rem)]">
+    <OPageLayout
+      class="session-details bg-card-glass-bg"
       data-test="session-detail-header"
-      class="tw:px-4 tw:border-b tw:border-border-default"
       :title="t('traces.sessionDetail.pageTitle')"
       :back="{
         label: t('rum.sessions'),
         onClick: goBack,
         dataTest: 'session-detail-back-btn',
       }"
+      bleed
     >
       <!-- Session id pill (primary-tinted, copyable) — shows the full id -->
       <template #title-trail>
         <span
           v-if="detail"
-          class="tw:font-semibold tw:px-2 tw:py-1 tw:rounded-md tw:inline-flex tw:items-center tw:gap-1.5 tw:flex-shrink-0"
-          :class="store.state.theme === 'dark' ? 'tw:text-blue-400 tw:bg-blue-900/50' : 'tw:text-blue-600 tw:bg-blue-50'"
+          class="rounded-default text-status-info-text bg-status-info-bg inline-flex flex-shrink-0 items-center gap-1.5 px-2 py-1 font-semibold"
           data-test="session-detail-title"
         >
-          <span class="tw:font-mono tw:text-sm">{{ detail.sessionId }}</span>
+          <span class="font-mono text-sm">{{ detail.sessionId }}</span>
           <OIcon
             name="content-copy"
             size="xs"
-            class="tw:cursor-pointer tw:opacity-70 hover:tw:opacity-100 tw:flex-shrink-0"
+            class="flex-shrink-0 cursor-pointer opacity-70 hover:opacity-100"
             @click="copySessionId"
           />
         </span>
       </template>
-    </AppPageHeader>
 
-    <!-- Scrollable body — owns its own scroll so the header above stays fixed.
+      <template #actions>
+        <OButton
+          v-if="canManualEvaluate"
+          variant="primary"
+          size="sm"
+          icon-left="play-circle"
+          data-test="session-detail-evaluate-btn"
+          @click="manualEvaluationOpen = true"
+        >
+          {{ t("onlineEvals.manualEvaluation.titles.session") }}
+        </OButton>
+      </template>
+
+      <!-- Scrollable body — owns its own scroll so the header above stays fixed.
          Pads itself horizontally (the card has no px) so focus rings on edge
          controls aren't clipped by the scroll container's overflow. -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0 tw:overflow-y-auto tw:px-[0.625rem] tw:pt-[0.625rem]">
-    <!-- Loading — full-page skeleton mirroring the real layout (standard O2 wave
+      <div class="px-page-edge flex min-h-0 flex-1 flex-col overflow-y-auto pt-2.5">
+        <!-- Loading — full-page skeleton mirroring the real layout (standard O2 wave
          shimmer) so nothing jumps when data lands. -->
-    <div
-      v-if="loading"
-      class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
-      data-test="session-detail-skeleton"
-    >
-      <!-- Shape row: KPI tiles + ribbon -->
-      <div class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem] tw:mb-[0.625rem] tw:flex-shrink-0">
-        <div class="tw:grid tw:grid-cols-3 tw:gap-[0.625rem]">
-          <div v-for="n in 6" :key="n" :class="kpiCardClass()">
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[3rem] tw:h-[0.7rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[4.5rem] tw:h-[1.3rem] tw:mt-[0.3rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[6.5rem] tw:h-[0.6rem] tw:mt-[0.4rem]" />
-          </div>
-        </div>
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:pt-[1rem] tw:px-[1rem] tw:pb-[0.625rem] tw:flex tw:flex-col">
-          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[8rem] tw:h-[0.85rem] tw:flex-shrink-0" />
-          <!-- Fill the panel height (it stretches to the 6-tile block on the left)
+        <div
+          v-if="loading"
+          class="flex min-h-0 flex-1 flex-col overflow-hidden"
+          data-test="session-detail-skeleton"
+        >
+          <!-- Shape row: KPI tiles + ribbon -->
+          <div class="mb-2.5 grid flex-shrink-0 grid-cols-2 gap-2.5">
+            <div class="grid grid-cols-3 gap-2.5">
+              <div v-for="n in 6" :key="n" :class="kpiCardClass()">
+                <OSkeleton type="rect" animation="wave" class="rounded-default h-[0.7rem] w-12" />
+                <OSkeleton
+                  type="rect"
+                  animation="wave"
+                  class="rounded-default mt-[0.3rem] h-[1.3rem] w-[4.5rem]"
+                />
+                <OSkeleton
+                  type="rect"
+                  animation="wave"
+                  class="rounded-default mt-[0.4rem] h-[0.6rem] w-[6.5rem]"
+                />
+              </div>
+            </div>
+            <div
+              class="bg-card-glass-bg rounded-default border-border-default flex flex-col border px-4 pt-4 pb-2.5"
+            >
+              <OSkeleton
+                type="rect"
+                animation="wave"
+                class="rounded-default h-[0.85rem] w-32 flex-shrink-0"
+              />
+              <!-- Fill the panel height (it stretches to the 6-tile block on the left)
                so the skeleton matches the real ribbon and leaves no gap below. -->
-          <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-full tw:flex-1 tw:min-h-0 tw:mt-[0.75rem]" />
-        </div>
-      </div>
-
-      <!-- Lower: conversation (left) + rail (right) -->
-      <div class="tw:grid tw:grid-cols-[minmax(0,1fr)_340px] tw:gap-[0.625rem] tw:flex-1 tw:min-h-0">
-        <!-- Conversation column: toolbar + panel -->
-        <div class="tw:flex tw:flex-col tw:min-w-0 tw:min-h-0">
-          <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-shrink-0">
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:flex-1 tw:h-[36px]" />
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="tw:rounded tw:w-[8rem] tw:h-[36px]" />
-          </div>
-          <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-            <div class="tw:flex tw:items-center tw:gap-[0.625rem] tw:px-[1rem] tw:py-[0.75rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[7rem] tw:h-[1rem]" />
-            </div>
-            <div class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.5rem] tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-              <OSkeleton v-for="n in 14" :key="n" type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[3rem] tw:flex-shrink-0" />
+              <OSkeleton
+                type="rect"
+                animation="wave"
+                class="rounded-default mt-3 min-h-0 w-full flex-1"
+              />
             </div>
           </div>
-        </div>
 
-        <!-- Rail: 3 hotspot card skeletons (share the rail height) -->
-        <div class="tw:flex tw:flex-col tw:gap-[0.625rem] tw:min-h-0">
-          <div
-            v-for="c in 3"
-            :key="c"
-            class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
-          >
-            <div class="tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-              <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[6rem] tw:h-[0.8rem]" />
+          <!-- Lower: conversation (left) + rail (right) -->
+          <div class="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_340px] gap-2.5">
+            <!-- Conversation column: toolbar + panel -->
+            <div class="flex min-h-0 min-w-0 flex-col">
+              <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
+                <OSkeleton type="rect" animation="wave" class="rounded-default h-9 flex-1" />
+                <OSkeleton
+                  v-for="n in 3"
+                  :key="n"
+                  type="rect"
+                  animation="wave"
+                  class="rounded-default h-9 w-32"
+                />
+              </div>
+              <div
+                class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
+              >
+                <div
+                  class="border-border-default flex flex-shrink-0 items-center gap-2.5 border-b px-4 py-3"
+                >
+                  <OSkeleton type="rect" animation="wave" class="rounded-default h-4 w-28" />
+                </div>
+                <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-2">
+                  <OSkeleton
+                    v-for="n in 14"
+                    :key="n"
+                    type="rect"
+                    animation="wave"
+                    class="rounded-default h-12 w-full flex-shrink-0"
+                  />
+                </div>
+              </div>
             </div>
-            <div class="tw:flex tw:flex-col tw:gap-[0.4rem] tw:p-[0.5rem] tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-              <OSkeleton v-for="r in 8" :key="r" type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[1.25rem] tw:flex-shrink-0" />
+
+            <!-- Rail: 3 hotspot card skeletons (share the rail height) -->
+            <div class="flex min-h-0 flex-col gap-2.5">
+              <div
+                v-for="c in 3"
+                :key="c"
+                class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
+              >
+                <div class="border-border-default flex-shrink-0 border-b px-3 py-2">
+                  <OSkeleton type="rect" animation="wave" class="rounded-default h-[0.8rem] w-24" />
+                </div>
+                <div class="flex min-h-0 flex-1 flex-col gap-[0.4rem] overflow-hidden p-2">
+                  <OSkeleton
+                    v-for="r in 8"
+                    :key="r"
+                    type="rect"
+                    animation="wave"
+                    class="rounded-default h-5 w-full flex-shrink-0"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- Error -->
-    <div
-      v-else-if="error"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
-    >
-      <OIcon
-        name="error-outline"
-        size="xl"
-        class="tw:mb-3 tw:text-[var(--o2-status-error-text)]"
-      />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        {{ t('traces.sessionDetail.failedToLoad') }}
-      </div>
-      <div
-        class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:mb-3 tw:max-w-[30rem]"
-      >
-        {{ error }}
-      </div>
-      <OButton variant="outline" size="sm" @click="load">{{ t('traces.sessionDetail.retry') }}</OButton>
-    </div>
+        <!-- Error -->
+        <div v-else-if="error" class="flex flex-1 flex-col items-center justify-center text-center">
+          <OIcon name="error-outline" size="xl" class="text-error-600 mb-3" />
+          <div class="text-text-heading mb-2 text-base">
+            {{ t("traces.sessionDetail.failedToLoad") }}
+          </div>
+          <div class="text-text-muted mb-3 max-w-[30rem] text-sm">
+            {{ error }}
+          </div>
+          <OButton variant="outline" size="sm" @click="load">{{
+            t("traces.sessionDetail.retry")
+          }}</OButton>
+        </div>
 
-    <!-- Not found -->
-    <div
-      v-else-if="!detail"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:flex-1 tw:text-center"
-    >
-      <OIcon
-        name="search-off"
-        size="xl"
-        class="tw:mb-3 tw:text-[var(--o2-text-muted)]"
-      />
-      <div class="tw:text-base tw:text-[var(--o2-text-primary)] tw:mb-2">
-        {{ t('traces.sessionDetail.sessionNotFound') }}
-      </div>
-      <div class="tw:text-sm tw:text-[var(--o2-text-muted)] tw:max-w-[30rem]">
-        {{ t('traces.sessionDetail.noSpansFound', { id: sessionId }) }}
-      </div>
-    </div>
+        <!-- Not found -->
+        <div
+          v-else-if="!detail"
+          class="flex flex-1 flex-col items-center justify-center text-center"
+        >
+          <OIcon name="search-off" size="xl" class="text-text-muted mb-3" />
+          <div class="text-text-heading mb-2 text-base">
+            {{ t("traces.sessionDetail.sessionNotFound") }}
+          </div>
+          <div class="text-text-muted max-w-[30rem] text-sm">
+            {{ t("traces.sessionDetail.noSpansFound", { id: sessionId }) }}
+          </div>
+        </div>
 
-    <!-- Content -->
-    <template v-else>
-      <!-- Shape row: KPI tiles (left) + session ribbon (right), always two
+        <!-- Content -->
+        <template v-else>
+          <!-- Shape row: KPI tiles (left) + session ribbon (right), always two
            equal columns side by side (matches the mockup's 1fr 1fr). -->
-      <div
-        class="tw:grid tw:grid-cols-2 tw:gap-[0.625rem] tw:mb-[0.625rem] tw:flex-shrink-0"
-      >
-      <!-- KPI strip — six session-level metric tiles. Card chrome + danger
+          <div class="mb-2.5 grid flex-shrink-0 grid-cols-2 gap-2.5">
+            <!-- KPI strip — six session-level metric tiles. Card chrome + danger
            variant are Tailwind utilities (see kpiCardClass / kpiAccentClass),
            matching the LLM Insights dashboard so the AI module stays consistent. -->
-      <div
-        class="tw:grid tw:grid-cols-3 tw:grid-rows-2 tw:h-full tw:gap-[0.625rem]"
-        data-test="session-detail-kpis"
-      >
-        <div
-          v-for="card in kpiCards"
-          :key="card.key"
-          :class="kpiCardClass(card.variant)"
-          :data-test="`session-detail-kpi-${card.key}`"
-        >
-          <!-- Title uses the default primary text colour for every tile — same as
-               the LLM Insights KPI label (which sets no colour, so it inherits the
-               primary text). No red/orange on the Errors/Latency labels. -->
-          <div class="tw:text-[0.7rem] tw:leading-normal tw:font-semibold tw:text-[var(--o2-text-primary)]">
-            {{ card.label }}
-          </div>
-          <div class="tw:flex tw:items-baseline tw:gap-[0.2rem]">
-            <span
-              :class="['tw:text-[1.4rem] tw:font-bold tw:leading-none tw:tabular-nums', kpiAccentClass(card.variant) || 'tw:text-[var(--o2-text-primary)]']"
-            >
-              {{ card.value }}
-            </span>
-            <span
-              v-if="card.unit"
-              class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-secondary)]"
-            >
-              {{ card.unit }}
-            </span>
-            <template v-if="card.estimate">
-              <OIcon
-                name="info"
-                size="xs"
-                class="tw:ml-[0.15rem] tw:cursor-default tw:text-[var(--o2-text-muted)]"
-              />
-              <OTooltip max-width="280px">
-                <template #content>
-                  <div class="tw:flex tw:flex-col tw:gap-2 tw:min-w-[230px]">
-                    <div class="tw:text-xs tw:font-semibold tw:text-[var(--o2-text-primary)]">
-                      {{ t('traces.sessionDetail.kpiSub.cacheImpactTooltipTitle') }}
-                    </div>
-                    <div class="tw:flex tw:flex-col tw:gap-1">
-                      <div
-                        v-for="row in card.tooltipRows || []"
-                        :key="row.label"
-                        class="tw:flex tw:items-center tw:justify-between tw:gap-3 tw:text-[11px]"
-                      >
-                        <span class="tw:text-[var(--o2-text-muted)]">{{ row.label }}</span>
-                        <span class="tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-primary)]">{{ row.value }}</span>
-                      </div>
-                    </div>
-                    <div class="tw:text-[10.5px] tw:leading-snug tw:text-[var(--o2-text-secondary)]">
-                      {{ t('traces.sessionDetail.kpiSub.cacheEstimate') }}
-                    </div>
-                  </div>
-                </template>
-              </OTooltip>
-            </template>
-          </div>
-          <div
-            class="tw:flex tw:items-center tw:flex-wrap tw:gap-1 tw:text-[0.65rem] tw:leading-normal tw:font-medium tw:text-[var(--o2-text-secondary)]"
-          >
-            <span v-if="card.subLead">{{ card.subLead }}</span>
-            <template v-for="chip in card.subTurns" :key="chip.n">
-              <TurnPreviewCard
-                v-if="traces[chip.n - 1]"
-                :turn="traces[chip.n - 1]"
-                :index="chip.n - 1"
-                :cache-pct="cacheRatio"
-              >
-                <span
-                  class="tw:inline-flex tw:items-center tw:justify-center tw:min-w-[1rem] tw:h-[1.05rem] tw:px-[0.3rem] tw:rounded-[0.3rem] tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-[var(--o2-text-primary)] tw:text-[0.68rem] tw:font-bold tw:leading-none tw:cursor-pointer tw:transition-colors hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,var(--o2-card-bg))] hover:tw:border-[color-mix(in_srgb,var(--o2-text-primary)_25%,var(--o2-border-color))]"
-                  @click="jumpToTurn(chip.n)"
-                >{{ chip.label }}</span>
-              </TurnPreviewCard>
-            </template>
-            <OButton
-              v-if="card.filterErrors && !errorsFiltered"
-              variant="outline-destructive"
-              size="xs"
-              data-test="session-detail-filter-errors"
-              @click="filterToErrors"
-            >
-              {{ t('traces.sessionDetail.kpiSub.filterErrors') }}
-            </OButton>
-            <OButton
-              v-else-if="card.filterErrors && errorsFiltered"
-              variant="outline"
-              size="xs"
-              data-test="session-detail-reset-errors"
-              @click="resetErrorFilter"
-            >
-              {{ t('traces.sessionDetail.kpiSub.resetFilters') }}
-            </OButton>
-            <span v-if="card.subTail">{{ card.subTail }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Session ribbon — one bar per turn, Cost/Latency/Tokens toggle -->
-      <SessionRibbon :traces="traces" :cache-pct="cacheRatio" @jump="jumpToTurn" />
-      </div>
-
-      <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
-           scroll — the column grows with content; the rail sticks (items-start so
-           it doesn't stretch to the tall conversation's height). -->
-      <div
-        class="tw:grid tw:grid-cols-[minmax(0,1fr)_340px] tw:gap-[0.625rem] tw:items-start"
-      >
-      <!-- Conversation column: toolbar + panel -->
-      <div class="tw:flex tw:flex-col tw:min-w-0 tw:min-h-0">
-
-      <!-- Conversation toolbar: search (fills width) + status + model filters.
-           Sorting lives on the Collapsed view's metric column headers. -->
-      <div class="tw:flex tw:items-center tw:gap-[0.5rem] tw:mb-[0.625rem] tw:flex-shrink-0">
-        <OSearchInput
-          v-model="searchText"
-          :placeholder="t('traces.sessionDetail.searchPlaceholder')"
-          clearable
-          :debounce="200"
-          size="xs"
-          class="no-border tw:flex-1! tw:h-[36px]"
-        />
-        <div class="tw:w-[9rem] tw:flex-shrink-0">
-          <OSelect
-            v-model="statusFilter"
-            :label="t('traces.sessionDetail.filters.status')"
-            label-position="inside"
-            :options="statusOptions"
-          />
-        </div>
-        <div class="tw:w-[12rem] tw:flex-shrink-0">
-          <OSelect
-            v-model="modelFilter"
-            :label="t('traces.sessionDetail.filters.model')"
-            label-position="inside"
-            :options="modelOptions"
-          />
-        </div>
-      </div>
-
-      <!-- Conversation panel -->
-      <div
-        class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:mb-[0.625rem] tw:flex tw:flex-col tw:overflow-hidden"
-        data-test="session-conversation-panel"
-      >
-        <!-- panel header: title + count chip + jump buttons -->
-        <div
-          class="tw:flex tw:items-center tw:gap-[0.625rem] tw:px-[1rem] tw:py-[0.75rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0"
-        >
-          <span class="tw:text-[0.95rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
-            {{ t('traces.sessionDetail.conversation') }}
-          </span>
-          <OTag type="countChip" value="neutral">
-            {{ t('traces.sessionDetail.turnCount', {
-              count: filteredTraces.length,
-              unit: filteredTraces.length === 1 ? t('traces.sessionDetail.turn') : t('traces.sessionDetail.turns'),
-            }) }}
-          </OTag>
-          <OToggleGroup :model-value="viewMode" @update:model-value="setViewMode">
-            <OToggleGroupItem value="collapsed" size="sm">
-              {{ t('traces.sessionDetail.viewCollapsed') }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="pretty" size="sm">
-              {{ t('traces.sessionDetail.viewPretty') }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-        </div>
-
-        <!-- Conversation body — natural height; the page scrolls, not this. -->
-        <div>
-
-        <!-- turn list (Collapsed view) -->
-        <div
-          v-show="viewMode === 'collapsed'"
-          class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.5rem]"
-        >
-          <!-- column headers — clickable sort controls for the three metric bars
-               (OTable-style arrows). Aligned to the same grid template as each
-               turn row, sticky so they persist on scroll. -->
-          <div
-            v-if="filteredTraces.length"
-            class="tw:sticky tw:top-0 tw:z-[5] tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.4rem] tw:bg-[var(--o2-card-bg-solid)] tw:border-b tw:border-[var(--o2-border-color)] tw:text-[0.72rem] tw:font-medium tw:text-[var(--o2-text-primary)]"
-            data-test="session-turn-columns"
-          >
-            <span></span>
-            <span></span>
-            <span></span>
-            <button
-              v-for="col in sortableColumns"
-              :key="col.key"
-              type="button"
-              class="tw:flex tw:items-center tw:justify-end tw:gap-[0.15rem] tw:cursor-pointer tw:select-none hover:tw:text-[var(--o2-text-primary)]"
-              :data-test="`session-turn-sort-${col.key}`"
-              @click="toggleSort(col.key)"
-            >
-              {{ t(col.label) }}
-              <OIcon
-                :name="sortIconName(col.key)"
-                size="xs"
-                :class="sortIcon(col.key) === 'none' ? 'tw:opacity-40' : 'tw:text-[var(--color-table-sort-icon-active)]'"
-              />
-            </button>
-          </div>
-          <div
-            v-for="trace in filteredTraces"
-            :key="trace.traceId"
-            :id="`turn-${originalTurnIndex(trace.traceId) + 1}`"
-            :class="turnRowClass(trace)"
-            :data-test="`session-turn-row-${trace.traceId}`"
-          >
-            <!-- collapsed header (click to expand) -->
             <div
-              class="tw:grid tw:grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] tw:items-center tw:gap-[0.75rem] tw:px-[0.75rem] tw:py-[0.6rem] tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_3%,var(--o2-card-bg))]"
-              :data-test="`session-turn-header-${trace.traceId}`"
-              @click="toggleTurn(trace.traceId)"
+              class="grid h-full grid-cols-3 grid-rows-2 gap-2.5"
+              data-test="session-detail-kpis"
             >
-              <OIcon
-                :name="isExpanded(trace.traceId) ? 'expand-more' : 'chevron-right'"
-                size="sm"
-                class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0"
-              />
-              <span
-                class="tw:inline-flex tw:items-center tw:justify-center tw:w-[1.5rem] tw:h-[1.5rem] tw:rounded-full tw:text-[0.7rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0"
-                :class="trace.status === 'error'
-                  ? 'tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_15%,transparent)] tw:text-[var(--o2-service-health-critical)]'
-                  : 'tw:bg-[color-mix(in_srgb,var(--o2-service-health-healthy)_15%,transparent)] tw:text-[var(--o2-service-health-healthy)]'"
+              <div
+                v-for="card in kpiCards"
+                :key="card.key"
+                :class="kpiCardClass(card.variant)"
+                :data-test="`session-detail-kpi-${card.key}`"
               >
-                {{ originalTurnIndex(trace.traceId) + 1 }}
-              </span>
-              <div class="tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.15rem]">
-                <div class="tw:text-[0.8rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:truncate">
-                  {{ trace.turnUserMessage || '—' }}
+                <!-- Title row: label on the left, a metric icon in a soft rounded-default
+               tile on the right (KPI-card convention). The tile gives the icon
+               room to render crisply and anchors each metric without crowding
+               the label/value text. -->
+                <div class="flex items-center justify-between gap-2">
+                  <div
+                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+                  >
+                    {{ card.label }}
+                  </div>
+                  <span
+                    class="rounded-default bg-surface-subtle text-text-secondary inline-flex h-6 w-6 shrink-0 items-center justify-center"
+                  >
+                    <OIcon :name="card.icon" size="sm" />
+                  </span>
+                </div>
+                <div class="flex items-baseline gap-[0.2rem]">
+                  <span
+                    :class="[
+                      'text-2xl leading-none font-bold tabular-nums',
+                      kpiAccentClass(card.variant) || 'text-text-secondary',
+                    ]"
+                  >
+                    {{ card.value }}
+                  </span>
+                  <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
+                    {{ card.unit }}
+                  </span>
+                  <template v-if="card.estimate">
+                    <OIcon
+                      name="info"
+                      size="xs"
+                      class="text-text-muted ml-[0.15rem] cursor-default"
+                    />
+                    <OTooltip max-width="280px">
+                      <template #content>
+                        <div class="flex min-w-57.5 flex-col gap-2">
+                          <div class="text-text-heading text-xs font-semibold">
+                            {{ t("traces.sessionDetail.kpiSub.cacheImpactTooltipTitle") }}
+                          </div>
+                          <div class="flex flex-col gap-1">
+                            <div
+                              v-for="row in card.tooltipRows || []"
+                              :key="row.label"
+                              class="text-2xs flex items-center justify-between gap-3"
+                            >
+                              <span class="text-text-secondary">{{ row.label }}</span>
+                              <span class="text-text-body font-semibold tabular-nums">{{
+                                row.value
+                              }}</span>
+                            </div>
+                          </div>
+                          <div class="text-2xs text-text-secondary leading-snug">
+                            {{ t("traces.sessionDetail.kpiSub.cacheEstimate") }}
+                          </div>
+                        </div>
+                      </template>
+                    </OTooltip>
+                  </template>
                 </div>
                 <div
-                  class="tw:text-[0.72rem] tw:truncate"
-                  :class="trace.status === 'error' ? 'tw:text-[var(--o2-service-health-critical)]' : 'tw:text-[var(--o2-text-secondary)]'"
+                  class="text-3xs text-text-secondary flex flex-wrap items-center gap-1 leading-normal font-medium"
                 >
-                  {{ secondaryLine(trace) }}
-                </div>
-              </div>
-              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
-                  {{ formatDuration(trace.durationNanos) }}
-                </span>
-                <OProgressBar
-                  :value="ratio(trace.durationNanos, maxTurnLat)"
-                  :variant="trace.durationNanos >= 5e9 ? 'warning' : 'default'"
-                  size="xs"
-                />
-              </div>
-              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
-                  ${{ trace.cost.toFixed(4) }}
-                </span>
-                <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
-              </div>
-              <div class="tw:flex tw:flex-col tw:gap-[0.2rem] tw:min-w-0">
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:tabular-nums tw:text-right tw:text-[var(--o2-text-secondary)]">
-                  {{ formatTokens(trace.tokens) }}
-                </span>
-                <OProgressBar :value="ratio(trace.tokens, maxTurnTokens)" size="xs" />
-              </div>
-            </div>
-
-            <!-- expanded body (basic messages + stats; full Ledger is S6) -->
-            <div
-              v-if="isExpanded(trace.traceId)"
-              class="tw:border-t tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg-solid)] tw:p-[0.75rem]"
-              :data-test="`session-turn-body-${trace.traceId}`"
-            >
-              <!-- loading skeleton -->
-              <div v-if="sessionSpansLoading" class="tw:flex tw:flex-col tw:gap-[0.4rem]">
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[40%] tw:h-[0.7rem]" />
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[90%] tw:h-[0.65rem]" />
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[80%] tw:h-[0.65rem]" />
-                <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[60%] tw:h-[0.65rem]" />
-              </div>
-
-              <div v-else class="tw:flex tw:flex-col tw:gap-[0.625rem]">
-                <!-- user block -->
-                <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:overflow-hidden">
-                  <div class="tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-[var(--o2-border-color)]">
-                    <span class="tw:text-[0.75rem] tw:font-bold tw:text-[var(--o2-text-primary)]">
-                      {{ t('traces.sessionDetail.roles.user') }}
-                    </span>
-                    <OIcon
-                      v-if="turnDetail(trace.traceId)?.userMessage"
-                      name="content-copy"
-                      size="xs"
-                      class="tw:cursor-pointer tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]"
-                      @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
-                    />
-                  </div>
-                  <div class="tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:leading-relaxed tw:text-[var(--o2-text-primary)] tw:whitespace-pre-wrap tw:break-words tw:max-h-[12rem] tw:overflow-y-auto">
-                    {{ turnDetail(trace.traceId)?.userMessage?.content || t('traces.sessionDetail.noUserMessage') }}
-                  </div>
-                </div>
-
-                <!-- tool calls — between user input and assistant output, same
-                     "Show calls" thread used by the Pretty view (ThreadView) -->
-                <ThreadToolCalls
-                  :tool-calls="toolCallsForTurn(trace.traceId)"
-                  @span-selected="onSpanSelected"
-                />
-
-                <!-- assistant block -->
-                <div class="tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:overflow-hidden">
-                  <div class="tw:flex tw:items-center tw:justify-between tw:px-[0.625rem] tw:py-[0.375rem] tw:border-b tw:border-[var(--o2-border-color)]">
-                    <span class="tw:flex tw:items-center tw:gap-[0.375rem] tw:text-[0.75rem] tw:font-bold tw:text-[var(--o2-text-primary)]">
-                      {{ t('traces.sessionDetail.roles.assistant') }}
-                      <OTag v-if="turnDetail(trace.traceId)?.model" variant="purple-soft" size="sm">
-                        {{ turnDetail(trace.traceId)?.model }}
-                      </OTag>
-                    </span>
-                    <OIcon
-                      v-if="turnDetail(trace.traceId)?.assistantMessage"
-                      name="content-copy"
-                      size="xs"
-                      class="tw:cursor-pointer tw:text-[var(--o2-text-muted)] hover:tw:text-[var(--o2-text-primary)]"
-                      @click="copyText(turnDetail(trace.traceId)?.assistantMessage?.content)"
-                    />
-                  </div>
-                  <!-- assistant content rendered as markdown (headings, tables,
-                       code, bold). v-html is sanitized in renderMarkdown(). -->
-                  <div
-                    v-if="turnDetail(trace.traceId)?.assistantMessage?.content"
-                    class="markdown-body tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:text-[var(--o2-text-primary)] tw:break-words tw:max-h-[16rem] tw:overflow-auto"
-                    v-html="renderMarkdown(turnDetail(trace.traceId)?.assistantMessage?.content)"
-                  />
-                  <div
-                    v-else
-                    class="tw:px-[0.75rem] tw:py-[0.625rem] tw:text-[0.8rem] tw:text-[var(--o2-text-muted)]"
+                  <span v-if="card.subLead">{{ card.subLead }}</span>
+                  <template v-for="chip in card.subTurns" :key="chip.n">
+                    <TurnPreviewCard
+                      v-if="traces[chip.n - 1]"
+                      :turn="traces[chip.n - 1]"
+                      :index="chip.n - 1"
+                      :cache-pct="cacheRatio"
+                    >
+                      <span
+                        class="rounded-default border-border-default bg-surface-base text-text-body text-2xs inline-flex h-[1.05rem] min-w-4 cursor-pointer items-center justify-center border px-[0.3rem] leading-none font-bold transition-colors hover:border-[color-mix(in_srgb,var(--color-text-heading)_25%,var(--color-border-default))] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_8%,var(--color-surface-base))]"
+                        @click="jumpToTurn(chip.n)"
+                        >{{ chip.label }}</span
+                      >
+                    </TurnPreviewCard>
+                  </template>
+                  <OButton
+                    v-if="card.filterErrors && !errorsFiltered"
+                    variant="outline-destructive"
+                    size="xs"
+                    data-test="session-detail-filter-errors"
+                    @click="filterToErrors"
                   >
-                    {{ t('traces.sessionDetail.noAssistantMessage') }}
-                  </div>
-                </div>
-
-                <!-- compact stats footer -->
-                <div class="tw:flex tw:flex-wrap tw:items-center tw:gap-x-[0.75rem] tw:gap-y-[0.25rem] tw:text-[0.7rem] tw:text-[var(--o2-text-secondary)] tw:tabular-nums">
-                  <span>{{ formatTime(trace.startTimeMicros) }}</span>
-                  <span>· {{ formatDuration(trace.durationNanos) }}</span>
-                  <span>· ${{ trace.cost.toFixed(4) }}</span>
-                  <span>· {{ formatTokens(trace.inputTokens) }} → {{ formatTokens(trace.outputTokens) }}</span>
-                  <span v-if="turnDetail(trace.traceId)">
-                    · {{ turnDetail(trace.traceId)!.llmCalls }} {{ t('traces.sessionDetail.stats.llmCalls') }}
-                    · {{ turnDetail(trace.traceId)!.toolCalls }} {{ t('traces.sessionDetail.stats.toolCalls') }}
-                  </span>
-                  <div class="tw:flex-1"></div>
-                  <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                    <OIcon name="open-in-new" size="xs" class="tw:mr-[0.25rem]" />
-                    {{ t('traces.sessionDetail.openInTraceExplorer') }}
+                    {{ t("traces.sessionDetail.kpiSub.filterErrors") }}
                   </OButton>
+                  <OButton
+                    v-else-if="card.filterErrors && errorsFiltered"
+                    variant="outline"
+                    size="xs"
+                    data-test="session-detail-reset-errors"
+                    @click="resetErrorFilter"
+                  >
+                    {{ t("traces.sessionDetail.kpiSub.resetFilters") }}
+                  </OButton>
+                  <span v-if="card.subTail">{{ card.subTail }}</span>
                 </div>
               </div>
             </div>
+
+            <!-- Session ribbon — one bar per turn, Cost/Latency/Tokens toggle -->
+            <SessionRibbon :traces="traces" :cache-pct="cacheRatio" @jump="jumpToTurn" />
           </div>
 
-          <!-- empty state -->
-          <div
-            v-if="filteredTraces.length === 0"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-[0.5rem] tw:py-[3rem] tw:text-[var(--o2-text-muted)]"
-          >
-            <OIcon name="search-off" size="lg" />
-            <span class="tw:text-[0.8rem]">{{ t('traces.sessionDetail.noTurnsMatch') }}</span>
-          </div>
-        </div>
+          <!-- Lower area: conversation column (left) + hotspot rail (right). Full-page
+           scroll — the column grows with content; the rail sticks (items-start so
+           it doesn't stretch to the tall conversation's height). -->
+          <div class="grid grid-cols-[minmax(0,1fr)_340px] items-start gap-2.5">
+            <!-- Conversation column: toolbar + panel -->
+            <div class="flex min-h-0 min-w-0 flex-col">
+              <!-- Conversation toolbar: search (fills width) + status + model filters.
+           Sorting lives on the Collapsed view's metric column headers. -->
+              <div class="mb-2.5 flex flex-shrink-0 items-center gap-2">
+                <OSearchInput
+                  v-model="searchText"
+                  :placeholder="t('traces.sessionDetail.searchPlaceholder')"
+                  clearable
+                  :debounce="200"
+                  size="xs"
+                  class="no-border h-9 flex-1!"
+                />
+                <div class="w-36 flex-shrink-0">
+                  <OSelect
+                    v-model="statusFilter"
+                    :label="t('traces.sessionDetail.filters.status')"
+                    label-position="inside"
+                    :options="statusOptions"
+                  />
+                </div>
+                <div class="w-48 flex-shrink-0">
+                  <OSelect
+                    v-model="modelFilter"
+                    :label="t('traces.sessionDetail.filters.model')"
+                    label-position="inside"
+                    :options="modelOptions"
+                  />
+                </div>
+              </div>
 
-        <!-- Pretty (transcript) view — reuses ThreadView, rendered from the
+              <!-- Conversation panel -->
+              <div
+                class="bg-card-glass-bg rounded-default border-border-default mb-2.5 flex flex-col overflow-hidden border"
+                data-test="session-conversation-panel"
+              >
+                <!-- panel header: title + count chip + jump buttons -->
+                <div
+                  class="border-border-default flex flex-shrink-0 items-center gap-2.5 border-b px-4 py-3"
+                >
+                  <span class="text-text-heading text-base font-semibold">
+                    {{ t("traces.sessionDetail.conversation") }}
+                  </span>
+                  <OTag type="countChip" value="neutral">
+                    {{
+                      t("traces.sessionDetail.turnCount", {
+                        count: filteredTraces.length,
+                        unit:
+                          filteredTraces.length === 1
+                            ? t("traces.sessionDetail.turn")
+                            : t("traces.sessionDetail.turns"),
+                      })
+                    }}
+                  </OTag>
+                  <OToggleGroup :model-value="viewMode" @update:model-value="setViewMode">
+                    <OToggleGroupItem value="collapsed" size="sm">
+                      {{ t("traces.sessionDetail.viewCollapsed") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="pretty" size="sm">
+                      {{ t("traces.sessionDetail.viewPretty") }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                </div>
+
+                <!-- Conversation body — natural height; the page scrolls, not this. -->
+                <div>
+                  <!-- turn list (Collapsed view) -->
+                  <div v-show="viewMode === 'collapsed'" class="flex flex-col gap-2 p-2">
+                    <!-- column headers — clickable sort controls for the three metric bars
+               (OTable-style arrows). Aligned to the same grid template as each
+               turn row, sticky so they persist on scroll. -->
+                    <div
+                      v-if="filteredTraces.length"
+                      class="bg-surface-base border-border-default text-text-label sticky top-0 z-5 grid grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 border-b px-3 py-[0.4rem] text-xs font-medium"
+                      data-test="session-turn-columns"
+                    >
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                      <button
+                        v-for="col in sortableColumns"
+                        :key="col.key"
+                        type="button"
+                        class="hover:text-text-body flex cursor-pointer items-center justify-end gap-[0.15rem] select-none"
+                        :data-test="`session-turn-sort-${col.key}`"
+                        @click="toggleSort(col.key)"
+                      >
+                        {{ t(col.label) }}
+                        <OIcon
+                          :name="sortIconName(col.key)"
+                          size="xs"
+                          :class="
+                            sortIcon(col.key) === 'none'
+                              ? 'opacity-40'
+                              : 'text-table-sort-icon-active'
+                          "
+                        />
+                      </button>
+                    </div>
+                    <div
+                      v-for="trace in filteredTraces"
+                      :key="trace.traceId"
+                      :id="`turn-${originalTurnIndex(trace.traceId) + 1}`"
+                      :class="turnRowClass(trace)"
+                      :data-test="`session-turn-row-${trace.traceId}`"
+                    >
+                      <!-- collapsed header (click to expand) -->
+                      <div
+                        class="grid cursor-pointer grid-cols-[auto_auto_minmax(0,1fr)_5rem_5rem_5rem] items-center gap-3 px-3 py-[0.6rem] hover:bg-[color-mix(in_srgb,var(--color-text-heading)_3%,var(--color-surface-base))]"
+                        :data-test="`session-turn-header-${trace.traceId}`"
+                        @click="toggleTurn(trace.traceId)"
+                      >
+                        <OIcon
+                          :name="isExpanded(trace.traceId) ? 'expand-more' : 'chevron-right'"
+                          size="sm"
+                          class="text-text-muted flex-shrink-0"
+                        />
+                        <span
+                          class="text-2xs inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full font-bold tabular-nums"
+                          :class="
+                            trace.status === 'error'
+                              ? 'text-error-500 bg-[color-mix(in_srgb,var(--color-error-500)_15%,transparent)]'
+                              : 'text-status-success-text bg-[color-mix(in_srgb,var(--color-success-500)_15%,transparent)]'
+                          "
+                        >
+                          {{ originalTurnIndex(trace.traceId) + 1 }}
+                        </span>
+                        <div class="flex min-w-0 flex-col gap-[0.15rem]">
+                          <div class="text-compact text-text-heading truncate font-semibold">
+                            {{ trace.turnUserMessage || "—" }}
+                          </div>
+                          <div
+                            class="truncate text-xs"
+                            :class="
+                              trace.status === 'error' ? 'text-error-500' : 'text-text-secondary'
+                            "
+                          >
+                            {{ secondaryLine(trace) }}
+                          </div>
+                        </div>
+                        <div class="flex min-w-0 flex-col gap-[0.2rem]">
+                          <span
+                            class="text-text-secondary text-right text-xs font-semibold tabular-nums"
+                          >
+                            {{ formatDuration(trace.durationNanos) }}
+                          </span>
+                          <OProgressBar
+                            :value="ratio(trace.durationNanos, maxTurnLat)"
+                            :variant="trace.durationNanos >= 5e9 ? 'warning' : 'default'"
+                            size="xs"
+                          />
+                        </div>
+                        <div class="flex min-w-0 flex-col gap-[0.2rem]">
+                          <span
+                            class="text-text-secondary text-right text-xs font-semibold tabular-nums"
+                          >
+                            {{ t("traces.sessionDetail.currencySymbol")
+                            }}{{ trace.cost.toFixed(4) }}
+                          </span>
+                          <OProgressBar :value="ratio(trace.cost, maxTurnCost)" size="xs" />
+                        </div>
+                        <div class="flex min-w-0 flex-col gap-[0.2rem]">
+                          <span
+                            class="text-text-secondary text-right text-xs font-semibold tabular-nums"
+                          >
+                            {{ formatTokens(trace.tokens) }}
+                          </span>
+                          <OProgressBar :value="ratio(trace.tokens, maxTurnTokens)" size="xs" />
+                        </div>
+                      </div>
+
+                      <!-- expanded body (basic messages + stats; full Ledger is S6) -->
+                      <div
+                        v-if="isExpanded(trace.traceId)"
+                        class="border-border-default bg-surface-base border-t p-3"
+                        :data-test="`session-turn-body-${trace.traceId}`"
+                      >
+                        <!-- loading skeleton -->
+                        <div v-if="sessionSpansLoading" class="flex flex-col gap-[0.4rem]">
+                          <OSkeleton
+                            type="rect"
+                            animation="wave"
+                            class="rounded-default h-[0.7rem] w-[40%]"
+                          />
+                          <OSkeleton
+                            type="rect"
+                            animation="wave"
+                            class="rounded-default h-[0.65rem] w-[90%]"
+                          />
+                          <OSkeleton
+                            type="rect"
+                            animation="wave"
+                            class="rounded-default h-[0.65rem] w-[80%]"
+                          />
+                          <OSkeleton
+                            type="rect"
+                            animation="wave"
+                            class="rounded-default h-[0.65rem] w-[60%]"
+                          />
+                        </div>
+
+                        <div v-else class="flex flex-col gap-2.5">
+                          <!-- user block -->
+                          <div
+                            class="rounded-default border-border-default bg-surface-base overflow-hidden border"
+                          >
+                            <div
+                              class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
+                            >
+                              <span class="text-text-heading text-xs font-bold">
+                                {{ t("traces.sessionDetail.roles.user") }}
+                              </span>
+                              <OIcon
+                                v-if="turnDetail(trace.traceId)?.userMessage"
+                                name="content-copy"
+                                size="xs"
+                                class="text-text-muted hover:text-text-body cursor-pointer"
+                                @click="copyText(turnDetail(trace.traceId)?.userMessage?.content)"
+                              />
+                            </div>
+                            <div
+                              class="text-compact text-text-body max-h-48 overflow-y-auto px-3 py-2.5 leading-relaxed break-words whitespace-pre-wrap"
+                            >
+                              {{
+                                turnDetail(trace.traceId)?.userMessage?.content ||
+                                t("traces.sessionDetail.noUserMessage")
+                              }}
+                            </div>
+                          </div>
+
+                          <!-- tool calls — between user input and assistant output, same
+                     "Show calls" thread used by the Pretty view (ThreadView) -->
+                          <ThreadToolCalls
+                            :tool-calls="toolCallsForTurn(trace.traceId)"
+                            @span-selected="onSpanSelected"
+                          />
+
+                          <!-- assistant block -->
+                          <div
+                            class="rounded-default border-border-default bg-surface-base overflow-hidden border"
+                          >
+                            <div
+                              class="border-border-default flex items-center justify-between border-b px-2.5 py-1.5"
+                            >
+                              <span
+                                class="text-text-heading flex items-center gap-1.5 text-xs font-bold"
+                              >
+                                {{ t("traces.sessionDetail.roles.assistant") }}
+                                <OTag
+                                  v-if="turnDetail(trace.traceId)?.model"
+                                  variant="purple-soft"
+                                  size="sm"
+                                >
+                                  {{ turnDetail(trace.traceId)?.model }}
+                                </OTag>
+                              </span>
+                              <OIcon
+                                v-if="turnDetail(trace.traceId)?.assistantMessage"
+                                name="content-copy"
+                                size="xs"
+                                class="text-text-muted hover:text-text-body cursor-pointer"
+                                @click="
+                                  copyText(turnDetail(trace.traceId)?.assistantMessage?.content)
+                                "
+                              />
+                            </div>
+                            <!-- assistant content rendered as markdown (headings, tables,
+                       code, bold). v-html is sanitized in renderMarkdown(). -->
+                            <div
+                              v-if="turnDetail(trace.traceId)?.assistantMessage?.content"
+                              class="markdown-body text-compact text-text-body max-h-64 overflow-auto px-3 py-2.5 break-words"
+                              v-html="
+                                renderMarkdown(turnDetail(trace.traceId)?.assistantMessage?.content)
+                              "
+                            />
+                            <div v-else class="text-compact text-text-muted px-3 py-2.5">
+                              {{ t("traces.sessionDetail.noAssistantMessage") }}
+                            </div>
+                          </div>
+
+                          <!-- compact stats footer -->
+                          <div
+                            class="text-2xs text-text-secondary flex flex-wrap items-center gap-x-3 gap-y-1 tabular-nums"
+                          >
+                            <span>{{ formatTime(trace.startTimeMicros) }}</span>
+                            <span>· {{ formatDuration(trace.durationNanos) }}</span>
+                            <span
+                              >· {{ t("traces.sessionDetail.currencySymbol")
+                              }}{{ trace.cost.toFixed(4) }}</span
+                            >
+                            <span
+                              >· {{ formatTokens(trace.inputTokens) }}
+                              {{ t("traces.sessionDetail.tokensArrow") }}
+                              {{ formatTokens(trace.outputTokens) }}</span
+                            >
+                            <span v-if="turnDetail(trace.traceId)">
+                              · {{ turnDetail(trace.traceId)!.llmCalls }}
+                              {{ t("traces.sessionDetail.stats.llmCalls") }} ·
+                              {{ turnDetail(trace.traceId)!.toolCalls }}
+                              {{ t("traces.sessionDetail.stats.toolCalls") }}
+                            </span>
+                            <div class="flex-1"></div>
+                            <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
+                              <OIcon name="open-in-new" size="xs" class="mr-1" />
+                              {{ t("traces.sessionDetail.openInTraceExplorer") }}
+                            </OButton>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- empty state -->
+                    <div
+                      v-if="filteredTraces.length === 0"
+                      class="text-text-muted flex flex-col items-center justify-center gap-2 py-12"
+                    >
+                      <OIcon name="search-off" size="lg" />
+                      <span class="text-compact">{{ t("traces.sessionDetail.noTurnsMatch") }}</span>
+                    </div>
+                  </div>
+
+                  <!-- Pretty (transcript) view — reuses ThreadView, rendered from the
              session's raw spans (fetched once on first switch). Natural height so
              it flows into the page scroll. -->
-        <div v-if="viewMode === 'pretty'">
-          <div
-            v-if="sessionSpansLoading"
-            class="tw:flex tw:flex-col tw:gap-[0.5rem] tw:p-[0.75rem]"
-            data-test="session-pretty-skeleton"
-          >
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[30%] tw:h-[1.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[70%] tw:h-[3rem] tw:mt-[0.5rem]" />
-            <OSkeleton type="rect" animation="wave" class="tw:rounded tw:w-[85%] tw:h-[4rem]" />
-          </div>
-          <ThreadView
-            v-else
-            :spans="sessionSpans"
-            :show-summary="false"
-            condense-turns
-            @span-selected="onSpanSelected"
-          />
-        </div>
-        </div>
-      </div>
-      </div>
+                  <div v-if="viewMode === 'pretty'">
+                    <div
+                      v-if="sessionSpansLoading"
+                      class="flex flex-col gap-2 p-3"
+                      data-test="session-pretty-skeleton"
+                    >
+                      <OSkeleton type="rect" animation="wave" class="rounded-default h-6 w-[30%]" />
+                      <OSkeleton
+                        type="rect"
+                        animation="wave"
+                        class="rounded-default mt-2 h-12 w-[70%]"
+                      />
+                      <OSkeleton
+                        type="rect"
+                        animation="wave"
+                        class="rounded-default h-16 w-[85%]"
+                      />
+                    </div>
+                    <ThreadView
+                      v-else
+                      :spans="sessionSpans"
+                      :show-summary="false"
+                      condense-turns
+                      @span-selected="onSpanSelected"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-      <!-- Right rail: hotspot cards. Sticks to the top of the page-scroll so the
+            <!-- Right rail: hotspot cards. Sticks to the top of the page-scroll so the
            hotspots stay visible while the conversation scrolls. The three cards
-           split the rail height EQUALLY (flex-1 thirds); each scrolls internally
-           if its rows exceed its third. A card with fewer rows just shows them in
-           its third. Definite height so the thirds distribute. -->
-      <aside
-        class="tw:sticky tw:top-0 tw:self-start tw:flex tw:flex-col tw:gap-[0.625rem] tw:h-[calc(100vh-2.6rem-68px-1.25rem)] tw:overflow-hidden tw:pb-[0.625rem]"
-        data-test="session-rail"
-      >
-        <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-            <OIcon name="build" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
-              {{ t('traces.sessionDetail.rail.toolHotspots') }}
-            </span>
-          </div>
-          <div
-            v-if="sessionSpansLoading"
-            class="tw:flex tw:flex-col tw:gap-[0.4rem] tw:p-[0.625rem]"
-          >
-            <OSkeleton v-for="n in 3" :key="n" type="rect" animation="wave" class="tw:rounded tw:w-full tw:h-[1.1rem]" />
-          </div>
-          <div
-            v-else-if="toolHotspots.length"
-            class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]"
-          >
-            <span
-              v-for="(row, i) in toolHotspots"
-              :key="row.name"
-              class="tw:contents"
+           Cards size to their CONTENT (not forced-equal thirds), so a session
+           with few tools/turns shows compact cards with no dead space and no
+           internal scroll. Each card caps its list at a max-height and only
+           scrolls internally when it genuinely overflows. The rail sticks to the
+           top and never exceeds the viewport. -->
+            <aside
+              class="sticky top-0 flex max-h-[calc(100vh-2.6rem-68px-1.25rem)] flex-col gap-2.5 self-start overflow-y-auto pb-2.5"
+              data-test="session-rail"
             >
-              <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
-                @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
+              <!-- Tool Hotspots (by time + calls; cost pending backend attribution) -->
+              <div
+                class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
               >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
-                  {{ i + 1 }}
-                </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:flex-1 tw:min-w-0 tw:truncate" :title="row.name">
-                  {{ row.name }}
-                </span>
-                <span class="tw:flex tw:items-center tw:gap-[0.3rem] tw:text-[0.7rem] tw:tabular-nums tw:flex-shrink-0">
-                  <span class="tw:font-semibold tw:text-[var(--o2-text-secondary)]">
-                    {{ formatDuration(row.duration) }}
+                <div
+                  class="border-border-default flex flex-shrink-0 items-center gap-[0.4rem] border-b px-3 py-2"
+                >
+                  <OIcon name="build" size="xs" class="text-text-muted" />
+                  <span class="text-text-heading text-xs font-semibold">
+                    {{ t("traces.sessionDetail.rail.toolHotspots") }}
                   </span>
-                  <span class="tw:text-[var(--o2-text-muted)]">
-                    · {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
-                  </span>
-                </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
-              </button>
-              <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
+                </div>
+                <div v-if="sessionSpansLoading" class="flex flex-col gap-[0.4rem] p-2.5">
+                  <OSkeleton
+                    v-for="n in 3"
+                    :key="n"
+                    type="rect"
+                    animation="wave"
+                    class="rounded-default h-[1.1rem] w-full"
+                  />
+                </div>
+                <div
+                  v-else-if="toolHotspots.length"
+                  class="flex max-h-60 flex-col gap-[0.1rem] overflow-y-auto p-1.5"
+                >
+                  <span v-for="(row, i) in toolHotspots" :key="row.name" class="contents">
+                    <button
+                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      @click="jumpToTurn(originalTurnIndex(row.topTraceId) + 1)"
+                    >
+                      <span
+                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                      >
+                        {{ i + 1 }}
+                      </span>
+                      <span
+                        class="text-text-heading min-w-0 flex-1 truncate text-xs font-semibold"
+                        :title="row.name"
+                      >
+                        {{ row.name }}
+                      </span>
+                      <span
+                        class="text-2xs flex flex-shrink-0 items-center gap-[0.3rem] tabular-nums"
+                      >
+                        <span class="text-text-secondary font-semibold">
+                          {{ formatDuration(row.duration) }}
+                        </span>
+                        <span class="text-text-muted">
+                          ·
+                          {{
+                            t(
+                              row.calls === 1
+                                ? "traces.sessionDetail.rail.call"
+                                : "traces.sessionDetail.rail.calls",
+                              { n: row.calls },
+                            )
+                          }}
+                        </span>
+                      </span>
+                      <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />
+                    </button>
+                    <!-- Hover: which turns this (deduped) tool actually ran in. side="left"
                    (like the Cost/Slowest hovers) so it opens to the side instead of
                    covering the rows above it. -->
-              <OTooltip side="left" :delay="120" max-width="220px" content-class="tw:p-0!">
-                <template #content>
-                  <div class="tw:w-[200px] tw:py-[9px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]">
-                    <div class="tw:font-bold tw:mb-[2px] tw:break-words">{{ row.name }}</div>
-                    <div class="tw:text-[10px] tw:text-[var(--o2-text-muted)] tw:mb-[7px]">
-                      {{ t(row.calls === 1 ? 'traces.sessionDetail.rail.call' : 'traces.sessionDetail.rail.calls', { n: row.calls }) }}
-                    </div>
-                    <div class="tw:text-[9.5px] tw:font-bold tw:tracking-[0.05em] tw:text-[var(--o2-text-muted)] tw:mb-1">
-                      {{ t('traces.sessionDetail.rail.usedIn') }}
-                    </div>
-                    <div class="tw:flex tw:flex-wrap tw:gap-1">
+                    <OTooltip side="left" :delay="120" max-width="220px" content-class="p-0!">
+                      <template #content>
+                        <div class="text-text-body w-50 px-3 py-2.25 text-xs">
+                          <div class="mb-0.5 font-bold break-words">{{ row.name }}</div>
+                          <div class="text-3xs text-text-muted mb-1.75">
+                            {{
+                              t(
+                                row.calls === 1
+                                  ? "traces.sessionDetail.rail.call"
+                                  : "traces.sessionDetail.rail.calls",
+                                { n: row.calls },
+                              )
+                            }}
+                          </div>
+                          <div
+                            class="text-3xs text-text-secondary mb-1 font-bold tracking-[0.05em]"
+                          >
+                            {{ t("traces.sessionDetail.rail.usedIn") }}
+                          </div>
+                          <div class="flex flex-wrap gap-1">
+                            <span
+                              v-for="tn in row.turns"
+                              :key="tn"
+                              class="rounded-default border-border-default bg-surface-base text-3xs inline-flex h-[1.05rem] items-center border px-[0.35rem] font-semibold tabular-nums"
+                              >{{ t("traces.sessionDetail.turnLabel") }} {{ tn }}</span
+                            >
+                          </div>
+                        </div>
+                      </template>
+                    </OTooltip>
+                  </span>
+                </div>
+                <div v-else class="text-text-muted px-3 py-5 text-center text-xs">
+                  {{ t("traces.sessionDetail.rail.noTools") }}
+                </div>
+              </div>
+
+              <!-- Cost Hotspots -->
+              <div
+                class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
+              >
+                <div
+                  class="border-border-default flex flex-shrink-0 items-center gap-[0.4rem] border-b px-3 py-2"
+                >
+                  <OIcon name="trending-up" size="xs" class="text-text-muted" />
+                  <span class="text-text-heading text-xs font-semibold">
+                    {{ t("traces.sessionDetail.rail.costHotspots") }}
+                  </span>
+                </div>
+                <div class="flex max-h-60 flex-col gap-[0.1rem] overflow-y-auto p-1.5">
+                  <TurnPreviewCard
+                    v-for="(row, i) in costHotspots"
+                    :key="row.n"
+                    :turn="traces[row.n - 1]"
+                    :index="row.n - 1"
+                    :cache-pct="cacheRatio"
+                    side="right"
+                  >
+                    <button
+                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      @click="jumpToTurn(row.n)"
+                    >
                       <span
-                        v-for="tn in row.turns"
-                        :key="tn"
-                        class="tw:inline-flex tw:items-center tw:px-[0.35rem] tw:h-[1.05rem] tw:rounded-[0.3rem] tw:border tw:border-[var(--o2-border-color)] tw:bg-[var(--o2-card-bg)] tw:text-[10px] tw:font-semibold tw:tabular-nums"
-                      >{{ t('traces.sessionDetail.turnLabel') }} {{ tn }}</span>
-                    </div>
-                  </div>
-                </template>
-              </OTooltip>
-            </span>
-          </div>
-          <div v-else class="tw:px-[0.75rem] tw:py-[1.25rem] tw:text-center tw:text-[0.72rem] tw:text-[var(--o2-text-muted)]">
-            {{ t('traces.sessionDetail.rail.noTools') }}
-          </div>
-        </div>
+                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                      >
+                        {{ i + 1 }}
+                      </span>
+                      <span class="text-text-heading w-11 flex-shrink-0 text-xs font-semibold">
+                        {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
+                      </span>
+                      <span class="flex min-w-[3.25rem] flex-col items-end">
+                        <span class="text-2xs text-text-secondary font-semibold tabular-nums">
+                          {{ t("traces.sessionDetail.currencySymbol") }}{{ row.cost.toFixed(4) }}
+                        </span>
+                        <span
+                          v-if="detail && detail.cost > 0"
+                          class="text-3xs text-text-muted tabular-nums"
+                        >
+                          {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
+                        </span>
+                      </span>
+                      <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />
+                    </button>
+                  </TurnPreviewCard>
+                </div>
+              </div>
 
-        <!-- Cost Hotspots -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-            <OIcon name="trending-up" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
-              {{ t('traces.sessionDetail.rail.costHotspots') }}
-            </span>
-          </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
-            <TurnPreviewCard
-              v-for="(row, i) in costHotspots"
-              :key="row.n"
-              :turn="traces[row.n - 1]"
-              :index="row.n - 1"
-              :cache-pct="cacheRatio"
-              side="right"
-            >
-              <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
-                @click="jumpToTurn(row.n)"
+              <!-- Slowest Turns -->
+              <div
+                class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
               >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
-                  {{ i + 1 }}
-                </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
-                  {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
-                </span>
-                <span class="tw:flex-1 tw:min-w-0">
-                  <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
-                </span>
-                <span class="tw:flex tw:flex-col tw:items-end tw:min-w-[3.25rem]">
-                  <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)]">
-                    ${{ row.cost.toFixed(4) }}
+                <div
+                  class="border-border-default flex flex-shrink-0 items-center gap-[0.4rem] border-b px-3 py-2"
+                >
+                  <OIcon name="schedule" size="xs" class="text-text-muted" />
+                  <span class="text-text-heading text-xs font-semibold">
+                    {{ t("traces.sessionDetail.rail.slowestTurns") }}
                   </span>
-                  <span v-if="detail && detail.cost > 0" class="tw:text-[0.6rem] tw:tabular-nums tw:text-[var(--o2-text-muted)]">
-                    {{ ((row.cost / detail.cost) * 100).toFixed(1) }}%
-                  </span>
-                </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
-              </button>
-            </TurnPreviewCard>
+                </div>
+                <div class="flex max-h-60 flex-col gap-[0.1rem] overflow-y-auto p-1.5">
+                  <TurnPreviewCard
+                    v-for="(row, i) in slowestTurns"
+                    :key="row.n"
+                    :turn="traces[row.n - 1]"
+                    :index="row.n - 1"
+                    :cache-pct="cacheRatio"
+                    side="right"
+                  >
+                    <button
+                      class="rounded-default flex w-full cursor-pointer items-center gap-2 px-[0.4rem] py-[0.35rem] text-left hover:bg-[color-mix(in_srgb,var(--color-text-heading)_4%,transparent)]"
+                      @click="jumpToTurn(row.n)"
+                    >
+                      <span
+                        class="rounded-default text-3xs text-text-secondary grid h-5 w-5 flex-shrink-0 place-items-center bg-[color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] font-bold tabular-nums"
+                      >
+                        {{ i + 1 }}
+                      </span>
+                      <span class="text-text-heading w-11 flex-shrink-0 text-xs font-semibold">
+                        {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
+                      </span>
+                      <span class="min-w-0 flex-1">
+                        <OProgressBar
+                          :value="ratio(row.lat, maxTurnLat)"
+                          :variant="row.status === 'error' ? 'danger' : 'warning'"
+                          size="xs"
+                        />
+                      </span>
+                      <span
+                        class="text-2xs text-text-secondary min-w-11 text-right font-semibold tabular-nums"
+                      >
+                        {{ formatDuration(row.lat) }}
+                      </span>
+                      <OIcon name="chevron-right" size="xs" class="text-text-muted flex-shrink-0" />
+                    </button>
+                  </TurnPreviewCard>
+                </div>
+              </div>
+            </aside>
           </div>
-        </div>
-
-        <!-- Slowest Turns -->
-        <div class="card-container tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-          <div class="tw:flex tw:items-center tw:gap-[0.4rem] tw:px-[0.75rem] tw:py-[0.5rem] tw:border-b tw:border-[var(--o2-border-color)] tw:flex-shrink-0">
-            <OIcon name="schedule" size="xs" class="tw:text-[var(--o2-text-muted)]" />
-            <span class="tw:text-[0.78rem] tw:font-semibold tw:text-[var(--o2-text-primary)]">
-              {{ t('traces.sessionDetail.rail.slowestTurns') }}
-            </span>
-          </div>
-          <div class="tw:flex-1 tw:min-h-0 tw:overflow-y-auto tw:p-[0.375rem] tw:flex tw:flex-col tw:gap-[0.1rem]">
-            <TurnPreviewCard
-              v-for="(row, i) in slowestTurns"
-              :key="row.n"
-              :turn="traces[row.n - 1]"
-              :index="row.n - 1"
-              :cache-pct="cacheRatio"
-              side="right"
-            >
-              <button
-                class="tw:flex tw:items-center tw:gap-[0.5rem] tw:w-full tw:px-[0.4rem] tw:py-[0.35rem] tw:rounded-md tw:text-left tw:cursor-pointer hover:tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_4%,transparent)]"
-                @click="jumpToTurn(row.n)"
-              >
-                <span class="tw:w-[1.25rem] tw:h-[1.25rem] tw:rounded-md tw:grid tw:place-items-center tw:text-[0.62rem] tw:font-bold tw:tabular-nums tw:flex-shrink-0 tw:bg-[color-mix(in_srgb,var(--o2-text-primary)_8%,transparent)] tw:text-[var(--o2-text-secondary)]">
-                  {{ i + 1 }}
-                </span>
-                <span class="tw:text-[0.72rem] tw:font-semibold tw:text-[var(--o2-text-primary)] tw:w-[2.75rem] tw:flex-shrink-0">
-                  {{ t('traces.sessionDetail.turnLabel') }} {{ row.n }}
-                </span>
-                <span class="tw:flex-1 tw:min-w-0">
-                  <OProgressBar :value="ratio(row.lat, maxTurnLat)" :variant="row.status === 'error' ? 'danger' : 'warning'" size="xs" />
-                </span>
-                <span class="tw:text-[0.7rem] tw:font-semibold tw:tabular-nums tw:text-[var(--o2-text-secondary)] tw:min-w-[2.75rem] tw:text-right">
-                  {{ formatDuration(row.lat) }}
-                </span>
-                <OIcon name="chevron-right" size="xs" class="tw:text-[var(--o2-text-muted)] tw:flex-shrink-0" />
-              </button>
-            </TurnPreviewCard>
-          </div>
-        </div>
-      </aside>
+        </template>
       </div>
-    </template>
-    </div>
-  </div>
+    </OPageLayout>
+    <ManualEvaluationDialog
+      v-if="canManualEvaluate"
+      v-model:open="manualEvaluationOpen"
+      :org-id="orgIdentifier"
+      :stream="streamName"
+      target-scope="session"
+      :target-id="sessionId"
+      :start-time="sessionEvaluationRange.startTime"
+      :end-time="sessionEvaluationRange.endTime"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, reactive, onMounted, nextTick, computed } from "vue";
+import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import {
   useSessions,
   type SessionDetail,
@@ -746,14 +917,10 @@ import {
   type TurnDetail,
   type TurnMessage,
 } from "./composables/useSessions";
-import {
-  messagesFromInput,
-  messagesFromOutput,
-  getModel,
-} from "./threadView.utils";
+import { messagesFromInput, messagesFromOutput, getModel } from "./threadView.utils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
@@ -766,14 +933,16 @@ import TurnPreviewCard from "./TurnPreviewCard.vue";
 import SessionRibbon from "./SessionRibbon.vue";
 import ThreadView from "./ThreadView.vue";
 import ThreadToolCalls from "./ThreadToolCalls.vue";
+import config from "@/aws-exports";
 
-import {
-  splitNumberWithUnit,
-  splitDuration,
-} from "./llmInsightsDashboard.utils";
+import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 import { renderMarkdown } from "./markdown";
 
-const { t } = useI18n();
+const ManualEvaluationDialog = defineAsyncComponent(
+  () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
+);
+
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -793,9 +962,52 @@ const streamName = computed(() =>
 const startTime = computed(() =>
   typeof route.query.from === "string" ? Number(route.query.from) : 0,
 );
-const endTime = computed(() =>
-  typeof route.query.to === "string" ? Number(route.query.to) : 0,
+const endTime = computed(() => (typeof route.query.to === "string" ? Number(route.query.to) : 0));
+const orgIdentifier = computed(
+  () =>
+    (typeof route.query.org_identifier === "string" ? route.query.org_identifier : "") ||
+    store.state.selectedOrganization?.identifier ||
+    "",
 );
+const sessionEvaluationRange = computed(() => {
+  const firstSeenNanos = Number(detail.value?.firstSeenMicros);
+  const durationNanos = Number(detail.value?.durationNanos);
+  if (
+    Number.isFinite(firstSeenNanos) &&
+    Number.isFinite(durationNanos) &&
+    firstSeenNanos >= 0 &&
+    durationNanos > 0
+  ) {
+    // Preserve the session boundary despite nanosecond values exceeding
+    // JavaScript's exact integer range.
+    return {
+      startTime: Math.max(0, Math.floor(firstSeenNanos / 1_000) - 1),
+      endTime: Math.ceil((firstSeenNanos + durationNanos) / 1_000) + 1,
+    };
+  }
+  return {
+    startTime: startTime.value,
+    endTime: endTime.value,
+  };
+});
+// The session detail endpoint is keyed by gen_ai_conversation_id, so a
+// populated response is authoritative evidence that this is an LLM session.
+const hasLlmSessionData = computed(() => detail.value !== null && traces.value.length > 0);
+const canManualEvaluate = computed(() => {
+  const range = sessionEvaluationRange.value;
+  return (
+    hasLlmSessionData.value &&
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+    Boolean(store.state.zoConfig?.online_evals_enabled) &&
+    Boolean(orgIdentifier.value) &&
+    Boolean(streamName.value) &&
+    Boolean(sessionId.value) &&
+    Number.isFinite(range.startTime) &&
+    Number.isFinite(range.endTime) &&
+    range.endTime > range.startTime
+  );
+});
+const manualEvaluationOpen = ref(false);
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.
@@ -816,8 +1028,7 @@ const sessionStats = computed(() => {
   // Per-session p95 over a handful of turns is statistically meaningless (it
   // collapses to the max), so we surface the slowest turn honestly instead.
   const slowestLat = lats.length ? Math.max(...lats) : 0;
-  const slowestTurn =
-    (lats.indexOf(slowestLat) >= 0 ? lats.indexOf(slowestLat) : 0) + 1;
+  const slowestTurn = (lats.indexOf(slowestLat) >= 0 ? lats.indexOf(slowestLat) : 0) + 1;
 
   const costs = rows.map((tr) => tr.cost);
   const maxCost = costs.length ? Math.max(...costs) : 0;
@@ -825,9 +1036,7 @@ const sessionStats = computed(() => {
 
   const cachedTokens = d.cacheReadInputTokens;
   const cacheDenominator = cacheInputDenominator(d);
-  const cacheRatio = cacheDenominator
-    ? Math.round((cachedTokens / cacheDenominator) * 100)
-    : 0;
+  const cacheRatio = cacheDenominator ? Math.round((cachedTokens / cacheDenominator) * 100) : 0;
   const hasNetCacheImpact = d.estimatedCostWithoutCache > 0 || d.netCacheImpact !== 0;
   const cacheImpact = hasNetCacheImpact ? d.netCacheImpact : d.cacheReadSavings;
 
@@ -868,22 +1077,22 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    "tw:flex tw:flex-col tw:justify-center tw:gap-1 tw:px-3.5 tw:py-2.5 tw:rounded-lg tw:border tw:transition-shadow hover:tw:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
+    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
   if (variant === "danger")
-    return `${base} tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))] tw:border-[color-mix(in_srgb,var(--o2-service-health-critical)_35%,var(--o2-border-color))]`;
-  return `${base} tw:bg-[var(--o2-card-bg)] tw:border-[var(--o2-border-color)]`;
+    return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
+  return `${base} bg-surface-base border-border-default`;
 }
 
 // Accent text colour for a variant's value; "" → use the neutral default.
 function kpiAccentClass(variant?: "danger"): string {
-  if (variant === "danger") return "tw:text-[var(--o2-service-health-critical)]";
+  if (variant === "danger") return "text-error-500";
   return "";
 }
 
 /** A turn reference inside a KPI sub-line — rendered as a hover-preview chip. */
 interface TurnChip {
   n: number; // 1-based turn number
-  label: string;
+  label: I18nText;
 }
 
 // Session-level KPI tiles. Each sub-line is split into `subLead` text, optional
@@ -893,7 +1102,9 @@ interface TurnChip {
 const kpiCards = computed<
   {
     key: string;
-    label: string;
+    label: I18nText;
+    /** Material-symbol icon name (OIcon) shown next to the tile label. */
+    icon: string;
     value: string;
     unit: string;
     subLead: string;
@@ -901,7 +1112,7 @@ const kpiCards = computed<
     subTail: string;
     variant?: "danger";
     estimate?: boolean;
-    tooltipRows?: { label: string; value: string }[];
+    tooltipRows?: { label: I18nText; value: string }[];
     /** Errors tile: show a "Filter Errors" button instead of per-turn chips
      *  when there are too many error turns to list as chips. */
     filterErrors?: boolean;
@@ -920,6 +1131,7 @@ const kpiCards = computed<
   return [
     {
       key: "turns",
+      icon: "forum",
       label: t("traces.sessionDetail.kpi.turns"),
       value: String(d.turns),
       unit: "",
@@ -931,6 +1143,7 @@ const kpiCards = computed<
     },
     {
       key: "errors",
+      icon: "error",
       label: t("traces.sessionDetail.kpi.errors"),
       value: String(s.errRate),
       unit: "%",
@@ -950,15 +1163,13 @@ const kpiCards = computed<
               errors: s.errors,
               total: d.turns,
             }),
-      subTurns:
-        s.errors > 3
-          ? []
-          : s.errorTurnNums.map((n) => ({ n, label: String(n) })),
+      subTurns: s.errors > 3 ? [] : s.errorTurnNums.map((n) => ({ n, label: raw(String(n)) })),
       filterErrors: s.errors > 3,
       subTail: "",
     },
     {
       key: "latency",
+      icon: "schedule",
       label: t("traces.sessionDetail.kpi.duration"),
       value: lat.value,
       unit: lat.unit,
@@ -967,22 +1178,24 @@ const kpiCards = computed<
       subLead: t("traces.sessionDetail.kpiSub.latencyLead", {
         slowest: formatDuration(s.slowestLat),
       }),
-      subTurns: [{ n: s.slowestTurn, label: `${turnWord} ${s.slowestTurn}` }],
+      subTurns: [{ n: s.slowestTurn, label: raw(`${turnWord} ${s.slowestTurn}`) }],
       subTail: "",
     },
     {
       key: "cost",
+      icon: "payments",
       label: t("traces.sessionDetail.kpi.cost"),
       value: cost.value,
       unit: cost.unit,
       subLead: t("traces.sessionDetail.kpiSub.costLead", {
         peak: usd4(s.maxCost),
       }),
-      subTurns: [{ n: s.peakTurn, label: `${turnWord} ${s.peakTurn}` }],
+      subTurns: [{ n: s.peakTurn, label: raw(`${turnWord} ${s.peakTurn}`) }],
       subTail: "",
     },
     {
       key: "tokens",
+      icon: "tag",
       label: t("traces.sessionDetail.kpi.tokens"),
       value: tokens.value,
       unit: tokens.unit,
@@ -992,6 +1205,7 @@ const kpiCards = computed<
     },
     {
       key: "cacheImpact",
+      icon: "bolt",
       label: t("traces.sessionDetail.kpi.cacheImpact"),
       value: signedUsd4(s.cacheImpact),
       unit: "",
@@ -1029,8 +1243,7 @@ const kpiCards = computed<
   ];
 });
 
-// ── Conversation: filters, sort, expand (logic restored from the pre-redesign
-// page; markup is rebuilt to the new design). All client-side over `traces`. ──
+// ── Conversation: filters, sort, expand. All client-side over `traces`. ──
 const searchText = ref("");
 const statusFilter = ref<"all" | "ok" | "error">("all");
 const modelFilter = ref<string>("all");
@@ -1066,11 +1279,7 @@ function sortIcon(key: SortKey): "asc" | "desc" | "none" {
 }
 function sortIconName(key: SortKey): string {
   const s = sortIcon(key);
-  return s === "asc"
-    ? "arrow-upward"
-    : s === "desc"
-      ? "arrow-downward"
-      : "unfold-more";
+  return s === "asc" ? "arrow-upward" : s === "desc" ? "arrow-downward" : "unfold-more";
 }
 
 const statusOptions = computed(() => [
@@ -1083,7 +1292,7 @@ const modelOptions = computed(() => {
   traces.value.forEach((tr) => tr.models.forEach((m) => models.add(m)));
   return [
     { label: t("traces.sessionDetail.filters.all"), value: "all" },
-    ...Array.from(models).map((m) => ({ label: m, value: m })),
+    ...Array.from(models).map((m) => ({ label: raw(m), value: m })),
   ];
 });
 
@@ -1092,16 +1301,9 @@ const expandedTurns = reactive<Record<string, boolean>>({});
 // Per-turn detail is DERIVED from the session spans we already fetch eagerly
 // (`sessionSpans`) — the SAME single source that powers the Pretty view and the
 // Tool Hotspots. This guarantees the collapsed turn body, the tool hotspots, and
-// the transcript can never disagree. (Previously a separate per-turn query could
-// come back empty while the spans clearly contained tools — so clicking a tool
-// hotspot jumped to a turn that reported "0 tool calls".) Spans are grouped by
-// `trace_id` and classified exactly like ThreadView / the old fetchTurnDetail.
-const LLM_OPS = new Set([
-  "chat",
-  "text_completion",
-  "generate_content",
-  "embeddings",
-]);
+// the transcript can never disagree. Spans are grouped by `trace_id` and
+// classified exactly like ThreadView.
+const LLM_OPS = new Set(["chat", "text_completion", "generate_content", "embeddings"]);
 
 const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
   const byTrace: Record<string, any[]> = {};
@@ -1115,9 +1317,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
   for (const tid of Object.keys(byTrace)) {
     const spans = byTrace[tid]
       .slice()
-      .sort(
-        (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
-      );
+      .sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
 
     let llmCalls = 0;
     let toolCalls = 0;
@@ -1146,7 +1346,7 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
         const inputMsgs = messagesFromInput(sp.gen_ai_input_messages);
         for (let i = inputMsgs.length - 1; i >= 0; i--) {
           if (inputMsgs[i].role === "user" && inputMsgs[i].content) {
-            userMessage = { role: "user", content: inputMsgs[i].content };
+            userMessage = { role: "user", content: raw(inputMsgs[i].content) };
             break;
           }
         }
@@ -1188,20 +1388,13 @@ const turnDetailsByTrace = computed<Record<string, TurnDetail>>(() => {
 const filteredTraces = computed(() => {
   const q = searchText.value.trim().toLowerCase();
   let rows = traces.value.filter((tr) => {
-    if (statusFilter.value !== "all" && tr.status !== statusFilter.value)
-      return false;
-    if (modelFilter.value !== "all" && !tr.models.includes(modelFilter.value))
-      return false;
+    if (statusFilter.value !== "all" && tr.status !== statusFilter.value) return false;
+    if (modelFilter.value !== "all" && !tr.models.includes(modelFilter.value)) return false;
     if (q) {
-      const hay = [tr.traceId, tr.model || "", tr.turnUserMessage || ""]
-        .join(" ")
-        .toLowerCase();
+      const hay = [tr.traceId, tr.model || "", tr.turnUserMessage || ""].join(" ").toLowerCase();
       if (!hay.includes(q)) {
         const td = turnDetailsByTrace.value[tr.traceId];
-        const msgHay = [
-          td?.userMessage?.content || "",
-          td?.assistantMessage?.content || "",
-        ]
+        const msgHay = [td?.userMessage?.content || "", td?.assistantMessage?.content || ""]
           .join(" ")
           .toLowerCase();
         if (!msgHay.includes(q)) return false;
@@ -1212,10 +1405,8 @@ const filteredTraces = computed(() => {
   const dir = sortDir.value === "asc" ? 1 : -1;
   if (sortKey.value === "latency")
     rows = [...rows].sort((a, b) => (a.durationNanos - b.durationNanos) * dir);
-  else if (sortKey.value === "cost")
-    rows = [...rows].sort((a, b) => (a.cost - b.cost) * dir);
-  else if (sortKey.value === "tokens")
-    rows = [...rows].sort((a, b) => (a.tokens - b.tokens) * dir);
+  else if (sortKey.value === "cost") rows = [...rows].sort((a, b) => (a.cost - b.cost) * dir);
+  else if (sortKey.value === "tokens") rows = [...rows].sort((a, b) => (a.tokens - b.tokens) * dir);
   else if (sortKey.value === "turn" && dir === -1)
     // "turn" asc is the natural (chronological) order; desc reverses it.
     rows = [...rows].reverse();
@@ -1237,16 +1428,13 @@ function turnDetail(traceId: string): TurnDetail | undefined {
 const toolSpansByTrace = computed<Record<string, any[]>>(() => {
   const out: Record<string, any[]> = {};
   for (const s of sessionSpans.value) {
-    if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool")
-      continue;
+    if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool") continue;
     const tid = String(s.trace_id || "");
     if (!tid) continue;
     (out[tid] ||= []).push(s);
   }
   for (const tid of Object.keys(out)) {
-    out[tid].sort(
-      (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
-    );
+    out[tid].sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
   }
   return out;
 });
@@ -1302,16 +1490,14 @@ function onSpanSelected(spanId: string) {
 // ── Right-rail hotspots ────────────────────────────────────────────────────
 // Slowest turns + cost hotspots come from `traces`. Tool hotspots come from the
 // session spans (ranked by total duration + calls — tool spans carry no cost,
-// pending a backend per-tool attribution; see redesign doc §3).
+// pending a backend per-tool attribution).
 const slowestTurns = computed(() =>
   traces.value
     .map((t, i) => ({ n: i + 1, lat: t.durationNanos, status: t.status }))
     .sort((a, b) => b.lat - a.lat),
 );
 const costHotspots = computed(() =>
-  traces.value
-    .map((t, i) => ({ n: i + 1, cost: t.cost }))
-    .sort((a, b) => b.cost - a.cost),
+  traces.value.map((t, i) => ({ n: i + 1, cost: t.cost })).sort((a, b) => b.cost - a.cost),
 );
 interface ToolHotspot {
   name: string;
@@ -1324,16 +1510,10 @@ interface ToolHotspot {
   turns: number[];
 }
 const toolHotspots = computed<ToolHotspot[]>(() => {
-  const agg: Record<
-    string,
-    Omit<ToolHotspot, "turns"> & { turnsSet: Set<number> }
-  > = {};
+  const agg: Record<string, Omit<ToolHotspot, "turns"> & { turnsSet: Set<number> }> = {};
   for (const s of sessionSpans.value) {
-    if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool")
-      continue;
-    const name = String(
-      s.tool_name || s.gen_ai_tool_name || s.operation_name || "tool",
-    );
+    if (String(s.gen_ai_operation_name || "").toLowerCase() !== "execute_tool") continue;
+    const name = String(s.tool_name || s.gen_ai_tool_name || s.operation_name || "tool");
     const dur = Number(s.duration) || 0;
     const tokens = Number(s.gen_ai_usage_total_tokens) || 0;
     const a =
@@ -1445,9 +1625,7 @@ function trunc(s: string | null | undefined, n: number): string {
 // Per-turn bar denominators (max across turns) for the latency/cost mini-bars.
 const maxTurnCost = computed(() => sessionStats.value?.maxCost ?? 0);
 const maxTurnLat = computed(() => sessionStats.value?.slowestLat ?? 0);
-const maxTurnTokens = computed(() =>
-  traces.value.reduce((m, tr) => Math.max(m, tr.tokens), 0),
-);
+const maxTurnTokens = computed(() => traces.value.reduce((m, tr) => Math.max(m, tr.tokens), 0));
 function ratio(v: number, max: number): number {
   return max > 0 ? Math.min(1, v / max) : 0;
 }
@@ -1468,16 +1646,15 @@ function turnRowClass(trace: SessionTraceRow): string {
   // coloured left border — keeps the row chrome flat, matching the KPI tiles.
   const surface =
     trace.status === "error"
-      ? "tw:bg-[color-mix(in_srgb,var(--o2-service-health-critical)_5%,var(--o2-card-bg))]"
-      : "tw:bg-[var(--o2-card-bg)]";
-  const flash =
-    flashTurn.value === n ? " tw:ring-2 tw:ring-[#3b82f6]" : "";
-  return `tw:rounded-lg tw:border tw:border-[var(--o2-border-color)] ${surface} tw:overflow-hidden${flash}`;
+      ? "bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))]"
+      : "bg-surface-base";
+  const flash = flashTurn.value === n ? " ring-2 ring-accent" : "";
+  return `rounded-default border border-border-default ${surface} overflow-hidden${flash}`;
 }
 
 async function load() {
   if (!sessionId.value || !streamName.value) {
-    error.value = "Missing session id or stream in URL";
+    error.value = t("traces.sessionDetails.missingSessionInfo");
     return;
   }
   loading.value = true;
@@ -1496,15 +1673,11 @@ async function load() {
     // usable from `traces` alone).
     loadSessionSpans();
   } catch (e: any) {
-    error.value = e?.message || "Failed to load session";
+    error.value = e?.message || t("traces.sessionDetails.failedToLoadSession");
     // Log both the parsed message and the raw envelope so we can see
     // DataFusion's actual complaint (e.g. unknown column, bad GROUP BY)
     // instead of the generic wrapper.
-    console.error(
-      "Session details fetch error:",
-      e?.message,
-      e?.raw?.content ?? e?.raw ?? e,
-    );
+    console.error("Session details fetch error:", e?.message, e?.raw?.content ?? e?.raw ?? e);
   } finally {
     loading.value = false;
   }
@@ -1539,7 +1712,7 @@ function copySessionId() {
 
 function copyText(text: string | null | undefined) {
   if (!text) return;
-  copyToClipboard(text, { successMessage: "Copied", timeout: 1000 });
+  copyToClipboard(text, t, { successMessage: t("traces.sessionDetails.copied"), timeout: 1000 });
 }
 
 function usd4(v: number): string {
@@ -1562,15 +1735,15 @@ function formatTokens(n: number): string {
   return `${tk.value}${tk.unit}`;
 }
 
-
 onMounted(load);
 </script>
 
 <style scoped lang="scss">
-/* Markdown styling for the assistant message (v-html). Scoped CSS is the one
-   sanctioned case (§5a): you can't target innerHTML-injected elements with
-   Tailwind utility classes, so `:deep()` rules are used. All colours map to
-   --o2-* tokens so it adapts to the theme. */
+/* keep(generated-content): markdown styling for the assistant message injected
+   with v-html. Those nodes carry no scope attribute and no classes of their own,
+   so :deep() element selectors are the only expressible form — a Tailwind
+   utility cannot reach them. All colours map to --color-* tokens, so this one
+   rule set covers light and dark. */
 .markdown-body {
   line-height: 1.55;
 
@@ -1592,16 +1765,16 @@ onMounted(load);
     line-height: 1.3;
   }
   :deep(h1) {
-    font-size: 1.05rem;
+    font-size: var(--text-base);
   }
   :deep(h2) {
-    font-size: 0.95rem;
+    font-size: var(--text-base);
   }
   :deep(h3) {
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
   }
   :deep(h4) {
-    font-size: 0.8rem;
+    font-size: var(--text-compact);
   }
   :deep(ul),
   :deep(ol) {
@@ -1612,7 +1785,7 @@ onMounted(load);
     margin: 0.15rem 0;
   }
   :deep(a) {
-    color: var(--o2-interactive-primary, #3b82f6);
+    color: var(--color-text-link);
     text-decoration: none;
 
     &:hover {
@@ -1620,17 +1793,17 @@ onMounted(load);
     }
   }
   :deep(code) {
-    font-family: monospace;
-    font-size: 0.72rem;
-    background: color-mix(in srgb, var(--o2-text-primary) 8%, transparent);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    background: color-mix(in srgb, var(--color-text-heading) 8%, transparent);
     padding: 0.1rem 0.3rem;
-    border-radius: 3px;
+    border-radius: 0.1875rem;
   }
   :deep(pre) {
-    background: color-mix(in srgb, var(--o2-text-primary) 5%, transparent);
-    border: 1px solid var(--o2-border-color);
+    background: color-mix(in srgb, var(--color-text-heading) 5%, transparent);
+    border: 1px solid var(--color-border-default);
     padding: 0.5rem 0.625rem;
-    border-radius: 4px;
+    border-radius: var(--radius-default);
     overflow-x: auto;
     margin: 0.5rem 0;
   }
@@ -1639,30 +1812,30 @@ onMounted(load);
     padding: 0;
   }
   :deep(blockquote) {
-    border-left: 3px solid var(--o2-border-color);
+    border-left: 0.1875rem solid var(--color-border-default);
     margin: 0.5rem 0;
     padding-left: 0.75rem;
-    color: var(--o2-text-secondary);
+    color: var(--color-text-secondary);
   }
   :deep(table) {
     border-collapse: collapse;
     width: 100%;
     margin: 0.5rem 0;
-    font-size: 0.72rem;
+    font-size: var(--text-xs);
   }
   :deep(th),
   :deep(td) {
-    border: 1px solid var(--o2-border-color);
+    border: 1px solid var(--color-border-default);
     padding: 0.3rem 0.5rem;
     text-align: left;
   }
   :deep(th) {
-    background: color-mix(in srgb, var(--o2-text-primary) 6%, transparent);
+    background: color-mix(in srgb, var(--color-text-heading) 6%, transparent);
     font-weight: 600;
   }
   :deep(hr) {
     border: none;
-    border-top: 1px solid var(--o2-border-color);
+    border-top: 1px solid var(--color-border-default);
     margin: 0.625rem 0;
   }
 }

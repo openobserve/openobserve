@@ -16,25 +16,21 @@
 import http from "./http";
 
 const actions = {
-  create: (org_identifier: string, action_id: string = "", data: any) => {
+  create: (org_identifier: string, _action_id: string = "", data: any) => {
     return http().post(`/api/${org_identifier}/actions/upload`, data);
   },
   update: (org_identifier: string, action_id: string, data: any) => {
     return http().put(`/api/${org_identifier}/actions/${action_id}`, data);
   },
-  //as backend is not supporting the pagination,  page no, desc so as of now we removed it
+  // backend does not support pagination / page-no / desc
   list: (org_identifier: string) => {
     return http().get(`/api/${org_identifier}/actions`);
   },
   get_by_id: (org_identifier: string, ksuid: string) => {
-    return http().get(
-      `/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`,
-    );
+    return http().get(`/api/${org_identifier}/actions/${encodeURIComponent(ksuid)}`);
   },
   delete: (org_identifier: string, action_id: string) => {
-    return http().delete(
-      `/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`,
-    );
+    return http().delete(`/api/${org_identifier}/actions/${encodeURIComponent(action_id)}`);
   },
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/actions/bulk`, { data });

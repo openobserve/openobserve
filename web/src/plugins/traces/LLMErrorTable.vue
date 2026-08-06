@@ -30,23 +30,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     ref="rootEl"
-    class="card-container llm-trend-panel tw:rounded-lg tw:flex tw:flex-col tw:overflow-hidden"
+    class="bg-card-glass-bg llm-trend-panel rounded-default border-border-default flex flex-col overflow-hidden border"
   >
     <!-- Padding lives on the header only, so the table spans edge-to-edge
          (no left/right/bottom inset) and sits flush within the card. -->
-    <div
-      class="tw:flex tw:items-baseline tw:justify-between tw:mb-[0.5rem] tw:px-[1rem] tw:pt-[1rem]"
-    >
+    <div class="mb-2 flex items-baseline justify-between px-4 pt-4">
       <div>
-        <div
-          class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
-        >
+        <div class="text-text-heading text-sm font-semibold">
           {{ displayTitle }}
         </div>
-        <div
-          v-if="displaySubtitle"
-          class="tw:text-[0.7rem] tw:leading-normal tw:mt-[0.1rem]"
-        >
+        <div v-if="displaySubtitle" class="text-2xs mt-[0.1rem] leading-normal">
           {{ displaySubtitle }}
         </div>
       </div>
@@ -64,10 +57,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       table-id="llm-recent-errors"
       show-index
       pagination="none"
-      :empty-message="panel.emptyStateText || 'No data'"
+      :empty-message="
+        panel.emptyStateKey ? t(panel.emptyStateKey) : t('traces.lLMErrorTable.noData')
+      "
       @row-click="onRowClick"
       data-test="llm-recent-errors-table"
-      class="tw:w-full"
+      class="w-full"
     >
       <!-- Time needs timezone formatting, so it keeps a cell template — but no
            text styling: it inherits OTable's default cell text like every other
@@ -79,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Operation is the one cell we colour — it names the failed span, so it
            reads in the error colour. -->
       <template #cell-operation="{ value }">
-        <span class="tw:text-[var(--o2-status-error-text)]">{{ value }}</span>
+        <span class="text-error-600">{{ value }}</span>
       </template>
 
       <!-- Trace id: only a title for the full value on hover; default text. -->
@@ -93,14 +88,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { COL } from "@/lib/core/Table/OTable.types";
-import {
-  type LLMPanelDef,
-  renderPanelSql,
-  panelI18nKey,
-} from "./config/llmInsightsPanels";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 // Shared in-memory cache (module singleton) — survives this table's remount on
@@ -129,13 +120,11 @@ const emit = defineEmits<{
   (e: "view-trace", traceId: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-// Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
-const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() =>
-  t(`${panelI18nKey(props.panel.id)}.subtitle`),
-);
+// Panel defs are a plain config module with no i18n context, so they carry keys.
+const displayTitle = computed(() => t(props.panel.titleKey));
+const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 
 const store = useStore();
 const { executeQuery } = useLLMStreamQuery();
@@ -145,10 +134,10 @@ const timezone = computed(() => store.state.timezone || "UTC");
 const rows = ref<any[]>([]);
 const loading = ref(false);
 
-const columns = [
+const columns: OTableColumnDef[] = [
   {
     id: "time",
-    header: "Time",
+    header: t("traces.lLMErrorTable.time"),
     accessorKey: "_timestamp",
     sortable: false,
     size: COL.createdAt,
@@ -156,7 +145,7 @@ const columns = [
   },
   {
     id: "service",
-    header: "Service",
+    header: t("traces.lLMErrorTable.service"),
     accessorKey: "service_name",
     sortable: false,
     // Half the usual stream-name width — service names here are short.
@@ -165,7 +154,7 @@ const columns = [
   },
   {
     id: "operation",
-    header: "Operation",
+    header: t("traces.lLMErrorTable.operation"),
     accessorKey: "operation",
     sortable: false,
     // Numeric size + flex: fills the leftover width and stays resizable.
@@ -174,7 +163,7 @@ const columns = [
   },
   {
     id: "trace_id",
-    header: "Trace ID",
+    header: t("traces.lLMErrorTable.traceId"),
     accessorKey: "trace_id",
     sortable: false,
     size: COL.url,
@@ -265,9 +254,3 @@ onUnmounted(() => {
   observer = null;
 });
 </script>
-
-<style lang="scss" scoped>
-.llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
-}
-</style>

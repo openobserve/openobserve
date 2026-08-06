@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="tw:rounded-md tw:p-0" style="min-height: inherit">
+  <div class="rounded-default p-0" style="min-height: inherit">
     <OTable
       data-test="log-stream-table"
       :data="filteredStreamData"
@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :page-size-options="pageSizeOptions"
       expansion="single"
       v-model:expanded-ids="expandedIds"
+      show-index
       :show-global-filter="false"
       :default-columns="false"
       width="100%"
@@ -40,20 +41,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #top>
-        <div class="tw:flex tw:items-center tw:w-full tw:border-b tw:border-[var(--o2-border)] tw:pb-2 tw:mb-1">
-          <div class="tw:text-[15px] tw:font-[600]" data-test="log-stream-title-text">
+        <div class="border-border-default mb-1 flex w-full items-center border-b pb-2">
+          <div class="text-sm font-[600]" data-test="log-stream-title-text">
             {{ t("logStream.header") }}
           </div>
-          <div class="tw:ml-auto" data-test="stream-association-search-input">
-            <OSearchInput
-              v-model="filterQuery"
-              class="tw:mb-1"
-              :placeholder="t('logStream.search')"
-            />
+          <div class="ml-auto" data-test="stream-association-search-input">
+            <OSearchInput v-model="filterQuery" class="mb-1" :placeholder="t('logStream.search')" />
           </div>
           <OButton
             data-test="log-stream-refresh-stats-btn"
-            class="tw:ml-3 tw:mb-1"
+            class="mb-1 ml-3"
             variant="outline"
             size="sm-action"
             @click="getLogStream"
@@ -64,15 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </template>
 
-      <template #expansion="{ row }">
-        <div
-          v-show="loadingFunctions"
-          class="tw:pl-3 tw:py-1"
-          style="height: 60px"
-        >
+      <template #expansion>
+        <div v-show="loadingFunctions" class="py-1 pl-3" style="height: 60px">
           <OInnerLoading
             :showing="loadingFunctions"
-            label="Fetching functions..."
+            :label="t('logStream.fetchingFunctions')"
             size="sm"
           />
         </div>
@@ -88,33 +81,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :default-columns="false"
           >
             <template #top>
-              <div
-                style="
-                  display: flex;
-                  flex-direction: row;
-                  width: 100%;
-                  justify-content: space-between;
-                "
-              >
-                <div
-                  class="tw:text-[15px] tw:font-[600] tw:flex tw:items-center"
-                  data-test="log-stream-title-text"
-                >
+              <div class="flex w-full flex-row justify-between">
+                <div class="flex items-center text-sm font-[600]" data-test="log-stream-title-text">
                   {{ t("function.associatedFunctionHeader") }}
                 </div>
                 <OButton
                   data-test="stream-association-associate-function-btn"
                   variant="outline"
                   size="sm-action"
-                  class="tw:ml-3 tw:mb-1"
+                  class="mb-1 ml-3"
                   @click="addFunctionInProgress = true"
                 >
-                  Associate Function
+                  {{ t("logStream.associateFunction") }}
                 </OButton>
               </div>
             </template>
 
-            <template #cell-#="{ row, index }">
+            <template #[`cell-#`]="{ row, index }">
               <span v-if="!row._isAddRow">{{ index + 1 }}</span>
             </template>
 
@@ -153,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="!row._isAddRow"
                 data-test="stream-association-delete-function-btn"
                 :title="t('function.deleteAssociatedFunction')"
-                class="tw:ml-1"
+                class="ml-1"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
@@ -161,18 +144,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #empty>
-              <div
-                v-if="!addFunctionInProgress"
-                style="width: 100%; text-align: center"
-              >
-                No functions found
+              <div v-if="!addFunctionInProgress" class="w-full text-center">
+                {{ t("logStream.noFunctionsFound") }}
               </div>
             </template>
           </OTable>
         </div>
       </template>
     </OTable>
-    <ODrawer data-test="associated-stream-function-index-schema-drawer"
+    <ODrawer
+      data-test="associated-stream-function-index-schema-drawer"
+      bleed
       v-model:open="showIndexSchemaDialog"
       size="lg"
     >
@@ -182,18 +164,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-
-import {
-  defineComponent,
-  ref,
-  onActivated,
-  onMounted,
-  watch,
-  computed,
-} from "vue";
+import { defineComponent, ref, onActivated, onMounted, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import jsTransformService from "../../services/jstransform";
 
 import streamService from "../../services/stream";
@@ -204,7 +178,6 @@ import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -212,17 +185,25 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { SchemaIndex, NoData, OButton, ODrawer, OInnerLoading, OSwitch, OSelect, OSearchInput,
-    OIcon, OTable,
-},
+  components: {
+    SchemaIndex,
+    NoData,
+    OButton,
+    ODrawer,
+    OInnerLoading,
+    OSwitch,
+    OSelect,
+    OSearchInput,
+    OTable,
+  },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const logStream = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -233,13 +214,6 @@ export default defineComponent({
     const previousOrgIdentifier = ref("");
     const functionsList = ref<any>([]);
     const columns: OTableColumnDef[] = [
-      {
-        id: "#",
-        header: "#",
-        accessorKey: "#",
-        size: TABLE_INDEX_COL_SIZE,
-        meta: { align: "left" },
-      },
       {
         id: "name",
         accessorKey: "name",
@@ -283,7 +257,7 @@ export default defineComponent({
     ];
     const addFunctionInProgress = ref(false);
     const addFunctionInProgressLoading = ref(false);
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     let deleteStreamName = "";
     let deleteStreamType = "";
@@ -304,8 +278,7 @@ export default defineComponent({
       if (!query) return logStream.value;
       return logStream.value.filter(
         (row: any) =>
-          row.name.toLowerCase().includes(query) ||
-          row.stream_type.toLowerCase().includes(query)
+          row.name.toLowerCase().includes(query) || row.stream_type.toLowerCase().includes(query),
       );
     });
 
@@ -341,7 +314,7 @@ export default defineComponent({
       const cols: OTableColumnDef[] = [
         {
           id: "#",
-          header: "#",
+          header: raw("#"),
           cell: " ",
           size: 50,
           meta: { align: "left" },
@@ -358,7 +331,7 @@ export default defineComponent({
         {
           id: "order",
           accessorKey: "order",
-          header: "Order",
+          header: t("function.order"),
           cell: " ",
           sortable: true,
           size: COL.count,
@@ -367,7 +340,7 @@ export default defineComponent({
         {
           id: "applyBeforeFlattening",
           accessorKey: "applyBeforeFlattening",
-          header: "Apply Before Flattening",
+          header: t("function.applyBeforeFlattening"),
           cell: " ",
           sortable: true,
           size: 180,
@@ -378,7 +351,7 @@ export default defineComponent({
           header: t("user.actions"),
           isAction: true,
           size: 80,
-          meta: { align: "left", actionCount: 1 },
+          meta: { align: "center", actionCount: 1 },
         },
       ];
       if (expandedRow.value.stream_type !== "logs") {
@@ -389,25 +362,21 @@ export default defineComponent({
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
-        previousOrgIdentifier.value =
-          store.state.selectedOrganization.identifier;
+        previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while loading streams...",
-                  timeout: 0,
-});
+          message: t("toastMessages.functions.pleaseWaitWhileLoadingStreams"),
+          timeout: 0,
+        });
 
         getStreams("", false)
           .then((res: any) => {
-            let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
             resultTotal.value = res.list.length;
             logStream.value = res.list
-              .filter(
-                (stream: any) => stream.stream_type !== "enrichment_tables"
-              )
+              .filter((stream: any) => stream.stream_type !== "enrichment_tables")
               .map((data: any) => {
                 doc_num = "--";
                 storage_size = "--";
@@ -417,7 +386,6 @@ export default defineComponent({
                   compressed_size = data.stats.compressed_size + " MB";
                 }
                 return {
-                  "#": counter <= 9 ? `0${counter++}` : counter++,
                   name: data.name,
                   doc_num: doc_num,
                   storage_size: storage_size,
@@ -435,11 +403,11 @@ export default defineComponent({
 
             dismiss();
           })
-          .catch((err) => {
+          .catch(() => {
             dismiss();
             toast({
               variant: "error",
-              message: "Error while pulling stream.",
+              message: t("toastMessages.functions.errorWhilePullingStream"),
             });
           });
       }
@@ -455,10 +423,7 @@ export default defineComponent({
     const filterFn = (val: string) => {
       const needle = val.toLowerCase();
       filterFunctions.value = allFunctionsList.value
-        .filter(
-          (item: any) =>
-            !functionsList.value.some((obj: any) => obj.name === item.name)
-        ) // filter existing applied functions
+        .filter((item: any) => !functionsList.value.some((obj: any) => obj.name === item.name)) // filter existing applied functions
         .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
     };
 
@@ -466,18 +431,10 @@ export default defineComponent({
 
     const getAllFunctions = () => {
       jsTransformService
-        .list(
-          1,
-          100000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
+        .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
         .then((res: any) => {
           res.data.list.forEach((element: any) => {
-            element.applyBeforeFlattening =
-              element.applyBeforeFlattening || false;
+            element.applyBeforeFlattening = element.applyBeforeFlattening || false;
           });
           allFunctionsList.value = res.data?.list || [];
           filterFunctions.value = res.data?.list || [];
@@ -485,9 +442,7 @@ export default defineComponent({
         .catch((err) => {
           toast({
             variant: "error",
-            message:
-              JSON.stringify(err.response.data["error"]) ||
-              "Function fetching failed",
+            message: raw(JSON.stringify(err.response.data["error"]) || "Function fetching failed"),
           });
         });
     };
@@ -510,13 +465,10 @@ export default defineComponent({
             expandedRow.value.name,
             expandedRow.value.stream_type,
             selectedFunction.value.name,
-            apiData
+            apiData,
           )
           .then(() => {
-            return getStreamFunctions(
-              expandedRow.value.name,
-              expandedRow.value.stream_type
-            );
+            return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
           })
           .finally(() => {
             addFunctionInProgressLoading.value = false;
@@ -526,30 +478,20 @@ export default defineComponent({
       }
     });
 
-    const getStreamFunctions = async (
-      stream_name: any,
-      stream_type: string
-    ) => {
+    const getStreamFunctions = async (stream_name: any, stream_type: string) => {
       loadingFunctions.value = stream_name ? true : false;
       await jsTransformService
-        .stream_function(
-          store.state.selectedOrganization.identifier,
-          stream_name,
-          stream_type
-        )
+        .stream_function(store.state.selectedOrganization.identifier, stream_name, stream_type)
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
           functionsList.value.forEach((element: any) => {
-            element.applyBeforeFlattening =
-              element.applyBeforeFlattening || false;
+            element.applyBeforeFlattening = element.applyBeforeFlattening || false;
           });
         })
         .catch((err) => {
           toast({
             variant: "error",
-            message:
-              JSON.stringify(err.response.data["error"]) ||
-              "Function creation failed",
+            message: raw(JSON.stringify(err.response.data["error"]) || "Function creation failed"),
           });
         })
         .finally(() => {
@@ -563,13 +505,10 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           expandedRow.value.name,
           expandedRow.value.stream_type,
-          functionName
+          functionName,
         )
         .then(() => {
-          return getStreamFunctions(
-            expandedRow.value.name,
-            expandedRow.value.stream_type
-          );
+          return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
         })
         .finally(() => {
           addFunctionInProgressLoading.value = false;
@@ -596,23 +535,19 @@ export default defineComponent({
 
     const deleteStream = () => {
       streamService
-        .delete(
-          store.state.selectedOrganization.identifier,
-          deleteStreamName,
-          deleteStreamType
-        )
+        .delete(store.state.selectedOrganization.identifier, deleteStreamName, deleteStreamType)
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "Stream deleted successfully.",
+              message: t("toastMessages.functions.streamDeletedSuccessfully"),
               variant: "success",
             });
             getLogStream();
           }
         })
-        .catch((err: any) => {
+        .catch(() => {
           toast({
-            message: "Error while deleting stream.",
+            message: t("toastMessages.functions.errorWhileDeletingStream"),
             variant: "error",
           });
         });
@@ -623,10 +558,7 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      if (
-        previousOrgIdentifier.value !=
-        store.state.selectedOrganization.identifier
-      ) {
+      if (previousOrgIdentifier.value != store.state.selectedOrganization.identifier) {
         getLogStream();
       }
     });
@@ -638,13 +570,10 @@ export default defineComponent({
           expandedRow.value.name,
           expandedRow.value.stream_type,
           _function.name,
-          _function
+          _function,
         )
-        .then((res) => {
-          getStreamFunctions(
-            expandedRow.value.name,
-            expandedRow.value.stream_type
-          );
+        .then(() => {
+          getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
         });
     };
 
@@ -680,7 +609,7 @@ export default defineComponent({
       onExpandRow,
       pageSize,
       pageSizeOptions,
-      "delete": "delete",
+      delete: "delete",
       getImageURL,
       loadingFunctions,
       verifyOrganizationStatus,
@@ -694,10 +623,7 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
+      this.verifyOrganizationStatus(this.store.state.organizations, this.router);
       this.orgData = newVal;
       if (
         (newVal != oldVal || this.logStream.values == undefined) &&

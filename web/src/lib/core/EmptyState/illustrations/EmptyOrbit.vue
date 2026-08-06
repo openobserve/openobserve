@@ -26,38 +26,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
     role="img"
-    aria-label="Waiting for data"
+    :aria-label="t('emptyState.illustrations.orbit.ariaLabel')"
   >
     <ellipse cx="104" cy="80" rx="86" ry="54" fill="var(--color-primary-500)" opacity="0.06" />
 
     <!-- orbit guides -->
-    <circle cx="104" cy="80" r="46" stroke="var(--color-border-default)" stroke-width="1.25" stroke-dasharray="3 5" />
-    <circle cx="104" cy="80" r="28" stroke="var(--color-border-default)" stroke-width="1.25" stroke-dasharray="3 5" />
+    <circle
+      cx="104"
+      cy="80"
+      r="46"
+      stroke="var(--color-border-default)"
+      stroke-width="1.25"
+      stroke-dasharray="3 5"
+    />
+    <circle
+      cx="104"
+      cy="80"
+      r="28"
+      stroke="var(--color-border-default)"
+      stroke-width="1.25"
+      stroke-dasharray="3 5"
+    />
 
     <!-- outer orbit: two dots, clockwise -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="0 104 80;360 104 80" dur="7s" repeatCount="indefinite" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="0 104 80;360 104 80"
+        dur="7s"
+        repeatCount="indefinite"
+      />
       <circle cx="150" cy="80" r="6" fill="var(--color-primary-500)" />
       <circle cx="58" cy="80" r="4" fill="var(--color-primary-300)" />
     </g>
 
     <!-- inner orbit: one dot, counter-clockwise -->
     <g>
-      <animateTransform v-if="animated" attributeName="transform" type="rotate" values="360 104 80;0 104 80" dur="4.5s" repeatCount="indefinite" />
+      <animateTransform
+        v-if="animated"
+        attributeName="transform"
+        type="rotate"
+        values="360 104 80;0 104 80"
+        dur="4.5s"
+        repeatCount="indefinite"
+      />
       <circle cx="132" cy="80" r="5" fill="var(--color-primary-400)" />
     </g>
 
     <!-- central node -->
-    <circle cx="104" cy="80" r="16" fill="var(--color-surface-base)" stroke="var(--color-border-strong)" stroke-width="1.5" />
+    <circle
+      cx="104"
+      cy="80"
+      r="16"
+      fill="var(--color-surface-base)"
+      stroke="var(--color-border-strong)"
+      stroke-width="1.5"
+    />
     <circle cx="104" cy="80" r="6" fill="var(--color-primary-600)">
-      <animate v-if="animated" attributeName="r" values="6;7.5;6" dur="2.4s" repeatCount="indefinite" />
+      <animate
+        v-if="animated"
+        attributeName="r"
+        values="6;7.5;6"
+        dur="2.4s"
+        repeatCount="indefinite"
+      />
     </circle>
   </svg>
 </template>
 
 <script setup lang="ts">
-withDefaults(
-  defineProps<{ width?: number; animated?: boolean }>(),
-  { width: 208, animated: true },
-);
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
+withDefaults(defineProps<{ width?: number; animated?: boolean }>(), { width: 208, animated: true });
 </script>

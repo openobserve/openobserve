@@ -16,16 +16,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:justify-between tw:w-full tw:py-px tw:px-1 tw:border-t tw:border-(--o2-border-color) tw:bg-(--o2-card-bg)"
-    :class="showSchemaToggle || showQuickMode ? 'tw:flex' : ''"
+    class="border-card-glass-border bg-card-glass-bg w-full justify-between border-t px-1 py-px"
+    :class="showSchemaToggle || showQuickMode ? 'flex' : ''"
   >
     <!-- Schema Toggle Buttons -->
     <div v-if="showSchemaToggle">
       <OToggleGroup
         :model-value="useUserDefinedSchemas"
-        @update:model-value="$emit('toggle-schema', $event)"
+        @update:model-value="$emit('toggle-schema', $event as string)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
-        class="schema-field-toggle tw:p-0 tw:mt-1"
+        class="schema-field-toggle mt-1 p-0"
       >
         <OToggleGroupItem
           v-for="opt in schemaToggleOptions"
@@ -41,10 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         >
           <template v-if="opt.slot === 'user_defined_slot'">
-            <OIcon name="person" size="xs" class="tw:text-[10px]!"></OIcon>
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+            <OIcon name="person" size="xs" class="text-3xs!"></OIcon>
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
-              :data-test="`${dataTestPrefix}-fields-list-user-defined-fields-warning-tooltip`"
               :content="t('search.userDefinedSchemaLabel')"
               max-width="18.75rem"
               side="right"
@@ -52,25 +51,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template v-else-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
-            <OTooltip
-              :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
-              max-width="18.75rem"
-              side="right"
-              align="center"
-            >
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
-                <span class="tw:font-bold">{{ t("search.allFieldsLabel") }}</span>
-                <hr class="tw:my-1 tw:opacity-50" />
+                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
             </OTooltip>
           </template>
-          <template
-            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
-          >
-            <OIcon name="info-outline" size="xs" class="tw:text-[10px]!" />
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -87,7 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div v-else-if="showQuickMode">
       <OToggleGroup
         :model-value="showOnlyInterestingFields"
-        @update:model-value="$emit('toggle-interesting-fields', $event)"
+        @update:model-value="$emit('toggle-interesting-fields', $event as boolean)"
         :data-test="`${dataTestPrefix}-fields-list-user-defined-schema-toggle`"
         class="schema-field-toggle"
       >
@@ -96,28 +88,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="opt.value"
           :value="opt.value"
           size="xs"
-          :data-test="opt.slot === 'all_fields_slot' ? `${dataTestPrefix}-all-fields-btn` : `${dataTestPrefix}-interesting-fields-btn`"
+          :data-test="
+            opt.slot === 'all_fields_slot'
+              ? `${dataTestPrefix}-all-fields-btn`
+              : `${dataTestPrefix}-interesting-fields-btn`
+          "
         >
           <template v-if="opt.slot === 'all_fields_slot'">
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
-            <OTooltip
-              :data-test="`${dataTestPrefix}-fields-list-all-fields-warning-tooltip`"
-              max-width="18.75rem"
-              side="right"
-              align="center"
-            >
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
+            <OTooltip max-width="18.75rem" side="right" align="center">
               <template #content>
-                <span class="tw:font-bold">{{ t("search.allFieldsLabel") }}</span>
-                <hr class="tw:my-1 tw:opacity-50" />
+                <span class="font-bold">{{ t("search.allFieldsLabel") }}</span>
+                <hr class="my-1 opacity-50" />
                 {{ t("search.allFieldsWarningMsg") }}
               </template>
             </OTooltip>
           </template>
-          <template
-            v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode"
-          >
-            <OIcon name="info-outline" size="xs" class="tw:text-[10px]!" />
-            <OIcon name="schema" size="xs" class="tw:text-[10px]!"></OIcon>
+          <template v-else-if="opt.slot === 'interesting_fields_slot' && showQuickMode">
+            <OIcon name="info-outline" size="xs" class="text-3xs!" />
+            <OIcon name="schema" size="xs" class="text-3xs!"></OIcon>
             <OTooltip
               :content="t('search.showOnlyInterestingFields')"
               max-width="18.75rem"
@@ -131,12 +120,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Pagination and Reset Controls -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:gap-1">
+    <div class="flex items-center justify-end gap-1">
       <!-- Pagination -->
-      <div v-if="pagesNumber > 1" class="tw:flex tw:items-center tw:gap-0.5">
+      <div v-if="pagesNumber > 1" class="flex items-center gap-0.5">
         <OTooltip
-          :data-test="`${dataTestPrefix}-fields-list-pagination-tooltip`"
-          :content="'Total Fields: ' + totalFieldsCount"
+          :content="t('common.totalFields', { count: totalFieldsCount })"
           max-width="18.75rem"
           side="left"
           align="center"
@@ -149,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isFirstPage"
           @click="$emit('first-page')"
-          aria-label="First page"
+          :aria-label="t('search.firstPage')"
         >
           <OIcon name="fast-rewind" size="xs" />
         </OButton>
@@ -173,23 +161,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="icon-xs-sq"
           :disabled="isLastPage"
           @click="$emit('last-page')"
-          aria-label="Last page"
+          :aria-label="t('search.lastPage')"
         >
           <OIcon name="fast-forward" size="xs" />
         </OButton>
       </div>
 
       <!-- Reset Fields Icon -->
-      <div class="tw:flex tw:items-center">
+      <div class="flex items-center">
         <OIcon
           name="restart-alt"
           size="sm"
           :data-test="`${dataTestPrefix}-fields-list-reset-icon`"
-          class="tw:cursor-pointer tw:text-sm tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100!"
+          class="cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100!"
           @click="$emit('reset-fields')"
         />
         <OTooltip
-          :data-test="`${dataTestPrefix}-fields-list-reset-tooltip`"
           :content="t('search.resetFields')"
           max-width="18.75rem"
           side="left"
@@ -202,14 +189,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 interface Props {
   dataTestPrefix?: string;
@@ -271,12 +258,13 @@ const visiblePages = computed(() => {
 });
 </script>
 
-<style>
-.schema-field-toggle [role="group"] {
+<style scoped>
+/* keep(complex-state): :deep overrides of the child toggle-group's [role=group] internals */
+.schema-field-toggle :deep([role="group"]) {
   gap: 0.125rem;
 }
 
-.schema-field-toggle [role="group"] > * {
+.schema-field-toggle :deep([role="group"]) > * {
   gap: 0.25rem;
   height: 1.375rem;
   min-height: unset;

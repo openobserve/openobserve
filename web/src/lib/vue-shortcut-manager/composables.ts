@@ -1,13 +1,10 @@
+import { raw } from "@/types/i18n";
+
 import { onMounted, onUnmounted, ref } from "vue";
 import { getManager } from "./manager";
 import { isMacOS } from "@/utils/keyboardShortcuts";
 import { getShortcutDef, resolveShortcutKeys } from "./shortcutRegistry";
-import type {
-  Shortcut,
-  ShortcutById,
-  ShortcutInput,
-  RegisteredShortcut,
-} from "./types";
+import type { Shortcut, ShortcutById, ShortcutInput, RegisteredShortcut } from "./types";
 
 // ---------- useShortcut ----------
 
@@ -34,11 +31,7 @@ export function useShortcut(
 
 /** True for the registry-driven `{ id, handler }` form (no inline key). */
 function isById(input: ShortcutInput): input is ShortcutById {
-  return (
-    !("key" in input) &&
-    !("keyForWindows" in input) &&
-    !("keyForMac" in input)
-  );
+  return !("key" in input) && !("keyForWindows" in input) && !("keyForMac" in input);
 }
 
 /**
@@ -59,10 +52,7 @@ function isById(input: ShortcutInput): input is ShortcutById {
  * mounted that scope is made active (and restored on unmount) so page-level
  * shortcuts only fire on their page. Pass `scope` to override.
  */
-export function useShortcuts(
-  shortcuts: ShortcutInput[],
-  scope?: string,
-): void {
+export function useShortcuts(shortcuts: ShortcutInput[], scope?: string): void {
   const ids: string[] = [];
   let previousScope: string | undefined;
   let resolvedScope: string | undefined;
@@ -92,7 +82,7 @@ export function useShortcuts(
             id: keys.length > 1 ? `${def.id}-${i}` : def.id,
             key,
             scope: def.scope,
-            description: def.descriptionKey,
+            description: raw(def.descriptionKey),
             handler: input.handler,
             whenFocused: input.whenFocused,
             allowInInput: def.allowInInput,
@@ -114,11 +104,7 @@ export function useShortcuts(
     }
 
     for (const s of toRegister) {
-      ids.push(
-        manager.register(
-          resolvedScope && !s.scope ? { ...s, scope: resolvedScope } : s,
-        ),
-      );
+      ids.push(manager.register(resolvedScope && !s.scope ? { ...s, scope: resolvedScope } : s));
     }
   });
 

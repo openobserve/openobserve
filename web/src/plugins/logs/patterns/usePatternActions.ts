@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
 import { searchState } from "@/composables/useLogs/searchState";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -28,13 +29,29 @@ import {
 export const usePatternActions = () => {
   const store = useStore();
   const router = useRouter();
+  const { t } = useI18nTyped();
   const { searchObj } = searchState();
   const { patternsState } = usePatterns();
 
   const selectedPattern = ref<any>(null);
   const showPatternDetails = ref(false);
 
-  const openPatternDetails = (pattern: any, index: number) => {
+  // The exact list being navigated — snapshotted at open time from the list the
+  // user clicked (the severity-filtered view when a filter is active), so the
+  // index, Next/Prev, and "X of Y" all agree. Falls back to the full pattern set
+  // when the caller doesn't supply a list.
+  const navPatterns = ref<any[]>([]);
+
+  /** The list to navigate: the snapshot when there is one, otherwise the full
+   * pattern set. Without the fallback, navigation silently does nothing if the
+   * drawer's state was set without going through `openPatternDetails`. */
+  const navigablePatterns = computed<any[]>(() =>
+    navPatterns.value.length ? navPatterns.value : (patternsState.value.patterns?.patterns ?? []),
+  );
+  const navTotal = computed(() => navigablePatterns.value.length);
+
+  const openPatternDetails = (pattern: any, index: number, visiblePatterns?: any[]) => {
+    navPatterns.value = visiblePatterns ?? patternsState.value.patterns?.patterns ?? [];
     selectedPattern.value = { pattern, index };
     showPatternDetails.value = true;
   };
@@ -42,57 +59,50 @@ export const usePatternActions = () => {
   const navigatePatternDetail = (next: boolean, prev: boolean) => {
     if (!selectedPattern.value) return;
 
+    const list = navigablePatterns.value;
     const currentIndex = (selectedPattern.value as any).index;
-    const totalPatterns = patternsState.value.patterns?.patterns?.length || 0;
 
     let newIndex = currentIndex;
-    if (next && currentIndex < totalPatterns - 1) {
+    if (next && currentIndex < list.length - 1) {
       newIndex = currentIndex + 1;
     } else if (prev && currentIndex > 0) {
       newIndex = currentIndex - 1;
     }
 
-    if (newIndex !== currentIndex && patternsState.value.patterns?.patterns) {
-      const newPattern = patternsState.value.patterns.patterns[newIndex];
-      selectedPattern.value = { pattern: newPattern, index: newIndex };
+    if (newIndex !== currentIndex && list[newIndex]) {
+      selectedPattern.value = { pattern: list[newIndex], index: newIndex };
     }
   };
 
-  const addPatternToSearch = (
-    pattern: any,
-    action: "include" | "exclude",
-  ) => {
-    const constants = extractConstantsFromPattern(pattern.template);
+  const addPatternToSearch = (pattern: any, action: "include" | "exclude") => {
+    // Only the pattern's invariant constant text identifies the pattern. An
+    // all-wildcard template has none — its sample values are per-log examples,
+    // not invariants — so there's no reliable filter and we warn instead of
+    // applying a misleading one (see extractConstantsFromPattern).
+    const terms = extractConstantsFromPattern(pattern.template);
 
-    if (constants.length === 0) {
+    if (terms.length === 0) {
       toast({
         variant: "warning",
-        message: "No strings longer than 10 characters found in pattern",
+        message: t("logs.patternList.noMatchTerms"),
       });
       return;
     }
 
-    const matchAllClauses = constants.map(
-      (constant) => `match_all('${escapeForMatchAll(constant)}')`,
-    );
+    const matchAllClauses = terms.map((term) => `match_all('${escapeForMatchAll(term)}')`);
 
     let filterExpression = matchAllClauses.join(" AND ");
 
     if (action === "exclude") {
       filterExpression =
-        matchAllClauses.length > 1
-          ? `NOT (${filterExpression})`
-          : `NOT ${filterExpression}`;
+        matchAllClauses.length > 1 ? `NOT (${filterExpression})` : `NOT ${filterExpression}`;
     }
 
     searchObj.data.stream.addToFilter = filterExpression;
     searchObj.meta.logsVisualizeToggle = "logs";
   };
 
-  const addWildcardValueToSearch = (
-    value: string,
-    action: "include" | "exclude",
-  ) => {
+  const addWildcardValueToSearch = (value: string, action: "include" | "exclude") => {
     const escaped = escapeForMatchAll(value);
     let filterExpression = `match_all('${escaped}')`;
 
@@ -109,18 +119,18 @@ export const usePatternActions = () => {
     if (!streamName) {
       toast({
         variant: "warning",
-        message:
-          "No stream selected. Please select a stream before creating an alert.",
+        message: t("logs.patternList.noStreamSelected"),
       });
       return;
     }
 
-    const constants = extractConstantsFromPattern(pattern.template);
-    if (constants.length === 0) {
+    // Block when the alert query would have no distinctive constants — without
+    // them buildPatternSqlQuery produces a WHERE-less SELECT that matches every
+    // log in the stream, which is almost never a useful alert.
+    if (extractConstantsFromPattern(pattern.template).length === 0) {
       toast({
         variant: "warning",
-        message:
-          "Pattern has very short constant segments. The alert query will match all logs in this stream — consider adding manual filters.",
+        message: t("logs.patternList.alertBroadMatch"),
         timeout: 5000,
       });
       return;
@@ -130,9 +140,7 @@ export const usePatternActions = () => {
     const start = dt?.startTime;
     const end = dt?.endTime;
     const periodMinutes =
-      start && end
-        ? Math.max(5, Math.min(60, Math.round((end - start) / 60_000_000)))
-        : 15;
+      start && end ? Math.max(5, Math.min(60, Math.round((end - start) / 60_000_000))) : 15;
 
     const patternData = buildPatternAlertData(
       pattern,
@@ -156,6 +164,7 @@ export const usePatternActions = () => {
     showPatternDetails,
     openPatternDetails,
     navigatePatternDetail,
+    navTotal,
     addPatternToSearch,
     addWildcardValueToSearch,
     createAlertFromPattern,

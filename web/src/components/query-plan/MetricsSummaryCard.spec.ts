@@ -19,7 +19,6 @@ import i18n from "@/locales";
 import MetricsSummaryCard from "./MetricsSummaryCard.vue";
 import type { SummaryMetrics } from "@/utils/queryPlanParser";
 
-
 const defaultMetrics: SummaryMetrics = {
   totalTime: "1.23ms",
   totalRows: "1,000",
@@ -48,7 +47,7 @@ describe("MetricsSummaryCard", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should render a q-card element", () => {
+    it("should render the summary card element", () => {
       wrapper = mountComponent();
       expect(wrapper.find('[data-test="metrics-summary-card"]').exists()).toBe(true);
     });

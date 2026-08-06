@@ -22,12 +22,31 @@ import DynamoDB from "./DynamoDB.vue";
 import dynamodbCard from "@/components/ingestion/setupCard/content/dynamodb";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
-vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "t@e.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
+}));
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "t@e.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -36,7 +55,11 @@ describe("dynamodbCard builder", () => {
     const card = dynamodbCard(SUBS);
     expect(card.provider.name).toBe("DynamoDB");
     expect(card.provider.metaBadges).toEqual(["Logs"]);
-    expect(card.detect).toMatchObject({ streamType: "logs", match: "keyword", streamName: "dynamodb" });
+    expect(card.detect).toMatchObject({
+      streamType: "logs",
+      match: "keyword",
+      streamName: "dynamodb",
+    });
     expect(card.steps.map((s) => s.id)).toEqual(["firehose-endpoint", "pipeline", "verify"]);
     const code = card.steps.find((s) => s.id === "firehose-endpoint")!.code!;
     expect(code.raw).toContain(`${SUBS.url}/aws/${SUBS.org}/dynamodb/_kinesis_firehose`);
@@ -45,7 +68,9 @@ describe("dynamodbCard builder", () => {
 });
 describe("DynamoDB.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card", () => {
     expect(getDataSourceCard("dynamoDB", SUBS)?.provider.name).toBe("DynamoDB");
     wrapper = mount(DynamoDB, { global: { plugins: [mockStore, mockI18n] } });

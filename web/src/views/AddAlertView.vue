@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-height">
+  <div class="h-full max-h-full overflow-hidden">
     <AddAlert
       v-if="destinations.length > 0"
       :isUpdated="isUpdated"
@@ -34,6 +34,7 @@ import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -41,6 +42,7 @@ export default defineComponent({
     AddAlert,
   },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -57,7 +59,7 @@ export default defineComponent({
       } catch (error) {
         toast({
           variant: "error",
-          message: "Error while pulling destinations.",
+          message: t("toastMessages.views.errorWhilePullingDestinations"),
         });
       }
     };
@@ -94,8 +96,7 @@ export default defineComponent({
       if (!destinations.value.length) {
         toast({
           variant: "warning",
-          message:
-            "No destinations found. Please create a destination first.",
+          message: t("toastMessages.views.noDestinationsFoundPleaseCreateA"),
         });
         router.push({
           name: "alertList",
@@ -116,4 +117,3 @@ export default defineComponent({
   },
 });
 </script>
-

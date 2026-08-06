@@ -15,92 +15,140 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog v-model:open="showDialog" data-test="enterprise-upgrade-dialog" :show-close="false" :width="75" @update:open="(v) => !v && onDialogHide()">
-    <div class="enterprise-dialog-v3 tw:overflow-hidden tw:relative tw:-my-(--spacing-dialog-content-py) tw:-mx-(--spacing-dialog-content-px)">
+  <ODialog
+    v-model:open="showDialog"
+    data-test="enterprise-upgrade-dialog"
+    :show-close="false"
+    :width="75"
+    @update:open="(v) => !v && onDialogHide()"
+  >
+    <div
+      class="enterprise-dialog-v3 relative -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py) overflow-hidden"
+    >
       <!-- Close Button -->
-      <div class="tw:absolute tw:top-4 tw:right-4 tw:z-[100]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.7)] tw:hover:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.6)] tw:hover:text-[rgba(0,0,0,0.87)]'">
-        <OButton
-          variant="ghost"
-          size="icon"
-          @click="showDialog = false"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+      <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
+        <OButton variant="ghost" size="icon" @click="showDialog = false">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
         </OButton>
       </div>
 
-      <div class="dialog-split-layout tw:flex tw:max-h-[92vh]" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
+      <div
+        class="dialog-split-layout flex max-h-[92vh] max-[56.25rem]:flex-col"
+        :class="{ 'cloud-layout': dialogConfig.isCloudLayout }"
+      >
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
-        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel tw:[flex:0_0_35%] tw:bg-[linear-gradient(135deg,var(--q-primary)_0%,color-mix(in_srgb,var(--q-primary)_85%,black_15%)_100%)] tw:p-[40px] tw:flex tw:flex-col tw:relative tw:text-white tw:overflow-y-auto tw:min-h-0">
-
-          <div class="tw:flex-1 tw:flex tw:flex-col tw:justify-center tw:items-center tw:max-w-[400px] tw:w-full tw:m-auto">
-            <div class="tw:w-[80px] tw:h-[80px] tw:bg-[rgba(255,255,255,0.15)] tw:rounded-[16px] tw:flex tw:items-center tw:justify-center tw:mb-6 tw:backdrop-blur-[10px]">
+        <div
+          v-if="!dialogConfig.isCloudLayout"
+          class="hero-panel relative flex min-h-0 [flex:0_0_35%] flex-col overflow-y-auto bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 text-white max-[56.25rem]:min-h-100 max-[56.25rem]:flex-none"
+        >
+          <div class="m-auto flex w-full max-w-100 flex-1 flex-col items-center justify-center">
+            <div
+              class="rounded-default mb-6 flex h-20 w-20 items-center justify-center bg-[rgba(255,255,255,0.15)] backdrop-blur-[10px]"
+            >
               <OIcon name="workspace-premium" size="xl" />
             </div>
 
-            <div data-test="enterprise-upgrade-hero-title" class="tw:text-[32px] tw:font-bold tw:mb-4 tw:leading-[1.2] tw:text-center tw:text-white">{{ dialogConfig.heroTitle }}</div>
+            <div
+              data-test="enterprise-upgrade-hero-title"
+              class="mb-4 text-center text-3xl leading-[1.2] font-bold text-white"
+            >
+              {{ dialogConfig.heroTitle }}
+            </div>
 
-            <div class="tw:mb-6 tw:text-sm tw:leading-[1.6] tw:opacity-[0.95] tw:text-center tw:text-white">
+            <div class="mb-6 text-center text-sm leading-[1.6] text-white opacity-[0.95]">
               {{ dialogConfig.offerText }}
             </div>
 
-            <div class="tw:mb-8 tw:flex tw:flex-row tw:items-center tw:justify-center tw:gap-4">
+            <div class="mb-8 flex flex-row items-center justify-center gap-4">
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
                 <OSkeleton
-                  class="tw:shrink-0 tw:rounded-full"
-                  style="width: 40px; height: 40px;"
+                  class="h-10 w-10 shrink-0 rounded-full"
                   data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
                 <OSkeleton
-                  class="tw:shrink-0 tw:rounded-3xl"
-                  style="width: 200px; height: 44px;"
+                  class="rounded-default shrink-0"
+                  style="width: 200px; height: 44px"
                   data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <div data-test="enterprise-upgrade-offer-badge" class="tw:inline-flex tw:items-center tw:bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] tw:py-[10px] tw:px-5 tw:rounded-[24px] tw:font-bold tw:text-[15px] tw:backdrop-blur-[10px] tw:text-white tw:shadow-[0_4px_16px_rgba(34,197,94,0.4)]" :class="{ 'tw:bg-[rgba(255,255,255,0.2)]! tw:shadow-[0_4px_12px_rgba(0,0,0,0.15)]!': dialogConfig.isLicensed }">
-                  <OIcon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="md" class="tw:mr-1" />
+                <div
+                  data-test="enterprise-upgrade-offer-badge"
+                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
+                  :class="{
+                    'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!':
+                      dialogConfig.isLicensed,
+                  }"
+                >
+                  <OIcon
+                    v-if="!dialogConfig.showUsageIndicator"
+                    :name="dialogConfig.badgeIcon"
+                    size="md"
+                    class="mr-1"
+                  />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
             </div>
 
             <!-- Usage Chart (only for Enterprise with license) -->
-            <div v-if="dialogConfig.isLicensed" class="tw:w-full tw:mb-6 tw:bg-[rgba(255,255,255,0.1)] tw:rounded-[12px] tw:p-4 tw:backdrop-blur-[10px] tw:border tw:border-[rgba(255,255,255,0.2)]">
+            <div
+              v-if="dialogConfig.isLicensed"
+              class="rounded-default mb-6 w-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-4 backdrop-blur-[10px]"
+            >
               <!-- Loading skeleton -->
               <template v-if="isLoadingLicense">
                 <OSkeleton
-                  class="chart-skeleton tw:rounded-lg"
-                  style="height: 150px;"
+                  class="chart-skeleton rounded-default"
+                  style="height: 150px"
                   data-test="enterprise-upgrade-chart-skeleton"
                 />
               </template>
               <!-- Loaded chart -->
               <template v-else-if="chartData">
-                <div class="tw:relative tw:w-full">
-                  <div class="usage-chart-container tw:w-full tw:overflow-visible tw:p-0 tw:mx-auto tw:min-h-[150px] tw:max-h-[150px]" style="height: 150px; width: 100%;">
-                    <ChartRenderer
-                      :key="dashboardRenderKey"
-                      :data="chartData"
-                    />
+                <div class="relative w-full">
+                  <div
+                    class="usage-chart-container mx-auto max-h-37.5 min-h-37.5 w-full overflow-visible p-0"
+                    style="height: 150px"
+                  >
+                    <ChartRenderer :key="dashboardRenderKey" :data="chartData" />
                   </div>
-                  <div v-if="isIngestionUnlimited" class="tw:text-xs" style="color: rgba(255, 255, 255, 0.7); font-size: 10px; text-align: center; margin-top: 4px;">
-                    {{ t('about.usage_shows_zero_unlimited') }}
+                  <div
+                    v-if="isIngestionUnlimited"
+                    class="mt-1 text-center text-xs"
+                    style="color: rgba(255, 255, 255, 0.7); font-size: var(--text-3xs)"
+                  >
+                    {{ t("about.usage_shows_zero_unlimited") }}
                   </div>
                 </div>
               </template>
             </div>
 
-            <div class="tw:flex tw:flex-col tw:gap-3 tw:w-full">
+            <div class="flex w-full flex-col gap-3">
               <OButton
                 v-if="dialogConfig.showPrimaryButton"
                 variant="on-dark-primary"
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="tw:bg-white! tw:text-[var(--q-primary)]! tw:font-bold! tw:py-[10px] tw:px-8 tw:text-[15px] tw:rounded-lg! tw:shadow-[0_4px_16px_rgba(0,0,0,0.15)] tw:transition-all tw:duration-300 tw:[transition-timing-function:cubic-bezier(0.4,0,0.2,1)] tw:[letter-spacing:0.3px] tw:hover:[transform:translateY(-3px)_scale(1.02)] tw:hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] tw:active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.3px] text-[var(--color-theme-accent)]! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-3px)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 {{ dialogConfig.primaryButtonText }}
                 <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
@@ -112,9 +160,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="on-dark-ghost"
                 size="lg"
                 @click="contactSales"
-                class="tw:font-semibold! tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.2px] transition-all duration-300 hover:[transform:translateX(4px)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
-                {{ t('about.enterprise_offer.buttons.contact_sales') }}
+                {{ t("about.enterprise_offer.buttons.contact_sales") }}
               </OButton>
               <OButton
                 v-else
@@ -122,50 +170,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="openDocsLink"
                 data-test="enterprise-upgrade-learn-more-btn"
-                class="tw:font-semibold! tw:py-[10px] tw:px-6 tw:text-[15px] tw:rounded-lg! tw:border-2 tw:border-[rgba(255,255,255,0.3)] tw:transition-all tw:duration-300 tw:bg-transparent tw:[letter-spacing:0.2px] tw:hover:bg-[rgba(255,255,255,0.15)] tw:hover:border-[rgba(255,255,255,0.5)] tw:hover:[transform:translateX(4px)] tw:active:[transform:scale(0.96)]"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.2px] transition-all duration-300 hover:[transform:translateX(4px)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
               >
-                {{ t('about.enterprise_offer.buttons.learn_more') }}
+                {{ t("about.enterprise_offer.buttons.learn_more") }}
               </OButton>
             </div>
           </div>
         </div>
 
         <!-- Right Panel - Features List -->
-        <div class="tw:flex-1 tw:flex tw:flex-col tw:overflow-hidden" :class="[isDark ? 'tw:bg-[#1e1e1e]' : 'tw:bg-white', { 'tw:max-w-full': dialogConfig.isCloudLayout }]">
-          <div class="tw:pt-4 tw:pb-3 tw:px-8 tw:sticky tw:top-0 tw:z-10 tw:border-b tw:text-center" :class="isDark ? 'tw:bg-[#1e1e1e] tw:border-b-[rgba(255,255,255,0.1)]' : 'tw:bg-white tw:border-b-[rgba(0,0,0,0.08)]'">
-            <div data-test="enterprise-upgrade-features-title" class="tw:text-[18px] tw:font-bold tw:mb-1 tw:[letter-spacing:-0.3px]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.9)]'">{{ dialogConfig.featuresTitle }}</div>
-            <div class="tw:text-xs tw:font-medium" :class="isDark ? 'tw:text-[rgba(255,255,255,0.6)]' : 'tw:text-[rgba(0,0,0,0.6)]'">{{ dialogConfig.featuresSubtitle }}</div>
+        <div
+          class="bg-surface-base flex flex-1 flex-col overflow-hidden"
+          :class="[{ 'max-w-full': dialogConfig.isCloudLayout }]"
+        >
+          <div
+            class="bg-surface-base border-border-default sticky top-0 z-10 border-b px-8 pt-4 pb-3 text-center"
+          >
+            <div
+              data-test="enterprise-upgrade-features-title"
+              class="text-text-heading mb-1 text-lg font-bold [letter-spacing:-0.3px]"
+            >
+              {{ dialogConfig.featuresTitle }}
+            </div>
+            <div class="text-text-secondary text-xs font-medium">
+              {{ dialogConfig.featuresSubtitle }}
+            </div>
           </div>
 
           <!-- Cloud 3-column layout -->
-          <div v-if="dialogConfig.isCloudLayout" data-test="enterprise-upgrade-features-list-cloud" class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-3 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
+          <div
+            v-if="dialogConfig.isCloudLayout"
+            data-test="enterprise-upgrade-features-list-cloud"
+            class="grid flex-1 grid-cols-3 content-start gap-x-[14px] gap-y-[7px] overflow-y-auto px-8 pt-2 pb-4"
+          >
             <!-- Column 1: Core Features -->
             <div
               v-for="feature in coreFeatures"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:transition-all tw:duration-200"
+              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
               :class="[
-                isDark ? 'tw:border-[rgba(255,255,255,0.12)]' : 'tw:border-[rgba(0,0,0,0.08)]',
+                'border-border-default',
                 feature.link
-                  ? (isDark
-                    ? 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.1)] tw:hover:border-[rgba(var(--q-primary-rgb),0.4)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)]'
-                    : 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.05)] tw:hover:border-[rgba(var(--q-primary-rgb),0.3)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)]')
-                  : (isDark
-                    ? 'tw:hover:bg-[rgba(255,255,255,0.05)]'
-                    : 'tw:hover:bg-[rgba(0,0,0,0.03)] tw:hover:border-[rgba(0,0,0,0.12)]')
+                  ? isDark
+                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                  : isDark
+                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
+                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="tw:shrink-0 tw:w-[30px] tw:h-[30px] tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:text-[var(--q-primary)]" :class="isDark ? 'tw:bg-[rgba(var(--q-primary-rgb),0.15)]' : 'tw:bg-[rgba(var(--q-primary-rgb),0.1)]'">
+              <div
+                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+              >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
+              <div class="min-w-0 flex-1">
+                <div
+                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
+                  :class="'text-text-heading'"
+                >
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
+                  <OIcon
+                    v-if="feature.link"
+                    name="open-in-new"
+                    size="xs"
+                    class="ml-1 align-middle opacity-60"
+                  />
                 </div>
-                <div class="tw:text-[11px] tw:leading-[1.25]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.55)]' : 'tw:text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
+                  {{ feature.note }}
+                </div>
               </div>
             </div>
 
@@ -175,67 +251,116 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-show="!feature.cloudHidden"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:transition-all tw:duration-200"
+              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
               :class="[
-                isDark ? 'tw:border-[rgba(255,255,255,0.12)]' : 'tw:border-[rgba(0,0,0,0.08)]',
+                'border-border-default',
                 feature.link
-                  ? (isDark
-                    ? 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.1)] tw:hover:border-[rgba(var(--q-primary-rgb),0.4)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)]'
-                    : 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.05)] tw:hover:border-[rgba(var(--q-primary-rgb),0.3)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)]')
-                  : (isDark
-                    ? 'tw:hover:bg-[rgba(255,255,255,0.05)]'
-                    : 'tw:hover:bg-[rgba(0,0,0,0.03)] tw:hover:border-[rgba(0,0,0,0.12)]')
+                  ? isDark
+                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                  : isDark
+                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
+                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="tw:shrink-0 tw:w-[30px] tw:h-[30px] tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:text-[var(--q-primary)]" :class="isDark ? 'tw:bg-[rgba(var(--q-primary-rgb),0.15)]' : 'tw:bg-[rgba(var(--q-primary-rgb),0.1)]'">
+              <div
+                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+              >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
+              <div class="min-w-0 flex-1">
+                <div
+                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
+                  :class="'text-text-heading'"
+                >
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
-                  <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
+                  <OIcon
+                    v-if="feature.link"
+                    name="open-in-new"
+                    size="xs"
+                    class="ml-1 align-middle opacity-60"
+                  />
+                  <OTag
+                    v-if="feature.beta"
+                    type="featureFlag"
+                    value="beta"
+                    data-test="enterprise-upgrade-feature-beta-badge"
+                  />
                 </div>
-                <div class="tw:text-[11px] tw:leading-[1.25]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.55)]' : 'tw:text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
+                  {{ feature.note }}
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Standard 2-column layout for non-Cloud -->
-          <div v-else data-test="enterprise-upgrade-features-list-standard" class="tw:flex-1 tw:overflow-y-auto tw:pt-2 tw:pb-4 tw:px-8 tw:grid tw:grid-cols-2 tw:gap-y-[7px] tw:gap-x-[14px] tw:content-start">
+          <div
+            v-else
+            data-test="enterprise-upgrade-features-list-standard"
+            class="grid flex-1 grid-cols-2 content-start gap-x-[14px] gap-y-[7px] overflow-y-auto px-8 pt-2 pb-4"
+          >
             <div
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudOnly"
               :key="feature.name"
               data-test="enterprise-upgrade-feature-item"
-              class="tw:flex tw:gap-[10px] tw:p-[8px_12px] tw:rounded-md tw:border tw:transition-all tw:duration-200"
+              class="rounded-default flex gap-2.5 border p-[8px_12px] transition-all duration-200"
               :class="[
-                isDark ? 'tw:border-[rgba(255,255,255,0.12)]' : 'tw:border-[rgba(0,0,0,0.08)]',
+                'border-border-default',
                 feature.link
-                  ? (isDark
-                    ? 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.1)] tw:hover:border-[rgba(var(--q-primary-rgb),0.4)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)]'
-                    : 'tw:cursor-pointer tw:hover:bg-[rgba(var(--q-primary-rgb),0.05)] tw:hover:border-[rgba(var(--q-primary-rgb),0.3)] tw:hover:[transform:translateX(2px)] tw:active:[transform:translateX(0)]')
-                  : (isDark
-                    ? 'tw:hover:bg-[rgba(255,255,255,0.05)]'
-                    : 'tw:hover:bg-[rgba(0,0,0,0.03)] tw:hover:border-[rgba(0,0,0,0.12)]')
+                  ? isDark
+                    ? 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_40%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] active:[transform:translateX(0)]'
+                    : 'cursor-pointer hover:[transform:translateX(2px)] hover:border-[color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-theme-accent)_5%,transparent)] active:[transform:translateX(0)]'
+                  : isDark
+                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
+                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
               ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="tw:shrink-0 tw:w-[30px] tw:h-[30px] tw:rounded-lg tw:flex tw:items-center tw:justify-center tw:text-[var(--q-primary)]" :class="isDark ? 'tw:bg-[rgba(var(--q-primary-rgb),0.15)]' : 'tw:bg-[rgba(var(--q-primary-rgb),0.1)]'">
+              <div
+                class="rounded-default flex h-7.5 w-7.5 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] text-[var(--color-theme-accent)] dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_15%,transparent)]"
+              >
                 <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="tw:flex-1 tw:min-w-0">
-                <div data-test="enterprise-upgrade-feature-name" class="tw:text-[13px] tw:font-semibold tw:mb-0.5 tw:leading-[1.25] tw:flex tw:items-center tw:gap-1.5" :class="isDark ? 'tw:text-[rgba(255,255,255,0.95)]' : 'tw:text-[rgba(0,0,0,0.87)]'">
+              <div class="min-w-0 flex-1">
+                <div
+                  data-test="enterprise-upgrade-feature-name"
+                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
+                  :class="'text-text-heading'"
+                >
                   {{ feature.name }}
-                  <OIcon v-if="feature.link" name="open-in-new" size="xs" data-test="enterprise-upgrade-feature-external-link" class="tw:opacity-60 tw:ml-1 tw:align-middle" />
-                  <OTag v-if="feature.beta" type="featureFlag" value="beta" data-test="enterprise-upgrade-feature-beta-badge" />
-                  <span v-if="feature.requiresHA" class="tw:inline-flex">
-                    <OTag type="featureFlag" value="ha" data-test="enterprise-upgrade-feature-ha-badge" />
-                    <OTooltip side="top" align="center" :sideOffset="8" :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')" />
+                  <OIcon
+                    v-if="feature.link"
+                    name="open-in-new"
+                    size="xs"
+                    data-test="enterprise-upgrade-feature-external-link"
+                    class="ml-1 align-middle opacity-60"
+                  />
+                  <OTag
+                    v-if="feature.beta"
+                    type="featureFlag"
+                    value="beta"
+                    data-test="enterprise-upgrade-feature-beta-badge"
+                  />
+                  <span v-if="feature.requiresHA" class="inline-flex">
+                    <OTag
+                      type="featureFlag"
+                      value="ha"
+                      data-test="enterprise-upgrade-feature-ha-badge"
+                    />
+                    <OTooltip
+                      side="top"
+                      align="center"
+                      :sideOffset="8"
+                      :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')"
+                    />
                   </span>
                 </div>
-                <div class="tw:text-[11px] tw:leading-[1.25]" :class="isDark ? 'tw:text-[rgba(255,255,255,0.55)]' : 'tw:text-[rgba(0,0,0,0.55)]'">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
+                  {{ feature.note }}
+                </div>
               </div>
             </div>
           </div>
@@ -246,10 +371,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, watch, defineAsyncComponent } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -261,7 +387,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 const ChartRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/panels/ChartRenderer.vue")
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
 
 // Feature documentation links configuration
@@ -327,21 +453,22 @@ export default defineComponent({
     const showDialog = ref(props.modelValue);
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
     const chartData = ref<any>(null);
     const dashboardRenderKey = ref(0);
 
-    // tw:dark: variants generate empty CSS in this project, so derive dark mode
-    // from the store and toggle classes via :class bindings instead.
-    const isDark = computed(() => store.state.theme === 'dark');
+    // Dark-mode flag from the sanctioned theme seam; used to toggle classes via
+    // :class bindings for the few genuinely theme-divergent (translucent) styles.
+    const { isDark } = useTheme();
 
     // Fetch license data when dialog opens for Enterprise with license
     const fetchLicenseData = async () => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Only fetch for Enterprise with license (not Cloud)
       if (isEnterprise && hasLicense && !isCloud) {
@@ -358,11 +485,11 @@ export default defineComponent({
             license: {
               limits: {
                 Ingestion: {
-                  value: 0
-                }
-              }
+                  value: 0,
+                },
+              },
             },
-            ingestion_used: 0
+            ingestion_used: 0,
           };
         } finally {
           isLoadingLicense.value = false;
@@ -372,9 +499,10 @@ export default defineComponent({
 
     // Dialog configuration based on deployment type
     const dialogConfig = computed(() => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Calculate ingestion quota limit for non-licensed enterprise
       // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
@@ -404,13 +532,19 @@ export default defineComponent({
         return {
           heroTitle: t("about.enterprise_offer.enterprise_without_license.hero_title"),
           offerText: t("about.enterprise_offer.enterprise_without_license.offer_text"),
-          badgeText: t("about.enterprise_offer.enterprise_without_license.badge_text", { quota: ingestionQuota }),
+          badgeText: t("about.enterprise_offer.enterprise_without_license.badge_text", {
+            quota: ingestionQuota,
+          }),
           badgeIcon: "data_usage",
           showUsageIndicator: true,
           usagePercentage: usagePercentage,
           featuresTitle: t("about.enterprise_offer.enterprise_without_license.features_title"),
-          featuresSubtitle: t("about.enterprise_offer.enterprise_without_license.features_subtitle"),
-          primaryButtonText: t("about.enterprise_offer.enterprise_without_license.primary_button_text"),
+          featuresSubtitle: t(
+            "about.enterprise_offer.enterprise_without_license.features_subtitle",
+          ),
+          primaryButtonText: t(
+            "about.enterprise_offer.enterprise_without_license.primary_button_text",
+          ),
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showLicenseNote: true, // Show note about license limits
@@ -423,9 +557,12 @@ export default defineComponent({
         // Calculate ingestion usage from license data
         const ingestionLimit = licenseData.value?.license?.limits?.Ingestion?.value || 0;
         const ingestionUsedPercentage = licenseData.value?.ingestion_used || 0;
-        const badgeText = ingestionLimit > 0
-          ? t("about.enterprise_offer.enterprise_with_license.badge_text_limited", { limit: ingestionLimit })
-          : t("about.enterprise_offer.enterprise_with_license.badge_text_unlimited");
+        const badgeText =
+          ingestionLimit > 0
+            ? t("about.enterprise_offer.enterprise_with_license.badge_text_limited", {
+                limit: ingestionLimit,
+              })
+            : t("about.enterprise_offer.enterprise_with_license.badge_text_unlimited");
 
         return {
           heroTitle: t("about.enterprise_offer.enterprise_with_license.hero_title"),
@@ -436,7 +573,9 @@ export default defineComponent({
           usagePercentage: ingestionUsedPercentage,
           featuresTitle: t("about.enterprise_offer.enterprise_with_license.features_title"),
           featuresSubtitle: t("about.enterprise_offer.enterprise_with_license.features_subtitle"),
-          primaryButtonText: t("about.enterprise_offer.enterprise_with_license.primary_button_text"),
+          primaryButtonText: t(
+            "about.enterprise_offer.enterprise_with_license.primary_button_text",
+          ),
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showContactSales: true,
@@ -529,7 +668,16 @@ export default defineComponent({
     ];
 
     // Enterprise features list - all 21 features
-    const enterpriseFeatures = [
+    const enterpriseFeatures: {
+      name: string;
+      note: string;
+      icon: string;
+      link?: string;
+      requiresHA?: boolean;
+      beta?: boolean;
+      cloudOnly?: boolean;
+      cloudHidden?: boolean;
+    }[] = [
       {
         name: t("about.enterprise_offer.enterprise_features.single_sign_on.name"),
         note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),
@@ -694,9 +842,10 @@ export default defineComponent({
     };
 
     const openDocsLink = () => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       let docsUrl = "https://openobserve.ai/docs/";
 
@@ -726,7 +875,7 @@ export default defineComponent({
 
       // Find the meta org from the organizations list
       const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier
+        (org: any) => org.identifier === metaOrgIdentifier,
       );
 
       if (metaOrg) {
@@ -748,8 +897,8 @@ export default defineComponent({
 
         // Navigate to license page with the meta org identifier
         router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
+          name: "license",
+          query: { org_identifier: metaOrgIdentifier },
         });
       } else {
         // Show error notification when user doesn't have access to meta org
@@ -761,9 +910,10 @@ export default defineComponent({
     };
 
     const handlePrimaryButtonClick = () => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Cloud - open download page
       if (isCloud) {
@@ -819,9 +969,9 @@ export default defineComponent({
           return;
         }
 
-        const dates = [];
-        let values = [];
-        let dataUnit = 'GB'; // Default unit
+        const dates: string[] = [];
+        let values: number[] = [];
+        let dataUnit = "GB"; // Default unit
         let unitDivisor = 1024; // Default: MB to GB
 
         // Use actual ingestion history data
@@ -829,8 +979,8 @@ export default defineComponent({
         // Values are in MB, determine best unit based on data range
         if (ingestionHistory.length > 0) {
           // Sort by timestamp to ensure chronological order
-          const sortedHistory = [...ingestionHistory].sort((a, b) =>
-            new Date(a.ts).getTime() - new Date(b.ts).getTime()
+          const sortedHistory = [...ingestionHistory].sort(
+            (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime(),
           );
 
           // Find max value to determine appropriate unit
@@ -839,15 +989,15 @@ export default defineComponent({
           // Determine best unit based on max value
           if (maxValueMB >= 1024 * 1024) {
             // Use TB if max value is >= 1 TB
-            dataUnit = 'TB';
+            dataUnit = "TB";
             unitDivisor = 1024 * 1024;
           } else if (maxValueMB >= 1024) {
             // Use GB if max value is >= 1 GB
-            dataUnit = 'GB';
+            dataUnit = "GB";
             unitDivisor = 1024;
           } else {
             // Use MB for smaller values
-            dataUnit = 'MB';
+            dataUnit = "MB";
             unitDivisor = 1;
           }
 
@@ -867,9 +1017,9 @@ export default defineComponent({
         // Convert threshold to the same unit as data
         let thresholdInDataUnit = 0;
         if (thresholdGB && thresholdGB > 0) {
-          if (dataUnit === 'TB') {
+          if (dataUnit === "TB") {
             thresholdInDataUnit = thresholdGB / 1024; // GB to TB
-          } else if (dataUnit === 'GB') {
+          } else if (dataUnit === "GB") {
             thresholdInDataUnit = thresholdGB; // Already in GB
           } else {
             thresholdInDataUnit = thresholdGB * 1024; // GB to MB
@@ -905,110 +1055,117 @@ export default defineComponent({
         const yAxisInterval = yAxisMax > 0 ? calculateInterval(yAxisMax) : undefined;
 
         // Create mark line for threshold if limit exists
-        const markLine: any = thresholdGB && thresholdGB > 0 ? {
-          silent: true,
-          symbol: 'none',
-          label: {
-            show: false
-          },
-          lineStyle: {
-            color: '#FF0000',
-            width: 2,
-            type: 'solid'
-          },
-          data: [{
-            yAxis: thresholdInDataUnit
-          }]
-        } : undefined;
+        const markLine: any =
+          thresholdGB && thresholdGB > 0
+            ? {
+                silent: true,
+                symbol: "none",
+                label: {
+                  show: false,
+                },
+                lineStyle: {
+                  color: "#FF0000",
+                  width: 2,
+                  type: "solid",
+                },
+                data: [
+                  {
+                    yAxis: thresholdInDataUnit,
+                  },
+                ],
+              }
+            : undefined;
 
         // Simple echarts configuration for bar chart
         // ChartRenderer expects data in format: { options: { ... } }
         chartData.value = {
           options: {
-            backgroundColor: 'transparent',
+            backgroundColor: "transparent",
             grid: {
-              left: '10%',
-              right: '5%',
-              top: '10%',
-              bottom: '15%',
-              containLabel: true
+              left: "10%",
+              right: "5%",
+              top: "10%",
+              bottom: "15%",
+              containLabel: true,
             },
             xAxis: {
-              type: 'category',
+              type: "category",
               data: dates,
               axisLine: {
                 show: true,
-                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisTick: {
                 show: true,
-                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisLabel: {
                 show: true,
-                color: 'rgba(255, 255, 255, 0.8)',
+                color: "rgba(255, 255, 255, 0.8)",
                 fontSize: 10,
-                interval: Math.floor(dates.length / 6) // Show ~6 labels based on actual data length
-              }
+                interval: Math.floor(dates.length / 6), // Show ~6 labels based on actual data length
+              },
             },
             yAxis: {
-              type: 'value',
+              type: "value",
               min: 0,
               max: yAxisMax,
               interval: yAxisInterval,
               axisLine: {
                 show: true,
-                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisTick: {
                 show: true,
-                lineStyle: { color: 'rgba(255, 255, 255, 0.3)' }
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
               },
               axisLabel: {
                 show: true,
-                color: 'rgba(255, 255, 255, 0.8)',
+                color: "rgba(255, 255, 255, 0.8)",
                 fontSize: 10,
                 formatter: (value: number) => {
                   return value.toFixed(0) + dataUnit;
-                }
+                },
               },
               splitLine: {
                 show: true,
                 lineStyle: {
-                  color: 'rgba(255, 255, 255, 0.1)',
-                  type: 'dashed'
-                }
-              }
+                  color: "rgba(255, 255, 255, 0.1)",
+                  type: "dashed",
+                },
+              },
             },
-            series: [{
-              type: 'bar',
-              data: values.map((value, index) => {
-                // Color bars red if they exceed threshold, otherwise green
-                const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
-                return {
-                  value: value,
-                  itemStyle: {
-                    color: exceeds ? '#FF6B6B' : '#22c55e' // Red if exceeds, green if within limit
-                  }
-                };
-              }),
-              barWidth: '60%',
-              markLine: markLine
-            }],
+            series: [
+              {
+                type: "bar",
+                data: values.map((value) => {
+                  // Color bars red if they exceed threshold, otherwise green
+                  const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
+                  return {
+                    value: value,
+                    itemStyle: {
+                      color: exceeds ? "#FF6B6B" : "#22c55e", // Red if exceeds, green if within limit
+                    },
+                  };
+                }),
+                barWidth: "60%",
+                markLine: markLine,
+              },
+            ],
             tooltip: {
               show: true,
-              trigger: 'axis',
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              borderColor: 'rgba(255, 255, 255, 0.2)',
+              trigger: "axis",
+              backgroundColor: "rgba(0, 0, 0, 0.8)",
+              borderColor: "rgba(255, 255, 255, 0.2)",
               borderWidth: 1,
               textStyle: {
-                color: '#fff',
-                fontSize: 12
+                color: "#fff",
+                fontSize: 12,
               },
               formatter: (params: any) => {
                 const dayNum = params[0].name;
                 const value = params[0].value;
-                const formattedValue = value.toFixed(2) + ' ' + dataUnit;
+                const formattedValue = value.toFixed(2) + " " + dataUnit;
 
                 // Get the actual date from ingestion history for this day
                 const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
@@ -1019,15 +1176,15 @@ export default defineComponent({
 
                 if (matchingEntry) {
                   const fullDate = new Date(matchingEntry.ts);
-                  const monthName = fullDate.toLocaleString('default', { month: 'short' });
+                  const monthName = fullDate.toLocaleString("default", { month: "short" });
                   return `${monthName} ${dayNum}<br/>Usage: ${formattedValue}`;
                 }
 
                 return `Day ${dayNum}<br/>Usage: ${formattedValue}`;
-              }
+              },
             },
-            animation: true
-          }
+            animation: true,
+          },
         };
 
         dashboardRenderKey.value++;
@@ -1079,19 +1236,10 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.usage-chart-container .grid-stack-item-content {
-  border: 0px !important;
-}
-
-@media (max-width: 900px) {
-  .dialog-split-layout {
-    flex-direction: column;
-  }
-
-  .hero-panel {
-    flex: 0 0 auto;
-    min-height: 400px;
-  }
+<style scoped>
+/* keep(lib-override): strip the gridstack widget's default border inside the usage chart
+   (.grid-stack-item-content is gridstack-generated DOM, not addressable via template utilities) */
+.usage-chart-container :deep(.grid-stack-item-content) {
+  border: 0 !important;
 }
 </style>

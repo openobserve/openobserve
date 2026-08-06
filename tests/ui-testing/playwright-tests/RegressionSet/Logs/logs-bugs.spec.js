@@ -1422,7 +1422,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Ingest data into a second stream so the multi-stream join has two streams
     const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
-    const secondStream = 'e2e_8641_stream';
+    // Per-run unique name — the fixed 'e2e_8641_stream' collided with concurrent shared-org runs
+    // ("Stream not available. Ingestion may have failed."). Keep the e2e_ prefix for cleanup.
+    const secondStream = 'e2e_8641_stream_' + Math.random().toString(36).slice(2, 7);
     await sendRequest(page, getIngestionUrl(orgId, secondStream), [{
       level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
     }], headers);
@@ -1439,7 +1441,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(2000);
 
-    const errorVisible = await page.locator('[class*="error"], [class*="negative"], .q-banner, .q-notification')
+    const errorVisible = await page.locator('[class*="error"], [class*="negative"], [role="alert"]')
       .filter({ hasText: /error|failed|invalid/i })
       .first().isVisible({ timeout: 2000 }).catch(() => false);
 
@@ -1663,13 +1665,13 @@ test.describe("Logs Regression Bug Fixes", () => {
 
       testLogger.info('✓ PASSED: Decimal value rejected in datetime picker');
     } else {
-      // Time input not in absolute tab — check if the time is entered via Quasar time picker buttons instead
-      // Uses class-based selector as fallback (Quasar QTime component has no data-test attr)
-      const timePickerVisible = await pm.logsPage.getQuasarTimePicker()
+      // Time input not in absolute tab — check if the time is entered via time picker buttons instead
+      // Uses class-based selector as fallback (the QTime component has no data-test attr)
+      const timePickerVisible = await pm.logsPage.getTimePicker()
         .isVisible({ timeout: 2000 }).catch(() => false);
 
       if (timePickerVisible) {
-        testLogger.info('Quasar time picker component found — decimal entry not possible via button UI');
+        testLogger.info('Time picker component found — decimal entry not possible via button UI');
         testLogger.info('✓ PASSED: Time picker uses button UI — decimal entry is naturally prevented');
       } else {
         testLogger.warn('Time input not found — skipping');
@@ -1687,7 +1689,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: include/exclude search term position (Bug #11606)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1730,7 +1732,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Histogram redraws on index list collapse/expand (Bug #9339)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1762,7 +1764,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Stream dropdown replaces search term on selection (Bug #7310)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1795,7 +1797,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Column positions persist after re-query (Bug #5277)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1834,7 +1836,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Text wrap toggle and saved view alignment (Bug #4426)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1882,7 +1884,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Cancel query available on visualize page (Bug #4091)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 

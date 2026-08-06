@@ -1,24 +1,23 @@
 <template>
-  <div style="display: flex; align-items: center; width: 100%">
+  <div class="flex w-full items-center">
     <OSelect
       v-model="backgroundType"
       :options="colorModeOptions"
       :label="t('dashboard.colorMode')"
-      class="tw:flex-1"
+      class="flex-1"
       data-test="dashboard-config-color-mode"
     />
 
     <div v-if="backgroundType === 'single'">
       <div
         data-test="dashboard-config-color-input-wrapper"
-        class="tw:h-6.25 tw:w-6.25 tw:overflow-hidden tw:rounded-full tw:inline-flex tw:items-center tw:relative"
-        style="margin-top: 36px; margin-left: 5px"
+        class="relative mt-9 ml-1.25 inline-flex h-6.25 w-6.25 items-center overflow-hidden rounded-full"
       >
         <input
           data-test="dashboard-config-color-input"
           type="color"
           v-model="backgroundColor"
-          class="tw:absolute tw:h-[4em] tw:w-[4em] tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:overflow-hidden tw:border-0 tw:m-0 tw:p-0"
+          class="absolute top-1/2 left-1/2 m-0 h-[4em] w-[4em] -translate-x-1/2 -translate-y-1/2 overflow-hidden border-0 p-0"
         />
       </div>
     </div>
@@ -27,8 +26,8 @@
 
 <script lang="ts">
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, inject, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
@@ -36,14 +35,9 @@ export default defineComponent({
   components: { OSelect },
   setup() {
     // Destructure props and emit if needed
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
-    const { t } = useI18n();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const colorModeOptions = [
       { label: t("dashboard.none"), value: "" },

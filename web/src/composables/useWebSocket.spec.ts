@@ -160,9 +160,8 @@ describe("useWebSocket", () => {
 
     // Temporarily override WebSocket.prototype.addEventListener so every call
     // made by createSocket() is captured in `listeners`.
-    const originalProtoAddEventListener =
-      (WebSocket as any).prototype.addEventListener;
-    (WebSocket as any).prototype.addEventListener = function(
+    const originalProtoAddEventListener = (WebSocket as any).prototype.addEventListener;
+    (WebSocket as any).prototype.addEventListener = function (
       type: string,
       handler: (e: any) => void,
       ...rest: any[]
@@ -198,9 +197,7 @@ describe("useWebSocket", () => {
 
     it("throws 'Invalid WebSocket URL' for an http URL", () => {
       const { connect } = ws();
-      expect(() => connect(uid(), "http://localhost")).toThrow(
-        "Invalid WebSocket URL"
-      );
+      expect(() => connect(uid(), "http://localhost")).toThrow("Invalid WebSocket URL");
     });
 
     it("throws 'Invalid WebSocket URL' for an empty url", () => {
@@ -210,9 +207,7 @@ describe("useWebSocket", () => {
 
     it("throws 'Invalid WebSocket URL' for a plain string without ws scheme", () => {
       const { connect } = ws();
-      expect(() => connect(uid(), "localhost:8080")).toThrow(
-        "Invalid WebSocket URL"
-      );
+      expect(() => connect(uid(), "localhost:8080")).toThrow("Invalid WebSocket URL");
     });
 
     it("stores a socket in the registry for a valid ws:// URL", () => {
@@ -268,9 +263,7 @@ describe("useWebSocket", () => {
     });
 
     it("logs an error and does not call send() when socket readyState is CLOSED", () => {
-      const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const id = uid("send-closed");
       const handle = connectAndWrap(id);
       Object.defineProperty(handle.raw, "readyState", {
@@ -286,9 +279,7 @@ describe("useWebSocket", () => {
     });
 
     it("logs an error when socketId does not exist", () => {
-      const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const { sendMessage } = ws();
       sendMessage("absolutely-nonexistent-id", "hello");
       expect(errorSpy).toHaveBeenCalled();
@@ -316,9 +307,9 @@ describe("useWebSocket", () => {
 
     it("throws when handler is not a function", () => {
       const { addMessageHandler } = ws();
-      expect(() =>
-        addMessageHandler("any-id", "not-a-function" as any)
-      ).toThrow("Handler must be a function");
+      expect(() => addMessageHandler("any-id", "not-a-function" as any)).toThrow(
+        "Handler must be a function",
+      );
     });
 
     it("removes a registered message handler so it is no longer invoked", () => {
@@ -338,7 +329,7 @@ describe("useWebSocket", () => {
     it("throws on removeMessageHandler when handler is not a function", () => {
       const { removeMessageHandler } = ws();
       expect(() => removeMessageHandler("any-id", "bad" as any)).toThrow(
-        "Handler must be a function"
+        "Handler must be a function",
       );
     });
 
@@ -377,9 +368,7 @@ describe("useWebSocket", () => {
 
     it("throws when open handler is not a function", () => {
       const { addOpenHandler } = ws();
-      expect(() => addOpenHandler("any-id", 42 as any)).toThrow(
-        "Handler must be a function"
-      );
+      expect(() => addOpenHandler("any-id", 42 as any)).toThrow("Handler must be a function");
     });
 
     it("removes open handler so it is no longer invoked", () => {
@@ -398,9 +387,7 @@ describe("useWebSocket", () => {
 
     it("throws on removeOpenHandler when handler is not a function", () => {
       const { removeOpenHandler } = ws();
-      expect(() => removeOpenHandler("any-id", null as any)).toThrow(
-        "Handler must be a function"
-      );
+      expect(() => removeOpenHandler("any-id", null as any)).toThrow("Handler must be a function");
     });
   });
 
@@ -422,9 +409,7 @@ describe("useWebSocket", () => {
 
     it("throws when close handler is not a function", () => {
       const { addCloseHandler } = ws();
-      expect(() => addCloseHandler("any-id", {} as any)).toThrow(
-        "Handler must be a function"
-      );
+      expect(() => addCloseHandler("any-id", {} as any)).toThrow("Handler must be a function");
     });
 
     it("removes close handler so it is no longer invoked", () => {
@@ -444,7 +429,7 @@ describe("useWebSocket", () => {
     it("throws on removeCloseHandler when handler is not a function", () => {
       const { removeCloseHandler } = ws();
       expect(() => removeCloseHandler("any-id", "bad" as any)).toThrow(
-        "Handler must be a function"
+        "Handler must be a function",
       );
     });
   });
@@ -467,9 +452,7 @@ describe("useWebSocket", () => {
 
     it("throws when error handler is not a function", () => {
       const { addErrorHandler } = ws();
-      expect(() => addErrorHandler("any-id", "bad" as any)).toThrow(
-        "Handler must be a function"
-      );
+      expect(() => addErrorHandler("any-id", "bad" as any)).toThrow("Handler must be a function");
     });
 
     it("removes error handler so it is no longer invoked", () => {
@@ -488,9 +471,7 @@ describe("useWebSocket", () => {
 
     it("throws on removeErrorHandler when handler is not a function", () => {
       const { removeErrorHandler } = ws();
-      expect(() => removeErrorHandler("any-id", 0 as any)).toThrow(
-        "Handler must be a function"
-      );
+      expect(() => removeErrorHandler("any-id", 0 as any)).toThrow("Handler must be a function");
     });
   });
 
@@ -509,9 +490,7 @@ describe("useWebSocket", () => {
 
     it("returns undefined for an unknown socketId", () => {
       const { getWebSocketBasedOnSocketId } = ws();
-      expect(
-        getWebSocketBasedOnSocketId("absolutely-no-such-id")
-      ).toBeUndefined();
+      expect(getWebSocketBasedOnSocketId("absolutely-no-such-id")).toBeUndefined();
     });
   });
 
@@ -608,9 +587,7 @@ describe("useWebSocket", () => {
     });
 
     it("logs an error when the socketId is not found", () => {
-      const errorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const { cleanupSocket } = ws();
       cleanupSocket("ghost-id-xyz");
       expect(errorSpy).toHaveBeenCalled();

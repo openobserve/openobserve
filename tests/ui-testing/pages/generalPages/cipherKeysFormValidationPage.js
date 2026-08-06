@@ -278,7 +278,13 @@ export class CipherKeysFormValidationPage {
     await expect(this.encryptionAlgorithmTrigger).toHaveAttribute('data-test-selected-label', label, { timeout: 5000 });
   }
 
-  async assertSaveButtonDisabled() {
-    await expect(this.saveButton).toBeDisabled({ timeout: 5000 });
+  // R3: Save is never disabled to gate validity — an invalid submit is blocked
+  // by the schema and surfaces field errors instead of a dead button.
+  async assertSaveButtonEnabled() {
+    await expect(this.saveButton).toBeEnabled({ timeout: 5000 });
+  }
+
+  async clickSave() {
+    await this.saveButton.click();
   }
 }

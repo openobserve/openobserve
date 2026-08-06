@@ -48,7 +48,7 @@ interface TranslateStackTraceResponse {
 const sourcemapsService = {
   translateStackTrace: (
     org_identifier: string,
-    data: TranslateStackTraceRequest
+    data: TranslateStackTraceRequest,
   ): Promise<{ data: TranslateStackTraceResponse }> => {
     const url = `/api/${org_identifier}/sourcemaps/stacktrace`;
     return http().post(url, data);
@@ -56,16 +56,13 @@ const sourcemapsService = {
 
   listSourceMaps: (
     org_identifier: string,
-    params?: { version?: string; service?: string; env?: string }
+    params?: { version?: string; service?: string; env?: string },
   ): Promise<{ data: any[] }> => {
     const url = `/api/${org_identifier}/sourcemaps`;
     return http().get(url, { params });
   },
 
-  uploadSourceMaps: (
-    org_identifier: string,
-    formData: FormData
-  ): Promise<{ data: any }> => {
+  uploadSourceMaps: (org_identifier: string, formData: FormData): Promise<{ data: any }> => {
     const url = `/api/${org_identifier}/sourcemaps`;
     return http().post(url, formData, {
       headers: {
@@ -76,14 +73,14 @@ const sourcemapsService = {
 
   deleteSourceMaps: (
     org_identifier: string,
-    params: { version: string; service: string; env: string }
+    params: { version: string; service: string; env: string },
   ): Promise<{ data: any }> => {
     const url = `/api/${org_identifier}/sourcemaps`;
     return http().delete(url, { params });
   },
 
   getSourceMapsValues: (
-    org_identifier: string
+    org_identifier: string,
   ): Promise<{ data: { services: string[]; envs: string[]; versions: string[] } }> => {
     const url = `/api/${org_identifier}/sourcemaps/values`;
     return http().get(url);

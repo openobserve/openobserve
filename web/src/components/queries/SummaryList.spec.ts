@@ -13,13 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import SummaryList from "./SummaryList.vue";
-
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -36,7 +35,7 @@ describe("SummaryList.vue", () => {
       numOfQueries: 5,
       duration: 2.5,
       queryRange: 3600,
-      trace_ids: ["trace1", "trace2"]
+      trace_ids: ["trace1", "trace2"],
     },
     {
       row_id: "2",
@@ -45,8 +44,8 @@ describe("SummaryList.vue", () => {
       numOfQueries: 3,
       duration: 1.2,
       queryRange: 1800,
-      trace_ids: ["trace3", "trace4"]
-    }
+      trace_ids: ["trace3", "trace4"],
+    },
   ];
   const mockSelectedRows: any[] = [];
 
@@ -67,15 +66,26 @@ describe("SummaryList.vue", () => {
         plugins: [i18n, router],
         stubs: {
           NoData: {
-            template: '<div data-test="no-data">No Data</div>'
+            template: '<div data-test="no-data">No Data</div>',
           },
           OTable: {
-            name: 'OTable',
-            props: ['data', 'columns', 'rowKey', 'selectedIds', 'selection', 'pagination', 'pageSize', 'pageSizeOptions', 'showGlobalFilter'],
-            emits: ['update:selected-ids', 'row-click'],
-            template: '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="bottom" /></div>'
-          }
-        }
+            name: "OTable",
+            props: [
+              "data",
+              "columns",
+              "rowKey",
+              "selectedIds",
+              "selection",
+              "pagination",
+              "pageSize",
+              "pageSizeOptions",
+              "showGlobalFilter",
+            ],
+            emits: ["update:selected-ids", "row-click"],
+            template:
+              '<div data-test="o-table-stub"><slot name="cell-actions" :row="{}" /><slot name="cell-duration" :row="{}" /><slot name="cell-queryRange" :row="{}" /><slot name="empty" /><slot name="bottom" /></div>',
+          },
+        },
       },
     });
     await flushPromises();
@@ -123,7 +133,9 @@ describe("SummaryList.vue", () => {
   it("should initialize deleteDialog with correct default values", () => {
     expect(wrapper.vm.deleteDialog.show).toBe(false);
     expect(wrapper.vm.deleteDialog.title).toBe("Delete Running Query");
-    expect(wrapper.vm.deleteDialog.message).toBe("Are you sure you want to delete this running query?");
+    expect(wrapper.vm.deleteDialog.message).toBe(
+      "Are you sure you want to delete this running query?",
+    );
     expect(wrapper.vm.deleteDialog.data).toBe(null);
   });
 
@@ -136,22 +148,21 @@ describe("SummaryList.vue", () => {
   // Test 10: Test columns structure (OTable format: id/accessorKey/header)
   it("should have correct column structure", () => {
     const columns = wrapper.vm.columns;
-    expect(columns).toHaveLength(7);
-    expect(columns[0].id).toBe("#");
-    expect(columns[1].id).toBe("user_id");
-    expect(columns[2].id).toBe("search_type_label");
-    expect(columns[3].id).toBe("numOfQueries");
-    expect(columns[4].id).toBe("duration");
-    expect(columns[5].id).toBe("queryRange");
-    expect(columns[6].id).toBe("actions");
+    expect(columns).toHaveLength(6);
+    expect(columns[0].id).toBe("user_id");
+    expect(columns[1].id).toBe("search_type_label");
+    expect(columns[2].id).toBe("numOfQueries");
+    expect(columns[3].id).toBe("duration");
+    expect(columns[4].id).toBe("queryRange");
+    expect(columns[5].id).toBe("actions");
   });
 
   // Test 14: Test confirmDeleteAction function
   it("should emit delete:queries with trace_ids when confirmDeleteAction is called", () => {
     const mockProps = {
       row: {
-        trace_ids: ["trace1", "trace2"]
-      }
+        trace_ids: ["trace1", "trace2"],
+      },
     };
 
     wrapper.vm.confirmDeleteAction(mockProps);
@@ -163,7 +174,7 @@ describe("SummaryList.vue", () => {
   // Test 15: Test confirmDeleteAction with empty trace_ids
   it("should emit empty array when trace_ids is undefined", () => {
     const mockProps = {
-      row: {}
+      row: {},
     };
 
     wrapper.vm.confirmDeleteAction(mockProps);
@@ -203,7 +214,8 @@ describe("SummaryList.vue", () => {
       "filter:queries",
       "update:selectedRows",
       "delete:queries",
-      "clear:filters"
+      "clear:filters",
+      "refresh",
     ];
     expect(wrapper.vm.$options.emits).toEqual(expectedEmits);
   });
@@ -211,12 +223,12 @@ describe("SummaryList.vue", () => {
   // Test 21: Test columns have correct labels (OTable format uses `header`)
   it("should have correct column headers", () => {
     const columns = wrapper.vm.columns;
-    expect(columns[1].header).toBe(wrapper.vm.t("user.email"));
-    expect(columns[2].header).toBe(wrapper.vm.t("queries.searchType"));
-    expect(columns[3].header).toBe(wrapper.vm.t("queries.numOfQueries"));
-    expect(columns[4].header).toBe(wrapper.vm.t("queries.totalDuration"));
-    expect(columns[5].header).toBe(wrapper.vm.t("queries.totalTimeRange"));
-    expect(columns[6].header).toBe(wrapper.vm.t("common.actions"));
+    expect(columns[0].header).toBe(wrapper.vm.t("user.email"));
+    expect(columns[1].header).toBe(wrapper.vm.t("queries.searchType"));
+    expect(columns[2].header).toBe(wrapper.vm.t("queries.numOfQueries"));
+    expect(columns[3].header).toBe(wrapper.vm.t("queries.totalDuration"));
+    expect(columns[4].header).toBe(wrapper.vm.t("queries.totalTimeRange"));
+    expect(columns[5].header).toBe(wrapper.vm.t("common.actions"));
   });
 
   // Test 22: Test columns have correct alignment (OTable format uses `meta.align`)
@@ -224,21 +236,20 @@ describe("SummaryList.vue", () => {
     const columns = wrapper.vm.columns;
     expect(columns[0].meta.align).toBe("left");
     expect(columns[1].meta.align).toBe("left");
-    expect(columns[2].meta.align).toBe("left");
-    expect(columns[3].meta.align).toBe("right");
+    expect(columns[2].meta.align).toBe("right");
+    expect(columns[3].meta.align).toBe("left");
     expect(columns[4].meta.align).toBe("left");
-    expect(columns[5].meta.align).toBe("left");
-    expect(columns[6].meta.align).toBe("center");
+    expect(columns[5].meta.align).toBe("center");
   });
 
   // Test 23: Test columns sortable property
   it("should have correct sortable columns", () => {
     const columns = wrapper.vm.columns;
+    expect(columns[0].sortable).toBe(true);
     expect(columns[1].sortable).toBe(true);
     expect(columns[2].sortable).toBe(true);
     expect(columns[3].sortable).toBe(true);
     expect(columns[4].sortable).toBe(true);
-    expect(columns[5].sortable).toBe(true);
   });
 
   // Test 24: Test showListSchemaDialog initial value
@@ -264,7 +275,7 @@ describe("SummaryList.vue", () => {
 
   // Test 29: Test "cancel" icon
   it('should render "cancel" icon in the page', () => {
-    // After q-icon → OIcon migration, "cancel" is the OIcon name prop
+    // "cancel" is the OIcon name prop
     const cancelIcons = wrapper
       .findAllComponents({ name: "OIcon" })
       .filter((i: any) => i.props("name") === "cancel");
@@ -294,13 +305,20 @@ describe("SummaryList.vue", () => {
   // Test 33: Test component has correct setup function return values
   it("should return all required values from setup function", () => {
     const setupReturnKeys = [
-      "t", "columns", "confirmDeleteAction", "deleteDialog", "pageSizeOptions",
-      "showListSchemaDialog", "loadingState",
-      "isMetaOrg", "selectedRow",
-      "handleMultiQueryCancel", "getAllUserQueries"
+      "t",
+      "columns",
+      "confirmDeleteAction",
+      "deleteDialog",
+      "pageSizeOptions",
+      "showListSchemaDialog",
+      "loadingState",
+      "isMetaOrg",
+      "selectedRow",
+      "handleMultiQueryCancel",
+      "getAllUserQueries",
     ];
 
-    setupReturnKeys.forEach(key => {
+    setupReturnKeys.forEach((key) => {
       expect(wrapper.vm[key]).toBeDefined();
     });
   });

@@ -2,27 +2,86 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const { v4: uuidv4 } = require('uuid');
-const { getOrgIdentifier } = require('../utils/cloud-auth.js');
+const { getOrgIdentifier, getAuthHeaders } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: "parallel" });
 
 test.describe("Enrichment data testcases", () => {
     let pm;
 
+    // Backend-readiness gate: on cloud the e2e_automate stream is indexed
+    // asynchronously AFTER ingestion returns. Selecting it in the logs UI before it
+    // is actually queryable means applyQuery() never fires a real _search — which is
+    // exactly why the page-armed waitForResponse timed out. Poll the same streams API
+    // that logsPage.waitForStreamAvailable uses (bounded, tolerant of transient cloud
+    // connection resets) until the stream is present, so the UI selection is
+    // deterministic. Returns true once the stream is confirmed selectable.
+    async function waitForStreamQueryable(page, streamName, maxWaitMs = 60000, pollIntervalMs = 3000) {
+        const apiUrl = process.env["INGESTION_URL"] || process.env["ZO_BASE_URL"];
+        const org = getOrgIdentifier();
+        const url = `${apiUrl}/api/${org}/streams?type=logs&keyword=${streamName}`;
+        const deadline = Date.now() + maxWaitMs;
+        let attempt = 0;
+
+        while (Date.now() < deadline) {
+            attempt++;
+            try {
+                const response = await page.request.get(url, { headers: getAuthHeaders() });
+                if (response.ok()) {
+                    const body = await response.json().catch(() => ({}));
+                    if ((body.list || []).some((s) => s.name === streamName)) {
+                        testLogger.info('Stream confirmed queryable via streams API', { streamName, attempt });
+                        return true;
+                    }
+                } else {
+                    testLogger.debug('Stream readiness poll non-OK', { status: response.status(), attempt });
+                }
+            } catch (err) {
+                // Tolerate transient cloud errors (Connection timeout / ECONNRESET) and retry.
+                testLogger.debug('Stream readiness poll error (retrying)', { error: err.message, attempt });
+            }
+            // Documented consistency backoff between readiness polls (cloud indexing lag).
+            await page.waitForTimeout(pollIntervalMs);
+        }
+        return false;
+    }
+
     // Helper function for tests that need logs data setup
     async function setupLogsData(page, pm) {
         await pm.ingestionPage.ingestion();
+
+        // Gate on backend readiness BEFORE driving the logs UI so the stream is
+        // actually selectable and the subsequent search fires against a real stream.
+        const streamReady = await waitForStreamQueryable(page, "e2e_automate");
+        if (!streamReady) {
+            throw new Error('setupLogsData: e2e_automate stream not queryable via streams API within readiness window; cannot deterministically select it in the logs UI');
+        }
 
         const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
         testLogger.navigation('Navigating to logs page', { url: logsUrl });
 
         try {
             await page.goto(logsUrl);
-            const searchPattern = `**/api/${getOrgIdentifier()}/_search**`;
-            const allsearch = page.waitForResponse(searchPattern, { timeout: 30000 });
+
+            // Select the confirmed-present stream. selectStream throws after its
+            // internal retries, so a silent mis-selection now surfaces here.
             await pm.logsPage.selectStream("e2e_automate");
+
+            // Arm the search-response wait IMMEDIATELY BEFORE the action that triggers
+            // it. Previously it was armed before the slow selectStream, so its 30s timer
+            // elapsed during selectStream's up-to-120s cloud stream-indexing wait and
+            // timed out even when the search later succeeded. Gate on a 200 for the
+            // org's _search so we only accept a successful search against the selected
+            // stream — a real backend signal, not a weakened assertion.
+            const org = getOrgIdentifier();
+            const successfulSearch = page.waitForResponse(
+                (response) =>
+                    response.url().includes(`/api/${org}/_search`) &&
+                    response.status() === 200,
+                { timeout: 30000 }
+            );
             await pm.enrichmentPage.applyQuery();
-            await allsearch;
+            await successfulSearch;
             testLogger.info('Logs data setup completed');
         } catch (error) {
             testLogger.error('Logs data setup failed', {

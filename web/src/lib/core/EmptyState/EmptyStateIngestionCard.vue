@@ -22,21 +22,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <button
     type="button"
-    class="es-ing-card tw:relative tw:flex tw:items-center tw:gap-3 tw:w-[18rem] tw:max-w-full tw:min-h-16 tw:py-2.5 tw:pr-3.5 tw:pl-3 tw:rounded-xl tw:border tw:border-border-default tw:bg-surface-base tw:shadow-sm tw:text-left tw:cursor-pointer tw:outline-none tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150"
+    class="es-ing-card group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
     @click="emit('click')"
   >
-    <span class="es-ing-card__icon tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:bg-tabs-active-bg tw:text-tabs-active-text tw:transition-[background-color,color] tw:duration-150" :class="iconClass">
+    <span
+      class="es-ing-card__icon rounded-default bg-tabs-active-bg text-tabs-active-text inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+      :class="iconClass"
+    >
       <OIcon :name="icon" size="md" />
     </span>
-    <span class="es-ing-card__body tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5">
-      <span class="tw:text-[length:var(--text-sm)] tw:font-semibold tw:text-text-primary tw:truncate">{{ label }}</span>
-      <span v-if="sublabel" class="tw:text-[length:var(--text-xs)] tw:text-text-secondary tw:leading-[1.4]">{{ sublabel }}</span>
+    <span class="es-ing-card__body flex min-w-0 flex-1 flex-col gap-0.5">
+      <span class="text-compact text-text-heading truncate font-semibold">{{ label }}</span>
+      <span v-if="sublabel" class="text-text-secondary text-xs leading-[1.4]">{{ sublabel }}</span>
     </span>
-    <OIcon name="chevron-right" size="sm" class="es-ing-card__chevron tw:shrink-0 tw:text-text-disabled tw:transition-[transform,color] tw:duration-150" />
+    <OIcon
+      name="chevron-right"
+      size="sm"
+      class="es-ing-card__chevron text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+    />
   </button>
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -46,8 +54,8 @@ type IconVariant = "default" | "blue" | "teal" | "purple" | "amber" | "orange";
 const props = withDefaults(
   defineProps<{
     icon: IconName;
-    label: string;
-    sublabel?: string;
+    label: I18nText;
+    sublabel?: I18nText;
     iconVariant?: IconVariant;
   }>(),
   { iconVariant: "default" },
@@ -60,34 +68,34 @@ const iconClass = computed(() =>
 );
 </script>
 
-<style>
-/* hover / focus-visible states (compound selectors — can't be inlined) */
-.es-ing-card:hover {
-  box-shadow: var(--shadow-md);
-  border-color: var(--color-primary-400);
-  background: var(--color-tabs-hover-bg);
+<style scoped>
+/* keep(brand): decorative icon accent tints — color-mix on palette tokens has
+   no semantic equivalent; the parent-hover override must outrank the variant
+   classes, so both live here rather than as utilities. */
+.es-ing-card__icon--blue {
+  background: color-mix(in srgb, var(--color-blue-500) 12%, transparent);
+  color: var(--color-blue-500);
 }
-.es-ing-card:focus-visible {
-  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
+.es-ing-card__icon--teal {
+  background: color-mix(in srgb, var(--color-teal-600) 12%, transparent);
+  color: var(--color-teal-600);
+}
+.es-ing-card__icon--purple {
+  background: color-mix(in srgb, var(--color-purple-500) 12%, transparent);
+  color: var(--color-purple-500);
+}
+.es-ing-card__icon--amber {
+  background: color-mix(in srgb, var(--color-amber-600) 12%, transparent);
+  color: var(--color-amber-600);
+}
+.es-ing-card__icon--orange {
+  background: color-mix(in srgb, var(--color-orange-500) 12%, transparent);
+  color: var(--color-orange-500);
 }
 
-/* icon color variants (color-mix not expressible in Tailwind arbitrary) */
-.es-ing-card__icon--blue   { background: color-mix(in srgb, #3b82f6 12%, transparent); color: #3b82f6; }
-.es-ing-card__icon--teal   { background: color-mix(in srgb, #0d9488 12%, transparent); color: #0d9488; }
-.es-ing-card__icon--purple { background: color-mix(in srgb, #8b5cf6 12%, transparent); color: #8b5cf6; }
-.es-ing-card__icon--amber  { background: color-mix(in srgb, #d97706 12%, transparent); color: #d97706; }
-.es-ing-card__icon--orange { background: color-mix(in srgb, #f97316 12%, transparent); color: #f97316; }
-
-/* parent-context compound: icon highlight on card hover */
 .es-ing-card:hover .es-ing-card__icon,
 .es-ing-card:hover [class*="es-ing-card__icon--"] {
   background: var(--color-primary-600);
-  color: #fff;
-}
-
-/* chevron nudge on card hover */
-.es-ing-card:hover .es-ing-card__chevron {
-  transform: translateX(0.125rem);
-  color: var(--color-primary-600);
+  color: var(--color-white);
 }
 </style>

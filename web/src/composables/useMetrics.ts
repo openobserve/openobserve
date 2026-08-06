@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { cloneDeep } from "lodash-es";
-import { reactive, ref } from "vue";
+import { ref } from "vue";
 
 const defaultObject = {
   organizationIdentifier: "",

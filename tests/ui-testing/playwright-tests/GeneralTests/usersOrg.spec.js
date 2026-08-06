@@ -262,7 +262,7 @@ test.describe("Users and Organizations", () => {
         testLogger.info('Test completed successfully');
     });
 
-    test('Save button disabled if Add Organization with Empty Name', async ({ page }, testInfo) => {
+    test('Save button stays enabled for empty org name (submit-gated)', async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
@@ -271,8 +271,11 @@ test.describe("Users and Organizations", () => {
         await pageManager.createOrgPage.navigateToOrg();
         await pageManager.createOrgPage.clickAddOrg();
         await pageManager.createOrgPage.fillOrgName('');
+        // R3 (Zod migration): Save is always enabled; the schema gates the submit
+        // (the inline required error is asserted by the "Error Message displayed
+        // if Add Organization is blank" test).
         const isSaveEnabled = await pageManager.createOrgPage.checkSaveEnabled();
-        expect(isSaveEnabled).toBe(false);
+        expect(isSaveEnabled).toBe(true);
 
         testLogger.info('Test completed successfully');
     });

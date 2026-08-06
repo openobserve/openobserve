@@ -6,7 +6,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     :title="t('onlineEvals.scorer.import.title')"
     test-prefix="scorer"
@@ -18,43 +18,43 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 380px">
+      <div class="flex h-full w-full flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
           data-test="scorer-import-errors-title"
         >
           {{ t("onlineEvals.scorer.import.errors.title") }}
         </div>
         <div
           v-else
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
           data-test="scorer-import-output-title"
         >
           {{ t("onlineEvals.scorer.import.outputMessages") }}
         </div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="mt-1 shrink-0" />
 
-        <div class="tw:overflow-auto">
-          <div v-if="errors.length" class="tw:p-2.5 tw:mb-2.5">
+        <div class="min-h-0 flex-1 overflow-auto">
+          <div v-if="errors.length" class="mb-2.5 p-2.5">
             <div class="error-list">
               <div
                 v-for="(err, errIdx) in errors"
                 :key="`${err.itemIndex}-${err.field}-${errIdx}`"
-                class="tw:py-1.25 tw:px-0 tw:text-sm"
+                class="px-0 py-1.25 text-sm"
                 :data-test="`scorer-import-error-${err.itemIndex}-${err.field}`"
               >
                 <span
                   v-if="err.field === 'name'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="scorer-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="Name *"
+                      :label="t('onlineEvals.importNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -62,15 +62,15 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'nameConflict'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="scorer-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="New Name *"
+                      :label="t('onlineEvals.importNewNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -78,16 +78,16 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'type'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="scorer-import-type-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
                       v-model="typeFixers[err.itemIndex]"
                       :options="typeOptions"
-                      label="Type *"
+                      :label="t('onlineEvals.importTypeRequired')"
                       @update:model-value="updateType(err.itemIndex, $event)"
                     />
                   </div>
@@ -95,16 +95,16 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'scoreConfigRef'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="scorer-import-score-config-ref-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
                       v-model="scoreConfigFixers[err.itemIndex]"
                       :options="scoreConfigOptions"
-                      label="Score Config *"
+                      :label="t('onlineEvals.importScoreConfigRequired')"
                       @update:model-value="updateScoreConfigRef(err.itemIndex, $event)"
                     />
                   </div>
@@ -112,28 +112,31 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'providerRef'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="scorer-import-provider-ref-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
                       v-model="providerFixers[err.itemIndex]"
                       :options="providerOptions"
-                      label="Provider *"
+                      :label="t('onlineEvals.importProviderRequired')"
                       @update:model-value="updateProviderRef(err.itemIndex, $event)"
                     />
                   </div>
                 </span>
 
-                <span v-else class="text-red">{{ err.message }}</span>
+                <span v-else class="text-error-600">{{ err.message }}</span>
               </div>
             </div>
           </div>
 
-          <div v-if="creators.length" class="tw:p-2.5 tw:mb-2.5">
-            <div class="section-title text-primary tw:text-base tw:mb-2.5 tw:uppercase" data-test="scorer-import-creation-title">
+          <div v-if="creators.length" class="mb-2.5 p-2.5">
+            <div
+              class="section-title text-text-heading mb-2.5 text-base uppercase"
+              data-test="scorer-import-creation-title"
+            >
               {{ t("onlineEvals.scorer.import.creation") }}
             </div>
             <div
@@ -144,30 +147,31 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'tw:py-1.25 tw:px-0 tw:text-sm tw:font-bold': true,
-                  'text-green': c.status === 'success',
-                  'text-red': c.status === 'error',
-                  'text-secondary': c.status === 'exists',
+                  'px-0 py-1.25 text-sm font-bold': true,
+                  'text-status-success-text': c.status === 'success',
+                  'text-error-600': c.status === 'error',
+                  'text-text-secondary': c.status === 'exists',
                 }"
                 :data-test="`scorer-import-creation-${i}-message`"
               >
-                <pre class="tw:whitespace-pre-wrap tw:font-[inherit] tw:m-0">{{ c.message }}</pre>
+                <pre class="m-0 font-[inherit] whitespace-pre-wrap">{{ c.message }}</pre>
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -195,7 +199,7 @@ const emit = defineEmits<{
   (e: "saved"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
@@ -204,7 +208,9 @@ const scoreConfigs = toRef(props, "scoreConfigs");
 const providers = toRef(props, "providers");
 
 const errors = ref<ScorerImportError[]>([]);
-const creators = ref<Array<{ name: string; status: "success" | "error" | "exists"; message: string }>>([]);
+const creators = ref<
+  Array<{ name: string; status: "success" | "error" | "exists"; message: string }>
+>([]);
 
 // Inline-fixer state, indexed by itemIndex in the imported batch.
 const nameFixers = reactive<Record<number, string>>({});
@@ -213,19 +219,19 @@ const scoreConfigFixers = reactive<Record<number, string>>({});
 const providerFixers = reactive<Record<number, string>>({});
 
 const typeOptions = [
-  { label: "LLM Judge", value: "llm_judge" },
-  { label: "Remote", value: "remote" },
+  { label: t("onlineEvals.scorer.detail.typeLlmJudge"), value: "llm_judge" },
+  { label: t("onlineEvals.scorer.detail.typeRemote"), value: "remote" },
 ];
 
 const scoreConfigOptions = computed(() =>
   scoreConfigs.value.map((sc) => ({
-    label: sc.name,
+    label: raw(sc.name),
     value: String((sc as any).entityId ?? (sc as any).entity_id ?? sc.id),
   })),
 );
 
 const providerOptions = computed(() =>
-  providers.value.map((p) => ({ label: p.name, value: String(p.id) })),
+  providers.value.map((p) => ({ label: raw(p.name), value: String(p.id) })),
 );
 
 const editorHeights = computed(() => ({
@@ -270,14 +276,14 @@ function ensureScorerEnvelope(item: any): Record<string, any> {
   return item.scorer;
 }
 
-function updateName(itemIndex: number, value: string) {
+function updateName(itemIndex: number, value: string | number) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].name = value;
   syncEditor(arr);
 }
 
-function updateType(itemIndex: number, value: ScorerType) {
+function updateType(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -285,7 +291,7 @@ function updateType(itemIndex: number, value: ScorerType) {
   syncEditor(arr);
 }
 
-function updateScoreConfigRef(itemIndex: number, value: string) {
+function updateScoreConfigRef(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -298,7 +304,7 @@ function updateScoreConfigRef(itemIndex: number, value: string) {
   syncEditor(arr);
 }
 
-function updateProviderRef(itemIndex: number, value: string) {
+function updateProviderRef(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   const scorer = ensureScorerEnvelope(arr[itemIndex]);
@@ -331,6 +337,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     existingScorerNames: existingScorers.value,
     scoreConfigs: scoreConfigs.value,
     providers: providers.value,
+    t,
   });
 
   // Seed inline fixers from the current raw values.
@@ -338,9 +345,11 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     for (const e of item.errors) {
       const raw: any = rawItems[e.itemIndex] ?? {};
       const scorer = raw.scorer ?? raw;
-      const params = scorer?.params ?? {};
 
-      if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
+      if (
+        (e.field === "name" || e.field === "nameConflict") &&
+        nameFixers[e.itemIndex] === undefined
+      ) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";
       }
       if (e.field === "type" && typeFixers[e.itemIndex] === undefined) {
@@ -413,13 +422,16 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   if (successCount === payloads.length) {
     toast({
-      message: `Successfully imported ${successCount} scorer(s)`,
+      message: t("toastMessages.onlineEvals.successfullyImportedScorers", { count: successCount }),
       variant: "success",
     });
     setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
-      message: `Imported ${successCount} of ${payloads.length} scorer(s)`,
+      message: t("toastMessages.onlineEvals.importedOfScorers", {
+        imported: successCount,
+        count: payloads.length,
+      }),
       variant: "warning",
     });
     emit("saved");

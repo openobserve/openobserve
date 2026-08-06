@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
-// ONumberCell — consistent numeric rendering for tables (audit §2.4):
+// ONumberCell — consistent numeric rendering for tables:
 // tabular-nums so digits stack, one set of shared formatters, muted dash for
 // empty. Pair the column with `meta.align: "right"` for proper alignment.
 //
@@ -37,9 +38,9 @@ const props = withDefaults(
     digits?: number;
     /** Optional suffix appended after the formatted value (muted). */
     suffix?: string;
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { format: "number", digits: 1, emptyLabel: "—" },
+  { format: "number", digits: 1, emptyLabel: raw("—") },
 );
 
 const num = computed<number | null>(() => {
@@ -75,14 +76,10 @@ const formatted = computed<string | null>(() => {
 </script>
 
 <template>
-  <span
-    v-if="formatted === null"
-    class="tw:text-text-primary tw:text-xs tw:tabular-nums"
-  >{{ emptyLabel }}</span>
-  <span v-else class="tw:tabular-nums tw:whitespace-nowrap">
-    {{ formatted }}<span
-      v-if="suffix"
-      class="tw:text-text-primary tw:ml-0.5"
-    >{{ suffix }}</span>
+  <span v-if="formatted === null" class="text-text-muted text-xs tabular-nums">{{
+    emptyLabel
+  }}</span>
+  <span v-else class="whitespace-nowrap tabular-nums">
+    {{ formatted }}<span v-if="suffix" class="text-text-muted ml-0.5">{{ suffix }}</span>
   </span>
 </template>

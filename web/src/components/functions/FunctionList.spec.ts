@@ -20,17 +20,13 @@ import i18n from "@/locales";
 import { createRouter, createWebHistory } from "vue-router";
 import { createStore } from "vuex";
 
-const {
-  mockJsTransformList,
-  mockJsTransformDelete,
-  mockBulkDelete,
-  mockGetAssociatedPipelines,
-} = vi.hoisted(() => ({
-  mockJsTransformList: vi.fn(),
-  mockJsTransformDelete: vi.fn(),
-  mockBulkDelete: vi.fn(),
-  mockGetAssociatedPipelines: vi.fn(),
-}));
+const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssociatedPipelines } =
+  vi.hoisted(() => ({
+    mockJsTransformList: vi.fn(),
+    mockJsTransformDelete: vi.fn(),
+    mockBulkDelete: vi.fn(),
+    mockGetAssociatedPipelines: vi.fn(),
+  }));
 
 vi.mock("../../services/jstransform", () => ({
   default: {
@@ -90,10 +86,10 @@ describe("FunctionList", () => {
       '<div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-size="size" :data-persistent="persistent">' +
       '<span data-test-stub="o-dialog-title">{{ title }}</span>' +
       '<slot name="header"></slot>' +
-      '<slot></slot>' +
+      "<slot></slot>" +
       '<slot name="footer"></slot>' +
       '<button data-test-stub="o-dialog-update-open" @click="$emit(\'update:open\', false)">close</button>' +
-      '</div>',
+      "</div>",
   };
 
   const globalStubs = {
@@ -107,7 +103,9 @@ describe("FunctionList", () => {
     vi.clearAllMocks();
 
     mockJsTransformList.mockResolvedValue(mockFunctionData);
-    mockJsTransformDelete.mockResolvedValue({ data: { code: 200, message: "Deleted successfully" } });
+    mockJsTransformDelete.mockResolvedValue({
+      data: { code: 200, message: "Deleted successfully" },
+    });
     mockBulkDelete.mockResolvedValue({ data: { successful: ["func1"], unsuccessful: [] } });
     mockGetAssociatedPipelines.mockResolvedValue({ data: { list: [] } });
 
@@ -136,6 +134,32 @@ describe("FunctionList", () => {
     });
 
     router.push("/functions");
+  });
+
+  // The list otherwise gives no clue whether a function is JS or VRL, so the
+  // language gets its own Type column rendered as a badge.
+  describe("Type column (JS vs VRL badge)", () => {
+    const mountList = () =>
+      mount(FunctionList, {
+        global: { plugins: [i18n, store, router], stubs: globalStubs },
+      });
+
+    it("badges each function with its language and keeps the name intact", async () => {
+      const wrapper = mountList();
+      await flushPromises();
+
+      // fixture: func1 + func2 are VRL (transType 0), js_func is JS (transType 1)
+      const js = wrapper.findAll('[data-test="function-list-type-badge-js"]');
+      const vrl = wrapper.findAll('[data-test="function-list-type-badge-vrl"]');
+      expect(js).toHaveLength(1);
+      expect(vrl.length).toBeGreaterThanOrEqual(2);
+
+      expect(js[0].text()).toBe("JavaScript");
+      expect(vrl[0].text()).toBe("VRL");
+
+      // the badge is its own column — the name cell is untouched
+      expect(wrapper.find('[data-test="function-list-name-cell-js_func"]').text()).toBe("js_func");
+    });
   });
 
   describe("Component Rendering", () => {
@@ -184,14 +208,7 @@ describe("FunctionList", () => {
       });
 
       await flushPromises();
-      expect(mockJsTransformList).toHaveBeenCalledWith(
-        1,
-        100000,
-        "name",
-        false,
-        "",
-        "test-org"
-      );
+      expect(mockJsTransformList).toHaveBeenCalledWith(1, 100000, "name", false, "", "test-org");
     });
 
     it("should populate jsTransforms after load", async () => {
@@ -394,7 +411,12 @@ describe("FunctionList", () => {
   describe("Associated Pipelines (getAssociatedPipelines)", () => {
     it("should fetch and show associated pipelines dialog", async () => {
       const pipelines = {
-        data: { list: [{ id: "p1", name: "Pipeline 1" }, { id: "p2", name: "Pipeline 2" }] },
+        data: {
+          list: [
+            { id: "p1", name: "Pipeline 1" },
+            { id: "p2", name: "Pipeline 2" },
+          ],
+        },
       };
       mockGetAssociatedPipelines.mockResolvedValue(pipelines);
 
@@ -459,7 +481,6 @@ describe("FunctionList", () => {
 
       expect(vm.confirmForceDelete).toBe(false);
     });
-
   });
 
   describe("Bulk Delete (bulkDeleteFunctions)", () => {
@@ -702,7 +723,9 @@ describe("FunctionList", () => {
       await flushPromises();
 
       const vm = wrapper.vm as any;
-      expect(vm.filterData([{ name: "func1", function: "identity()" }], "xyz_no_match")).toHaveLength(0);
+      expect(
+        vm.filterData([{ name: "func1", function: "identity()" }], "xyz_no_match"),
+      ).toHaveLength(0);
     });
 
     it("should compute visibleRows returning all rows when no filter", async () => {
@@ -811,9 +834,7 @@ describe("FunctionList", () => {
       await flushPromises();
 
       const dialog = wrapper.find('[data-test-stub="o-dialog"]');
-      expect(dialog.attributes("data-title")).toBe(
-        "Pipelines Associated with func1"
-      );
+      expect(dialog.attributes("data-title")).toBe("Pipelines Associated with func1");
     });
 
     it("should set ODialog size=md and persistent attributes", async () => {
@@ -856,9 +877,7 @@ describe("FunctionList", () => {
       vm.confirmForceDelete = true;
       await flushPromises();
 
-      await wrapper
-        .find('[data-test-stub="o-dialog-update-open"]')
-        .trigger("click");
+      await wrapper.find('[data-test-stub="o-dialog-update-open"]').trigger("click");
 
       expect(vm.confirmForceDelete).toBe(false);
     });

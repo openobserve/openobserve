@@ -39,7 +39,9 @@ describe("GroupRoles Component", () => {
       groupsState: {},
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue(mockPermissions);
+    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue(
+      mockPermissions,
+    );
 
     wrapper = mount(GroupRoles, {
       global: {
@@ -138,9 +140,17 @@ describe("GroupRoles Component", () => {
       await flushPromises();
 
       // Verify all 3 roles are visible before filtering
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
+          .exists(),
+      ).toBe(true);
 
       // Act: type search term
       const searchInput = wrapper.find('input[type="text"]');
@@ -148,9 +158,17 @@ describe("GroupRoles Component", () => {
       await flushPromises();
 
       // Assert: only matching role checkbox is visible
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists()).toBe(false);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists(),
+      ).toBe(false);
+      expect(
+        wrapper
+          .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
+          .exists(),
+      ).toBe(false);
     });
 
     it("filters roles case-insensitively", async () => {
@@ -164,8 +182,12 @@ describe("GroupRoles Component", () => {
       await flushPromises();
 
       // Assert: case-insensitive match finds the role
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists(),
+      ).toBe(false);
     });
 
     it("returns all roles when search term is empty", async () => {
@@ -179,9 +201,17 @@ describe("GroupRoles Component", () => {
       await flushPromises();
 
       // Assert: all 3 roles visible
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 
@@ -206,12 +236,10 @@ describe("GroupRoles Component", () => {
       expect(wrapper.vm.users).toHaveLength(2);
       expect(wrapper.vm.users[0]).toEqual({
         role_name: "admin",
-        "#": 1,
         isInGroup: true, // admin is in groupRoles prop
       });
       expect(wrapper.vm.users[1]).toEqual({
         role_name: "user",
-        "#": 2,
         isInGroup: true, // user is in groupRoles prop
       });
     });
@@ -281,7 +309,9 @@ describe("GroupRoles Component", () => {
 
       // OTable renders the OEmptyState component in its #empty slot when there are no rows
       // The empty state is rendered by OTable internally; verify no role rows are rendered
-      const roleCheckboxes = emptyWrapper.findAll('[data-test^="iam-roles-selection-table-body-row-"]');
+      const roleCheckboxes = emptyWrapper.findAll(
+        '[data-test^="iam-roles-selection-table-body-row-"]',
+      );
       expect(roleCheckboxes.length).toBe(0);
 
       emptyWrapper.unmount();
@@ -296,8 +326,12 @@ describe("GroupRoles Component", () => {
       await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
-      const adminCheckbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]');
-      const userCheckbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-user-checkbox"]');
+      const adminCheckbox = wrapper.find(
+        '[data-test="iam-roles-selection-table-body-row-admin-checkbox"]',
+      );
+      const userCheckbox = wrapper.find(
+        '[data-test="iam-roles-selection-table-body-row-user-checkbox"]',
+      );
 
       expect(adminCheckbox.exists()).toBe(true);
       expect(userCheckbox.exists()).toBe(true);
@@ -308,7 +342,9 @@ describe("GroupRoles Component", () => {
       await wrapper.vm.updateUserTable("all");
       await flushPromises();
 
-      const developerCheckbox = wrapper.find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]');
+      const developerCheckbox = wrapper.find(
+        '[data-test="iam-roles-selection-table-body-row-developer-checkbox"]',
+      );
       expect(developerCheckbox.exists()).toBe(true);
 
       // Click the developer checkbox to select it
@@ -410,7 +446,6 @@ describe("GroupRoles Component", () => {
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgUsers = false;
-      const initialLength = wrapper.vm.users.length;
 
       await wrapper.vm.updateUserTable("all");
 
@@ -430,8 +465,6 @@ describe("GroupRoles Component", () => {
 
   describe("Props Watching", () => {
     it("updates when groupRoles prop changes", async () => {
-      const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-
       await wrapper.setProps({ groupRoles: ["admin", "user", "developer"] });
       await flushPromises();
 
@@ -496,14 +529,22 @@ describe("GroupRoles Component", () => {
       await flushPromises();
 
       // No checkboxes should be visible
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists(),
+      ).toBe(false);
 
       // Clear search - all should reappear
       await searchInput.setValue("");
       await flushPromises();
 
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="iam-roles-selection-table-body-row-admin-checkbox"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-test="iam-roles-selection-table-body-row-developer-checkbox"]')
+          .exists(),
+      ).toBe(true);
     });
   });
 

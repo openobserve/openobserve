@@ -15,124 +15,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col tw:shadow-none tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:rounded-lg tw:w-full tw:h-full tw:dark:bg-[var(--o2-card-background)] tw:dark:border-[var(--o2-border)]">
-    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+  <OCard
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default flex h-full w-full flex-col border shadow-none"
+  >
+    <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="tw:pt-2 tw:text-base tw:font-semibold tw:leading-6 tw:text-(--o2-text-heading) tw:m-0">{{ t("billing.proPlanLabel") }}</h3>
-        <p class="tw:mt-2 tw:text-sm tw:font-normal tw:leading-4.5 tw:text-(--o2-text-secondary) tw:m-0">
+        <h3 class="text-text-heading m-0 pt-2 text-base leading-6 font-semibold">
+          {{ t("billing.proPlanLabel") }}
+        </h3>
+        <p class="text-text-secondary m-0 mt-2 text-sm leading-4.5 font-normal">
           {{ t("billing.proPlanSubtitle") }}
         </p>
       </div>
-      <OTag
-        v-if="planType == planName"
-        type="billingTag"
-        value="subscribed"
-        class="tw:mt-2"
-      />
+      <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="mt-2" />
     </div>
 
-    <OSeparator class="tw:my-2" />
+    <OSeparator class="my-2" />
 
-    <div class="tw:px-3 tw:py-2">
-      <h4 class="tw:text-[0.8125rem] tw:font-semibold tw:leading-[0.983rem] tw:text-(--o2-text-heading) tw:m-0">{{ t("billing.features") }}</h4>
-      <p class="tw:mb-3 tw:mt-1 tw:text-[0.8125rem] tw:font-normal tw:leading-4.5 tw:text-(--o2-text-secondary) tw:m-0">
+    <div class="px-3 py-2">
+      <h4 class="text-compact text-text-heading m-0 leading-[0.983rem] font-semibold">
+        {{ t("billing.features") }}
+      </h4>
+      <p class="text-compact text-text-secondary m-0 mt-1 mb-3 leading-4.5 font-normal">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
+        class="text-status-error-text mb-2 flex items-center"
       >
-        <OIcon name="warning" size="sm" class="tw:mr-2" />
-        <span class="tw:text-[0.938rem] tw:leading-5.5 tw:text-(--o2-text-body)"
-          >Failed to load pricing details. Please refresh the page.</span
-        >
+        <OIcon name="warning" size="sm" class="mr-2" />
+        <span class="text-text-body text-base leading-5.5">{{
+          t("billing.pricingErrorMessage")
+        }}</span>
       </div>
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+        class="mb-2 flex items-center justify-between"
       >
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="tw:mr-2 tw:text-green-500 check-icon"
+            class="text-status-positive check-icon mr-2"
           />
-          <div class="tw:text-[0.938rem] tw:leading-5.5 tw:text-(--o2-text-body)" :class="{ 'tw:ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div class="text-text-body text-base leading-5.5" :class="{ 'ml-6': !feature.is_parent }">
+            {{ feature.name }}
+          </div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="tw:mx-2"
-          style="
-            flex: 1;
-            border-top: 1px dotted #454f5b;
-            height: 0;
-            opacity: 0.4;
-          "
+          class="border-border-default mx-2 h-0 flex-1 border-t border-dotted opacity-40"
         ></div>
-        <div class="tw:text-[0.938rem] tw:leading-5.5 tw:text-(--o2-text-body) tw:font-bold">{{ feature.price }}</div>
+        <div class="text-text-body text-base leading-5.5 font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="tw:px-3 tw:pt-2 tw:text-[0.8125rem] tw:font-normal tw:leading-4.5 tw:text-(--o2-text-secondary) tw:m-0">
+    <p class="text-compact text-text-secondary m-0 px-3 pt-2 leading-4.5 font-normal">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
     </p>
 
-    <div class="tw:flex tw:justify-between tw:p-3">
+    <div class="flex justify-between p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
-      <div v-if="billingProvider === 'aws'" class="tw:w-full tw:text-center">
-        <OTag
-          type="billingManagement"
-          value="aws"
-          class="tw:inline-flex tw:items-center tw:gap-1"
-        >
+      <div v-if="billingProvider === 'aws'" class="w-full text-center">
+        <OTag type="billingManagement" value="aws" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
-          Billing is handled through your AWS account
+        <div class="text-text-secondary mt-2 text-xs">
+          {{ t("billing.awsManagedMessage") }}
         </div>
       </div>
-      <div
-        v-else-if="billingProvider === 'azure'"
-        class="tw:w-full tw:text-center"
-      >
-        <OTag
-          type="billingManagement"
-          value="azure"
-          class="tw:inline-flex tw:items-center tw:gap-1"
-        >
+      <div v-else-if="billingProvider === 'azure'" class="w-full text-center">
+        <OTag type="billingManagement" value="azure" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="check-circle" size="xs" />
           </template>
         </OTag>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
-          Billing is handled through your Azure account
+        <div class="text-text-secondary mt-2 text-xs">
+          {{ t("billing.azureManagedMessage") }}
         </div>
       </div>
       <!-- External contract - billed offline, no Stripe portal to open -->
-      <div
-        v-else-if="subscriptionType === 'external-contract'"
-        class="tw:w-full tw:text-center"
-      >
-        <OTag
-          type="billingManagement"
-          value="contract"
-          class="tw:inline-flex tw:items-center tw:gap-1"
-        >
+      <div v-else-if="subscriptionType === 'external-contract'" class="w-full text-center">
+        <OTag type="billingManagement" value="contract" class="inline-flex items-center gap-1">
           <template #icon>
             <OIcon name="description" size="xs" />
           </template>
         </OTag>
-        <div class="tw:text-xs tw:text-gray-400 tw:mt-2">
-          Billing is handled through your contract — contact your account
-          manager for changes
+        <div class="text-text-secondary mt-2 text-xs">
+          {{ t("billing.contractManagedMessage") }}
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
@@ -145,13 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ btnCancelSubscription }}
       </OButton>
-      <OButton
-        v-else
-        variant="primary"
-        size="sm-action"
-        block
-        @click="onSubscribe"
-      >
+      <OButton v-else variant="primary" size="sm-action" block @click="onSubscribe">
         {{ btnSubscribe }}
       </OButton>
     </div>
@@ -160,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -170,21 +142,15 @@ import OCard from "@/lib/core/Card/OCard.vue";
 export default defineComponent({
   name: "proPlan",
   components: { OSeparator, OButton, OTag, OIcon, OCard },
-  props: [
-    "planType",
-    "billingProvider",
-    "subscriptionType",
-    "features",
-    "pricingError",
-  ],
+  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const planName = "pay-as-you-go";
     const btnCancelSubscription = ref(t("billing.manageSubscription"));
     const btnSubscribe = ref(t("billing.subscribe"));
 
     const cancelSubscription = () => {
-      btnCancelSubscription.value = "Loading...";
+      btnCancelSubscription.value = t("common.loadingEllipsis");
       setTimeout(function () {
         btnCancelSubscription.value = t("billing.manageSubscription");
       }, 1000);
@@ -192,7 +158,7 @@ export default defineComponent({
     };
 
     const onSubscribe = () => {
-      btnSubscribe.value = "Loading...";
+      btnSubscribe.value = t("common.loadingEllipsis");
       setTimeout(function () {
         btnSubscribe.value = t("billing.subscribe");
       }, 1000);

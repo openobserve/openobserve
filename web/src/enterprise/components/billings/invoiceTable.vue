@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     filter-mode="client"
     :default-columns="false"
     :show-global-filter="false"
-    class="tw:h-full tw:w-full"
+    class="h-full w-full"
   >
     <template #empty>
       <NoData />
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('billing.downloadInvoice')"
         variant="ghost"
         size="icon-sm"
-        class="tw:ml-1"
+        class="ml-1"
       >
         <OIcon name="download" size="sm" />
       </OButton>
@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
 import BillingService from "@/services/billings";
@@ -71,13 +71,13 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const columns: OTableColumnDef[] = [
   {
     id: "id",
-    header: "#",
+    header: raw("#"),
     accessorKey: "id",
     sortable: true,
     meta: { align: "left" },
@@ -131,28 +131,53 @@ const columns: OTableColumnDef[] = [
   },
 ];
 
-const invoiceHistory = ref([]);
+interface Invoice {
+  period_start: number;
+  period_end: number;
+  paid: boolean;
+  total: number;
+  currency: string;
+  amount_paid: number;
+  amount_due: number;
+  attempt_count: number;
+  statue: string;
+  invoice_pdf: string;
+}
+
+interface InvoiceRow {
+  id: number;
+  start_date: number;
+  end_date: number;
+  paid: string;
+  amount: string;
+  amount_paid: number;
+  amount_due: number;
+  attempt_count: number;
+  status: string;
+  pdf: string;
+  action: string;
+}
+
+const invoiceHistory = ref<InvoiceRow[]>([]);
 
 const getInvoiceHistory = () => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading invoice history...",
-      timeout: 0,
-});
+    message: t("toastMessages.billings.pleaseWaitWhileLoadingInvoiceHistory"),
+    timeout: 0,
+  });
 
-  BillingService.list_invoice_history(
-    store.state.selectedOrganization.identifier
-  )
+  BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
     .then((res) => {
       dismiss();
       const invoiceList = res.data.invoices;
       if (invoiceList.length > 0) {
-        invoiceHistory.value = invoiceList.map((invoice, index) => {
+        invoiceHistory.value = invoiceList.map((invoice: Invoice, index: number) => {
           return {
             id: ++index,
             start_date: invoice.period_start,
             end_date: invoice.period_end,
-            paid: invoice.paid ? "Yes" : "No",
+            paid: invoice.paid ? t("common.yes") : t("common.no"),
             amount: invoice.total + " " + invoice.currency.toUpperCase(),
             amount_paid: invoice.amount_paid,
             amount_due: invoice.amount_due,

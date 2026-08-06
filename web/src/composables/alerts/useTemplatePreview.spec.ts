@@ -29,12 +29,8 @@ describe("renderTemplate", () => {
   });
 
   it("renders {rows} and {rows:N} as opaque chips, never faked", () => {
-    expect(renderTemplate("{rows}", ctx)).toEqual([
-      { kind: "opaque", text: "{rows}" },
-    ]);
-    expect(renderTemplate("{rows:5}", ctx)).toEqual([
-      { kind: "opaque", text: "{rows:5}" },
-    ]);
+    expect(renderTemplate("{rows}", ctx)).toEqual([{ kind: "opaque", text: "{rows}" }]);
+    expect(renderTemplate("{rows:5}", ctx)).toEqual([{ kind: "opaque", text: "{rows:5}" }]);
   });
 
   it("renders {var:N} and spread {...rows} as opaque chips", () => {
@@ -68,9 +64,7 @@ describe("renderTemplate", () => {
   });
 
   it("returns a single text segment when there are no tokens", () => {
-    expect(renderTemplate("plain text", ctx)).toEqual([
-      { kind: "text", text: "plain text" },
-    ]);
+    expect(renderTemplate("plain text", ctx)).toEqual([{ kind: "text", text: "plain text" }]);
   });
 
   it("handles empty input", () => {
@@ -104,10 +98,7 @@ describe("buildPreviewContext", () => {
 
   it("renders a mixed template end to end", () => {
     const ctx = buildPreviewContext({ alert_name: "High CPU" });
-    const segs = renderTemplate(
-      "{alert_name} count {alert_count} rows {rows}",
-      ctx,
-    );
+    const segs = renderTemplate("{alert_name} count {alert_count} rows {rows}", ctx);
     expect(segs.map((s) => s.kind)).toEqual([
       "live", // alert_name
       "text",
@@ -145,10 +136,7 @@ describe("buildPreviewContext", () => {
   it("does NOT fake stream field values — they stay opaque", () => {
     // We know the field NAME but not its runtime value, so it must chip,
     // not render a fabricated value.
-    const ctx = buildPreviewContext(
-      {},
-      { streamFields: ["k8s_pod_name", "host"] },
-    );
+    const ctx = buildPreviewContext({}, { streamFields: ["k8s_pod_name", "host"] });
     expect("k8s_pod_name" in ctx.live).toBe(false);
     expect("host" in ctx.live).toBe(false);
     const segs = renderTemplate("pod {k8s_pod_name}", ctx);

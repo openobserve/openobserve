@@ -3,17 +3,25 @@
  * OTab renders a single clickable tab trigger inside OTabs.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 export interface OTabProps {
   /** Unique identifier — must match the corresponding OTabPanel name */
-  name: string | number
+  name: string | number;
   /** Display text label */
-  label?: string
+  label?: I18nText;
   /** Material icon name shown before the label */
-  icon?: string
+  icon?: string;
   /** Prevents interaction with this tab */
-  disable?: boolean
+  disable?: boolean;
+  /**
+   * Opt this single tab out of drag-to-reorder even while OTabs is reorderable
+   * (e.g. its label is being renamed inline). The grip stays visible but the tab
+   * is no longer draggable and shows a text cursor instead of grab.
+   */
+  disableDrag?: boolean;
   /** Tooltip shown on hover — especially useful when disable is true to explain why */
-  tooltip?: string
+  tooltip?: I18nText;
 }
 
 export interface OTabSlots {
@@ -22,7 +30,7 @@ export interface OTabSlots {
    * Used for badges, close icons, tooltips, and other rich content.
    * When provided, the `label` and `icon` props are ignored.
    */
-  default?: () => unknown
+  default?: () => unknown;
   /** Custom icon area — overrides the `icon` prop */
-  icon?: () => unknown
+  icon?: () => unknown;
 }

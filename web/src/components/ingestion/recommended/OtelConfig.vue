@@ -1,25 +1,24 @@
 <template>
   <div>
-    <div class="tw:p-2 tw:pt-1">
-      <div class="tw:text-base tw:font-medium tw:font-bold">OTLP HTTP</div>
-      <ContentCopy class="tw:mt-2" :content="getOtelHttpConfig" />
+    <div class="p-2 pt-1">
+      <div class="text-base font-bold font-medium">{{ t("ingestion.otlpHttp") }}</div>
+      <ContentCopy class="mt-2" :content="raw(getOtelHttpConfig)" />
     </div>
-    <div class="tw:p-3" v-if="config.isCloud == 'false'">
-      <div class="tw:text-base tw:font-medium tw:font-bold">OTLP gRPC</div>
-      <ContentCopy :content="getOtelGrpcConfig" />
+    <div class="p-3" v-if="config.isCloud == 'false'">
+      <div class="text-base font-bold font-medium">{{ t("ingestion.otlpGrpc") }}</div>
+      <ContentCopy :content="raw(getOtelGrpcConfig)" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
-import type { Endpoint } from "@/ts/interfaces";
+import { computed, ref } from "vue";
 import ContentCopy from "@/components/CopyContent.vue";
-import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
 import config from "@/aws-exports";
+import { raw, useI18nTyped } from "@/types/i18n";
 
-const store = useStore();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   currOrgIdentifier: {
@@ -40,12 +39,6 @@ const endpoint: any = ref({
 
 const ingestionURL = getIngestionURL();
 endpoint.value = getEndPoint(ingestionURL);
-
-const accessKey = computed(() => {
-  return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
-  );
-});
 
 const getOtelGrpcConfig = computed(() => {
   return `exporters:

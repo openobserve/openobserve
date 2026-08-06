@@ -16,19 +16,14 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div
-      v-for="(,index) in dashboardPanelData.data.config.mark_line"
-      :key="index"
-    >
-      <div
-        class="tw:flex tw:justify-between tw:pb-3 tw:mb-3 tw:border-b tw:border-gray-500"
-      >
-        <div style="width: 90%" class="tw:flex tw:flex-col tw:gap-2">
+    <div v-for="(_, index) in dashboardPanelData.data.config.mark_line" :key="index">
+      <div class="border-border-default mb-3 flex justify-between border-b pb-3">
+        <div class="flex w-[90%] flex-col gap-2">
           <OSelect
             v-model="dashboardPanelData.data.config.mark_line[index].type"
             :label="t('dashboard.markLineType')"
             :options="markLineTypeOptions"
-            class="tw:w-full"
+            class="w-full"
             :data-test="`dashboard-config-markline-type-${index}`"
           />
           <OInput
@@ -37,11 +32,7 @@
             :data-test="`dashboard-config-markline-name-${index}`"
           />
           <OInput
-            v-if="
-              ['xAxis', 'yAxis'].includes(
-                dashboardPanelData.data.config.mark_line[index].type,
-              )
-            "
+            v-if="['xAxis', 'yAxis'].includes(dashboardPanelData.data.config.mark_line[index].type)"
             v-model="dashboardPanelData.data.config.mark_line[index].value"
             :label="t('dashboard.markLineValue')"
             :data-test="`dashboard-config-markline-value-${index}`"
@@ -49,7 +40,7 @@
         </div>
 
         <OIcon
-          class="tw:mr-1 tw:cursor-pointer"
+          class="mr-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeMarkLineByIndex(index)"
@@ -70,7 +61,7 @@
 <script lang="ts">
 import { defineComponent, inject } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -80,12 +71,10 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 
 export default defineComponent({
   name: "MarkLineConfig",
-  components: { OButton, OSelect, OInput,
-    OIcon,
-},
+  components: { OButton, OSelect, OInput, OIcon },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const markLineTypeOptions = [
       { label: t("dashboard.markLineAverage"), value: "average" },
@@ -96,13 +85,8 @@ export default defineComponent({
       { label: t("dashboard.markLineYAxis"), value: "yAxis" },
     ];
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the mark_line object is initialized in config

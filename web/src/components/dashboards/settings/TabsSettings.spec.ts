@@ -361,7 +361,9 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
 
       const saveButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-save"]');
-      const cancelButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]');
+      const cancelButton = wrapper.find(
+        '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]',
+      );
 
       expect(saveButton.exists()).toBe(true);
       expect(cancelButton.exists()).toBe(true);
@@ -431,7 +433,9 @@ describe("TabsSettings", () => {
 
       expect(wrapper.vm.editTabId).toBe("tab1");
 
-      const cancelButton = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]');
+      const cancelButton = wrapper.find(
+        '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]',
+      );
       await cancelButton.trigger("click");
 
       expect(wrapper.vm.editTabId).toBeNull();
@@ -728,12 +732,12 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
 
       const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
-      // Check that the edit input exists and has the dark theme tailwind class applied
+      // The dark/light ternary collapsed to a single theme-aware token utility.
       expect(editInput.exists()).toBe(true);
-      expect(editInput.classes()).toContain("tw:bg-gray-800");
+      expect(editInput.classes()).toContain("bg-input-bg");
     });
 
-    it("should not apply dark theme class when theme is light", async () => {
+    it("should apply the same semantic input background when theme is light", async () => {
       wrapper = createWrapper();
       await waitForComponent(wrapper);
 
@@ -742,7 +746,7 @@ describe("TabsSettings", () => {
       await wrapper.vm.$nextTick();
 
       const editInput = wrapper.find('[data-test="dashboard-tab-settings-tab-name-edit"]');
-      expect(editInput.classes()).not.toContain("tw:bg-gray-800");
+      expect(editInput.classes()).toContain("bg-input-bg");
     });
   });
 

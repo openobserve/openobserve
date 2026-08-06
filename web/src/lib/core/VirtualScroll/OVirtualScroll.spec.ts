@@ -1,21 +1,18 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { defineComponent, h, ref, nextTick } from "vue";
+import { h, ref, nextTick } from "vue";
 import OVirtualScroll from "./OVirtualScroll.vue";
 
 // @tanstack/vue-virtual uses DOM measurements that jsdom doesn't support.
 // We mock useVirtualizer to return predictable virtual items.
 vi.mock("@tanstack/vue-virtual", () => ({
   useVirtualizer: vi.fn((options: any) => {
-    const opts =
-      typeof options === "function" ? options() : options.value ?? options;
+    const opts = typeof options === "function" ? options() : (options.value ?? options);
     const count = typeof opts.count === "function" ? opts.count() : opts.count;
     const estimateSize =
-      typeof opts.estimateSize === "function"
-        ? opts.estimateSize(0)
-        : opts.estimateSize ?? 40;
+      typeof opts.estimateSize === "function" ? opts.estimateSize(0) : (opts.estimateSize ?? 40);
 
     const virtualItems = Array.from({ length: count }, (_, i) => ({
       index: i,

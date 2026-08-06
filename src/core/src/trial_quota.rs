@@ -1,0 +1,948 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Trial Quota Service — in-memory quota counter with DB persistence.
+//!
+//! Free tier: every org gets a single shared lifetime pool of free credits.
+//! All features (AI chat, incidents, etc.) deduct from the same pool.
+//! The pool never resets — once consumed, the org must subscribe to continue.
+//! Pay-as-you-go: when free credits are exhausted and the org has an active
+//! Stripe subscription, AI metering prices are auto-added to the subscription
+//! and usage is reported to the _usage stream for billing.
+//!
+//! ## Architecture
+//!
+//! - **Hot path** (`try_deduct`): atomic CAS on per-org counter, sends deduction record to a
+//!   bounded channel, broadcasts delta via dedicated NATS queue.
+//! - **DB flush** (`flush_to_db`): background job drains the channel periodically, coalesces
+//!   per-org/feature records, and batch-upserts to DB.
+//! - **Cluster sync** (`subscribe_ha_queue`): listens for delta messages from other nodes on a
+//!   dedicated NATS queue and atomically adds the delta to the local counter. Skips messages from
+//!   self (source_node check). Deltas are commutative so message ordering doesn't matter.
+
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc, LazyLock as Lazy, OnceLock, RwLock,
+        atomic::{AtomicI64, AtomicU64, Ordering},
+    },
+};
+
+use bytes::Bytes;
+use chrono::{Datelike, Timelike, Utc};
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        cluster::Node,
+        self_reporting::usage::{UsageData, UsageEvent},
+        stream::StreamType,
+    },
+    utils::json,
+};
+use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
+use utoipa::ToSchema;
+
+/// Per-org total usage counter. Single AtomicU64 per org — no cross-key locks.
+/// This is the hot-path structure used by `try_deduct`.
+static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Explicit per-organization limits. Missing organizations use the
+/// deployment-wide default.
+static ORG_LIMITS: Lazy<RwLock<HashMap<String, u64>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+
+/// Bounded channel for deduction records pending DB flush.
+/// Capacity is generous to avoid backpressure on the hot path.
+static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
+    let (tx, rx) = mpsc::channel(10_000);
+    // Leak the receiver into a static so the flush job can drain it.
+    // Safety: this is initialized once and lives for the process lifetime.
+    let rx = Box::leak(Box::new(tokio::sync::Mutex::new(rx)));
+    // Store the receiver reference
+    FLUSH_RX.set(rx).ok();
+    tx
+});
+
+/// The receiver end, set once during FLUSH_TX initialization.
+static FLUSH_RX: OnceLock<&'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord>>> =
+    OnceLock::new();
+
+/// Dedicated NATS queue for HA sync of quota deductions across nodes.
+pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";
+
+/// Max `updated_at` (micros) from DB rows loaded during init_from_db.
+/// NATS messages with timestamp <= this are already reflected in the DB
+/// snapshot and must be skipped to avoid double-counting.
+static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
+
+/// The checkpoints at which quota notification emails are sent.
+const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
+
+/// A deduction record buffered for periodic DB flush.
+struct FlushRecord {
+    org_id: String,
+    feature_key: String,
+    cost: i64,
+}
+
+/// Trial quota feature variants — extensible for future metered features
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrialQuotaFeature {
+    AiChat,
+    NewIncident,
+    IncidentReAnalysis,
+}
+
+impl TrialQuotaFeature {
+    /// DB key for this feature (stored in `feature` column)
+    pub fn feature_key(&self) -> &'static str {
+        match self {
+            TrialQuotaFeature::AiChat => "ai_chat",
+            TrialQuotaFeature::NewIncident => "new_incident",
+            TrialQuotaFeature::IncidentReAnalysis => "incident_reanalysis",
+        }
+    }
+
+    /// Get the credit cost for this feature from enterprise config
+    pub fn cost(&self) -> u64 {
+        let cfg = o2_enterprise::enterprise::common::config::get_config();
+        match self {
+            TrialQuotaFeature::AiChat => cfg.cloud.ai_credit_cost_chat,
+            TrialQuotaFeature::NewIncident => cfg.cloud.ai_credit_cost_incident,
+            TrialQuotaFeature::IncidentReAnalysis => cfg.cloud.ai_credit_cost_incident_reanalysis,
+        }
+    }
+
+    /// Get the corresponding UsageEvent variant
+    pub fn usage_event(&self) -> UsageEvent {
+        match self {
+            TrialQuotaFeature::AiChat => UsageEvent::AiChat,
+            TrialQuotaFeature::NewIncident => UsageEvent::NewIncident,
+            TrialQuotaFeature::IncidentReAnalysis => UsageEvent::IncidentReAnalysis,
+        }
+    }
+}
+
+impl std::fmt::Display for TrialQuotaFeature {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.feature_key())
+    }
+}
+
+/// Error returned when free quota is exhausted
+#[derive(Debug, Serialize, Deserialize)]
+pub struct QuotaExhaustedError {
+    pub usage_count: u64,
+    pub usage_limit: u64,
+}
+
+impl std::fmt::Display for QuotaExhaustedError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Free trial quota exhausted ({}/{} used). Subscribe to continue using this feature.",
+            self.usage_count, self.usage_limit
+        )
+    }
+}
+
+impl std::error::Error for QuotaExhaustedError {}
+
+/// Get the organization's shared pool limit, falling back to deployment config.
+fn get_pool_limit(org_id: &str) -> u64 {
+    let default_limit = o2_enterprise::enterprise::common::config::get_config()
+        .cloud
+        .ai_free_credit_pool;
+    let org_limit = ORG_LIMITS.read().unwrap().get(org_id).copied();
+    org_limit.unwrap_or(default_limit)
+}
+
+/// Get total usage across all features for an org (single atomic read)
+fn get_org_total_used(org_id: &str) -> u64 {
+    let map = ORG_USAGE.read().unwrap();
+    map.get(org_id)
+        .map(|v| v.load(Ordering::Relaxed))
+        .unwrap_or(0)
+}
+
+/// Ensure the per-org atomic counter exists.
+/// If the org is new, inserts an AtomicU64(0) under a brief write lock.
+fn ensure_org_counter(org_id: &str) {
+    {
+        let map = ORG_USAGE.read().unwrap();
+        if map.contains_key(org_id) {
+            return;
+        }
+    }
+    // Use entry() instead of direct insert because another thread may have
+    // inserted between us dropping the read lock above and acquiring this write lock.
+    let mut map = ORG_USAGE.write().unwrap();
+    map.entry(org_id.to_string())
+        .or_insert_with(|| AtomicU64::new(0));
+}
+
+/// Atomically add a delta to the org's in-memory counter.
+/// Used by the HA consumer to apply remote deductions.
+fn add_to_org_counter(org_id: &str, delta: u64) {
+    ensure_org_counter(org_id);
+    let map = ORG_USAGE.read().unwrap();
+    if let Some(counter) = map.get(org_id) {
+        counter.fetch_add(delta, Ordering::Relaxed);
+    }
+}
+
+fn set_cached_limit(org_id: &str, usage_limit: u64) {
+    ORG_LIMITS
+        .write()
+        .unwrap()
+        .insert(org_id.to_string(), usage_limit);
+}
+
+/// HA message broadcast to other nodes after a deduction or limit update.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrialQuotaHaMsg {
+    pub org_id: String,
+    pub cost: u64,
+    #[serde(default)]
+    pub usage_limit: Option<u64>,
+    pub source_node: Node,
+    /// Microsecond timestamp of when the deduction happened.
+    /// Used to skip messages older than the DB snapshot loaded at init.
+    pub timestamp: i64,
+}
+
+/// Persist and publish an explicit lifetime credit limit for an organization.
+/// Credit usage continues to use the existing in-memory counter and batched DB flush.
+pub async fn set_limit(org_id: &str, usage_limit: u64) -> Result<(), anyhow::Error> {
+    let previous_limit = get_pool_limit(org_id);
+    let db_limit = i64::try_from(usage_limit)
+        .map_err(|_| anyhow::anyhow!("AI credit limit exceeds the supported maximum"))?;
+    infra::table::trial_quota_usage::set_usage_limit_for_org(org_id, db_limit).await?;
+    if usage_limit > previous_limit {
+        reset_checkpoint(org_id).await;
+    }
+    set_cached_limit(org_id, usage_limit);
+
+    if !LOCAL_NODE.is_single_node()
+        && let Err(err) = publish_ha_msg(&TrialQuotaHaMsg {
+            org_id: org_id.to_string(),
+            cost: 0,
+            usage_limit: Some(usage_limit),
+            source_node: LOCAL_NODE.clone(),
+            timestamp: config::utils::time::now_micros(),
+        })
+        .await
+    {
+        log::warn!(
+            "[TRIAL_QUOTA] Failed to broadcast limit update for org={org_id}; periodic reconciliation will apply it: {err}"
+        );
+    }
+    Ok(())
+}
+
+/// Reconcile explicit limits from the database. This runs on the existing
+/// flush interval so missed or out-of-order HA messages remain short-lived.
+pub async fn refresh_limits_from_db() {
+    match infra::table::trial_quota_usage::load_all_usage_limits().await {
+        Ok(limits) => {
+            let limits = limits
+                .into_iter()
+                .filter_map(|(org_id, limit)| {
+                    u64::try_from(limit).ok().map(|limit| (org_id, limit))
+                })
+                .collect();
+            *ORG_LIMITS.write().unwrap() = limits;
+        }
+        Err(err) => {
+            log::warn!("[TRIAL_QUOTA] Failed to refresh organization limits: {err}");
+        }
+    }
+}
+
+/// Try to deduct credits from the org's shared pool for a feature.
+///
+/// Returns `Ok(remaining)` on success, or `Err(QuotaExhaustedError)` when
+/// the shared pool is depleted.
+///
+/// The limit check is against the total usage across ALL features for the org,
+/// not per-feature. The per-feature counter is still tracked for breakdown.
+pub async fn try_deduct(
+    org_id: &str,
+    feature: TrialQuotaFeature,
+) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
+    let cost = feature.cost();
+    let pool_limit = get_pool_limit(org_id);
+
+    log::info!(
+        "[TRIAL_QUOTA] try_deduct called: org={} feature={} cost={} pool_limit={}",
+        org_id,
+        feature,
+        cost,
+        pool_limit,
+    );
+
+    // Ensure the org has an atomic counter
+    ensure_org_counter(org_id);
+
+    // Single atomic CAS loop on the org-level total — no cross-key locks.
+    // The RwLockReadGuard must be dropped before any .await, so the entire
+    // CAS loop runs synchronously, then we do async work after.
+    let deduct_result = {
+        let map = ORG_USAGE.read().unwrap();
+        let counter = map.get(org_id).unwrap(); // safe: ensure_org_counter just ran
+
+        loop {
+            let current = counter.load(Ordering::Relaxed);
+            let new_total = current + cost;
+            if new_total > pool_limit {
+                log::info!(
+                    "[TRIAL_QUOTA] quota exhausted: org={} feature={} current_used={} cost={} pool_limit={}",
+                    org_id,
+                    feature,
+                    current,
+                    cost,
+                    pool_limit,
+                );
+                break Err(QuotaExhaustedError {
+                    usage_count: current,
+                    usage_limit: pool_limit,
+                });
+            }
+            // Atomic compare-and-swap: only succeeds if no one else incremented
+            if counter
+                .compare_exchange(current, new_total, Ordering::AcqRel, Ordering::Relaxed)
+                .is_ok()
+            {
+                log::info!(
+                    "[TRIAL_QUOTA] deducted: org={} feature={} cost={} total_used={}/{} remaining={}",
+                    org_id,
+                    feature,
+                    cost,
+                    new_total,
+                    pool_limit,
+                    pool_limit - new_total,
+                );
+                break Ok(new_total);
+            }
+            // CAS failed — another thread incremented first, retry
+        }
+    }; // RwLockReadGuard dropped here
+
+    match deduct_result {
+        Err(e) => Err(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
+        Ok(new_total) => {
+            // Buffer the deduction for periodic DB flush (non-blocking)
+            if let Err(e) = FLUSH_TX.try_send(FlushRecord {
+                org_id: org_id.to_string(),
+                feature_key: feature.feature_key().to_string(),
+                cost: cost as i64,
+            }) {
+                log::warn!(
+                    "[TRIAL_QUOTA] Flush channel full, dropping record for org={}: {e}",
+                    org_id
+                );
+            }
+
+            // Broadcast delta to other nodes via NATS queue
+            // Skip if single node — no other nodes to sync with
+            if !LOCAL_NODE.is_single_node() {
+                let msg = TrialQuotaHaMsg {
+                    org_id: org_id.to_string(),
+                    cost,
+                    usage_limit: None,
+                    source_node: LOCAL_NODE.clone(),
+                    timestamp: config::utils::time::now_micros(),
+                };
+                if let Err(e) = publish_ha_msg(&msg).await {
+                    log::warn!(
+                        "[TRIAL_QUOTA] Failed to broadcast delta for org={}: {e}",
+                        org_id
+                    );
+                }
+            }
+
+            Ok(pool_limit - new_total)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Periodic DB flush
+// ---------------------------------------------------------------------------
+
+/// Drain the flush channel and batch-upsert to DB.
+/// Called periodically by the background job in `cloud.rs`.
+pub async fn flush_to_db() {
+    let rx_ref = match FLUSH_RX.get() {
+        Some(rx) => rx,
+        None => {
+            // Channel not initialized yet (FLUSH_TX not accessed).
+            // Force initialization by touching the sender.
+            let _ = &*FLUSH_TX;
+            match FLUSH_RX.get() {
+                Some(rx) => rx,
+                None => return,
+            }
+        }
+    };
+
+    // Drain all pending records under a brief lock
+    let mut records: Vec<FlushRecord> = Vec::new();
+    {
+        let mut rx = rx_ref.lock().await;
+        while let Ok(record) = rx.try_recv() {
+            records.push(record);
+        }
+    }
+
+    if records.is_empty() {
+        return;
+    }
+
+    // Coalesce: sum costs per (org_id, feature_key)
+    let mut coalesced: HashMap<(String, String), i64> = HashMap::new();
+    for r in &records {
+        *coalesced
+            .entry((r.org_id.clone(), r.feature_key.clone()))
+            .or_default() += r.cost;
+    }
+
+    let batch: Vec<(String, String, i64)> = coalesced
+        .into_iter()
+        .map(|((org_id, feature_key), cost)| (org_id, feature_key, cost))
+        .collect();
+
+    let batch_len = batch.len();
+    log::info!(
+        "[TRIAL_QUOTA] flushing {} coalesced records to DB (from {} raw)",
+        batch_len,
+        records.len(),
+    );
+
+    if let Err(e) = infra::table::trial_quota_usage::batch_increment(batch).await {
+        log::error!("[TRIAL_QUOTA] Failed to flush quota to DB: {e}");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Cluster sync via dedicated NATS queue (delta-based)
+// ---------------------------------------------------------------------------
+
+/// Publish a delta message to the HA queue.
+async fn publish_ha_msg(msg: &TrialQuotaHaMsg) -> Result<(), anyhow::Error> {
+    let payload = Bytes::from(json::to_vec(msg).map_err(|e| anyhow::anyhow!("{e}"))?);
+    let q = infra::queue::get_queue().await;
+    q.publish(TRIAL_QUOTA_HA_QUEUE, payload)
+        .await
+        .map_err(|e| anyhow::anyhow!("{e}"))
+}
+
+/// Subscribe to the HA queue and apply remote deltas to local counters.
+/// Each message carries a usage delta or an explicit limit. Messages from self
+/// are skipped. Usage deltas are atomically added to the local counter.
+///
+/// Must run on ALL cloud nodes. Skipped in single-node mode.
+pub async fn subscribe_ha_queue() {
+    if LOCAL_NODE.is_single_node() {
+        log::info!("[TRIAL_QUOTA] Single node mode, skipping HA queue subscriber");
+        return;
+    }
+
+    let q = infra::queue::get_queue().await;
+    if let Err(e) = q.create(TRIAL_QUOTA_HA_QUEUE).await {
+        log::error!("[TRIAL_QUOTA] Failed to create HA queue: {e}");
+        return;
+    }
+
+    // DeliverPolicy::All — replay all messages, but skip any with timestamp
+    // <= INIT_WATERMARK (those are already reflected in the DB snapshot).
+    // This ensures we don't miss deltas published between init_from_db and
+    // subscribe, while avoiding double-counting old messages.
+    let mut receiver = match q
+        .consume(TRIAL_QUOTA_HA_QUEUE, Some(infra::queue::DeliverPolicy::All))
+        .await
+    {
+        Ok(rx) => rx,
+        Err(e) => {
+            log::error!("[TRIAL_QUOTA] Failed to consume from HA queue: {e}");
+            return;
+        }
+    };
+
+    let rx = match Arc::get_mut(&mut receiver) {
+        Some(rx) => rx,
+        None => {
+            log::error!("[TRIAL_QUOTA] Failed to get mutable receiver for HA queue");
+            return;
+        }
+    };
+
+    log::info!("[TRIAL_QUOTA] HA queue subscriber started");
+
+    while let Some(msg) = rx.recv().await {
+        let payload = msg.message();
+        let ha_msg: TrialQuotaHaMsg = match json::from_slice(payload) {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("[TRIAL_QUOTA] Failed to deserialize HA message: {e}");
+                if let Err(e) = msg.ack().await {
+                    log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
+                }
+                continue;
+            }
+        };
+
+        // Skip messages from self — we already applied the deduction locally
+        if ha_msg.source_node.eq(&LOCAL_NODE) {
+            if let Err(e) = msg.ack().await {
+                log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
+            }
+            continue;
+        }
+
+        // Skip messages older than the DB snapshot — already counted in init_from_db
+        let watermark = INIT_WATERMARK.load(Ordering::Relaxed);
+        if ha_msg.timestamp <= watermark {
+            log::debug!(
+                "[TRIAL_QUOTA] Skipping stale HA message: org={} ts={} watermark={}",
+                ha_msg.org_id,
+                ha_msg.timestamp,
+                watermark,
+            );
+            if let Err(e) = msg.ack().await {
+                log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
+            }
+            continue;
+        }
+
+        if let Some(usage_limit) = ha_msg.usage_limit {
+            set_cached_limit(&ha_msg.org_id, usage_limit);
+        }
+
+        let old = get_org_total_used(&ha_msg.org_id);
+        if ha_msg.cost > 0 {
+            add_to_org_counter(&ha_msg.org_id, ha_msg.cost);
+        }
+        let new_total = get_org_total_used(&ha_msg.org_id);
+
+        log::info!(
+            "[TRIAL_QUOTA] HA sync: org={} delta={} limit={:?} total {}->{}",
+            ha_msg.org_id,
+            ha_msg.cost,
+            ha_msg.usage_limit,
+            old,
+            new_total,
+        );
+
+        if let Err(e) = msg.ack().await {
+            log::error!("[TRIAL_QUOTA] Failed to ack HA message: {e}");
+        }
+    }
+
+    log::warn!("[TRIAL_QUOTA] HA queue subscriber ended");
+}
+
+// ---------------------------------------------------------------------------
+// Query helpers
+// ---------------------------------------------------------------------------
+
+/// Get remaining credits in the org's shared pool
+pub fn get_remaining(org_id: &str) -> u64 {
+    let limit = get_pool_limit(org_id);
+    let used = get_org_total_used(org_id);
+    limit.saturating_sub(used)
+}
+
+/// Get total credits used across all features for an org
+pub fn get_used(org_id: &str) -> u64 {
+    get_org_total_used(org_id)
+}
+
+/// Get the pool limit for an organization, falling back to the deployment-wide default.
+pub fn get_limit(org_id: &str) -> u64 {
+    get_pool_limit(org_id)
+}
+
+/// Serializable request body for AI usage events.
+/// Fields that are None are omitted from the JSON output.
+#[derive(Serialize)]
+struct AiUsageRequestBody<'a> {
+    feature: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_id: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    incident_id: Option<&'a str>,
+}
+
+/// Context for AI usage events — carries traceability info.
+#[derive(Default, Clone)]
+pub struct AiUsageContext {
+    pub user_email: String,
+    pub trace_id: Option<String>,
+    pub session_id: Option<String>,
+    pub incident_id: Option<String>,
+}
+
+/// Record AI usage to the _usage stream.
+///
+/// Writes TWO events:
+/// 1. Credit event (`AiFreeCredits` or `AiCredits`) with `size = credit_cost`
+/// 2. Feature event (AiChat/NewIncident/IncidentReAnalysis) with `size = 1` — for FE breakdown
+///
+/// `AiFreeCredits` is informational (not billed). `AiCredits` is picked up by the
+/// metering pipeline and reported to Stripe/AWS/Azure.
+fn record_usage_internal(
+    org_id: &str,
+    ctx: &AiUsageContext,
+    feature: TrialQuotaFeature,
+    billable: bool,
+) {
+    let now = Utc::now();
+    let timestamp = now.timestamp_micros();
+    let event_time_hour = format!(
+        "{:04}{:02}{:02}{:02}",
+        now.year(),
+        now.month(),
+        now.day(),
+        now.hour()
+    );
+
+    let credit_event = UsageData {
+        _timestamp: timestamp,
+        event: if billable {
+            UsageEvent::AiCredits
+        } else {
+            UsageEvent::AiFreeCredits
+        },
+        year: now.year(),
+        month: now.month(),
+        day: now.day(),
+        hour: now.hour(),
+        event_time_hour: event_time_hour.clone(),
+        org_id: org_id.to_string(),
+        request_body: serde_json::to_string(&AiUsageRequestBody {
+            feature: feature.feature_key(),
+            session_id: ctx.session_id.as_deref(),
+            incident_id: ctx.incident_id.as_deref(),
+        })
+        .unwrap_or_default(),
+        size: feature.cost() as f64,
+        unit: "count".to_string(),
+        user_email: ctx.user_email.clone(),
+        response_time: 0.0,
+        stream_type: StreamType::Logs,
+        num_records: 1,
+        dropped_records: 0,
+        stream_name: String::new(),
+        trace_id: ctx.trace_id.clone(),
+        cached_ratio: None,
+        scan_files: None,
+        compressed_size: None,
+        min_ts: None,
+        max_ts: None,
+        search_type: None,
+        search_event_context: None,
+        took_wait_in_queue: None,
+        result_cache_ratio: None,
+        function: None,
+        is_partial: false,
+        work_group: None,
+        node_name: None,
+        dashboard_info: None,
+        peak_memory_usage: None,
+    };
+
+    // Feature breakdown event (informational, not billed)
+    let feature_event = UsageData {
+        event: feature.usage_event(),
+        size: 1.0,
+        unit: "count".to_string(),
+        ..credit_event.clone()
+    };
+
+    usage_reporting::report_usage(vec![credit_event, feature_event]);
+}
+
+/// Record free credit usage (all orgs). Writes `AiFreeCredits` — not billed.
+pub fn record_free_ai_usage(org_id: &str, ctx: &AiUsageContext, feature: TrialQuotaFeature) {
+    record_usage_internal(org_id, ctx, feature, false);
+}
+
+/// Record billable PAYG usage (paid orgs only). Writes `AiCredits` — billed to Stripe.
+pub fn record_billable_ai_usage(org_id: &str, ctx: &AiUsageContext, feature: TrialQuotaFeature) {
+    record_usage_internal(org_id, ctx, feature, true);
+}
+
+/// AI usage response for the API
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct AiUsageResponse {
+    pub mode: String,
+    pub credits_used: u64,
+    pub credits_limit: u64,
+    pub credits_remaining: u64,
+    pub requires_additional_credits: bool,
+}
+
+/// Get AI usage info for an org (for the usage API endpoint).
+/// Reports the single shared pool across all AI features.
+/// Uses the greater of persisted and in-memory usage to include pending flushes.
+///
+/// Mode is derived from actual state:
+/// - `"free"`: credits remaining in pool
+/// - `"pay_as_you_go"`: credits exhausted + active subscription
+/// - `"exhausted"`: credits exhausted + no subscription
+pub async fn get_usage(org_id: &str) -> AiUsageResponse {
+    let limit = get_pool_limit(org_id);
+    let in_memory_used = get_org_total_used(org_id);
+
+    // Read from DB for accuracy
+    let db_used = match infra::table::trial_quota_usage::get_total_usage_for_org(org_id).await {
+        Ok(total) => {
+            log::info!(
+                "[TRIAL_QUOTA] get_usage: org={} db_total={} in_memory_total={} pool_limit={}",
+                org_id,
+                total,
+                in_memory_used,
+                limit,
+            );
+            total as u64
+        }
+        Err(e) => {
+            log::warn!(
+                "[TRIAL_QUOTA] get_usage: org={} DB read failed (falling back to cache={}): {e}",
+                org_id,
+                in_memory_used,
+            );
+            in_memory_used
+        }
+    };
+
+    let used = db_used.max(in_memory_used);
+    let remaining = limit.saturating_sub(used);
+    let exhaustion_policy = if remaining == 0 {
+        Some(
+            o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
+                org_id,
+            )
+            .await,
+        )
+    } else {
+        None
+    };
+    let requires_additional_credits =
+        exhaustion_policy.is_some_and(|policy| policy.requires_additional_credits());
+
+    let mode = match exhaustion_policy {
+        None => "free",
+        Some(policy) if policy.allows_metered_overage() => "pay_as_you_go",
+        Some(_) => "exhausted",
+    };
+
+    AiUsageResponse {
+        mode: mode.to_string(),
+        credits_used: used,
+        credits_limit: limit,
+        credits_remaining: remaining,
+        requires_additional_credits,
+    }
+}
+
+/// Get the current usage percentage for an org (0–100, clamped).
+pub fn get_quota_percentage(org_id: &str) -> u8 {
+    let limit = get_pool_limit(org_id);
+    if limit == 0 {
+        return 100;
+    }
+    let used = get_org_total_used(org_id);
+    let pct = (used * 100 / limit).min(100);
+    pct as u8
+}
+
+/// Returns the next checkpoint to notify for the org, or None if already notified.
+///
+/// Walks the QUOTA_CHECKPOINTS list and returns the highest checkpoint that
+/// the org's usage has reached but hasn't been notified about yet.
+pub async fn get_pending_checkpoint(org_id: &str) -> Option<u8> {
+    let pct = get_quota_percentage(org_id);
+    let already_notified = infra::table::trial_quota_usage::get_notified_checkpoint(org_id)
+        .await
+        .unwrap_or(0) as u8;
+    pending_checkpoint_from(pct, already_notified)
+}
+
+/// Compute the pending checkpoint given a pre-fetched usage percentage and
+/// already-notified level. This is the DB-free, sync part of
+/// `get_pending_checkpoint` — used by `check_all_orgs_ai_quota` which
+/// pre-fetches all checkpoints in a single query to avoid N+1 DB round-trips.
+pub fn pending_checkpoint_from(pct: u8, already_notified: u8) -> Option<u8> {
+    // Find the highest checkpoint that the org has reached
+    let mut highest_reached: Option<u8> = None;
+    for &cp in QUOTA_CHECKPOINTS {
+        if pct >= cp && cp > already_notified {
+            highest_reached = Some(cp);
+        }
+    }
+    highest_reached
+}
+
+/// Atomically mark a checkpoint as notified for an org in the DB.
+/// Returns true if this pod won the update (no other pod set it first).
+pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
+    match infra::table::trial_quota_usage::update_notified_checkpoint(org_id, checkpoint as i16)
+        .await
+    {
+        Ok(updated) => updated,
+        Err(e) => {
+            log::error!("[AI_QUOTA] Failed to persist checkpoint for org={org_id}: {e}");
+            false
+        }
+    }
+}
+
+/// Reset checkpoint tracking for an org (e.g., when credits are refilled).
+pub async fn reset_checkpoint(org_id: &str) {
+    if let Err(e) = infra::table::trial_quota_usage::reset_notified_checkpoint(org_id).await {
+        log::error!("[AI_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
+    }
+}
+
+/// Initialize quota from DB on node startup.
+/// Loads all quota records into the in-memory counters.
+pub async fn init_from_db() {
+    match infra::table::trial_quota_usage::load_all().await {
+        Ok(records) => {
+            // Find the max updated_at across all rows — this is our watermark.
+            // NATS messages with timestamp <= this are already in the DB snapshot.
+            let max_updated_at = records.iter().map(|r| r.updated_at).max().unwrap_or(0);
+            INIT_WATERMARK.store(max_updated_at, Ordering::Relaxed);
+
+            // Sum per-feature counts into per-org totals and load explicit limits.
+            let mut org_totals: HashMap<String, u64> = HashMap::new();
+            let mut org_limits: HashMap<String, u64> = HashMap::new();
+            for record in &records {
+                *org_totals.entry(record.org_id.clone()).or_default() += record.usage_count as u64;
+                if let Some(limit) = record.usage_limit
+                    && let Ok(limit) = u64::try_from(limit)
+                {
+                    org_limits
+                        .entry(record.org_id.clone())
+                        .and_modify(|current| *current = (*current).max(limit))
+                        .or_insert(limit);
+                }
+            }
+
+            // Populate ORG_USAGE with totals
+            {
+                let mut map = ORG_USAGE.write().unwrap();
+                for (org_id, total) in org_totals {
+                    map.insert(org_id, AtomicU64::new(total));
+                }
+            }
+            *ORG_LIMITS.write().unwrap() = org_limits;
+
+            log::info!(
+                "[TRIAL_QUOTA] Loaded {} quota records from DB, watermark={}",
+                records.len(),
+                max_updated_at,
+            );
+        }
+        Err(e) => {
+            log::error!("[TRIAL_QUOTA] Failed to load quota from DB: {e}");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- pending_checkpoint_from ---
+    // QUOTA_CHECKPOINTS = [80, 90, 95, 100]
+
+    #[test]
+    fn test_pending_checkpoint_below_all() {
+        assert_eq!(pending_checkpoint_from(0, 0), None);
+        assert_eq!(pending_checkpoint_from(79, 0), None);
+    }
+
+    #[test]
+    fn test_pending_checkpoint_exactly_80() {
+        assert_eq!(pending_checkpoint_from(80, 0), Some(80));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_90_returns_highest_reached() {
+        assert_eq!(pending_checkpoint_from(90, 0), Some(90));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_100_returns_100() {
+        assert_eq!(pending_checkpoint_from(100, 0), Some(100));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_already_notified_at_80() {
+        // pct=90 reached, 80 already notified → highest unrenotified is 90
+        assert_eq!(pending_checkpoint_from(90, 80), Some(90));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_all_notified() {
+        assert_eq!(pending_checkpoint_from(100, 100), None);
+    }
+
+    #[test]
+    fn test_pending_checkpoint_between_checkpoints() {
+        // pct=85 → reached 80 but not 90; 80 already notified → None
+        assert_eq!(pending_checkpoint_from(85, 80), None);
+        // pct=85 → reached 80, not yet notified → Some(80)
+        assert_eq!(pending_checkpoint_from(85, 0), Some(80));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_95_skip_lower_notified() {
+        assert_eq!(pending_checkpoint_from(95, 90), Some(95));
+    }
+
+    #[test]
+    fn test_pending_checkpoint_100_skip_notified_95() {
+        assert_eq!(pending_checkpoint_from(100, 95), Some(100));
+    }
+
+    #[test]
+    fn test_ai_usage_request_body_optional_fields_absent_when_none() {
+        let body = AiUsageRequestBody {
+            feature: "chat",
+            session_id: None,
+            incident_id: None,
+        };
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(!json.contains("session_id"));
+        assert!(!json.contains("incident_id"));
+    }
+
+    #[test]
+    fn test_ai_usage_request_body_optional_fields_present_when_some() {
+        let body = AiUsageRequestBody {
+            feature: "chat",
+            session_id: Some("sess-123"),
+            incident_id: Some("inc-456"),
+        };
+        let json = serde_json::to_string(&body).unwrap();
+        assert!(json.contains("session_id"));
+        assert!(json.contains("incident_id"));
+    }
+}

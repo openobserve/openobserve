@@ -1,23 +1,33 @@
 <template>
-  <div data-test="promql-metric-selector" class="tw:mb-2">
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
+  <div data-test="promql-metric-selector" class="mb-2">
+    <div class="flex flex-row pl-3">
       <div
         data-test="promql-metric-selector-label"
-        class="tw:text-sm tw:whitespace-nowrap tw:flex tw:items-center tw:min-w-32.5"
-      >{{ t("panel.metric") }}</div>
-      <span class="tw:flex tw:items-center tw:ml-0.5 tw:mr-0.5">:</span>
-      <div class="tw:m-1.25 tw:flex-1">
+        class="flex min-w-24 items-center whitespace-nowrap"
+      >
+        <span
+          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
+        {{ t("panel.metric") }}
+      </div>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+      <div class="m-1.25 flex-1">
         <OSelect
           v-model="selectedMetric"
           :options="metrics"
-          label="Metric Name"
-          class="showLabelOnTop tw:min-w-75 tw:max-w-125"
+          :label="t('metrics.metricSelector.metricName')"
+          class="showLabelOnTop max-w-125 min-w-75"
           @update:model-value="onMetricSelect"
           clearable
           data-test="metric-selector"
         >
           <template #empty>
-            {{ loading ? "Loading metrics..." : "No metrics found" }}
+            {{
+              loading
+                ? t("metrics.metricSelector.loadingMetrics")
+                : t("metrics.metricSelector.noMetricsFound")
+            }}
           </template>
         </OSelect>
       </div>
@@ -28,9 +38,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import streamService from "@/services/stream";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 const props = defineProps<{
   metric: string;
@@ -41,7 +52,7 @@ const emit = defineEmits<{
   "update:metric": [value: string];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const selectedMetric = ref<string>(props.metric);
 const metrics = ref<string[]>([]);
@@ -63,7 +74,7 @@ const loadMetrics = async () => {
       -1, // limit (get all)
       "", // keyword
       "", // sort
-      false // asc
+      false, // asc
     );
 
     if (response.data && response.data.list) {
@@ -77,8 +88,9 @@ const loadMetrics = async () => {
   }
 };
 
-const onMetricSelect = (value: string | null) => {
-  selectedMetric.value = value || "";
+const onMetricSelect = (value: SelectModelValue) => {
+  // Single-select of metric names: value is a string or null/empty at runtime.
+  selectedMetric.value = typeof value === "string" ? value : "";
   emit("update:metric", selectedMetric.value);
 };
 </script>

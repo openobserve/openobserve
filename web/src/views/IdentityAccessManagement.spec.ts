@@ -16,7 +16,6 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import IdentityAccessManagement from "@/views/IdentityAccessManagement.vue";
-import RouteTabs from "@/components/RouteTabs.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -29,7 +28,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
     isMetaOrg: { value: false },
   }),
 }));
-
 
 /** Helper: collect all items from sectionGroups (flattened, excluding hidden ones) */
 function visibleItems(sectionGroups: any[]): any[] {
@@ -45,10 +43,8 @@ function allItems(sectionGroups: any[]): any[] {
 
 const defaultStubs = {
   RouterView: { template: "<div>Router View</div>" },
-  RouteTabs: true,
-  PageLayout: {
-    template:
-      '<div><slot name="sidebar" /><slot /></div>',
+  OPageLayout: {
+    template: '<div><slot name="sidebar" /><slot /></div>',
   },
   SectionRail: true,
 };
@@ -91,10 +87,6 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     it("should have the correct component structure", () => {
       expect(wrapper.element.tagName).toBe("DIV");
-    });
-
-    it("should have RouteTabs component available", () => {
-      expect(RouteTabs).toBeDefined();
     });
   });
 
@@ -160,9 +152,7 @@ describe("IdentityAccessManagement.vue Component", () => {
 
     it("should always include ingestionTokens item", () => {
       const items = allItems(wrapper.vm.sectionGroups);
-      const hasTokens = items.some(
-        (item: any) => item.key === "ingestionTokens",
-      );
+      const hasTokens = items.some((item: any) => item.key === "ingestionTokens");
       expect(hasTokens).toBe(true);
     });
 
@@ -321,8 +311,7 @@ describe("IdentityAccessManagement.vue Component", () => {
     });
 
     it("should handle isEnterprise flag", () => {
-      const isEnterprise =
-        config.isEnterprise === "true" || config.isCloud === "true";
+      const isEnterprise = config.isEnterprise === "true" || config.isCloud === "true";
       expect(typeof isEnterprise).toBe("boolean");
     });
 

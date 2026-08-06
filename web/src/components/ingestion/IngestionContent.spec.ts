@@ -31,11 +31,11 @@ describe("IngestionContent.vue", () => {
   it("root element has the layout classes", () => {
     wrapper = createWrapper();
     const root = wrapper.find("div");
-    expect(root.classes()).toContain("tw:p-3");
-    expect(root.classes()).toContain("tw:flex");
-    expect(root.classes()).toContain("tw:flex-col");
-    expect(root.classes()).toContain("tw:gap-4");
-    expect(root.classes()).toContain("tw:text-sm");
+    expect(root.classes()).toContain("p-3");
+    expect(root.classes()).toContain("flex");
+    expect(root.classes()).toContain("flex-col");
+    expect(root.classes()).toContain("gap-4");
+    expect(root.classes()).toContain("text-sm");
   });
 
   it("renders default slot content", () => {

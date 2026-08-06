@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// Shared, stable spy so call assertions survive the virtualizer computed being
+// re-evaluated on every read (the mock recreates its object each access).
+const { mockScrollToIndex } = vi.hoisted(() => ({
+  mockScrollToIndex: vi.fn(),
+}));
+
 // Mock @tanstack/vue-virtual BEFORE any imports so the virtualizer returns
 // synthetic virtual rows even when scrollContainer is null (as in jsdom).
 vi.mock("@tanstack/vue-virtual", () => ({
@@ -22,7 +28,6 @@ vi.mock("@tanstack/vue-virtual", () => ({
       const options = optionsComputed.value;
       const count = options.count;
       const estimateSize = options.estimateSize?.() ?? 30;
-      const scrollToIndex = vi.fn();
       const items = Array.from({ length: count }, (_, i) => ({
         key: i,
         index: i,
@@ -34,16 +39,15 @@ vi.mock("@tanstack/vue-virtual", () => ({
       return {
         getVirtualItems: () => items,
         getTotalSize: () => count * estimateSize,
-        scrollToIndex,
+        scrollToIndex: mockScrollToIndex,
+        currentScrollToIndex: null,
       };
     });
   }),
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
-  getServiceIconDataUrl: vi
-    .fn()
-    .mockReturnValue("data:image/svg+xml;base64,ICON"),
+  getServiceIconDataUrl: vi.fn().mockReturnValue("data:image/svg+xml;base64,ICON"),
   getSpanTechIconDataUrl: vi.fn().mockReturnValue(null),
 }));
 
@@ -61,7 +65,6 @@ import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
 import { createStore } from "vuex";
 
-import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import TraceTree from "@/plugins/traces/TraceTree.vue";
 
 const mockStore = createStore({
@@ -222,10 +225,7 @@ const mockSpanList = [
   },
 ];
 
-function mountTraceTree(
-  extraProps: Record<string, unknown> = {},
-  storePlugin = mockStore,
-) {
+function mountTraceTree(extraProps: Record<string, unknown> = {}, storePlugin = mockStore) {
   return mount(TraceTree, {
     props: {
       spans: mockSpans,
@@ -243,7 +243,6 @@ function mountTraceTree(
     global: {
       plugins: [i18n, router, storePlugin],
       stubs: {
-        "q-resize-observer": true,
         "span-block": true,
       },
     },
@@ -267,15 +266,11 @@ describe("TraceTree", () => {
   });
 
   it("should render all spans", () => {
-    const spanElements = wrapper.findAll(
-      `[data-test^="trace-tree-span-container-"]`,
-    );
+    const spanElements = wrapper.findAll(`[data-test^="trace-tree-span-container-"]`);
     expect(spanElements.length).toBe(mockSpans.length);
 
     for (const span of mockSpans) {
-      const spanElement = wrapper.find(
-        `[data-test="trace-tree-span-container-${span.spanId}"]`,
-      );
+      const spanElement = wrapper.find(`[data-test="trace-tree-span-container-${span.spanId}"]`);
       expect(spanElement.exists()).toBe(true);
     }
   });
@@ -291,9 +286,7 @@ describe("TraceTree", () => {
   });
 
   it("should render service names", () => {
-    const serviceNameElements = wrapper.findAll(
-      '[data-test^="trace-tree-span-service-name-"]',
-    );
+    const serviceNameElements = wrapper.findAll('[data-test^="trace-tree-span-service-name-"]');
     expect(serviceNameElements.length).toBe(mockSpans.length);
 
     expect(serviceNameElements[0].text()).toBe(mockSpans[0].serviceName);
@@ -301,16 +294,12 @@ describe("TraceTree", () => {
   });
 
   it("should render error icon for error spans", () => {
-    const errorIcon = wrapper.find(
-      '[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]',
-    );
+    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-6702b0494b2b6e57"]');
     expect(errorIcon.exists()).toBe(true);
   });
 
   it("should not render error icon for non-error spans", () => {
-    const errorIcon = wrapper.find(
-      '[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]',
-    );
+    const errorIcon = wrapper.find('[data-test="trace-tree-span-error-icon-d9603ec7f76eb499"]');
     expect(errorIcon.exists()).toBe(false);
   });
 
@@ -368,9 +357,7 @@ describe("TraceTree", () => {
       await collapseBtn.trigger("click");
 
       expect(wrapper.emitted("toggleCollapse")).toBeTruthy();
-      expect(wrapper.emitted("toggleCollapse")[0]).toEqual([
-        "d9603ec7f76eb499",
-      ]);
+      expect(wrapper.emitted("toggleCollapse")[0]).toEqual(["d9603ec7f76eb499"]);
     });
 
     it("should apply correct collapse icon rotation", async () => {
@@ -420,7 +407,7 @@ describe("TraceTree", () => {
 
       const highlightedSpans = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("tw:bg-yellow-300"));
+        .filter((el) => el.classes().includes("bg-table-highlight-bg"));
       expect(highlightedSpans.length).toBeGreaterThan(0);
     });
 
@@ -433,7 +420,7 @@ describe("TraceTree", () => {
 
       const currentMatch = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("tw:text-red-600"));
+        .filter((el) => el.classes().includes("text-status-error-text"));
       expect(currentMatch.length).toBeGreaterThan(0);
     });
 
@@ -446,7 +433,7 @@ describe("TraceTree", () => {
 
       const highlightedSpans = wrapper
         .findAll('[data-test^="trace-tree-span-service-name-"]')
-        .filter((el) => el.classes().includes("tw:bg-yellow-300"));
+        .filter((el) => el.classes().includes("bg-yellow-300"));
       expect(highlightedSpans.length).toBe(0);
     });
 
@@ -530,10 +517,7 @@ describe("TraceTree", () => {
           ["operation_name", "evaluate_scheduled"],
         ];
 
-        const result = wrapper.vm.isHighlighted([
-          "service_name",
-          "alertmanager",
-        ]);
+        const result = wrapper.vm.isHighlighted(["service_name", "alertmanager"]);
         expect(result).toBe(true);
       });
 
@@ -597,6 +581,61 @@ describe("TraceTree", () => {
 
         // scrollToSpan returns early when spanIndex === -1
         expect(() => wrapper.vm.scrollToMatch()).not.toThrow();
+      });
+    });
+
+    describe("cancelScroll function", () => {
+      const validSpanId = "d9603ec7f76eb499";
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+      });
+
+      afterEach(() => {
+        vi.useRealTimers();
+      });
+
+      it("should expose cancelScroll", () => {
+        expect(wrapper.vm.cancelScroll).toBeTypeOf("function");
+      });
+
+      it("should clear a pending scroll so scrollToIndex never fires", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        wrapper.vm.cancelScroll();
+        vi.advanceTimersByTime(300);
+
+        expect(mockScrollToIndex).not.toHaveBeenCalled();
+      });
+
+      it("should let a pending scroll fire when not cancelled", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        vi.advanceTimersByTime(300);
+
+        expect(mockScrollToIndex).toHaveBeenCalledTimes(1);
+      });
+
+      it("should supersede an earlier pending scroll with the latest one", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        vi.advanceTimersByTime(300);
+
+        // The first timeout was cleared by the second call.
+        expect(mockScrollToIndex).toHaveBeenCalledTimes(1);
+      });
+
+      it("should not throw when nothing is pending", () => {
+        expect(() => wrapper.vm.cancelScroll()).not.toThrow();
+      });
+
+      it("should drop a pending scroll on unmount", () => {
+        wrapper.vm.scrollToSpan(validSpanId, 300);
+        wrapper.unmount();
+        vi.advanceTimersByTime(300);
+
+        expect(mockScrollToIndex).not.toHaveBeenCalled();
+
+        // Re-mount so the suite-level afterEach unmounts a live wrapper.
+        wrapper = mountTraceTree();
       });
     });
   });
@@ -693,7 +732,7 @@ describe("TraceTree", () => {
         '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
       );
       expect(operationContainer.exists()).toBe(true);
-      expect(operationContainer.classes()).toContain("bg-white");
+      expect(operationContainer.classes()).toContain("bg-surface-base");
     });
 
     it("should apply dark theme when store theme is dark", async () => {
@@ -716,7 +755,8 @@ describe("TraceTree", () => {
         '[data-test="trace-tree-span-operation-name-container-d9603ec7f76eb499"]',
       );
       expect(operationContainer.exists()).toBe(true);
-      expect(operationContainer.classes()).toContain("bg-dark");
+      // Token-based utility handles dark mode; class is identical in both themes.
+      expect(operationContainer.classes()).toContain("bg-surface-base");
 
       darkWrapper.unmount();
     });
@@ -726,9 +766,7 @@ describe("TraceTree", () => {
     it("should render span-block stubs for each span", () => {
       // span-block is stubbed; verify the component renders without error
       // and the expected number of span containers is present.
-      const spanContainers = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const spanContainers = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(spanContainers.length).toBe(mockSpans.length);
     });
 
@@ -970,9 +1008,7 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const spanElements = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const spanElements = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(spanElements.length).toBe(100);
     });
 
@@ -983,9 +1019,7 @@ describe("TraceTree", () => {
 
       await flushPromises();
 
-      const updatedSpans = wrapper.findAll(
-        '[data-test^="trace-tree-span-container-"]',
-      );
+      const updatedSpans = wrapper.findAll('[data-test^="trace-tree-span-container-"]');
       expect(updatedSpans.length).toBe(1);
     });
   });
@@ -1033,9 +1067,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-d9603ec7f76eb499"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).toContain("span-row-selected");
     });
@@ -1044,9 +1076,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "d9603ec7f76eb499" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-6702b0494b2b6e57"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-6702b0494b2b6e57"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
@@ -1057,9 +1087,7 @@ describe("TraceTree", () => {
       await wrapper.setProps({ selectedSpanId: "" });
       await flushPromises();
 
-      const row = wrapper.find(
-        '[data-test="trace-tree-span-container-d9603ec7f76eb499"]',
-      );
+      const row = wrapper.find('[data-test="trace-tree-span-container-d9603ec7f76eb499"]');
       expect(row.exists()).toBe(true);
       expect(row.classes()).not.toContain("span-row-selected");
     });
@@ -1299,16 +1327,12 @@ describe("TraceTree", () => {
     });
 
     it("should render vertical connector segments for spans with depth > 0", () => {
-      const verticalSegments = depthWrapper.findAll(
-        '[data-test="vertical-segment"]',
-      );
+      const verticalSegments = depthWrapper.findAll('[data-test="vertical-segment"]');
       expect(verticalSegments.length).toBeGreaterThan(0);
     });
 
     it("should render horizontal connector segments for spans with depth > 0", () => {
-      const horizontalSegment = depthWrapper.find(
-        '[data-test="horizontal-segment"]',
-      );
+      const horizontalSegment = depthWrapper.find('[data-test="horizontal-segment"]');
       expect(horizontalSegment.exists()).toBe(true);
     });
   });

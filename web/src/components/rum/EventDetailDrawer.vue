@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import EventDetailDrawerContent from "./EventDetailDrawerContent.vue";
 
-const props = defineProps({
+defineProps({
   modelValue: {
     type: Boolean,
     default: false,

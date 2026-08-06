@@ -1,0 +1,1435 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it } from "vitest";
+import {
+  mapRunDetail,
+  SYNTHETIC_FIELDS,
+  SYNTHETIC_RESULTS_STREAM,
+  STATUS_VALUES,
+  aggregateStepStats,
+  bucketInterval,
+  buildHistogramSql,
+  buildLastRunSql,
+  buildRunsSql,
+  buildRunsWithStepsSql,
+  buildStepDefsSql,
+  buildRetryAttributionSql,
+  buildAttemptViews,
+  foldRetryAttribution,
+  foldStepDefs,
+  splitDelimited,
+  STATUS_REASON,
+  deviceIconName,
+  deviceLabelKey,
+  mapHistogram,
+  deriveKpiFromHistogram,
+  mapRun,
+  evidenceOriginTs,
+  evidenceSeverity,
+  indexEvidenceByStep,
+  stepOwnDetail,
+  mergeLocatorLadder,
+  type EvidenceEvent,
+  buildStepAggregateSql,
+  buildStepDimensionSql,
+  buildStepSparklineSql,
+  foldStepStream,
+} from "./syntheticResultsSchema";
+
+/** Shim: the old mapKpi took one aggregate row; the tiles are now summed from
+ *  histogram buckets. One bucket carrying the same counts is the equivalent
+ *  input, and the same row still supplies p95. */
+const deriveKpiFromHistogramCompat = (
+  row: Record<string, unknown> | null | undefined,
+  lastRun: Record<string, unknown> | null | undefined,
+) => deriveKpiFromHistogram(row ? [row] : [], row, lastRun);
+
+describe("syntheticResultsSchema query builders", () => {
+  it("should reference the configured stream and fields in the KPI SQL", () => {
+    const sql = buildHistogramSql("mon-1", "1 hour");
+    expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon-1'`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.passed}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.warning}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.failed}')`);
+    expect(sql).toContain(`FILTER (WHERE ${SYNTHETIC_FIELDS.status} = '${STATUS_VALUES.error}')`);
+    expect(sql).toContain(`approx_percentile_cont(${SYNTHETIC_FIELDS.duration}, 0.95)`);
+  });
+
+  it("should include retried_runs clause when attempts field exists in schema", () => {
+    const sql = buildHistogramSql("mon-1", "1 hour", true);
+    expect(sql).toContain("WHERE attempts > 1");
+    expect(sql).toContain("retried_runs");
+  });
+
+  it("should omit retried_runs clause when attempts field is absent from schema", () => {
+    const sql = buildHistogramSql("mon-1", "1 hour", false);
+    expect(sql).not.toContain("attempts");
+    expect(sql).not.toContain("retried_runs");
+  });
+
+  it("should order the last-run query by timestamp descending with limit 1", () => {
+    const sql = buildLastRunSql("mon-1");
+    expect(sql).toContain(`ORDER BY ${SYNTHETIC_FIELDS.timestamp} DESC`);
+    expect(sql).toContain("LIMIT 1");
+  });
+
+  it("should embed the histogram interval and group by bucket", () => {
+    const sql = buildHistogramSql("mon-1", "5 minutes");
+    expect(sql).toContain(`histogram(${SYNTHETIC_FIELDS.timestamp}, '5 minutes')`);
+    expect(sql).toContain("GROUP BY ts");
+    expect(sql).toContain("ORDER BY ts");
+  });
+
+  it("should apply the requested limit on the runs query", () => {
+    const sql = buildRunsSql("mon-1", 50, null);
+    expect(sql).toContain("LIMIT 50");
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.device} as device`);
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.error} as error`);
+  });
+
+  it("should select typed literals for columns absent from the stream schema", () => {
+    // The schema only contains fields some ingested row has carried
+    // (device/engine are browser-only, error appears after a first failure);
+    // naming an absent field makes the search API reject the whole query.
+    const sql = buildRunsSql(
+      "mon-1",
+      50,
+      new Set(["_timestamp", "status", "response_time_ms", "location"]),
+    );
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.timestamp} as ts`);
+    expect(sql).toContain("status as status");
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.location} as location`);
+    expect(sql).toContain("'' as device");
+    expect(sql).toContain("'' as engine");
+    expect(sql).toContain("'' as error");
+    expect(sql).toContain("0 as scheduled_ts");
+    expect(sql).not.toContain(`${SYNTHETIC_FIELDS.error} as error`);
+    // Empty set (schema unavailable) — every optional column is a literal.
+    const minimal = buildRunsSql("mon-1", 50, new Set());
+    expect(minimal).toContain("0 as ts");
+    expect(minimal).toContain("'' as status");
+  });
+
+  it("should target the configured stream name", () => {
+    expect(SYNTHETIC_RESULTS_STREAM).toBe("synthetics_results");
+    expect(SYNTHETIC_FIELDS.duration).toBe("response_time_ms");
+  });
+
+  it("should escape single quotes in the monitor id to prevent injection", () => {
+    const sql = buildHistogramSql("mon'1", "1 hour");
+    expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon''1'`);
+  });
+});
+
+describe("bucketInterval", () => {
+  it("should widen the bucket as the window grows", () => {
+    expect(bucketInterval(60 * 60 * 1_000_000)).toBe("5 minutes"); // 1h window
+    expect(bucketInterval(24 * 60 * 60 * 1_000_000)).toBe("30 minutes"); // 1d window
+    expect(bucketInterval(14 * 24 * 60 * 60 * 1_000_000)).toBe("6 hours"); // 14d window
+  });
+});
+
+describe("mapKpi", () => {
+  it("should compute uptime from passed/total and map the last run", () => {
+    const kpi = deriveKpiFromHistogramCompat(
+      {
+        total_runs: 288,
+        passed_runs: 287,
+        failed_runs: 1,
+        p95_duration: 2940,
+      },
+      { status: "passed", ts: 1_700_000_000_000_000 },
+    );
+    expect(kpi.totalRuns).toBe(288);
+    expect(kpi.failedRuns).toBe(1);
+    expect(kpi.p95Ms).toBe(2940);
+    expect(kpi.uptimePct).toBeCloseTo((287 / 288) * 100, 5);
+    expect(kpi.lastRunStatus).toBe("passed");
+    expect(kpi.lastRunAt).toBe(1_700_000_000_000); // micros → ms
+  });
+
+  it("should yield a zeroed kpi with null last run when there is no data", () => {
+    const kpi = deriveKpiFromHistogram([], null, null);
+    expect(kpi.uptimePct).toBe(0);
+    expect(kpi.totalRuns).toBe(0);
+    expect(kpi.lastRunStatus).toBe(null);
+    expect(kpi.lastRunAt).toBe(null);
+  });
+
+  it("should coerce string field values from the search response", () => {
+    const kpi = deriveKpiFromHistogramCompat(
+      { total_runs: "10", passed_runs: "9", failed_runs: "1", p95_duration: "120" },
+      null,
+    );
+    expect(kpi.totalRuns).toBe(10);
+    expect(kpi.uptimePct).toBeCloseTo(90, 5);
+  });
+});
+
+describe("mapRun", () => {
+  it("should map a raw hit to the typed run model and normalise status", () => {
+    const run = mapRun({
+      ts: 1_700_000_000_000_000,
+      status: "failed",
+      duration: 1760,
+      location: "ap-southeast-1",
+      device: "desktop",
+      error: "Timeout waiting for selector",
+    });
+    expect(run.timestamp).toBe(1_700_000_000_000);
+    expect(run.status).toBe("failed");
+    expect(run.durationMs).toBe(1760);
+    expect(run.location).toBe("ap-southeast-1");
+    expect(run.device).toBe("desktop");
+    expect(run.error).toBe("Timeout waiting for selector");
+  });
+
+  it("should map probe status values to RunStatus", () => {
+    expect(mapRun({ status: "passed" }).status).toBe("passed");
+    expect(mapRun({ status: "warning" }).status).toBe("warning");
+    expect(mapRun({ status: "failed" }).status).toBe("failed");
+    expect(mapRun({ status: "error" }).status).toBe("error");
+    expect(mapRun({ status: "unknown" }).status).toBe("failed");
+  });
+});
+
+describe("mapHistogram", () => {
+  const HOUR = 60 * 60 * 1_000_000;
+  // A 1h window → 5-minute buckets → 12 slots.
+  const start = 1_700_000_000_000_000;
+  const end = start + HOUR;
+
+  it("should zero-fill the full grid when the stream is sparse", () => {
+    const buckets = mapHistogram([], start, end);
+    expect(buckets.length).toBeGreaterThan(1);
+    expect(buckets.every((b) => b.failedRuns === 0)).toBe(true);
+    expect(buckets.every((b) => b.uptimePct === 100)).toBe(true);
+    // Strictly time-ordered.
+    for (let i = 1; i < buckets.length; i++) {
+      expect(buckets[i].tsMs).toBeGreaterThan(buckets[i - 1].tsMs);
+    }
+  });
+
+  it("should map populated buckets with per-bucket uptime and durations", () => {
+    // Align a key to the 5-minute grid the builder uses.
+    const stepMs = 5 * 60 * 1000;
+    const slotMs = Math.floor(start / 1000 / stepMs) * stepMs;
+    const key = new Date(slotMs).toISOString().slice(0, 19);
+    const buckets = mapHistogram(
+      [
+        {
+          ts: key,
+          avg_duration: 1500,
+          p95_duration: 2940,
+          total_runs: 10,
+          passed_runs: 8,
+          failed_runs: 2,
+        },
+      ],
+      start,
+      end,
+    );
+    const populated = buckets.find((b) => b.failedRuns === 2);
+    expect(populated).toBeTruthy();
+    expect(populated?.avgMs).toBe(1500);
+    expect(populated?.p95Ms).toBe(2940);
+    expect(populated?.uptimePct).toBeCloseTo(80, 5);
+  });
+});
+
+describe("buildRunsWithStepsSql", () => {
+  it("should include the JSON step columns needed for client-side aggregation", () => {
+    const sql = buildRunsWithStepsSql("mon-1", 500);
+    expect(sql).toContain(`FROM "${SYNTHETIC_RESULTS_STREAM}"`);
+    expect(sql).toContain("last_attempt_steps");
+    expect(sql).toContain("retry_history");
+    expect(sql).toContain("attempts");
+    expect(sql).toContain("LIMIT 500");
+  });
+
+  it("should NOT select recorded_steps on the wide tally query", () => {
+    // ~4 KB per row, near-identical across rows of one config version. Selecting
+    // it on 5000 rows was roughly 60% of the panel's payload; the definitions
+    // come from buildStepDefsSql over a bounded subset instead.
+    expect(buildRunsWithStepsSql("mon-1", 5000)).not.toContain("recorded_steps");
+  });
+
+  it("should fetch step definitions from a bounded row subset", () => {
+    const sql = buildStepDefsSql("mon-1", 100);
+    expect(sql).toContain("recorded_steps");
+    expect(sql).toContain("LIMIT 100");
+    expect(sql).toContain("ORDER BY");
+    // Only the blob — nothing else is needed to build the lookup.
+    expect(sql).not.toContain("last_attempt_steps");
+  });
+});
+
+describe("foldStepDefs", () => {
+  const row = (steps: unknown[]) => ({ recorded_steps: JSON.stringify(steps) });
+
+  it("should build a step_id keyed lookup", () => {
+    const defs = foldStepDefs([
+      row([
+        { id: "s1", name: "Open page" },
+        { id: "s2", name: "Click login" },
+      ]),
+    ]);
+    expect(defs.get("s1")?.name).toBe("Open page");
+    expect(defs.get("s2")?.name).toBe("Click login");
+  });
+
+  it("should prefer the newest definition when a step was renamed", () => {
+    // Rows arrive newest-first, so the first definition seen for an id wins —
+    // a renamed step shows its current name while older rows still resolve.
+    const defs = foldStepDefs([
+      row([{ id: "s1", name: "Click sign in" }]), // newer
+      row([{ id: "s1", name: "Click login" }]), // older
+    ]);
+    expect(defs.get("s1")?.name).toBe("Click sign in");
+  });
+
+  it("should fall back to the id when a definition has no name", () => {
+    expect(foldStepDefs([row([{ id: "s9" }])]).get("s9")?.name).toBe("s9");
+  });
+
+  it("should tolerate rows with no recorded_steps", () => {
+    expect(foldStepDefs([{}, { recorded_steps: "" }]).size).toBe(0);
+  });
+});
+
+describe("aggregateStepStats", () => {
+  const HOUR = 60 * 60 * 1_000_000;
+  const start = 1_700_000_000_000_000;
+  const end = start + HOUR;
+
+  function makeHit(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      ts: 1_700_000_000_500_000,
+      engine: "chromium",
+      location: "us-east-1",
+      device: "desktop",
+      error: "",
+      run_id: "run-1",
+      execution_id: "exec-1",
+      attempts: 1,
+      recorded_steps: JSON.stringify([
+        { id: "step-1", name: "Open homepage", selector: "css=.hero" },
+        { id: "step-2", name: "Click login", selector: "css=.login-btn" },
+      ]),
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+        {
+          step_id: "step-2",
+          status: "fail",
+          duration_ms: 5000,
+          error: "Timeout waiting for selector",
+        },
+      ]),
+      retry_history: "[]",
+      ...overrides,
+    };
+  }
+
+  it("should compute correct fail rates and duration per step", () => {
+    const result = aggregateStepStats([makeHit(), makeHit()], start, end);
+
+    expect(result.stepGroups).toHaveLength(2);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+    expect(login!.totalExecutions).toBe(2);
+    expect(login!.failCount).toBe(2);
+    expect(login!.failRate).toBeCloseTo(1, 5);
+    expect(login!.avgDurationMs).toBe(5000);
+
+    const home = result.stepGroups.find((g) => g.name === "Open homepage");
+    expect(home).toBeTruthy();
+    expect(home!.totalExecutions).toBe(2);
+    expect(home!.failCount).toBe(0);
+    expect(home!.failRate).toBe(0);
+  });
+
+  it("should detect flaky steps when a retry fixes a prior failure", () => {
+    const hit = makeHit({
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+        { step_id: "step-2", status: "ok", duration_ms: 800, error: "" },
+      ]),
+      retry_history: JSON.stringify([
+        {
+          attempt: 1,
+          status: "failed",
+          durationMs: 5200,
+          steps: [
+            { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+            { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" },
+          ],
+        },
+      ]),
+    });
+
+    const result = aggregateStepStats([hit], start, end);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+    expect(login!.flakyCount).toBe(1);
+    expect(login!.flakyRate).toBeGreaterThan(0);
+    expect(login!.failCount).toBe(0); // passed on final attempt
+  });
+
+  it("should NOT count step as flaky when it fails on all attempts", () => {
+    const hit = makeHit({
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+        { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" },
+      ]),
+      retry_history: JSON.stringify([
+        {
+          attempt: 1,
+          status: "failed",
+          durationMs: 5200,
+          steps: [
+            { step_id: "step-1", status: "ok", duration_ms: 200, error: "" },
+            { step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" },
+          ],
+        },
+      ]),
+    });
+
+    const result = aggregateStepStats([hit], start, end);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+    expect(login!.flakyCount).toBe(0);
+    expect(login!.failCount).toBe(1);
+  });
+
+  it("should break down failures by browser and location", () => {
+    const chrome = makeHit({ engine: "chromium", location: "us-east-1" });
+    const firefox = makeHit({
+      engine: "firefox",
+      location: "eu-west-1",
+      run_id: "run-2",
+      execution_id: "exec-2",
+    });
+
+    const result = aggregateStepStats([chrome, firefox], start, end);
+    const login = result.stepGroups.find((g) => g.name === "Click login");
+    expect(login).toBeTruthy();
+
+    const chromStats = login!.browserStats.find((s) => s.name === "chromium");
+    expect(chromStats).toBeTruthy();
+    expect(chromStats!.total).toBe(1);
+    expect(chromStats!.failures).toBe(1);
+
+    const ffStats = login!.browserStats.find((s) => s.name === "firefox");
+    expect(ffStats).toBeTruthy();
+    expect(ffStats!.total).toBe(1);
+    expect(ffStats!.failures).toBe(1);
+  });
+
+  it("should generate failure instances for failed and flaky steps", () => {
+    const result = aggregateStepStats([makeHit()], start, end);
+    expect(result.failureInstances.length).toBeGreaterThan(0);
+    const loginFi = result.failureInstances.find((fi) => fi.stepName === "Click login");
+    expect(loginFi).toBeTruthy();
+    expect(loginFi!.isFlaky).toBe(false);
+    expect(loginFi!.browser).toBe("chromium");
+  });
+
+  it("should handle empty input gracefully", () => {
+    const result = aggregateStepStats([], start, end);
+    expect(result.stepGroups).toEqual([]);
+    expect(result.stepFailures).toEqual([]);
+    expect(result.stepDurations).toEqual([]);
+    expect(result.flakySteps).toEqual([]);
+    expect(result.failureInstances).toEqual([]);
+    expect(result.trendBuckets).toEqual([]);
+  });
+
+  it("should fall back to step_id when recorded_steps is missing", () => {
+    const hit = makeHit({
+      recorded_steps: "[]",
+      last_attempt_steps: JSON.stringify([
+        { id: "custom-step", status: "ok", duration_ms: 200, error: "" },
+      ]),
+    });
+
+    const result = aggregateStepStats([hit], start, end);
+    expect(result.stepGroups).toHaveLength(1);
+    expect(result.stepGroups[0].name).toBe("custom-step");
+    expect(result.stepGroups[0].sub).toBeNull();
+  });
+
+  it("should generate flakiest steps ranked by flaky count", () => {
+    const flakyHit = makeHit({
+      run_id: "run-a",
+      execution_id: "exec-a",
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([
+        { step_id: "step-2", status: "ok", duration_ms: 800, error: "" },
+      ]),
+      retry_history: JSON.stringify([
+        {
+          attempt: 1,
+          status: "failed",
+          durationMs: 5200,
+          steps: [{ step_id: "step-2", status: "fail", duration_ms: 5000, error: "Timeout" }],
+        },
+      ]),
+    });
+
+    const result = aggregateStepStats([flakyHit], start, end);
+    expect(result.flakySteps).toHaveLength(1);
+    expect(result.flakySteps[0].stepName).toBe("Click login");
+    expect(result.flakySteps[0].flakyCount).toBe(1);
+  });
+
+  it("should generate trend buckets per step for the duration chart", () => {
+    const result = aggregateStepStats([makeHit()], start, end);
+    expect(result.trendBuckets.length).toBeGreaterThan(0);
+    const loginBuckets = result.trendBuckets.filter((b) => b.stepName === "Click login");
+    expect(loginBuckets.length).toBeGreaterThan(0);
+    expect(loginBuckets[0].avgDurationMs).toBeGreaterThan(0);
+  });
+});
+
+describe("deviceIconName", () => {
+  it("should return the correct icon for desktop", () => {
+    expect(deviceIconName("desktop")).toBe("computer");
+  });
+
+  it("should return the correct icon for tablet", () => {
+    expect(deviceIconName("tablet")).toBe("tablet");
+  });
+
+  it("should return the correct icon for mobile", () => {
+    expect(deviceIconName("mobile")).toBe("smartphone");
+  });
+
+  it("should fall back to 'devices' icon for an unknown device ID", () => {
+    expect(deviceIconName("unknown_device")).toBe("devices");
+  });
+
+  it("should fall back to 'devices' icon for an empty string", () => {
+    expect(deviceIconName("")).toBe("devices");
+  });
+});
+
+describe("deviceLabelKey", () => {
+  it("should return the label key for desktop", () => {
+    expect(deviceLabelKey("desktop")).toBe("synthetics.browserDevices.desktop");
+  });
+
+  it("should return the label key for tablet", () => {
+    expect(deviceLabelKey("tablet")).toBe("synthetics.browserDevices.tablet");
+  });
+
+  it("should return the label key for mobile", () => {
+    expect(deviceLabelKey("mobile")).toBe("synthetics.browserDevices.mobile");
+  });
+
+  it("should return undefined for an unknown device (caller shows the raw ID)", () => {
+    expect(deviceLabelKey("some_custom_device")).toBeUndefined();
+  });
+
+  it("should return undefined for an empty string", () => {
+    expect(deviceLabelKey("")).toBeUndefined();
+  });
+});
+
+describe("mapRunDetail — evidence the probe already writes (Phase 4)", () => {
+  function hit(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      ts: 1_700_000_000_500_000,
+      engine: "chromium",
+      location: "us-east-1",
+      device: "desktop",
+      run_id: "run-1",
+      execution_id: "exec-1",
+      recorded_steps: JSON.stringify([{ id: "s1", name: "Sign in" }]),
+      last_attempt_steps: JSON.stringify([
+        { step_id: "s1", status: "ok", duration_ms: 10, error: "" },
+      ]),
+      ...overrides,
+    };
+  }
+
+  it("keeps `skipped` as skipped instead of reporting it as a failure", () => {
+    // An `optional` step exists precisely because it may not be there — a
+    // cookie banner, a one-time popup. Collapsing it to `fail` reported a
+    // correctly-skipped step as broken, the opposite of what the feature is for.
+    const detail = mapRunDetail(
+      hit({
+        last_attempt_steps: JSON.stringify([
+          { step_id: "s1", status: "ok", duration_ms: 5 },
+          { step_id: "s2", status: "skipped", duration_ms: 1 },
+          { step_id: "s3", status: "failed", duration_ms: 9 },
+        ]),
+      }),
+    );
+    expect(detail.lastAttemptSteps.map((s) => s.status)).toEqual(["ok", "skipped", "fail"]);
+  });
+
+  it("maps retry history instead of discarding it", () => {
+    // The probe writes retry_history on every failed run; the mapper hardcoded
+    // an empty array, so no component could ever read it. A step that failed
+    // once and passed next attempt is transient by definition.
+    const detail = mapRunDetail(
+      hit({
+        retry_history: [
+          {
+            attempt: 0,
+            steps: [
+              { step_id: "s1", status: "passed", duration_ms: 100 },
+              { step_id: "s2", status: "failed", duration_ms: 400 },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(detail.retryHistory).toHaveLength(1);
+    expect(detail.retryHistory[0].attempt).toBe(0);
+    // Derived, not invented: an entry exists only because that attempt failed.
+    expect(detail.retryHistory[0].status).toBe("failed");
+    expect(detail.retryHistory[0].durationMs).toBe(500);
+    expect(detail.retryHistory[0].failedStep).toBe("s2");
+  });
+
+  it("maps the seven items of failure_detail", () => {
+    const detail = mapRunDetail(
+      hit({
+        failure_detail: {
+          step_id: "s2",
+          step_name: "Profile visible",
+          step_index: 2,
+          error: "locator.waitFor: Timeout 60000ms exceeded",
+          candidates_tried: [
+            { kind: "test_attribute", value: '[data-test="x"]', outcome: "not_found" },
+            { kind: "role", value: "internal:role=button", outcome: "matched" },
+          ],
+          settle_signals: [
+            {
+              kind: "response",
+              signal: "response matching **/auth/login",
+              status: "stale",
+              required: false,
+              waited_ms: 30000,
+            },
+          ],
+          settle_ms: 41000,
+          observed_duration_ms: 2300,
+          screenshot_key: "k/shot.png",
+          trace_key: "k/trace.zip",
+        },
+      }),
+    );
+
+    const fd = detail.failureDetail!;
+    expect(fd.stepName).toBe("Profile visible");
+    expect(fd.stepIndex).toBe(2);
+    expect(fd.error).toContain("Timeout 60000ms");
+    // Item 3 — which candidate matched answers "locator rot?" mechanically.
+    expect(fd.candidatesTried.map((c) => c.outcome)).toEqual(["not_found", "matched"]);
+    // Item 4 — a stale signal is the strongest application-is-at-fault
+    // indicator already on the record, and it was invisible.
+    expect(fd.settleSignals[0].status).toBe("stale");
+    expect(fd.settleSignals[0].waitedMs).toBe(30000);
+    // Item 5 — settled in 2.3s when recorded, 41s today.
+    expect(fd.settleMs).toBe(41000);
+    expect(fd.observedDurationMs).toBe(2300);
+    expect(fd.screenshotKey).toBe("k/shot.png");
+    expect(fd.traceKey).toBe("k/trace.zip");
+  });
+
+  it("returns null failure detail on a passing run", () => {
+    expect(mapRunDetail(hit()).failureDetail).toBeNull();
+  });
+
+  it("degrades rather than throwing on a record written before these fields", () => {
+    // Backwards compatibility: records predating the probe change carry none of
+    // this, and must render as they did before rather than break the view.
+    const detail = mapRunDetail(hit({ retry_history: undefined, failure_detail: undefined }));
+    expect(detail.retryHistory).toEqual([]);
+    expect(detail.failureDetail).toBeNull();
+  });
+});
+
+// ── C3 · flaky and degraded are different failures ───────────────────────────
+
+describe("KPI: warning is two unrelated things", () => {
+  it("splits flaky from degraded when status_reason is in the schema", () => {
+    const sql = buildHistogramSql("mon-1", "1 hour", true, true);
+    expect(sql).toContain("as flaky_runs");
+    expect(sql).toContain("as degraded_runs");
+    // Both clauses hang off the scan the query already performs.
+    expect(sql.match(/FROM/g)).toHaveLength(1);
+  });
+
+  it("omits both clauses when the field is absent from the schema", () => {
+    // The search API rejects a query naming a field the stream doesn't have,
+    // which would take the whole KPI panel down rather than one tile.
+    const sql = buildHistogramSql("mon-1", "1 hour", true, false);
+    expect(sql).not.toContain("status_reason");
+  });
+
+  it("counts flaky and degraded separately, against the execution denominator", () => {
+    const kpi = deriveKpiFromHistogramCompat(
+      {
+        total_runs: 100,
+        passed_runs: 80,
+        warning_runs: 12,
+        failed_runs: 5,
+        error_runs: 3,
+        flaky_runs: 4,
+        degraded_runs: 8,
+      },
+      null,
+    );
+    // A TLS check inside its warning window is `warning` on every single run.
+    // Folded together, it reported as ~100% flaky forever.
+    expect(kpi.flakyExecutions).toBe(4);
+    expect(kpi.degradedExecutions).toBe(8);
+    // D4 — the denominator is executions, the grain of totalRuns.
+    expect(kpi.totalRuns).toBe(100);
+  });
+});
+
+// ── C7 · the flaky column without the 5000-row blob fetch ────────────────────
+
+describe("retry attribution", () => {
+  it("scans only the rows that actually retried", () => {
+    const sql = buildRetryAttributionSql("mon-1");
+    expect(sql).toContain("attempts > 1");
+    expect(sql).toContain("retry_step_ids");
+    // The point of the column is that no blob is read.
+    expect(sql).not.toContain("retry_history");
+    expect(sql).not.toContain("last_attempt_steps");
+  });
+
+  it("splits the delimited form back without empty members", () => {
+    // The probe wraps in leading/trailing commas so LIKE '%,s2,%' cannot also
+    // match s20. Splitting has to drop the segments that wrapping creates.
+    expect(splitDelimited(",s2,s20,")).toEqual(["s2", "s20"]);
+    expect(splitDelimited("")).toEqual([]);
+    expect(splitDelimited(undefined)).toEqual([]);
+  });
+
+  it("reads recovery from the verdict, not from the row's presence", () => {
+    // D2 — attribution is written on any retried execution. A run that retried
+    // three times and still failed is attributed too, and must not be counted
+    // as a step that recovers.
+    const summary = foldRetryAttribution([
+      {
+        execution_id: "e1",
+        status: STATUS_VALUES.warning,
+        status_reason: STATUS_REASON.flaky,
+        retry_step_ids: ",s3,",
+        retry_error_classes: ",timeout,",
+      },
+      {
+        execution_id: "e2",
+        status: STATUS_VALUES.failed,
+        status_reason: "",
+        retry_step_ids: ",s3,",
+        retry_error_classes: ",timeout,",
+        retry_consistent: true,
+      },
+    ]);
+    expect(summary.retriedExecutions).toBe(2);
+    expect(summary.byStep.get("s3")).toEqual({ retriedExecutions: 2, flakyExecutions: 1 });
+    expect(summary.byErrorClass.get("timeout")).toBe(2);
+    expect(summary.consistentFailures).toBe(1);
+    expect(summary.byExecution.get("e1")).toEqual(new Set(["s3"]));
+  });
+
+  it("treats an absent retry_consistent as unknown, never as false", () => {
+    // D1 — the column is deliberately absent below two failing attempts.
+    // Counting absent as `false` would report every recovered run as
+    // non-deterministic, which is the opposite of what happened.
+    const summary = foldRetryAttribution([
+      {
+        execution_id: "e1",
+        status: STATUS_VALUES.warning,
+        status_reason: STATUS_REASON.flaky,
+        retry_step_ids: ",s1,",
+      },
+    ]);
+    expect(summary.consistentFailures).toBe(0);
+    expect(summary.retriedExecutions).toBe(1);
+  });
+
+  it("drives the flaky tally without any retry_history being present", () => {
+    const attribution = foldRetryAttribution([
+      {
+        execution_id: "ex-1",
+        status: STATUS_VALUES.warning,
+        status_reason: STATUS_REASON.flaky,
+        retry_step_ids: ",s1,",
+      },
+    ]);
+    const stats = aggregateStepStats(
+      [
+        {
+          ts: 1_700_000_000_000_000,
+          execution_id: "ex-1",
+          run_id: "r1",
+          attempts: 2,
+          // No retry_history column at all — that is the saving.
+          last_attempt_steps: JSON.stringify([
+            { step_id: "s1", status: "ok", duration_ms: 120 },
+            { step_id: "s2", status: "ok", duration_ms: 80 },
+          ]),
+        },
+      ],
+      1_699_000_000_000_000,
+      1_701_000_000_000_000,
+      new Map([
+        ["s1", { name: "Sign in", selector: ".btn" }],
+        ["s2", { name: "Dashboard", selector: null }],
+      ]),
+      attribution,
+    );
+    const flaky = stats.flakySteps.find((f) => f.stepName === "Sign in");
+    expect(flaky, "s1 failed on attempt 0 and passed on attempt 1").toBeTruthy();
+    expect(stats.flakySteps.find((f) => f.stepName === "Dashboard")).toBeUndefined();
+  });
+});
+
+// ── C2 · one uniform attempts list ───────────────────────────────────────────
+
+describe("attempt views", () => {
+  const detail = (over: Record<string, unknown> = {}) =>
+    mapRunDetail({
+      ts: 1_700_000_000_000_000,
+      status: STATUS_VALUES.warning,
+      duration: 1200,
+      execution_id: "ex-1",
+      run_id: "r1",
+      attempts: 2,
+      last_attempt_steps: JSON.stringify([{ step_id: "s1", status: "ok", duration_ms: 120 }]),
+      trace_key: "traces/final.zip",
+      ...over,
+    })!;
+
+  it("marks the last attempt as the deciding one and gives it the full detail", () => {
+    const views = buildAttemptViews(
+      detail({
+        retry_history: [
+          {
+            attempt: 0,
+            status: "failed",
+            response_time_ms: 3400,
+            steps: [{ step_id: "s1", status: "failed", duration_ms: 3000 }],
+            artifacts: { trace_ref: "traces/attempt-1.zip" },
+          },
+          { attempt: 1, status: "passed", response_time_ms: 1200, steps: [] },
+        ],
+      }),
+    );
+    expect(views).toHaveLength(2);
+    expect(views[0]).toMatchObject({ decided: false, compact: true, status: "failed" });
+    // A passing final attempt used to be reported as failed: the mapper
+    // hard-coded the status on the reasoning that entries only exist for
+    // failures. On a flaky run that is the one attempt that passed.
+    expect(views[1]).toMatchObject({ decided: true, compact: false, status: "passed" });
+    // The deciding attempt is what the record's top-level fields describe.
+    expect(views[1].steps).toHaveLength(1);
+    expect(views[1].traceKey).toBe("traces/final.zip");
+    // A superseded attempt keeps its OWN artifacts, not the survivor's.
+    expect(views[0].traceKey).toBe("traces/attempt-1.zip");
+  });
+
+  it("uses the probe's own duration rather than summing step durations", () => {
+    // Summing steps misses everything between them — launch, settle waits, the
+    // navigation a step triggers — which on a real journey is most of the time.
+    const views = buildAttemptViews(
+      detail({
+        retry_history: [
+          {
+            attempt: 0,
+            status: "failed",
+            response_time_ms: 3400,
+            steps: [{ step_id: "s1", status: "failed", duration_ms: 120 }],
+          },
+          { attempt: 1, status: "passed", response_time_ms: 1200, steps: [] },
+        ],
+      }),
+    );
+    expect(views[0].durationMs).toBe(3400);
+  });
+
+  it("shows a single attempt for a run that never retried", () => {
+    const views = buildAttemptViews(detail({ retry_history: [], attempts: 1 }));
+    expect(views).toHaveLength(1);
+    expect(views[0].decided).toBe(true);
+  });
+
+  it("counts attempts from the field the probe actually writes", () => {
+    // The mapper read `attempt`, which no record has ever carried, so the count
+    // was 0 on every run and the retry chip never appeared.
+    expect(detail({ attempts: 3 }).attempts).toBe(3);
+  });
+});
+
+// ── C4/C5 · the two costs inside one duration ────────────────────────────────
+
+describe("run timing breakdown", () => {
+  it("separates queue delay from run duration", () => {
+    const run = mapRun({
+      ts: 1_700_000_002_200_000,
+      scheduled_ts: 1_700_000_000_000_000,
+      started_ts: 1_700_000_001_000_000,
+      duration: 1200,
+      init_ms: 900,
+      status: STATUS_VALUES.passed,
+    });
+    expect(run.queueDelayMs).toBe(1000);
+    // init is INSIDE duration — subtract it, never add it.
+    expect(run.initMs).toBe(900);
+    expect(run.durationMs).toBe(1200);
+  });
+
+  it("reports an unknown queue delay as null, not as zero", () => {
+    // Rendering an unknown as 0 ms claims the scheduler was perfect on every
+    // record written before started_ts existed.
+    const run = mapRun({ ts: 1_700_000_002_200_000, scheduled_ts: 1_700_000_000_000_000 });
+    expect(run.queueDelayMs).toBeNull();
+  });
+
+  it("never reports a negative delay", () => {
+    // A start before the schedule is a clock artefact, not early execution.
+    const run = mapRun({
+      ts: 1_700_000_002_200_000,
+      scheduled_ts: 1_700_000_001_000_000,
+      started_ts: 1_700_000_000_000_000,
+    });
+    expect(run.queueDelayMs).toBe(0);
+  });
+});
+
+// ── Evidence ranking and step attribution ──────────────────────────────────
+
+/** A minimal event; every field the shape requires, overridable per case. */
+const evidenceEv = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
+  ts: 0,
+  stepId: "s1",
+  kind: "response",
+  level: null,
+  text: null,
+  message: null,
+  stack: null,
+  method: null,
+  url: null,
+  status: null,
+  resourceType: null,
+  initiatedTs: null,
+  durationMs: null,
+  firstParty: true,
+  ...over,
+});
+
+describe("evidence origin", () => {
+  it("takes the earliest instant, whatever order the events arrive in", () => {
+    // Buckets are ranked worst-first, so the earliest event is rarely index 0.
+    expect(
+      evidenceOriginTs([evidenceEv({ ts: 900 }), evidenceEv({ ts: 100 }), evidenceEv({ ts: 500 })]),
+    ).toBe(100);
+  });
+
+  it("places an event where the work began, not where it landed", () => {
+    expect(evidenceOriginTs([evidenceEv({ ts: 5_000, initiatedTs: 1_000 })])).toBe(1_000);
+  });
+
+  it("has no origin for an empty bundle, rather than pretending to zero", () => {
+    expect(evidenceOriginTs([])).toBeNull();
+  });
+});
+
+describe("evidence severity ranking", () => {
+  it("ranks a page error above a failed request above a console error", () => {
+    expect(evidenceSeverity(evidenceEv({ kind: "pageerror" }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ kind: "requestfailed" })),
+    );
+    expect(evidenceSeverity(evidenceEv({ kind: "requestfailed" }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ kind: "console", level: "error" })),
+    );
+  });
+
+  it("ranks a 5xx above a 4xx above a healthy response", () => {
+    expect(evidenceSeverity(evidenceEv({ status: 503 }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ status: 401 })),
+    );
+    expect(evidenceSeverity(evidenceEv({ status: 401 }))).toBeLessThan(
+      evidenceSeverity(evidenceEv({ status: 200 })),
+    );
+  });
+
+  it("treats a crash as a page error, not as an unranked kind", () => {
+    expect(evidenceSeverity(evidenceEv({ kind: "crash" }))).toBe(
+      evidenceSeverity(evidenceEv({ kind: "pageerror" })),
+    );
+  });
+
+  it("does not promote a non-error console line", () => {
+    // A console.log is not a finding; it must not outrank a 404.
+    expect(evidenceSeverity(evidenceEv({ kind: "console", level: "log" }))).toBeGreaterThan(
+      evidenceSeverity(evidenceEv({ status: 404 })),
+    );
+  });
+});
+
+describe("indexEvidenceByStep", () => {
+  it("buckets events under their own step", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ stepId: "s1" }),
+      evidenceEv({ stepId: "s2" }),
+      evidenceEv({ stepId: "s1" }),
+    ]);
+    expect(byStep.get("s1")).toHaveLength(2);
+    expect(byStep.get("s2")).toHaveLength(1);
+  });
+
+  it("returns unattributed events separately rather than under a null key", () => {
+    // "we could not attribute this" is a finding, not a step.
+    const { byStep, unattributed } = indexEvidenceByStep([
+      evidenceEv({ stepId: null }),
+      evidenceEv({ stepId: "s1" }),
+    ]);
+    expect(unattributed).toHaveLength(1);
+    expect(byStep.has("s1")).toBe(true);
+    expect(byStep.size).toBe(1);
+  });
+
+  it("ranks each bucket by severity, worst first", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 200 }),
+      evidenceEv({ kind: "pageerror" }),
+      evidenceEv({ status: 503 }),
+    ]);
+    expect(
+      byStep.get("s1")!.map((e) => (e.kind === "pageerror" ? "page" : String(e.status))),
+    ).toEqual(["page", "503", "200"]);
+  });
+
+  it("ranks first-party above third-party at equal severity", () => {
+    // Third-party is ranked below, never dropped (design D6).
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 503, firstParty: false, url: "https://cdn.example.io/a" }),
+      evidenceEv({ status: 503, firstParty: true, url: "https://app.example.dev/b" }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.firstParty)).toEqual([true, false]);
+  });
+
+  it("orders equal-severity, equal-party events by when they were initiated", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ status: 200, initiatedTs: 300 }),
+      evidenceEv({ status: 200, initiatedTs: 100 }),
+      evidenceEv({ status: 200, initiatedTs: 200 }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.initiatedTs)).toEqual([100, 200, 300]);
+  });
+
+  it("falls back to the observed timestamp when nothing was initiated", () => {
+    const { byStep } = indexEvidenceByStep([
+      evidenceEv({ kind: "console", level: "log", ts: 500 }),
+      evidenceEv({ kind: "console", level: "log", ts: 100 }),
+    ]);
+    expect(byStep.get("s1")!.map((e) => e.ts)).toEqual([100, 500]);
+  });
+});
+
+// ── Per-step settle attribution ────────────────────────────────────────────
+//
+// Shapes copied from a live "OpenObserve Sys Query" failure (run 3HFCZ3fm…),
+// where failure_detail carried the whole journey's 13 signals while the failed
+// step owned none of them.
+describe("stepOwnDetail", () => {
+  const RUN_LEVEL = {
+    stepId: "s15",
+    stepName: "Click on synthetics_results",
+    stepIndex: 15,
+    error: "did not become visible within 30000 ms",
+    candidatesTried: [],
+    settleSignals: [
+      {
+        kind: "response" as const,
+        signal: "POST **/auth/login",
+        status: "fired" as const,
+        required: false,
+        waitedMs: 5298,
+      },
+      {
+        kind: "navigation" as const,
+        signal: "navigation to **/web/logs/**",
+        status: "fired" as const,
+        required: false,
+        waitedMs: 2532,
+      },
+      {
+        kind: "response" as const,
+        signal: "POST **/_search_stream",
+        status: "stale" as const,
+        required: false,
+        waitedMs: 30274,
+      },
+    ],
+    settleMs: 30274,
+    observedDurationMs: 1200,
+    screenshotKey: null,
+    traceKey: null,
+  };
+
+  const step = (over: any) => ({
+    step_id: "s14",
+    status: "ok" as const,
+    duration_ms: 30285,
+    error: null,
+    start_time: 0,
+    end_time: 1,
+    screenshot_key: null,
+    ...over,
+  });
+
+  it("gives the failing step only the signals it actually owns", () => {
+    // The run-level list is an accumulation across every step; rendering it on
+    // the failed step credits it with traffic from steps it never ran.
+    const d = stepOwnDetail(
+      step({ step_id: "s15", status: "fail", settle_signals: [] }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals).toEqual([]);
+    expect(d?.error).toBe("did not become visible within 30000 ms");
+  });
+
+  it("puts a stale signal on the step that produced it", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [
+          {
+            kind: "response",
+            signal: "POST **/_search_stream",
+            status: "stale",
+            required: false,
+            waited_ms: 30274,
+          },
+        ],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals).toHaveLength(1);
+    expect(d?.settleSignals[0]).toMatchObject({ status: "stale", waitedMs: 30274 });
+  });
+
+  it("normalises waited_ms the same way the run-level mapper does", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 46 }],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.settleSignals[0].waitedMs).toBe(46);
+    expect(d?.settleSignals[0].required).toBe(false);
+  });
+
+  it("carries the step's own locator candidates", () => {
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "button", outcome: "matched" }] }),
+      RUN_LEVEL,
+    );
+    expect(d?.candidatesTried).toHaveLength(1);
+  });
+
+  it("returns null for a passing step with nothing of its own to show", () => {
+    // Otherwise every row grows an empty evidence block.
+    expect(stepOwnDetail(step({}), RUN_LEVEL)).toBeNull();
+  });
+
+  it("never borrows the run-level error for a step that did not fail", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }],
+      }),
+      RUN_LEVEL,
+    );
+    expect(d?.error).toBe("");
+  });
+
+  it("works when there is no run-level failure detail at all", () => {
+    const d = stepOwnDetail(
+      step({
+        settle_signals: [{ kind: "navigation", signal: "nav", status: "fired", waited_ms: 1 }],
+      }),
+      null,
+    );
+    expect(d?.settleSignals).toHaveLength(1);
+    expect(d?.stepId).toBe("s14");
+  });
+});
+
+// ── Locator ladder ─────────────────────────────────────────────────────────
+//
+// Shapes from the live "OpenObserve Cloud Happy Path" failure: step 16 asserts
+// a single role locator and reports `used_as_primary`, while its click steps
+// carry two or three candidates. Nothing on the record said which was which.
+describe("mergeLocatorLadder", () => {
+  const authored = [
+    { kind: "test_attribute", value: 'internal:testid=[data-test="x"]' },
+    { kind: "role", value: "internal:role=button" },
+    { kind: "css", value: "#submit" },
+  ];
+
+  it("marks authored candidates the probe never reached as not_tried", () => {
+    // `not_tried` has been in the union since the type was written and nothing
+    // ever produced it — this is the case it was for.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "test_attribute", value: 'internal:testid=[data-test="x"]', outcome: "matched" }],
+      authored,
+    );
+    expect(ladder.map((c) => c.outcome)).toEqual(["matched", "not_tried", "not_tried"]);
+  });
+
+  it("keeps the authored order, which is the order the probe walks them", () => {
+    const ladder = mergeLocatorLadder([], authored);
+    expect(ladder.map((c) => c.kind)).toEqual(["test_attribute", "role", "css"]);
+  });
+
+  it("pairs an outcome to its candidate by value, not by position", () => {
+    // A probe that skips a rung would otherwise shift every outcome up one.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "css", value: "#submit", outcome: "matched" }],
+      authored,
+    );
+    expect(ladder[2]).toMatchObject({ value: "#submit", outcome: "matched" });
+    expect(ladder[0].outcome).toBe("not_tried");
+  });
+
+  it("falls back to what was tried when the record carries no authored bundle", () => {
+    // Older records predate the locator bundle; showing nothing would be worse
+    // than showing the attempts.
+    const tried = [{ kind: "role", value: "r", outcome: "used_as_primary" as const }];
+    expect(mergeLocatorLadder(tried, undefined)).toEqual(tried);
+    expect(mergeLocatorLadder(tried, [])).toEqual(tried);
+  });
+
+  it("keeps an attempted candidate the authored bundle does not list", () => {
+    // Self-healing may reach for something not in the bundle; dropping it would
+    // hide the locator that actually ran.
+    const ladder = mergeLocatorLadder(
+      [{ kind: "role", value: "surprise", outcome: "matched" }],
+      authored,
+    );
+    expect(ladder.some((c) => c.value === "surprise")).toBe(true);
+    expect(ladder).toHaveLength(4);
+  });
+
+  it("returns nothing when there is neither a bundle nor an attempt", () => {
+    expect(mergeLocatorLadder([], undefined)).toEqual([]);
+  });
+});
+
+describe("stepOwnDetail locator ladder", () => {
+  const step = (over: any) => ({
+    step_id: "s16",
+    status: "fail" as const,
+    duration_ms: 60000,
+    error: null,
+    start_time: 0,
+    end_time: 1,
+    screenshot_key: null,
+    ...over,
+  });
+  const RUN = {
+    stepId: "s16",
+    stepName: "Assert visible row",
+    stepIndex: 16,
+    error: "Timeout 60000ms exceeded",
+    candidatesTried: [],
+    settleSignals: [],
+    settleMs: null,
+    observedDurationMs: null,
+    screenshotKey: null,
+    traceKey: null,
+  };
+
+  it("shows the whole authored ladder, not only what ran", () => {
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "a", outcome: "used_as_primary" }] }),
+      RUN,
+      [
+        { kind: "role", value: "a" },
+        { kind: "css", value: "b" },
+      ],
+    );
+    expect(d?.candidatesTried).toHaveLength(2);
+    expect(d?.candidatesTried[1].outcome).toBe("not_tried");
+  });
+
+  it("reports a one-rung ladder as exactly that", () => {
+    // The Happy Path failure: one authored candidate, so no fallback existed.
+    const d = stepOwnDetail(
+      step({ candidates_tried: [{ kind: "role", value: "a", outcome: "used_as_primary" }] }),
+      RUN,
+      [{ kind: "role", value: "a" }],
+    );
+    expect(d?.candidatesTried).toHaveLength(1);
+    expect(d?.candidatesTried[0].outcome).toBe("used_as_primary");
+  });
+});
+
+describe("step-stream query builders", () => {
+  const MON = "3HORp1V1zqa1CxwYYXzp6ohP2UA";
+
+  it("aggregates over the WHOLE window — no LIMIT", () => {
+    // The entire point of B10. The old path capped at 5000 execution rows, so on
+    // the busiest check measured (18 079 executions / 7 days) it described 4.0 of
+    // the 7 days and reported a 33.7% fail rate as 56.3%. A LIMIT creeping back
+    // in here restores that silently — the numbers stay plausible, just wrong.
+    const sql = buildStepAggregateSql(MON);
+    expect(sql).not.toContain("LIMIT");
+    expect(sql).toContain(`FROM "synthetics_step_results"`);
+    expect(sql).toContain("GROUP BY step_id");
+    // `kind` is populated with 'step' only today, but the column exists so
+    // protocol assertions can share this stream later without a grain migration.
+    // Without this filter the tab would silently start counting them.
+    expect(sql).toContain("kind = 'step'");
+  });
+
+  it("selects every column the Steps table renders, plus the window bounds", () => {
+    const sql = buildStepAggregateSql(MON);
+    for (const col of [
+      "executions",
+      "failures",
+      "flaky",
+      "avg_duration_ms",
+      "p95_duration_ms",
+      "max_duration_ms",
+      "step_index",
+      // Coverage reads these; deriving them from the capped sparkline reported a
+      // 7-day range as the newest ~100 minutes.
+      "first_ts",
+      "last_ts",
+    ]) {
+      expect(sql).toContain(col);
+    }
+    // Percentiles do not compose across groups, so p95 must come from a query
+    // grouped only by the dimension it is reported at.
+    expect(sql).toContain("approx_percentile_cont(duration_ms, 0.95)");
+  });
+
+  it("groups the dimension query by both axes and counts only", () => {
+    // Counts compose, so one query answers browserStats and locationStats by
+    // folding the same rows twice. A percentile here would not be foldable.
+    const sql = buildStepDimensionSql(MON);
+    expect(sql).toContain("GROUP BY step_id, engine, location");
+    expect(sql).not.toContain("approx_percentile_cont");
+    expect(sql).toContain("kind = 'step'");
+  });
+
+  it("bounds the sparkline, and only the sparkline", () => {
+    // "The last N runs" is this query's definition rather than a truncation, so
+    // its cap is correct where the aggregate's would not be.
+    const sql = buildStepSparklineSql(MON, 2000);
+    expect(sql).toContain("LIMIT 2000");
+    expect(sql).toContain("ORDER BY _timestamp DESC");
+    expect(sql).toContain("failed_in_prior_attempt");
+  });
+
+  it("escapes the monitor id in all three", () => {
+    for (const sql of [
+      buildStepAggregateSql("mon'1"),
+      buildStepDimensionSql("mon'1"),
+      buildStepSparklineSql("mon'1"),
+    ]) {
+      expect(sql).toContain("synthetics_id = 'mon''1'");
+    }
+  });
+});
+
+describe("foldStepStream coverage", () => {
+  const agg = (
+    stepId: string,
+    stepIndex: number,
+    executions: number,
+    first: number,
+    last: number,
+  ) => ({
+    step_id: stepId,
+    step_index: stepIndex,
+    executions,
+    failures: 0,
+    flaky: 0,
+    avg_duration_ms: 1,
+    p95_duration_ms: 1,
+    max_duration_ms: 1,
+    first_ts: first,
+    last_ts: last,
+  });
+
+  it("counts EXECUTIONS, not step rows", () => {
+    // One execution writes one row per step. Summing the per-step counts would
+    // report a 3-step check as 3x its real execution count, which is what the
+    // banner would then show the user.
+    const r = foldStepStream(
+      [
+        agg("s1", 0, 100, 1_000, 2_000),
+        agg("s2", 1, 100, 1_000, 2_000),
+        agg("s3", 2, 90, 1_000, 2_000),
+      ],
+      [],
+      [],
+    );
+    expect(r.coverage.executions).toBe(100);
+  });
+
+  it("takes the window from the unbounded aggregate, not the capped sparkline", () => {
+    // The sparkline is LIMIT 2000; the aggregates are not. Deriving the window
+    // from the sparkline reported a 7-day range as the newest ~100 minutes.
+    const r = foldStepStream(
+      [agg("s1", 0, 10, 1_000_000, 9_000_000)],
+      [],
+      // Sparkline covers a deliberately narrower slice — it must not win.
+      [{ step_id: "s1", status: "passed", failed_in_prior_attempt: false, _timestamp: 8_000_000 }],
+    );
+    expect(r.coverage.fromMs).toBe(1_000);
+    expect(r.coverage.toMs).toBe(9_000);
+  });
+
+  it("puts failRate and flakyRate on the SAME scales the client-side tally uses", () => {
+    // `StepGroup` is consumed by one component that renders `failRate * 100` and
+    // `flakyRate * 10 / 10` — so failRate is a fraction and flakyRate is already
+    // a percentage. The asymmetry is inherited, not chosen, and it is invisible
+    // to the type checker because both are `number`.
+    //
+    // Emitting flakyRate as a fraction rendered a 25%-flaky step as "0.3%". Both
+    // paths feed the same component while the fallback exists, so they have to
+    // agree; this test is what notices when they stop.
+    const r = foldStepStream(
+      [{ ...agg("s1", 0, 200, 1_000, 2_000), failures: 50, flaky: 50 }],
+      [],
+      [],
+    );
+    const g = r.stepGroups[0];
+    expect(g.failRate).toBe(0.25); // fraction — component multiplies by 100
+    expect(g.flakyRate).toBe(25); // already a percentage — component does not
+  });
+
+  it("orders steps by step_index", () => {
+    const r = foldStepStream([agg("late", 5, 1, 1, 2), agg("early", 0, 1, 1, 2)], [], []);
+    expect(r.stepGroups.map((g) => g.key)).toEqual(["step-early", "step-late"]);
+  });
+});

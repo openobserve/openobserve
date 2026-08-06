@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, provide, ref, watch } from "vue";
+import { computed, provide, ref } from "vue";
 import type { TreeProps, TreeEmits, TreeNodeKey, TreeNode } from "./OTree.types";
 import { TREE_CONTEXT_KEY } from "./OTree.context";
 import OTreeNode from "./OTreeNode.vue";
@@ -49,9 +49,7 @@ const defaultFilterMethod = (node: TreeNode, filter: string): boolean => {
   return label.toLowerCase().includes(filter.toLowerCase());
 };
 
-const resolvedFilterMethod = computed(
-  () => props.filterMethod ?? defaultFilterMethod,
-);
+const resolvedFilterMethod = computed(() => props.filterMethod ?? defaultFilterMethod);
 
 // ── Tick handlers ─────────────────────────────────────────────────────────
 
@@ -110,16 +108,7 @@ provide(TREE_CONTEXT_KEY, {
 </script>
 
 <template>
-  <ul
-    role="tree"
-    class="tw:list-none tw:m-0 tw:p-0"
-    v-bind="$attrs"
-  >
-    <OTreeNode
-      v-for="node in nodes"
-      :key="node[nodeKey] as TreeNodeKey"
-      :node="node"
-      :depth="0"
-    />
+  <ul role="tree" class="m-0 list-none p-0" v-bind="$attrs">
+    <OTreeNode v-for="node in nodes" :key="node[nodeKey] as TreeNodeKey" :node="node" :depth="0" />
   </ul>
 </template>

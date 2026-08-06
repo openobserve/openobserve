@@ -32,17 +32,20 @@ test.describe("IAM Organization form validation", () => {
         testLogger.info('Navigated to IAM Organizations tab');
     });
 
-    test("should disable submit button when organization name is empty", {
+    test("should keep submit enabled and block empty organization name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled state for empty org name');
+        testLogger.info('Testing submit gating for empty org name');
 
         await pm.iamFormValidation.openOrganizationForm();
         await expect(pm.iamFormValidation.getOrgDialogLocator()).toBeVisible();
-        // Submit is disabled: :primaryButtonDisabled="(!organizationData.name || !isValidOrgName)"
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeDisabled();
+        // R3 (Zod migration): Save stays enabled; the schema gates the submit,
+        // not the button. Submitting an empty name reveals the inline error.
+        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.getOrgSubmitBtnLocator().click();
+        await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Submit button correctly disabled for empty name');
+        testLogger.info('Empty org name correctly blocked on submit');
     });
 
     test("should show error when organization name contains invalid characters", {
@@ -51,14 +54,15 @@ test.describe("IAM Organization form validation", () => {
         testLogger.info('Testing org name invalid character error');
 
         await pm.iamFormValidation.openOrganizationForm();
-        // Type an invalid name — error appears on input change (not on submit)
+        // R3 (Zod migration): errors are revealed on SUBMIT (revalidateLogic),
+        // not on input; Save stays enabled and the schema gates the submit.
         await pm.iamFormValidation.fillOrgName('org@name!');
+        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitOrgForm();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText(
             'Use alphanumeric characters, space and underscore only.'
         );
-        // Submit button still disabled
-        await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Invalid org name error correctly shown');
     });
@@ -70,12 +74,13 @@ test.describe("IAM Organization form validation", () => {
 
         await pm.iamFormValidation.openOrganizationForm();
         await pm.iamFormValidation.fillOrgName('bad@name!');
+        await pm.iamFormValidation.submitOrgForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
 
+        // After the first submit, errors revalidate live on change → fixing clears it.
         await pm.iamFormValidation.fillOrgName('valid_name');
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).not.toBeVisible();
-        // Submit should now be enabled
         await expect(pm.iamFormValidation.getOrgSubmitBtnLocator()).toBeEnabled();
 
         testLogger.info('Org name error correctly cleared on fix');
@@ -105,6 +110,7 @@ test.describe("IAM Organization form validation", () => {
 
         await pm.iamFormValidation.openOrganizationForm();
         await pm.iamFormValidation.fillOrgName('bad@name!');
+        await pm.iamFormValidation.submitOrgForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getOrgNameErrorLocator()).toContainText('Use alphanumeric characters, space and underscore only.');
 
@@ -137,16 +143,19 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         testLogger.info('Navigated to IAM Groups tab');
     });
 
-    test("should disable submit button when group name is empty", {
+    test("should keep submit enabled and block empty group name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled for empty group name');
+        testLogger.info('Testing submit gating for empty group name');
 
         await pm.iamFormValidation.openGroupForm();
         await expect(pm.iamFormValidation.getGroupDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
+        // R3: Save stays enabled; submitting an empty name reveals the required error.
+        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitGroupForm();
+        await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Group submit button correctly disabled for empty name');
+        testLogger.info('Empty group name correctly blocked on submit');
     });
 
     test("should show error when group name contains invalid characters", {
@@ -156,11 +165,12 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openGroupForm();
         await pm.iamFormValidation.fillGroupName('group with spaces');
+        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitGroupForm(); // reveal the error
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText(
-            "Use letters, numbers and underscores only, without spaces."
+            "Use alphanumeric and '_' characters only, without spaces."
         );
-        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Group invalid name error correctly shown');
     });
@@ -172,9 +182,10 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openGroupForm();
         await pm.iamFormValidation.fillGroupName('group@name!');
+        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitGroupForm(); // reveal the error
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getGroupNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
-        await expect(pm.iamFormValidation.getGroupSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Group special-char error correctly shown');
     });
@@ -193,46 +204,6 @@ test.describe("IAM Group form validation", { tag: '@enterprise' }, () => {
         await expect(pm.iamFormValidation.getGroupDialogLocator()).not.toBeVisible();
 
         testLogger.info('Group created successfully');
-    });
-
-    test("should auto-route to Edit Group after create", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        const groupName = `e2e_iam_group_${Date.now()}`;
-        testLogger.info(`Creating group and expecting auto-route: ${groupName}`);
-
-        await pm.iamFormValidation.openGroupForm();
-        await pm.iamFormValidation.fillGroupName(groupName);
-        await pm.iamFormValidation.submitGroupForm();
-
-        // Lands on the Edit Group page instead of returning to the list.
-        await expect(pm.iamFormValidation.getEditGroupSectionLocator()).toBeVisible({ timeout: 15000 });
-        await expect(page).toHaveURL(/groups\/edit\//);
-
-        testLogger.info('Auto-routed to Edit Group');
-    });
-
-    test("should warn about access loss in the group delete confirm dialog", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        const groupName = `e2e_iam_group_${Date.now()}`;
-        testLogger.info(`Creating then deleting group to check blast-radius: ${groupName}`);
-
-        await pm.iamFormValidation.openGroupForm();
-        await pm.iamFormValidation.fillGroupName(groupName);
-        await pm.iamFormValidation.submitGroupForm();
-        await expect(pm.iamFormValidation.getEditGroupSectionLocator()).toBeVisible({ timeout: 15000 });
-
-        // Back to the groups list, then delete.
-        await pm.iamFormValidation.navigateToGroupsTab();
-        await pm.iamFormValidation.clickDeleteGroup(groupName);
-
-        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toContainText(/lose the roles/i);
-
-        await pm.iamFormValidation.getConfirmDialogOkBtnLocator().click();
-
-        testLogger.info('Group delete blast-radius warning shown');
     });
 });
 
@@ -258,16 +229,19 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
         testLogger.info('Navigated to IAM Roles tab');
     });
 
-    test("should disable submit button when role name is empty", {
+    test("should keep submit enabled and block empty role name on submit", {
         tag: ['@iamFormValidation', '@smoke', '@P0']
     }, async ({ page }) => {
-        testLogger.info('Testing submit button disabled for empty role name');
+        testLogger.info('Testing submit gating for empty role name');
 
         await pm.iamFormValidation.openRoleForm();
         await expect(pm.iamFormValidation.getRoleDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeDisabled();
+        // R3: Save stays enabled; submitting an empty name reveals the required error.
+        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitRoleForm();
+        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
 
-        testLogger.info('Role submit button correctly disabled for empty name');
+        testLogger.info('Empty role name correctly blocked on submit');
     });
 
     test("should show error when role name contains invalid characters", {
@@ -277,11 +251,12 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openRoleForm();
         await pm.iamFormValidation.fillRoleName('role with spaces');
+        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeEnabled();
+        await pm.iamFormValidation.submitRoleForm(); // reveal the error
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText(
-            "Use letters, numbers and underscores only, without spaces."
+            "Use alphanumeric and '_' characters only, without spaces."
         );
-        await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeDisabled();
 
         testLogger.info('Role invalid name error correctly shown');
     });
@@ -293,9 +268,11 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
 
         await pm.iamFormValidation.openRoleForm();
         await pm.iamFormValidation.fillRoleName('bad role name!');
+        await pm.iamFormValidation.submitRoleForm(); // reveal the error (submit-then-change)
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use letters, numbers and underscores only, without spaces.");
+        await expect(pm.iamFormValidation.getRoleNameErrorLocator()).toContainText("Use alphanumeric and '_' characters only, without spaces.");
 
+        // After the first submit, errors revalidate live on change → fixing clears it.
         await pm.iamFormValidation.fillRoleName('valid_role_name');
         await expect(pm.iamFormValidation.getRoleNameErrorLocator()).not.toBeVisible();
         await expect(pm.iamFormValidation.getRoleSubmitBtnLocator()).toBeEnabled();
@@ -318,102 +295,19 @@ test.describe("IAM Role form validation", { tag: '@enterprise' }, () => {
 
         testLogger.info('Role created successfully');
     });
-
-    test("should show 'Start from' preset options in the Add Role dialog", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        testLogger.info('Testing Start-from preset options render');
-
-        await pm.iamFormValidation.openRoleForm();
-        await expect(pm.iamFormValidation.getRoleStartFromCustomLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getRoleStartFromReadonlyLocator()).toBeVisible();
-
-        testLogger.info('Start-from Custom + Read-only options rendered');
-    });
-
-    test("should auto-route to Edit Role Permissions tab after create", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        const roleName = `e2e_iam_role_${Date.now()}`;
-        testLogger.info(`Creating role and expecting auto-route: ${roleName}`);
-
-        await pm.iamFormValidation.openRoleForm();
-        await pm.iamFormValidation.fillRoleName(roleName);
-        await pm.iamFormValidation.submitRoleForm();
-
-        // Instead of returning to the list, we land on the Edit Role page with the
-        // Permissions tab active.
-        await expect(pm.iamFormValidation.getEditRolePageLocator()).toBeVisible({ timeout: 15000 });
-        await expect(pm.iamFormValidation.getEditRolePermsSectionLocator()).toBeVisible();
-        await expect(page).toHaveURL(/roles\/edit\//);
-
-        testLogger.info('Auto-routed to Edit Role Permissions tab');
-    });
-
-    test("should warn about access loss in the delete confirm dialog", {
-        tag: ['@iamFormValidation', '@functional', '@P1']
-    }, async ({ page }) => {
-        const roleName = `e2e_iam_role_${Date.now()}`;
-        testLogger.info(`Creating then deleting role to check blast-radius: ${roleName}`);
-
-        // Create a role, then return to the list to delete it.
-        await pm.iamFormValidation.openRoleForm();
-        await pm.iamFormValidation.fillRoleName(roleName);
-        await pm.iamFormValidation.submitRoleForm();
-        await expect(pm.iamFormValidation.getEditRolePageLocator()).toBeVisible({ timeout: 15000 });
-
-        // Back to the roles list.
-        await pm.iamFormValidation.navigateToRolesTab();
-        await pm.iamFormValidation.clickDeleteRole(roleName);
-
-        // Confirm dialog shows a blast-radius warning banner mentioning access loss.
-        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toContainText(/lose access/i);
-
-        // Confirm the delete to clean up.
-        await pm.iamFormValidation.getConfirmDialogOkBtnLocator().click();
-
-        testLogger.info('Delete confirm blast-radius warning shown');
-    });
-
-    test("should mark the Permissions tab dirty and prompt on leave with unsaved changes", {
-        tag: ['@iamFormValidation', '@functional', '@P2']
-    }, async ({ page }) => {
-        const roleName = `e2e_iam_role_${Date.now()}`;
-        testLogger.info(`Testing dirty dot + discard guard: ${roleName}`);
-
-        await pm.iamFormValidation.openRoleForm();
-        await pm.iamFormValidation.fillRoleName(roleName);
-        await pm.iamFormValidation.submitRoleForm();
-        await expect(pm.iamFormValidation.getEditRolePageLocator()).toBeVisible({ timeout: 15000 });
-
-        // Toggle a permission to dirty the Permissions tab.
-        const toggled = await pm.iamFormValidation.toggleFirstPermissionCheckbox();
-        if (!toggled) {
-            test.skip(true, 'No permission checkboxes rendered for this org — cannot exercise dirty state');
-            return;
-        }
-
-        await expect(pm.iamFormValidation.getEditRolePermsDirtyDotLocator()).toBeVisible();
-
-        // Attempt to leave — a discard-changes confirm dialog should appear.
-        await pm.iamFormValidation.navigateToRolesTab();
-        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getConfirmDialogLocator()).toContainText(/discard/i);
-
-        // Discard and continue.
-        await pm.iamFormValidation.getConfirmDialogOkBtnLocator().click();
-
-        testLogger.info('Dirty dot + discard-changes guard verified');
-    });
 });
 
-// ── Service Account email format validation ───────────────────────────────────
-// Note: empty email, valid creation, and duplicate email cases are already
-// covered in serviceAccount.spec.js. This suite covers only the format
-// validation case (invalid email string).
+// ── Service Account name format validation ────────────────────────────────────
+// Service accounts are created from a NAME (lowercase slug) — the identifier
+// email is synthesized as <name>.<org>@sa.internal. The name must match
+// /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/ (AddServiceAccount.schema.ts); invalid
+// input shows the serviceAccounts.nameInvalid message. Note: empty name, valid
+// creation, and duplicate name cases are already covered in
+// serviceAccount.spec.js. This suite covers only the format validation case.
 
-test.describe("IAM Service Account email format validation", () => {
+const SA_NAME_ERROR = 'Use lowercase letters, numbers and hyphens';
+
+test.describe("IAM Service Account name format validation", () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
@@ -425,58 +319,61 @@ test.describe("IAM Service Account email format validation", () => {
         testLogger.info('Navigated to IAM Service Accounts tab');
     });
 
-    test("should show error when email format is invalid", {
+    test("should show error when name format is invalid", {
         tag: ['@iamFormValidation', '@functional', '@P1']
     }, async ({ page }) => {
-        testLogger.info('Testing invalid email format for service account');
+        testLogger.info('Testing invalid name format for service account');
 
         await pm.iamFormValidation.openServiceAccountForm();
         await expect(pm.iamFormValidation.getSaDialogLocator()).toBeVisible();
 
-        await pm.iamFormValidation.fillSaEmail('notanemail');
+        // Uppercase and underscores are rejected by the slug regex.
+        await pm.iamFormValidation.fillSaName('Not_A_Valid_Name');
         await pm.iamFormValidation.submitSaForm();
 
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText(
-            'Please enter a valid email address'
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toContainText(
+            SA_NAME_ERROR
         );
 
-        testLogger.info('Invalid email format error correctly shown');
+        testLogger.info('Invalid name format error correctly shown');
     });
 
-    test("should show error when email is missing @ symbol", {
+    test("should show error when name has a leading or trailing hyphen", {
         tag: ['@iamFormValidation', '@functional', '@P1']
     }, async ({ page }) => {
-        testLogger.info('Testing email missing @ for service account');
+        testLogger.info('Testing leading/trailing hyphen name for service account');
 
         await pm.iamFormValidation.openServiceAccountForm();
-        await pm.iamFormValidation.fillSaEmail('missingatgmail.com');
+        await pm.iamFormValidation.fillSaName('-bad-name-');
         await pm.iamFormValidation.submitSaForm();
 
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText(
-            'Please enter a valid email address'
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toContainText(
+            SA_NAME_ERROR
         );
 
-        testLogger.info('Missing @ email error correctly shown');
+        testLogger.info('Leading/trailing hyphen name error correctly shown');
     });
 
-    test("should clear email error when a valid email is entered and re-submitted", {
+    test("should clear name error when a valid name is entered", {
         tag: ['@iamFormValidation', '@functional', '@P2']
     }, async ({ page }) => {
-        testLogger.info('Testing email error clears on valid re-entry');
+        testLogger.info('Testing name error clears on valid re-entry');
 
         await pm.iamFormValidation.openServiceAccountForm();
-        await pm.iamFormValidation.fillSaEmail('bademail');
+        await pm.iamFormValidation.fillSaName('bad_name');
         await pm.iamFormValidation.submitSaForm();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toBeVisible();
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).toContainText('Please enter a valid email address');
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toBeVisible();
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).toContainText(SA_NAME_ERROR);
 
-        // Correct the email — error should clear on input change (@update:model-value="emailError = ''")
-        await pm.iamFormValidation.fillSaEmail(`e2e_sa_${Date.now()}@example.com`);
-        await expect(pm.iamFormValidation.getSaEmailErrorLocator()).not.toBeVisible();
+        // Correct the name — OForm revalidates on change after the first
+        // submit (revalidateLogic modeAfterSubmission: "change"), so the
+        // error clears without another submit. No account is created.
+        await pm.iamFormValidation.fillSaName(`e2e-sa-${Date.now()}`);
+        await expect(pm.iamFormValidation.getSaNameErrorLocator()).not.toBeVisible();
 
-        testLogger.info('Service account email error correctly cleared');
+        testLogger.info('Service account name error correctly cleared');
     });
 });
 

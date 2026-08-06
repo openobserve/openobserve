@@ -15,16 +15,14 @@ const props = defineProps<FormRadioGroupProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormRadioGroup] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormRadioGroup] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
   <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
-      <div class="tw:flex tw:flex-col tw:gap-1">
+      <div class="flex flex-col gap-1">
         <ORadioGroup
           v-bind="$attrs"
           :label="props.label"
@@ -42,12 +40,7 @@ if (import.meta.env.DEV && !form) {
         >
           <slot />
         </ORadioGroup>
-        <div
-          v-if="
-            field.state.meta.errors.length > 0
-          "
-          class="tw:text-xs tw:text-input-error-text"
-        >
+        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
       </div>

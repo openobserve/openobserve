@@ -22,7 +22,7 @@
 //! directory on remote storage whose data is entirely older than the cutoff.
 //!
 //! The deletion decision mirrors the compactor retention logic
-//! ([`crate::service::compact::retention`]): a stream's effective retention is
+//! ([`compaction::retention`]): a stream's effective retention is
 //! `stream_settings.data_retention` (falling back to
 //! `ZO_COMPACT_DATA_RETENTION_DAYS`), and any day overlapping an
 //! `extended_retention_days` range is preserved.
@@ -30,11 +30,10 @@
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use config::{
     get_config, is_local_disk_storage,
-    meta::stream::{ALL_STREAM_TYPES, StreamType, TimeRange},
+    meta::stream::{StreamType, TimeRange},
     utils::time::now,
 };
-
-use crate::service::db;
+use db;
 
 /// Entry point for the `gc-file-list` command.
 ///
@@ -90,9 +89,9 @@ pub async fn run(
     } else {
         // process every stream: load schema cache to enumerate orgs/streams
         db::schema::cache().await?;
-        let orgs = db::schema::list_organizations_from_cache().await;
-        for org_id in orgs {
-            for stream_type in ALL_STREAM_TYPES {
+        let grouped = db::schema::list_all_streams_grouped().await;
+        for (org_id, stream_types) in grouped {
+            for (stream_type, streams) in stream_types {
                 // enrichment tables and file_list streams are not subject to data
                 // retention, skip them (same as compactor retention::generate_jobs)
                 if stream_type == StreamType::EnrichmentTables
@@ -100,7 +99,6 @@ pub async fn run(
                 {
                     continue;
                 }
-                let streams = db::schema::list_streams_from_cache(&org_id, stream_type).await;
                 for stream_name in streams {
                     let (dirs, files) = gc_stream(
                         &org_id,
@@ -390,7 +388,7 @@ mod tests {
     fn test_retention_decision_keeps_extended_retention_day() {
         let (day_start, day_end) = day_bounds(2026, 5, 15).unwrap();
         let day_range = TimeRange::new(day_start.timestamp_micros(), day_end.timestamp_micros());
-        let extended = vec![TimeRange::new(
+        let extended = [TimeRange::new(
             Utc.with_ymd_and_hms(2026, 5, 14, 0, 0, 0)
                 .single()
                 .unwrap()

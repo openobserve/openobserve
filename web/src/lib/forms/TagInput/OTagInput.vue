@@ -1,0 +1,154 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div data-test="tag-input-container" class="h-full w-full">
+    <div
+      data-test="tag-input-wrapper"
+      class="group border-card-glass-border rounded-default bg-card-glass-bg focus-within:border-theme-accent relative flex h-full min-h-14 w-full max-w-full cursor-text flex-col overflow-hidden border px-1.25 py-0 transition-colors duration-300"
+    >
+      <label
+        v-if="label"
+        data-test="tag-input-label"
+        class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ml-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
+        :class="
+          hasContent || isFocused
+            ? 'text-theme-accent -translate-y-2 scale-75'
+            : 'text-text-secondary'
+        "
+        >{{ label }}</label
+      >
+      <div
+        data-test="tags-and-input"
+        class="mt-1.25 flex w-full flex-wrap items-start gap-1 overflow-hidden"
+      >
+        <OTag
+          v-for="(tag, index) in modelValue"
+          :key="index"
+          :data-test="`tag-chip-${index}`"
+          type="selectionChip"
+          class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
+        >
+          {{ tag }}
+          <template #trailing>
+            <button
+              type="button"
+              :aria-label="t('common.removeTag', { tag })"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
+              @click="removeTag(index)"
+            >
+              <OIcon name="close" size="xs" />
+            </button>
+          </template>
+        </OTag>
+        <input
+          data-test="tag-input-field"
+          ref="inputRef"
+          v-model="inputValue"
+          type="text"
+          :placeholder="
+            modelValue.length > 0 ? '' : (placeholder ?? t('common.typeAndPressEnterOrComma'))
+          "
+          class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_100px] border-0 bg-transparent p-1 text-sm outline-none"
+          @keydown.enter.prevent="addTag"
+          @input="handleInput"
+          @keydown.delete="handleBackspace"
+          @focus="isFocused = true"
+          @blur="
+            addTag();
+            isFocused = false;
+          "
+        />
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed } from "vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
+interface Props {
+  modelValue: string[];
+  placeholder?: I18nText;
+  label?: I18nText;
+}
+
+// No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
+// module-evaluation time, so the fallback is resolved in the template instead.
+const props = withDefaults(defineProps<Props>(), {
+  label: raw(""),
+});
+
+const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);
+// Live-reported bug: the label only floated when there was content, so an
+// empty, focused field showed the label sitting directly on top of the
+// placeholder ("Type and press Enter or comma") — indistinguishable from
+// garbled/overlapping text. Standard floating-label inputs also float on
+// focus, before any content exists; this input didn't.
+const isFocused = ref(false);
+
+const emit = defineEmits<{
+  (e: "update:modelValue", value: string[]): void;
+}>();
+
+const inputValue = ref("");
+const inputRef = ref<HTMLInputElement | null>(null);
+
+const addTag = () => {
+  const trimmedValue = inputValue.value.trim();
+  if (trimmedValue && !props.modelValue.includes(trimmedValue)) {
+    const newTags = [...props.modelValue, trimmedValue];
+    emit("update:modelValue", newTags);
+    inputValue.value = "";
+  }
+};
+
+const handleInput = () => {
+  // Check if the input contains a comma
+  if (inputValue.value.includes(",")) {
+    // Split by comma and process each value
+    const values = inputValue.value.split(",");
+
+    // Process all complete values (all but the last one)
+    for (let i = 0; i < values.length - 1; i++) {
+      const trimmedValue = values[i].trim();
+      if (trimmedValue && !props.modelValue.includes(trimmedValue)) {
+        const newTags = [...props.modelValue, trimmedValue];
+        emit("update:modelValue", newTags);
+      }
+    }
+
+    // Keep the last value (after the last comma) in the input
+    inputValue.value = values[values.length - 1];
+  }
+};
+
+const removeTag = (index: number) => {
+  const newTags = props.modelValue.filter((_, i) => i !== index);
+  emit("update:modelValue", newTags);
+};
+
+const handleBackspace = () => {
+  if (inputValue.value === "" && props.modelValue.length > 0) {
+    removeTag(props.modelValue.length - 1);
+  }
+};
+</script>

@@ -14,16 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
-import config from "../aws-exports";
 
 const users = {
-  list: (
-    page_num: number,
-    page_size: number,
-    sort_by: string,
-    desc: boolean,
-    name: string,
-  ) => {
+  list: (page_num: number, page_size: number, sort_by: string, desc: boolean, name: string) => {
     return http().get(
       `/api/users?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
     );
@@ -34,11 +27,7 @@ const users = {
   update: (data: any, org_identifier: string, user_email: string) => {
     return http().put(`/api/${org_identifier}/users/${user_email}`, data);
   },
-  updateexistinguser: (
-    data: any,
-    org_identifier: string,
-    user_email: string,
-  ) => {
+  updateexistinguser: (data: any, org_identifier: string, user_email: string) => {
     return http().post(`/api/${org_identifier}/users/${user_email}`, data);
   },
   delete: (org_identifier: string, user_email: string) => {
@@ -72,7 +61,7 @@ const users = {
     return http().get(`api/${orgId}/users/${userEmail}/roles`);
   },
   // Roles for every user in the org in a single request. Returns a map of
-  // user email -> role list, replacing one getUserRoles call per user.
+  // user email -> role list.
   getAllUserRoles: (orgId: string) => {
     return http().get(`api/${orgId}/users/roles/all`);
   },

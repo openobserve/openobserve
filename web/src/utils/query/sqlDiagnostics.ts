@@ -37,10 +37,19 @@
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
+import type { I18nText } from "@/types/i18n";
+
 export interface SqlErrorRange {
   startLine: number;
   endLine: number;
   column?: number;
+  /**
+   * Optional 1-based end column. When set, the editor squiggles only from
+   * `column` to `endColumn` (used to wrap a single offending token — e.g. an
+   * unknown field name). When omitted, the editor highlights to end-of-line,
+   * which is the right behaviour for syntax errors near the cursor.
+   */
+  endColumn?: number;
   error: string;
 }
 
@@ -49,40 +58,62 @@ export interface SqlErrorRange {
 
 const MSG = {
   // EOF / incomplete
-  incompleteAnd:        "Incomplete condition — expected an expression after AND",
-  incompleteOr:         "Incomplete condition — expected an expression after OR",
-  incompleteNot:        "Incomplete condition — expected an expression after NOT",
-  incompleteLike:       "Incomplete LIKE — expected a pattern string, e.g. LIKE '%value%'",
-  incompleteIn:         "Incomplete IN — expected a value list, e.g. IN (1, 2, 3) or IN (SELECT …)",
-  incompleteBetween:    "Incomplete BETWEEN — expected a range, e.g. BETWEEN 1 AND 10",
-  incompleteIs:         "Incomplete IS — expected NULL, NOT NULL, TRUE, or FALSE after IS",
-  incompleteOrderBy:    "Incomplete ORDER BY — expected a column name or expression",
-  incompleteOrder:      "Incomplete ORDER — expected BY after ORDER",
-  incompleteGroupBy:    "Incomplete GROUP BY — expected a column name or expression",
-  incompleteGroup:      "Incomplete GROUP — expected BY after GROUP",
-  incompleteHaving:     "Incomplete HAVING — expected a condition after HAVING",
-  incompleteWhere:      "Incomplete WHERE — expected a condition after WHERE",
-  incompleteFrom:       "Incomplete FROM — expected a table or stream name",
-  incompleteSelect:     "Incomplete SELECT — expected column names, expressions, or *",
+  incompleteAnd: "Incomplete condition — expected an expression after AND",
+  incompleteOr: "Incomplete condition — expected an expression after OR",
+  incompleteNot: "Incomplete condition — expected an expression after NOT",
+  incompleteLike: "Incomplete LIKE — expected a pattern string, e.g. LIKE '%value%'",
+  incompleteIn: "Incomplete IN — expected a value list, e.g. IN (1, 2, 3) or IN (SELECT …)",
+  incompleteBetween: "Incomplete BETWEEN — expected a range, e.g. BETWEEN 1 AND 10",
+  incompleteIs: "Incomplete IS — expected NULL, NOT NULL, TRUE, or FALSE after IS",
+  incompleteOrderBy: "Incomplete ORDER BY — expected a column name or expression",
+  incompleteOrder: "Incomplete ORDER — expected BY after ORDER",
+  incompleteGroupBy: "Incomplete GROUP BY — expected a column name or expression",
+  incompleteGroup: "Incomplete GROUP — expected BY after GROUP",
+  incompleteHaving: "Incomplete HAVING — expected a condition after HAVING",
+  incompleteWhere: "Incomplete WHERE — expected a condition after WHERE",
+  incompleteFrom: "Incomplete FROM — expected a table or stream name",
+  incompleteSelect: "Incomplete SELECT — expected column names, expressions, or *",
   incompleteComparison: (op: string) => `Incomplete comparison — expected a value after ${op}`,
-  incompleteLimit:      "Incomplete LIMIT — expected a number",
-  incompleteOffset:     "Incomplete OFFSET — expected a number",
-  incompleteOpenParen:  "Unclosed parenthesis — expected an expression or closing )",
-  incompleteExpr:       "Unexpected end of query — the expression is incomplete",
+  incompleteLimit: "Incomplete LIMIT — expected a number",
+  incompleteOffset: "Incomplete OFFSET — expected a number",
+  incompleteOpenParen: "Unclosed parenthesis — expected an expression or closing )",
+  incompleteExpr: "Unexpected end of query — the expression is incomplete",
 
   // UNION / JOIN / DISTINCT
-  incompleteUnion:      "Incomplete UNION — expected SELECT after UNION or UNION ALL",
-  incompleteJoinOn:     "Incomplete JOIN — expected a condition after ON",
-  incompleteDistinct:   "Incomplete SELECT — expected column names after DISTINCT",
+  incompleteUnion: "Incomplete UNION — expected SELECT after UNION or UNION ALL",
+  incompleteJoinOn: "Incomplete JOIN — expected a condition after ON",
+  incompleteDistinct: "Incomplete SELECT — expected column names after DISTINCT",
 
   // Unexpected token
-  missingWhere:     (col: string) => `Missing WHERE keyword — did you mean: … FROM … WHERE ${col} = …?`,
-  missingOperator:  (word: string) => `Missing operator before '${word}' — did you forget AND or OR?`,
-  unexpectedIdent:  (word: string) => `Unexpected '${word}' — did you forget AND, OR, or an operator?`,
-  badLikePattern:   "Invalid LIKE pattern — wrap the pattern in single quotes, e.g. LIKE '%value%'",
-  unexpectedClose:  "Unexpected closing parenthesis ) — check that every ( has a matching )",
-  unexpectedComma:  (line: number, col: number) => `Unexpected comma at line ${line}, column ${col} — check your column list or function arguments`,
-  generic:          (ch: string, line: number, col: number) => `Unexpected '${ch}' at line ${line}, column ${col}`,
+  missingWhere: (col: string) => `Missing WHERE keyword — did you mean: … FROM … WHERE ${col} = …?`,
+  missingOperator: (word: string) =>
+    `Missing operator before '${word}' — did you forget AND or OR?`,
+  unexpectedIdent: (word: string) =>
+    `Unexpected '${word}' — did you forget AND, OR, or an operator?`,
+  badLikePattern: "Invalid LIKE pattern — wrap the pattern in single quotes, e.g. LIKE '%value%'",
+  unexpectedClose: "Unexpected closing parenthesis ) — check that every ( has a matching )",
+  unexpectedComma: (line: number, col: number) =>
+    `Unexpected comma at line ${line}, column ${col} — check your column list or function arguments`,
+  generic: (ch: string, line: number, col: number) =>
+    `Unexpected '${ch}' at line ${line}, column ${col}`,
+
+  // Semantic / schema errors (returned by the backend, not caught client-side).
+  // These reference an identifier that we locate in the query text.
+  fieldNotFound: (field: string) =>
+    `Unknown field '${field}' — this column does not exist in the stream`,
+  functionNotFound: (fn: string) => `Unknown function '${fn}' — no such function is defined`,
+  incompatibleType: (field: string) =>
+    `Field '${field}' has an incompatible data type for this operation`,
+  streamNotFound: (stream: string) => `Unknown stream '${stream}' — this stream does not exist`,
+  groupByMissing: (col: string) =>
+    `'${col}' must appear in the GROUP BY clause or be used in an aggregate function`,
+  ambiguousColumn: (col: string) =>
+    `Column '${col}' is ambiguous — qualify it with its stream/table name`,
+  duplicateColumn: (col: string) =>
+    `Column '${col}' is defined more than once — remove or alias the duplicate`,
+  tableNotFound: (tbl: string) => `Unknown table '${tbl}' — this table or CTE does not exist`,
+  functionSignature: (fn: string) =>
+    `Function '${fn}' was called with the wrong argument type(s) — add an explicit cast`,
 } as const;
 
 // ─── Backward context scanner ─────────────────────────────────────────────────
@@ -117,10 +148,16 @@ function innermostConstruct(sql: string, offset: number): string {
       const q = ch;
       i++;
       while (i < text.length) {
-        if (text[i] === "\\") { i += 2; continue; }
+        if (text[i] === "\\") {
+          i += 2;
+          continue;
+        }
         if (text[i] === q) {
           i++;
-          if (text[i] === q) { i++; continue; } // doubled-quote escape: '' or ""
+          if (text[i] === q) {
+            i++;
+            continue;
+          } // doubled-quote escape: '' or ""
           break;
         }
         i++;
@@ -169,20 +206,32 @@ function innermostConstruct(sql: string, offset: number): string {
     } else if (tok === "END") {
       // close innermost CASE frame
       for (let s = stack.length - 1; s >= 0; s--) {
-        if (stack[s].kind.startsWith("CASE")) { stack.splice(s, 1); break; }
+        if (stack[s].kind.startsWith("CASE")) {
+          stack.splice(s, 1);
+          break;
+        }
       }
     } else if (tok === "WHEN") {
       // Update the innermost CASE frame to CASE_WHEN
       for (let s = stack.length - 1; s >= 0; s--) {
-        if (stack[s].kind.startsWith("CASE")) { stack[s].kind = "CASE_WHEN"; break; }
+        if (stack[s].kind.startsWith("CASE")) {
+          stack[s].kind = "CASE_WHEN";
+          break;
+        }
       }
     } else if (tok === "THEN") {
       for (let s = stack.length - 1; s >= 0; s--) {
-        if (stack[s].kind.startsWith("CASE")) { stack[s].kind = "CASE_THEN"; break; }
+        if (stack[s].kind.startsWith("CASE")) {
+          stack[s].kind = "CASE_THEN";
+          break;
+        }
       }
     } else if (tok === "ELSE") {
       for (let s = stack.length - 1; s >= 0; s--) {
-        if (stack[s].kind.startsWith("CASE")) { stack[s].kind = "CASE_ELSE"; break; }
+        if (stack[s].kind.startsWith("CASE")) {
+          stack[s].kind = "CASE_ELSE";
+          break;
+        }
       }
     } else if (tok === "(") {
       // Determine what kind of paren this is from the token before it
@@ -204,7 +253,10 @@ function innermostConstruct(sql: string, offset: number): string {
     } else if (tok === "PARTITION") {
       // Mark the innermost OVER frame
       for (let s = stack.length - 1; s >= 0; s--) {
-        if (stack[s].kind === "OVER") { stack[s].kind = "PARTITION"; break; }
+        if (stack[s].kind === "OVER") {
+          stack[s].kind = "PARTITION";
+          break;
+        }
       }
     }
   }
@@ -261,7 +313,8 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
 
   // ── EOF after OVER ( — expSize is moderate (PARTITION/ORDER/ROWS in expected) ─
   if (found === null && has(exp, "PARTITION", "ORDER", "ROWS") && !has(exp, "AND", "OR", "WHERE")) {
-    if (has(exp, "PARTITION")) return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
+    if (has(exp, "PARTITION"))
+      return "Incomplete OVER clause — expected PARTITION BY, ORDER BY, or closing )";
   }
 
   // ── EOF inside nested constructs (CASE/COALESCE/OVER/subquery/CTE) ──────────
@@ -296,7 +349,7 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
         // construct is "" or "PAREN" — scanner found no unclosed named construct.
         // Fall back to lastWord for keywords that produce large expSizes.
         const lw = lastWord();
-        if (lw === "ON")       return MSG.incompleteJoinOn;
+        if (lw === "ON") return MSG.incompleteJoinOn;
         if (lw === "DISTINCT") return MSG.incompleteDistinct;
         if (lw === "AND") {
           // Could be BETWEEN x AND <eof> — check for BETWEEN in the token stream
@@ -330,16 +383,36 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
       if (lw === "ORDER") return MSG.incompleteOrder;
       if (lw === "GROUP") return MSG.incompleteGroup;
       // Already have BY (e.g. "ORDER BY") — need a column
-      const prev2 = sql.substring(0, offset).trimEnd().split(/\s+/).slice(-2).map(t => t.toUpperCase());
+      const prev2 = sql
+        .substring(0, offset)
+        .trimEnd()
+        .split(/\s+/)
+        .slice(-2)
+        .map((t) => t.toUpperCase());
       if (prev2.includes("ORDER")) return MSG.incompleteOrderBy;
       if (prev2.includes("GROUP")) return MSG.incompleteGroupBy;
       return MSG.incompleteExpr;
     }
 
     // LIMIT/OFFSET incomplete: expected has number/sign tokens but no SQL keywords
-    if (!has(exp, "AND", "OR", "NOT", "BY", "WHERE", "HAVING", "FROM", "SELECT", "NULL", "TRUE", "FALSE")) {
+    if (
+      !has(
+        exp,
+        "AND",
+        "OR",
+        "NOT",
+        "BY",
+        "WHERE",
+        "HAVING",
+        "FROM",
+        "SELECT",
+        "NULL",
+        "TRUE",
+        "FALSE",
+      )
+    ) {
       const lw = lastWord();
-      if (lw === "LIMIT")  return MSG.incompleteLimit;
+      if (lw === "LIMIT") return MSG.incompleteLimit;
       if (lw === "OFFSET") return MSG.incompleteOffset;
     }
 
@@ -347,19 +420,25 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
     if (has(exp, "NOT", "NULL", "TRUE", "FALSE") && has(exp, "SELECT")) {
       const lw = lastWord();
       switch (lw) {
-        case "AND":    return MSG.incompleteAnd;
-        case "OR":     return MSG.incompleteOr;
-        case "NOT":    return MSG.incompleteNot;
-        case "WHERE":  return MSG.incompleteWhere;
-        case "HAVING": return MSG.incompleteHaving;
-        case "(":      return MSG.incompleteOpenParen;
+        case "AND":
+          return MSG.incompleteAnd;
+        case "OR":
+          return MSG.incompleteOr;
+        case "NOT":
+          return MSG.incompleteNot;
+        case "WHERE":
+          return MSG.incompleteWhere;
+        case "HAVING":
+          return MSG.incompleteHaving;
+        case "(":
+          return MSG.incompleteOpenParen;
         default: {
           const tokens = sql.substring(0, offset).trimEnd().split(/\s+/).filter(Boolean);
           const last = tokens[tokens.length - 1]?.replace(/^\(*/, "").toUpperCase() ?? "";
           const prev = tokens[tokens.length - 2]?.replace(/^\(*/, "").toUpperCase() ?? "";
           if (last === "BY" && prev === "GROUP") return MSG.incompleteGroupBy;
           if (last === "BY" && prev === "ORDER") return MSG.incompleteOrderBy;
-          if (last === "(" ) return MSG.incompleteOpenParen;
+          if (last === "(") return MSG.incompleteOpenParen;
           return MSG.incompleteExpr;
         }
       }
@@ -371,7 +450,7 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
       if (lw === "NOT") return MSG.incompleteNot;
       if (["LIKE", "ILIKE", "RLIKE"].includes(lw)) return MSG.incompleteLike;
       if (["=", "!=", "<>", "<", ">", "<=", ">="].includes(lw)) return MSG.incompleteComparison(lw);
-      if (lw === "IS")      return MSG.incompleteIs;
+      if (lw === "IS") return MSG.incompleteIs;
       if (lw === "BETWEEN") return MSG.incompleteBetween;
     }
 
@@ -412,9 +491,7 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
   // ── Unexpected token errors (found !== null) ────────────────────────────────
 
   // Extract full word at error position (PEG only gives first char in `found`)
-  const wordAtError =
-    sql.substring(offset).match(/^[a-zA-Z_$][a-zA-Z0-9_$]*/)?.[0] ??
-    found;
+  const wordAtError = sql.substring(offset).match(/^[a-zA-Z_$][a-zA-Z0-9_$]*/)?.[0] ?? found;
 
   // found "=" or an identifier/operator with WHERE in expected → missing WHERE keyword
   // Covers: "FROM t col = val" (found="=") and "FROM t col IS NULL" (found="I" for IS)
@@ -429,8 +506,7 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
     const isBareIdent = /^[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(tokenBefore);
     const atErrorStr = sql.substring(offset);
     const atErrorIsOperator =
-      /^[=<>!]/.test(found) ||
-      /^(IS|NOT|IN|LIKE|ILIKE|RLIKE|BETWEEN)\b/i.test(atErrorStr);
+      /^[=<>!]/.test(found) || /^(IS|NOT|IN|LIKE|ILIKE|RLIKE|BETWEEN)\b/i.test(atErrorStr);
     if (isBareIdent && atErrorIsOperator) {
       return MSG.missingWhere(tokenBefore);
     }
@@ -441,7 +517,9 @@ export function buildContextualSqlMessage(sql: string, err: any): string | null 
   if (/^[a-zA-Z_$]/.test(found) && has(exp, "AND", "OR")) {
     // Check char before error: if it ends a value (quote, digit, paren) → missing operator
     const charBeforeError = sql.substring(0, offset).trimEnd().slice(-1);
-    if (["'", '"', ")", "0","1","2","3","4","5","6","7","8","9"].includes(charBeforeError)) {
+    if (
+      ["'", '"', ")", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(charBeforeError)
+    ) {
       return MSG.missingOperator(wordAtError);
     }
     return MSG.unexpectedIdent(wordAtError);
@@ -533,7 +611,7 @@ export function isParserLimitation(err: any, sql?: string): boolean {
   // Fingerprint: found is a single letter or "[" with no AND/OR/closing-paren
   // in the literal set, and the text before the error matches the construct.
   if (err?.found != null && !expLits.has("AND") && !expLits.has("OR") && !expLits.has(")")) {
-    const offset: number = err?.location?.start?.offset ?? (sql?.length ?? 0);
+    const offset: number = err?.location?.start?.offset ?? sql?.length ?? 0;
     const textBefore = sql ? sql.substring(0, offset).trimEnd().toUpperCase() : "";
     if (
       err.found === "[" ||
@@ -631,7 +709,11 @@ export async function rangesFromSqlParserDetail(
     // Distinguish: re-parse and check if it throws at all.
     const parser = await getParser();
     let clientThrows = false;
-    try { parser.astify(originalSql); } catch { clientThrows = true; }
+    try {
+      parser.astify(originalSql);
+    } catch {
+      clientThrows = true;
+    }
     if (!clientThrows) return []; // case (a): client accepted — semantic error only
     // case (b): client rejected but suppressed — use server position + cleaned message
   }
@@ -669,4 +751,308 @@ export async function rangesFromServerMessage(
     : message.replace(/^Error#\s*/i, "").trim();
 
   return [{ startLine: 1, endLine: 1, column: 1, error: fallbackMsg }];
+}
+
+// ─── Semantic (schema) error support ──────────────────────────────────────────
+//
+// Backend search errors that reference an identifier (field/function/stream)
+// but carry NO line/column position. We extract the identifier from the error
+// text and locate every occurrence of it in the query so the editor can
+// squiggle the exact token(s). See src/infra/src/errors/{mod,grpc}.rs for the
+// message formats each code produces.
+
+/** One located token occurrence, in 1-based editor coordinates. */
+interface TokenHit {
+  line: number;
+  startCol: number;
+  /** Exclusive end column (Monaco-style: one past the last char). */
+  endCol: number;
+}
+
+/**
+ * Find every whole-token occurrence of `rawName` in `sql`, skipping string
+ * literals and comments. Matches bare identifiers (`error_id`) and quoted
+ * identifiers (`"error_id"`, `` `error_id` ``). Case-insensitive, since
+ * DataFusion folds identifiers to lower case.
+ *
+ * A double-quoted token is treated as an identifier (SQL semantics), not a
+ * string literal, so quoted field/stream names are still located.
+ */
+export function locateIdentifier(sql: string, rawName: string): TokenHit[] {
+  // Backend usually gives a bare name; guard against dotted (stream.field) forms.
+  const cleaned = rawName.replace(/[`"']/g, "").trim();
+  const name = cleaned.includes(".") ? cleaned.split(".").pop()! : cleaned;
+  if (!name) return [];
+  const target = name.toLowerCase();
+  const hits: TokenHit[] = [];
+
+  const n = sql.length;
+  let i = 0;
+  let line = 1;
+  let col = 1;
+
+  const advance = () => {
+    if (sql[i] === "\n") {
+      line++;
+      col = 1;
+    } else {
+      col++;
+    }
+    i++;
+  };
+
+  while (i < n) {
+    const ch = sql[i];
+
+    // Line comment
+    if (ch === "-" && sql[i + 1] === "-") {
+      while (i < n && sql[i] !== "\n") advance();
+      continue;
+    }
+    // Block comment
+    if (ch === "/" && sql[i + 1] === "*") {
+      advance();
+      advance();
+      while (i < n && !(sql[i] === "*" && sql[i + 1] === "/")) advance();
+      if (i < n) {
+        advance();
+        advance();
+      }
+      continue;
+    }
+    // Single-quoted string literal — never an identifier, skip.
+    if (ch === "'") {
+      advance();
+      while (i < n) {
+        if (sql[i] === "\\") {
+          advance();
+          advance();
+          continue;
+        }
+        if (sql[i] === "'") {
+          advance();
+          if (sql[i] === "'") {
+            advance();
+            continue;
+          } // '' escape
+          break;
+        }
+        advance();
+      }
+      continue;
+    }
+    // Double/backtick-quoted identifier — candidate match.
+    if (ch === '"' || ch === "`") {
+      const q = ch;
+      const startLine = line;
+      const startCol = col;
+      advance(); // opening quote
+      let inner = "";
+      while (i < n) {
+        if (sql[i] === q) {
+          advance();
+          if (sql[i] === q) {
+            inner += q;
+            advance();
+            continue;
+          } // "" escape
+          break;
+        }
+        inner += sql[i];
+        advance();
+      }
+      if (inner.toLowerCase() === target) {
+        hits.push({ line: startLine, startCol, endCol: col });
+      }
+      continue;
+    }
+    // Bare word token.
+    if (/[a-zA-Z_$]/.test(ch)) {
+      const startLine = line;
+      const startCol = col;
+      let word = "";
+      while (i < n && /[a-zA-Z0-9_$]/.test(sql[i])) {
+        word += sql[i];
+        advance();
+      }
+      if (word.toLowerCase() === target) {
+        hits.push({ line: startLine, startCol, endCol: col });
+      }
+      continue;
+    }
+    advance();
+  }
+
+  return hits;
+}
+
+/** Strip quotes/backticks and trailing punctuation from an extracted identifier. */
+function cleanIdent(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  // Strip quotes/backticks and any leading/trailing punctuation, but KEEP
+  // internal dots so a qualified name (schema.col) survives — locateIdentifier
+  // resolves it to its last segment when searching the query text.
+  const cleaned = raw
+    .replace(/[`"']/g, "")
+    .replace(/^[.,\s]+|[.,\s]+$/g, "")
+    .trim();
+  return cleaned || null;
+}
+
+/**
+ * Pull the offending identifier + a contextual message out of a server error.
+ *
+ * Code-agnostic by design: it sniffs the combined message/error_detail text for
+ * the backend's distinctive phrasings rather than dispatching on the 2000x code.
+ * Some callers (e.g. dashboards) only surface the HTTP status, not the business
+ * code, so relying on the code would silently miss those. The phrasings below
+ * are specific enough that false positives on unrelated errors (timeouts, rate
+ * limits) are very unlikely — those simply match nothing and return null.
+ *
+ * Ordered most-specific first. See src/infra/src/errors/{mod,grpc}.rs.
+ */
+function extractSemanticError(text: string): { field: string; message: string } | null {
+  // Field not found (20004): DataFusion "No field named X" or the wrapped
+  // "Search field not found: <field>. Field not found in stream schema."
+  const noField = cleanIdent(text.match(/No field named\s+`?([^`.\s,]+)`?/i)?.[1]);
+  if (noField) return { field: noField, message: MSG.fieldNotFound(noField) };
+  const fieldNotFound = cleanIdent(
+    text.match(/Search field not found:\s*([A-Za-z_$][\w$]*)/i)?.[1],
+  );
+  if (fieldNotFound) return { field: fieldNotFound, message: MSG.fieldNotFound(fieldNotFound) };
+
+  // Function not defined (20005): "Invalid function 'foo'" / "Search function
+  // not defined: foo".
+  const fn = cleanIdent(
+    text.match(/Invalid function\s+'?([A-Za-z_$][\w$]*)'?/i)?.[1] ??
+      text.match(/Search function not defined:\s*([A-Za-z_$][\w$]*)/i)?.[1],
+  );
+  if (fn) return { field: fn, message: MSG.functionNotFound(fn) };
+
+  // Incompatible data type (20007): DataFusion "for field <name>"; the backend
+  // also re-wraps it as "Search field has no compatible data type: field <name>".
+  const typeField = cleanIdent(
+    text.match(/for field\s+([A-Za-z_$][\w$]*)/i)?.[1] ??
+      text.match(/no compatible data type:\s*(?:field\s+)?([A-Za-z_$][\w$]*)/i)?.[1],
+  );
+  if (typeField) return { field: typeField, message: MSG.incompatibleType(typeField) };
+
+  // Stream not found (20002): "Search stream not found: <stream>".
+  const stream = cleanIdent(text.match(/Search stream not found:\s*([^\s,]+)/i)?.[1]);
+  if (stream) return { field: stream, message: MSG.streamNotFound(stream) };
+
+  // ── Execute / planning errors (20008) — free-text DataFusion strings ─────────
+
+  // GROUP BY: a selected column is neither grouped nor aggregated. DataFusion's
+  // wording is "Projection references non-aggregate values: Expression <col>
+  // could not be resolved …"; some versions/engines say "<col> must appear in
+  // the GROUP BY clause".
+  const groupBy = cleanIdent(
+    text.match(/Projection references non-aggregate values:\s*Expression\s+([\w$.]+)/i)?.[1] ??
+      text.match(/([\w$.]+)\s+must appear in the GROUP BY/i)?.[1],
+  );
+  if (groupBy) return { field: groupBy, message: MSG.groupByMissing(groupBy) };
+
+  // Ambiguous column: DataFusion says "… unqualified field name <col> which
+  // would be ambiguous" or "Ambiguous reference to (unqualified) field <col>".
+  // The trailing "<col> is ambiguous" form is kept for other engines.
+  const ambiguous = cleanIdent(
+    text.match(/unqualified field name\s+([\w$.]+)\s+which would be ambiguous/i)?.[1] ??
+      text.match(/Ambiguous reference to (?:unqualified )?field\s+([\w$.]+)/i)?.[1] ??
+      text.match(/(?:Column|Reference)\s+'?"?([\w$.]+)"?'?\s+is ambiguous/i)?.[1],
+  );
+  if (ambiguous) return { field: ambiguous, message: MSG.ambiguousColumn(ambiguous) };
+
+  // Duplicate column: "Schema contains duplicate (un)qualified field name <col>".
+  const duplicate = cleanIdent(
+    text.match(/duplicate (?:un)?qualified field name\s+([\w$.]+)/i)?.[1],
+  );
+  if (duplicate) return { field: duplicate, message: MSG.duplicateColumn(duplicate) };
+
+  // Table / CTE not found (JOINs & subqueries): "Table or CTE with name '<t>'
+  // not found" / "table '<t>' not found".
+  const table = cleanIdent(
+    text.match(/Table or CTE with name\s+'?([\w$.]+)'?\s+not found/i)?.[1] ??
+      text.match(/\btable\s+'([\w$.]+)'\s+not found/i)?.[1],
+  );
+  if (table) return { field: table, message: MSG.tableNotFound(table) };
+
+  // Function called with the wrong argument types (the function DOES exist):
+  // "No function matches the given name and argument types '<fn>(…)'".
+  const badFnArgs = cleanIdent(
+    text.match(/No function matches[^']*'([A-Za-z_$][\w$]*)\s*\(/i)?.[1],
+  );
+  if (badFnArgs) return { field: badFnArgs, message: MSG.functionSignature(badFnArgs) };
+
+  return null;
+}
+
+/**
+ * Unified server-error → editor ranges entry point. Handles ALL locatable
+ * search error codes. This is the single function response handlers should
+ * call; it dispatches to the right strategy:
+ *   • 20001 (syntax)   → sqlparser line/column (SQL mode) or reconstructed-SQL
+ *                        parse (non-SQL mode) — precise positions from the parser.
+ *   • 20002/4/5/7/8    → locate the offending identifier in the query text and
+ *                        squiggle every occurrence.
+ * Returns [] when the error carries nothing locatable (e.g. 20003 full-text
+ * field, timeouts, rate limits).
+ *
+ * @param query      The exact text in the editor (raw SQL, or the filter text
+ *                   in non-SQL mode). Used both to locate identifiers and to
+ *                   reconstruct SQL for the non-SQL syntax path.
+ * @param streamName Selected stream — only needed to wrap non-SQL filters.
+ */
+export async function rangesFromServerError(params: {
+  code?: number;
+  message?: I18nText;
+  errorDetail?: string;
+  sqlMode: boolean;
+  query?: string;
+  streamName?: string;
+}): Promise<SqlErrorRange[]> {
+  const { code, message = "", errorDetail = "", sqlMode, query = "", streamName } = params;
+
+  if (!query.trim()) return [];
+
+  const text = `${message} ${errorDetail}`;
+
+  // ── Syntax errors: defer to the parser-position extractors ──────────────────
+  // Code-agnostic: code 20001, or a message carrying the sqlparser location /
+  // ParserError signature (some callers surface only the HTTP status, not the
+  // 2000x business code). Falls through to the semantic path if it locates
+  // nothing (the client parser can't always reproduce the server's error).
+  const looksLikeSyntax =
+    code === 20001 ||
+    /at\s+Line:\s*\d+,\s*Column:\s*\d+/i.test(text) ||
+    /ParserError|sql parser error/i.test(text);
+  if (looksLikeSyntax) {
+    let syntaxRanges: SqlErrorRange[] = [];
+    if (sqlMode && (errorDetail || message)) {
+      syntaxRanges = await rangesFromSqlParserDetail(errorDetail || message, query);
+    } else if (!sqlMode && streamName) {
+      const prefix = `select * from "${streamName}" WHERE `;
+      syntaxRanges = await rangesFromServerMessage(
+        message || errorDetail || "",
+        prefix + query,
+        prefix.length,
+      );
+    }
+    if (syntaxRanges.length) return syntaxRanges;
+  }
+
+  // ── Semantic errors: locate the identifier the backend named ────────────────
+  const semantic = extractSemanticError(text);
+  if (!semantic) return [];
+
+  const hits = locateIdentifier(query, semantic.field);
+  if (!hits.length) return [];
+
+  return hits.map((h) => ({
+    startLine: h.line,
+    endLine: h.line,
+    column: h.startCol,
+    endColumn: h.endCol,
+    error: semantic.message,
+  }));
 }

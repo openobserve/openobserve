@@ -12,8 +12,7 @@
 export function isMacOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const source =
-    (navigator as { userAgentData?: { platform?: string } }).userAgentData
-      ?.platform ||
+    (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ||
     navigator.platform ||
     navigator.userAgent ||
     "";
@@ -27,7 +26,7 @@ const INPUT_ROLES = ["textbox", "combobox", "searchbox", "spinbutton"];
  * Returns true when the focused element is a text-input.
  * Single-letter shortcuts should guard with this to avoid firing while typing.
  *
- * Catches native inputs, any contentEditable element (CodeMirror, ProseMirror,
+ * Catches native inputs, any contentEditable element (ProseMirror,
  * RichTextInput, inline-editable table cells, etc.), and custom widgets that
  * expose an input-like ARIA role — regardless of which component built them.
  *
@@ -51,20 +50,18 @@ export function isInputFocused(target?: EventTarget | null): boolean {
  * attribute actually lands in the DOM:
  *  - O2 inputs (OInput/OSearchInput) put the real <input> at `${dataTest}-field`
  *  - otherwise the focusable element may be nested under the wrapper, or be the
- *    `data-test` element itself (raw input / CodeMirror `.cm-editor`).
+ *    `data-test` element itself (a raw input).
  * Tries the most reliable target first so a single `/` handler works everywhere.
  */
 export function focusSearchInput(dataTest: string): void {
   const target =
     document.querySelector<HTMLElement>(`[data-test="${dataTest}-field"]`) ??
     document.querySelector<HTMLElement>(
-      `[data-test="${dataTest}"] input, [data-test="${dataTest}"] textarea, [data-test="${dataTest}"] .cm-editor`,
+      `[data-test="${dataTest}"] input, [data-test="${dataTest}"] textarea`,
     ) ??
     (() => {
       const el = document.querySelector<HTMLElement>(`[data-test="${dataTest}"]`);
-      return el && el.matches("input, textarea, .cm-editor, [contenteditable]")
-        ? el
-        : null;
+      return el && el.matches("input, textarea, [contenteditable]") ? el : null;
     })();
   target?.focus();
 }

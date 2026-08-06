@@ -18,12 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     data-test="span-row-status-pill"
     type="spanStatus"
     :value="status || 'unset'"
-    :label="status || 'UNSET'"
-    class="tw:uppercase"
+    :label="raw(status || 'UNSET')"
+    class="uppercase"
   />
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 defineProps<{

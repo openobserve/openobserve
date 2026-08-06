@@ -15,15 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="field-values-panel-container" class="tw:py-2 tw:text-xs">
+  <div data-test="field-values-panel-container" class="py-2 text-xs">
     <!-- Value search input — only when fetched count hits the limit -->
-    <div v-if="showValueSearch" class="value-search-container tw:mb-1">
+    <div v-if="showValueSearch" class="value-search-container mb-1">
       <div class="value-search-input-wrap">
         <OSearchInput
           v-model="valueSearchTerm"
           clearable
           size="sm"
-          :placeholder="`Search ${fieldName} values…`"
+          :placeholder="t('common.searchValuesIn', { field: fieldName })"
           @clear="valueSearchTerm = ''"
         />
       </div>
@@ -32,23 +32,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Filter mode toggle + selection count -->
     <div
       v-if="showMultiSelect"
-      class="filter-mode-bar tw:flex tw:items-center tw:justify-between tw:px-2 tw:py-1 tw:border-b tw:border-(--o2-border-color)"
+      class="filter-mode-bar border-card-glass-border flex items-center justify-between border-b px-2 py-1"
       data-test="field-values-panel-filter-mode-bar"
     >
-      <div class="tw:flex tw:items-center tw:gap-1 ">
+      <div class="flex items-center gap-1">
         <span
           v-if="selectedValues.length > 0"
-          class="selection-count tw:text-3! tw:text-[0.625rem] tw:font-medium tw:text-[var(--o2-primary-color)]"
+          class="selection-count text-3! text-3xs text-accent font-medium"
           data-test="field-values-panel-selection-count"
         >
-          {{ selectedValues.length }} selected
+          {{ selectedValues.length }} {{ t("search.selectedLabel") }}
         </span>
-        <span v-else class="selection-hint  tw:text-3! tw:text-[0.625rem] tw:text-[var(--o2-text-secondary)]">Select to filter</span>
+        <span v-else class="selection-hint text-3! text-3xs text-text-secondary">{{
+          t("search.selectToFilter")
+        }}</span>
         <OButton
           v-if="selectedValues.length > 0"
           variant="ghost"
           size="icon"
-          title="Clear selection"
+          :title="t('search.clearSelection')"
           class="selection-clear-btn"
           @click="clearSelection"
           data-test="field-values-panel-clear-selection-btn"
@@ -57,32 +59,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="filter-mode-toggle tw:flex tw:border tw:border-[var(--o2-border-color)] tw:rounded tw:overflow-hidden"
+        class="filter-mode-toggle border-card-glass-border rounded-default flex overflow-hidden border"
         data-test="field-values-panel-filter-mode-toggle"
       >
         <OButton
           :variant="filterMode === 'include' ? 'primary' : 'ghost-muted'"
           size="icon-chip"
-          class="filter-mode-btn tw:rounded-none! tw:[transition:background_0.15s,color_0.15s]"
+          class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'include' && isModeToggleDisabled"
-          title="Include mode (=)"
+          :title="t('search.includeModeHint')"
           @click="setFilterMode('include')"
           data-test="field-values-panel-include-mode-btn"
         >
-          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
+          <!-- name="" → OIcon renders the slotted custom SVG -->
+          <OIcon name="" class="m-0.5! h-2.5! w-2.5!">
             <EqualIcon />
           </OIcon>
         </OButton>
         <OButton
           :variant="filterMode === 'exclude' ? 'destructive' : 'ghost-muted'"
           size="icon-chip"
-          class="filter-mode-btn tw:rounded-none! tw:[transition:background_0.15s,color_0.15s]"
+          class="filter-mode-btn rounded-none! [transition:background_0.15s,color_0.15s]"
           :disabled="filterMode !== 'exclude' && isModeToggleDisabled"
-          title="Exclude mode (≠)"
+          :title="t('search.excludeModeHint')"
           @click="setFilterMode('exclude')"
           data-test="field-values-panel-exclude-mode-btn"
         >
-          <OIcon class="tw:h-2.5! tw:w-2.5! tw:m-0.5!">
+          <OIcon name="" class="m-0.5! h-2.5! w-2.5!">
             <NotEqualIcon />
           </OIcon>
         </OButton>
@@ -90,17 +93,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Scrollable values area -->
-    <div class="tw:max-h-64 tw:overflow-y-auto">
+    <div class="max-h-64 overflow-y-auto">
       <!-- Loading state (only shown when there are no interim cached results) -->
-      <div
-        v-show="fieldValues?.isLoading && !displayValues.length"
-        class="tw:relative tw:pl-3 tw:py-1"
-        style="height: 3.75rem"
-      >
+      <div v-show="fieldValues?.isLoading && !displayValues.length" class="relative h-15 py-1 pl-3">
+        <!-- scrim off: this box is empty while loading, so there is nothing to
+             dim — and the scrim is 70% of surface-base (white), which on this
+             panel's grey surface just reads as a white block. -->
         <OInnerLoading
-          :showing="fieldValues?.isLoading && !displayValues.length"
-          label="Fetching values..."
+          :showing="!!fieldValues?.isLoading && !displayValues.length"
+          :label="t('search.fetchingValues')"
           size="xs"
+          :scrim="false"
           data-test="field-values-panel-loading-indicator"
         />
       </div>
@@ -108,13 +111,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- No values found -->
       <div
         v-show="!displayValues.length && !fieldValues?.isLoading"
-        class="tw:pl-3 tw:py-1 tw:text-sm tw:text-o2-text-secondary"
+        class="text-o2-text-secondary py-1 pl-3 text-sm"
         data-test="field-values-panel-no-values-msg"
       >
         <template v-if="fieldValues?.errMsg">{{ fieldValues.errMsg }}</template>
         <template v-else>
           {{ t("search.fieldValuesEmpty") }}
-          <span class="tw:block tw:text-xs tw:text-o2-text-muted tw:mt-0.5">
+          <span class="text-o2-text-muted mt-0.5 block text-xs">
             {{ t("search.fieldValuesEmptyHint") }}
           </span>
         </template>
@@ -122,21 +125,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Selected values with no count data available (synthetic fallback) -->
       <div
-        v-if="displayValues.length > 0 && (displayValues[0] as any)?.synthetic && !fieldValues?.isLoading"
-        class="tw:pl-3 tw:pb-1 tw:text-xs tw:text-o2-text-secondary tw:italic"
+        v-if="
+          displayValues.length > 0 &&
+          (displayValues[0] as any)?.synthetic &&
+          !fieldValues?.isLoading
+        "
+        class="text-o2-text-secondary pb-1 pl-3 text-xs italic"
         data-test="field-values-panel-no-count-msg"
       >
-        No data in range — values from active filter
+        {{ t("search.noDataInRangeHint") }}
       </div>
 
       <!-- Field values list -->
-      <ul
-        class="tw:flex tw:flex-col tw:m-0 tw:p-0 tw:list-none"
-        data-test="field-values-panel-values-list"
-      >
-        <li v-for="value in displayValues" :key="value.key" class="tw:py-1">
+      <ul class="m-0 flex list-none flex-col p-0" data-test="field-values-panel-values-list">
+        <li v-for="value in displayValues" :key="value.key" class="py-1">
           <label
-            class="tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-1 tw:cursor-pointer tw:hover:bg-muted/50"
+            class="hover:bg-muted/50 flex cursor-pointer items-center gap-1 px-2 py-1"
             :data-test="`logs-search-subfield-add-${fieldName}-${value.key}`"
           >
             <!-- Checkbox for multi-select — uses :model-value + @update to
@@ -148,30 +152,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :value="value.key"
               :color="filterMode === 'exclude' ? 'negative' : 'primary'"
               size="xs"
-              class="tw:shrink-0"
+              class="shrink-0"
               @update:model-value="handleUserCheckboxChange"
               @click.stop
             />
 
             <div
-              class="tw:flex tw:flex-row tw:flex-wrap tw:justify-between tw:min-w-0 tw:pl-1"
-              :style="
-                showMultiSelect ? 'width: calc(100% - 1.5rem)' : 'width: 100%'
-              "
+              class="flex min-w-0 flex-row flex-wrap justify-between pl-1"
+              :class="showMultiSelect ? 'w-[calc(100%-1.5rem)]' : 'w-full'"
             >
               <div
                 :title="value.key"
-                class="tw:truncate tw:pr-1 tw:text-field-list-label-text tw:text-3!"
-                style="width: calc(100% - 3.125rem)"
+                class="text-field-list-label-text text-3! w-[calc(100%-3.125rem)] truncate pr-1"
               >
                 {{ value.label ?? value.key }}
               </div>
               <div
                 v-if="value.count != null"
                 :title="String(value.count)"
-                class="tw:truncate tw:text-right tw:pr-0 tw:text-3!"
-                style="display: contents"
-                :style="showMultiSelect ? 'width: 3.125rem' : ''"
+                class="text-3! contents truncate pr-0 text-right"
+                :class="showMultiSelect ? 'w-[3.125rem]' : ''"
               >
                 {{ formatLargeNumber(value.count) }}
               </div>
@@ -184,16 +184,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- View more values / loading more indicator -->
     <div
       v-if="isLoadingMore || (fieldValues?.hasMore && !fieldValues?.isLoading)"
-      class="tw:w-full tw:flex tw:justify-center tw:border-t tw:border-(--o2-border-color) tw:pt-1 tw:px-1"
+      class="border-card-glass-border flex w-full justify-center border-t px-1 pt-1"
     >
       <button
-        class="tw:inline-flex tw:items-center tw:gap-1 tw:bg-transparent tw:border-0 tw:text-(--o2-primary-color) tw:text-[0.6875rem] tw:font-[inherit] tw:py-0.5 tw:px-1 tw:cursor-pointer tw:rounded-[0.1875rem] tw:transition-opacity tw:duration-150 tw:hover:opacity-80 tw:hover:bg-(--color-interactive-hover-bg) tw:disabled:opacity-50 tw:disabled:cursor-default"
+        class="text-accent text-2xs rounded-default hover:bg-interactive-hover-bg inline-flex cursor-pointer items-center gap-1 border-0 bg-transparent px-1 py-0.5 font-[inherit] transition-opacity duration-150 hover:opacity-80 disabled:cursor-default disabled:opacity-50"
         :disabled="isLoadingMore"
         @click="handleLoadMoreClick"
         :data-test="`log-search-subfield-load-more-${fieldName}`"
       >
         <OSpinner variant="dots" v-if="isLoadingMore" size="xs" />
-        <span v-else>View more values</span>
+        <span v-else>{{ t("search.viewMoreValues") }}</span>
       </button>
     </div>
   </div>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useDebounceFn, watchDebounced } from "@vueuse/core";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -212,6 +212,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import type { CheckboxModelValue } from "@/lib/forms/Checkbox/OCheckbox.types";
 
 interface FieldValues {
   isLoading: boolean;
@@ -230,7 +231,7 @@ interface Props {
   activeExcludeValues?: string[];
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<Props>(), {
   showMultiSelect: true,
@@ -239,11 +240,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "add-multiple-search-terms": [
-    fieldName: string,
-    values: string[],
-    action: string,
-  ];
+  "add-multiple-search-terms": [fieldName: string, values: string[], action: string];
   "remove-field-filter": [fieldName: string];
   "load-more-values": [fieldName: string];
   "search-field-values": [fieldName: string, searchTerm: string];
@@ -302,15 +299,9 @@ watch(
 // synthesise the selected values as items so the user can see and deselect them
 // instead of seeing a contradictory "N selected / No values found" state.
 const displayValues = computed(() => {
-  if (
-    props.fieldValues?.isLoading &&
-    valueSearchTerm.value &&
-    cachedValues.value.length
-  ) {
+  if (props.fieldValues?.isLoading && valueSearchTerm.value && cachedValues.value.length) {
     const term = valueSearchTerm.value.toLowerCase();
-    return cachedValues.value.filter((v) =>
-      String(v.key).toLowerCase().includes(term),
-    );
+    return cachedValues.value.filter((v) => String(v.key).toLowerCase().includes(term));
   }
 
   const apiValues = props.fieldValues?.values || [];
@@ -319,7 +310,13 @@ const displayValues = computed(() => {
   // No API values — fall back to synthetic entries for each selected value so
   // they remain visible and removable (count: null signals no data available).
   if (selectedValues.value.length > 0 && !props.fieldValues?.isLoading) {
-    return selectedValues.value.map((v) => ({ key: v, count: null as unknown as number, synthetic: true }));
+    return selectedValues.value.map(
+      (v): { key: string; count: number; label?: string; synthetic: boolean } => ({
+        key: v,
+        count: null as unknown as number,
+        synthetic: true,
+      }),
+    );
   }
 
   return [];
@@ -327,9 +324,7 @@ const displayValues = computed(() => {
 
 // Show search box whenever there are values to search.
 const showValueSearch = computed(
-  () =>
-    cachedValues.value.length > 0 ||
-    (props.fieldValues?.values?.length ?? 0) > 0,
+  () => cachedValues.value.length > 0 || (props.fieldValues?.values?.length ?? 0) > 0,
 );
 
 watchDebounced(
@@ -390,17 +385,14 @@ watch(
  * Immediately emits the updated selection with the current filter mode,
  * or emits remove-field-filter when all values are unchecked.
  */
-const handleUserCheckboxChange = (newValues: string[]) => {
+const handleUserCheckboxChange = (value: CheckboxModelValue) => {
+  // Array (group) mode: OCheckbox emits the current selection as primitives.
+  const newValues = Array.isArray(value) ? value.map(String) : [];
   selectedValues.value = newValues;
   if (newValues.length === 0) {
     emit("remove-field-filter", props.fieldName);
   } else {
-    emit(
-      "add-multiple-search-terms",
-      props.fieldName,
-      [...newValues],
-      filterMode.value,
-    );
+    emit("add-multiple-search-terms", props.fieldName, [...newValues], filterMode.value);
   }
 };
 
@@ -442,16 +434,6 @@ watch(
 );
 
 /**
- * Returns the Quasar colour token for a value's checkbox.
- * Excluded values (!=) render red ("negative") to visually distinguish them
- * from included values (=) which render the default blue ("primary").
- */
-const checkboxColor = (key: string): string => {
-  if (props.activeExcludeValues?.includes(key)) return "negative";
-  return "primary";
-};
-
-/**
  * Resets the panel to match the current active filter state.
  * Called by the parent (via defineExpose) when the expansion panel closes, so
  * stale user selections don't persist the next time the panel is opened.
@@ -460,8 +442,7 @@ const reset = () => {
   selectedValues.value = allActiveValues.value;
   valueSearchTerm.value = "";
   cachedValues.value = [];
-  filterMode.value =
-    (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
+  filterMode.value = (props.activeExcludeValues?.length ?? 0) > 0 ? "exclude" : "include";
   isLoadingMore.value = false;
 };
 

@@ -1,27 +1,35 @@
 <template>
-    <div v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'" data-test="license-period-container" class="tw:w-full tw:p-3 tw:border tw:border-[#D7D7D7] tw:rounded-md tw:[background:linear-gradient(to_right,transparent_60%,#f7f7ff_70%,#cdf7e4_100%)] tw:dark:[background:linear-gradient(to_right,transparent_60%,#24262F_70%,#2C3934_100%)] tw:dark:border-[#454F5B]">
-        <div class="tw:flex" >
-        <div class="tw:flex tw:flex-col">
-        <span data-test="license-period-message" class="tw:text-lg tw:font-semibold tw:leading-8">{{ getLicenseExpiryMessage() }}</span>
+  <div
+    v-if="showLicenseExpiryWarning && config.isEnterprise == 'true' && config.isCloud === 'false'"
+    data-test="license-period-container"
+    class="border-border-default rounded-default w-full border p-3 [background:var(--color-usage-banner-success-bg)]"
+  >
+    <div class="flex">
+      <div class="flex flex-col">
+        <span data-test="license-period-message" class="text-lg leading-8 font-semibold">{{
+          getLicenseExpiryMessage()
+        }}</span>
         <br />
-        <span data-test="license-period-subtitle" class="tw:text-base tw:font-normal tw:leading-5.5">Please update your license by contacting your administrator.</span>
-        </div>
-  </div>
+        <span data-test="license-period-subtitle" class="text-base leading-5.5 font-normal">{{
+          t("billing.licenseExpiryContactAdmin")
+        }}</span>
+      </div>
     </div>
+  </div>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue';
-import { useStore } from 'vuex';
-import { useRouter } from 'vue-router';
-import config from '@/aws-exports';
+import { computed, defineComponent } from "vue";
+import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
+import config from "@/aws-exports";
 
 export default defineComponent({
-  name: 'LicensePeriod',
-  emits: ['updateLicense'],
-  setup(emits) {
+  name: "LicensePeriod",
+  emits: ["updateLicense"],
+  setup() {
     const store = useStore();
-    const router = useRouter();
+    const { t } = useI18nTyped();
     const showLicenseExpiryWarning = computed(() => {
       if (!store.state.zoConfig.license_expiry) return false;
       const now = Date.now();
@@ -32,7 +40,7 @@ export default defineComponent({
     });
 
     const getLicenseExpiryMessage = () => {
-      if (!store.state.zoConfig.license_expiry) return '';
+      if (!store.state.zoConfig.license_expiry) return "";
       const now = Date.now();
       const expiryDate = store.state.zoConfig.license_expiry / 1000;
       const daysUntilExpiry = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
@@ -42,10 +50,11 @@ export default defineComponent({
       } else if (daysUntilExpiry === 1) {
         return `1 day remaining until your license expires`;
       } else {
-        return 'Your license has expired';
+        return "Your license has expired";
       }
     };
     return {
+      t,
       getLicenseExpiryMessage,
       showLicenseExpiryWarning,
       config,

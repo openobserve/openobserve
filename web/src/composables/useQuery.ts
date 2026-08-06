@@ -2,6 +2,7 @@ import { useStore } from "vuex";
 import useNotifications from "@/composables/useNotifications";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { onBeforeMount, onBeforeUnmount } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 
 interface BuildQueryPayload {
   from?: number;
@@ -140,7 +141,7 @@ const useQuery = () => {
     }
   };
 
-  const buildQueryPayload = (data: BuildQueryPayload) => {
+  const buildQueryPayload = (data: BuildQueryPayload, t: TranslateFn) => {
     try {
       const req: any = {
         query: {
@@ -153,17 +154,12 @@ const useQuery = () => {
         aggs: {
           histogram:
             "select histogram(" +
-            (data?.timestamp_column ||
-              store.state.zoConfig.timestamp_column ||
-              "_timestamp") +
+            (data?.timestamp_column || store.state.zoConfig.timestamp_column || "_timestamp") +
             ", '[INTERVAL]') AS zo_sql_key, count(*) AS zo_sql_num from query GROUP BY zo_sql_key ORDER BY zo_sql_key",
         },
       };
 
-      req.aggs.histogram = req.aggs.histogram.replaceAll(
-        "[INTERVAL]",
-        data.timeInterval,
-      );
+      req.aggs.histogram = req.aggs.histogram.replaceAll("[INTERVAL]", data.timeInterval);
 
       req.query.sql = req.query.sql.replaceAll(
         "[QUERY_FUNCTIONS]",
@@ -177,11 +173,9 @@ const useQuery = () => {
         data.parsedQuery?.whereClause || "",
       );
 
-      if (data?.timestamps?.startTime)
-        req.query.start_time = data.timestamps.startTime;
+      if (data?.timestamps?.startTime) req.query.start_time = data.timestamps.startTime;
 
-      if (data?.timestamps?.endTime)
-        req.query.end_time = data.timestamps.endTime;
+      if (data?.timestamps?.endTime) req.query.end_time = data.timestamps.endTime;
 
       if (store.state.zoConfig.sql_base64_enabled) {
         req["encoding"] = "base64";
@@ -193,7 +187,7 @@ const useQuery = () => {
 
       return req;
     } catch (e: any) {
-      showErrorNotification("Invalid SQL Syntax");
+      showErrorNotification(t("toastMessages.composables.invalidSqlSyntax"));
     }
   };
 

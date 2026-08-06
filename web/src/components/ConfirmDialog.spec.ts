@@ -19,7 +19,6 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport)
 // and so we can assert on the props the component forwards + emit
 // the click events the component listens to.
@@ -75,7 +74,7 @@ const ODialogStub = {
   `,
 };
 
-// Stub OBanner — the component ConfirmDialog uses OBanner (not q-banner).
+// Stub OBanner — the component ConfirmDialog uses OBanner (not a raw banner element).
 // Render it with role="alert" (matching OBanner's warning variant behaviour)
 // so tests can locate it semantically via role query.
 const OBannerStub = {

@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -49,7 +49,7 @@ const emit = defineEmits<{
   (e: "apply:template", name: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const title = computed(() => {
   switch (props.topic) {
@@ -197,10 +197,8 @@ const displayedVariables = computed(() => {
 });
 
 // Built-in variables the server actually substitutes (source of truth:
-// process_dest_template in src/service/alerts/alert.rs). Each has a one-line
+// process_dest_template in src/core/src/alerts/alert.rs). Each has a one-line
 // description shown on hover so the list teaches, not just lists.
-// NOTE: alert_agg_value is intentionally ABSENT — the UI elsewhere advertises
-// it but the server never substitutes it, so it would be sent as literal text.
 const builtInVars: { name: string; desc: string }[] = [
   { name: "org_name", desc: "Your organization name" },
   { name: "stream_type", desc: "Stream type (logs, metrics, traces)" },
@@ -211,6 +209,10 @@ const builtInVars: { name: string; desc: string }[] = [
   { name: "alert_operator", desc: "Threshold comparison operator (>, <, =)" },
   { name: "alert_threshold", desc: "The configured threshold value" },
   { name: "alert_count", desc: "Number of matching records" },
+  {
+    name: "alert_agg_value",
+    desc: "The evaluated aggregation value for the triggering group (empty when the alert has no aggregation value)",
+  },
   { name: "alert_description", desc: "The alert's description text" },
   { name: "alert_start_time", desc: "Window start time (ISO 8601)" },
   { name: "alert_end_time", desc: "Window end time (ISO 8601)" },
@@ -227,7 +229,7 @@ const builtInVars: { name: string; desc: string }[] = [
 const showBuiltIns = ref(false);
 
 function copyVar(name: string) {
-  copyToClipboard(`{${name}}`, { successMessage: `Copied {${name}}` });
+  copyToClipboard(`{${name}}`, t, { successMessage: `Copied {${name}}` });
 }
 
 defineExpose({ applyTemplate, previewTemplate });
@@ -245,26 +247,24 @@ defineExpose({ applyTemplate, previewTemplate });
       <!-- Legend (shown only when a non-empty preview is actually on screen, so
            the colored swatches always have something to explain). Readable in
            both themes. -->
-      <div
-        v-if="showLegend"
-        data-test="help-legend"
-        class="help-legend"
-      >
-        <span class="help-legend__title">{{
-          t("alerts.alertSettings.helpLegendTitle")
-        }}</span>
+      <div v-if="showLegend" data-test="help-legend" class="help-legend">
+        <span class="help-legend__title">{{ t("alerts.alertSettings.helpLegendTitle") }}</span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--live">High CPU</span>
+          <span class="help-legend__swatch help-legend__swatch--live">{{
+            t("alerts.alertSettings.helpLegendLiveExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendLive") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--sample">42</span>
+          <span class="help-legend__swatch help-legend__swatch--sample">{{
+            t("alerts.alertSettings.helpLegendSampleExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--opaque">{{ "{rows}" }}</span>
+          <span class="help-legend__swatch help-legend__swatch--opaque">{{ raw("{rows}") }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}
         </span>
@@ -302,10 +302,9 @@ defineExpose({ applyTemplate, previewTemplate });
             <pre
               v-if="currentSegments.length"
               class="preview-box"
-              ><template v-for="(s, i) in currentSegments" :key="i"
+            ><template v-for="(s, i) in currentSegments" :key="i"
                 ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-              ></pre
-            >
+              ></pre>
             <p v-else class="help-empty">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
@@ -334,10 +333,9 @@ defineExpose({ applyTemplate, previewTemplate });
                   v-if="d.segments.length"
                   data-test="help-destination-preview"
                   class="preview-box preview-box--nested"
-                  ><template v-for="(s, i) in d.segments" :key="i"
+                ><template v-for="(s, i) in d.segments" :key="i"
                     ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-                  ></pre
-                >
+                  ></pre>
                 <p v-else class="help-empty help-empty--sm">
                   {{ t("alerts.alertSettings.helpDestinationNoTemplate") }}
                 </p>
@@ -364,10 +362,9 @@ defineExpose({ applyTemplate, previewTemplate });
             <pre
               v-if="previewSegments.length"
               class="preview-box"
-              ><template v-for="(s, i) in previewSegments" :key="i"
+            ><template v-for="(s, i) in previewSegments" :key="i"
                 ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-              ></pre
-            >
+              ></pre>
             <p v-else class="help-empty">
               {{ t("alerts.alertSettings.helpCurrentBodyEmpty") }}
             </p>
@@ -443,9 +440,7 @@ defineExpose({ applyTemplate, previewTemplate });
           <p class="help-section__text help-section__text--mb">
             {{ t("alerts.alertSettings.helpVariablesExampleCaption") }}
           </p>
-          <pre class="preview-box">{{
-            t("alerts.alertSettings.helpVariablesExampleCode")
-          }}</pre>
+          <pre class="preview-box">{{ t("alerts.alertSettings.helpVariablesExampleCode") }}</pre>
           <span class="help-result-label">{{
             t("alerts.alertSettings.helpExampleResultLabel")
           }}</span>
@@ -466,10 +461,7 @@ defineExpose({ applyTemplate, previewTemplate });
             :aria-expanded="showBuiltIns"
             @click="showBuiltIns = !showBuiltIns"
           >
-            <OIcon
-              :name="showBuiltIns ? 'chevron-down' : 'chevron-right'"
-              size="sm"
-            />
+            <OIcon :name="showBuiltIns ? 'chevron-down' : 'chevron-right'" size="sm" />
             <span>{{ t("alerts.alertSettings.helpBuiltInHeading") }}</span>
           </button>
           <template v-if="showBuiltIns">
@@ -507,11 +499,7 @@ defineExpose({ applyTemplate, previewTemplate });
             </p>
           </template>
           <ul v-else class="help-var-list">
-            <li
-              v-for="cv in displayedVariables"
-              :key="cv.id"
-              class="help-var-row"
-            >
+            <li v-for="cv in displayedVariables" :key="cv.id" class="help-var-row">
               <span class="help-var-row__key">{{ "{" + cv.key + "}" }}</span>
               <span class="help-var-row__val">{{ cv.value }}</span>
             </li>
@@ -599,10 +587,9 @@ defineExpose({ applyTemplate, previewTemplate });
           <pre
             v-if="rowSegments.length"
             class="preview-box"
-            ><template v-for="(s, i) in rowSegments" :key="i"
+          ><template v-for="(s, i) in rowSegments" :key="i"
               ><span :class="segClass(s.kind)">{{ s.text }}</span></template
-            ></pre
-          >
+            ></pre>
           <p v-else class="help-empty" data-test="help-row-preview-empty">
             {{ t("alerts.alertSettings.helpRowTemplatePreviewEmpty") }}
           </p>
@@ -613,6 +600,11 @@ defineExpose({ applyTemplate, previewTemplate });
 </template>
 
 <style scoped lang="scss">
+/* keep(complex-state): the .seg-live/-sample/-opaque/-text segment styles are
+   applied by the computed segClass() mapper to the v-for'd preview segments —
+   a dynamic, per-kind class name the utility layer cannot inline — and the
+   legend / preview-box / destination-card BEM blocks cascade hover and kind
+   variants around them. All values already resolve to design tokens. */
 // Colors use the design-token layer defined in src/lib/styles/tokens/*.css
 // (--color-*, --radius-*) — the same theme-aware tokens the O* component
 // library consumes, with dark-mode overrides in tokens/dark.css.
@@ -623,7 +615,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 1.5rem;
   padding: 1.25rem;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   color: var(--color-text-body);
 }
 
@@ -636,9 +628,9 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
   background: var(--color-surface-subtle);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 
   &__title {
@@ -663,9 +655,9 @@ defineExpose({ applyTemplate, previewTemplate });
     flex-shrink: 0;
     min-width: 3.5rem;
     padding: 0.0625rem 0.375rem;
-    border-radius: var(--radius-sm);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.6875rem;
+    border-radius: var(--radius-default);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
     line-height: 1.4;
     text-align: center;
   }
@@ -694,7 +686,7 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
 
   &__title {
-    font-size: 0.9375rem;
+    font-size: var(--text-sm);
     font-weight: 600;
     color: var(--color-text-heading);
     margin: 0 0 0.5rem;
@@ -712,7 +704,7 @@ defineExpose({ applyTemplate, previewTemplate });
 
   &__hint {
     color: var(--color-text-secondary);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     margin: 0.5rem 0 0;
 
     &--top {
@@ -731,7 +723,7 @@ defineExpose({ applyTemplate, previewTemplate });
   background: transparent;
   border: none;
   cursor: pointer;
-  font-size: 0.9375rem;
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text-heading);
 
@@ -745,7 +737,7 @@ defineExpose({ applyTemplate, previewTemplate });
 .help-result-label {
   display: block;
   margin: 0.625rem 0 0.25rem;
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.03em;
@@ -753,7 +745,7 @@ defineExpose({ applyTemplate, previewTemplate });
 }
 
 .preview-box--result {
-  border-left: 2px solid var(--color-primary-500);
+  border-left: 0.125rem solid var(--color-primary-500);
 }
 
 .help-empty {
@@ -764,7 +756,7 @@ defineExpose({ applyTemplate, previewTemplate });
   margin: 0;
 
   &--sm {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
   }
 }
 
@@ -781,7 +773,7 @@ defineExpose({ applyTemplate, previewTemplate });
   align-items: center;
   gap: 0.5rem;
   margin: 0.5rem 0 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-compact);
   color: var(--color-text-secondary);
 }
 
@@ -792,7 +784,7 @@ defineExpose({ applyTemplate, previewTemplate });
   gap: 0.375rem;
 
   &__label {
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -812,8 +804,8 @@ defineExpose({ applyTemplate, previewTemplate });
     gap: 0.375rem;
     padding: 0.75rem;
     border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-lg);
-    border-left-width: 2px;
+    border-radius: var(--radius-surface);
+    border-left-width: 0.125rem;
 
     &--bad {
       border-left-color: var(--color-warning-500);
@@ -824,7 +816,7 @@ defineExpose({ applyTemplate, previewTemplate });
   }
 
   &__label {
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
@@ -832,7 +824,7 @@ defineExpose({ applyTemplate, previewTemplate });
   }
   &__desc {
     margin: 0;
-    font-size: 0.8125rem;
+    font-size: var(--text-compact);
     color: var(--color-text-secondary);
     line-height: 1.45;
   }
@@ -863,7 +855,7 @@ defineExpose({ applyTemplate, previewTemplate });
   gap: 0.5rem;
   padding: 0.75rem;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   background: var(--color-surface-base);
 
   &__head {
@@ -877,7 +869,7 @@ defineExpose({ applyTemplate, previewTemplate });
     color: var(--color-text-heading);
   }
   &__tpl {
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--color-text-muted);
   }
 }
@@ -892,10 +884,10 @@ defineExpose({ applyTemplate, previewTemplate });
 .help-chip {
   padding: 0.25rem 0.5rem;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
   background: transparent;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   color: var(--color-text-code);
   cursor: pointer;
   transition: background 0.2s ease;
@@ -921,11 +913,11 @@ defineExpose({ applyTemplate, previewTemplate });
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--color-border-default);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-default);
 
   &__key {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
     color: var(--color-text-code);
   }
   &__val {
@@ -937,12 +929,12 @@ defineExpose({ applyTemplate, previewTemplate });
 .preview-box {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
   line-height: 1.6;
   margin: 0;
   padding: 0.75rem;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-surface);
   border: 1px solid var(--color-border-default);
   background: var(--color-surface-subtle);
   color: var(--color-text-body);
@@ -969,7 +961,7 @@ defineExpose({ applyTemplate, previewTemplate });
 // previous version put faint text on a near-same gray and was unreadable.
 .seg-opaque {
   padding: 0 0.25rem;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-default);
   background: var(--color-surface-subtle-hover);
   color: var(--color-text-body);
 }

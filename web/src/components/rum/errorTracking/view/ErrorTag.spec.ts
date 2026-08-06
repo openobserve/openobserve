@@ -69,7 +69,6 @@ describe("ErrorTag Component", () => {
     expect(wrapper.text()).toContain("web-application");
   });
 
-
   it("shows updated key text when tag prop changes", async () => {
     // Arrange
     const newTag = { key: "error_type", value: "TypeError" };

@@ -66,6 +66,26 @@ async function ingestSingleLog(page, streamName, fieldName, fieldValue, maxRetri
   }
 }
 
+// Wrap a page.request API call with retry tolerance for transient cloud-network
+// failures (e.g. "apiRequestContext.post: Connection timeout" / ECONNRESET on the
+// shared cloud gateway). Only retries genuine connection/timeout errors — a real
+// HTTP error response still surfaces via the caller's res.ok() check. Prevents a
+// single network blip from failing an expensive @slow flow (previously only
+// recovered by a full, minutes-long test-level retry).
+async function requestWithRetry(page, action, label, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await action();
+    } catch (err) {
+      const msg = (err && err.message) || String(err);
+      const retriable = /Connection timeout|ECONNRESET|ECONNREFUSED|socket hang up|Request timed out|net::|timeout/i.test(msg);
+      if (!retriable || attempt === maxRetries) throw err;
+      testLogger.warn(`${label} failed (attempt ${attempt}/${maxRetries}): ${msg} — retrying`);
+      await page.waitForTimeout(attempt * 2000);
+    }
+  }
+}
+
 test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -109,10 +129,14 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     const allPatternsToCreate = [...queryTimePatterns, ...ingestionTimePatterns];
 
     for (const patternDef of allPatternsToCreate) {
-      const res = await page.request.post(`${baseUrl}/api/${org}/re_patterns`, {
-        headers,
-        data: { name: patternDef.name, description: patternDef.description, pattern: patternDef.pattern }
-      });
+      const res = await requestWithRetry(
+        page,
+        () => page.request.post(`${baseUrl}/api/${org}/re_patterns`, {
+          headers,
+          data: { name: patternDef.name, description: patternDef.description, pattern: patternDef.pattern }
+        }),
+        `create pattern ${patternDef.name}`
+      );
       if (!res.ok()) {
         const body = await res.text();
         throw new Error(`Failed to create pattern ${patternDef.name}: ${res.status()} ${body}`);
@@ -121,7 +145,11 @@ test.describe("Multiple Patterns on One Field", { tag: '@enterprise' }, () => {
     }
 
     // Verify all patterns exist
-    const listRes = await page.request.get(`${baseUrl}/api/${org}/re_patterns`, { headers });
+    const listRes = await requestWithRetry(
+      page,
+      () => page.request.get(`${baseUrl}/api/${org}/re_patterns`, { headers }),
+      'list patterns'
+    );
     const listData = await listRes.json();
     const existingNames = new Set((listData.patterns || []).map(p => p.name));
     for (const p of allPatternsToCreate) {

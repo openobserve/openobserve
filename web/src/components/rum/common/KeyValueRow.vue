@@ -16,28 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
-    :class="[
-      showBorder
-        ? 'tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]'
-        : '',
-    ]"
+    class="flex px-1.5 py-1 text-xs"
+    :class="[showBorder ? 'border-card-glass-border border-b border-solid' : '']"
     :data-test="dataTest"
   >
-    <div
-      class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-    >
-      {{ label }}:
-    </div>
-    <div class="tw:flex-1 tw:break-words" :class="valueClass">
+    <div class="text-text-secondary w-25 shrink-0 font-medium">{{ label }}:</div>
+    <div class="flex-1 break-words" :class="valueClass">
       <slot>{{ value }}</slot>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 interface Props {
-  label: string;
+  label: I18nText;
   value?: string | number;
   showBorder?: boolean;
   valueClass?: string;

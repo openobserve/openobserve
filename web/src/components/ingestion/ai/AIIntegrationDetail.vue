@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import useIngestion from "@/composables/useIngestion";
@@ -33,6 +34,7 @@ const props = defineProps<{
   integrationSlug: string;
 }>();
 
+const { t } = useI18nTyped();
 const store = useStore();
 const { aiContent, endpoint } = useIngestion();
 
@@ -45,10 +47,6 @@ const integration = computed<AIIntegration | undefined>(() =>
 );
 
 const docURL = computed(() => integration.value?.docURL ?? "");
-const displayName = computed(
-  () => integration.value?.name ?? props.integrationSlug,
-);
-
 // Rich card markdown sourced from o2-datasource (if this integration has it),
 // otherwise fall back to the legacy 3-line snippet + doc link.
 const cardContent = computed(() =>
@@ -72,15 +70,12 @@ const subs = computed<CardSubstitutions>(() => {
 // Rich, stepped setup card for integrations that have it (registry-driven, keyed
 // by content slug — e.g. "anthropic"). Falls back to the markdown card otherwise.
 const richContent = computed(() =>
-  getRichCardContent(
-    integration.value?.contentSlug ?? integration.value?.slug,
-    subs.value,
-  ),
+  getRichCardContent(integration.value?.contentSlug ?? integration.value?.slug, subs.value),
 );
 </script>
 
 <template>
-  <div v-if="integration" class="tw:p-2">
+  <div v-if="integration" class="p-2">
     <AIRichSetupCard
       v-if="richContent"
       :key="integrationSlug"
@@ -89,28 +84,24 @@ const richContent = computed(() =>
       :logo-url="integration.logo"
       :logo-url-dark="integration.logoDark"
     />
-    <AIIntegrationCard
-      v-else-if="cardContent"
-      :content="cardContent"
-      :doc-url="docURL"
-    />
-    <div v-else class="tw:text-[16px]">
-      <CopyContent :content="aiContent" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Click
+    <AIIntegrationCard v-else-if="cardContent" :content="raw(cardContent)" :doc-url="docURL" />
+    <div v-else class="text-base">
+      <CopyContent :content="raw(aiContent)" />
+      <div class="pt-6 pb-2 font-bold">
+        {{ t("ingestion.ai.viewDocsPrefix") }}
         <a
           :href="safeHttpUrl(docURL)"
           target="_blank"
           rel="noopener noreferrer"
-          class="text-blue-500 hover:text-blue-600"
+          class="text-text-link hover:text-text-link-hover"
           style="text-decoration: underline"
-          >here</a
+          >{{ t("ingestion.ai.viewDocsLinkLabel") }}</a
         >
-        to check further documentation.
+        {{ t("ingestion.ai.viewDocsSuffix") }}
       </div>
     </div>
   </div>
-  <div v-else class="tw:p-2">
-    <p>Select an integration to view details.</p>
+  <div v-else class="p-2">
+    <p>{{ t("ingestion.ai.selectIntegrationPrompt") }}</p>
   </div>
 </template>

@@ -127,15 +127,16 @@ export function extractCorrelationFilters(
 
   // Match field = 'value' where value may contain SQL-escaped single quotes ('')
   const conditionRegex = /(\w+)\s*=\s*'((?:[^']|'')*)'/gi;
-  let m;
+  let m: RegExpExecArray | null;
   while ((m = conditionRegex.exec(whereClause)) !== null) {
-    if (trackedSet.has(m[1])) {
+    const field = m[1];
+    if (trackedSet.has(field)) {
       const value = m[2].replace(/''/g, "'");
-      const existing = filters.findIndex((f) => f.field === m[1]);
+      const existing = filters.findIndex((f) => f.field === field);
       if (existing >= 0) {
         filters[existing].value = value;
       } else {
-        filters.push({ field: m[1], value });
+        filters.push({ field, value });
       }
     }
   }
@@ -151,10 +152,7 @@ export function saveCorrelationFilters(
 ): void {
   if (!orgId || !streamType || !streamName || !filters.length) return;
 
-  localStorage.setItem(
-    storageKey(orgId, streamType, streamName),
-    JSON.stringify(filters),
-  );
+  localStorage.setItem(storageKey(orgId, streamType, streamName), JSON.stringify(filters));
 }
 
 export function loadCorrelationFilters(
@@ -173,9 +171,7 @@ export function loadCorrelationFilters(
 
 export function buildCorrelationWhereClause(filters: SavedFilter[]): string {
   if (!filters.length) return "";
-  return filters
-    .map((f) => `${f.field} = '${f.value.replace(/'/g, "''")}'`)
-    .join(" AND ");
+  return filters.map((f) => `${f.field} = '${f.value.replace(/'/g, "''")}'`).join(" AND ");
 }
 
 export function clearCorrelationFilters(

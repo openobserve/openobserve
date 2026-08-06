@@ -91,7 +91,7 @@ export default class DashboardImport {
       // Tab might already be active, continue
     }
 
-    // Quasar's q-file renders the underlying input as hidden — wait for
+    // The file control renders the underlying input as hidden — wait for
     // `attached` (not visible) since setInputFiles works on hidden inputs.
     await this.inputFile.waitFor({ state: "attached", timeout: 20000 });
 
@@ -315,7 +315,7 @@ export default class DashboardImport {
     }
   }
 
-  // Assert the "File(s) Failed to Import" toast AND the per-file rejected
+  // Assert the "{n} File(s) Failed to Import" toast AND the per-file rejected
   // span both contain expected text. The per-file rejected span is rendered
   // by Vue on the next tick after the toast notification — wait for the
   // wrapper container before asserting its child text.

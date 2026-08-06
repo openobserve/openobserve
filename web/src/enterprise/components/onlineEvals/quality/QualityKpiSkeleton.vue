@@ -1,80 +1,34 @@
 <template>
-  <div
-    class="tw:grid tw:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] tw:gap-[10px]"
-    :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
-  >
+  <!-- Same KpiCardRow grid and the same card padding/background as the real
+       QualityKpiCard, so the tiles don't resize or change colour on load. -->
+  <KpiCardRow>
     <div
       v-for="n in count"
       :key="n"
-      class="tw:pt-3 tw:px-3.5 tw:pb-2.5 tw:bg-(--tile-bg) tw:border tw:border-(--tile-border) tw:rounded-md tw:flex tw:flex-col tw:gap-2 tw:min-h-24"
-      :class="store.state.theme === 'dark' ? 'dark-tile-content' : 'light-tile-content'"
+      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-2 border px-3.5 py-2.5"
       data-test="quality-kpi-skeleton"
     >
-      <SkeletonBox width="55%" height="11px" rounded />
-      <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-        <SkeletonBox width="50%" height="22px" rounded />
-        <SkeletonBox width="22%" height="11px" rounded />
+      <OSkeleton type="text" class="h-2.75 w-[55%]" />
+      <div class="flex items-baseline justify-between gap-2">
+        <OSkeleton type="text" class="h-5.5 w-[50%]" />
+        <OSkeleton type="text" class="h-2.75 w-[22%]" />
       </div>
-      <div class="tw:flex tw:items-end tw:gap-[3px] tw:h-[28px] tw:mt-auto">
-        <SkeletonBox
+      <div class="mt-auto flex h-7 items-end gap-0.75">
+        <OSkeleton
+          type="text"
           v-for="bar in 14"
           :key="bar"
-          width="100%"
-          :height="`${30 + ((bar * 23) % 65)}%`"
-          rounded
+          :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
+          class="w-full"
         />
       </div>
     </div>
-  </div>
+  </KpiCardRow>
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
 
 withDefaults(defineProps<{ count?: number }>(), { count: 5 });
-
-const store = useStore();
 </script>
-
-<style>
-.dark-tile-content {
-  --tile-bg: #2b2c2d;
-  --tile-border: #444444;
-}
-
-.light-tile-content {
-  --tile-bg: #ffffff;
-  --tile-border: #e7eaee;
-}
-
-.skeleton-box {
-  position: relative;
-  overflow: hidden;
-  background-size: 200% 100%;
-  animation: qkpi-skel-wave 1.5s ease-in-out infinite;
-}
-
-.light-tile-content .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    rgba(0, 0, 0, 0.04),
-    rgba(0, 0, 0, 0.1),
-    rgba(0, 0, 0, 0.04)
-  );
-}
-
-.dark-tile-content .skeleton-box {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04),
-    rgba(255, 255, 255, 0.12),
-    rgba(255, 255, 255, 0.04)
-  );
-}
-
-@keyframes qkpi-skel-wave {
-  0%   { background-position: -200% 0; }
-  100% { background-position:  200% 0; }
-}
-</style>

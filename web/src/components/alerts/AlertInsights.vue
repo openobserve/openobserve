@@ -15,170 +15,139 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="tw:px-[0.625rem] tw:py-[0.1rem]">
-      <div class="card-container tw:mb-[0.625rem]">
-        <!-- Header -->
-        <div
-          class="tw:flex tw:justify-between tw:items-center tw:px-2 tw:py-2"
-        >
-          <div class="tw:flex tw:items-center">
-            <OButton
-              variant="outline"
-              size="icon-sm"
-              class="hideOnPrintMode el-border"
-              @click="goBack"
-              data-test="alert-insights-back-btn"
-            >
-              <OIcon name="arrow-back-ios-new" size="sm" />
-            </OButton>
-            <div class="tw:text-xl tw:tracking-[0.005em] tw:font-[600] tw:ml-2">{{ t("alerts.insights.title") }}</div>
-          </div>
+  <OPageLayout
+    :title="t('alerts.insights.title')"
+    :back="{ label: t('menu.alerts'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    tabs-below
+    bleed
+  >
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: timeRange.__global.start_time.getTime(),
+          endTime: timeRange.__global.end_time.getTime(),
+        }"
+        :default-relative-time="relativeTime"
+        @on:date-change="updateDateTime"
+        @on:timezone-change="updateTimezone"
+        data-test="alert-insights-datetime"
+      />
 
-          <div class="tw:flex tw:items-center">
-            <date-time
-              ref="dateTimeRef"
-              auto-apply
-              :default-type="dateTimeType"
-              :default-absolute-time="{
-                startTime: timeRange.__global.start_time.getTime(),
-                endTime: timeRange.__global.end_time.getTime(),
-              }"
-              :default-relative-time="relativeTime"
-              @on:date-change="updateDateTime"
-              @on:timezone-change="updateTimezone"
-              class="tw:mr-2"
-              data-test="alert-insights-datetime"
-            />
+      <OButton
+        @click="refreshDashboard"
+        :loading="isLoading"
+        variant="ghost"
+        size="icon-sm"
+        data-test="alert-insights-refresh-btn"
+      >
+        <OIcon name="refresh" size="sm" />
+        <OTooltip :content="t('common.refresh')" />
+      </OButton>
+    </template>
 
-            <OButton
-              @click="refreshDashboard"
-              :loading="isLoading"
-              variant="ghost"
-              size="icon-sm"
-              class="tw:mr-1 el-border"
-              data-test="alert-insights-refresh-btn"
-            >
-              <OIcon name="refresh" size="sm" />
-              <OTooltip :content="t('common.refresh')" />
-            </OButton>
-          </div>
-        </div>
+    <template #header-tabs>
+      <OTabs v-model="currentTab" dense align="left" data-test="alert-insights-tabs">
+        <OTab
+          name="overview"
+          :label="t('alerts.insights.tabs.overview')"
+          data-test="tab-overview"
+        />
+        <OTab
+          v-if="isEnterprise"
+          name="frequency"
+          :label="t('alerts.insights.tabs.frequency')"
+          data-test="tab-frequency"
+        />
+        <OTab
+          v-if="isEnterprise"
+          name="correlation"
+          :label="t('alerts.insights.tabs.correlation')"
+          data-test="tab-correlation"
+        />
+        <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+      </OTabs>
+    </template>
 
-        <!-- Tabs -->
-        <OTabs
-          v-model="currentTab"
-          dense
-          class="alert-insights-tabs tw:ml-2"
-          align="left"
-          data-test="alert-insights-tabs"
-        >
-          <OTab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
-          <OTab
-            v-if="isEnterprise"
-            name="frequency"
-            :label="t('alerts.insights.tabs.frequency')"
-            data-test="tab-frequency"
-          />
-          <OTab
-            v-if="isEnterprise"
-            name="correlation"
-            :label="t('alerts.insights.tabs.correlation')"
-            data-test="tab-correlation"
-          />
-          <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
-        </OTabs>
+    <!-- Filters Section -->
+    <div
+      v-if="show"
+      class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-3"
+    >
+      <span class="relative top-1 text-sm font-semibold">{{ t("common.filters") }}:</span>
 
-        <!-- Filters Section -->
-        <div
-          v-if="show"
-          class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:px-4 tw:py-3 tw:border-b tw:border-(--q-border-color)"
-        >
-          <span class="tw:text-sm tw:font-semibold tw:relative tw:top-1">{{ t("common.filters") }}:</span>
+      <!-- Failed Only Toggle -->
+      <OSwitch
+        v-model="showFailedOnly"
+        :label="t('alerts.insights.filters.failedOnly')"
+        class="o2-toggle-button-sm"
+        @update:model-value="onFilterChange"
+        data-test="failed-only-toggle"
+      >
+        <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')"> </OTooltip>
+      </OSwitch>
 
-          <!-- Failed Only Toggle -->
-          <OSwitch
-          v-model="showFailedOnly"
-          :label="t('alerts.insights.filters.failedOnly')"
-          class="o2-toggle-button-sm"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-          @update:model-value="onFilterChange"
-          data-test="failed-only-toggle"
-          >
-          <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')">
-          </OTooltip>
-        </OSwitch>
+      <!-- Silenced Only Toggle -->
+      <OSwitch
+        v-model="showSilencedOnly"
+        :label="t('alerts.insights.filters.silenced')"
+        class="o2-toggle-button-sm"
+        @update:model-value="onFilterChange"
+        data-test="silenced-only-toggle"
+      >
+        <OTooltip :content="t('alerts.insights.filters.silencedTooltip')"> </OTooltip>
+      </OSwitch>
 
-          <!-- Silenced Only Toggle -->
-          <OSwitch
-          v-model="showSilencedOnly"
-          :label="t('alerts.insights.filters.silenced')"
-          class="o2-toggle-button-sm"
-          :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-          @update:model-value="onFilterChange"
-          data-test="silenced-only-toggle"
-          >
-          <OTooltip :content="t('alerts.insights.filters.silencedTooltip')">
-          </OTooltip>
-            </OSwitch>
-
-          <!-- Range Filter Chips -->
-          <div
-            v-for="[panelId, filter] in rangeFilters"
-            :key="panelId"
-            class="tw:inline-flex tw:items-center tw:rounded tw:py-1 tw:px-3 tw:text-sm tw:cursor-default"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tw:bg-indigo-900 tw:text-indigo-100'
-                : 'tw:bg-blue-100 tw:text-blue-800'
-            "
-            data-test="range-filter-chip"
-          >
-            <span class="chip-label">
-              {{ filter.panelTitle }}
-              <span v-if="filter.start !== null && filter.end !== null">
-                {{ formatFilterValue(filter.start) }} -
-                {{ formatFilterValue(filter.end) }}
-              </span>
-              <span v-else-if="filter.start !== null">
-                >= {{ formatFilterValue(filter.start) }}
-              </span>
-              <span v-else-if="filter.end !== null">
-                <= {{ formatFilterValue(filter.end) }}
-              </span>
-            </span>
-            <OIcon
-              name="close" size="sm"
-              class="tw:cursor-pointer tw:text-sm tw:ml-2 tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100"
-              @click="removeRangeFilter(panelId)"
-            />
-          </div>
-
-          <!-- Clear All Filters -->
-          <OButton
-            v-if="hasActiveFilters"
-            variant="ghost"
-            size="sm"
-            class="tw:ml-2"
-            @click="clearAllFilters"
-            data-test="clear-all-filters-btn"
-            icon-left="close"
-          >
-            {{ t('alerts.insights.filters.clearAll') }}
-          </OButton>
-        </div>
+      <!-- Range Filter Chips -->
+      <div
+        v-for="[panelId, filter] in rangeFilters"
+        :key="panelId"
+        class="rounded-default bg-status-info-bg text-status-info-text inline-flex cursor-default items-center px-3 py-1 text-sm"
+        data-test="range-filter-chip"
+      >
+        <span class="chip-label">
+          {{ filter.panelTitle }}
+          <span v-if="filter.start !== null && filter.end !== null">
+            {{ formatFilterValue(filter.start) }} -
+            {{ formatFilterValue(filter.end) }}
+          </span>
+          <span v-else-if="filter.start !== null"> >= {{ formatFilterValue(filter.start) }} </span>
+          <span v-else-if="filter.end !== null"> &lt;= {{ formatFilterValue(filter.end) }} </span>
+        </span>
+        <OIcon
+          name="close"
+          size="sm"
+          class="ml-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
+          @click="removeRangeFilter(panelId)"
+        />
       </div>
+
+      <!-- Clear All Filters -->
+      <OButton
+        v-if="hasActiveFilters"
+        variant="ghost"
+        size="sm"
+        class="ml-2"
+        @click="clearAllFilters"
+        data-test="clear-all-filters-btn"
+        icon-left="close"
+      >
+        {{ t("alerts.insights.filters.clearAll") }}
+      </OButton>
     </div>
 
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center tw:px-4 tw:py-3 tw:gap-3 tw:border-b tw:border-(--q-border-color)"
+      class="bg-primary bg-opacity-10 border-border-default flex shrink-0 items-center gap-3 border-b px-4 py-3"
       data-test="action-buttons-row"
     >
       <OIcon name="campaign" size="sm" />
-      <span class="tw:text-sm tw:font-medium"
-        >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
+      <span class="text-sm font-medium"
+        >{{ t("alerts.insights.actions.actionsFor") }}
+        <strong>{{ selectedAlertForAction }}</strong></span
       >
 
       <OButton
@@ -214,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
       </OButton>
 
-      <div class="tw:flex-1" />
+      <div class="flex-1" />
 
       <OButton
         variant="ghost"
@@ -223,26 +192,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="close-actions-btn"
       >
         <OIcon name="close" size="sm" />
-        <OTooltip content="Close actions" />
+        <OTooltip :content="t('alerts.insights.actions.closeActions')" />
       </OButton>
     </div>
 
     <!-- Dashboard Content -->
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
-      <div class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-208px)]">
-        <div
-          @contextmenu="handleNativeContextMenu"
-        >
-          <div v-show="isLoading" class="tw:flex tw:items-center tw:justify-center tw:h-100">
+    <div class="min-h-0 flex-1 px-2.5 pb-2.5">
+      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
+        <div @contextmenu="handleNativeContextMenu">
+          <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />
-            <div class="tw:ml-3">Loading insights...</div>
+            <div class="ml-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
-          <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
-            <div v-if="!dashboardData" class="tw:p-5 tw:text-center tw:text-[#666]">
+          <div :class="isLoading ? 'invisible' : 'visible'">
+            <div v-if="!dashboardData" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="tw:p-5 tw:text-center tw:text-[#666]">
+            <div v-else-if="!show" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts
@@ -276,17 +243,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OButton from '@/lib/core/Button/OButton.vue';
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
@@ -300,11 +268,12 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Check if enterprise features are enabled
 const isEnterprise = config.isEnterprise === "true";
@@ -335,7 +304,14 @@ const alertsList = ref<any[]>([]); // Cache alerts list
 provide("selectedTabId", currentTab);
 
 // Context menu
-const contextMenu = reactive({
+const contextMenu = reactive<{
+  show: boolean;
+  x: number;
+  y: number;
+  value: number | string;
+  panelTitle: string;
+  panelId: string;
+}>({
   show: false,
   x: 0,
   y: 0,
@@ -374,9 +350,7 @@ const loadDashboard = () => {
   const org = store.state.selectedOrganization.identifier;
 
   // Find the current tab
-  const currentTabData = config.tabs?.find(
-    (tab: any) => tab.tabId === currentTab.value
-  );
+  const currentTabData = config.tabs?.find((tab: any) => tab.tabId === currentTab.value);
 
   if (!currentTabData) {
     dashboardData.value = config;
@@ -391,9 +365,7 @@ const loadDashboard = () => {
 
         // Build base filters that always apply
         // Note: module = 'alert' is now hardcoded in all queries in insights-metrics.json
-        const mandatoryFilters = [
-          `org = '${org}'`
-        ];
+        const mandatoryFilters = [`org = '${org}'`];
 
         // Combine with user filters
         const allFilters = [...mandatoryFilters, ...baseFilters];
@@ -440,28 +412,31 @@ const fetchAlerts = async () => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier,//store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier, //store.state.selectedOrganization.identifier,
       "", // Empty folder to get all alerts
-      ""
+      "",
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to load alerts",
+      message: t("toastMessages.alerts.failedToLoadAlerts"),
     });
   }
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const updateDateTime = (value: any) => {
   timeRange.value = {
     __global: {
-      start_time: new Date(value.startTime ),
-      end_time: new Date(value.endTime ),
+      start_time: new Date(value.startTime),
+      end_time: new Date(value.endTime),
     },
   };
 
@@ -475,7 +450,7 @@ const updateDateTime = (value: any) => {
   refreshDashboard();
 };
 
-const updateTimezone = (value: any) => {
+const updateTimezone = () => {
   // Handle timezone changes if needed
   // Currently the date-time component manages timezone internally
   // This is here for compatibility with the logs date picker
@@ -516,14 +491,14 @@ const onDataZoom = (data: any) => {
 
 const handleNativeContextMenu = (event: MouseEvent) => {
   // Only handle context menu on Frequency & Dedup tab
-  if (currentTab.value !== 'frequency') {
+  if (currentTab.value !== "frequency") {
     return; // Let other handlers or default behavior work
   }
 
   const target = event.target as HTMLElement;
 
   // Find if we clicked on a table cell
-  const tableCell = target.closest('td');
+  const tableCell = target.closest("td");
   if (!tableCell) {
     return; // Not a table cell, let default behavior work
   }
@@ -533,7 +508,7 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
   // Extract alert name (remove the /unique_id part)
   // Format: alert_name/unique_id -> alert_name
-  const alertName = alertKey?.split('/')[0];
+  const alertName = alertKey?.split("/")[0];
 
   // Check if this is the "Alert Key" column (first column in Dedup table)
   const cellIndex = Array.from(tableCell.parentElement?.children || []).indexOf(tableCell);
@@ -546,16 +521,14 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
     // Find the panel title from dashboard data
     const currentTabData = dashboardData.value?.tabs?.[0];
-    const dedupPanel = currentTabData?.panels?.find((p: any) =>
-      p.title?.includes('Dedup')
-    );
+    const dedupPanel = currentTabData?.panels?.find((p: any) => p.title?.includes("Dedup"));
 
     contextMenu.show = true;
     contextMenu.x = event.clientX;
     contextMenu.y = event.clientY;
     contextMenu.value = alertName;
-    contextMenu.panelId = dedupPanel?.id || '';
-    contextMenu.panelTitle = dedupPanel?.title || 'Dedup Impact Analysis';
+    contextMenu.panelId = dedupPanel?.id || "";
+    contextMenu.panelTitle = dedupPanel?.title || "Dedup Impact Analysis";
   }
   // If not first column or no alert name, let default context menu show
 };
@@ -604,7 +577,10 @@ const handleConfigureDedup = async (alertName: string) => {
     if (!alert) {
       toast({
         variant: "error",
-        message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
+        message: t("toastMessages.alerts.alertNotFoundInAlerts", {
+          name: alertName,
+          count: alertsList.value.length,
+        }),
       });
       return;
     }
@@ -624,7 +600,7 @@ const handleConfigureDedup = async (alertName: string) => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to navigate to alert",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -637,7 +613,7 @@ const handleEditAlert = async (alertName: string) => {
     if (!alert) {
       toast({
         variant: "error",
-        message: "Alert not found",
+        message: t("toastMessages.alerts.alertNotFound"),
       });
       return;
     }
@@ -655,7 +631,7 @@ const handleEditAlert = async (alertName: string) => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to navigate to alert",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -679,11 +655,12 @@ const formatFilterValue = (value: number): string => {
 
 // Action button methods
 const openDedupConfig = () => {
+  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
   toast({
     variant: "info",
-    message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
+    message: t("toastMessages.alerts.openingDedupConfig", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page with dedup section focused",
-  });
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page with dedup section
   // router.push({
@@ -696,9 +673,9 @@ const openDedupConfig = () => {
 const editAlert = () => {
   toast({
     variant: "info",
-    message: `Editing alert: ${selectedAlertForAction.value}`,
+    message: t("toastMessages.alerts.editingAlert", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page",
-  });
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page
   // router.push({
@@ -706,7 +683,6 @@ const editAlert = () => {
   //   params: { alertName: selectedAlertForAction.value }
   // });
 };
-const org = 'default'
 const viewHistory = () => {
   // Navigate to alert history with filter
   router.push({
@@ -749,9 +725,3 @@ onMounted(async () => {
   isLoading.value = false;
 });
 </script>
-
-<style>
-.alert-insights-tabs :deep(.o-tab__label) {
-  text-transform: none !important;
-}
-</style>

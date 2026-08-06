@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceHeader from "@/plugins/traces/TraceHeader.vue";
 import i18n from "@/locales";
@@ -95,9 +95,7 @@ describe("TraceHeader", () => {
         provide: {
           store: mockStore,
         },
-        stubs: {
-          "q-resize-observer": true,
-        },
+        stubs: {},
       },
     });
   });
@@ -118,38 +116,30 @@ describe("TraceHeader", () => {
 
     it("should have correct default height", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:h-7.5");
+      expect(headerContainer.classes()).toContain("h-7.5");
     });
 
     it("should have sticky positioning", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:sticky");
-      expect(headerContainer.classes()).toContain("tw:top-0");
+      expect(headerContainer.classes()).toContain("sticky");
+      expect(headerContainer.classes()).toContain("top-0");
     });
   });
 
   describe("Operation name section", () => {
     it("should render operation name section", () => {
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
       expect(operationNameSection.exists()).toBe(true);
     });
 
     it("should display 'Operation Name' text", () => {
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
       expect(operationNameSection.text()).toContain("Operation Name");
     });
 
     it("should have correct width based on splitterWidth prop", () => {
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
-      expect(operationNameSection.attributes("style")).toContain(
-        "width: 300px",
-      );
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      expect(operationNameSection.attributes("style")).toContain("width: 300px");
     });
 
     it("should render resize button", () => {
@@ -166,8 +156,8 @@ describe("TraceHeader", () => {
 
     it("should have correct avatar properties", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("tw:bg-(--o2-primary)");
-      expect(resizeBtn.classes()).toContain("tw:rounded-full");
+      expect(resizeBtn.classes()).toContain("bg-accent");
+      expect(resizeBtn.classes()).toContain("rounded-full");
     });
   });
 
@@ -179,9 +169,7 @@ describe("TraceHeader", () => {
 
     it("should have correct width calculation", () => {
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.attributes("style")).toContain(
-        "width: calc(100% - 300px)",
-      );
+      expect(ticsSection.attributes("style")).toContain("width: calc(100% - 300px)");
     });
 
     it("should render all tic labels", () => {
@@ -226,14 +214,12 @@ describe("TraceHeader", () => {
 
     it("should have correct z-index for first tic", () => {
       const firstTic = wrapper.find('[data-test="trace-header-tic-line-0"]');
-      expect(firstTic.classes()).toContain("tw:z-5");
-      expect(firstTic.classes()).toContain("tw:hidden");
+      expect(firstTic.classes()).toContain("z-5");
+      expect(firstTic.classes()).toContain("hidden");
     });
 
     it("should have correct z-index for other tics", () => {
-      const otherTics = wrapper
-        .findAll('[data-test^="trace-header-tic-line-"]')
-        .slice(1);
+      const otherTics = wrapper.findAll('[data-test^="trace-header-tic-line-"]').slice(1);
       otherTics.forEach((tic) => {
         expect(tic.classes()).toContain("trace-tic");
       });
@@ -244,12 +230,11 @@ describe("TraceHeader", () => {
     it("should apply light theme by default", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain(
-        "tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
+        "bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
       );
       const ticLines = wrapper.findAll('[data-test^="trace-header-tic-line-"]');
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("tw:bg-[#cacaca]");
-        expect(tic.classes()).not.toContain("tw:bg-[#3c3c3c]");
+        expect(tic.classes()).toContain("bg-border-default");
       });
     });
 
@@ -278,17 +263,14 @@ describe("TraceHeader", () => {
           provide: {
             store: darkStore,
           },
-          stubs: {
-            "q-resize-observer": true,
-          },
+          stubs: {},
         },
       });
 
-      const ticLines = darkWrapper.findAll(
-        '[data-test^="trace-header-tic-line-"]',
-      );
+      const ticLines = darkWrapper.findAll('[data-test^="trace-header-tic-line-"]');
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("tw:bg-[#3c3c3c]");
+        // Token-based utility handles dark mode; class is identical in both themes.
+        expect(tic.classes()).toContain("bg-border-default");
       });
 
       darkWrapper.unmount();
@@ -319,17 +301,14 @@ describe("TraceHeader", () => {
           provide: {
             store: darkStore,
           },
-          stubs: {
-            "q-resize-observer": true,
-          },
+          stubs: {},
         },
       });
 
-      const ticLines = darkWrapper.findAll(
-        '[data-test^="trace-header-tic-line-"]',
-      );
+      const ticLines = darkWrapper.findAll('[data-test^="trace-header-tic-line-"]');
       ticLines.forEach((tic) => {
-        expect(tic.classes()).toContain("tw:bg-[#3c3c3c]");
+        // Token-based utility handles dark mode; class is identical in both themes.
+        expect(tic.classes()).toContain("bg-border-default");
       });
 
       darkWrapper.unmount();
@@ -363,7 +342,7 @@ describe("TraceHeader", () => {
 
     it("should have correct cursor style for resize button", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
-      expect(resizeBtn.classes()).toContain("tw:cursor-col-resize");
+      expect(resizeBtn.classes()).toContain("cursor-col-resize");
     });
   });
 
@@ -389,15 +368,11 @@ describe("TraceHeader", () => {
         splitterWidth: 0,
       });
 
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
       expect(operationNameSection.attributes("style")).toContain("width: 0px");
 
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.attributes("style")).toContain(
-        "width: calc(100% - 0px)",
-      );
+      expect(ticsSection.attributes("style")).toContain("width: calc(100% - 0px)");
     });
 
     it("should handle large splitterWidth", async () => {
@@ -405,17 +380,11 @@ describe("TraceHeader", () => {
         splitterWidth: 500,
       });
 
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
-      expect(operationNameSection.attributes("style")).toContain(
-        "width: 500px",
-      );
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      expect(operationNameSection.attributes("style")).toContain("width: 500px");
 
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.attributes("style")).toContain(
-        "width: calc(100% - 500px)",
-      );
+      expect(ticsSection.attributes("style")).toContain("width: calc(100% - 500px)");
     });
 
     it("should handle missing tics in baseTracePosition", async () => {
@@ -455,45 +424,43 @@ describe("TraceHeader", () => {
   describe("CSS classes and styling", () => {
     it("should have correct flex classes", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
-      expect(headerContainer.classes()).toContain("tw:flex");
-      expect(headerContainer.classes()).toContain("tw:justify-start");
-      expect(headerContainer.classes()).toContain("tw:items-center");
+      expect(headerContainer.classes()).toContain("flex");
+      expect(headerContainer.classes()).toContain("justify-start");
+      expect(headerContainer.classes()).toContain("items-center");
     });
 
     it("should have correct header background class", () => {
       const headerContainer = wrapper.find('[data-test="trace-header"]');
       expect(headerContainer.classes()).toContain(
-        "tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
+        "bg-[color-mix(in_srgb,currentColor_5%,transparent)]",
       );
     });
 
     it("should have correct operation name section classes", () => {
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
-      expect(operationNameSection.classes()).toContain("tw:relative");
-      expect(operationNameSection.classes()).toContain("tw:flex");
-      expect(operationNameSection.classes()).toContain("tw:justify-start");
-      expect(operationNameSection.classes()).toContain("tw:items-center");
-      expect(operationNameSection.classes()).toContain("tw:flex-nowrap");
-      expect(operationNameSection.classes()).toContain("tw:px-2");
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      expect(operationNameSection.classes()).toContain("relative");
+      expect(operationNameSection.classes()).toContain("flex");
+      expect(operationNameSection.classes()).toContain("justify-start");
+      expect(operationNameSection.classes()).toContain("items-center");
+      expect(operationNameSection.classes()).toContain("flex-nowrap");
+      expect(operationNameSection.classes()).toContain("px-2");
     });
 
     it("should have correct tics section classes", () => {
       const ticsSection = wrapper.find('[data-test="trace-header-tics"]');
-      expect(ticsSection.classes()).toContain("tw:flex");
-      expect(ticsSection.classes()).toContain("tw:justify-start");
-      expect(ticsSection.classes()).toContain("tw:items-center");
-      expect(ticsSection.classes()).toContain("tw:flex-nowrap");
-      // Component was migrated from Quasar's `relative-position` to Tailwind `tw:relative`.
-      expect(ticsSection.classes()).toContain("tw:relative");
+      expect(ticsSection.classes()).toContain("flex");
+      expect(ticsSection.classes()).toContain("justify-start");
+      expect(ticsSection.classes()).toContain("items-center");
+      expect(ticsSection.classes()).toContain("flex-nowrap");
+      // Uses the Tailwind `relative` class for positioning.
+      expect(ticsSection.classes()).toContain("relative");
     });
 
     it("should have correct tic label classes", () => {
       const tic0 = wrapper.find('[data-test="trace-header-tic-label-0"]');
-      expect(tic0.classes()).toContain("tw:w-1/4");
-      expect(tic0.classes()).toContain("tw:text-xs");
-      expect(tic0.classes()).toContain("tw:pl-3");
+      expect(tic0.classes()).toContain("w-1/4");
+      expect(tic0.classes()).toContain("text-xs");
+      expect(tic0.classes()).toContain("pl-3");
     });
 
     it("should have correct tic line classes", () => {
@@ -534,9 +501,7 @@ describe("TraceHeader", () => {
           provide: {
             store: mockStore,
           },
-          stubs: {
-            "q-resize-observer": true,
-          },
+          stubs: {},
         },
       });
 
@@ -598,30 +563,22 @@ describe("TraceHeader", () => {
 
       await flushPromises();
 
-      const operationNameSection = wrapper.find(
-        '[data-test="trace-header-operation-name"]',
-      );
-      expect(operationNameSection.attributes("style")).toContain(
-        "width: 400px",
-      );
+      const operationNameSection = wrapper.find('[data-test="trace-header-operation-name"]');
+      expect(operationNameSection.attributes("style")).toContain("width: 400px");
     });
   });
 
   describe("Accessibility", () => {
     it("should have proper data-test attributes", () => {
       expect(wrapper.find('[data-test="trace-header"]').exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="trace-header-operation-name"]').exists(),
-      ).toBe(true);
-      expect(wrapper.find('[data-test="trace-header-tics"]').exists()).toBe(
-        true,
-      );
+      expect(wrapper.find('[data-test="trace-header-operation-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="trace-header-tics"]').exists()).toBe(true);
     });
 
     it("should expose the resize button as an interactive element", () => {
       const resizeBtn = wrapper.find('[data-test="trace-header-resize-btn"]');
       expect(resizeBtn.exists()).toBe(true);
-      expect(resizeBtn.classes()).toContain("tw:cursor-col-resize");
+      expect(resizeBtn.classes()).toContain("cursor-col-resize");
     });
   });
 

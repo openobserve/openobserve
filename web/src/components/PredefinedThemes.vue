@@ -15,11 +15,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="predefined-themes-drawer"
+  <ODrawer
+    data-test="predefined-themes-drawer"
     v-model:open="dialogOpen"
     size="sm"
     seamless
-    title="Theme"
+    :title="t('components.predefinedThemes.title')"
   >
     <template #header-right>
       <OButton
@@ -29,53 +30,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="resetToDefaultTheme"
       >
         <template #icon-left><OIcon name="refresh" size="xs" /></template>
-        Reset
+        {{ t("common.reset") }}
       </OButton>
     </template>
 
     <!-- Light / Dark segmented mode toggle -->
-    <OCardSection class="tw:pt-2 tw:px-2">
+    <OCardSection class="px-2 pt-2">
       <OToggleGroup
         :model-value="activeTab"
         type="single"
-        class="tw:w-full"
-        @update:model-value="(v) => (activeTab = (v as string))"
+        class="w-full"
+        @update:model-value="(v) => (activeTab = v as string)"
       >
         <OToggleGroupItem
           data-test="predefined-themes-tab-light"
           value="light"
           icon-left="light-mode"
-          class="tw:flex-1"
-        >Light</OToggleGroupItem>
+          class="flex-1"
+          >{{ t("components.predefinedThemes.light") }}</OToggleGroupItem
+        >
         <OToggleGroupItem
           data-test="predefined-themes-tab-dark"
           value="dark"
           icon-left="dark-mode"
-          class="tw:flex-1"
-        >Dark</OToggleGroupItem>
+          class="flex-1"
+          >{{ t("components.predefinedThemes.dark") }}</OToggleGroupItem
+        >
       </OToggleGroup>
     </OCardSection>
 
     <!-- Theme list for the active mode. Selecting a row applies it immediately;
          the applied row is highlighted rather than carrying an Apply button. -->
-    <OCardSection class="tw:py-2 tw:px-2 tw:max-h-[calc(100vh-100px)] tw:overflow-y-auto">
-      <ul class="tw:list-none tw:m-0 tw:p-0 tw:flex tw:flex-col tw:gap-2">
+    <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
+      <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="tw:flex tw:items-center tw:w-full tw:py-2 tw:px-3 tw:border tw:rounded-lg tw:cursor-pointer tw:transition-[border-color,background-color,box-shadow] tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
-            :class="isThemeApplied(theme, mode)
-              ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
-              : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
+            class="rounded-default flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            :class="
+              isThemeApplied(theme, mode)
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+            "
             :aria-pressed="isThemeApplied(theme, mode)"
-            :aria-label="`Apply ${themeDisplayName(theme.name)} theme`"
+            :aria-label="t('common.applyTheme', { name: themeDisplayName(theme.name) })"
             @click="applyTheme(theme, mode)"
           >
-            <span class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative" :style="swatchStyle(theme[mode])" />
-            <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">{{ themeDisplayName(theme.name) }}</span>
-              <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">{{ theme[mode].themeColor }}</span>
+            <span
+              class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
+              :style="swatchStyle(theme[mode])"
+            />
+            <span class="ml-2 min-w-0 flex-1 text-left">
+              <span class="block truncate text-sm font-medium">{{
+                themeDisplayName(theme.name)
+              }}</span>
+              <span class="text-text-secondary block truncate text-xs">{{
+                theme[mode].themeColor
+              }}</span>
             </span>
             <OTag
               v-if="isThemeApplied(theme, mode)"
@@ -91,27 +103,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="tw:flex tw:items-center tw:w-full tw:py-2 tw:px-3 tw:border tw:border-dashed tw:rounded-lg tw:cursor-pointer tw:transition-[border-color,background-color,box-shadow] tw:duration-150 tw:focus-visible:outline-none tw:focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--o2-primary-color)_40%,transparent)]"
-            :class="isCustomThemeApplied(mode)
-              ? 'tw:border-(--o2-primary-color) tw:bg-[color-mix(in_srgb,var(--o2-primary-color)_8%,var(--o2-card-bg))] tw:shadow-[inset_0_0_0_1px_var(--o2-primary-color)]'
-              : 'tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:hover:border-(--o2-primary-color) tw:hover:bg-[color-mix(in_srgb,var(--o2-primary-color)_5%,var(--o2-card-bg))]'"
+            class="rounded-default flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            :class="
+              isCustomThemeApplied(mode)
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
+                : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
+            "
             :aria-pressed="isCustomThemeApplied(mode)"
-            aria-label="Pick a custom theme color"
+            :aria-label="t('components.predefinedThemes.customThemeColorAriaLabel')"
             @click="openColorPicker(mode)"
           >
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
-              class="tw:w-8 tw:h-8 tw:rounded tw:border tw:border-(--o2-border-color) tw:shrink-0 tw:relative"
+              class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
               :style="{ backgroundColor: mode === 'light' ? customLightColor : customDarkColor }"
             >
-              <OIcon name="colorize" size="sm" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2" />
+              <OIcon
+                name="colorize"
+                size="sm"
+                class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              />
             </span>
-            <span class="tw:ml-2 tw:min-w-0 tw:flex-1 tw:text-left">
-              <span class="tw:block tw:text-sm tw:font-medium tw:truncate">Custom Color</span>
-              <span class="tw:block tw:text-xs tw:text-gray-400 tw:truncate">
-                {{ isCustomThemeApplied(mode)
-                  ? (mode === 'light' ? customLightColor : customDarkColor)
-                  : 'Pick any brand hex' }}
+            <span class="ml-2 min-w-0 flex-1 text-left">
+              <span class="block truncate text-sm font-medium">{{
+                t("components.predefinedThemes.customColor")
+              }}</span>
+              <span class="text-text-secondary block truncate text-xs">
+                {{
+                  isCustomThemeApplied(mode)
+                    ? mode === "light"
+                      ? customLightColor
+                      : customDarkColor
+                    : t("components.predefinedThemes.pickAnyBrandHex")
+                }}
               </span>
             </span>
             <OTag
@@ -126,33 +150,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <!-- Note at the bottom -->
-    <OCardSection class="tw:pt-0 tw:pb-2 tw:px-2">
-      <OSeparator class="tw:mb-2" />
-      <div
-        class="tw:text-xs tw:text-gray-400 tw:flex tw:items-start tw:gap-1 tw:italic"
-      >
-        <OIcon name="info-outline" size="xs" class="tw:mt-0.5" />
-        <span
-          >Saved to this device only — themes don't sync across different
-          browsers or devices.</span
-        >
+    <OCardSection class="px-2 pt-0 pb-2">
+      <OSeparator class="mb-2" />
+      <div class="text-text-secondary flex items-start gap-1 text-xs italic">
+        <OIcon name="info-outline" size="xs" class="mt-0.5" />
+        <span>{{ t("components.predefinedThemes.themeSyncNote") }}</span>
       </div>
     </OCardSection>
 
     <!-- Color Picker Dialog -->
-    <ODialog data-test="predefined-themes-color-picker-dialog"
+    <ODialog
+      data-test="predefined-themes-color-picker-dialog"
       v-model:open="showColorPicker"
       size="sm"
-      title="Pick Custom Color"
-      primary-button-label="Apply"
-      neutral-button-label="Cancel"
+      :title="t('components.predefinedThemes.pickCustomColorTitle')"
+      :primary-button-label="t('common.apply')"
+      :neutral-button-label="t('common.cancel')"
       @click:primary="confirmCustomColor"
       @click:neutral="showColorPicker = false"
     >
-      <OColor
-        v-model="tempColor"
-        @update:model-value="updateCustomColor"
-      />
+      <OColor v-model="tempColor" @update:model-value="updateCustomColor" />
     </ODialog>
   </ODrawer>
 </template>
@@ -169,9 +186,10 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useStore } from "vuex";
-import { applyThemeColors } from "@/utils/theme";
+import { useTheme } from "@/composables/useTheme";
+import { applyThemeColors, switchThemeMode } from "@/utils/theme";
 import { applyThemeForMode, applyCurrentTheme } from "@/utils/themeManager";
 import {
   PREDEFINED_THEMES,
@@ -184,17 +202,18 @@ import {
   type ThemeModeColors,
 } from "@/constants/themes";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
+const { t } = useI18nTyped();
 const store = useStore();
+const { isDark } = useTheme();
 const { isOpen } = usePredefinedThemes();
 const dialogOpen = ref(false);
 const activeTab = ref("light");
 
 // Strongly-typed mode derived from the toggle selection — used for indexing
 // theme color maps and for the mode-aware data-test/handler calls.
-const mode = computed<"light" | "dark">(() =>
-  activeTab.value === "dark" ? "dark" : "light",
-);
+const mode = computed<"light" | "dark">(() => (activeTab.value === "dark" ? "dark" : "light"));
 
 // Predefined themes list (used by the template) — sourced from the shared registry.
 const predefinedThemes = PREDEFINED_THEMES;
@@ -223,15 +242,13 @@ const appliedDarkThemeName = ref<string | null>(
 const customLightColor = ref(
   store.state.tempThemeColors?.light ||
     localStorage.getItem(THEME_STORAGE_KEYS.light.color) ||
-    store.state?.organizationData?.organizationSettings
-      ?.light_mode_theme_color ||
+    store.state?.organizationData?.organizationSettings?.light_mode_theme_color ||
     DEFAULT_LIGHT_COLOR,
 );
 const customDarkColor = ref(
   store.state.tempThemeColors?.dark ||
     localStorage.getItem(THEME_STORAGE_KEYS.dark.color) ||
-    store.state?.organizationData?.organizationSettings
-      ?.dark_mode_theme_color ||
+    store.state?.organizationData?.organizationSettings?.dark_mode_theme_color ||
     DEFAULT_DARK_COLOR,
 );
 
@@ -256,7 +273,7 @@ watch(isOpen, (val) => {
   dialogOpen.value = val;
   // When dialog opens, sync activeTab with current store theme
   if (val) {
-    activeTab.value = store.state.theme === "dark" ? "dark" : "light";
+    activeTab.value = isDark.value ? "dark" : "light";
   }
 });
 
@@ -269,11 +286,13 @@ watch(dialogOpen, (val) => {
 watch(activeTab, (newTab) => {
   const newTheme = newTab === "dark" ? "dark" : "light";
   if (store.state.theme !== newTheme) {
-    // Update theme in store and localStorage
-    store.dispatch("appTheme", newTheme);
     localStorage.setItem("theme", newTheme);
-    // Toggle .dark on <html> for the O2 component library (Tailwind dark variant)
-    document.documentElement.classList.toggle("dark", newTheme === "dark");
+    // Update store and toggle .dark on <html> (Tailwind dark variant) inside
+    // switchThemeMode so the mode flip cross-fades as one frame.
+    switchThemeMode(newTheme, () => {
+      store.dispatch("appTheme", newTheme);
+      document.documentElement.classList.toggle("dark", newTheme === "dark");
+    });
   }
 });
 
@@ -297,8 +316,7 @@ watch(
     if (!newSettings || newSettings === oldSettings) return;
 
     // Don't override a live preview coming from General Settings.
-    const hasTempColors =
-      store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+    const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
     if (hasTempColors) return;
 
     if (
@@ -307,10 +325,7 @@ watch(
     ) {
       customLightColor.value = newSettings.light_mode_theme_color;
     }
-    if (
-      !localStorage.getItem(THEME_STORAGE_KEYS.dark.color) &&
-      newSettings.dark_mode_theme_color
-    ) {
+    if (!localStorage.getItem(THEME_STORAGE_KEYS.dark.color) && newSettings.dark_mode_theme_color) {
       customDarkColor.value = newSettings.dark_mode_theme_color;
     }
 
@@ -337,24 +352,18 @@ onMounted(() => {
   // unless a live preview from General Settings is active.
   observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
-      if (
-        mutation.type === "attributes" &&
-        mutation.attributeName === "class"
-      ) {
+      if (mutation.type === "attributes" && mutation.attributeName === "class") {
         const hasTempColors =
-          store.state.tempThemeColors?.light ||
-          store.state.tempThemeColors?.dark;
+          store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
         if (hasTempColors) return;
 
-        const bodyMode = document.body.classList.contains("body--dark")
-          ? "dark"
-          : "light";
+        const bodyMode = document.documentElement.classList.contains("dark") ? "dark" : "light";
         applyThemeForMode(bodyMode, store);
       }
     });
   });
 
-  observer.observe(document.body, {
+  observer.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["class"],
   });
@@ -399,22 +408,20 @@ const applyTheme = (theme: PredefinedTheme, themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `${themeDisplayName(theme.name)} applied to ${themeMode} mode successfully!`,
+    message: t("toastMessages.components.appliedToModeSuccessfully", {
+      theme: themeDisplayName(theme.name),
+      mode: themeMode,
+    }),
   });
 };
 
-const isThemeApplied = (
-  theme: PredefinedTheme,
-  themeMode: "light" | "dark",
-): boolean =>
-  (themeMode === "light" ? appliedLightThemeName.value : appliedDarkThemeName.value) ===
-  theme.name;
+const isThemeApplied = (theme: PredefinedTheme, themeMode: "light" | "dark"): boolean =>
+  (themeMode === "light" ? appliedLightThemeName.value : appliedDarkThemeName.value) === theme.name;
 
 // Custom theme functions
 const openColorPicker = (themeMode: "light" | "dark") => {
   currentPickerMode.value = themeMode;
-  tempColor.value =
-    themeMode === "light" ? customLightColor.value : customDarkColor.value;
+  tempColor.value = themeMode === "light" ? customLightColor.value : customDarkColor.value;
   showColorPicker.value = true;
 };
 
@@ -424,14 +431,12 @@ const openColorPicker = (themeMode: "light" | "dark") => {
  * "Applied" badge doesn't appear during preview).
  */
 const isCustomThemeApplied = (themeMode: "light" | "dark"): boolean => {
-  const hasTempColors =
-    store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
+  const hasTempColors = store.state.tempThemeColors?.light || store.state.tempThemeColors?.dark;
   if (hasTempColors) return false;
 
   return (
-    (themeMode === "light"
-      ? appliedLightThemeName.value
-      : appliedDarkThemeName.value) === CUSTOM_THEME_NAME
+    (themeMode === "light" ? appliedLightThemeName.value : appliedDarkThemeName.value) ===
+    CUSTOM_THEME_NAME
   );
 };
 
@@ -449,8 +454,7 @@ const updateCustomColor = () => {
  * is the source of truth), marked with CUSTOM_THEME_NAME.
  */
 const applyCustomTheme = (themeMode: "light" | "dark") => {
-  const color =
-    themeMode === "light" ? customLightColor.value : customDarkColor.value;
+  const color = themeMode === "light" ? customLightColor.value : customDarkColor.value;
   const keys = THEME_STORAGE_KEYS[themeMode];
 
   // Apply immediately (custom theme is never default)
@@ -469,7 +473,9 @@ const applyCustomTheme = (themeMode: "light" | "dark") => {
 
   toast({
     variant: "success",
-    message: `Custom color applied to ${themeMode} mode successfully!`,
+    message: t("toastMessages.components.customColorAppliedToModeSuccessfully", {
+      mode: themeMode,
+    }),
   });
 };
 
@@ -512,8 +518,8 @@ const resetToDefaultTheme = () => {
     variant: "success",
     message:
       orgLightColor || orgDarkColor
-        ? "Theme reset to organization settings!"
-        : "Theme reset to default colors!",
+        ? t("toastMessages.components.themeResetToOrganization")
+        : t("toastMessages.components.themeResetToDefault"),
   });
 };
 </script>

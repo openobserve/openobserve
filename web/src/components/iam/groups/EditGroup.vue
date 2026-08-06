@@ -15,28 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="edit-group-section" class="tw:flex tw:flex-col tw:h-full">
-    <!-- Sub-page header: the listing's icon becomes a Back button (→ Groups). -->
-    <AppPageHeader
-      :title="groupDetails.group_name"
-      :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-    />
-    <div
-      data-test="edit-group-section-title"
-      class="tw:px-2.5 tw:pt-2.5 tw:pb-[0.625rem] tw:flex-shrink-0"
-    >
-    <div class="card-container tw:py-3">
-    <AppTabs
-      data-test="edit-group-tabs"
-      :tabs="tabs"
-      :active-tab="activeTab"
-      :dirty-title="t('iam.editGroup.unsavedDot.title')"
-      @update:active-tab="updateActiveTab"
-    />
+  <OPageLayout
+    data-test="edit-group-section"
+    :title="raw(groupDetails.group_name)"
+    :back="{ label: t('iam.groups'), onClick: cancelEditGroup }"
+    bleed
+  >
+    <div data-test="edit-group-section-title" class="px-page-edge flex-shrink-0 pt-2.5 pb-2.5">
+      <div class="bg-card-glass-bg py-3">
+        <AppTabs
+          data-test="edit-group-tabs"
+          :tabs="tabs"
+          :active-tab="activeTab"
+          :dirty-title="t('iam.editGroup.unsavedDot.title')"
+          @update:active-tab="updateActiveTab"
+        />
+      </div>
     </div>
-    </div>
-    <div class="tw:flex-1 tw:min-h-0 tw:overflow-hidden">
+    <div class="min-h-0 flex-1 overflow-hidden">
       <GroupUsers
         v-show="activeTab === 'users'"
         :groupUsers="groupDetails.users"
@@ -61,28 +57,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :removed-users="removedServiceAccounts"
       />
     </div>
-    <div
-      data-test="edit-group-footer"
-    class="tw:flex tw:justify-end tw:w-full tw:flex-shrink-0"
-      style="z-index: 2"
-    >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex tw:gap-2 tw:border-t tw:border-border-default">
-      <OButton
-        data-test="edit-group-cancel-btn"
-        variant="outline"
-        size="sm-action"
-        @click="cancelEditGroup"
+    <div data-test="edit-group-footer" class="z-2 flex w-full flex-shrink-0 justify-end">
+      <div
+        class="bg-card-glass-bg px-page-edge border-border-default flex w-full justify-end gap-2 border-t py-2"
       >
-        {{ t('alerts.cancel') }}
-      </OButton>
-      <OButton
-        data-test="edit-group-submit-btn"
-        variant="primary"
-        size="sm-action"
-        @click="saveGroupChanges"
-      >
-        {{ t('alerts.save') }}
-      </OButton>
+        <OButton
+          data-test="edit-group-cancel-btn"
+          variant="outline"
+          size="sm-action"
+          @click="cancelEditGroup"
+        >
+          {{ t("alerts.cancel") }}
+        </OButton>
+        <OButton
+          data-test="edit-group-submit-btn"
+          variant="primary"
+          size="sm-action"
+          @click="saveGroupChanges"
+        >
+          {{ t("alerts.save") }}
+        </OButton>
       </div>
     </div>
     <ConfirmDialog
@@ -92,18 +86,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="onLeaveConfirm(false)"
       v-model="leaveConfirm.show"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
 import GroupRoles from "./GroupRoles.vue";
 import GroupUsers from "./GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
-import { useI18n } from "vue-i18n";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import { getGroup, updateGroup } from "@/services/iam";
@@ -125,8 +118,7 @@ const store = useStore();
 
 const router = useRouter();
 
-const { t } = useI18n();
-
+const { t } = useI18nTyped();
 
 const groupDetails = ref({
   group_name: "dev",
@@ -147,23 +139,16 @@ const addedServiceAccounts = ref(new Set());
 const removedServiceAccounts = ref(new Set());
 
 // Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
-const isRolesDirty = computed(
-  () => addedRoles.value.size > 0 || removedRoles.value.size > 0,
-);
+const isRolesDirty = computed(() => addedRoles.value.size > 0 || removedRoles.value.size > 0);
 
-const isUsersDirty = computed(
-  () => addedUsers.value.size > 0 || removedUsers.value.size > 0,
-);
+const isUsersDirty = computed(() => addedUsers.value.size > 0 || removedUsers.value.size > 0);
 
 const isServiceAccountsDirty = computed(
-  () =>
-    addedServiceAccounts.value.size > 0 ||
-    removedServiceAccounts.value.size > 0,
+  () => addedServiceAccounts.value.size > 0 || removedServiceAccounts.value.size > 0,
 );
 
 const isAnyDirty = computed(
-  () =>
-    isRolesDirty.value || isUsersDirty.value || isServiceAccountsDirty.value,
+  () => isRolesDirty.value || isUsersDirty.value || isServiceAccountsDirty.value,
 );
 
 // Route-leave guard: warn before discarding unsaved role/membership changes.
@@ -192,13 +177,13 @@ const tabs = computed(() => {
   const baseTabs = [
     {
       value: "roles",
-      label: "Roles",
+      label: t("iam.editGroup.roles"),
       icon: "shield",
       dirty: isRolesDirty.value,
     },
     {
       value: "users",
-      label: "Users",
+      label: t("iam.editGroup.users"),
       icon: "group",
       dirty: isUsersDirty.value,
     },
@@ -207,7 +192,7 @@ const tabs = computed(() => {
   if (store.state.zoConfig.service_account_enabled) {
     baseTabs.push({
       value: "serviceAccounts",
-      label: "Service Accounts",
+      label: t("iam.editGroup.serviceAccounts"),
       icon: "smart-toy",
       dirty: isServiceAccountsDirty.value,
     });
@@ -217,8 +202,7 @@ const tabs = computed(() => {
 });
 
 const getGroupDetails = () => {
-  const groupName: string = router.currentRoute.value.params
-    .group_name as string;
+  const groupName: string = router.currentRoute.value.params.group_name as string;
 
   getGroup(groupName, store.state.selectedOrganization.identifier)
     .then((res) => {
@@ -231,7 +215,7 @@ const getGroupDetails = () => {
     .catch((err) => {
       console.log(err);
       toast({
-        message: err?.message || "Group not found or has been deleted. Redirecting to groups list.",
+        message: err?.message || t("iam.editGroup.groupNotFound"),
         variant: "error",
       });
       router.push({
@@ -272,7 +256,7 @@ const saveGroupChanges = () => {
   ) {
     toast({
       variant: "info",
-      message: `No updates detected.`,
+      message: t("iam.editGroup.noUpdates"),
     });
 
     return;
@@ -283,15 +267,15 @@ const saveGroupChanges = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then((res) => {
+    .then(() => {
       toast({
         variant: "success",
-        message: `Updated group successfully!`,
+        message: t("iam.editGroup.updateSuccess"),
       });
 
       // Reset Roles
       groupDetails.value.roles = groupDetails.value.roles.filter(
-        (user) => !removedRoles.value.has(user)
+        (user) => !removedRoles.value.has(user),
       );
 
       addedRoles.value.forEach((value: any) => {
@@ -304,9 +288,7 @@ const saveGroupChanges = () => {
 
       // Reset Users + Service Accounts (both stored in groupDetails.users)
       groupDetails.value.users = groupDetails.value.users.filter(
-        (user) =>
-          !removedUsers.value.has(user) &&
-          !removedServiceAccounts.value.has(user)
+        (user) => !removedUsers.value.has(user) && !removedServiceAccounts.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
@@ -326,23 +308,21 @@ const saveGroupChanges = () => {
       removedServiceAccounts.value = new Set([]);
     })
     .catch((err) => {
-      if(err.response.status != 403){
+      if (err.response.status != 403) {
         toast({
           variant: "error",
-          message: "Error while updating group!",
+          message: t("iam.editGroup.updateError"),
         });
       }
     });
 };
 
 const cancelEditGroup = () => {
-  router.push(
-    { name: "groups", 
-    query: 
-      { 
-        org_identifier: store.state.selectedOrganization.identifier 
-      }
-    }
-  );
+  router.push({
+    name: "groups",
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
 };
 </script>

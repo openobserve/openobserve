@@ -9,11 +9,7 @@ import { resolveSessionId } from "./traceDetails.utils";
 describe("resolveSessionId", () => {
   // Empty / null / undefined inputs → "" so the header template hides
   // the chip via v-if instead of showing an empty cell.
-  it.each([
-    [null],
-    [undefined],
-    [[]],
-  ])("returns empty string for %j", (input) => {
+  it.each([[null], [undefined], [[]]])("returns empty string for %j", (input) => {
     expect(resolveSessionId(input as any)).toBe("");
   });
 
@@ -28,18 +24,13 @@ describe("resolveSessionId", () => {
 
   // Legacy fallback: session_id when gen_ai_conversation_id isn't set.
   it("falls back to legacy session_id when gen_ai_conversation_id is absent", () => {
-    const spans = [
-      { trace_id: "t-1" },
-      { session_id: "legacy-sess-42" },
-    ];
+    const spans = [{ trace_id: "t-1" }, { session_id: "legacy-sess-42" }];
     expect(resolveSessionId(spans)).toBe("legacy-sess-42");
   });
 
   // Both fields present on the same span: prefer gen_ai (OTEL spec).
   it("prefers gen_ai_conversation_id over session_id on the same span", () => {
-    const spans = [
-      { gen_ai_conversation_id: "new-id", session_id: "old-id" },
-    ];
+    const spans = [{ gen_ai_conversation_id: "new-id", session_id: "old-id" }];
     expect(resolveSessionId(spans)).toBe("new-id");
   });
 
@@ -47,10 +38,7 @@ describe("resolveSessionId", () => {
   // different value. Scanning order matches the array order, which
   // matches the trace's ingestion order.
   it("returns the first span's value when multiple spans have IDs", () => {
-    const spans = [
-      { gen_ai_conversation_id: "first" },
-      { gen_ai_conversation_id: "second" },
-    ];
+    const spans = [{ gen_ai_conversation_id: "first" }, { gen_ai_conversation_id: "second" }];
     expect(resolveSessionId(spans)).toBe("first");
   });
 
@@ -66,10 +54,7 @@ describe("resolveSessionId", () => {
 
   // No span carries either field → "".
   it("returns empty string when no span has session/conversation id", () => {
-    const spans = [
-      { trace_id: "t-1" },
-      { trace_id: "t-2", operation_name: "GET /api" },
-    ];
+    const spans = [{ trace_id: "t-1" }, { trace_id: "t-2", operation_name: "GET /api" }];
     expect(resolveSessionId(spans)).toBe("");
   });
 
@@ -92,10 +77,7 @@ describe("resolveSessionId", () => {
   // of the predicate use `||` (truthy check). This means a span with
   // explicit empty session_id is skipped. Pin this behaviour.
   it("treats empty-string IDs as missing", () => {
-    const spans = [
-      { session_id: "" },
-      { session_id: "real" },
-    ];
+    const spans = [{ session_id: "" }, { session_id: "real" }];
     expect(resolveSessionId(spans)).toBe("real");
   });
 });

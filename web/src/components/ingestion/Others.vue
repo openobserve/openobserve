@@ -22,9 +22,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     searchable
     search-data-test="others-list-search-input"
   >
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-full">
-        <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full">
+        <div class="h-full overflow-auto pt-0.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -38,13 +38,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
@@ -59,15 +58,15 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
 
-    const ingestTabType = ref(resolveTab("others", router.currentRoute.value.name as string, "airflow"));
+    const ingestTabType = ref(
+      resolveTab("others", router.currentRoute.value.name as string, "airflow"),
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "others") {
@@ -172,4 +171,3 @@ export default defineComponent({
   },
 });
 </script>
-

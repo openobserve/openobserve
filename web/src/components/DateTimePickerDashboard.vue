@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <date-time
+  <DateTime
     ref="dateTimePicker"
     :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
@@ -32,12 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @hide="onHide"
     @show="onShow"
   >
-  </date-time>
+  </DateTime>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, reactive, watch, computed, onUnmounted } from "vue";
+import { ref, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 export default defineComponent({
   name: "DateTimePickerDashboard",
@@ -74,12 +75,12 @@ export default defineComponent({
     menuAlign: {
       required: false,
       default: "end",
-      type: String,
+      type: String as PropType<"center" | "start" | "end">,
     },
     variant: {
       required: false,
       default: "outline",
-      type: String,
+      type: String as PropType<ButtonVariant>,
     },
   },
   emits: ["update:modelValue", "hide", "show"],

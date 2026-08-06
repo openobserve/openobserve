@@ -17,12 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-bind="$attrs" :style="isSidebarOpen && { width: leftWidth + 'px' }">
     <!-- Virtualizer outer: sets the full scrollable height -->
-    <div
-      :style="{ position: 'relative', height: totalSize + 'px', width: '100%' }"
-    >
+    <div :style="{ position: 'relative', height: totalSize + 'px', width: '100%' }">
       <div
         v-for="virtualRow in virtualRows"
-        :key="virtualRow.key"
+        :key="getVirtualRowKey(virtualRow)"
         :style="{
           position: 'absolute',
           top: 0,
@@ -47,9 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 )
               "
               data-test="vertical-segment"
-              :data-left="
-                parseInt((spans as any[])[virtualRow.index].style.left)
-              "
+              :data-left="parseInt((spans as any[])[virtualRow.index].style.left)"
               :data-depth="depth"
               :style="{
                 position: 'absolute',
@@ -63,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   : depth === 1
                     ? spanDimensions.height / 2 + 'px'
                     : spanDimensions.height + 'px',
-                borderLeft: '1.5px solid var(--o2-border-color)',
+                borderLeft: '1.5px solid var(--color-card-glass-border)',
                 pointerEvents: 'none',
                 zIndex: 1,
               }"
@@ -74,13 +70,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="horizontal-segment"
             :style="{
               position: 'absolute',
-              left:
-                parseInt((spans as any[])[virtualRow.index].style.left) + 'px',
+              left: parseInt((spans as any[])[virtualRow.index].style.left) + 'px',
               top: '50%',
               width: (spans as any[])[virtualRow.index].hasChildSpans
                 ? (spanDimensions?.gap ?? 15) / 2 + 'px'
                 : (spanDimensions?.gap ?? 15) + 5 + 'px',
-              borderTop: '1.5px solid var(--o2-border-color)',
+              borderTop: '1.5px solid var(--color-card-glass-border)',
               pointerEvents: 'none',
               zIndex: 1,
             }"
@@ -95,15 +90,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             flexWrap: 'nowrap',
             height: '100%',
           }"
-          class="tw:flex tw:relative tw:min-h-7.5 span-row"
+          class="span-row relative flex min-h-7.5"
           :class="{
-            'span-row-selected':
-              (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
+            'span-row-selected': (spans as any[])[virtualRow.index].spanId === highlightedSpanId,
           }"
           @mouseleave="onUnhoverSpan"
           :data-test="`trace-tree-span-container-${(spans as any[])[virtualRow.index].spanId}`"
         >
-          <div :style="{ width: leftWidth + 'px' }" class="tw:pl-[0.375rem]">
+          <div :style="{ width: leftWidth + 'px' }" class="pl-1.5">
             <div
               :style="{
                 height: '100%',
@@ -115,32 +109,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       'px'
                 }`,
               }"
-              class="tw:flex tw:flex-col tw:items-start tw:justify-start tw:truncate"
+              class="flex flex-col items-start justify-start truncate"
               :title="(spans as any[])[virtualRow.index].operationName"
             >
               <div
-                class="tw:flex tw:flex-nowrap tw:w-full tw:h-7.5 tw:overflow-visible relative-position operation-name-container tw:cursor-pointer tw:items-center"
-                :class="[
-                  store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-                ]"
+                class="relative-position operation-name-container bg-surface-base flex h-7.5 w-full cursor-pointer flex-nowrap items-center overflow-visible"
                 :data-test="`trace-tree-span-operation-name-container-${(spans as any[])[virtualRow.index].spanId}`"
                 @click="selectSpan((spans as any[])[virtualRow.index].spanId)"
-                @mouseenter="
-                  onHoverSpan((spans as any[])[virtualRow.index].spanId)
-                "
+                @mouseenter="onHoverSpan((spans as any[])[virtualRow.index].spanId)"
               >
                 <div
-                  class="tw:absolute tw:top-1 tw:right-0 tw:invisible view-logs-container"
+                  class="view-logs-container invisible absolute top-1 right-0"
                   :data-test="`trace-tree-span-view-logs-container-${(spans as any[])[virtualRow.index].spanId}`"
                 >
-                  <div class="tw:mx-1 view-span-logs">
+                  <div class="view-span-logs mx-1">
                     <OButton
                       variant="ghost"
                       size="icon"
                       :title="t('traces.viewLogs')"
-                      @click.stop="
-                        viewSpanLogs((spans as any[])[virtualRow.index])
-                      "
+                      @click.stop="viewSpanLogs((spans as any[])[virtualRow.index])"
                       :data-test="`trace-tree-span-view-logs-btn-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       <OIcon name="search" size="xs" />
@@ -149,30 +136,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="(spans as any[])[virtualRow.index].hasChildSpans"
-                  class="span-count-box tw:min-w-5 tw:h-5 tw:py-0 tw:px-1 tw:rounded-full tw:border tw:flex tw:items-center tw:justify-center tw:text-[0.7rem] tw:font-semibold tw:mr-1 tw:transition-colors tw:duration-200 tw:cursor-pointer tw:border-(--o2-border-color)! tw:relative"
+                  class="span-count-box text-2xs border-card-glass-border! hover:bg-interactive-hover-bg relative mr-1 flex h-5 min-w-5 cursor-pointer items-center justify-center rounded-full border px-1 py-0 font-semibold transition-colors duration-200"
                   :style="{
                     color: (spans as any[])[virtualRow.index].style.color,
                   }"
-                  @click.stop="
-                    toggleSpanCollapse(
-                      (spans as any[])[virtualRow.index].spanId,
-                    )
-                  "
+                  @click.stop="toggleSpanCollapse((spans as any[])[virtualRow.index].spanId)"
                   :data-test="`trace-tree-span-badge-collapse-btn-${(spans as any[])[virtualRow.index].spanId}`"
-                  :title="`Click to ${collapseMapping[(spans as any[])[virtualRow.index].spanId] ? 'expand' : 'collapse'}`"
+                  :title="
+                    collapseMapping[(spans as any[])[virtualRow.index].spanId]
+                      ? t('traces.traceTree.clickToExpand')
+                      : t('traces.traceTree.clickToCollapse')
+                  "
                 >
                   {{ getChildCount((spans as any[])[virtualRow.index]) }}
                   <div
-                    v-if="
-                      collapseMapping[(spans as any[])[virtualRow.index].spanId]
-                    "
+                    v-if="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
                     data-test="vertical-segment"
                     :style="{
                       position: 'absolute',
                       left: '0.5rem',
                       bottom: '-6px',
                       height: '5px',
-                      borderLeft: '1.5px solid var(--o2-border-color)',
+                      borderLeft: '1.5px solid var(--color-card-glass-border)',
                       pointerEvents: 'none',
                       zIndex: 1,
                     }"
@@ -181,57 +166,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <div
                   v-else
-                  class="tw:w-1.5 tw:h-1.5 tw:rounded-full tw:mr-1 tw:shrink-0 tw:self-center"
+                  class="mr-1 h-1.5 w-1.5 shrink-0 self-center rounded-full"
                   :style="{
-                    backgroundColor: (spans as any[])[virtualRow.index].style
-                      .color,
+                    backgroundColor: (spans as any[])[virtualRow.index].style.color,
                   }"
                 ></div>
 
                 <div
-                  class="tw:flex tw:justify-between"
+                  class="flex justify-between"
                   :class="
                     (spans as any[])[virtualRow.index].hasChildSpans
-                      ? 'tw:w-full'
-                      : 'tw:w-[calc(100%-0.6rem)]!'
+                      ? 'w-full'
+                      : 'w-[calc(100%-0.6rem)]!'
                   "
                 >
                   <div
-                    class="tw:truncate tw:pl-1 tw:cursor-pointer tw:w-[calc(100%-2rem)]!"
+                    class="w-[calc(100%-2rem)]! cursor-pointer truncate pl-1"
                     :class="
                       isLLMTrace((spans as any[])[virtualRow.index])
-                        ? 'tw:flex-col tw:items-start'
-                        : ' tw:flex tw:items-center'
+                        ? 'flex-col items-start'
+                        : 'flex items-center'
                     "
                     :data-test="`trace-tree-span-select-btn-${(spans as any[])[virtualRow.index].spanId}`"
                   >
-                    <div
-                      class="tw:truncate tw:flex tw:items-center span-name-section-content"
-                    >
+                    <div class="span-name-section-content flex items-center truncate">
                       <OIcon
-                        v-if="
-                          (spans as any[])[virtualRow.index].spanStatus ===
-                          'ERROR'
-                        "
-                        name="error" size="sm"
-                        class="tw:text-[var(--o2-status-error-text)]! tw:mr-1"
-                        title="Error Span"
+                        v-if="(spans as any[])[virtualRow.index].spanStatus === 'ERROR'"
+                        name="error"
+                        size="sm"
+                        class="text-status-error-text! mr-1"
+                        :title="t('traces.traceTree.errorSpan')"
                         :data-test="`trace-tree-span-error-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="tw:text-sm tw:font-medium tw:font-bold tw:mr-2"
+                        class="mr-2 text-sm font-bold font-medium"
                         :class="{
-                          'tw:bg-yellow-300 tw:font-bold': isHighlighted(
-                            (spans as any[])[virtualRow.index].spanId,
-                          ),
-                          'tw:text-gray-900':
-                            store.state.theme === 'dark' &&
-                            isHighlighted(
-                              (spans as any[])[virtualRow.index].spanId,
-                            ),
-                          'tw:bg-yellow-300 tw:text-red-600 tw:font-bold':
-                            currentSelectedValue ===
-                            (spans as any[])[virtualRow.index].spanId,
+                          'bg-table-highlight-bg text-table-highlight-text font-bold':
+                            isHighlighted((spans as any[])[virtualRow.index].spanId),
+                          'bg-table-highlight-bg text-status-error-text font-bold':
+                            currentSelectedValue === (spans as any[])[virtualRow.index].spanId,
                         }"
                         :data-test="`trace-tree-span-service-name-${(spans as any[])[virtualRow.index].spanId}`"
                       >
@@ -240,106 +213,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <SpanKindBadge
                         v-if="(spans as any[])[virtualRow.index]?.spanKind"
                         :kind="(spans as any[])[virtualRow.index]?.spanKind"
-                        class="tw:mr-1"
+                        class="mr-1"
                       />
 
                       <img
-                        v-if="
-                          spanTechIconUrlMap.get(
-                            getSpanTech((spans as any[])[virtualRow.index]),
-                          )
-                        "
-                        :src="
-                          spanTechIconUrlMap.get(
-                            getSpanTech((spans as any[])[virtualRow.index]),
-                          )
-                        "
+                        v-if="getSpanTechIcon((spans as any[])[virtualRow.index])"
+                        :src="getSpanTechIcon((spans as any[])[virtualRow.index])"
                         :title="getSpanTech((spans as any[])[virtualRow.index])"
-                        class="tw:mr-1 tw:shrink-0 tw:w-[0.875rem] tw:h-[0.875rem] tw:inline-block tw:opacity-60"
+                        class="mr-1 inline-block h-3.5 w-3.5 shrink-0 opacity-60"
                         aria-hidden="true"
                         alt=""
                         :data-test="`trace-tree-span-tech-icon-${(spans as any[])[virtualRow.index].spanId}`"
                       />
                       <span
-                        class="tw:text-sm"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'tw:text-gray-400'
-                            : 'text-blue-grey-9'
-                        "
+                        class="text-text-secondary text-sm"
                         :data-test="`trace-tree-span-operation-name-${(spans as any[])[virtualRow.index].spanId}`"
-                        >{{
-                          (spans as any[])[virtualRow.index].operationName
-                        }}</span
+                        >{{ (spans as any[])[virtualRow.index].operationName }}</span
                       >
                     </div>
                     <!-- LLM Metrics -->
                     <div
                       v-if="isLLMTrace((spans as any[])[virtualRow.index])"
-                      class="tw:flex tw:items-center tw:text-xs tw:text-[var(--o2-status-error-text)]! tw:mt-[-0.125rem] tw:mb-[0.125rem] tw:leading-none"
+                      class="text-status-error-text! mt-[-0.125rem] mb-0.5 flex items-center text-xs leading-none"
                     >
                       <span
-                        v-if="
-                          (spans as any[])[virtualRow.index].genAiUsage?.total >
-                          0
-                        "
-                        class="tw:mr-2"
+                        v-if="(spans as any[])[virtualRow.index].genAiUsage?.total > 0"
+                        class="mr-2"
                       >
                         <OIcon name="functions" size="xs" />
-                        {{
-                          formatTokens(
-                            (spans as any[])[virtualRow.index].genAiUsage.total,
-                          )
-                        }}
+                        {{ formatTokens((spans as any[])[virtualRow.index].genAiUsage.total) }}
                       </span>
-                      <span
-                        v-if="
-                          (spans as any[])[virtualRow.index].genAiCost?.total > 0
-                        "
-                      >
+                      <span v-if="(spans as any[])[virtualRow.index].genAiCost?.total > 0">
                         <OIcon name="attach-money" size="xs" />
-                        {{
-                          formatCost(
-                            (spans as any[])[virtualRow.index].genAiCost.total,
-                          )
-                        }}
+                        {{ formatCost((spans as any[])[virtualRow.index].genAiCost.total) }}
                       </span>
                     </div>
                   </div>
 
-                  <div class="tw:flex tw:items-center tw:sticky tw:right-0">
+                  <div class="sticky right-0 flex items-center">
                     <span
-                      v-if="
-                        getHttpStatusVars((spans as any[])[virtualRow.index])
-                      "
-                      class="tw:text-xs tw:font-semibold tw:leading-none tw:py-[0.4rem] tw:px-1 tw:mr-[0.25rem] tw:rounded tw:whitespace-nowrap"
+                      v-if="getHttpStatusVars((spans as any[])[virtualRow.index])"
+                      class="rounded-default mr-1 px-1 py-[0.4rem] text-xs leading-none font-semibold whitespace-nowrap"
                       :style="{
-                        backgroundColor: getHttpStatusVars(
-                          (spans as any[])[virtualRow.index],
-                        ).bg,
-                        color: getHttpStatusVars(
-                          (spans as any[])[virtualRow.index],
-                        ).text,
+                        backgroundColor: getHttpStatusVars((spans as any[])[virtualRow.index])?.bg,
+                        color: getHttpStatusVars((spans as any[])[virtualRow.index])?.text,
                       }"
-                      :title="`HTTP ${getHttpStatus((spans as any[])[virtualRow.index])}`"
+                      :title="
+                        t('traces.traceTree.httpStatus', {
+                          status: getHttpStatus((spans as any[])[virtualRow.index]),
+                        })
+                      "
                       :data-test="`trace-tree-span-http-status-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       {{ getHttpStatus((spans as any[])[virtualRow.index]) }}
                     </span>
                     <span
-                      v-if="
-                        getEventCount((spans as any[])[virtualRow.index]) > 0 &&
-                        false
-                      "
-                      class="tw:flex tw:items-center"
+                      v-if="getEventCount((spans as any[])[virtualRow.index]) > 0 && false"
+                      class="flex items-center"
                       :style="{
                         fontSize: '0.625rem',
                         lineHeight: 1,
                         gap: '0.125rem',
-                        color: 'var(--o2-text-secondary)',
+                        color: 'var(--color-text-secondary)',
                         whiteSpace: 'nowrap',
                       }"
-                      :title="`${getEventCount((spans as any[])[virtualRow.index])} span event${getEventCount((spans as any[])[virtualRow.index]) > 1 ? 's' : ''}`"
+                      :title="
+                        getEventCount((spans as any[])[virtualRow.index]) > 1
+                          ? t('traces.traceTree.spanEvents', {
+                              count: getEventCount((spans as any[])[virtualRow.index]),
+                            })
+                          : t('traces.traceTree.spanEvent', {
+                              count: getEventCount((spans as any[])[virtualRow.index]),
+                            })
+                      "
                       :data-test="`trace-tree-span-event-count-${(spans as any[])[virtualRow.index].spanId}`"
                     >
                       <OIcon name="event-note" size="xs" />
@@ -349,25 +295,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </div>
               <div
-                class="tw:grow tw:relative span-background-wrapper"
+                class="span-background-wrapper relative grow"
                 :style="{
-                  backgroundColor: (spans as any[])[virtualRow.index].style
-                    .backgroundColor,
+                  backgroundColor: (spans as any[])[virtualRow.index].style.backgroundColor,
                   borderLeft: `0.1875rem solid ${(spans as any[])[virtualRow.index].style.color}`,
-                  marginLeft: (spans as any[])[virtualRow.index].hasChildSpans
-                    ? '0.875rem'
-                    : '0',
+                  marginLeft: (spans as any[])[virtualRow.index].hasChildSpans ? '0.875rem' : '0',
                   width: '100%',
                 }"
                 :data-test="`trace-tree-span-background-${(spans as any[])[virtualRow.index].spanId}`"
               />
             </div>
           </div>
-          <div
-            v-if="!isSidebarOpen"
-            :style="{ width: `calc(100% - ${leftWidth}px)` }"
-          >
-            <span-block
+          <div v-if="!isSidebarOpen" :style="{ width: `calc(100% - ${leftWidth}px)` }">
+            <SpanBlock
               :span="(spans as any[])[virtualRow.index]"
               :depth="depth"
               :baseTracePosition="baseTracePosition"
@@ -378,9 +318,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 height: '3.75rem',
               }"
               :spanDimensions="spanDimensions"
-              :isCollapsed="
-                collapseMapping[(spans as any[])[virtualRow.index].spanId]
-              "
+              :isCollapsed="collapseMapping[(spans as any[])[virtualRow.index].spanId]"
               :spanData="spanMap[(spans as any[])[virtualRow.index].spanId]"
               @toggle-collapse="toggleSpanCollapse"
               @select-span="selectSpan"
@@ -401,20 +339,20 @@ import {
   watch,
   computed,
   onMounted,
+  onBeforeUnmount,
+  type PropType,
 } from "vue";
 import useTraces from "@/composables/useTraces";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import SpanBlock from "./SpanBlock.vue";
 import SpanKindBadge from "./components/SpanKindBadge.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import { formatTokens, formatCost, isLLMTrace } from "@/utils/llmUtils";
-import {
-  getServiceIconDataUrl,
-  getSpanTechIconDataUrl,
-} from "@/utils/traces/convertTraceData";
+import { getServiceIconDataUrl, getSpanTechIconDataUrl } from "@/utils/traces/convertTraceData";
 import { getKindIcon } from "@/composables/traces/useTraceProcessing";
-import { useVirtualizer } from "@tanstack/vue-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/vue-virtual";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -445,7 +383,11 @@ export default defineComponent({
       default: 0,
     },
     spanDimensions: {
-      type: Object,
+      type: Object as PropType<{
+        height: number;
+        collapseWidth: number;
+        gap: number;
+      }>,
       default: () => {},
     },
     spanMap: {
@@ -493,9 +435,10 @@ export default defineComponent({
   setup(props, { emit }) {
     const { buildQueryDetails, navigateToLogs } = useTraces();
     const store = useStore();
+    const { isDark } = useTheme();
 
-    const { t } = useI18n();
-    const router = useRouter();
+    const { t } = useI18nTyped();
+    useRouter();
 
     // As there are some UX issues, disabling it for now
     const enableHoverSelection = false;
@@ -513,14 +456,20 @@ export default defineComponent({
     const virtualRows = computed(() => rowVirtualizer.value.getVirtualItems());
     const totalSize = computed(() => rowVirtualizer.value.getTotalSize());
 
-    const highlightedSpanId = computed(
-      () => props.hoveredSpanId || props.selectedSpanId,
-    );
+    const getVirtualRowKey = (row: VirtualItem): string | number => row.key as string | number;
+
+    const highlightedSpanId = computed(() => props.hoveredSpanId || props.selectedSpanId);
 
     onMounted(() => {
       if (props.selectedSpanId) {
         scrollToSpan(props.selectedSpanId as string, 300);
       }
+    });
+
+    onBeforeUnmount(() => {
+      // Drop any queued scroll so it can't fire against a torn-down virtualizer
+      // (the tree can remount since searchObj is a module-level singleton).
+      cancelScroll();
     });
 
     // ── CSS connector helpers (pre-computed, O(n) total) ────────────────────
@@ -584,10 +533,10 @@ export default defineComponent({
       emit("selectSpan", spanId);
     };
     const onHoverSpan = (spanId: string) => {
-      if(enableHoverSelection) emit("hoverSpan", spanId);
+      if (enableHoverSelection) emit("hoverSpan", spanId);
     };
     const onUnhoverSpan = () => {
-     if(enableHoverSelection) emit("unhoverSpan");
+      if (enableHoverSelection) emit("unhoverSpan");
     };
 
     const viewSpanLogs = (span: any) => {
@@ -641,21 +590,52 @@ export default defineComponent({
         .filter((index: any) => index !== -1);
     };
 
+    // Tracks the pending scrollToSpan setTimeout so a newer scroll or an
+    // explicit cancel can clear an in-flight one. Non-reactive — never used in
+    // the template.
+    let pendingScrollTimeout: ReturnType<typeof setTimeout> | null = null;
+
     const scrollToSpan = (spanId: string, delay: number = 0) => {
       const spanIndex = (props.spans as any[]).findIndex(
         (s: any) => s.spanId === spanId || s.span_id === spanId,
       );
 
       if (spanIndex !== -1) {
-        setTimeout(() => {
+        // Clear any previously queued scroll so only the latest one runs.
+        if (pendingScrollTimeout !== null) {
+          clearTimeout(pendingScrollTimeout);
+        }
+        pendingScrollTimeout = setTimeout(() => {
+          pendingScrollTimeout = null;
           rowVirtualizer.value.scrollToIndex(spanIndex, { align: "center" });
         }, delay);
       }
     };
 
+    // Cancels any pending and in-flight programmatic scroll. Called when the
+    // selection is cleared (e.g. sidebar close) so the virtualizer stops
+    // forcing the previously-selected span back into view while the user
+    // scrolls manually.
+    const cancelScroll = () => {
+      if (pendingScrollTimeout !== null) {
+        clearTimeout(pendingScrollTimeout);
+        pendingScrollTimeout = null;
+      }
+      // TanStack's scrollToIndex runs a requestAnimationFrame retry loop that
+      // keeps re-scrolling until the target offset is reached; the loop only
+      // bails when its captured `currentScrollToIndex` no longer matches the
+      // instance's. Resetting it to null (the value the library inits it to)
+      // makes the next frame bail. There is no public API for this, so guard
+      // the access in case the internal field is renamed in a future
+      // @tanstack/virtual-core release.
+      const virtualizer = rowVirtualizer.value as any;
+      if (virtualizer && "currentScrollToIndex" in virtualizer) {
+        virtualizer.currentScrollToIndex = null;
+      }
+    };
+
     const scrollToMatch = () => {
-      if (searchResults.value.length === 0 || currentIndex.value === null)
-        return;
+      if (searchResults.value.length === 0 || currentIndex.value === null) return;
       scrollToSpan(searchResults.value[currentIndex.value]);
     };
 
@@ -682,10 +662,7 @@ export default defineComponent({
     };
 
     const nextMatch = () => {
-      if (
-        currentIndex.value !== null &&
-        currentIndex.value < searchResults.value.length - 1
-      ) {
+      if (currentIndex.value !== null && currentIndex.value < searchResults.value.length - 1) {
         currentIndex.value++;
         nextTick(() => {
           scrollToMatch();
@@ -717,44 +694,42 @@ export default defineComponent({
 
     // ── Icon maps ────────────────────────────────────────────────────────────
     const spanServiceIconUrlMap = computed(() => {
-      const isDark = store.state.theme === "dark";
       const cache = new Map<string, string>();
       for (const span of props.spans as any[]) {
         const key = `${span.serviceName}/${span.style?.color ?? ""}`;
         if (!cache.has(key)) {
           cache.set(
             key,
-            getServiceIconDataUrl(
-              span.serviceName,
-              isDark,
-              span.style?.color ?? "#9e9e9e",
-            ),
+            getServiceIconDataUrl(span.serviceName, isDark.value, span.style?.color ?? "#9e9e9e"),
           );
         }
       }
       return cache;
     });
 
-    const getSpanTech = (span: any): string | null => {
+    const getSpanTech = (span: any): string | undefined => {
       const attrs = span || {};
       return (
         attrs["db_system"] ||
         attrs["messaging_system"] ||
         attrs["rpc_system"] ||
-        (span.spanKind?.toUpperCase() === "CLIENT" && attrs["http_url"]
-          ? "http"
-          : null) ||
-        null
+        (span.spanKind?.toUpperCase() === "CLIENT" && attrs["http_url"] ? "http" : null) ||
+        undefined
       );
     };
 
+    // Resolve the tech icon URL for a span; undefined when no tech/icon.
+    const getSpanTechIcon = (span: any): string | undefined => {
+      const tech = getSpanTech(span);
+      return tech ? spanTechIconUrlMap.value.get(tech) : undefined;
+    };
+
     const spanTechIconUrlMap = computed(() => {
-      const isDark = store.state.theme === "dark";
       const map = new Map<string, string>();
       for (const span of props.spans as any[]) {
         const tech = getSpanTech(span);
         if (tech && !map.has(tech)) {
-          const url = getSpanTechIconDataUrl(tech, isDark);
+          const url = getSpanTechIconDataUrl(tech, isDark.value);
           if (url) map.set(tech, url);
         }
       }
@@ -768,29 +743,27 @@ export default defineComponent({
       return code !== null ? Number(code) : null;
     };
 
-    const getHttpStatusVars = (
-      span: any,
-    ): { text: string; bg: string } | null => {
+    const getHttpStatusVars = (span: any): { text: string; bg: string } | null => {
       const code = getHttpStatus(span);
       if (code === null || code < 200) return null;
       if (code < 300)
         return {
-          text: "var(--o2-status-success-text)",
-          bg: "var(--o2-status-success-bg)",
+          text: "var(--color-status-success-text)",
+          bg: "var(--color-status-success-bg)",
         };
       if (code < 400)
         return {
-          text: "var(--o2-status-info-text)",
-          bg: "var(--o2-status-info-bg)",
+          text: "var(--color-status-info-text)",
+          bg: "var(--color-status-info-bg)",
         };
       if (code < 500)
         return {
-          text: "var(--o2-status-warning-text)",
-          bg: "var(--o2-status-warning-bg)",
+          text: "var(--color-status-warning-text)",
+          bg: "var(--color-status-warning-bg)",
         };
       return {
-        text: "var(--o2-status-error-text)",
-        bg: "var(--o2-status-error-bg)",
+        text: "var(--color-status-error-text)",
+        bg: "var(--color-status-error-bg)",
       };
     };
 
@@ -808,6 +781,7 @@ export default defineComponent({
       viewSpanLogs,
       t,
       searchResults,
+      getVirtualRowKey,
       currentIndex,
       updateSearch,
       nextMatch,
@@ -815,6 +789,7 @@ export default defineComponent({
       isHighlighted,
       currentSelectedValue,
       scrollToSpan,
+      cancelScroll,
       scrollToMatch,
       findMatches,
       getChildCount,
@@ -824,6 +799,7 @@ export default defineComponent({
       spanServiceIconUrlMap,
       spanTechIconUrlMap,
       getSpanTech,
+      getSpanTechIcon,
       getKindIcon,
       getHttpStatus,
       getHttpStatusVars,
@@ -835,32 +811,31 @@ export default defineComponent({
       ancestorSiblingMap,
     };
   },
-  components: { SpanBlock, SpanKindBadge, OButton,
-    OIcon,
-},
+  components: { SpanBlock, SpanKindBadge, OButton, OIcon },
 });
 </script>
 
-<style>
-.span-count-box:hover {
-  background-color: rgba(0, 0, 0, 0.05);
-}
-
-.bg-dark .span-count-box:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Hover highlight via CSS — no JS required */
-.span-row:hover::before {
+<style scoped>
+/* keep(complex-state): span-row hover/selected ::before overlay tints plus
+   parent-state child reveal chains target descendants and pseudo-overlays that
+   Tailwind utilities can't express. The overlay is always present (transparent
+   at rest) so its background-color can transition — matching OTable row hover
+   (transition-colors duration-150) instead of snapping in abruptly. */
+.span-row::before {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
   top: 0;
   bottom: 0;
-  background-color: rgba(0, 123, 255, 0.2);
+  background-color: transparent;
   pointer-events: none;
   z-index: 999;
+  transition: background-color 150ms ease;
+}
+
+.span-row:hover::before {
+  background-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 .span-row:hover .operation-name-container {
@@ -872,15 +847,7 @@ export default defineComponent({
 }
 
 .span-row.span-row-selected::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  background-color: rgba(0, 123, 255, 0.35);
-  pointer-events: none;
-  z-index: 999;
+  background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
 
 .span-row.span-row-selected .operation-name-container {

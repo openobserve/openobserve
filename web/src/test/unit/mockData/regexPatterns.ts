@@ -21,21 +21,21 @@ export const regexPatterns = {
       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$",
       description: "Matches email addresses",
       created_at: 1640995200, // 2022-01-01
-      updated_at: 1640995200
+      updated_at: 1640995200,
     },
     {
-      id: "pattern-2", 
+      id: "pattern-2",
       name: "IP Address Pattern",
       pattern: "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$",
       description: "Matches IPv4 addresses",
       created_at: 1640995300,
-      updated_at: 1640995300
-    }
-  ]
+      updated_at: 1640995300,
+    },
+  ],
 };
 
 export const testResults = {
-  results: ["test@example.com", "user@domain.org"]
+  results: ["test@example.com", "user@domain.org"],
 };
 
 export default regexPatterns;

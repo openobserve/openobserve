@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,33 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <div
-      class="tw:w-full tw:flex tw:flex-col flex-center tw:gap-2"
-      style="font-size: 1.5rem"
-    >
-      <img
-        data-test="no-organization-selected-image"
-        :src="getImageURL('images/common/selectOrganization.svg')"
-        style="width: 200px; height: 200px; margin-top: 20vh"
-        alt=""
-      />
-      <div data-test="no-organization-selected-title" class="tw:m-0 tw:text-[18px] tw:font-semibold">{{ t("ticket.noOrganizationSelected") }}</div>
-      <div data-test="no-organization-selected-message" class="tw:m-0 tw:text-sm tw:font-normal tw:leading-5 tw:text-[#7F7777]">{{ t("ticket.selectOrganizationForQuota") }}</div>
+  <div class="flex w-full flex-col items-center justify-center gap-2 text-2xl">
+    <img
+      class="mt-[20vh] size-50"
+      data-test="no-organization-selected-image"
+      :src="getImageURL('images/common/selectOrganization.svg')"
+      alt=""
+    />
+    <div data-test="no-organization-selected-title" class="m-0 text-lg font-semibold">
+      {{ t("ticket.noOrganizationSelected") }}
     </div>
-  </template>
-  
-  <script lang="ts">
-  import { defineComponent } from "vue";
-  import { useI18n } from "vue-i18n";
-  import { getImageURL } from "../../../utils/zincutils";
-  
-  export default defineComponent({
-    name: "QTableNoData",
-    setup() {
-      const { t } = useI18n();
-  
-      return { t, getImageURL };
-    },
-  });
-  </script>
-  
+    <div
+      data-test="no-organization-selected-message"
+      class="text-text-secondary m-0 text-sm leading-5 font-normal"
+    >
+      {{ t("ticket.selectOrganizationForQuota") }}
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import { getImageURL } from "../../../utils/zincutils";
+
+export default defineComponent({
+  name: "NoOrganizationSelected",
+  setup() {
+    const { t } = useI18nTyped();
+
+    return { t, getImageURL };
+  },
+});
+</script>

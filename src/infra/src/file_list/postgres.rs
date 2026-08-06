@@ -1262,33 +1262,6 @@ DO UPDATE SET
         Ok(())
     }
 
-    async fn reset_stream_stats_min_ts(
-        &self,
-        _org_id: &str,
-        stream: &str,
-        min_ts: i64,
-    ) -> Result<()> {
-        let pool = CLIENT.clone();
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "stream_stats"])
-            .inc();
-        sqlx::query(r#"UPDATE stream_stats SET min_ts = $1 WHERE stream = $2;"#)
-            .bind(min_ts)
-            .bind(stream)
-            .execute(&pool)
-            .await?;
-        DB_QUERY_NUMS
-            .with_label_values(&["update", "stream_stats"])
-            .inc();
-        sqlx::query(
-            r#"UPDATE stream_stats SET max_ts = min_ts WHERE stream = $1 AND max_ts < min_ts;"#,
-        )
-        .bind(stream)
-        .execute(&pool)
-        .await?;
-        Ok(())
-    }
-
     async fn len(&self) -> usize {
         let pool = CLIENT_RO.clone();
         DB_QUERY_NUMS
@@ -1398,6 +1371,17 @@ DO UPDATE SET
         limit: i64,
         fast_mode: bool,
     ) -> Result<Vec<super::MergeJobRecord>> {
+        // quick check without the advisory lock, if there are no pending jobs we can skip the
+        // locked transaction.
+        let pool = CLIENT_RO.clone();
+        let has_pending = sqlx::query("SELECT id FROM file_list_jobs WHERE status = $1 LIMIT 1;")
+            .bind(super::FileListJobStatus::Pending)
+            .fetch_optional(&pool)
+            .await?;
+        if has_pending.is_none() {
+            return Ok(Vec::new());
+        }
+
         let pool = CLIENT.clone();
         let mut tx = pool.begin().await?;
         let lock_key = "file_list_jobs:get_pending_jobs";
@@ -1923,6 +1907,37 @@ WHERE org = $1 AND account = $2;"#;
         // we can get null, so need to handle that with option<>
         let (storage, index) = ret.unwrap_or_default();
         Ok((storage.unwrap_or_default(), index.unwrap_or_default()))
+    }
+
+    async fn delete_by_org(&self, org_id: &str) -> Result<()> {
+        let pool = CLIENT.clone();
+        let created_at = now_micros();
+        let mut tx = pool.begin().await?;
+        // Move remaining rows into file_list_deleted first so the file GC removes
+        // the backing S3 objects. A bare DELETE would orphan those files in object
+        // store. (Normal per-stream deletion already routes files here; this is the
+        // catch-all for rows whose stream schema is already gone.)
+        DB_QUERY_NUMS
+            .with_label_values(&["insert", "file_list_deleted"])
+            .inc();
+        sqlx::query(
+            r#"INSERT INTO file_list_deleted (account, org, stream, date, file, index_file, flattened, created_at)
+               SELECT account, org, stream, date, file, index_file, flattened, $2
+               FROM file_list WHERE org = $1;"#,
+        )
+        .bind(org_id)
+        .bind(created_at)
+        .execute(&mut *tx)
+        .await?;
+        DB_QUERY_NUMS
+            .with_label_values(&["delete", "file_list"])
+            .inc();
+        sqlx::query("DELETE FROM file_list WHERE org = $1;")
+            .bind(org_id)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+        Ok(())
     }
 }
 
@@ -2711,6 +2726,54 @@ async fn apply_autovacuum_tuning(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     Ok(())
 }
 
+const FILE_COLUMN_TARGET_WIDTH: i32 = 1024;
+const ACCOUNT_COLUMN_TARGET_WIDTH: i32 = 128;
+
+/// Return the declared max length of a VARCHAR column, if the column exists.
+async fn get_varchar_column_width(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+    column: &str,
+) -> Result<Option<i32>> {
+    let width: Option<i32> = sqlx::query_scalar(
+        "SELECT character_maximum_length FROM information_schema.columns \
+         WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2",
+    )
+    .bind(table)
+    .bind(column)
+    .fetch_optional(pool)
+    .await?
+    .flatten();
+    Ok(width)
+}
+
+/// Widen a VARCHAR column to `target_width` if it is currently narrower.
+async fn widen_varchar_column(
+    pool: &sqlx::Pool<Postgres>,
+    table: &str,
+    column: &str,
+    target_width: i32,
+) -> Result<()> {
+    match get_varchar_column_width(pool, table, column).await? {
+        Some(width) if width >= target_width => {
+            log::info!(
+                "[POSTGRES] Skipping {column} column widen for {table}: already VARCHAR({width})"
+            );
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    let sql =
+        format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN {column} TYPE VARCHAR({target_width})");
+    if let Err(e) = sqlx::query(&sql).execute(pool).await {
+        log::warn!("[POSTGRES] Failed to widen {column} column for {table}: {e}");
+    } else {
+        log::info!("[POSTGRES] Widened {column} column for {table} to VARCHAR({target_width})");
+    }
+    Ok(())
+}
+
 /// Apply column width compatibility for VARCHAR(file).
 async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
     let tables = [
@@ -2720,10 +2783,7 @@ async fn apply_column_width_compat(pool: &sqlx::Pool<Postgres>) -> Result<()> {
         "file_list_dump_stats",
     ];
     for table in &tables {
-        let sql = format!("ALTER TABLE IF EXISTS {table} ALTER COLUMN file TYPE VARCHAR(1024)");
-        if let Err(e) = sqlx::query(&sql).execute(pool).await {
-            log::warn!("[POSTGRES] Failed to widen file column for {table}: {e}");
-        }
+        widen_varchar_column(pool, table, "file", FILE_COLUMN_TARGET_WIDTH).await?;
     }
     Ok(())
 }
@@ -2998,15 +3058,9 @@ CREATE TABLE IF NOT EXISTS stream_stats
     }
 
     // after introducing org_storage, the account can have value of org_id:default,
-    // and we restrict org_id to 100 characters so here we change it to 256 from original 32
+    // and we restrict org_id to 100 characters so here we change it to 128 from original 32
     for table in &["file_list", "file_list_history", "file_list_deleted"] {
-        log::info!("[POSTGRES] updating account col to 128 for table {table}");
-        sqlx::query(&format!(
-            "ALTER TABLE {table} ALTER COLUMN account TYPE VARCHAR(128);"
-        ))
-        .execute(&pool)
-        .await?;
-        log::info!("[POSTGRES] successfully updated account col to 128 for table {table}");
+        widen_varchar_column(&pool, table, "account", ACCOUNT_COLUMN_TARGET_WIDTH).await?;
     }
 
     Ok(())

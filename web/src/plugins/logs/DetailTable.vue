@@ -15,46 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="tw:flex tw:flex-col tw:h-full tw:flex-nowrap searchdetaildialog"
-    data-test="dialog-box"
-  >
+  <div class="searchdetaildialog flex h-full flex-col flex-nowrap" data-test="dialog-box">
     <!-- Single Tab Row -->
-    <div class="tw:flex tw:justify-between tw:pt-2 tw:items-center">
-      <div class="tw:flex tw:items-center tw:gap-2 tw:-mb-0.75">
-        <OTabs v-model="tab" align="left">
+    <div class="flex shrink-0 items-center justify-between">
+      <div class="-mb-0.75 flex items-center gap-2">
+        <OTabs v-model="tab" align="left" reorderable @reorder="onTabReorder">
+          <!-- Correlation tabs are only present when service streams are enabled
+               and an enterprise license is active; see availableTabs. -->
           <OTab
-            data-test="log-detail-json-tab"
-            name="json"
-            :label="t('common.json')"
-          />
-          <OTab
-            data-test="log-detail-table-tab"
-            name="table"
-            :label="t('common.table')"
-          />
-          <!-- Correlation Tabs (only visible when service streams enabled and enterprise license) -->
-          <OTab
-            data-test="correlated-logs-tab"
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-logs"
-            :label="t('correlation.correlatedLogs')"
-          />
-          <OTab
-            data-test="correlated-metrics-tab"
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-metrics"
-            :label="t('correlation.correlatedMetrics')"
-          />
-          <OTab
-            data-test="correlated-traces-tab"
-            v-if="serviceStreamsEnabled && config.isEnterprise === 'true'"
-            name="correlated-traces"
-            :label="t('correlation.correlatedTraces')"
+            v-for="tabItem in tabOrder"
+            :key="tabItem.name"
+            :data-test="tabItem.dataTest"
+            :name="tabItem.name"
+            :label="raw(tabItem.label)"
           />
         </OTabs>
       </div>
-      <div class="tw:flex tw:items-center tw:gap-2 tw:pr-3 tw:shrink-0">
+      <div class="flex shrink-0 items-center gap-2 pr-3">
         <O2AIContextAddBtn
           data-test="logs-detail-ai-context-btn"
           @sendToAiChat="sendToAiChat(JSON.stringify(rowData))"
@@ -74,174 +51,185 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div
       :class="[
-        'tw:flex tw:flex-col tw:h-full',
-        tab.startsWith('correlated-') ? 'tw:overflow-hidden full-height-panels' : 'tw:overflow-y-auto',
+        'flex min-h-0 flex-1 flex-col',
+        tab.startsWith('correlated-') ? 'full-height-panels overflow-hidden' : 'overflow-y-auto',
       ]"
     >
-    <OTabPanels
-      data-test="log-detail-tab-container"
-      v-model="tab"
-      keep-alive
-      grow
-      class="tw:overflow-y-auto!"
-    >
-      <OTabPanel name="json">
-        <OCardSection
-          data-test="log-detail-json-content"
-          class="tw:p-0 tw:mb-6 tw:pt-2"
-        >
-          <json-preview
-            :value="rowData"
-            show-copy-button
-            mode="sidebar"
-            hide-view-related
-            :highlight-query="highlightQuery"
-            :should-wrap-values="shouldWrapValues"
-            @copy="copyContentToClipboard"
-            @add-field-to-table="addFieldToTable"
-            @add-search-term="toggleIncludeSearchTerm"
-            @view-trace="viewTrace"
-            @send-to-ai-chat="sendToAiChat"
-            @closeTable="closeTable"
-            @show-correlation="showCorrelation"
-          />
-        </OCardSection>
-      </OTabPanel>
-      <OTabPanel name="table">
-        <OCardSection
-          class="tw:p-[0.675rem] tw:mb-6"
-          data-test="log-detail-table-content"
-        >
-          <div v-if="rowData.length == 0" class="tw:pt-3 tw:max-w-[350px]">
-            No data available.
-          </div>
-          <OTable
-            v-else
-            data-test="log-detail-table"
-            :data="tableRows"
-            :columns="tableColumns"
-            row-key="_rowKey"
-            pagination="none"
-            :default-columns="false"
-            class="o2-table o2-row-md o2-schema-table log-detail-source-table tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-            :class="store.state.theme === 'dark' && 'dark'"
+      <OTabPanels
+        data-test="log-detail-tab-container"
+        v-model="tab"
+        keep-alive
+        grow
+        :class="tab.startsWith('correlated-') ? 'overflow-hidden!' : 'overflow-y-auto!'"
+      >
+        <OTabPanel name="json">
+          <OCardSection data-test="log-detail-json-content" class="px-page-edge mb-6 pt-2">
+            <JsonPreview
+              :value="rowData"
+              show-copy-button
+              mode="sidebar"
+              hide-view-related
+              :highlight-query="highlightQuery"
+              :should-wrap-values="shouldWrapValues"
+              @copy="copyContentToClipboard"
+              @add-field-to-table="addFieldToTable"
+              @add-search-term="toggleIncludeSearchTerm"
+              @view-trace="viewTrace"
+              @send-to-ai-chat="sendToAiChat"
+              @closeTable="closeTable"
+              @show-correlation="showCorrelation"
+            />
+          </OCardSection>
+        </OTabPanel>
+        <OTabPanel name="table">
+          <OCardSection
+            class="px-page-edge mb-6 py-[0.675rem]"
+            data-test="log-detail-table-content"
           >
-            <template #cell-field="{ row, value }">
-              <div
-                :data-test="`log-detail-${value}-key`"
-                class="tw:text-left"
-                :class="
-                  store.state.theme == 'dark'
-                    ? 'tw:text-[#f67a7aff]'
-                    : 'tw:text-[#B71C1C]'
-                "
-              >
-                {{ value }}
-              </div>
-            </template>
+            <div v-if="rowData.length == 0" class="max-w-87.5 pt-3">
+              {{ t("logs.detailTable.noDataAvailable") }}
+            </div>
+            <OTable
+              v-else
+              data-test="log-detail-table"
+              :data="tableRows"
+              :columns="tableColumns"
+              row-key="_rowKey"
+              pagination="none"
+              :row-height="24"
+              :default-columns="false"
+              :show-global-filter="false"
+              :global-filter="detailSearchQuery"
+              class="o2-table o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
+            >
+              <template #toolbar>
+                <OSearchInput
+                  v-model="detailSearchQuery"
+                  data-test="log-detail-table-search-input"
+                  class="flex-1"
+                  :placeholder="t('common.search')"
+                />
+              </template>
+              <template #cell-field="{ value }">
+                <div
+                  :data-test="`log-detail-${value}-key`"
+                  class="text-status-error-text text-left"
+                >
+                  {{ value }}
+                </div>
+              </template>
 
-            <template #cell-value="{ row }">
-              <div class="tw:text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
-                <div class="tw:flex tw:items-start tw:gap-2">
-                  <ODropdown v-model:open="tableDropdownOpenMap[row.field]" side="bottom" align="start">
-                    <template #trigger>
-                      <OButton
-                        :data-test="`log-details-include-exclude-field-btn-${row.field}`"
-                        size="icon-xs"
-                        variant="ghost"
-                        class="log-json-field-dropdown-btn"
-                        aria-label="Add icon"
-                      >
-                        <OIcon :name="tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
-                      </OButton>
-                    </template>
-                    <ODropdownItem
-                      v-if="
-                        searchObj.data.stream.selectedStreamFields.some(
-                          (item: any) =>
-                            item.name === row.field ? item.isSchemaField : '',
-                        )
-                      "
-                      data-test="log-details-include-field-btn"
-                      @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
+              <template #cell-value="{ row }">
+                <div class="text-left" :class="!shouldWrapValues ? 'ellipsis' : ''">
+                  <div class="flex items-start gap-2">
+                    <ODropdown
+                      v-model:open="tableDropdownOpenMap[row.field]"
+                      side="bottom"
+                      align="start"
                     >
-                      <template #icon-left><EqualIcon class="tw:size-2.5" /></template>
-                      {{ t("common.includeSearchTerm") }}
-                    </ODropdownItem>
-                    <ODropdownItem
-                      v-if="
-                        searchObj.data.stream.selectedStreamFields.some(
-                          (item: any) =>
-                            item.name === row.field ? item.isSchemaField : '',
-                        )
-                      "
-                      data-test="log-details-exclude-field-btn"
-                      @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
-                    >
-                      <template #icon-left><NotEqualIcon class="tw:size-2.5" /></template>
-                      {{ t("common.excludeSearchTerm") }}
-                    </ODropdownItem>
-                    <template v-if="row.field !== store.state.zoConfig.timestamp_column">
-                      <ODropdownItem
-                        v-if="!searchObj.data.stream.selectedFields.includes(row.field.toString())"
-                        data-test="log-details-include-field-btn"
-                        @select="addFieldToTable(row.field.toString())"
-                        icon-left="visibility"
-                      >
-                        {{ t("common.addFieldToTable") }}
-                      </ODropdownItem>
-                      <ODropdownItem
-                        v-else
-                        data-test="log-details-include-field-btn"
-                        @select="addFieldToTable(row.field.toString())"
-                        icon-left="visibility-off"
-                      >
-                        {{ t("common.removeFieldFromTable") }}
-                      </ODropdownItem>
-                    </template>
-                    <!-- Cross-link options -->
-                    <template v-if="getCrossLinksForField(row.field).length > 0">
-                      <ODropdownSeparator />
-                      <ODropdownItem
-                        v-for="crossLink in getCrossLinksForField(row.field)"
-                        :key="crossLink.name"
-                        :data-test="`log-details-cross-link-${crossLink.name}`"
-                        @select.stop="openCrossLink(crossLink.resolvedUrl)"
-                        icon-left="open-in-new"
-                      >
-                        {{ crossLink.name }}
-                      </ODropdownItem>
-                    </template>
-                    <ODropdownItem
-                      v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                      data-test="log-details-table-send-to-ai-chat-btn"
-                      @select="sendToAiChat(JSON.stringify({ [row.field]: row.value }))"
-                    >
-                      <template #icon-left>
-                        <img :src="getBtnLogo" width="14" height="14" alt="" />
+                      <template #trigger>
+                        <OButton
+                          :data-test="`log-details-include-exclude-field-btn-${row.field}`"
+                          size="icon-xs"
+                          variant="ghost"
+                          class="h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+                          :aria-label="t('logs.detailTable.addIcon')"
+                        >
+                          <OIcon
+                            :name="
+                              tableDropdownOpenMap[row.field] ? 'arrow-drop-up' : 'arrow-drop-down'
+                            "
+                            size="sm"
+                          />
+                        </OButton>
                       </template>
-                      Send to AI Chat
-                    </ODropdownItem>
-                    <ODropdownItem
-                      v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
-                      data-test="log-details-table-redirect-to-regex-pattern-btn"
-                      @select="createRegexPatternFromLogs(row.field, row.value)"
-                    >
-                      <template #icon-left>
-                        <img :src="regexIcon" width="14" height="14" alt="" />
+                      <ODropdownItem
+                        v-if="
+                          searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                            item.name === row.field ? item.isSchemaField : '',
+                          )
+                        "
+                        data-test="log-details-include-field-btn"
+                        @select="toggleIncludeSearchTerm(row.field, row.value, 'include')"
+                      >
+                        <template #icon-left><EqualIcon class="size-2.5" /></template>
+                        {{ t("common.includeSearchTerm") }}
+                      </ODropdownItem>
+                      <ODropdownItem
+                        v-if="
+                          searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                            item.name === row.field ? item.isSchemaField : '',
+                          )
+                        "
+                        data-test="log-details-exclude-field-btn"
+                        @select="toggleExcludeSearchTerm(row.field, row.value, 'exclude')"
+                      >
+                        <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+                        {{ t("common.excludeSearchTerm") }}
+                      </ODropdownItem>
+                      <template v-if="row.field !== store.state.zoConfig.timestamp_column">
+                        <ODropdownItem
+                          v-if="
+                            !searchObj.data.stream.selectedFields.includes(row.field.toString())
+                          "
+                          data-test="log-details-include-field-btn"
+                          @select="addFieldToTable(row.field.toString())"
+                          icon-left="visibility"
+                        >
+                          {{ t("common.addFieldToTable") }}
+                        </ODropdownItem>
+                        <ODropdownItem
+                          v-else
+                          data-test="log-details-include-field-btn"
+                          @select="addFieldToTable(row.field.toString())"
+                          icon-left="visibility-off"
+                        >
+                          {{ t("common.removeFieldFromTable") }}
+                        </ODropdownItem>
                       </template>
-                      {{ t("regex_patterns.create_regex_pattern_field") }}
-                    </ODropdownItem>
-                  </ODropdown>
-                  <pre
-                    :data-test="`log-detail-${row.field}-value`"
-                    class="table-pre tw:flex-1 tw:min-w-0"
-                    :class="
-                      !shouldWrapValues
-                        ? 'tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis'
-                        : 'tw:whitespace-pre-wrap'
-                    "
-                  ><ChunkedContent
+                      <!-- Cross-link options -->
+                      <template v-if="getCrossLinksForField(row.field).length > 0">
+                        <ODropdownSeparator />
+                        <ODropdownItem
+                          v-for="crossLink in getCrossLinksForField(row.field)"
+                          :key="crossLink.name"
+                          :data-test="`log-details-cross-link-${crossLink.name}`"
+                          @select.stop="openCrossLink(crossLink.resolvedUrl)"
+                          icon-left="open-in-new"
+                        >
+                          {{ crossLink.name }}
+                        </ODropdownItem>
+                      </template>
+                      <ODropdownItem
+                        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                        data-test="log-details-table-send-to-ai-chat-btn"
+                        @select="sendToAiChat(JSON.stringify({ [row.field]: row.value }))"
+                      >
+                        <template #icon-left>
+                          <img :src="getBtnLogo" width="14" height="14" alt="" />
+                        </template>
+                        {{ t("logs.detailTable.sendToAiChat") }}
+                      </ODropdownItem>
+                      <ODropdownItem
+                        v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+                        data-test="log-details-table-redirect-to-regex-pattern-btn"
+                        @select="createRegexPatternFromLogs(row.field, row.value)"
+                      >
+                        <template #icon-left>
+                          <img :src="regexIcon" width="14" height="14" alt="" />
+                        </template>
+                        {{ t("regex_patterns.create_regex_pattern_field") }}
+                      </ODropdownItem>
+                    </ODropdown>
+                    <pre
+                      :data-test="`log-detail-${row.field}-value`"
+                      class="m-0 inline min-w-0 flex-1 p-0 font-mono font-normal wrap-break-word"
+                      :class="
+                        !shouldWrapValues
+                          ? 'overflow-hidden text-ellipsis whitespace-nowrap'
+                          : 'whitespace-pre-wrap'
+                      "
+                    ><ChunkedContent
                       v-if="getContentSize(row.value) > 50000"
                       :data="row.value"
                       :field-key="`detail_${row.field}`"
@@ -253,137 +241,160 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :show-braces="false"
                       :query-string="highlightQuery"
                     /></pre>
+                  </div>
                 </div>
+              </template>
+            </OTable>
+          </OCardSection>
+        </OTabPanel>
+
+        <!-- Correlated Logs Tab Panel (Custom Component) -->
+        <OTabPanel name="correlated-logs" stretch>
+          <CorrelatedLogsTable
+            v-if="correlationProps"
+            :service-name="correlationProps.serviceName"
+            :matched-dimensions="correlationProps.matchedDimensions"
+            :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
+            :log-streams="correlationProps.logStreams"
+            :source-stream="correlationProps.sourceStream"
+            :source-type="correlationProps.sourceType"
+            :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
+            :fts-fields="correlationProps.ftsFields"
+            :time-range="correlationProps.timeRange"
+            :hide-view-related-button="true"
+            :hide-search-term-actions="false"
+            :hide-dimension-filters="true"
+            :hide-reset-filters-button="true"
+            @sendToAiChat="sendToAiChat"
+            @addSearchTerm="addSearchTerm"
+          />
+          <!-- Loading/Empty state when no data -->
+          <div v-else class="flex h-full items-center justify-center py-20">
+            <div class="text-center">
+              <OSpinner
+                v-if="correlationLoading"
+                size="lg"
+                class="mb-4"
+                data-test="logs-correlation-loading-indicator"
+              />
+              <div v-else-if="correlationError" class="text-status-error-text text-base">
+                {{ correlationError }}
               </div>
-            </template>
-          </OTable>
-        </OCardSection>
-      </OTabPanel>
-
-      <!-- Correlated Logs Tab Panel (Custom Component) -->
-      <OTabPanel name="correlated-logs" stretch>
-        <CorrelatedLogsTable
-          v-if="correlationProps"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :matched-set-id="correlationProps.matchedSetId"
-          :chip-dimensions="correlationProps.chipDimensions"
-          :source-event="correlationProps.sourceEvent"
-          :log-streams="correlationProps.logStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
-          :hide-view-related-button="true"
-          :hide-search-term-actions="false"
-          :hide-dimension-filters="true"
-          :hide-reset-filters-button="true"
-          class="tw:pr-3!"
-          @sendToAiChat="sendToAiChat"
-          @addSearchTerm="addSearchTerm"
-        />
-        <!-- Loading/Empty state when no data -->
-        <div
-          v-else
-          class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div
-              v-else-if="correlationError"
-              class="tw:text-base tw:text-red-500"
-            >
-              {{ correlationError }}
-            </div>
-            <div v-else class="tw:text-base tw:text-gray-500">
-              {{ t("correlation.clickToLoadLogs") }}
+              <div v-else class="text-text-muted text-base">
+                {{ t("correlation.clickToLoadLogs") }}
+              </div>
             </div>
           </div>
-        </div>
-      </OTabPanel>
+        </OTabPanel>
 
-      <!-- Correlated Metrics Tab Panel -->
-      <OTabPanel name="correlated-metrics" stretch>
-        <TelemetryCorrelationDashboard
-          v-if="correlationProps"
-          mode="embedded-tabs"
-          external-active-tab="metrics"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :matched-set-id="correlationProps.matchedSetId"
-          :chip-dimensions="correlationProps.chipDimensions"
-          :source-event="correlationProps.sourceEvent"
-          :metric-streams="correlationProps.metricStreams"
-          :log-streams="correlationProps.logStreams"
-          :trace-streams="correlationProps.traceStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
-          :hide-dimension-filters="true"
-          @close="tab = 'json'"
-        />
-        <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
-          <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadMetrics') }}</div>
+        <!-- Correlated Metrics Tab Panel -->
+        <OTabPanel name="correlated-metrics" stretch>
+          <TelemetryCorrelationDashboard
+            v-if="correlationProps"
+            mode="embedded-tabs"
+            external-active-tab="metrics"
+            :service-name="correlationProps.serviceName"
+            :matched-dimensions="correlationProps.matchedDimensions"
+            :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
+            :metric-streams="correlationProps.metricStreams"
+            :log-streams="correlationProps.logStreams"
+            :trace-streams="correlationProps.traceStreams"
+            :source-stream="correlationProps.sourceStream"
+            :source-type="correlationProps.sourceType"
+            :available-dimensions="correlationProps.availableDimensions"
+            :fts-fields="correlationProps.ftsFields"
+            :time-range="correlationProps.timeRange"
+            :hide-dimension-filters="true"
+            @close="tab = 'table'"
+          />
+          <!-- Loading/Empty state when no data -->
+          <div v-else class="flex h-full items-center justify-center py-20">
+            <div class="text-center">
+              <OSpinner
+                v-if="correlationLoading"
+                size="lg"
+                class="mb-4"
+                data-test="logs-correlation-loading-indicator"
+              />
+              <div v-else-if="correlationError" class="text-status-error-text text-base">
+                {{ correlationError }}
+              </div>
+              <div v-else class="text-text-muted text-base">
+                {{ t("correlation.clickToLoadMetrics") }}
+              </div>
+            </div>
           </div>
-        </div>
-      </OTabPanel>
+        </OTabPanel>
 
-      <!-- Correlated Traces Tab Panel -->
-      <OTabPanel name="correlated-traces" stretch>
-        <TelemetryCorrelationDashboard
-          v-if="correlationProps"
-          mode="embedded-tabs"
-          external-active-tab="traces"
-          :service-name="correlationProps.serviceName"
-          :matched-dimensions="correlationProps.matchedDimensions"
-          :additional-dimensions="correlationProps.additionalDimensions"
-          :matched-set-id="correlationProps.matchedSetId"
-          :chip-dimensions="correlationProps.chipDimensions"
-          :source-event="correlationProps.sourceEvent"
-          :metric-streams="correlationProps.metricStreams"
-          :log-streams="correlationProps.logStreams"
-          :trace-streams="correlationProps.traceStreams"
-          :source-stream="correlationProps.sourceStream"
-          :source-type="correlationProps.sourceType"
-          :available-dimensions="correlationProps.availableDimensions"
-          :fts-fields="correlationProps.ftsFields"
-          :time-range="correlationProps.timeRange"
-          :hide-dimension-filters="true"
-          @close="tab = 'json'"
-        />
-        <!-- Loading/Empty state when no data -->
-        <div v-else class="tw:flex tw:items-center tw:justify-center tw:h-full tw:py-20">
-          <div class="tw:text-center">
-            <OSpinner v-if="correlationLoading" size="lg" class="tw:mb-4" data-test="logs-correlation-loading-indicator" />
-            <div v-else-if="correlationError" class="tw:text-base tw:text-red-500">{{ correlationError }}</div>
-            <div v-else class="tw:text-base tw:text-gray-500">{{ t('correlation.clickToLoadTraces') }}</div>
+        <!-- Correlated Traces Tab Panel -->
+        <OTabPanel name="correlated-traces" stretch>
+          <TelemetryCorrelationDashboard
+            v-if="correlationProps"
+            mode="embedded-tabs"
+            external-active-tab="traces"
+            :service-name="correlationProps.serviceName"
+            :matched-dimensions="correlationProps.matchedDimensions"
+            :additional-dimensions="correlationProps.additionalDimensions"
+            :matched-set-id="correlationProps.matchedSetId"
+            :chip-dimensions="correlationProps.chipDimensions"
+            :source-event="correlationProps.sourceEvent"
+            :metric-streams="correlationProps.metricStreams"
+            :log-streams="correlationProps.logStreams"
+            :trace-streams="correlationProps.traceStreams"
+            :source-stream="correlationProps.sourceStream"
+            :source-type="correlationProps.sourceType"
+            :available-dimensions="correlationProps.availableDimensions"
+            :fts-fields="correlationProps.ftsFields"
+            :time-range="correlationProps.timeRange"
+            :hide-dimension-filters="true"
+            @close="tab = 'table'"
+          />
+          <!-- Loading/Empty state when no data -->
+          <div v-else class="flex h-full items-center justify-center py-20">
+            <div class="text-center">
+              <OSpinner
+                v-if="correlationLoading"
+                size="lg"
+                class="mb-4"
+                data-test="logs-correlation-loading-indicator"
+              />
+              <div v-else-if="correlationError" class="text-status-error-text text-base">
+                {{ correlationError }}
+              </div>
+              <div v-else class="text-text-muted text-base">
+                {{ t("correlation.clickToLoadTraces") }}
+              </div>
+            </div>
           </div>
-        </div>
-      </OTabPanel>
-    </OTabPanels>
+        </OTabPanel>
+      </OTabPanels>
     </div>
 
     <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
     <OSeparator v-if="tab === 'json' || tab === 'table'" />
-    <OCardSection v-if="tab === 'json' || tab === 'table'" class="tw:p-4 tw:pb-4 tw:sticky tw:bottom-0 tw:bg-dialog-bg tw:z-10">
-      <div class="tw:flex tw:items-center tw:flex-nowrap tw:justify-between">
-        <div class="tw:w-1/12">
+    <OCardSection
+      v-if="tab === 'json' || tab === 'table'"
+      class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
+    >
+      <div class="flex flex-nowrap items-center justify-between">
+        <div class="w-1/12">
           <OButton
             data-test="log-detail-previous-detail-btn"
             variant="outline"
             size="sm-action"
             :disabled="currentIndex <= 0"
             @click="$emit('showPrevDetail', false, true)"
-          ><OIcon name="navigate-before" size="sm" class="tw:mr-1" />{{ t('common.previous') }}</OButton>
+            ><OIcon name="navigate-before" size="sm" class="mr-1" />{{
+              t("common.previous")
+            }}</OButton
+          >
         </div>
         <div
           v-show="
@@ -391,9 +402,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             searchObj.data.stream.selectedStream.length <= 1 &&
             hasAggregationQuery == false
           "
-          class="tw:flex tw:items-center tw:gap-2"
+          class="flex items-center gap-2"
         >
-          <label class="tw:font-bold tw:whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
+          <label class="font-bold whitespace-nowrap">{{ t("common.noOfRecords") }}</label>
           <OSelect
             v-model="selectedRelativeValue"
             :options="recordSizeOptions"
@@ -405,16 +416,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm-action"
             @click="searchTimeBoxed(rowData, selectedRelativeValue)"
-          >{{ t('common.searchAround') }}</OButton>
+            >{{ t("common.searchAround") }}</OButton
+          >
         </div>
-        <div class="tw:w-1/12 tw:items-end" style="display: contents;">
+        <div class="w-1/12 items-end" style="display: contents">
           <OButton
             data-test="log-detail-next-detail-btn"
             variant="outline"
             size="sm-action"
             :disabled="currentIndex >= totalLength - 1"
             @click="$emit('showNextDetail', true, false)"
-          >{{ t('common.next') }}<OIcon name="navigate-next" size="sm" class="tw:ml-1" /></OButton>
+            >{{ t("common.next") }}<OIcon name="navigate-next" size="sm" class="ml-1"
+          /></OButton>
         </div>
       </div>
     </OCardSection>
@@ -422,15 +435,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../../utils/zincutils";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
@@ -456,8 +470,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 const defaultValue: any = () => {
   return {
     data: {},
@@ -467,10 +481,30 @@ const defaultValue: any = () => {
 export default defineComponent({
   name: "SearchDetail",
   components: {
-    OSeparator, OCardSection,
-    OTabs, OTab, OTabPanels, OTabPanel, EqualIcon, NotEqualIcon, JsonPreview, O2AIContextAddBtn, LogsHighLighting, ChunkedContent, TelemetryCorrelationDashboard, CorrelatedLogsTable, OButton, OSelect, ODropdown, ODropdownItem, ODropdownSeparator, OSwitch, OSpinner,
+    OSeparator,
+    OCardSection,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
+    EqualIcon,
+    NotEqualIcon,
+    JsonPreview,
+    O2AIContextAddBtn,
+    LogsHighLighting,
+    ChunkedContent,
+    TelemetryCorrelationDashboard,
+    CorrelatedLogsTable,
+    OButton,
+    OSelect,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    OSwitch,
+    OSpinner,
     OIcon,
     OTable,
+    OSearchInput,
   },
   emits: [
     "showPrevDetail",
@@ -547,26 +581,26 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
+    const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
     const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref<number>(10);
-    const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "200", value: 200 },
-      { label: "500", value: 500 },
-      { label: "1000", value: 1000 },
+    const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
+      { label: raw("200"), value: 200 },
+      { label: raw("500"), value: 500 },
+      { label: raw("1000"), value: 1000 },
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
-    const {fnParsedSQL, hasAggregation} = logsUtils();
-
+    const { fnParsedSQL, hasAggregation } = logsUtils();
 
     // Watch for initialTab prop changes to update tab
     watch(
@@ -639,11 +673,15 @@ export default defineComponent({
     ];
 
     // Transform rowData object into array of rows
-    const tableRows = computed(() => {
+    const detailSearchQuery = ref("");
+
+    const tableRows = computed<
+      { _rowKey: string; field: string; value: string | number | boolean }[]
+    >(() => {
       return Object.entries(rowData.value).map(([field, value]) => ({
         _rowKey: "field_" + field,
         field,
-        value,
+        value: value as string | number | boolean,
       }));
     });
 
@@ -663,27 +701,130 @@ export default defineComponent({
       return store.state.zoConfig.service_streams_enabled !== false;
     });
 
+    // Tab bar is drag-to-reorder (same pattern as the home page): the list of
+    // tabs that *may* be shown is derived from config, while the user's chosen
+    // order lives in localStorage.
+    const LS_TAB_ORDER_KEY = "o2_log_detail_tab_order";
+
+    const availableTabs = computed(() => {
+      const tabs = [
+        {
+          name: "json",
+          label: t("common.json"),
+          dataTest: "log-detail-json-tab",
+        },
+        {
+          name: "table",
+          label: t("common.table"),
+          dataTest: "log-detail-table-tab",
+        },
+      ];
+      if (serviceStreamsEnabled.value && config.isEnterprise === "true") {
+        tabs.push(
+          {
+            name: "correlated-logs",
+            label: t("correlation.correlatedLogs"),
+            dataTest: "correlated-logs-tab",
+          },
+          {
+            name: "correlated-metrics",
+            label: t("correlation.correlatedMetrics"),
+            dataTest: "correlated-metrics-tab",
+          },
+          {
+            name: "correlated-traces",
+            label: t("correlation.correlatedTraces"),
+            dataTest: "correlated-traces-tab",
+          },
+        );
+      }
+      return tabs;
+    });
+
+    type DetailTab = { name: string; label: string; dataTest: string };
+
+    const loadTabOrder = (): DetailTab[] => {
+      try {
+        const saved = window.localStorage.getItem(LS_TAB_ORDER_KEY);
+        if (saved) {
+          const names: string[] = JSON.parse(saved);
+          const ordered = names
+            .map((name) => availableTabs.value.find((t) => t.name === name))
+            .filter(Boolean) as DetailTab[];
+          // Append any tab that is available but missing from the saved order.
+          availableTabs.value.forEach((t) => {
+            if (!ordered.find((o) => o.name === t.name)) ordered.push(t);
+          });
+          return ordered;
+        }
+      } catch {
+        /* ignore: fall back to the default tab order */
+      }
+      return [...availableTabs.value];
+    };
+
+    const tabOrder = ref<DetailTab[]>(loadTabOrder());
+
+    // Enterprise/service-stream config arrives asynchronously, so re-sync the
+    // order whenever the set of available tabs changes — keeping the user's
+    // order and appending anything new.
+    watch(
+      () => availableTabs.value.map((t) => t.name).join(","),
+      () => {
+        const merged: DetailTab[] = [];
+        tabOrder.value.forEach((t) => {
+          const match = availableTabs.value.find((a) => a.name === t.name);
+          if (match) merged.push(match);
+        });
+        availableTabs.value.forEach((a) => {
+          if (!merged.find((m) => m.name === a.name)) merged.push(a);
+        });
+        tabOrder.value = merged;
+      },
+    );
+
+    // OTabs reports the intended move (dragged name → target name + which side
+    // of the target); we apply it to our own list and persist it.
+    const onTabReorder = ({
+      from,
+      to,
+      before = true,
+    }: {
+      from: string | number;
+      to: string | number;
+      before?: boolean;
+    }) => {
+      if (from === to) return;
+      const order = [...tabOrder.value];
+      const fromIdx = order.findIndex((t) => t.name === from);
+      if (fromIdx === -1) return;
+
+      const [moved] = order.splice(fromIdx, 1);
+      // Recompute the target index after removal, then insert on the chosen side.
+      let toIdx = order.findIndex((t) => t.name === to);
+      if (toIdx === -1) return;
+      if (!before) toIdx += 1;
+      order.splice(toIdx, 0, moved);
+
+      tabOrder.value = order;
+      window.localStorage.setItem(LS_TAB_ORDER_KEY, JSON.stringify(order.map((t) => t.name)));
+    };
+
     onBeforeMount(() => {
       if (window.localStorage.getItem("wrap-log-details") === null) {
         window.localStorage.setItem("wrap-log-details", "true");
       }
-      shouldWrapValues.value =
-        window.localStorage.getItem("wrap-log-details") === "true";
+      shouldWrapValues.value = window.localStorage.getItem("wrap-log-details") === "true";
 
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        if (
-          item.streams.length == searchObj.data.stream.selectedStream.length
-        ) {
+        if (item.streams.length == searchObj.data.stream.selectedStream.length) {
           multiStreamFields.value.push(item.name);
         }
       });
     });
 
     const toggleWrapLogDetails = () => {
-      window.localStorage.setItem(
-        "wrap-log-details",
-        shouldWrapValues.value ? "true" : "false",
-      );
+      window.localStorage.setItem("wrap-log-details", shouldWrapValues.value ? "true" : "false");
     };
 
     const flattenJSONObject = (obj: any, param: string) => {
@@ -704,8 +845,8 @@ export default defineComponent({
     };
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
-        successMessage: "Content Copied Successfully!",
+      copyToClipboard(JSON.stringify(log), t, {
+        successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
         timeout: 1000,
       });
     };
@@ -715,7 +856,9 @@ export default defineComponent({
     };
 
     // Cross-linking: get all matching cross-links for a field
-    const getCrossLinksForField = (fieldName: string): Array<{ name: string; resolvedUrl: string }> => {
+    const getCrossLinksForField = (
+      fieldName: string,
+    ): Array<{ name: string; resolvedUrl: string }> => {
       if (!store.state.zoConfig?.enable_cross_linking) return [];
 
       const crossLinks = searchObj.data.crossLinks;
@@ -805,14 +948,14 @@ export default defineComponent({
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
         : getImageURL("images/common/ai_icon_gradient.svg");
     });
 
     const regexIcon = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
@@ -873,6 +1016,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       router,
@@ -900,7 +1044,10 @@ export default defineComponent({
       statusColor,
       tableColumns,
       tableRows,
+      detailSearchQuery,
       serviceStreamsEnabled,
+      tabOrder,
+      onTabReorder,
       config,
       getContentSize,
       getDisplayValue,
@@ -916,11 +1063,57 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.full-height-panels .o-tab-panel {
+<style scoped>
+/* keep(complex-state): :deep override of the child tab component's panel to fill height */
+.full-height-panels :deep(.o-tab-panel) {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.searchdetaildialog {
+  width: 85vw;
+}
+
+/* keep(lib-override:oselect): reaches into the OSelect-rendered button to size
+   the records-per-page control. */
+.select-noof-records {
+  width: 5rem;
+}
+
+.select-noof-records :deep(button[type="button"]) {
+  height: 2.25rem;
+}
+
+/* keep(lib-override:otable): reaches into the OTable-rendered th/td DOM to
+   compress the source table and pin its header; the !important is load-bearing
+   against OTable's own row sizing. */
+.o2-schema-table :deep(th),
+.o2-schema-table :deep(td) {
+  height: 0.875rem !important;
+  min-height: 0.875rem !important;
+  padding: 0.125rem 0.1875rem !important;
+}
+
+.o2-schema-table :deep(thead) {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.o2-schema-table :deep(thead th),
+.o2-schema-table :deep(tbody td) {
+  border-right: 1px solid var(--color-card-glass-border);
+  border-bottom: 1px solid var(--color-card-glass-border);
+}
+
+.o2-schema-table :deep(thead th:last-child),
+.o2-schema-table :deep(tbody td:last-child) {
+  border-right: none;
+}
+
+.o2-schema-table :deep(tbody tr:last-child td) {
+  border-bottom: none;
 }
 </style>

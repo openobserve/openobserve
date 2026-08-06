@@ -70,8 +70,7 @@ const EMPTY_KPI: LLMKPI = {
  */
 export function useLLMInsights() {
   const store = useStore();
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const kpi = ref<LLMKPI>({ ...EMPTY_KPI });
   const sparklines = ref<LLMSparklineSeries>({
@@ -97,9 +96,6 @@ export function useLLMInsights() {
    * Called from the parent on org switch / unmount paths to free up
    * server-side resources and prevent stale results from arriving
    * after the user has moved on.
-   *
-   * @example
-   *   onUnmounted(() => cancelAll());
    */
   function cancelAll() {
     activeTraceIds.forEach((id) => {
@@ -120,11 +116,6 @@ export function useLLMInsights() {
    *
    * Resolves on `complete`. Rejects with an `Error` enriched with
    * `.status`, `.code`, `.raw` on the streaming endpoint's error event.
-   *
-   * @example (internal usage)
-   *   await executeQuery("SELECT count(*) ...", "default", 100, 200, (hits) => {
-   *     target.value.requestCount = Number(hits[0].count);
-   *   });
    */
   function executeQuery(
     sql: string,
@@ -196,9 +187,6 @@ export function useLLMInsights() {
    * are the model calls", so the fast child/tool spans must be excluded
    * or they drag the tail down. This matches the dedicated Latency trend
    * panel and the sparkline's per-bucket P95.
-   *
-   * @example (internal)
-   *   const p95 = await fetchLatency("default", 100, 200);
    */
   async function fetchLatency(
     streamName: string,
@@ -240,11 +228,6 @@ export function useLLMInsights() {
    * whole strip from one query. The error-rate CARD divides the summed
    * error count by the summed trace count; the per-bucket error-rate
    * SERIES is computed the same way per bucket.
-   *
-   * @example (internal)
-   *   const totals = await fetchSummary("default", 100, 200);
-   *   // sparklines.value.cost is now an array of per-bucket cost values
-   *   // totals.totalCost is the summed whole-window cost
    */
   async function fetchSummary(
     streamName: string,
@@ -252,11 +235,8 @@ export function useLLMInsights() {
     endTime: number,
     agent?: GenAiAgentListItem | null,
   ): Promise<Omit<LLMKPI, "p95DurationMicros">> {
-    // We need every bucket to render the sparkline — there is no
-    // pagination story here. Pass a generous size so the streaming
-    // endpoint never truncates the response. Even a 1-year window at a
-    // coarse auto-interval stays well under this, so 10_000 leaves a
-    // wide safety margin.
+    // One size must cover every bucket — there's no pagination here. 10_000
+    // is a wide margin (even a 1-year window at a coarse interval stays under).
     const size = 10_000;
 
     const agentFilter = buildAgentTraceFilter(agent, streamName);
@@ -309,9 +289,7 @@ export function useLLMInsights() {
           series.traces.push(traceCount);
           series.p95Micros.push(Number(row.p95_duration) || 0);
           series.cost.push(cost);
-          series.errorRate.push(
-            traceCount > 0 ? (errorCount / traceCount) * 100 : 0,
-          );
+          series.errorRate.push(traceCount > 0 ? (errorCount / traceCount) * 100 : 0);
 
           totals.requestCount += requestCount;
           totals.traceCount += traceCount;

@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import AlertSummary from "./AlertSummary.vue";
 import i18n from "@/locales";
 
-
 describe("AlertSummary", () => {
   let mockFormData: any;
   let mockDestinations: any[];
@@ -61,9 +60,7 @@ describe("AlertSummary", () => {
     });
 
     expect(wrapper.exists()).toBe(true);
-    expect(
-      wrapper.find('[data-test="alerts-alert-summary"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('[data-test="alerts-alert-summary"]').exists()).toBe(true);
   });
 
   it("should display placeholder when summaryText is empty", () => {
@@ -77,9 +74,7 @@ describe("AlertSummary", () => {
       },
     });
 
-    const placeholder = wrapper.find(
-      '[data-test="alerts-alert-summary-empty-state"]',
-    );
+    const placeholder = wrapper.find('[data-test="alerts-alert-summary-empty-state"]');
     expect(placeholder.exists()).toBe(true);
   });
 
@@ -109,7 +104,6 @@ describe("AlertSummary", () => {
       },
     });
 
-    const scrollButton = wrapper.find(".scroll-to-bottom-btn");
     // Button exists but is hidden (v-show)
     expect(wrapper.vm.showScrollToBottom).toBe(false);
   });
@@ -183,9 +177,8 @@ describe("AlertSummary", () => {
 
     // Mock the scrollTo method
     const mockScrollTo = vi.fn();
-    const summaryContainer = wrapper.find(
-      '[data-test="alerts-alert-summary-content"]',
-    ).element as HTMLElement;
+    const summaryContainer = wrapper.find('[data-test="alerts-alert-summary-content"]')
+      .element as HTMLElement;
     summaryContainer.scrollTo = mockScrollTo;
 
     wrapper.vm.showScrollToBottom = true;

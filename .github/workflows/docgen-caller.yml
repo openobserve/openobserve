@@ -10,8 +10,9 @@ name: DocGen Caller (openobserve)
 # `workflow_dispatch`. The engine then runs IN o2-enterprise CI and posts results back here using
 # the same PAT (its own GITHUB_TOKEN can't write to this repo).
 #
-# This caller only: (1) gates the command to org members, (2) resolves PR/dry-run/actor,
-# (3) dispatches the engine via the PAT, (4) posts an immediate ack on the OSS PR.
+# This caller only: (1) gates the command to org members (or an opt-in auto-trigger on a merged
+# feat: PR when vars.DOCGEN_AUTO_TRIGGER == 'true'), (2) resolves PR/dry-run/actor,
+# (3) dispatches the engine via the PAT, (4) posts an immediate ack on the OSS PR (manual path only).
 #
 # REQUIRED — secrets.ORG_ADMIN_TOKEN (fine-grained PAT) permissions:
 #   o2-enterprise:  Actions: R/W  (to dispatch)  + Issues/Pull requests: R/W (engine comments)
@@ -23,6 +24,10 @@ name: DocGen Caller (openobserve)
 on:
   issue_comment:
     types: [created]
+  # AUTO-TRIGGER (opt-in): when an OSS PR MERGES, dispatch DocGen automatically — but only if
+  # vars.DOCGEN_AUTO_TRIGGER == 'true'. Gated in the job `if:` to merged + feat: + same-repo branch.
+  pull_request:
+    types: [closed]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -45,32 +50,45 @@ jobs:
     # dispatch step (and therefore the PAT) never runs.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event.issue.pull_request &&
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request &&
        (github.event.comment.body == '/docgen' || github.event.comment.body == '/docgen-dryrun') &&
-       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)) ||
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.merged == true &&
+       github.event.pull_request.head.repo.full_name == github.repository &&
+       startsWith(github.event.pull_request.title, 'feat:') &&
+       vars.DOCGEN_AUTO_TRIGGER == 'true' &&
+       vars.DOCGEN_DISABLED != 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 10   # the dispatch is a quick API call; bound it as defense-in-depth
     steps:
       - name: Resolve context (untrusted event data via env, never spliced into commands)
         id: ctx
         env:
-          IN_PR: ${{ inputs.pr_number || github.event.issue.number }}
+          IS_PR: ${{ github.event_name == 'pull_request' }}
           IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          DISPATCH_PR: ${{ inputs.pr_number }}
           DISPATCH_DRY: ${{ inputs.dry_run }}
+          DISPATCH_ACTOR: ${{ github.actor }}
+          COMMENT_PR: ${{ github.event.issue.number }}
           COMMENT_BODY: ${{ github.event.comment.body }}
           COMMENT_LOGIN: ${{ github.event.comment.user.login }}
-          DISPATCH_ACTOR: ${{ github.actor }}
+          PR_EVENT_NUM: ${{ github.event.pull_request.number }}
+          PR_EVENT_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          PR="$IN_PR"
-          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::invalid PR number: $PR"; exit 1; }
-          if [ "$IS_DISPATCH" = "true" ]; then
-            DRY="$DISPATCH_DRY"; ACTOR="$DISPATCH_ACTOR"
+          if [ "$IS_PR" = "true" ]; then
+            # Auto-trigger: a merged feat: PR → full run, attributed to the PR author.
+            PR="$PR_EVENT_NUM"; DRY="false"; ACTOR="$PR_EVENT_AUTHOR"; AUTO="true"
+          elif [ "$IS_DISPATCH" = "true" ]; then
+            PR="$DISPATCH_PR"; DRY="$DISPATCH_DRY"; ACTOR="$DISPATCH_ACTOR"; AUTO="false"
           else
-            [ "$COMMENT_BODY" = "/docgen-dryrun" ] && DRY="true" || DRY="false"
-            ACTOR="$COMMENT_LOGIN"
+            PR="$COMMENT_PR"; [ "$COMMENT_BODY" = "/docgen-dryrun" ] && DRY="true" || DRY="false"; ACTOR="$COMMENT_LOGIN"; AUTO="false"
           fi
+          [[ "$PR" =~ ^[0-9]+$ ]] || { echo "::error::invalid PR number: $PR"; exit 1; }
           ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
-          { echo "pr=$PR"; echo "dry=$DRY"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
+          # auto=true only on the merge path → forwarded to the engine, which then suppresses its
+          # sister-pair "waiting for merge" comment (partial merges stay silent).
+          { echo "pr=$PR"; echo "dry=$DRY"; echo "actor=$ACTOR"; echo "auto=$AUTO"; } >> "$GITHUB_OUTPUT"
 
       - name: Dispatch the DocGen engine (o2-enterprise) via the org-admin PAT
         env:
@@ -78,13 +96,15 @@ jobs:
           PR: ${{ steps.ctx.outputs.pr }}
           DRY: ${{ steps.ctx.outputs.dry }}
           ACTOR: ${{ steps.ctx.outputs.actor }}
+          AUTO: ${{ steps.ctx.outputs.auto }}
         run: |
           gh workflow run docgen.yml --repo openobserve/o2-enterprise \
             -f source_repo=openobserve \
             -f pr_number="$PR" \
             -f dry_run="$DRY" \
-            -f actor="$ACTOR"
-          echo "Dispatched DocGen engine for openobserve PR #$PR (dry_run=$DRY, by @$ACTOR)."
+            -f actor="$ACTOR" \
+            -f auto="$AUTO"
+          echo "Dispatched DocGen engine for openobserve PR #$PR (dry_run=$DRY, auto=$AUTO, by @$ACTOR)."
 
       - name: Acknowledge on the source PR
         # success() => only ack if the dispatch actually succeeded (don't mislead the author if

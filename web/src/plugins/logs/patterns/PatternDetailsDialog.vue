@@ -16,264 +16,308 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <ODrawer data-test="pattern-details-dialog"
-    :open="modelValue"
-    @update:open="$emit('update:modelValue', $event)"
-    :width="90"
-    :title="t('search.patternDetailsTitle')"
-    :subTitle="selectedPattern ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns }) : undefined"
-  >
-    <template #header>
-      <div class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-0.5 tw:overflow-hidden">
-        <!-- Row 1: level badge · title · token & slot OBadges (right of title) -->
-        <div class="tw:flex tw:items-center tw:gap-2 tw:min-w-0">
-          <span
-            v-if="patternLevelInfo"
-            class="tw:shrink-0 tw:inline-flex tw:items-center tw:px-1.5 tw:py-0.5 tw:rounded tw:text-xs tw:font-semibold tw:uppercase tw:tracking-wide tw:text-white"
-            :style="{ backgroundColor: patternLevelInfo.color }"
-          >
-            {{ patternLevelInfo.level }}
-          </span>
-          <h4 class="tw:font-semibold tw:text-[var(--o2-text-heading)] tw:truncate tw:min-w-0 tw:text-base tw:leading-tight tw:m-0">
-            {{ selectedPattern?.pattern?.description || t('search.patternDetailsTitle') }}
-          </h4>
-          <template v-if="selectedPattern">
-            <OTag type="countChip" value="neutral" class="tw:shrink-0">
-              {{ selectedTemplateTokens.length }} {{ selectedTemplateTokens.length === 1 ? 'token' : 'tokens' }}
-            </OTag>
-            <OTag type="countChip" value="neutral" class="tw:shrink-0">
-              {{ patternWildcardCount }} {{ patternWildcardCount === 1 ? 'variable slot' : 'variable slots' }}
-            </OTag>
-          </template>
-        </div>
-        <!-- Row 2: full-width module path, truncates at edge -->
-        <code
-          v-if="selectedPattern && patternPathToken"
-          class="tw:block tw:w-full tw:truncate tw:text-[var(--o2-text-code)] tw:font-mono tw:text-[0.6875rem] tw:text-[var(--o2-text-caption)]"
-        >{{ patternPathToken }}</code>
-      </div>
-    </template>
-    <div class="tw:px-5 tw:py-3">
-    <template v-if="selectedPattern">
-        <!-- Statistics -->
-        <div class="tw:mb-4">
-          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
-            {{ t("search.patternStatistics") }}
-          </div>
-          <div class="tw:flex tw:gap-3">
-            <div class="tw:w-1/2">
-              <OCard
-                class="tw:bg-[var(--o2-card-bg-solid)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
-              >
-                <OCardSection class="tw:p-[0.375rem]">
-                  <div
-                    class="tw:text-xs"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
-                    "
-                  >
-                    {{ t("search.patternOccurrences") }}
-                  </div>
-                  <div
-                    class="tw:text-2xl tw:font-semibold text-weight-bold text-primary tw:mt-1"
-                  >
-                    {{
-                      selectedPattern.pattern.frequency.toLocaleString()
-                    }}
-                  </div>
-                </OCardSection>
-              </OCard>
-            </div>
-            <div class="tw:w-1/2">
-              <OCard class="tw:bg-[var(--o2-card-bg-solid)] tw:border tw:border-solid tw:border-[var(--o2-border-color)]">
-                <OCardSection class="tw:p-[0.375rem]">
-                  <div
-                    class="tw:text-xs"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
-                    "
-                  >
-                    {{ t("search.patternPercentage") }}
-                  </div>
-                  <div
-                    class="tw:text-2xl tw:font-semibold text-weight-bold text-primary tw:mt-1"
-                  >
-                    {{ selectedPattern.pattern.percentage.toFixed(2) }}%
-                  </div>
-                </OCardSection>
-              </OCard>
-            </div>
-          </div>
-          <div
-            v-if="selectedPattern.pattern.is_anomaly"
-            class="tw:mt-3"
-          >
-            <div
-              class="tw:rounded tw:border tw:border-solid tw:border-[var(--o2-status-error-border)] tw:px-3 tw:py-2 tw:flex tw:gap-3 tw:items-start"
-              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-white'"
+    <ODrawer
+      data-test="pattern-details-dialog"
+      bleed
+      :open="modelValue"
+      @update:open="$emit('update:modelValue', $event)"
+      :width="90"
+      :title="t('search.patternDetailsTitle')"
+      :subTitle="
+        selectedPattern
+          ? t('search.patternXofY', { index: selectedPattern.index + 1, total: totalPatterns })
+          : undefined
+      "
+    >
+      <template #header>
+        <div class="flex min-w-0 flex-1 flex-col gap-0.5 overflow-hidden">
+          <!-- Row 1: level badge · title · token & slot OBadges (right of title) -->
+          <div class="flex min-w-0 items-center gap-2">
+            <span
+              v-if="patternLevelInfo"
+              class="rounded-default inline-flex shrink-0 items-center px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase"
+              :style="{ backgroundColor: patternLevelInfo.color }"
             >
-              <OIcon name="warning" size="sm" class="tw:mt-0.5 tw:shrink-0" />
-              <div>
-                <div class="text-weight-bold tw:text-red-500">{{ t("search.patternAnomalyDetected") }}</div>
-                <div
-                  class="tw:text-xs tw:mt-1"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-gray-500'"
-                >
-                  {{ anomalyExplanationForSelected }}
-                </div>
-                <div
-                  v-if="selectedPattern.pattern.z_score !== undefined && selectedPattern.pattern.z_score < -1.5 && selectedPattern.pattern.avg_frequency"
-                  class="tw:text-xs tw:mt-1"
-                  :class="store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'"
-                >
-                  {{ t("search.patternZScore", { zScore: selectedPattern.pattern.z_score.toFixed(2), avgFrequency: Math.round(selectedPattern.pattern.avg_frequency).toLocaleString() }) }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Variables Summary -->
-        <div class="tw:mb-4">
-          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
-            {{ t("search.patternVariablesHeader") }}
-          </div>
-          <div
-            class="tw:px-2.5 tw:py-1.5 tw:rounded tw:border-l-4 tw:border-solid tw:border-l-[var(--o2-primary-color)]"
-            :class="
-              store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
-            "
-          >
-            {{
-              selectedPattern.pattern.examples?.[0]?.variables
-                ? t("search.patternVariablesDetected", { count: Object.keys(selectedPattern.pattern.examples[0].variables).length })
-                : t("search.patternNoVariablesDetected")
-            }}
-          </div>
-        </div>
-
-        <!-- Pattern Template -->
-        <div class="tw:mb-4">
-          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
-            {{ t("search.patternTemplate") }}
-          </div>
-          <div
-            class="tw:px-2.5 tw:py-1.5 tw:font-mono tw:text-[0.8125rem] tw:leading-[1.6] tw:rounded tw:border-l-4 tw:border-solid tw:border-l-[var(--o2-primary-color)] tw:break-all tw:flex tw:flex-wrap tw:items-baseline tw:gap-x-[2px] tw:gap-y-[2px]"
-            :class="
-              store.state.theme === 'dark' ? 'tw:bg-gray-800' : 'tw:bg-gray-100'
-            "
-          >
-            <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
-              <span v-if="tok.kind === 'text'" class="tw:whitespace-pre">{{ tok.value }}</span>
-              <span
-                v-else
-                class="tw:inline-flex"
-                @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
-                @mouseleave="onMouseLeave"
-              >
-                <OTag
-                  type="wildcardChip"
-                  :class="wildcardChipColor(tok.value, tok.sampleValues)"
-                >
-                  {{ wildcardLabel(tok.value, tok.sampleValues) }}
-                </OTag>
-              </span>
+              {{ patternLevelInfo.level }}
+            </span>
+            <h4
+              class="text-text-heading m-0 min-w-0 truncate text-base leading-tight font-semibold"
+            >
+              {{ selectedPattern?.pattern?.description || t("search.patternDetailsTitle") }}
+            </h4>
+            <template v-if="selectedPattern">
+              <OTag type="countChip" value="neutral" class="shrink-0">
+                {{ selectedTemplateTokens.length }}
+                {{
+                  selectedTemplateTokens.length === 1
+                    ? t("logs.patternDetailsDialog.token")
+                    : t("logs.patternDetailsDialog.tokens")
+                }}
+              </OTag>
+              <OTag type="countChip" value="neutral" class="shrink-0">
+                {{ patternWildcardCount }}
+                {{
+                  patternWildcardCount === 1
+                    ? t("logs.patternDetailsDialog.variableSlot")
+                    : t("logs.patternDetailsDialog.variableSlots")
+                }}
+              </OTag>
             </template>
           </div>
-        </div>
-
-        <!-- Variables -->
-        <div
-          v-if="
-            selectedPattern.pattern.variables &&
-            selectedPattern.pattern.variables.length > 0
-          "
-          class="tw:mb-4"
-        >
-          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
-            {{ t("search.patternVariablesWithCount", { count: selectedPattern.pattern.variables.length }) }}
-          </div>
-          <OTable
-            :data="selectedPattern.pattern.variables"
-            :columns="variableColumns"
-            row-key="index"
-            pagination="none"
-            :show-global-filter="false"
-            :default-columns="false"
-            :max-height="undefined"
-            class="tw:w-full tw:border tw:border-solid tw:border-[var(--o2-border-color)]"
+          <!-- Row 2: full-width module path, truncates at edge -->
+          <code
+            v-if="selectedPattern && patternPathToken"
+            class="text-text-code text-2xs text-text-secondary block w-full truncate font-mono"
+            >{{ patternPathToken }}</code
           >
-            <template #cell-name="{ row }">
-              <div class="tw:text-left text-weight-bold text-primary">
-                {{ row.name || "var_" + row.index }}
-              </div>
-            </template>
-
-            <template #cell-type="{ row }">
-              <div class="tw:text-left">
-                <OTag
-                  type="fieldType"
-                  :value="row.var_type"
-                  :label="row.var_type || 'unknown'"
-                />
-              </div>
-            </template>
-          </OTable>
-        </div>
-
-        <!-- Example Logs -->
-        <div
-          v-if="
-            selectedPattern.pattern.examples &&
-            selectedPattern.pattern.examples.length > 0
-          "
-          class="tw:mb-[1rem]"
-        >
-          <div class="tw:text-sm tw:font-medium tw:mb-1.5">
-            {{ t("search.patternExampleLogsWithCount", { count: selectedPattern.pattern.examples.length }) }}
-          </div>
-          <div
-            v-for="(example, exIdx) in selectedPattern.pattern.examples"
-            :key="exIdx"
-            class="tw:px-[0.625rem] tw:py-[0.375rem] tw:mb-[0.375rem] tw:font-mono tw:text-[0.75rem] tw:leading-[1.6] tw:rounded tw:break-all tw:whitespace-pre-wrap tw:border-l-[0.1875rem] tw:border-solid"
-            :class="[
-              store.state.theme === 'dark' ? 'tw:bg-gray-800 tw:border-l-[#3a3a3a]' : 'tw:bg-gray-50 tw:border-l-[#e0e0e0]'
-            ]"
-          >
-            <LogsHighLighting
-              :data="example.log_message"
-              :show-braces="false"
-              :show-quotes="false"
-              :query-string="''"
-              :simple-mode="false"
-            />
-          </div>
         </div>
       </template>
-    </div>
+      <div class="px-5 py-3">
+        <template v-if="selectedPattern">
+          <!-- Actions (moved here from each row) — highlighted bar with prominent,
+             semantically-colored buttons so they're impossible to miss. -->
+          <div
+            class="rounded-surface bg-surface-subtle border-card-glass-border mb-4 flex items-center gap-2 border border-solid p-2.5"
+            data-test="pattern-detail-actions"
+          >
+            <span class="text-text-secondary mr-1 text-xs font-medium tracking-wide uppercase">
+              {{ t("logs.patternList.actionsLabel") }}
+            </span>
+            <OButton
+              variant="primary"
+              size="xs"
+              data-test="pattern-detail-include-btn"
+              @click="onInclude"
+            >
+              <template #icon-left><EqualIcon class="size-2.5" /></template>
+              {{ t("logs.patternList.includeInQuery") }}
+            </OButton>
+            <OButton
+              variant="outline-destructive"
+              size="xs"
+              data-test="pattern-detail-exclude-btn"
+              @click="onExclude"
+            >
+              <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+              {{ t("logs.patternList.excludeFromQuery") }}
+            </OButton>
+            <OButton
+              variant="warning"
+              size="xs"
+              icon-left="notifications"
+              data-test="pattern-detail-create-alert-btn"
+              @click="onCreateAlert"
+            >
+              {{ t("logs.patternList.createAlertAction") }}
+            </OButton>
+          </div>
+
+          <!-- Statistics -->
+          <div class="mb-4">
+            <div class="mb-1.5 text-sm font-medium">
+              {{ t("search.patternStatistics") }}
+            </div>
+            <div class="flex gap-3">
+              <div class="w-1/2">
+                <OCard class="bg-card-glass-solid border-card-glass-border border border-solid">
+                  <OCardSection class="p-1.5">
+                    <div class="text-xs" :class="'text-text-secondary'">
+                      {{ t("search.patternOccurrences") }}
+                    </div>
+                    <div
+                      class="text-primary mt-1 text-2xl font-bold font-semibold"
+                      :title="
+                        volumeCount !== null
+                          ? t('logs.patternList.exactCountTooltip', {
+                              count: volumeCount.toLocaleString(),
+                            })
+                          : undefined
+                      "
+                    >
+                      {{ occurrencesLabel }}
+                    </div>
+                  </OCardSection>
+                </OCard>
+              </div>
+              <div class="w-1/2">
+                <OCard class="bg-card-glass-solid border-card-glass-border border border-solid">
+                  <OCardSection class="p-1.5">
+                    <div class="text-xs" :class="'text-text-secondary'">
+                      {{ t("search.patternPercentage") }}
+                    </div>
+                    <div class="text-primary mt-1 text-2xl font-bold font-semibold">
+                      {{ selectedPattern.pattern.percentage.toFixed(2) }}%
+                    </div>
+                  </OCardSection>
+                </OCard>
+              </div>
+            </div>
+            <div v-if="selectedPattern.pattern.is_anomaly" class="mt-3">
+              <div
+                class="rounded-default border-status-error-text bg-surface-base flex items-start gap-3 border border-solid px-3 py-2"
+              >
+                <OIcon name="warning" size="sm" class="mt-0.5 shrink-0" />
+                <div>
+                  <div class="text-status-error-text font-bold">
+                    {{ t("search.patternAnomalyDetected") }}
+                  </div>
+                  <div class="text-text-secondary mt-1 text-xs">
+                    {{ anomalyExplanationForSelected }}
+                  </div>
+                  <div
+                    v-if="
+                      selectedPattern.pattern.z_score !== undefined &&
+                      selectedPattern.pattern.z_score < -1.5 &&
+                      selectedPattern.pattern.avg_frequency
+                    "
+                    class="mt-1 text-xs"
+                    :class="'text-text-secondary'"
+                  >
+                    {{
+                      t("search.patternZScore", {
+                        zScore: selectedPattern.pattern.z_score.toFixed(2),
+                        avgFrequency: Math.round(
+                          selectedPattern.pattern.avg_frequency,
+                        ).toLocaleString(),
+                      })
+                    }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Variables Summary -->
+          <div class="mb-4">
+            <div class="mb-1.5 text-sm font-medium">
+              {{ t("search.patternVariablesHeader") }}
+            </div>
+            <div
+              class="rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5"
+            >
+              {{
+                selectedPattern.pattern.examples?.[0]?.variables
+                  ? t("search.patternVariablesDetected", {
+                      count: Object.keys(selectedPattern.pattern.examples[0].variables).length,
+                    })
+                  : t("search.patternNoVariablesDetected")
+              }}
+            </div>
+          </div>
+
+          <!-- Pattern Template -->
+          <div class="mb-4">
+            <div class="mb-1.5 text-sm font-medium">
+              {{ t("search.patternTemplate") }}
+            </div>
+            <div
+              class="text-compact rounded-default border-l-accent bg-surface-subtle border-l-4 border-solid px-2.5 py-1.5 font-mono leading-[1.6] break-all whitespace-pre-wrap"
+            >
+              <template v-for="(tok, i) in selectedTemplateTokens" :key="i">
+                <span v-if="tok.kind === 'text'">{{ tok.value }}</span>
+                <span
+                  v-else
+                  class="rounded-default bg-pattern-var-bg text-pattern-var-text px-0.5"
+                  @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
+                  @mouseleave="onMouseLeave"
+                  >{{ tok.mask ?? wildcardLabel(tok.value, tok.sampleValues) }}</span
+                >
+              </template>
+            </div>
+          </div>
+
+          <!-- Variables -->
+          <div
+            v-if="selectedPattern.pattern.variables && selectedPattern.pattern.variables.length > 0"
+            class="mb-4"
+          >
+            <div class="mb-1.5 text-sm font-medium">
+              {{
+                t("search.patternVariablesWithCount", {
+                  count: selectedPattern.pattern.variables.length,
+                })
+              }}
+            </div>
+            <OTable
+              :data="selectedPattern.pattern.variables"
+              :columns="variableColumns"
+              row-key="index"
+              pagination="none"
+              :show-global-filter="false"
+              :default-columns="false"
+              :max-height="undefined"
+              class="border-card-glass-border w-full border border-solid"
+            >
+              <template #cell-name="{ row }">
+                <div class="text-primary text-left font-bold">
+                  {{ raw(row.name || "var_" + row.index) }}
+                </div>
+              </template>
+
+              <template #cell-type="{ row }">
+                <div class="text-left">
+                  <OTag
+                    type="fieldType"
+                    :value="row.var_type"
+                    :label="row.var_type || t('logs.patternDetailsDialog.unknown')"
+                  />
+                </div>
+              </template>
+            </OTable>
+          </div>
+
+          <!-- Example Logs -->
+          <div
+            v-if="selectedPattern.pattern.examples && selectedPattern.pattern.examples.length > 0"
+            class="mb-4"
+          >
+            <div class="mb-1.5 text-sm font-medium">
+              {{
+                t("search.patternExampleLogsWithCount", {
+                  count: selectedPattern.pattern.examples.length,
+                })
+              }}
+            </div>
+            <div
+              v-for="(example, exIdx) in selectedPattern.pattern.examples"
+              :key="exIdx"
+              class="rounded-default bg-surface-panel border-l-border-default mb-1.5 border-l-[0.1875rem] border-solid px-2.5 py-1.5 font-mono text-xs leading-[1.6] break-all whitespace-pre-wrap"
+            >
+              <LogsHighLighting
+                :data="example.log_message"
+                :show-braces="false"
+                :show-quotes="false"
+                :query-string="''"
+                :simple-mode="false"
+              />
+            </div>
+          </div>
+        </template>
+      </div>
 
       <!-- Footer Navigation -->
-    <template #footer>
-      <div class="tw:flex tw:items-center tw:flex-nowrap tw:justify-between">
+      <template #footer>
+        <div class="flex flex-nowrap items-center justify-between">
           <div class="col-auto">
             <OButton
               variant="outline"
               size="sm"
               data-test="pattern-detail-previous-btn"
-              :disabled="selectedPattern.index === 0"
+              :disabled="selectedPattern?.index === 0"
               @click="$emit('navigate', false, true)"
               icon-left="chevron-left"
             >
-              {{ t('search.patternNavPrevious') }}
+              {{ t("search.patternNavPrevious") }}
             </OButton>
           </div>
-          <div class="col-auto tw:text-center">
-            <span class="tw:text-xs tw:text-gray-400">
-              {{ t("search.patternXofYShort", { index: selectedPattern.index + 1, total: totalPatterns }) }}
+          <div class="col-auto text-center">
+            <span class="text-text-secondary text-xs">
+              {{
+                t("search.patternXofYShort", {
+                  index: (selectedPattern?.index ?? 0) + 1,
+                  total: totalPatterns,
+                })
+              }}
             </span>
           </div>
           <div class="col-auto">
@@ -281,16 +325,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="sm"
               data-test="pattern-detail-next-btn"
-              :disabled="selectedPattern.index >= totalPatterns - 1"
+              :disabled="(selectedPattern?.index ?? 0) >= totalPatterns - 1"
               @click="$emit('navigate', true, false)"
               icon-right="chevron-right"
             >
-              {{ t('search.patternNavNext') }}
+              {{ t("search.patternNavNext") }}
             </OButton>
           </div>
         </div>
-    </template>
-  </ODrawer>
+      </template>
+    </ODrawer>
 
     <WildcardValuePopover
       :visible="!!hoveredToken"
@@ -305,29 +349,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-
-import { computed } from "vue";
-import { useStore } from "vuex";
+import { computed, inject, watch } from "vue";
+import useTheme from "@/composables/useTheme";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import EqualIcon from "@/components/icons/EqualIcon.vue";
+import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import {
   tokenizeTemplate,
-  wildcardChipColor,
   wildcardLabel,
   anomalyExplanation,
 } from "@/composables/useLogs/useTemplateTokenizer";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import { extractStatusFromTemplate } from "@/utils/logs/statusParser";
+import { compactCount } from "./patternUtils";
+import { PATTERN_VOLUME_CACHE, type PatternVolumeCache } from "./usePatternVolume";
 
 const props = defineProps<{
   modelValue: boolean;
@@ -335,24 +381,64 @@ const props = defineProps<{
   totalPatterns: number;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "update:modelValue", value: boolean): void;
   (e: "navigate", next: boolean, prev: boolean): void;
   (e: "filter-value", value: string, action: "include" | "exclude"): void;
+  (e: "add-to-search", pattern: any, action: "include" | "exclude"): void;
+  (e: "create-alert", pattern: any): void;
 }>();
 
-const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-const {
-  hoveredToken,
-  onMouseEnter,
-  onMouseLeave,
-  onPopoverEnter,
-  onPopoverLeave,
-} = useWildcardHover();
+// Window-wide occurrences for the selected pattern, read from the SAME cache the
+// rows use. Opening a row is therefore a cache hit and shows its real count
+// immediately — previously this panel ran its own query and displayed the
+// extraction-sample figure (a few hundred) until that resolved, so the number
+// visibly jumped. Paging to a pattern that was never on screen still has to
+// fetch, and shows a placeholder rather than a number we know to be wrong.
+const volumeCache = inject<PatternVolumeCache | null>(PATTERN_VOLUME_CACHE, null);
 
-const isDark = computed(() => store.state.theme === "dark");
+const volumeEntry = computed(() =>
+  props.selectedPattern?.pattern ? volumeCache?.get(props.selectedPattern.pattern) : undefined,
+);
+const volumeCount = computed<number | null>(() => volumeEntry.value?.total ?? null);
+
+// Pull in anything not already cached (Next/Prev past the rendered rows).
+watch(
+  () => props.selectedPattern?.pattern,
+  (pattern) => {
+    if (pattern && !volumeEntry.value) volumeCache?.request(pattern);
+  },
+  { immediate: true },
+);
+
+const occurrencesLabel = computed(() =>
+  volumeCount.value !== null ? `~${compactCount(volumeCount.value)}` : "…",
+);
+
+// Row-level actions now live in this side panel. Each fires the action and
+// closes the drawer (include/exclude switch to the logs view; create-alert
+// navigates to the alert form).
+const onInclude = () => {
+  if (!props.selectedPattern) return;
+  emit("add-to-search", props.selectedPattern.pattern, "include");
+  emit("update:modelValue", false);
+};
+const onExclude = () => {
+  if (!props.selectedPattern) return;
+  emit("add-to-search", props.selectedPattern.pattern, "exclude");
+  emit("update:modelValue", false);
+};
+const onCreateAlert = () => {
+  if (!props.selectedPattern) return;
+  emit("create-alert", props.selectedPattern.pattern);
+  emit("update:modelValue", false);
+};
+const { isDark } = useTheme();
+
+const { hoveredToken, onMouseEnter, onMouseLeave, onPopoverEnter, onPopoverLeave } =
+  useWildcardHover();
 
 const selectedTemplateTokens = computed(() =>
   tokenizeTemplate(
@@ -374,8 +460,8 @@ const patternPathToken = computed(() => {
   return first?.value?.trim() ?? "";
 });
 
-const patternWildcardCount = computed(() =>
-  selectedTemplateTokens.value.filter((t) => t.kind !== "text").length,
+const patternWildcardCount = computed(
+  () => selectedTemplateTokens.value.filter((t) => t.kind !== "text").length,
 );
 
 const anomalyExplanationForSelected = computed(() =>
@@ -383,11 +469,19 @@ const anomalyExplanationForSelected = computed(() =>
 );
 
 const variableColumns = computed<OTableColumnDef[]>(() => [
-  { id: "name", header: t("search.patternVariableNameColumn"), accessorKey: "name", size: COL.name, meta: { align: "left", autoWidth: true } },
-  { id: "type", header: t("search.patternVariableTypeColumn"), accessorKey: "var_type", size: COL.type, meta: { align: "left" } },
+  {
+    id: "name",
+    header: t("search.patternVariableNameColumn"),
+    accessorKey: "name",
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
+  },
+  {
+    id: "type",
+    header: t("search.patternVariableTypeColumn"),
+    accessorKey: "var_type",
+    size: COL.type,
+    meta: { align: "left" },
+  },
 ]);
 </script>
-
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>

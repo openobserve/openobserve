@@ -1,6 +1,6 @@
 // homePage.js - Landing Page Object for OpenObserve
 import { expect } from '@playwright/test';
-import { openNavFlyoutChild } from '../commonActions.js';
+import { openNavFlyoutChild, gotoMetricsEditor } from '../commonActions.js';
 
 export class HomePage {
     constructor(page) {
@@ -53,7 +53,7 @@ export class HomePage {
         this.logo = page.locator('[data-test="header-openobserve-logo"]').first();
 
         // ===== PAGE LOAD INDICATORS (for verifying navigation completed) =====
-        this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="log-table-column-0-source"]')).first();
+        this.logsPageIndicator = page.locator('[data-test="logs-search-bar-refresh-btn"]').or(page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]')).first();
         this.streamsPageIndicator = page.locator('[data-test="streams-search-stream-input"]').or(page.locator('[data-test="stream-add-stream-btn"]')).first();
         this.dashboardsPageIndicator = page.locator('[data-test="dashboard-new"]').or(page.locator('[data-test="dashboard-table"]')).first();
         this.alertsPageIndicator = page.locator('[data-test="alert-list-page"]').or(page.locator('[data-test="alerts-page"]')).first();
@@ -87,10 +87,20 @@ export class HomePage {
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
+    /**
+     * Clicks the sidebar's Metrics item — which is what this page object's
+     * callers are testing — and then continues into the panel EDITOR, whose
+     * controls `validateMetricsPageElements` asserts on.
+     *
+     * The sidebar now lands on the Metrics Explorer browse grid (`/metrics`);
+     * the editor moved to `/metrics/editor`. Both hops are kept so the sidebar
+     * link itself stays covered rather than being bypassed by a direct goto.
+     */
     async navigateToMetrics() {
         await this.metricsMenu.waitFor({ state: 'visible', timeout: 10000 });
         await this.metricsMenu.click();
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+        await gotoMetricsEditor(this.page);
     }
 
     async navigateToTraces() {
@@ -187,16 +197,70 @@ export class HomePage {
         await this.orgMenuList.waitFor({ state: 'visible', timeout: 5000 });
     }
 
+    /**
+     * Click a row in the org dropdown, tolerating the list settling underneath.
+     *
+     * The menu is virtualized and the popper animates in, so a row can be
+     * visible-and-stable yet still get re-positioned or briefly intercepted a
+     * tick later. One long click spends its entire budget on a single such
+     * attempt; short retries ride the relayout out instead.
+     */
+    async clickOrgRow(row, { timeout = 20000 } = {}) {
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+        await expect(async () => {
+            // Virtualized rows carry a `transform: translateY(...)` that keeps
+            // shifting while the popper animates in and the list settles. Under
+            // CI load those frames stretch out, so Playwright's actionability
+            // "element is stable" check can burn the whole 5s click budget and
+            // time out even though the row is present and visible. Nudge it into
+            // view and force the click past the stability/hit-test gates — the
+            // row is already confirmed visible, so this clicks a real target.
+            await row.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+            await row.click({ force: true, timeout: 5000 });
+            // select() closes the menu. If the click landed mid-reflow and
+            // missed, the popover stays open — gate on it hiding so toPass retries
+            // instead of leaving an un-selected menu for the next step.
+            await this.orgMenuList.waitFor({ state: 'hidden', timeout: 3000 });
+        }).toPass({ timeout });
+    }
+
+    /**
+     * Switch to a specific org by identifier, verified by the URL.
+     *
+     * A force-click on a virtualized row that is still re-positioning can land
+     * on a neighbouring row (often "default") — the menu still closes, so a
+     * "menu hidden" check alone can't tell a right selection from a wrong one.
+     * The only authoritative success signal is the URL carrying the target
+     * identifier, so retry the whole open → search → click until it does,
+     * re-opening the menu when a prior miss closed it.
+     */
+    async selectOrgByIdentifier(orgName, orgIdentifier) {
+        const targetRow = this.getOrgMenuItemByIdentifier(orgIdentifier);
+        await expect(async () => {
+            if (!(await this.orgMenuList.isVisible())) {
+                await this.orgSelector.click();
+                await this.orgMenuList.waitFor({ state: 'visible', timeout: 5000 });
+            }
+            // Filter is name/identifier-matched; the name can be shared across
+            // several orgs, so we still target the unique identifier row.
+            await this.orgSearchInput.fill(orgName, { force: true });
+            await targetRow.waitFor({ state: 'visible', timeout: 5000 });
+            await targetRow.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+            await targetRow.click({ force: true, timeout: 5000 });
+            await this.page.waitForURL(new RegExp(`org_identifier=${orgIdentifier}`), {
+                timeout: 5000,
+            });
+        }).toPass({ timeout: 30000 });
+    }
+
     async selectOrganization(orgName) {
         await this.openOrgSelector();
 
         // Search for the organization
         await this.orgSearchInput.fill(orgName);
-        // Wait for the result row to render before clicking.
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 5000 });
 
         // Click the first matching organization
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
@@ -205,8 +269,7 @@ export class HomePage {
         await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
         // Find the "default" row by its label cell text using a data-test scoped lookup.
         await this.orgSearchInput.fill('default');
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 10000 });
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 
     async homePageURLValidationDefaultOrg() {
@@ -219,8 +282,7 @@ export class HomePage {
         await this.orgSelector.click();
         await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
         await this.orgSearchInput.fill('defaulttestmulti');
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 10000 });
-        await this.orgMenuItemLabel.first().click();
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 
     async homePageURLValidation() {
@@ -230,31 +292,21 @@ export class HomePage {
     async homePageOrg(orgName, orgIdentifier) {
         await this.page.reload();
         await this.orgSelector.waitFor({ state: 'visible', timeout: 10000 });
-        await this.orgSelector.click();
-        await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Search for the organization
-        await this.orgSearchInput.fill(orgName);
-
-        // When a specific identifier is available, target that row directly so
-        // we don't race against the OInput debounce / OTable filter and end up
-        // clicking the previously-first row (often "default").
+        // When a specific identifier is available, use the URL-verified switch
+        // so we can't silently settle on the wrong row (the name may be shared
+        // across several orgs). It opens the menu itself.
         if (orgIdentifier) {
-            const targetRow = this.getOrgMenuItemByIdentifier(orgIdentifier);
-            await targetRow.waitFor({ state: 'visible', timeout: 10000 });
-            await targetRow.click();
-            // Wait for the router push to land — the URL should now carry the
-            // new org identifier.
-            await this.page.waitForURL(new RegExp(`org_identifier=${orgIdentifier}`), {
-                timeout: 10000,
-            }).catch(() => {});
+            await this.selectOrgByIdentifier(orgName, orgIdentifier);
             return;
         }
 
-        await this.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 10000 });
+        await this.orgSelector.click();
+        await this.orgMenuList.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Click the organization from search results
-        await this.orgMenuItemLabel.first().click();
+        // Search for the organization, then click the first match.
+        await this.orgSearchInput.fill(orgName);
+        await this.clickOrgRow(this.orgMenuItemLabel.first());
     }
 
     async homeURLContains(orgNameIdentifier) {
@@ -351,16 +403,16 @@ export class HomePage {
      * After Header.vue migration the user profile menu is an ODropdown
      * ([role="menuitem"]) but the language sub-menu was kept in-place (not
      * supported by ODropdown nesting). The data-test attribute is preserved
-     * either on a q-item-section (Quasar) or directly on a menuitem (ODropdown),
+     * either on a menu item section or directly on a menuitem (ODropdown),
      * so target the element with data-test and walk up to its clickable ancestor.
-     * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
+     * @param {string} langCode - Language code (e.g., 'en-us', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
      */
     getLanguageOption(langCode) {
-        // Try ODropdown menuitem first (post-migration), fall back to q-item ancestor.
+        // ODropdown menuitem ancestor.
         return this.page
             .locator(`[data-test="language-dropdown-item-${langCode}"]`)
-            .locator('xpath=ancestor-or-self::*[@role="menuitem" or contains(@class, "q-item")][1]')
+            .locator('xpath=ancestor-or-self::*[@role="menuitem"][1]')
             .first();
     }
 
@@ -377,7 +429,7 @@ export class HomePage {
     /**
      * Opens the language selection submenu
      * Steps: Click profile icon -> Click on language item to open submenu
-     * Note: Quasar menus require click, not hover, to open nested menus
+     * Note: menus require click, not hover, to open nested menus
      */
     async openLanguageMenu() {
         await this.openProfileMenu();
@@ -395,12 +447,12 @@ export class HomePage {
     /**
      * Change the application language
      * @param {string} langCode - Language code to switch to
-     * Valid codes: 'en-gb', 'tr-turk', 'zh-cn', 'fr', 'es', 'de', 'it', 'ja', 'ko', 'nl', 'pt'
+     * Valid codes: 'en-us', 'tr-turk', 'zh-cn', 'fr', 'es', 'de', 'it', 'ja', 'ko', 'nl', 'pt'
      */
     async changeLanguage(langCode) {
         await this.openLanguageMenu();
 
-        // Click directly on the element with data-test, or its parent q-item
+        // Click directly on the element with data-test, or its parent menu item
         const langOption = this.page.locator(`[data-test="language-dropdown-item-${langCode}"]`);
         await langOption.waitFor({ state: 'visible', timeout: 5000 });
 
@@ -441,7 +493,7 @@ export class HomePage {
 
     /**
      * Get locator for a specific language option (simple, direct locator)
-     * @param {string} langCode - Language code (e.g., 'en-gb', 'de', 'es', 'fr', etc.)
+     * @param {string} langCode - Language code (e.g., 'en-us', 'de', 'es', 'fr', etc.)
      * @returns {Locator} - Playwright locator for the language option
      */
     getLanguageOptionLocator(langCode) {
@@ -473,7 +525,7 @@ export class HomePage {
      * Available language codes mapped to their labels
      */
     static LANGUAGES = {
-        'en-gb': { label: 'English', menuText: 'Home' },
+        'en-us': { label: 'English', menuText: 'Home' },
         'de': { label: 'Deutsch', menuText: 'Startseite' },
         'es': { label: 'Español', menuText: 'Inicio' },
         'fr': { label: 'Français', menuText: 'Accueil' },
@@ -493,9 +545,11 @@ export class HomePage {
      * @returns {Promise<boolean>} - True if dark mode is active
      */
     async isDarkMode() {
-        // Read the body class via page.evaluate (the dark-theme class lives on
-        // document.body and is not addressable via a data-test attribute).
-        return await this.page.evaluate(() => document.body.classList.contains('body--dark'));
+        // The dark-mode signal is the `.dark` class on <html>
+        // (document.documentElement) — set by utils/theme.ts. The legacy
+        // `body--dark` class on <body> was retired in the design-token
+        // migration (#13173).
+        return await this.page.evaluate(() => document.documentElement.classList.contains('dark'));
     }
 
     /**
@@ -730,16 +784,15 @@ export class HomePage {
     }
 
     /**
-     * Navigate to Alert Destinations tab in Settings
+     * Navigate to Notification Destinations via the Reliability nav group.
+     * No longer a Settings tab — it moved to /alert-destinations.
      */
     async navigateToAlertDestinations() {
-        await this.navigateToSettings();
-        await this.page.locator('[data-test="alert-destinations-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator('[data-test="alert-destinations-tab"]').click();
+        await openNavFlyoutChild(this.page, 'destinations');
     }
 
     /**
-     * Validate Settings - Alert Destinations page UI elements
+     * Validate Notification Destinations page UI elements
      */
     async validateSettingsAlertDestinationsPageElements() {
         await expect(this.page.locator('[data-test="alert-destination-list-add-alert-btn"]')).toBeVisible({ timeout: 10000 });
@@ -767,16 +820,15 @@ export class HomePage {
     }
 
     /**
-     * Navigate to Templates tab in Settings
+     * Navigate to Templates via the Reliability nav group.
+     * No longer a Settings tab — it moved to /alert-templates.
      */
     async navigateToTemplates() {
-        await this.navigateToSettings();
-        await this.page.locator('[data-test="alert-templates-tab"]').waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.locator('[data-test="alert-templates-tab"]').click();
+        await openNavFlyoutChild(this.page, 'templates');
     }
 
     /**
-     * Validate Settings - Templates page UI elements
+     * Validate Templates page UI elements
      */
     async validateSettingsTemplatesPageElements() {
         await expect(this.page.locator('[data-test="template-list-add-btn"]')).toBeVisible({ timeout: 10000 });

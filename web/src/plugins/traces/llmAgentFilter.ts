@@ -1,6 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// LLM Observability Phase 2 — Agent Filtering (Stream Contract v1.0, §6.4/§6.6).
+// Agent filtering for the LLM Insights dashboard.
 //
 // When an agent is selected on the LLM Insights dashboard, every query against
 // the agent's source trace stream can be scoped directly to that agent. Ingest
@@ -14,13 +14,16 @@ export const ALL_AGENTS_VALUE = "__all__";
 
 /**
  * Stable identity key for an agent option. The same agent name/id can appear in
- * multiple streams, so the key is scoped by stream + identity (spec §8). Agent
- * id is preferred over name (§6.3) because names are display labels.
+ * multiple streams, so the key is scoped by stream + identity. Agent id is
+ * preferred over name because names are display labels.
  */
 export function agentOptionKey(agent: GenAiAgentListItem): string {
+  // env/version are identity dimensions: the same name/id in the same stream
+  // but a different env or version is a distinct, separately selectable option
+  // (that is what makes version comparison possible). Keep them in the key.
   return `${agent.source_stream_type}/${agent.source_stream}/${
     agent.id ?? agent.name
-  }`;
+  }/${agent.env ?? ""}/${agent.version ?? ""}`;
 }
 
 function sqlQuote(value: string): string {
@@ -42,22 +45,31 @@ export function buildAgentTraceFilter(
   const field = agent.id ? "gen_ai_agent_id" : "gen_ai_agent_name";
   const value = agent.id ?? agent.name;
   if (!value) return "";
-  return `${field} = '${sqlQuote(String(value))}'`;
+  // env/version filter on the CANONICAL columns the registry writes back onto
+  // every discovered span (gen_ai_agent_env / gen_ai_agent_version) — stable
+  // regardless of which source attribute the value came from, mirroring how the
+  // agent identity filters on canonical gen_ai_agent_name/id above.
+  const clauses = [`${field} = '${sqlQuote(String(value))}'`];
+  if (agent.version) {
+    clauses.push(`gen_ai_agent_version = '${sqlQuote(String(agent.version))}'`);
+  }
+  if (agent.env) {
+    clauses.push(`gen_ai_agent_env = '${sqlQuote(String(agent.env))}'`);
+  }
+  return clauses.join(" AND ");
 }
 
 /**
- * Build a session-level predicate for the LLM Sessions list. This differs from
- * `buildAgentTraceFilter`: first find sessions that contain at least one trace
- * for the selected agent, then let the outer sessions query collect every trace
- * in those sessions. That preserves full-conversation totals and first-message
- * derivation while still filtering the visible session list by agent.
+ * Build the agent predicate used to select a page of LLM sessions. The backend
+ * applies this predicate only while choosing session ids, then runs the final
+ * rollup over every span in those sessions. A direct predicate therefore keeps
+ * full-conversation totals without the previous session-membership subquery.
  */
 export function buildAgentSessionFilter(
   agent: GenAiAgentListItem | null | undefined,
   streamName: string,
   sessionField = "gen_ai_conversation_id",
 ): string {
-  const traceFilter = buildAgentTraceFilter(agent, streamName);
-  if (!traceFilter || !sessionField) return "";
-  return `${sessionField} IN (SELECT ${sessionField} FROM "${streamName}" WHERE ${sessionField} IS NOT NULL AND ${sessionField} != '' AND ${traceFilter} GROUP BY ${sessionField})`;
+  if (!sessionField) return "";
+  return buildAgentTraceFilter(agent, streamName);
 }

@@ -1,0 +1,983 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+//! Service Graph Processor
+//!
+//! Queries trace streams and builds service graph topology.
+//! Called by compactor job - zero impact on ingestion performance.
+
+#[cfg(feature = "enterprise")]
+use {
+    config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::time::now_micros},
+    infra::cluster::get_node_by_uuid,
+    o2_enterprise::enterprise::common::config::get_config as get_o2_config,
+};
+
+#[cfg(feature = "enterprise")]
+#[derive(serde::Deserialize)]
+struct RecentIngestedTraceStream {
+    org_id: String,
+    stream_name: String,
+}
+
+/// Main entry point for service graph processing
+/// Called by compactor job
+#[cfg(feature = "enterprise")]
+pub async fn process_service_graph() -> Result<(), anyhow::Error> {
+    // get last offset
+    let (mut last_updated_at, node) = crate::db::service_graph::get_offset().await;
+    // other node is processing
+    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) && get_node_by_uuid(&node).await.is_some() {
+        return Ok(());
+    }
+
+    // before starting, set current node to lock the job
+    if node.is_empty() || LOCAL_NODE.uuid.ne(&node) {
+        crate::db::service_graph::set_offset(last_updated_at, Some(&LOCAL_NODE.uuid.clone()))
+            .await?;
+    }
+
+    let now = now_micros();
+    let window_micros = get_o2_config().service_graph.query_time_range_minutes * 60 * 1_000_000;
+    let mut next_updated_at = last_updated_at + window_micros;
+    // less than window_micros, no need to process
+    if next_updated_at > now {
+        return Ok(());
+    }
+    // set last updated at to now if it's 0
+    if last_updated_at == 0 {
+        last_updated_at = now - window_micros;
+        next_updated_at = now;
+    }
+
+    log::info!("[ServiceGraph] Processing traces from {last_updated_at} to {next_updated_at}");
+
+    // Query usage stream to find which streams have recent ingestion activity
+    let sql = r#"SELECT org_id, stream_name
+        FROM "usage"
+        WHERE event = 'Ingestion' AND stream_type = 'traces'
+        GROUP BY org_id, stream_name"#
+        .to_string();
+
+    let usage_results = match crate::self_reporting::search::get_usage(
+        sql,
+        last_updated_at,
+        next_updated_at,
+        false,
+    )
+    .await
+    {
+        Ok(v) => v
+            .into_iter()
+            .filter_map(
+                |v| match serde_json::from_value::<RecentIngestedTraceStream>(v) {
+                    Ok(usage) => Some(usage),
+                    Err(e) => {
+                        log::warn!("[ServiceGraph] Failed to deserialize usage row: {e}");
+                        None
+                    }
+                },
+            )
+            .collect::<Vec<_>>(),
+        Err(e) => {
+            log::error!(
+                "[ServiceGraph] Failed to get last ingestion from usage stream, skipping service graph: {e}"
+            );
+            return Ok(());
+        }
+    };
+
+    log::info!(
+        "[ServiceGraph] Found {} active trace streams in usage data",
+        usage_results.len()
+    );
+
+    // Discovery = usage-active streams UNION every trace stream in the schema cache.
+    //
+    // Usage-windowed discovery alone is not enough: it only surfaces streams that
+    // logged an `Ingestion` event *inside this window*. A stream whose producer
+    // paused, or ingests in bursts sparser than the window, silently drops out and
+    // stops getting a service graph / agent-signals rollup — even though it still
+    // holds queryable spans. (This is exactly how the agent-behavior streams went
+    // dark: they fell out of recent `usage` and were never re-processed.) The old
+    // code only fell back to the schema cache when usage was *entirely* empty, so
+    // on any busy instance an individually-stale stream was invisible forever.
+    //
+    // Unioning fixes that: every known trace stream is processed each window. This
+    // is the same total set the empty-usage fallback already processed, so it does
+    // not widen the worst case. Per-stream work self-bounds — an idle window's SQL
+    // returns no rows (no service-graph edges, no agent signals), so re-visiting a
+    // quiet stream is cheap. Dedup by (org_id, stream_name) so a stream present in
+    // both sources is processed once.
+    let mut discovered = usage_results;
+    let mut seen: std::collections::HashSet<(String, String)> = discovered
+        .iter()
+        .map(|s| (s.org_id.clone(), s.stream_name.clone()))
+        .collect();
+    match crate::organization::list_all_orgs(None).await {
+        Ok(orgs) => {
+            // one pass over the schema cache instead of a full scan per org
+            let mut grouped = crate::db::schema::list_all_streams_grouped().await;
+            for org in orgs {
+                let Some(streams) = grouped
+                    .get_mut(&org.identifier)
+                    .and_then(|types| types.remove(&StreamType::Traces))
+                else {
+                    continue;
+                };
+                for stream_name in streams {
+                    if seen.insert((org.identifier.clone(), stream_name.clone())) {
+                        discovered.push(RecentIngestedTraceStream {
+                            org_id: org.identifier.clone(),
+                            stream_name,
+                        });
+                    }
+                }
+            }
+        }
+        // Non-fatal: fall back to whatever usage discovered. A busy instance still
+        // gets its active streams; only the stale-but-active ones are missed.
+        Err(e) => log::warn!(
+            "[ServiceGraph] org list failed; processing usage-discovered streams only: {e}"
+        ),
+    }
+    log::info!(
+        "[ServiceGraph] Processing {} trace streams (usage ∪ schema cache)",
+        discovered.len()
+    );
+
+    for RecentIngestedTraceStream {
+        org_id,
+        stream_name,
+    } in discovered
+    {
+        log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
+
+        if let Err(e) =
+            process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await
+        {
+            log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
+            continue; // Don't fail entire job if one stream fails
+        }
+
+        // Agent-signals rollup: co-located, same window, same node. Self-guards on config.
+        if let Err(e) = crate::traces::agent_signals::process_agent_signals_stream(
+            &org_id,
+            &stream_name,
+            last_updated_at,
+            next_updated_at,
+        )
+        .await
+        {
+            log::error!("[AgentSignals] Failed for stream {org_id}/{stream_name}: {e}");
+            // Non-fatal: agent signals must never break the service graph.
+        }
+    }
+
+    // update last updated at
+    crate::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone())).await?;
+
+    Ok(())
+}
+
+/// Build the
+/// `COALESCE(child.agent, p1.agent, …, pN.agent, [trace_agent,] service_name)`
+/// nearest-ancestor-agent expression for the tool/model edge `from`. `depth` is
+/// the number of ancestor levels to climb (N). When `has_agent_id`, each level
+/// prefers `agent_id` then `agent_name`. This is what lets a tool/LLM span whose
+/// agent name lives several levels up the parent chain (real Google ADK:
+/// generate_content→chat→execute_tool) still attribute to the owning agent.
+///
+/// When `with_trace_agent`, a per-trace agent level (`ta.agent_name`, joined by
+/// `trace_id`) is inserted just before the `service_name` fallback. This is the
+/// last resort for a span whose direct parent chain is BROKEN — e.g. the
+/// intermediate `generate_content` span was dropped/sampled and never ingested,
+/// so climbing `reference_parent_span_id` hits a missing row and finds no agent
+/// within `depth` hops. Without it those spans mis-attribute to the host
+/// service, drawing a spurious `service → model`/`service → tool` edge instead
+/// of `agent → model`/`agent → tool`. Real agentic traces are single-agent (the
+/// CTE takes MAX per trace_id), so this cannot merge two agents' calls.
+#[cfg(feature = "enterprise")]
+fn build_agent_or_service(has_agent_id: bool, depth: usize, with_trace_agent: bool) -> String {
+    let level = |alias: &str| -> String {
+        if has_agent_id {
+            format!("{alias}.gen_ai_agent_id, {alias}.gen_ai_agent_name")
+        } else {
+            format!("{alias}.gen_ai_agent_name")
+        }
+    };
+    let mut parts = vec![level("c")];
+    for k in 1..=depth {
+        parts.push(level(&format!("p{k}")));
+    }
+    if with_trace_agent {
+        // The per-trace CTE only carries agent name/id columns (aliased `ta`).
+        parts.push(if has_agent_id {
+            "ta.gen_ai_agent_id, ta.gen_ai_agent_name".to_string()
+        } else {
+            "ta.gen_ai_agent_name".to_string()
+        });
+    }
+    parts.push("c.service_name".to_string());
+    format!("COALESCE({})", parts.join(", "))
+}
+
+/// The per-trace agent CTE + its `LEFT JOIN`, used as the broken-parent-chain
+/// fallback in `build_agent_or_service` (see there). Returns the `WITH …` CTE
+/// clause (empty string if no agent-id column) and the join clause to splice
+/// into the tool/model queries. One agent per trace is assumed (single-agent
+/// agentic traces); `MAX` gives a deterministic pick if that ever fails to hold.
+#[cfg(feature = "enterprise")]
+fn build_trace_agent_cte(
+    stream_name: &str,
+    has_agent_id: bool,
+    start_time: i64,
+    end_time: i64,
+) -> (String, String) {
+    let id_col = if has_agent_id {
+        ", MAX(gen_ai_agent_id) AS gen_ai_agent_id"
+    } else {
+        ""
+    };
+    let cte = format!(
+        r#"WITH trace_agent AS (
+            SELECT trace_id, MAX(gen_ai_agent_name) AS gen_ai_agent_name{id_col}
+            FROM "{stream_name}"
+            WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND gen_ai_agent_name IS NOT NULL AND gen_ai_agent_name != ''
+            GROUP BY trace_id
+        )"#,
+    );
+    let join = "LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id".to_string();
+    (cte, join)
+}
+
+/// Build the chained ancestor `LEFT JOIN`s (p1 on child `c`, p2 on p1, …, pN on
+/// p(N-1)) joining each span to its parent via `reference_parent_span_id` within
+/// the same `trace_id`. Paired with `build_agent_or_service` to realise the
+/// multi-level agent inheritance climb.
+#[cfg(feature = "enterprise")]
+fn build_ancestor_joins(stream_name: &str, depth: usize) -> String {
+    (1..=depth)
+        .map(|k| {
+            let prev = if k == 1 {
+                "c".to_string()
+            } else {
+                format!("p{}", k - 1)
+            };
+            format!(
+                "LEFT JOIN \"{stream_name}\" AS p{k} \
+                 ON {prev}.reference_parent_span_id = p{k}.span_id \
+                 AND {prev}.trace_id = p{k}.trace_id"
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n                    ")
+}
+
+/// The env SELECT + trailing GROUP-BY fragments spliced into the agent-edge SQL.
+/// Part B (Agent Graph) is ENV-ONLY / version-agnostic by design: agent edges
+/// carry the agent's `env` so topology stays stable across versions — never a
+/// version column. env is schema-gated: when the stream lacks `gen_ai_agent_env`
+/// both fragments are empty, so the emitted SQL is byte-identical to today.
+/// `aliased` picks the `c.`-qualified form used in the parent-link (aliased `c`)
+/// queries; the flat (no-alias) queries use the bare column.
+#[cfg(feature = "enterprise")]
+fn env_fragments(has_agent_env: bool, aliased: bool) -> (&'static str, &'static str) {
+    match (has_agent_env, aliased) {
+        (false, _) => ("", ""),
+        (true, false) => (", gen_ai_agent_env AS agent_env", ", gen_ai_agent_env"),
+        (true, true) => (", c.gen_ai_agent_env AS agent_env", ", c.gen_ai_agent_env"),
+    }
+}
+
+/// Wrap a raw model-name SQL expression in a `CASE` that maps it to the same
+/// canonical pattern used for cost lookup (`otel::pricing`), so vendor-prefix
+/// / date-suffix variants of the same model (e.g. "anthropic/claude-sonnet-4-6"
+/// vs. "claude-sonnet-4-6") collapse into one service-graph node instead of
+/// splitting. Falls back to the raw expression when no pattern matches.
+/// Patterns are regex fragments (may contain `'`-unsafe chars only via the
+/// hardcoded static list in pricing.rs — never from user input), matched with
+/// DataFusion's `regexp_like`.
+#[cfg(feature = "enterprise")]
+fn build_model_canonicalization_case(model_expr: &str) -> String {
+    let arms: String = crate::traces::otel::pricing::model_patterns()
+        .map(|pattern| format!("WHEN regexp_like({model_expr}, '{pattern}') THEN '{pattern}'"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("CASE {arms} ELSE {model_expr} END")
+}
+
+/// Process a single trace stream
+#[cfg(feature = "enterprise")]
+/// Aggregate one trace stream into service-graph edge hits for a window WITHOUT
+/// persisting them. Split out of `process_stream` so the compute step (the
+/// query-4 self-joins for instrumented / inferred / GenAI agent-tool-model
+/// edges) is isolated from the write step. Returns the raw SQL hits
+/// (`client`/`server`/`connection_type`/metrics) the writer consumes.
+#[cfg(feature = "enterprise")]
+async fn compute_stream_edges(
+    org_id: &str,
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+    // Build SQL to aggregate service graph edges directly in DataFusion
+    // Use CTE to compute client/server first, then aggregate
+    log::info!(
+        "[ServiceGraph] Querying stream {}/{} from {} to {} (window: {}s)",
+        org_id,
+        stream_name,
+        start_time,
+        end_time,
+        (end_time - start_time) / 1_000_000
+    );
+
+    let exclude_internal = get_o2_config().service_graph.exclude_internal_spans;
+
+    let (server_span_kinds, client_span_kinds) = if exclude_internal {
+        ("('2')", "('3')")
+    } else {
+        ("('1', '2')", "('1', '3')")
+    };
+
+    let sql = format!(
+        r#"SELECT
+            client.service_name AS client,
+            server.service_name AS server,
+            COUNT(*) AS total_requests,
+            COUNT(*) FILTER (WHERE server.span_status = 'ERROR') AS errors,
+            CAST(COUNT(*) FILTER (WHERE server.span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+            CAST(approx_median(server.end_time - server.start_time) AS BIGINT) AS p50,
+            CAST(approx_percentile_cont(server.end_time - server.start_time, 0.95) AS BIGINT) AS p95,
+            CAST(approx_percentile_cont(server.end_time - server.start_time, 0.99) AS BIGINT) AS p99
+        FROM "{stream_name}" AS server
+        LEFT JOIN "{stream_name}" AS client
+            ON server.reference_parent_span_id = client.span_id
+            AND server.trace_id = client.trace_id
+            AND CAST(client.span_kind AS VARCHAR) IN {client_span_kinds}
+        WHERE
+            server._timestamp >= {start_time} AND server._timestamp < {end_time}
+            AND CAST(server.span_kind AS VARCHAR) IN {server_span_kinds}
+            AND (
+                client.service_name IS NULL
+                OR client.service_name != server.service_name
+            )
+        GROUP BY client.service_name, server.service_name"#,
+    );
+    let mut hits = run_graph_search(org_id, sql, start_time, end_time).await?;
+    log::info!(
+        "[ServiceGraph] Query returned {} instrumented edges from {}/{}",
+        hits.len(),
+        org_id,
+        stream_name
+    );
+
+    // Inferred-dependency edges: CLIENT/PRODUCER spans that call an uninstrumented
+    // dependency (db/queue/external/rpc), tagged at ingestion via infer_service_*.
+    // Such a dependency has no server span, so its latency is the client span's own
+    // duration (the time spent waiting on it). The anti-join drops any inferred name
+    // that is actually an instrumented service in this window, so it is not
+    // Schema-gated: skip only on streams that genuinely lack the field. Use the
+    // DB-backed schema lookup (NOT the cache-only variant) so a cold in-memory
+    // cache on the compactor node does not silently disable all inferred edges.
+    let has_infer = infra::schema::get(org_id, stream_name, StreamType::Traces)
+        .await
+        .map(|s| {
+            s.field_with_name(crate::traces::inferred::INFER_SERVICE_NAME)
+                .is_ok()
+        })
+        .unwrap_or(false);
+    if has_infer {
+        // Emit ALL inferred-dependency edges. Classification (collision merge,
+        // rpc handling) happens downstream in build_topology via classify_entity,
+        // so there is no anti-join here: an inferred name that also matches a real
+        // service is resolved at topology-build time, not dropped at query time.
+        // (The old `NOT IN (subquery)` anti-join was both semantically wrong and
+        // unsupported by the query engine.)
+        let inferred_sql = format!(
+            r#"SELECT
+                service_name AS client,
+                infer_service_name AS server,
+                max(infer_service_type) AS connection_type,
+                COUNT(*) AS total_requests,
+                COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
+                CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+                CAST(approx_median(end_time - start_time) AS BIGINT) AS p50,
+                CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95,
+                CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99
+            FROM "{stream_name}"
+            WHERE
+                _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND CAST(span_kind AS VARCHAR) IN ('3', '4')
+                AND infer_service_name IS NOT NULL AND infer_service_name != ''
+            GROUP BY service_name, infer_service_name"#,
+        );
+        match run_graph_search(org_id, inferred_sql, start_time, end_time).await {
+            Ok(mut inferred_hits) => {
+                log::info!(
+                    "[ServiceGraph] Query returned {} inferred-dependency edges from {}/{}",
+                    inferred_hits.len(),
+                    org_id,
+                    stream_name
+                );
+                hits.append(&mut inferred_hits);
+            }
+            // Non-fatal: still write the instrumented edges we already have.
+            Err(e) => log::error!(
+                "[ServiceGraph] Inferred-edge query failed for {org_id}/{stream_name}: {e}"
+            ),
+        }
+
+        // Queue CONSUMER edges (span_kind = 5): a consumer reads from a topic, so
+        // the edge is topic → service (reverse of the producer's service → topic).
+        // Inference does NOT tag consumer spans (only CLIENT/PRODUCER), so we read
+        // the raw messaging destination directly. This reconnects async flows
+        // (producer → topic → consumer, e.g. checkout → orders → fraud-detection)
+        // that the parent/child span join cannot, since consumers run in a
+        // separate trace. connection_type = 'queue' marks the topic as inferred.
+        let consumer_sql = format!(
+            r#"SELECT
+                messaging_destination_name AS client,
+                service_name AS server,
+                'queue' AS connection_type,
+                COUNT(*) AS total_requests,
+                COUNT(*) FILTER (WHERE span_status = 'ERROR') AS errors,
+                CAST(COUNT(*) FILTER (WHERE span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate,
+                CAST(approx_median(end_time - start_time) AS BIGINT) AS p50,
+                CAST(approx_percentile_cont(end_time - start_time, 0.95) AS BIGINT) AS p95,
+                CAST(approx_percentile_cont(end_time - start_time, 0.99) AS BIGINT) AS p99
+            FROM "{stream_name}"
+            WHERE
+                _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND CAST(span_kind AS VARCHAR) = '5'
+                AND messaging_destination_name IS NOT NULL AND messaging_destination_name != ''
+            GROUP BY messaging_destination_name, service_name"#,
+        );
+        match run_graph_search(org_id, consumer_sql, start_time, end_time).await {
+            Ok(mut consumer_hits) => {
+                log::info!(
+                    "[ServiceGraph] Query returned {} queue-consumer edges from {}/{}",
+                    consumer_hits.len(),
+                    org_id,
+                    stream_name
+                );
+                hits.append(&mut consumer_hits);
+            }
+            // Non-fatal: streams without messaging columns simply return an error.
+            Err(e) => log::debug!(
+                "[ServiceGraph] Consumer-edge query (non-fatal) for {org_id}/{stream_name}: {e}"
+            ),
+        }
+    }
+
+    // ── Agent edges (GenAI topology) ─────────────────────────────────────────
+    // Three edge families derived from gen_ai_* columns already on each span, as
+    // a flat GROUP BY (no self-join — see design §2.2, avoids window-boundary
+    // edge loss). Gated on `gen_ai_operation_name` existing in the schema, which
+    // doubles as the LLM gate: it filters out the resource-fallback bleed where a
+    // process-wide gen_ai.agent.name would otherwise tag plain HTTP spans (§2.4).
+    //
+    // Predicates key on COLUMN PRESENCE, not the operation-name string: real data
+    // shows an open vocabulary (`chat`, `generate_content`, `span`, …). Model edges
+    // COALESCE request/response model because some vendors (Langfuse, OpenInference)
+    // populate ONLY response.model — verified live against synthetic vendor traces.
+    //
+    // Agent identity is COALESCE(agent_id, agent_name); `agent_id` may not exist
+    // as a column (verified: real streams lack it), so it is schema-gated
+    // independently and dropped from the COALESCE when absent (§6.1 finding 3).
+    let has_gen_ai = infra::schema::get(org_id, stream_name, StreamType::Traces)
+        .await
+        .map(|s| s.field_with_name("gen_ai_operation_name").is_ok())
+        .unwrap_or(false);
+    if has_gen_ai {
+        let has_agent_id = infra::schema::get(org_id, stream_name, StreamType::Traces)
+            .await
+            .map(|s| s.field_with_name("gen_ai_agent_id").is_ok())
+            .unwrap_or(false);
+        // Identity expression: prefer id, fall back to name; omit id if the column
+        // is absent (referencing a missing column is a hard error, not NULL).
+        let agent_ident = if has_agent_id {
+            "COALESCE(gen_ai_agent_id, gen_ai_agent_name)"
+        } else {
+            "gen_ai_agent_name"
+        };
+
+        // Agent `env` (Part B: env-only / version-agnostic). Emit it on every
+        // agent edge so topology can scope by env — but NOT by version. Same
+        // hard-error rule as agent_id: referencing a column absent from the
+        // stream schema fails, so env is schema-gated independently and the
+        // column/GROUP-BY vanish (SQL byte-identical to today) when absent.
+        let has_agent_env = infra::schema::get(org_id, stream_name, StreamType::Traces)
+            .await
+            .map(|s| s.field_with_name("gen_ai_agent_env").is_ok())
+            .unwrap_or(false);
+        // env fragments: flat (bare col) for no-alias queries, `_c` (c.-qualified)
+        // for the parent-link aliased queries. Empty when env is absent.
+        let (env_sel_flat, env_grp_flat) = env_fragments(has_agent_env, false);
+        let (env_sel_c, env_grp_c) = env_fragments(has_agent_env, true);
+
+        // Stream schema, used to gate optional columns (parent link, model cols).
+        let model_schema = infra::schema::get(org_id, stream_name, StreamType::Traces).await;
+
+        // For tool/model, the `from` is the agent that OWNS the span. But most
+        // frameworks (OpenInference, traceloop, CrewAI, Google ADK) put the agent
+        // name ONLY on an ancestor `invoke_agent`/AGENT span — the child tool and
+        // LLM spans carry no agent name. Critically, the agent may be MORE THAN
+        // ONE level up: real Google ADK traces nest
+        //   generate_content(agent=X) → chat(agent=NULL) → execute_tool(tool)
+        // so the tool's agent lives at depth 2, not 1. We therefore climb the
+        // parent chain up to AGENT_INHERIT_DEPTH levels and take the NEAREST
+        // ancestor (including self) that carries an agent name, falling back to
+        // the host service_name:
+        //   from = COALESCE(child.agent, p1.agent, …, pN.agent, child.service_name)
+        // A recursive CTE would be the general form, but the search engine does
+        // not support WITH RECURSIVE here (it panics), and real agent trees are
+        // shallow — a bounded chained-join climb is both supported and cheaper.
+        // p1..pN are the ancestor aliases in the tool/model queries below.
+        const AGENT_INHERIT_DEPTH: usize = 4;
+        let has_parent_link = model_schema
+            .as_ref()
+            .map(|s| s.field_with_name("reference_parent_span_id").is_ok())
+            .unwrap_or(false);
+        // The nearest-ancestor-agent-or-service `from` for tool/model. With the
+        // parent-link column present, COALESCE walks child → p1 → … → pN →
+        // per-trace agent → service; otherwise it is the flat child-or-service
+        // form (no join possible). The per-trace agent level recovers the owning
+        // agent when the direct parent chain is broken (a dropped intermediate
+        // span), which otherwise mis-attributes the span to the host service.
+        let agent_or_service = if has_parent_link {
+            build_agent_or_service(has_agent_id, AGENT_INHERIT_DEPTH, true)
+        } else {
+            format!("COALESCE({agent_ident}, service_name)")
+        };
+        // The chained ancestor LEFT JOINs (p1 on child, p2 on p1, …) plus the
+        // per-trace agent join, shared by the tool and model queries. Empty when
+        // the stream has no parent link.
+        let (trace_agent_cte, ancestor_joins) = if has_parent_link {
+            let (cte, ta_join) =
+                build_trace_agent_cte(stream_name, has_agent_id, start_time, end_time);
+            let joins = format!(
+                "{}\n                    {ta_join}",
+                build_ancestor_joins(stream_name, AGENT_INHERIT_DEPTH),
+            );
+            (cte, joins)
+        } else {
+            (String::new(), String::new())
+        };
+
+        // Model identity: prefer request.model, fall back to response.model. Some
+        // vendors (Langfuse, OpenInference) populate ONLY response.model, others
+        // only request.model. BOTH columns must be schema-gated independently —
+        // referencing a column absent from the stream schema is a hard error, so
+        // the COALESCE is built from only the columns that actually exist.
+        let has_request_model = model_schema
+            .as_ref()
+            .map(|s| s.field_with_name("gen_ai_request_model").is_ok())
+            .unwrap_or(false);
+        let has_response_model = model_schema
+            .as_ref()
+            .map(|s| s.field_with_name("gen_ai_response_model").is_ok())
+            .unwrap_or(false);
+        let model_expr = match (has_request_model, has_response_model) {
+            (true, true) => "COALESCE(gen_ai_request_model, gen_ai_response_model)",
+            (true, false) => "gen_ai_request_model",
+            (false, true) => "gen_ai_response_model",
+            // Neither column exists — no model edges possible; the predicate below
+            // will be false-ish and the query still runs (schema-safe).
+            (false, false) => "CAST(NULL AS STRING)",
+        };
+        let model_predicate = format!("{model_expr} IS NOT NULL AND {model_expr} != ''");
+        // Canonicalize the raw model string before it becomes a graph node key.
+        // Different frameworks/vendors report the same model under different raw
+        // strings (e.g. "anthropic/claude-sonnet-4-6" vs. "claude-sonnet-4-6"),
+        // which otherwise split into separate nodes. Reuses the same pattern list
+        // as cost lookup (pricing.rs) so node identity and cost stay consistent.
+        // Falls back to the raw expression when no known pattern matches.
+        let model_canon_expr = build_model_canonicalization_case(model_expr);
+
+        // Metric aggregates shared by every edge query (aliased to child `c`
+        // where a join is present, so it works in both flat and joined forms).
+        let metrics = |t: &str| {
+            format!(
+                "COUNT(*) AS total_requests, \
+                 COUNT(*) FILTER (WHERE {t}span_status = 'ERROR') AS errors, \
+                 CAST(COUNT(*) FILTER (WHERE {t}span_status = 'ERROR') * 100.0 / COUNT(*) AS DOUBLE) AS error_rate, \
+                 CAST(approx_median({t}end_time - {t}start_time) AS BIGINT) AS p50, \
+                 CAST(approx_percentile_cont({t}end_time - {t}start_time, 0.95) AS BIGINT) AS p95, \
+                 CAST(approx_percentile_cont({t}end_time - {t}start_time, 0.99) AS BIGINT) AS p99"
+            )
+        };
+
+        // 1) service → agent : an invoke_agent span's host service calls the agent.
+        // A flat scan — the agent name IS on this span by definition.
+        let m = metrics("");
+        let agent_sql = format!(
+            r#"SELECT service_name AS client, {agent_ident} AS server,
+                'agent' AS connection_type{env_sel_flat}, {m}
+            FROM "{stream_name}"
+            WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+                AND gen_ai_operation_name = 'invoke_agent'
+                AND service_name IS NOT NULL AND service_name != ''
+                AND ({agent_ident}) IS NOT NULL AND ({agent_ident}) != ''
+                AND service_name != ({agent_ident})
+            GROUP BY service_name, {agent_ident}{env_grp_flat}"#,
+        );
+
+        // 2) agent → tool  and  3) agent → model. These key the `from` on the
+        // OWNING agent, inherited from the parent span (parent-agent join) because
+        // most frameworks omit agent name on the child tool/LLM span. When the
+        // stream lacks the parent-link column, `agent_or_service` is the flat
+        // child-or-service form and no join is emitted.
+        let mc = metrics("c.");
+        let tool_from = &agent_or_service;
+        let model_from = &agent_or_service;
+        let (tool_sql, model_sql) = if has_parent_link {
+            (
+                format!(
+                    r#"{trace_agent_cte}
+                    SELECT {tool_from} AS client, c.gen_ai_tool_name AS server,
+                        'tool' AS connection_type{env_sel_c}, {mc}
+                    FROM "{stream_name}" AS c
+                    {ancestor_joins}
+                    WHERE c._timestamp >= {start_time} AND c._timestamp < {end_time}
+                        AND c.gen_ai_tool_name IS NOT NULL AND c.gen_ai_tool_name != ''
+                        AND ({tool_from}) IS NOT NULL AND ({tool_from}) != ''
+                        AND ({tool_from}) != c.gen_ai_tool_name
+                    GROUP BY {tool_from}, c.gen_ai_tool_name{env_grp_c}"#,
+                ),
+                format!(
+                    r#"{trace_agent_cte}
+                    SELECT {model_from} AS client, {model_canon_expr_c} AS server,
+                        'model' AS connection_type{env_sel_c}, {mc}
+                    FROM "{stream_name}" AS c
+                    {ancestor_joins}
+                    WHERE c._timestamp >= {start_time} AND c._timestamp < {end_time}
+                        AND {model_predicate_c}
+                        AND ({model_from}) IS NOT NULL AND ({model_from}) != ''
+                        AND ({model_from}) != ({model_expr_c})
+                    GROUP BY {model_from}, {model_canon_expr_c}{env_grp_c}"#,
+                    model_expr_c = model_expr.replace("gen_ai_", "c.gen_ai_"),
+                    model_predicate_c = model_predicate.replace("gen_ai_", "c.gen_ai_"),
+                    model_canon_expr_c = build_model_canonicalization_case(
+                        &model_expr.replace("gen_ai_", "c.gen_ai_")
+                    ),
+                ),
+            )
+        } else {
+            let m = metrics("");
+            (
+                format!(
+                    r#"SELECT {agent_or_service} AS client, gen_ai_tool_name AS server,
+                        'tool' AS connection_type{env_sel_flat}, {m}
+                    FROM "{stream_name}"
+                    WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+                        AND gen_ai_tool_name IS NOT NULL AND gen_ai_tool_name != ''
+                        AND ({agent_or_service}) IS NOT NULL AND ({agent_or_service}) != ''
+                        AND ({agent_or_service}) != gen_ai_tool_name
+                    GROUP BY {agent_or_service}, gen_ai_tool_name{env_grp_flat}"#,
+                ),
+                format!(
+                    r#"SELECT {agent_or_service} AS client, {model_canon_expr} AS server,
+                        'model' AS connection_type{env_sel_flat}, {m}
+                    FROM "{stream_name}"
+                    WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
+                        AND {model_predicate}
+                        AND ({agent_or_service}) IS NOT NULL AND ({agent_or_service}) != ''
+                        AND ({agent_or_service}) != ({model_expr})
+                    GROUP BY {agent_or_service}, {model_canon_expr}{env_grp_flat}"#,
+                ),
+            )
+        };
+
+        for (conn_type, agent_sql) in [
+            ("agent", agent_sql),
+            ("tool", tool_sql),
+            ("model", model_sql),
+        ] {
+            match run_graph_search(org_id, agent_sql, start_time, end_time).await {
+                Ok(mut agent_hits) => {
+                    log::info!(
+                        "[ServiceGraph] Query returned {} {conn_type} edges from {org_id}/{stream_name}",
+                        agent_hits.len(),
+                    );
+                    hits.append(&mut agent_hits);
+                }
+                // Non-fatal: still write whatever edges we already have.
+                Err(e) => log::debug!(
+                    "[ServiceGraph] Agent {conn_type}-edge query (non-fatal) for {org_id}/{stream_name}: {e}"
+                ),
+            }
+        }
+    }
+
+    Ok(hits)
+}
+
+/// Hourly-job path: aggregate one stream's edges and PERSIST them to the
+/// `_o2_service_graph` stream. Thin wrapper over `compute_stream_edges` so the
+/// live Agent Graph path can reuse the exact same aggregation without writing.
+#[cfg(feature = "enterprise")]
+async fn process_stream(
+    org_id: &str,
+    stream_name: &str,
+    start_time: i64,
+    end_time: i64,
+) -> Result<(), anyhow::Error> {
+    let hits = compute_stream_edges(org_id, stream_name, start_time, end_time).await?;
+    if hits.is_empty() {
+        return Ok(());
+    }
+    // SQL already aggregated everything - just write directly to _o2_service_graph stream
+    crate::traces::service_graph::write_sql_aggregated_edges(org_id, stream_name, hits).await?;
+    Ok(())
+}
+
+/// Run a pre-aggregated service-graph edge query against a trace stream and return
+/// the raw result hits. Shared by the instrumented self-join query and the
+/// inferred-dependency query.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn run_graph_search(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql,
+            from: 0,
+            size: 100000,
+            start_time,
+            end_time,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            action_id: None,
+            histogram_interval: 0,
+            streaming_id: None,
+            streaming_output: false,
+            sampling_config: None,
+            sampling_ratio: None,
+            timezone: None,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 300, // 5 minute timeout for large queries
+        search_type: None,
+        search_event_context: None,
+        use_cache: false,
+        clear_cache: false,
+        local_mode: Some(false),
+        agent_options: None,
+    };
+
+    let trace_id = config::ider::generate();
+    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    Ok(resp.hits)
+}
+
+// Stub implementation for non-enterprise builds
+#[cfg(not(feature = "enterprise"))]
+pub async fn process_service_graph() -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+#[cfg(all(test, feature = "enterprise"))]
+mod test {
+
+    #[test]
+    fn test_usage_deser() {
+        let value = serde_json::json!({
+            "org_id": "random",
+            "stream_name": "random-stream"
+        });
+
+        let result = serde_json::from_value::<super::RecentIngestedTraceStream>(value);
+
+        assert!(
+            result.is_ok_and(|data| {
+                data.org_id == "random" && data.stream_name == "random-stream"
+            })
+        );
+    }
+
+    // Multi-level agent inheritance: a tool/LLM span's owning agent may be more
+    // than one parent up (real Google ADK: generate_content(agent)→chat→tool),
+    // so the `from` COALESCE must walk child → p1 → … → pN → service, and the
+    // query must emit one chained LEFT JOIN per level. Regression guard against
+    // silently collapsing back to a single parent level.
+    #[test]
+    fn test_agent_or_service_climbs_all_levels() {
+        let expr = super::build_agent_or_service(false, 4, false);
+        assert_eq!(
+            expr,
+            "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name, \
+             p2.gen_ai_agent_name, p3.gen_ai_agent_name, p4.gen_ai_agent_name, \
+             c.service_name)"
+        );
+        // child first (self wins), service_name last (fallback).
+        assert!(expr.starts_with("COALESCE(c.gen_ai_agent_name,"));
+        assert!(expr.ends_with("c.service_name)"));
+        // one agent term per level + child + service.
+        assert_eq!(expr.matches("gen_ai_agent_name").count(), 5);
+    }
+
+    #[test]
+    fn test_agent_or_service_prefers_agent_id_when_present() {
+        let expr = super::build_agent_or_service(true, 2, false);
+        assert_eq!(
+            expr,
+            "COALESCE(c.gen_ai_agent_id, c.gen_ai_agent_name, \
+             p1.gen_ai_agent_id, p1.gen_ai_agent_name, \
+             p2.gen_ai_agent_id, p2.gen_ai_agent_name, c.service_name)"
+        );
+    }
+
+    // Broken-parent-chain fallback: when a tool/model span's intermediate parent
+    // span was dropped/never ingested, climbing p1..pN finds no agent, so a
+    // per-trace agent level (`ta.*`) must sit just before the service_name
+    // fallback — attributing the span to the trace's agent instead of the host
+    // service. Regression guard for the `service → model`/`service → tool` bug.
+    #[test]
+    fn test_agent_or_service_includes_trace_agent_before_service() {
+        let expr = super::build_agent_or_service(false, 2, true);
+        assert_eq!(
+            expr,
+            "COALESCE(c.gen_ai_agent_name, p1.gen_ai_agent_name, \
+             p2.gen_ai_agent_name, ta.gen_ai_agent_name, c.service_name)"
+        );
+        // trace-agent sits AFTER the last ancestor and BEFORE service.
+        let ta = expr.find("ta.gen_ai_agent_name").unwrap();
+        let p2 = expr.find("p2.gen_ai_agent_name").unwrap();
+        let svc = expr.find("c.service_name").unwrap();
+        assert!(p2 < ta && ta < svc);
+    }
+
+    #[test]
+    fn test_agent_or_service_trace_agent_with_agent_id() {
+        let expr = super::build_agent_or_service(true, 1, true);
+        assert_eq!(
+            expr,
+            "COALESCE(c.gen_ai_agent_id, c.gen_ai_agent_name, \
+             p1.gen_ai_agent_id, p1.gen_ai_agent_name, \
+             ta.gen_ai_agent_id, ta.gen_ai_agent_name, c.service_name)"
+        );
+    }
+
+    #[test]
+    fn test_trace_agent_cte_groups_by_trace() {
+        let (cte, join) = super::build_trace_agent_cte("mystream", false, 100, 200);
+        // CTE picks one agent per trace within the window.
+        assert!(cte.contains("WITH trace_agent AS"));
+        assert!(cte.contains("MAX(gen_ai_agent_name) AS gen_ai_agent_name"));
+        assert!(cte.contains("GROUP BY trace_id"));
+        assert!(cte.contains("_timestamp >= 100 AND _timestamp < 200"));
+        // No agent-id column requested → not selected.
+        assert!(!cte.contains("gen_ai_agent_id"));
+        // Join is by trace_id onto the child alias `c`.
+        assert_eq!(
+            join,
+            "LEFT JOIN trace_agent AS ta ON c.trace_id = ta.trace_id"
+        );
+
+        // With agent-id, the CTE also carries it.
+        let (cte_id, _) = super::build_trace_agent_cte("mystream", true, 100, 200);
+        assert!(cte_id.contains("MAX(gen_ai_agent_id) AS gen_ai_agent_id"));
+    }
+
+    // Part B is ENV-ONLY / version-agnostic: agent edges carry the agent's env
+    // (never its version) so topology stays stable across versions. env is
+    // schema-gated — a stream lacking `gen_ai_agent_env` must produce SQL
+    // byte-identical to today (empty fragments). Guards both the fragment shape
+    // and the "no version column, ever" rule for Part B.
+    #[test]
+    fn test_env_fragments_present_when_gated() {
+        // flat (no-alias) branch: bare column.
+        let (sel, grp) = super::env_fragments(true, false);
+        assert_eq!(sel, ", gen_ai_agent_env AS agent_env");
+        assert_eq!(grp, ", gen_ai_agent_env");
+        // c-aliased branch: qualified column.
+        let (sel_c, grp_c) = super::env_fragments(true, true);
+        assert_eq!(sel_c, ", c.gen_ai_agent_env AS agent_env");
+        assert_eq!(grp_c, ", c.gen_ai_agent_env");
+        // env only — never version, in any fragment.
+        for f in [sel, grp, sel_c, grp_c] {
+            assert!(f.contains("gen_ai_agent_env"));
+            assert!(
+                !f.contains("gen_ai_agent_version"),
+                "Part B is version-agnostic: {f}"
+            );
+        }
+    }
+
+    // Absent env column ⇒ empty fragments ⇒ SQL byte-identical to today.
+    #[test]
+    fn test_env_fragments_absent_yields_empty() {
+        assert_eq!(super::env_fragments(false, false), ("", ""));
+        assert_eq!(super::env_fragments(false, true), ("", ""));
+    }
+
+    // End-to-end: the service→agent SQL string built with env present must carry
+    // the raw `gen_ai_agent_env` column in BOTH the SELECT and the GROUP BY, and
+    // must never reference a version column.
+    #[test]
+    fn test_service_agent_sql_carries_env_not_version() {
+        let agent_ident = "gen_ai_agent_name";
+        let (env_sel_flat, env_grp_flat) = super::env_fragments(true, false);
+        let sql = format!(
+            r#"SELECT service_name AS client, {agent_ident} AS server,
+                'agent' AS connection_type{env_sel_flat}, metrics
+            FROM "stream"
+            WHERE _timestamp >= 100 AND _timestamp < 200
+                AND gen_ai_operation_name = 'invoke_agent'
+            GROUP BY service_name, {agent_ident}{env_grp_flat}"#,
+        );
+        // env appears in SELECT (as agent_env) and in GROUP BY.
+        assert!(sql.contains("gen_ai_agent_env AS agent_env"));
+        assert!(sql.contains("GROUP BY service_name, gen_ai_agent_name, gen_ai_agent_env"));
+        // version never appears.
+        assert!(!sql.contains("gen_ai_agent_version"));
+    }
+
+    #[test]
+    fn test_ancestor_joins_chain_parent_links() {
+        let joins = super::build_ancestor_joins("mystream", 3);
+        // p1 joins the child c; p2 joins p1; p3 joins p2 — a true chain.
+        assert!(
+            joins.contains(
+                "LEFT JOIN \"mystream\" AS p1 ON c.reference_parent_span_id = p1.span_id"
+            )
+        );
+        assert!(
+            joins.contains(
+                "LEFT JOIN \"mystream\" AS p2 ON p1.reference_parent_span_id = p2.span_id"
+            )
+        );
+        assert!(
+            joins.contains(
+                "LEFT JOIN \"mystream\" AS p3 ON p2.reference_parent_span_id = p3.span_id"
+            )
+        );
+        // trace_id is part of every join key (no cross-trace leakage).
+        assert_eq!(joins.matches("trace_id = p").count(), 3);
+        // exactly `depth` joins.
+        assert_eq!(joins.matches("LEFT JOIN").count(), 3);
+    }
+}

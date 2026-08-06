@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
+import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
 
@@ -75,7 +78,7 @@ export interface SessionTraceRow {
 /** Single message inside a turn (USER block / ASSISTANT block). */
 export interface TurnMessage {
   role: "user" | "assistant" | "system" | "tool";
-  content: string;
+  content: I18nText;
 }
 
 /** Full per-turn payload, lazy-loaded when a turn row is expanded. */
@@ -135,6 +138,34 @@ export interface SessionRow {
   firstUserMessage: string;
 }
 
+// ---------------------------------------------------------------------------
+// Module-scoped list state — a singleton that outlives the SessionsList
+// component. Because it isn't re-created on each mount, navigating into a
+// session detail and back restores the previously fetched page instead of
+// re-hitting the API. Fresh data comes only from an explicit refresh or a date
+// change.
+// ---------------------------------------------------------------------------
+const sessions = ref<SessionRow[]>([]);
+const total = ref(0);
+const totalIsExact = ref(true);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const hasLoadedOnce = ref(false);
+// When the current page was last fetched (drives the header's "last refreshed"
+// label) and the org it was fetched for (so switching org re-fetches rather
+// than showing the previous org's sessions).
+const lastRunAt = ref<number | null>(null);
+const loadedOrg = ref<string | null>(null);
+// Shared pagination so the page/size the user was on is preserved across the
+// unmount/remount cycle and stays in sync with the restored rows.
+const currentPage = ref(1);
+const rowsPerPage = ref(20);
+// Agent-filter list is loaded lazily by `loadSessions` (agent mode only), so it
+// lives here too — otherwise a back-navigation, which skips that load, would
+// reset `agentsLoaded` to false and strand the agent picker on its skeleton.
+const agents = ref<GenAiAgentListItem[]>([]);
+const agentsLoaded = ref(false);
+
 /**
  * Composable owning the Sessions tab's list state and fetch flow.
  *
@@ -143,7 +174,10 @@ export interface SessionRow {
  * session level on the server (GROUP BY gen_ai_conversation_id) and
  * the dashboard renders one row per session.
  *
- * State is per-mount, mirroring `useLLMInsights`.
+ * List state is a module-scoped singleton so it survives the SessionsList
+ * component's unmount/remount cycle (e.g. drilling into a session detail and
+ * navigating back) — the list only re-fetches on an explicit refresh or a date
+ * change, not on every remount.
  *
  * @example
  *   const { sessions, total, loading, error, fetchPage, cancelAll }
@@ -157,12 +191,6 @@ export function useSessions() {
   // session-list and session-detail endpoints
   // don't expose final assistant text or per-span output.
   const { executeQuery, cancelAll } = useLLMStreamQuery();
-
-  const sessions = ref<SessionRow[]>([]);
-  const total = ref(0);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const hasLoadedOnce = ref(false);
 
   /**
    * Fetch one page of sessions from the backend's dedicated sessions
@@ -226,7 +254,12 @@ export function useSessions() {
         };
       });
       total.value = Number(body.total) || 0;
+      totalIsExact.value = body.total_is_exact ?? true;
       hasLoadedOnce.value = true;
+      // Stamp when/which-org this page was fetched — used to keep the "last
+      // refreshed" label accurate and to invalidate the cache on org switch.
+      lastRunAt.value = Date.now();
+      loadedOrg.value = orgId;
     } catch (e: any) {
       // axios error shape — surface the server's message if present.
       const serverMsg =
@@ -277,9 +310,7 @@ export function useSessions() {
     // Sort chronologically so the conversation list reads in turn
     // order. The endpoint returns DESC by default to surface "most
     // recent" first; for a session we want oldest-first.
-    accumulated.sort(
-      (a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0),
-    );
+    accumulated.sort((a, b) => (Number(a.start_time) || 0) - (Number(b.start_time) || 0));
 
     // Map each trace summary to SessionTraceRow.
     //
@@ -342,9 +373,7 @@ export function useSessions() {
         model: modelsArr[0] ?? null,
         models: modelsArr,
         turnUserMessage: userMessageOf(r.gen_ai_input_messages),
-        serviceName: svcArr[0]?.service_name
-          ? String(svcArr[0].service_name)
-          : null,
+        serviceName: svcArr[0]?.service_name ? String(svcArr[0].service_name) : null,
       } as SessionTraceRow & { serviceName: string | null };
     });
 
@@ -392,8 +421,7 @@ export function useSessions() {
       userId: null,
       serviceName,
       firstSeenMicros: firstSeenNanos,
-      durationNanos:
-        lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
+      durationNanos: lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,
       turns: traces.length,
       inputTokens: totalInputTokens,
       outputTokens: totalOutputTokens,
@@ -429,15 +457,23 @@ export function useSessions() {
     endTime: number,
   ): Promise<TurnDetail> {
     if (!streamName || !traceId || !startTime || !endTime) {
-      return { traceId, userMessage: null, assistantMessage: null, model: null, llmCalls: 0, toolCalls: 0, otherCalls: 0, otherOps: [] };
+      return {
+        traceId,
+        userMessage: null,
+        assistantMessage: null,
+        model: null,
+        llmCalls: 0,
+        toolCalls: 0,
+        otherCalls: 0,
+        otherOps: [],
+      };
     }
     const safeId = traceId.replace(/'/g, "''");
 
-    // Fetch all gen_ai spans for this trace in one query. The
-    // gen_ai_input_messages IS NOT NULL filter was previously applied here
-    // but that meant a second parallel COUNT query was needed for LLM/tool
-    // call badge counts. Removing the filter lets us compute the counts
-    // client-side from the same result set, halving the number of API calls.
+    // Fetch all gen_ai spans for this trace in one query. No
+    // gen_ai_input_messages IS NOT NULL filter, so the LLM/tool call badge
+    // counts can be computed client-side from the same result set rather than
+    // via a second parallel COUNT query.
     const sql = compactSql(`
       SELECT
         gen_ai_input_messages,
@@ -465,14 +501,15 @@ export function useSessions() {
       const op = String(row.gen_ai_operation_name || "").toLowerCase();
       if (LLM_OPS.has(op)) llmCalls += 1;
       else if (op === "execute_tool") toolCalls += 1;
-      else { otherCalls += 1; otherOpsSet.add(op); }
+      else {
+        otherCalls += 1;
+        otherOpsSet.add(op);
+      }
     }
     const otherOps = [...otherOpsSet].sort();
     // Lazy-import the message parser so this composable stays light
     // when only the list view is in use.
-    const { messagesFromInput, messagesFromOutput, getModel } = await import(
-      "../threadView.utils"
-    );
+    const { messagesFromInput, messagesFromOutput, getModel } = await import("../threadView.utils");
 
     let userMessage: TurnMessage | null = null;
     let assistantMessage: TurnMessage | null = null;
@@ -525,7 +562,16 @@ export function useSessions() {
       }
     }
 
-    return { traceId, userMessage, assistantMessage, model, llmCalls, toolCalls, otherCalls, otherOps };
+    return {
+      traceId,
+      userMessage,
+      assistantMessage,
+      model,
+      llmCalls,
+      toolCalls,
+      otherCalls,
+      otherOps,
+    };
   }
 
   /**
@@ -543,13 +589,11 @@ export function useSessions() {
     endTime: number,
   ): Promise<any[]> {
     if (!streamName || !traceIds.length || !startTime || !endTime) return [];
-    const inList = traceIds
-      .map((id) => `'${String(id).replace(/'/g, "''")}'`)
-      .join(",");
+    const inList = traceIds.map((id) => `'${String(id).replace(/'/g, "''")}'`).join(",");
     const sql = compactSql(`
       SELECT
         span_id, trace_id, operation_name, gen_ai_operation_name,
-        tool_name, gen_ai_tool_name, tool_args,
+        gen_ai_tool_name,
         duration, start_time, end_time,
         span_status, status_message,
         gen_ai_request_model, gen_ai_response_model,
@@ -576,9 +620,16 @@ export function useSessions() {
   return {
     sessions,
     total,
+    totalIsExact,
     loading,
     error,
     hasLoadedOnce,
+    lastRunAt,
+    loadedOrg,
+    currentPage,
+    rowsPerPage,
+    agents,
+    agentsLoaded,
     fetchPage,
     fetchSession,
     fetchTurnDetail,

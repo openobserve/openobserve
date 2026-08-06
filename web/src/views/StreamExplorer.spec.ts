@@ -13,7 +13,6 @@ const i18n = createI18n({
   messages: { en: {} },
 });
 
-
 vi.mock("@/services/stream");
 vi.mock("@/services/search");
 
@@ -110,11 +109,7 @@ describe("StreamExplorer", () => {
 
     await flushPromises();
 
-    expect(stream.schema).toHaveBeenCalledWith(
-      "default",
-      "test_stream",
-      "logs",
-    );
+    expect(stream.schema).toHaveBeenCalledWith("default", "test_stream", "logs");
     wrapper.unmount();
   });
 

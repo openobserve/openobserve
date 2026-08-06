@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useChatHistory } from "@/composables/useChatHistory";
 import type { ChatHistoryEntry } from "@/ts/interfaces/chat";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -13,7 +13,7 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { loadHistory, deleteChatById, clearAllHistory } = useChatHistory(
   () => store.state.userInfo.email ?? "",
@@ -82,8 +82,7 @@ function formatTime(ts: string): string {
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffDays = Math.floor(diffMs / 86400000);
-  if (diffDays === 0)
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
@@ -92,18 +91,12 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="tw:flex tw:flex-col tw:h-full tw:text-base tw:w-[15em] tw:shrink-0 tw:border-r tw:border-r-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:overflow-hidden"
-    :class="store.state.theme === 'dark' ? 'hch-dark' : 'hch-light'"
+    class="border-card-glass-border bg-card-glass-bg flex h-full w-[15em] shrink-0 flex-col overflow-hidden border-r border-r-[0.0625em] text-base"
   >
     <!-- Header -->
-    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:pt-[0.625em] tw:pb-[0.375em] tw:shrink-0">
-      <span class="tw:text-[0.8125em] tw:font-semibold tw:opacity-70">{{ t("chatHistory.title") }}</span>
-      <OButton
-        variant="ghost-muted"
-        size="icon"
-        :title="t('chatHistory.newChat')"
-        @click="newChat"
-      >
+    <div class="flex shrink-0 items-center justify-between px-3 pt-[0.625em] pb-[0.375em]">
+      <span class="text-[0.8125em] font-semibold opacity-70">{{ t("chatHistory.title") }}</span>
+      <OButton variant="ghost-muted" size="icon" :title="t('chatHistory.newChat')" @click="newChat">
         <svg
           width="1em"
           height="1em"
@@ -121,10 +114,10 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- Search -->
-    <div class="tw:px-2 tw:pb-[0.375em] tw:shrink-0">
-      <div class="tw:flex tw:items-center tw:gap-[0.375em] tw:bg-(--o2-input-bg) tw:rounded-md tw:px-[0.375em]">
+    <div class="shrink-0 px-2 pb-[0.375em]">
+      <div class="bg-input-bg rounded-default flex items-center gap-[0.375em] px-[0.375em]">
         <svg
-          class="tw:opacity-50 tw:shrink-0"
+          class="shrink-0 opacity-50"
           width="0.875em"
           height="0.875em"
           viewBox="0 0 24 24"
@@ -139,16 +132,11 @@ function formatTime(ts: string): string {
         </svg>
         <input
           v-model="searchTerm"
-          class="hch-search-input tw:flex-1 tw:min-w-0 tw:border-0 tw:bg-transparent tw:outline-none tw:text-[0.8125em] tw:text-(--o2-text-primary) tw:py-[0.375em]"
+          class="hch-search-input text-text-body placeholder:text-text-muted min-w-0 flex-1 border-0 bg-transparent py-[0.375em] text-[0.8125em] outline-none placeholder:opacity-70"
           :placeholder="t('chatHistory.search')"
           type="text"
         />
-        <OButton
-          v-if="searchTerm"
-          variant="ghost-subtle"
-          size="icon"
-          @click="searchTerm = ''"
-        >
+        <OButton v-if="searchTerm" variant="ghost-subtle" size="icon" @click="searchTerm = ''">
           <svg
             width="0.75em"
             height="0.75em"
@@ -166,21 +154,30 @@ function formatTime(ts: string): string {
     </div>
 
     <!-- List -->
-    <div class="hch-list tw:flex-1 tw:overflow-y-auto tw:py-1 tw:px-[0.375em]">
+    <div class="hch-list flex-1 overflow-y-auto px-[0.375em] py-1">
       <div
         v-for="chat in filtered"
         :key="chat.id"
-        class="tw:group tw:flex tw:items-center tw:gap-1 tw:py-[0.4375em] tw:px-2 tw:rounded-md tw:cursor-pointer tw:transition-[background] tw:duration-[120ms] tw:hover:bg-[var(--o2-hover-color,rgba(128,128,128,0.1))]"
+        class="group rounded-default hover:bg-interactive-hover-bg flex cursor-pointer items-center gap-1 px-2 py-[0.4375em] transition-[background] duration-[120ms]"
         :class="{
-          'tw:bg-[var(--o2-selected-color,rgba(57,126,246,0.12))]!': activeChatId === chat.id,
+          'bg-surface-accent-active!': activeChatId === chat.id,
         }"
         @click="selectChat(chat.id)"
       >
-        <div class="tw:flex-1 tw:min-w-0">
-          <div class="tw:text-[0.8125em] tw:leading-[1.35] tw:truncate tw:text-(--o2-text-body)" :class="{ 'tw:font-medium': activeChatId === chat.id }">{{ chat.title }}</div>
-          <div class="tw:text-[0.6875em] tw:text-(--o2-text-caption) tw:mt-[0.0625em]">{{ formatTime(chat.timestamp) }}</div>
+        <div class="min-w-0 flex-1">
+          <div
+            class="text-text-body truncate text-[0.8125em] leading-[1.35]"
+            :class="{ 'font-medium': activeChatId === chat.id }"
+          >
+            {{ chat.title }}
+          </div>
+          <div class="text-text-secondary mt-[0.0625em] text-[0.6875em]">
+            {{ formatTime(chat.timestamp) }}
+          </div>
         </div>
-        <span class="tw:inline-flex tw:items-center tw:shrink-0 tw:opacity-0 tw:transition-opacity tw:duration-[120ms] tw:group-hover:opacity-100">
+        <span
+          class="inline-flex shrink-0 items-center opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100"
+        >
           <OButton
             variant="ghost-destructive"
             size="icon"
@@ -207,15 +204,19 @@ function formatTime(ts: string): string {
         </span>
       </div>
 
-      <div v-if="filtered.length === 0" class="tw:text-center tw:text-[0.8125em] tw:opacity-[0.45] tw:py-[1.5em]">
-        {{
-          searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory")
-        }}
+      <div
+        v-if="filtered.length === 0"
+        class="py-[1.5em] text-center text-[0.8125em] opacity-[0.45]"
+      >
+        {{ searchTerm ? t("chatHistory.noMatches") : t("chatHistory.noHistory") }}
       </div>
     </div>
 
     <!-- Clear all -->
-    <div v-if="history.length > 0" class="tw:shrink-0 tw:py-[0.375em] tw:px-2 tw:border-t tw:border-t-[0.0625em] tw:border-t-(--o2-border-color)">
+    <div
+      v-if="history.length > 0"
+      class="border-t-card-glass-border shrink-0 border-t border-t-[0.0625em] px-2 py-[0.375em]"
+    >
       <OButton variant="ghost-subtle" :block="true" @click="clearAll">
         <svg
           width="0.875em"
@@ -235,11 +236,3 @@ function formatTime(ts: string): string {
     </div>
   </div>
 </template>
-
-<style>
-/* placeholder pseudo-element — cannot be inlined */
-.hch-search-input::placeholder {
-  color: var(--o2-text-muted);
-  opacity: 0.7;
-}
-</style>

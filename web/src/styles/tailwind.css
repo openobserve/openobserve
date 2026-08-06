@@ -1,14 +1,97 @@
-@import "tailwindcss" prefix(tw);
+@import "tailwindcss";
 @import "tw-animate-css";
-/* Design tokens — all SCSS files removed; these 4 CSS files are the sole source. */
+/* Clear Tailwind's built-in colour palette BEFORE our tokens load, so only
+   registered design tokens generate colour utilities (see the file header). */
+@import "./palette-reset.css";
+/* Design tokens — these 4 CSS files are the sole source. */
 @import "../lib/styles/tokens/base.css";
 @import "../lib/styles/tokens/semantic.css";
 @import "../lib/styles/tokens/component.css";
+/* Element reset/typography layer. Imported here so its cascade order is kept. */
+@import "./base-elements.css";
 @import "../lib/styles/tokens/dark.css";
+/* App-wide @keyframes referenced from template `[animation:…]` arbitrary
+   utilities — must be global, as Vue's scoped rewriter can't follow them. */
+@import "./keyframes.css";
 
 @plugin "@tailwindcss/typography";
 
+/* Bind `dark:` to the app's `.dark` class (set by utils/theme.ts), not the OS
+   `prefers-color-scheme` — Tailwind v4's default — so it follows the app theme. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @source "../**/*.{vue,js,ts}";
+
+/*
+ * Light↔dark mode switch — soft curtain sweep (View Transitions API, started
+ * by switchThemeMode in utils/theme.ts). The outgoing theme holds fully opaque
+ * underneath while the new theme sweeps top→bottom behind a tall feathered
+ * mask edge (~half a viewport of blend), so the change reads as a soft light
+ * pass rather than a hard wipe or a flash.
+ * Mask math: the mask box is 250% of the viewport tall — solid for the first
+ * 40%, feathering to transparent by 60%. Sliding mask-position 100%→0% walks
+ * that feathered band across the full viewport height.
+ * REVERT: delete this block (browsers fall back to their default cross-fade)
+ * and reduce switchThemeMode to `applyChanges()` for a fully instant switch.
+ */
+::view-transition-old(root) {
+  animation: none;
+}
+::view-transition-new(root) {
+  animation: o2-theme-sweep 0.45s ease-in-out both;
+  mask-image: linear-gradient(to bottom, black 0%, black 40%, transparent 60%);
+  mask-size: 100% 250%;
+  mask-repeat: no-repeat;
+}
+@keyframes o2-theme-sweep {
+  from {
+    mask-position: 0% 100%;
+  }
+  to {
+    mask-position: 0% 0%;
+  }
+}
+
+/*
+ * While a theme switch is in flight, suppress per-element color transitions
+ * (inputs, buttons, table action icons carry their own `transition-colors`)
+ * so nothing animates a beat behind the page cross-fade. The class is added
+ * and removed by switchThemeMode in utils/theme.ts.
+ */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+/*
+ * Navbar theme-toggle icon swap (sun ↔ moon): rotate + scale out-in. Driven by
+ * the <Transition name="theme-icon"> wrapper in ThemeSwitcher.vue. Uses CSS
+ * animations rather than transitions so the `theme-switching` freeze above
+ * doesn't suppress it — it plays live inside the theme sweep.
+ */
+.theme-icon-enter-active {
+  animation: theme-icon-in 0.3s ease-out;
+}
+.theme-icon-leave-active {
+  animation: theme-icon-out 0.15s ease-in forwards;
+}
+@keyframes theme-icon-in {
+  from {
+    transform: rotate(-90deg) scale(0.6);
+    opacity: 0;
+  }
+  to {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes theme-icon-out {
+  to {
+    transform: rotate(90deg) scale(0.6);
+    opacity: 0;
+  }
+}
 
 /*
  * When reka-ui opens a modal dialog it sets `body { pointer-events: none }`
@@ -28,23 +111,27 @@
  * a placeholder on the Monaco query editor (logs, traces, RUM sessions,
  * RUM error tracking, alerts). Mirrors Monaco's rendered text (monospace,
  * same line height) so the placeholder reads as the future typed query.
- * --o2-text-placeholder is theme-paired, so no dark override is needed.
+ * The placeholder text token is theme-paired, so no dark override is needed.
  */
 .query-editor-placeholder-overlay .query-editor-placeholder-typewriter {
-  font-family: monospace;
-  font-size: var(--text-base);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
   line-height: 1.3125rem;
-  color: var(--o2-text-placeholder);
+  color: var(--color-text-placeholder);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 @layer base {
-  *, :before, :after {
-    border-color: #e5e7eb;
+  /* Tailwind's v3-compat default border colour, token-backed so it follows the
+     theme (a raw hex would paint light-grey borders in dark mode on any element
+     that sets a border-width without a colour). */
+  *,
+  :before,
+  :after {
+    border-color: var(--color-border-default);
   }
-
 }
 
 /*
@@ -72,19 +159,42 @@
  * `round 0.5rem` keeps the corners rounded throughout the wipe.
  */
 @keyframes o2-reveal-down-in {
-  from { opacity: 0; clip-path: inset(0 0 100% 0 round 0.5rem); }
-  to   { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0 round 0.5rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
 }
 @keyframes o2-reveal-down-out {
-  from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
-  to   { opacity: 0; clip-path: inset(0 0 100% 0 round 0.5rem); }
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0 round 0.5rem);
+  }
 }
 @keyframes o2-reveal-up-in {
-  from { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
-  to   { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
+  from {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
 }
 @keyframes o2-reveal-up-out {
-  from { opacity: 1; clip-path: inset(0 0 0 0 round 0.5rem); }
-  to   { opacity: 0; clip-path: inset(100% 0 0 0 round 0.5rem); }
+  from {
+    opacity: 1;
+    clip-path: inset(0 0 0 0 round 0.5rem);
+  }
+  to {
+    opacity: 0;
+    clip-path: inset(100% 0 0 0 round 0.5rem);
+  }
 }
-

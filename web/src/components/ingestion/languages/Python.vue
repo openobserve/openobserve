@@ -15,13 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useStore } from "vuex";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import useIngestion from "@/composables/useIngestion";
+import { raw, useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 const name = "python";
-const store = useStore();
-const { endpoint, languagesContent, languagesDocURLs } = useIngestion();
+const { languagesContent, languagesDocURLs } = useIngestion();
 const content = languagesContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 
 const docURL = languagesDocURLs[name];
@@ -30,15 +31,27 @@ const docURLFastAPI = languagesDocURLs["fastapi"];
 
 <template>
   <IngestionContent>
-    <CopyContent :content="content" />
+    <CopyContent :content="raw(content)" />
     <div>
-      <div class="tw:font-medium">Check further documentation at:</div>
-      <ol class="tw:list-decimal tw:pl-5 tw:mt-1">
-        <li class="tw:py-0.5">
-          <a :href="docURL" target="_blank" rel="noopener noreferrer" class="tw:text-text-link tw:hover:text-text-link-hover tw:underline">Python</a>
+      <div class="font-medium">{{ t("ingestion.checkFurtherDocumentationAt") }}</div>
+      <ol class="mt-1 list-decimal pl-5">
+        <li class="py-0.5">
+          <a
+            :href="docURL"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-link hover:text-text-link-hover underline"
+            >{{ t("ingestion.python") }}</a
+          >
         </li>
-        <li class="tw:py-0.5">
-          <a :href="docURLFastAPI" target="_blank" rel="noopener noreferrer" class="tw:text-text-link tw:hover:text-text-link-hover tw:underline">FastAPI</a>
+        <li class="py-0.5">
+          <a
+            :href="docURLFastAPI"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-text-link hover:text-text-link-hover underline"
+            >{{ t("ingestion.fastapi") }}</a
+          >
         </li>
       </ol>
     </div>

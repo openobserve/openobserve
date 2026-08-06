@@ -79,11 +79,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(1);
       expect(result[0].series).toHaveLength(1);
@@ -107,11 +103,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(1);
       expect(result[0].series).toHaveLength(1);
@@ -146,11 +138,7 @@ describe("dataProcessor", () => {
         config: { promql_legend: "{{job}}" },
       });
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(2);
       expect(result[0].queryIndex).toBe(0);
@@ -179,11 +167,7 @@ describe("dataProcessor", () => {
         config: { promql_legend: "{{job}}" },
       });
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(1);
       expect(result[0].queryIndex).toBe(1);
@@ -206,11 +190,7 @@ describe("dataProcessor", () => {
 
       mockPanelSchema.config.promql_series_limit = 50;
 
-      const processedResult = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const processedResult = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(processedResult[0].series).toHaveLength(50);
     });
@@ -232,11 +212,7 @@ describe("dataProcessor", () => {
 
       delete mockPanelSchema.config.promql_series_limit;
 
-      const processedResult = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const processedResult = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(processedResult[0].series).toHaveLength(100);
     });
@@ -266,16 +242,10 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].timestamps).toHaveLength(3);
-      expect(result[0].timestamps.map(([ts]) => ts)).toEqual([
-        1609459200, 1609459260, 1609459320,
-      ]);
+      expect(result[0].timestamps.map(([ts]) => ts)).toEqual([1609459200, 1609459260, 1609459320]);
     });
 
     it("should format timestamps with UTC timezone", async () => {
@@ -295,11 +265,7 @@ describe("dataProcessor", () => {
 
       mockStore.state.timezone = "UTC";
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].timestamps[0][0]).toBe(1609459200);
       expect(typeof result[0].timestamps[0][1]).toBe("string");
@@ -322,11 +288,7 @@ describe("dataProcessor", () => {
 
       mockStore.state.timezone = "America/New_York";
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].timestamps[0][0]).toBe(1609459200);
       expect(result[0].timestamps[0][1]).toBeInstanceOf(Date);
@@ -350,11 +312,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].series[0].data).toEqual({
         1609459200: "100",
@@ -379,11 +337,7 @@ describe("dataProcessor", () => {
 
       mockPanelSchema.queries = [];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].queryConfig).toEqual({});
     });
@@ -400,11 +354,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].series[0].values).toEqual([[1609459200, "42"]]);
     });
@@ -424,11 +374,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].series[0].values).toEqual([]);
       expect(result[0].series[0].data).toEqual({});

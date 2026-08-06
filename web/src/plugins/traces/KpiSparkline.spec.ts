@@ -116,14 +116,12 @@ describe("KpiSparkline — line path math", () => {
     });
     const linePath = wrapper.findAll("path")[1].attributes("d") || "";
     // Extract x-coordinates from the path commands
-    const xs = [...linePath.matchAll(/[ML](-?\d+\.?\d*),/g)].map((m) =>
-      parseFloat(m[1]),
-    );
+    const xs = [...linePath.matchAll(/[ML](-?\d+\.?\d*),/g)].map((m) => parseFloat(m[1]));
     expect(xs[0]).toBeCloseTo(0);
     expect(xs[xs.length - 1]).toBeCloseTo(200);
     // Even spacing — the values are rounded to 2 decimals via toFixed(2),
     // so neighbouring spans can differ by up to 0.01. Allow that tolerance.
-    expect(Math.abs((xs[1] - xs[0]) - (xs[2] - xs[1]))).toBeLessThan(0.02);
+    expect(Math.abs(xs[1] - xs[0] - (xs[2] - xs[1]))).toBeLessThan(0.02);
   });
 
   // All-equal data → flat line. Range fallback to 1 prevents NaN.
@@ -135,9 +133,7 @@ describe("KpiSparkline — line path math", () => {
     const linePath = wrapper.findAll("path")[1].attributes("d") || "";
     expect(linePath).not.toContain("NaN");
     // All y-coordinates should be the same
-    const ys = [...linePath.matchAll(/,(-?\d+\.?\d*)/g)].map((m) =>
-      parseFloat(m[1]),
-    );
+    const ys = [...linePath.matchAll(/,(-?\d+\.?\d*)/g)].map((m) => parseFloat(m[1]));
     const allSame = ys.every((y) => y === ys[0]);
     expect(allSame).toBe(true);
   });
@@ -159,9 +155,7 @@ describe("KpiSparkline — line path math", () => {
       props: { data: [10, 5, 0], height: 100 },
     });
     const linePath = wrapper.findAll("path")[1].attributes("d") || "";
-    const ys = [...linePath.matchAll(/,(-?\d+\.?\d*)/g)].map((m) =>
-      parseFloat(m[1]),
-    );
+    const ys = [...linePath.matchAll(/,(-?\d+\.?\d*)/g)].map((m) => parseFloat(m[1]));
     // First (data=10, max) at top → y close to padTop=2
     expect(ys[0]).toBeCloseTo(2, 0);
     // Last (data=0, min) at bottom → y close to height - padBottom = 98
@@ -209,9 +203,7 @@ describe("KpiSparkline — gradient id uniqueness", () => {
   // The id matches the documented pattern.
   it("gradient id starts with `kpi-spark-`", () => {
     const wrapper = mount(KpiSparkline, { props: { data: [1, 2] } });
-    expect(wrapper.find("linearGradient").attributes("id")).toMatch(
-      /^kpi-spark-/,
-    );
+    expect(wrapper.find("linearGradient").attributes("id")).toMatch(/^kpi-spark-/);
   });
 });
 
@@ -221,8 +213,6 @@ describe("KpiSparkline — preserveAspectRatio", () => {
   // aspect ratio and shrink instead.
   it("uses preserveAspectRatio=none so the line scales to fit width", () => {
     const wrapper = mount(KpiSparkline, { props: { data: [1, 2] } });
-    expect(wrapper.find("svg").attributes("preserveAspectRatio")).toBe(
-      "none",
-    );
+    expect(wrapper.find("svg").attributes("preserveAspectRatio")).toBe("none");
   });
 });

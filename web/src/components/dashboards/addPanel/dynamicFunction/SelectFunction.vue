@@ -1,83 +1,76 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
 <template>
-  <div class="tw:flex tw:flex-col">
-    <div class="tw:w-60 tw:flex-none">
+  <div class="flex flex-col">
+    <!-- Function selector -->
+    <div class="w-60 flex-none">
       <OSelect
         v-model="fields.functionName"
-        label="Select Function"
-        label-position="inside"
         :options="filteredFunctions"
         data-test="dashboard-function-dropdown"
-        class="tw:w-full"
+        class="w-full"
         @search="onFunctionSearch"
-      />
+      >
+        <template #icon-left>
+          <OIcon name="function" size="sm" />
+        </template>
+      </OSelect>
     </div>
-    <div class="tw:w-full tw:mt-2">
-      <!-- Loop through the args for the first n-1 arguments -->
-      <div class="tw:w-full">
+
+    <!-- Argument tree -->
+    <div class="mt-2 w-full">
+      <div class="w-full">
         <div
-          v-for="(arg, argIndex) in fields.args"
+          v-for="(arg, argIndex) in argRows"
           :key="argIndex + '-' + arg.type"
-          class="tw:w-full tw:flex tw:flex-col"
+          class="flex w-full flex-col"
         >
-          <div
-            class="tw:flex"
-            :style="{ marginLeft: isChild ? '-48px' : '0px' }"
-          >
-            <div class="tw:mr-2 tw:relative tw:w-3" style="min-height: 50px">
+          <div class="flex" :style="{ marginLeft: isChild ? '-48px' : '0px' }">
+            <div class="relative mr-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="tw:absolute tw:top-0 tw:w-px tw:bg-[#001495] tw:opacity-50"
+                class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
-                  bottom:
-                    argIndex === fields.args.length - 1
-                      ? 'calc(100% - 32px)'
-                      : '0',
-                  left: '6px',
+                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 32px)' : '0',
+                  left: '5px',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw:absolute" style="top: 30px; left: 5px">
+              <div class="text-text-secondary absolute top-7.5 left-1">
                 <SubTaskArrow />
               </div>
             </div>
 
-            <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-              <div class="tw:flex tw:items-center tw:gap-x-2">
+            <div class="flex min-w-0 flex-1 flex-col">
+              <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="tw:flex tw:items-start">
-                <!-- type selector -->
+              <div class="flex items-start gap-1">
+                <!-- Argument type switcher -->
                 <OSelect
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
                   :options="
-                    getSupportedTypeBasedOnFunctionNameAndIndex(
-                      fields.functionName,
-                      argIndex,
-                    )
+                    getSupportedTypeBasedOnFunctionNameAndIndex(fields.functionName, argIndex)
                   "
                   icon-key="icon"
                   label-position="inside"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5 tw:w-fit! tw:flex-none!"
+                  class="o2-custom-select-dashboard arg-type-select mr-0.5 w-fit! flex-none!"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
                   <template #icon-left>
-                    <OIcon
-                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
-                      size="sm"
-                    />
+                    <OIcon :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm" />
                   </template>
-                  <template #trigger><!-- icon-only --></template>
+                  <!-- empty slot keeps the trigger icon-only -->
+                  <template #trigger><span class="sr-only"></span></template>
                 </OSelect>
-                <!-- Left field selector using StreamFieldSelect -->
-                <div
-                  class="tw:w-52"
-                  v-if="fields.args[argIndex]?.type === 'field'"
-                >
+
+                <!-- Field selector -->
+                <div class="w-52 flex-none" v-if="fields.args[argIndex]?.type === 'field'">
                   <StreamFieldSelect
                     :streams="getAllSelectedStreams()"
                     v-model="fields.args[argIndex].value"
@@ -85,15 +78,12 @@
                   />
                 </div>
 
-                <div
-                  v-if="fields.args[argIndex]?.type === 'string'"
-                  class="tw:w-52 tw:flex-none"
-                >
+                <div v-if="fields.args[argIndex]?.type === 'string'" class="w-52 flex-none">
                   <OInput
                     type="text"
                     v-model="fields.args[argIndex].value"
-                    placeholder="Enter string"
-                    class="tw:w-full"
+                    :placeholder="t('dashboard.selectFunction.enterString')"
+                    class="w-full"
                     :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
                   />
                 </div>
@@ -102,15 +92,15 @@
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
-                  placeholder="Enter number"
-                  class="tw:w-52"
+                  :placeholder="t('dashboard.selectFunction.enterNumber')"
+                  class="w-52 flex-none"
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
                 <!-- histogram interval for sql queries -->
                 <div
                   v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-                  class="tw:w-52 tw:flex-none"
+                  class="w-52 flex-none"
                 >
                   <HistogramIntervalDropDown
                     :model-value="fields.args[argIndex].value"
@@ -119,7 +109,7 @@
                         fields.args[argIndex].value = newValue;
                       }
                     "
-                    class="tw:w-full"
+                    class="w-full"
                     :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
                   />
                 </div>
@@ -138,6 +128,7 @@
                   v-if="canRemoveArgument(fields.functionName, argIndex)"
                   variant="ghost"
                   size="icon"
+                  class="shrink-0"
                   @click="removeArgument(argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
                   icon-left="close"
@@ -147,25 +138,27 @@
             </div>
           </div>
         </div>
-
-        <!-- Add more arguments if allowed -->
       </div>
     </div>
+
+    <!-- Add more arguments if allowed -->
     <OButton
       v-if="canAddArgument(fields.functionName)"
       variant="outline"
       size="sm"
       @click="addArgument()"
-      class="tw:mt-3"
+      class="mt-3 w-fit border-dashed"
+      icon-left="add"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
     >
-      + Add
+      {{ t("dashboard.selectFunction.add") }}
     </OButton>
   </div>
 </template>
 
 <script lang="ts">
-import { ref, watch, toRef, computed, inject } from "vue";
+import { ref, watch, computed, inject } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
@@ -206,15 +199,20 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { getAllSelectedStreams } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    interface FunctionArg {
+      type: string;
+      value: unknown;
+    }
+
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { getAllSelectedStreams } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const fields = ref(addMissingArgs(props.modelValue));
+
+    // Typed view of the args used only for template iteration, so the v-for
+    // index resolves to `number` (v-model still writes through `fields`).
+    const argRows = computed<FunctionArg[]>(() => fields.value.args ?? []);
 
     watch(
       () => fields.value,
@@ -233,9 +231,7 @@ export default {
       let filteredFunctionsValidation = functionValidation;
       // if allowAggregation is false, filter out aggregation functions
       if (props.allowAggregation === false) {
-        filteredFunctionsValidation = filteredFunctionsValidation.filter(
-          (v) => !v.isAggregation,
-        );
+        filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
       }
 
       // None is already included in functionValidation.json, just map all functions
@@ -253,9 +249,7 @@ export default {
         let filteredFunctionsValidation = functionValidation;
         // if allowAggregation is false, filter out aggregation functions
         if (props.allowAggregation === false) {
-          filteredFunctionsValidation = filteredFunctionsValidation.filter(
-            (v) => !v.isAggregation,
-          );
+          filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
         }
 
         const searchVal = val?.toLowerCase();
@@ -273,9 +267,7 @@ export default {
     const onFunctionSearch = (val: string) => {
       let filteredFunctionsValidation = functionValidation;
       if (props.allowAggregation === false) {
-        filteredFunctionsValidation = filteredFunctionsValidation.filter(
-          (v) => !v.isAggregation,
-        );
+        filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
       }
       const searchVal = val?.toLowerCase() ?? "";
       filteredFunctions.value = filteredFunctionsValidation
@@ -286,14 +278,8 @@ export default {
         .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
     };
 
-    // const availableFunctions = ref(["arrzip", "concat", "count", "sum"]);
-
     const getValidationForFunction = (functionName: string) => {
-      return (
-        functionValidation.find(
-          (v) => v.functionName === (functionName ?? null),
-        ) ?? {}
-      );
+      return functionValidation.find((v) => v.functionName === (functionName ?? null)) ?? {};
     };
 
     const canAddArgument = (functionName: string) => {
@@ -311,11 +297,7 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       const minArg = argsValidation[adjustedIndex]?.min ?? 0;
       const functionTotalArgs = argsValidation.length;
@@ -325,9 +307,7 @@ export default {
     };
 
     const addArgument = () => {
-      const funcValidation: any = getValidationForFunction(
-        fields.value.functionName,
-      );
+      const funcValidation: any = getValidationForFunction(fields.value.functionName);
 
       const adjustedIndex = getAdjustedIndex(
         funcValidation?.args || [],
@@ -373,11 +353,7 @@ export default {
     };
 
     // Helper function to adjust the index based on allowAddArgAt
-    const getAdjustedIndex = (
-      argsValidation: any,
-      argIndex: number,
-      allowAddArgAt: any,
-    ) => {
+    const getAdjustedIndex = (argsValidation: any, argIndex: number, allowAddArgAt: any) => {
       const totalArgs = argsValidation.length;
 
       // Handle different cases for allowAddArgAt
@@ -416,15 +392,11 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       // Return the type for the adjusted index, or an empty array if the index is out of bounds
       const types = argsValidation[adjustedIndex]?.type || [];
-      // Inject icon name for each option so dropdown items show icons
+      // Inject icon name for each option so the switcher buttons show icons
       return types.map((t: any) => ({
         ...t,
         icon: getIconBasedOnArgType(t.value),
@@ -434,14 +406,12 @@ export default {
     // watcher on functionName
     watch(
       () => fields.value.functionName,
-      (newVal) => {
+      () => {
         // Save the old args
         const oldArgs = [...fields.value.args];
 
         // get the validation for the selected function
-        const funcValidation: any = getValidationForFunction(
-          fields.value.functionName,
-        );
+        const funcValidation: any = getValidationForFunction(fields.value.functionName);
 
         // rebuild fields.value.args based on funcValidation.args
         if (funcValidation) {
@@ -486,6 +456,13 @@ export default {
       }
     };
 
+    const setArgType = (argIndex: number, type: string) => {
+      const arg = fields.value.args[argIndex];
+      if (!arg || arg.type === type) return;
+      arg.type = type;
+      onArgTypeChange(arg);
+    };
+
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
@@ -498,6 +475,8 @@ export default {
           return "123";
         case "histogramInterval":
           return "bar-chart";
+        default:
+          return undefined;
       }
     };
 
@@ -505,28 +484,26 @@ export default {
       const funcValidation: any = getValidationForFunction(functionName);
 
       if (!funcValidation) {
-        return `Parameter ${argIndex + 1}`;
+        return t("dashboard.selectFunction.parameter", { n: argIndex + 1 });
       }
 
       const argsValidation = funcValidation?.args || [];
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       // Return the label from validation, or fallback to default
       return (
-        argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`
+        argsValidation[adjustedIndex]?.label ||
+        t("dashboard.selectFunction.parameter", { n: argIndex + 1 })
       );
     };
 
     return {
+      t,
       fields,
-      // availableFunctions,
+      argRows,
       getValidationForFunction,
       canAddArgument,
       canRemoveArgument,
@@ -541,6 +518,7 @@ export default {
       onFunctionSearch,
       initializeFunctions,
       onArgTypeChange,
+      setArgType,
       getAllSelectedStreams,
       getIconBasedOnArgType,
       getParameterLabel,
@@ -548,15 +526,3 @@ export default {
   },
 };
 </script>
-
-<style>
-/* Make the trigger compact - only show the icon + chevron (no label text) */
-.arg-type-select span[class~="tw:flex-1"][class~="tw:truncate"] {
-  display: none !important;
-}
-
-.arg-type-select button[type="button"] {
-  min-width: 2rem;
-  padding-inline-end: 1.5rem !important;
-}
-</style>

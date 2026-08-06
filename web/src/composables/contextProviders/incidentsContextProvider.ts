@@ -20,7 +20,7 @@
  * ```
  */
 
-import type { ContextProvider, PageContext } from './types';
+import type { ContextProvider, PageContext } from "./types";
 
 /**
  * Creates an incidents context provider that matches the structure expected by the SRE agent
@@ -33,16 +33,13 @@ import type { ContextProvider, PageContext } from './types';
  * const provider = createIncidentsContextProvider(incidentData, store);
  * ```
  */
-export const createIncidentsContextProvider = (
-  incidentData: any,
-  store: any
-): ContextProvider => {
+export const createIncidentsContextProvider = (incidentData: any, store: any): ContextProvider => {
   return {
     getContext(): PageContext {
       // Build context matching the exact structure that SREChat sends
       const context: any = {
-        agent_type: 'sre',
-        org_id: store?.state?.selectedOrganization?.identifier || '',
+        agent_type: "sre",
+        org_id: store?.state?.selectedOrganization?.identifier || "",
         incident_id: incidentData?.id,
         incident_title: incidentData?.title,
         incident_status: incidentData?.status,
@@ -55,6 +52,6 @@ export const createIncidentsContextProvider = (
       };
 
       return context;
-    }
+    },
   };
 };

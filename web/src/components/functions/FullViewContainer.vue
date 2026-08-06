@@ -1,36 +1,23 @@
 <template>
-  <div
-    class="tw:py-[2px]"
-    :class="store.state.theme === 'dark' ? 'tw:bg-gray-500' : 'tw:bg-gray-200 '"
-  >
+  <div class="bg-section-header-bg py-0.5">
     <div
-      class="tw:flex tw:justify-between"
-      :class="{ 'tw:items-center': minHeaderHeight }"
+      class="flex justify-between"
+      :class="{ 'items-center': minHeaderHeight }"
       :style="minHeaderHeight ? { minHeight: minHeaderHeight } : undefined"
     >
-      <div class="tw:flex tw:items-center">
+      <div class="flex items-center">
         <OIcon
           v-if="showExpandIcon"
           name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="tw:mr-1 tw:cursor-pointer tw:transition-all"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'tw:text-gray-100'
-              : 'tw:text-gray-500',
-            expanded ? 'tw:transform tw:rotate-180' : '',
-          ]"
+          class="text-text-secondary mr-1 cursor-pointer transition-all"
+          :class="expanded ? 'rotate-180 transform' : ''"
           size="md"
         />
         <div
-          @click="showExpandIcon ? expanded = !expanded : null"
-          class="tw:text-[14px] tw:font-bold"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'tw:text-gray-100'
-              : 'tw:text-gray-500',
-            labelClass,
-          ]"
+          @click="showExpandIcon ? (expanded = !expanded) : null"
+          class="text-text-secondary text-sm font-bold"
+          :class="labelClass"
         >
           {{ label }}
         </div>
@@ -44,7 +31,8 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from "vue";
+import { type I18nText } from "@/types/i18n";
+import { computed, type PropType } from "vue";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -54,7 +42,7 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
+    type: String as unknown as PropType<I18nText>,
     required: true,
   },
   isExpandable: {
@@ -93,4 +81,3 @@ const expanded = computed({
   set: (value) => emits("update:isExpanded", value),
 });
 </script>
-

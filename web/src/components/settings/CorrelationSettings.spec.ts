@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import CorrelationSettings from "./CorrelationSettings.vue";
 
-
 vi.mock("vue-router", () => ({
   useRoute: () => ({ params: {}, query: {} }),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -71,7 +70,7 @@ vi.mock("@/components/alerts/SemanticFieldGroupsConfig.vue", () => ({
 vi.mock("@/components/common/AppTabs.vue", () => ({
   default: {
     name: "AppTabs",
-    template: '<div><slot /></div>',
+    template: "<div><slot /></div>",
   },
 }));
 
@@ -109,10 +108,16 @@ function mountComponent() {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-        "q-tabs": { template: '<div class="q-tabs"><slot /></div>', props: ["modelValue"], emits: ["update:modelValue"] },
-        "q-tab": { template: '<div class="q-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>', props: ["name", "label", "noCaps"] },
-        OTabs: { template: '<div class="o-tabs"><slot /></div>', props: ["modelValue", "dense"], emits: ["update:modelValue"] },
-        OTab: { template: '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>', props: ["name", "label", "noCaps", "icon"] },
+        OTabs: {
+          template: '<div class="o-tabs"><slot /></div>',
+          props: ["modelValue", "dense"],
+          emits: ["update:modelValue"],
+        },
+        OTab: {
+          template:
+            '<div class="o-tab" :data-test="`tab-${name}`" :data-name="name"><slot /></div>',
+          props: ["name", "label", "noCaps", "icon"],
+        },
       },
     },
   });
@@ -134,9 +139,7 @@ describe("CorrelationSettings", () => {
 
     it("should render the section (title is provided by the Settings shell)", () => {
       wrapper = mountComponent();
-      expect(
-        wrapper.find('[data-test="correlation-settings-tabs"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="correlation-settings-tabs"]').exists()).toBe(true);
     });
 
     it("should default to services tab", () => {

@@ -28,11 +28,9 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-
 describe.skip("Alert List", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(DestinationList, {
       attachTo: "#app",
       global: {
@@ -50,14 +48,10 @@ describe.skip("Alert List", async () => {
   });
 
   it("Should render alerts title", () => {
-    expect(
-      wrapper.find('[data-test="alert-destinations-list-title"]').text(),
-    ).toBe("Destinations");
+    expect(wrapper.find('[data-test="alert-destinations-list-title"]').text()).toBe("Destinations");
   });
   it("Should reder table with templates", () => {
-    expect(
-      wrapper.find('[data-test="alert-destinations-list-table"]').exists(),
-    ).toBeTruthy();
+    expect(wrapper.find('[data-test="alert-destinations-list-table"]').exists()).toBeTruthy();
   });
 
   it("Should display table column headers", async () => {
@@ -88,16 +82,14 @@ describe.skip("Alert List", async () => {
   });
 
   it("Should display add destination button", () => {
-    expect(
-      wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').text(),
-    ).toBe("Add Destination");
+    expect(wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').text()).toBe(
+      "Add Destination",
+    );
   });
 
   it("Should move to add alerts page on clicking on add alert", async () => {
     const routerPush = vi.spyOn(router, "push");
-    await wrapper
-      .find('[data-test="alert-destination-list-add-alert-btn"]')
-      .trigger("click");
+    await wrapper.find('[data-test="alert-destination-list-add-alert-btn"]').trigger("click");
     expect(routerPush).toHaveBeenCalledTimes(1);
     expect(routerPush).toHaveBeenCalledWith({
       name: "alertDestinations",
@@ -146,9 +138,7 @@ describe.skip("Alert List", async () => {
         ),
       );
       await wrapper
-        .find(
-          `[data-test="alert-destination-list-${destination_name}-delete-destination"]`,
-        )
+        .find(`[data-test="alert-destination-list-${destination_name}-delete-destination"]`)
         .trigger("click");
       const mainWrapper = new DOMWrapper(document.body);
       await mainWrapper.find('[data-test="confirm-button"]').trigger("click");

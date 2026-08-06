@@ -22,7 +22,8 @@ import Okta from "@/components/ingestion/security/Okta.vue";
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: {
       okta: "https://docs.example.com/okta",
       falco: "https://docs.example.com/falco",
@@ -34,7 +35,6 @@ vi.mock("@/composables/useIngestion", () => ({
     },
   })),
 }));
-
 
 describe("Okta.vue", () => {
   let store: any;
@@ -108,15 +108,15 @@ describe("Okta.vue", () => {
     it("should apply padding class", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find(".tw\\:p-3").exists()).toBe(true);
+      expect(wrapper.find(".p-3").exists()).toBe(true);
     });
 
     it("should have link styling", () => {
       const wrapper = mountComponent();
 
       const link = wrapper.find("a");
-      expect(link.classes()).toContain("tw:text-text-link");
-      expect(link.classes()).toContain("tw:underline");
+      expect(link.classes()).toContain("text-text-link");
+      expect(link.classes()).toContain("underline");
     });
   });
 });

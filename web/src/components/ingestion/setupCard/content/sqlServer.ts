@@ -21,13 +21,11 @@
 // receiver connect, the single-receiver config exports, and `sqlserver_*` metric
 // streams land in OpenObserve. Reference: https://openobserve.ai/blog/monitor-sql-server-with-otel/
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 // Step 1 — the monitoring login + the grants the receiver actually needs
 // (verified). On SQL Server 2019 and older, VIEW SERVER STATE replaces
@@ -45,9 +43,8 @@ const applyGrants = (connect: string) => `${connect} -Q "
 ${GRANT_SQL}
 "`;
 
-// Verified single-receiver config (the blog's redundant `sqlserver/1` is dropped).
-// Only the exporter endpoint + token are substituted per-org; {server}/{port} are
-// filled live from the configure step's inputs.
+// Single-receiver config. Only the exporter endpoint + token are substituted
+// per-org; {server}/{port} are filled live from the configure step's inputs.
 const CONFIG_YAML = `receivers:
   sqlserver:
     collection_interval: 10s
@@ -73,43 +70,37 @@ service:
       processors: [batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function sqlServerCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function sqlServerCard(subs: CardSubstitutions): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
       name: "SQL Server",
-      tagline:
-        "Collect SQL Server metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.sqlServerTagline"),
       logo: getImageURL("images/ingestion/sqlserver.png"),
       tone: "#cc2927",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
         id: "prepare",
-        title: "Prepare SQL Server",
-        description:
-          "Create the monitoring login — run it in a SQL client, **not** your shell.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.prepareSqlServerTitle",
+        descriptionKey: "ingestion.setupCard.prepareSqlServerDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         variants: [
           {
             id: "sqlcmd",
-            label: "sqlcmd",
+            label: raw("sqlcmd"),
             icon: tool.terminal,
             code: {
               lang: "bash",
-              raw: applyGrants(
-                'sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C',
-              ),
+              raw: applyGrants('sqlcmd -S localhost,1433 -U sa -P "YOUR_SA_PASSWORD" -C'),
             },
             note: "Replace YOUR_SA_PASSWORD.",
           },
           {
             id: "docker",
-            label: "Docker",
+            label: raw("Docker"),
             icon: tool.docker,
             code: {
               lang: "bash",
@@ -120,7 +111,7 @@ export default function sqlServerCard(
           },
           {
             id: "sql-client",
-            label: "SQL Client (GUI)",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
             icon: getImageURL("images/ingestion/sqlserver.png"),
             code: { lang: "sql", raw: GRANT_SQL },
           },
@@ -129,9 +120,9 @@ export default function sqlServerCard(
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         // No own toggle — follow the OS picked at the install step.
@@ -141,15 +132,15 @@ export default function sqlServerCard(
         inputs: [
           {
             id: "server",
-            label: "SQL Server Host",
+            labelKey: "ingestion.setupCard.sqlServerHostLabel",
             default: "localhost",
-            placeholder: "localhost",
+            placeholder: raw("localhost"),
           },
           {
             id: "port",
-            label: "Port",
+            labelKey: "ingestion.setupCard.portLabel",
             default: "1433",
-            placeholder: "1433",
+            placeholder: raw("1433"),
             width: "sm",
           },
         ],
@@ -157,26 +148,28 @@ export default function sqlServerCard(
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector.",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: { lang: "bash", raw: "./otelcol-contrib --config ./config.yaml" },
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `sqlserver_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifySqlserverMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
+        // SQL Server performance-counter names (sqlserver.user.connection.count,
+        // sqlserver.batch.request.rate, …) — untranslated so the pills match the
+        // metric names that land in the streams.
         pills: [
-          "User Connections",
-          "Batch Request Rate",
-          "SQL Compilation Rate",
-          "Lock Wait Rate",
-          "Buffer Cache Hit Ratio",
+          raw("User Connections"),
+          raw("Batch Request Rate"),
+          raw("SQL Compilation Rate"),
+          raw("Lock Wait Rate"),
+          raw("Buffer Cache Hit Ratio"),
         ],
       },
     ],

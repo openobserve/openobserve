@@ -58,6 +58,17 @@ describe("OCodeBlock", () => {
     expect(wrapper.find('[data-test="ai-code-copy-btn"]').exists()).toBe(true);
   });
 
+  it("exposes the dataTest prop on the block root so the block is locatable", () => {
+    const wrapper = mountBlock({
+      code: "insecureHTTP: true",
+      lang: "javascript",
+      dataTest: "ai-code",
+    });
+    const root = wrapper.find('[data-test="ai-code"]');
+    expect(root.exists()).toBe(true);
+    expect(root.text()).toContain("insecureHTTP: true");
+  });
+
   it("shows a reveal toggle and copies the real code (not the mask) when masked", () => {
     const real = "secret=abc123";
     const wrapper = mountBlock({ code: real, lang: "bash", codeMasked: "secret=•••" });

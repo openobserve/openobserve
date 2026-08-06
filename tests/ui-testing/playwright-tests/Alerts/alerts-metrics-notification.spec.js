@@ -316,7 +316,7 @@ test.describe("Metrics Alert Notification Chain", () => {
         testLogger.info('=== PHASE 1: Verify alert exists in list ===');
         await pm.alertsPage.searchAlert(ALERT_NAME);
         // Use getByText instead of verifyAlertCreated's getByRole('cell') —
-        // Quasar QTable cells are unreliable with ARIA role matching.
+        // The table cells are unreliable with ARIA role matching.
         await expect(page.getByText(ALERT_NAME).first()).toBeVisible({ timeout: 15000 });
         testLogger.info('Alert found in list', { name: ALERT_NAME });
 
@@ -337,7 +337,20 @@ test.describe("Metrics Alert Notification Chain", () => {
         expect(historyVisible, 'Alert history section should be visible').toBeTruthy();
 
         const historyRows = page.locator(pm.alertsPage.locators.alertDetailsHistoryTable + ' tbody tr');
-        const rowCount = await historyRows.count();
+        // Trigger history is written a few scheduler cycles AFTER the condition is first satisfied
+        // (Phase 2), so the table can still be empty at first dialog-open. Poll by reopening the
+        // details dialog until at least one history row appears (non-masking: still fails if
+        // history never populates within the budget).
+        let rowCount = await historyRows.count();
+        if (rowCount === 0) {
+            await expect(async () => {
+                await pm.alertsPage.closeAlertDetailsDialog().catch(() => {});
+                await pm.alertsPage.openAlertDetailsDialog(ALERT_NAME);
+                await pm.alertsPage.expectAlertDetailsHistorySectionVisible();
+                rowCount = await historyRows.count();
+                expect(rowCount).toBeGreaterThan(0);
+            }).toPass({ timeout: 120000 });
+        }
         expect(rowCount, 'Alert history should have at least one entry').toBeGreaterThan(0);
         testLogger.info('Alert history rows', { count: rowCount });
 
@@ -359,7 +372,7 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const org = getOrgIdentifier();
-        await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
         await pm.alertsPage.searchTemplate(TEMPLATE_NAME);
@@ -387,7 +400,7 @@ test.describe("Metrics Alert Notification Chain", () => {
 
         testLogger.info('=== PHASE 3: Navigate back to templates list ===');
 
-        await page.goto(`${baseUrl}/web/settings/templates?org_identifier=${org}`);
+        await page.goto(`${baseUrl}/web/alert-templates?org_identifier=${org}`);
         await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
         testLogger.info('=== TEMPLATE VERIFICATION COMPLETE ===');

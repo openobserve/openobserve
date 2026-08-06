@@ -144,8 +144,16 @@ const BUG_9754_TEST_LOGS = [
   }
 ];
 
-const STREAM_NAME = 'e2e_highlighting_test';
+// Per-run unique suffix: the fixed name collided with concurrent shared-org runs, so ingestion
+// hit "stream [e2e_highlighting_test] is being deleted" (another run's cleanup mid-flight). Keep
+// the e2e_ prefix so prefix-based cleanup still catches it.
+const STREAM_NAME = 'e2e_highlighting_test_' + Math.random().toString(36).slice(2, 7);
 
+// Runs in serial mode because the tests share the e2e_highlighting_test stream (the @setup
+// test ingests data the later tests query). Serial mode means a failed test retries the
+// ENTIRE block (afterAll -> beforeEach -> setup), so afterAll blocks on stream deletion to
+// guarantee each retry starts from a clean slate — otherwise setup re-ingests into a
+// still-deleting stream and gets 400 "stream is being deleted".
 test.describe("Logs Highlighting Regression Bug Fixes", () => {
   test.describe.configure({ mode: 'serial' }); // Serial because tests depend on ingested data
   let pm;
@@ -428,7 +436,23 @@ test.describe("Logs Highlighting Regression Bug Fixes", () => {
       // Delete the test stream via API
       const result = await cleanupPm.apiCleanup.deleteStream(STREAM_NAME);
       testLogger.info('Stream cleanup result:', result);
-      testLogger.info(`Test stream ${STREAM_NAME} cleanup completed`);
+
+      // Block until the deletion has fully settled server-side. This describe runs in
+      // serial mode, so a failing test retries the WHOLE block (afterAll -> beforeEach ->
+      // setup). Without this wait, the retry's setup re-ingests while this deletion is
+      // still in-flight and gets 400 "stream [...] is being deleted", which cascades into
+      // every downstream test and makes the built-in retry useless. Waiting here lets the
+      // next attempt start from a clean slate so re-ingestion recreates the stream cleanly.
+      // Deliberately do NOT throw when the wait times out: this is an afterAll cleanup
+      // hook, so throwing would fail the whole describe even when every test passed. A
+      // slow-but-eventual deletion must not turn a green run red. If it hasn't settled,
+      // warn (so it's visible) and rely on the setup's own ingest retry loop as backstop.
+      const deleted = await cleanupPm.apiCleanup.waitForStreamDeletion(STREAM_NAME, 120000, 3000);
+      if (deleted) {
+        testLogger.info(`Test stream ${STREAM_NAME} cleanup completed (deletion settled)`);
+      } else {
+        testLogger.warn(`Test stream ${STREAM_NAME} deletion did not settle within 120s; setup's ingest retry will backstop the next attempt`);
+      }
     } catch (error) {
       testLogger.warn(`Failed to cleanup test stream: ${error.message}`);
     } finally {

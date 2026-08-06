@@ -24,10 +24,7 @@ var index = {
     }
 
     if (schema) {
-      url +=
-        url.indexOf("?") > 0
-          ? "&fetchSchema=" + schema
-          : "?fetchSchema=" + schema;
+      url += url.indexOf("?") > 0 ? "&fetchSchema=" + schema : "?fetchSchema=" + schema;
     }
     return http().get(url);
   },
@@ -39,12 +36,7 @@ var index = {
     }
     return http().get(url);
   },
-  updateSettings: (
-    org_identifier: string,
-    stream_name: string,
-    type: string,
-    data: any
-  ) => {
+  updateSettings: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {

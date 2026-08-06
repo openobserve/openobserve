@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { generateTraceContext, getWebSocketUrl } from "@/utils/zincutils";
+import { generateTraceContext } from "@/utils/zincutils";
 import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
-import stream from "./stream";
 
 const search = {
   search: (
@@ -36,6 +35,7 @@ const search = {
       tab_name,
       is_ui_histogram,
       validate,
+      signal,
     }: {
       org_identifier: string;
       query: any;
@@ -52,20 +52,26 @@ const search = {
       tab_name?: string;
       is_ui_histogram?: boolean;
       validate?: boolean;
+      /**
+       * Aborts the request. Callers that leave a view mid-query should pass one and
+       * abort on unmount: an abandoned search still occupies a slot in the server's
+       * work-group concurrency queue until it completes, and queries that queue behind
+       * a full group and are then cancelled come back as HTTP 429
+       * (ErrorCodes::SearchCancelQuery maps to 429). Optional, so existing callers are
+       * unaffected.
+       */
+      signal?: AbortSignal;
     },
     search_type: string = "ui",
     is_multi_stream_search: boolean = false,
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
+      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
-    if (dashboard_name)
-      url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
+    if (dashboard_name) url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
     if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
     if (panel_id) url += `&panel_id=${panel_id}`;
@@ -76,7 +82,9 @@ const search = {
     if (is_ui_histogram) url += `&is_ui_histogram=${is_ui_histogram}`;
     if (is_multi_stream_search) url += `&is_multi_stream_search=${is_multi_stream_search}`;
     if (validate) url += `&validate=${validate}`;
-    const axiosConfig =
+    // Built once and reused by every post() branch below, so the signal reaches the
+    // multi-stream and aggs paths too — not just the default one.
+    const baseAxiosConfig =
       page_type === "traces"
         ? {
             transformResponse: [
@@ -90,11 +98,16 @@ const search = {
             ],
           }
         : undefined;
+    // Only materialise a config object when there is something to put in it, so callers
+    // passing neither a traces transform nor a signal keep the previous `undefined`.
+    const axiosConfig =
+      signal || baseAxiosConfig
+        ? { ...(baseAxiosConfig ?? {}), ...(signal ? { signal } : {}) }
+        : undefined;
     if (typeof query.query.sql != "string") {
       url = `/api/${org_identifier}/_search_multi?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
       if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
-      if (dashboard_name)
-        url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
+      if (dashboard_name) url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
       if (folder_id) url += `&folder_id=${folder_id}`;
       if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
       if (panel_id) url += `&panel_id=${panel_id}`;
@@ -110,11 +123,7 @@ const search = {
           axiosConfig,
         );
       } else {
-        return http({ headers: { traceparent } }).post(
-          url,
-          query.query,
-          axiosConfig,
-        );
+        return http({ headers: { traceparent } }).post(url, query.query, axiosConfig);
       }
     }
     return http({ headers: { traceparent } }).post(url, query, axiosConfig);
@@ -144,9 +153,7 @@ const search = {
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
+      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     // const url = `/api/${org_identifier}/_search?type=${page_type}&search_type=${search_type}`;
     let url = `/api/${org_identifier}/result_schema?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}&is_streaming=${is_streaming}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
@@ -224,6 +231,7 @@ const search = {
     run_id,
     tab_id,
     tab_name,
+    signal,
   }: {
     org_identifier: string;
     query: string;
@@ -239,16 +247,19 @@ const search = {
     run_id?: string;
     tab_id?: string;
     tab_name?: string;
+    /**
+     * Aborts the request. The metrics explorer cancels preview queries on
+     * scroll-away, filter change and dialog close; `useCancelQuery` cannot help
+     * there, since it only cancels registered server-side trace ids.
+     */
+    signal?: AbortSignal;
   }) => {
-    const use_cache = (window as any).use_cache !== undefined
-      ? (window as any).use_cache
-      : true;
+    const use_cache = (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     let url = `/api/${org_identifier}/prometheus/api/v1/query_range?use_cache=${use_cache}&start=${start_time}&end=${end_time}&step=${step}&query=${encodeURIComponent(
       query,
     )}`;
     if (dashboard_id) url += `&dashboard_id=${dashboard_id}`;
-    if (dashboard_name)
-      url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
+    if (dashboard_name) url += `&dashboard_name=${encodeURIComponent(dashboard_name)}`;
     if (folder_id) url += `&folder_id=${folder_id}`;
     if (folder_name) url += `&folder_name=${encodeURIComponent(folder_name)}`;
     if (panel_id) url += `&panel_id=${panel_id}`;
@@ -256,12 +267,13 @@ const search = {
     if (run_id) url += `&run_id=${run_id}`;
     if (tab_id) url += `&tab_id=${tab_id}`;
     if (tab_name) url += `&tab_name=${encodeURIComponent(tab_name)}`;
-    return http().get(url);
+    // Only pass a config object when there is actually a signal, so callers
+    // that don't cancel keep the exact single-argument call they had before.
+    return signal ? http().get(url, { signal }) : http().get(url);
   },
   metrics_query: ({
     org_identifier,
     query,
-    start_time,
     end_time,
   }: {
     org_identifier: string;
@@ -312,7 +324,7 @@ const search = {
     stream_name: string,
     trace_id: string,
     start_time: number,
-    end_time: number
+    end_time: number,
   ) => {
     const url = `/api/${org_identifier}/${stream_name}/traces/${trace_id}/dag?start_time=${start_time}&end_time=${end_time}`;
     return http().get(url);
@@ -334,7 +346,7 @@ const search = {
 
     let url = `/api/${org_identifier}/_search_partition?type=${page_type}&enable_align_histogram=${enable_align_histogram}`;
     if (typeof query.sql != "string") {
-      // this condition will be true for multi-stream search non-sql mode. 
+      // this condition will be true for multi-stream search non-sql mode.
       url = `/api/${org_identifier}/_search_partition_multi?type=${page_type}&enable_align_histogram=true`;
     }
 
@@ -390,69 +402,46 @@ const search = {
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
+      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     const url = `/api/${org_identifier}/search_jobs?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     return http({ headers: { traceparent } }).post(url, query);
   },
-  cancel_scheduled_search: (
-    {
-      org_identifier,
-      jobId,
-      traceparent,
-    }: {
-      org_identifier: string;
-      jobId: string;
-      traceparent?: string;
-    },
-    search_type: string = "ui",
-  ) => {
+  cancel_scheduled_search: ({
+    org_identifier,
+    jobId,
+    traceparent,
+  }: {
+    org_identifier: string;
+    jobId: string;
+    traceparent?: string;
+  }) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
     const url = `/api/${org_identifier}/search_jobs/${jobId}/cancel`;
     return http({ headers: { traceparent } }).post(url);
   },
-  retry_scheduled_search: (
-    {
-      org_identifier,
-      jobId,
-      traceparent,
-    }: {
-      org_identifier: string;
-      jobId: string;
-      traceparent?: string;
-    },
-    search_type: string = "ui",
-  ) => {
+  retry_scheduled_search: ({
+    org_identifier,
+    jobId,
+    traceparent,
+  }: {
+    org_identifier: string;
+    jobId: string;
+    traceparent?: string;
+  }) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
     const url = `/api/${org_identifier}/search_jobs/${jobId}/retry`;
     return http({ headers: { traceparent } }).post(url);
   },
-  delete_scheduled_search: (
-    {
-      org_identifier,
-      jobId,
-      traceparent,
-    }: {
-      org_identifier: string;
-      jobId: string;
-      traceparent?: string;
-    },
-    search_type: string = "ui",
-  ) => {
+  delete_scheduled_search: ({
+    org_identifier,
+    jobId,
+    traceparent,
+  }: {
+    org_identifier: string;
+    jobId: string;
+    traceparent?: string;
+  }) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
-    const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
     const url = `/api/${org_identifier}/search_jobs/${jobId}`;
     return http({ headers: { traceparent } }).delete(url);
   },
@@ -470,9 +459,7 @@ const search = {
   ) => {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
+      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     const url = `/api/${org_identifier}/search_jobs?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     return http({ headers: { traceparent } }).get(url);
   },
@@ -495,9 +482,7 @@ const search = {
     if (!traceparent) traceparent = generateTraceContext()?.traceparent;
     const { size, from } = query.query;
     const use_cache: boolean =
-      (window as any).use_cache !== undefined
-        ? (window as any).use_cache
-        : true;
+      (window as any).use_cache !== undefined ? (window as any).use_cache : true;
     let url = `/api/${org_identifier}/search_jobs/${jobId}/result?type=${page_type}&search_type=${search_type}&use_cache=${use_cache}`;
     url += `&size=${size}&from=${from}`;
 

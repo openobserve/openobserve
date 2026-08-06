@@ -1,23 +1,23 @@
 <template>
-  <div class="tw:relative">
+  <div class="relative">
     <OButton
       v-if="showCopyButton"
       variant="secondary"
       size="icon-sm"
-      class="tw:absolute! tw:top-0! tw:right-0 tw:z-10"
+      class="absolute! top-0! right-0 z-10"
       :class="copyButtonClass"
       @click="copyToClipboard"
     >
       <OIcon name="content-copy" size="sm" />
       <OTooltip :content="t('common.copyToClipboard')" />
     </OButton>
-    <div class="tw:pb-1 tw:flex tw:justify-start tw:items-center tw:px-3 copy-log-btn">
+    <div class="copy-log-btn flex items-center justify-start px-3 pb-1">
       <!-- Toolbar slot: consumers add context-specific buttons (View Trace, View Related, etc.) -->
       <slot name="toolbar" />
     </div>
     {
     <div
-      class="log_json_content tw:flex"
+      class="flex font-mono text-xs whitespace-pre-wrap"
       v-for="(key, index) in Object.keys(value)"
       :key="key"
     >
@@ -33,24 +33,18 @@
             data-test="json-preview-field-dropdown-btn"
             size="xs"
             variant="ghost"
-            class="tw:ml-2 log-json-field-dropdown-btn"
-            aria-label="Add icon"
+            class="ml-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+            :aria-label="t('common.addIcon')"
           >
             <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
           </OButton>
         </template>
-        <div class="logs-table-list tw:min-w-[180px]">
-          <slot name="field-dropdown"
-:field="key"
-:value="value[key]" />
+        <div class="logs-table-list min-w-45">
+          <slot name="field-dropdown" :field="key" :value="value[key]" />
         </div>
       </ODropdown>
 
-      <span
-        class="tw:pl-[0.625rem]"
-        :data-test="`json-preview-key-${key}`"
-        :class="store.state.theme === 'dark' ? 'dark' : ''"
-      >
+      <span class="pl-2.5" :data-test="`json-preview-key-${key}`">
         <span class="log-key">{{ key }}</span
         ><span class="log-separator">: </span
         ><span
@@ -74,7 +68,7 @@
 <script lang="ts">
 import { computed, reactive, useSlots } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { copyToClipboard as copyTextToClipboard } from "@/utils/clipboard";
 import { getImageURL } from "@/utils/zincutils";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
@@ -114,7 +108,7 @@ export default {
   },
   emits: ["copy"],
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const slots = useSlots();
 
@@ -122,8 +116,7 @@ export default {
     const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
     const copyToClipboard = () => {
-      copyTextToClipboard(JSON.stringify(props.value, null, 2), {
-        successMessage: t("common.copyToClipboard") + "!",
+      copyTextToClipboard(JSON.stringify(props.value, null, 2), t, {
         timeout: 1500,
       });
       emit("copy", props.value);
@@ -154,4 +147,3 @@ export default {
   },
 };
 </script>
-

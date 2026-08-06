@@ -1,10 +1,7 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
 
-export function buildSQLQueryFromInput(
-  fields: any,
-  defaultStream: any,
-): string {
+export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
     return "";
@@ -66,11 +63,7 @@ export function buildSQLQueryFromInput(
       );
     } else if (argType === "string" || argType === "histogramInterval") {
       // Wrap strings in quotes if they are not already wrapped
-      if (
-        typeof argValue === "string" &&
-        !argValue.startsWith("'") &&
-        !argValue.endsWith("'")
-      ) {
+      if (typeof argValue === "string" && !argValue.startsWith("'") && !argValue.endsWith("'")) {
         sqlArgs.push(`'${argValue}'`);
       } else {
         sqlArgs.push(argValue);
@@ -81,10 +74,7 @@ export function buildSQLQueryFromInput(
     } else if (argType === "function") {
       // Recursively build the SQL query for the nested function
       try {
-        const nestedFunctionQuery = buildSQLQueryFromInput(
-          argValue,
-          defaultStream,
-        );
+        const nestedFunctionQuery = buildSQLQueryFromInput(argValue, defaultStream);
         if (nestedFunctionQuery) {
           sqlArgs.push(nestedFunctionQuery);
         }
@@ -145,7 +135,7 @@ function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
     let joinConditionStrings: string[] = [];
 
     for (const condition of conditions) {
-      const { leftField, rightField, operation, logicalOperator } = condition;
+      const { leftField, rightField, operation } = condition;
 
       if (!leftField?.field || !rightField?.field || !operation) {
         // Invalid condition, skip it and continue to the next one
@@ -164,9 +154,7 @@ function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
           ? `${defaultStream}.${rightField.field}`
           : rightField.field;
 
-      joinConditionStrings.push(
-        `${leftFieldStr} ${operation} ${rightFieldStr}`,
-      );
+      joinConditionStrings.push(`${leftFieldStr} ${operation} ${rightFieldStr}`);
     }
 
     // Skip joins with no valid conditions
@@ -228,7 +216,6 @@ function buildChartQuery(config: {
 
   // Only use stream alias when joins exist
   const streamAlias = queryData?.joins?.length > 0 ? stream : "";
-
 
   // Build SELECT clause
   const selectExpressions: string[] = [];
@@ -383,16 +370,10 @@ export function buildSQLChartQuery(config: {
   let query = `SELECT ${selectExpressions.join(", ")}`;
 
   // FROM clause with JOIN support
-  query += ` FROM "${stream}" ${buildSQLJoinsFromInput(
-    queryData.joins,
-    streamAlias,
-  )}`;
+  query += ` FROM "${stream}" ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
 
   // WHERE clause
-  const whereClause = buildWhereClause(
-    queryData.fields.filter.conditions,
-    dashboardPanelData,
-  );
+  const whereClause = buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
   query += whereClause;
 
   // GROUP BY clause - chart-type-specific logic
@@ -515,11 +496,7 @@ export function addMissingArgs(fields: any): any {
       // If the argument is missing, add it
       const argType = argDef.type[0].value; // Always take the first type
       const defaultValue =
-        argDef.defaultValue !== undefined
-          ? argDef.defaultValue
-          : argType === "field"
-            ? {}
-            : "";
+        argDef.defaultValue !== undefined ? argDef.defaultValue : argType === "field" ? {} : "";
 
       updatedArgs.push({
         type: argType,
@@ -555,9 +532,7 @@ const formatValue = (
         (it: any) => it.stream_alias === null || it.stream_alias === undefined,
       );
 
-  const columnType = streamFields?.schema?.find(
-    (it: any) => it.name == column.field,
-  )?.type;
+  const columnType = streamFields?.schema?.find((it: any) => it.name == column.field)?.type;
   if (value == null) {
     // if value is null or undefined, return it as is
     return value;
@@ -617,19 +592,16 @@ const formatINValue = (value: any) => {
 export const buildCondition = (condition: any, dashboardPanelData: any) => {
   // Check if joins exist to determine whether to use stream alias
   const hasJoins =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.joins?.length > 0;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins?.length > 0;
 
   const streamAlias = hasJoins
     ? (condition?.column?.streamAlias ??
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream)
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream)
     : "";
 
   if (condition.filterType === "group") {
     const groupConditions = condition.conditions
-      .map((condition) => buildCondition(condition, dashboardPanelData))
+      .map((condition: any) => buildCondition(condition, dashboardPanelData))
       .filter(Boolean);
     const logicalOperators = condition.conditions
       .map((c: any) => c.logicalOperator)
@@ -649,9 +621,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       ? `${streamAlias}.${condition.column.field}`
       : condition.column.field;
     return `${fieldRef} IN (${condition.values
-      .map((value: any) =>
-        formatValue(value, condition.column, dashboardPanelData),
-      )
+      .map((value: any) => formatValue(value, condition.column, dashboardPanelData))
       .join(", ")})`;
   } else if (condition.type === "condition" && condition.operator != null) {
     let selectFilter = "";
@@ -680,10 +650,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       selectFilter += `${fieldRef} NOT IN (${formatINValue(condition.value)})`;
     } else if (condition.operator === "match_all") {
       selectFilter += `match_all(${formatValue(condition.value, condition.column, dashboardPanelData)})`;
-    } else if (
-      condition.operator === "str_match" ||
-      condition.operator === "Contains"
-    ) {
+    } else if (condition.operator === "str_match" || condition.operator === "Contains") {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -716,21 +683,6 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         dashboardPanelData,
       )})`;
     } else if (condition.value != null && condition.value !== "") {
-      // streamAlias can be undefined or null, also, groupedfield will have one entry with streamAlias as null
-      // so we need to handle both cases
-      const streamFields = condition.column.streamAlias
-        ? dashboardPanelData?.meta?.streamFields?.groupedFields.find(
-            (it: any) => it.stream_alias === condition.column.streamAlias,
-          )
-        : dashboardPanelData?.meta?.streamFields?.groupedFields.find(
-            (it: any) =>
-              it.stream_alias === null || it.stream_alias === undefined,
-          );
-
-      const columnType = streamFields?.schema?.find(
-        (it: any) => it.name == condition.column.field,
-      )?.type;
-
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -779,7 +731,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
   const whereConditions = filterData
-    ?.map((condition) => buildCondition(condition, dashboardPanelData))
+    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
     ?.filter(Boolean);
 
   const logicalOperators = filterData.map((it: any) => it.logicalOperator);
@@ -791,9 +743,7 @@ const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
             ? logicalOperators[index + 1]
             : "";
 
-        return index < logicalOperators.length
-          ? `${cond} ${logicalOperator}`
-          : cond;
+        return index < logicalOperators.length ? `${cond} ${logicalOperator}` : cond;
       })
       .join(" ")}`;
   }
@@ -802,10 +752,7 @@ const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
 };
 
 export const mapChart = (dashboardPanelData: any) => {
-  const queryData =
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ];
+  const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   const { name, value_for_maps } = queryData.fields;
 
   return buildChartQuery({
@@ -821,10 +768,7 @@ export const mapChart = (dashboardPanelData: any) => {
 };
 
 export const geoMapChart = (dashboardPanelData: any) => {
-  const queryData =
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ];
+  const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   const { latitude, longitude, weight } = queryData.fields;
 
   return buildChartQuery({
@@ -841,10 +785,7 @@ export const geoMapChart = (dashboardPanelData: any) => {
 };
 
 export const sankeyChartQuery = (dashboardPanelData: any) => {
-  const queryData =
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ];
+  const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   const { source, target, value } = queryData.fields;
 
   return buildChartQuery({

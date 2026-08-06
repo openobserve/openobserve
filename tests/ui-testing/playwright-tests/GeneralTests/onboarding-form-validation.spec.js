@@ -7,12 +7,14 @@
 //     - submit button disabled when agree checkbox is unchecked
 //
 //   AWS Marketplace Setup (@cloud):
-//     - empty org name → button disabled, error shown on click attempt
-//     - valid org name enables the Create & Link button
+//     - Create & Link button stays enabled (OForm+zod gates the submit, not a
+//       disabled button); submitting an empty org name reveals the required error
+//     - valid org name keeps the Create & Link button enabled
 //
 //   Azure Marketplace Setup (@cloud):
-//     - empty org name → button disabled, error shown on click attempt
-//     - valid org name enables the Create & Link button
+//     - Create & Link button stays enabled (OForm+zod gates the submit, not a
+//       disabled button); submitting an empty org name reveals the required error
+//     - valid org name keeps the Create & Link button enabled
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
@@ -164,15 +166,17 @@ test.describe("AWS Marketplace Setup form validation", { tag: '@cloud' }, () => 
         testLogger.info('AWS Marketplace setup page loaded');
     });
 
-    test("should disable Create & Link button when org name is empty", {
+    test("should keep Create & Link button enabled when org name is empty", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing AWS Create & Link disabled for empty org name');
+        testLogger.info('Testing AWS Create & Link stays enabled for empty org name (OForm)');
 
-        // Org name is empty by default
-        await expect(pm.onboardingFormValidation.getAwsCreateLinkBtnLocator()).toBeDisabled();
+        // Under the OForm+zod foundation the Create & Link button is ALWAYS
+        // enabled — the schema (newOrgName min(1)) gates the submit, not a
+        // disabled button. With an empty org name the button stays enabled.
+        await expect(pm.onboardingFormValidation.getAwsCreateLinkBtnLocator()).toBeEnabled();
 
-        testLogger.info('AWS Create & Link button correctly disabled for empty org name');
+        testLogger.info('AWS Create & Link button correctly stays enabled for empty org name');
     });
 
     test("should show org name error message when Create & Link is clicked with empty name", {
@@ -180,18 +184,15 @@ test.describe("AWS Marketplace Setup form validation", { tag: '@cloud' }, () => 
     }, async ({ page }) => {
         testLogger.info('Testing AWS org name error when Create & Link clicked with empty name');
 
-        // Click the empty input to ensure no value, then click the button via JS
-        // (button is :disabled="!newOrgName" so we test the guard error path by
-        // directly calling createNewOrgWithAws through the Vue instance is not
-        // accessible in E2E; instead verify the disabled state which is the guard)
-        await expect(pm.onboardingFormValidation.getAwsCreateLinkBtnLocator()).toBeDisabled();
+        // Submitting the empty form runs the schema (newOrgName required) and
+        // reveals the required error on the org-name field — the button itself
+        // stays enabled throughout.
+        await pm.onboardingFormValidation.clickAwsCreateLink();
 
-        // The OInput error is driven by :error-message="orgNameError" set when
-        // createNewOrgWithAws fires its guard. Since the button is :disabled="!newOrgName",
-        // verify the input is visible and empty as the required baseline assertion.
         await expect(pm.onboardingFormValidation.getAwsOrgNameInputLocator()).toBeVisible();
+        await expect(pm.onboardingFormValidation.getAwsOrgNameErrorLocator()).toBeVisible();
 
-        testLogger.info('AWS org name field visible and Create & Link disabled on empty input');
+        testLogger.info('AWS org name required error correctly shown on empty submit');
     });
 
     test("should enable Create & Link button when org name is entered", {
@@ -206,18 +207,22 @@ test.describe("AWS Marketplace Setup form validation", { tag: '@cloud' }, () => 
         testLogger.info('AWS Create & Link button correctly enabled after org name entry');
     });
 
-    test("should disable Create & Link button again when org name is cleared", {
+    test("should re-show org name error after a filled name is cleared", {
         tag: ['@onboarding-form-validation', '@P1', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing AWS Create & Link re-disabled after org name cleared');
+        testLogger.info('Testing AWS org name error returns after clearing a filled name');
 
         await pm.onboardingFormValidation.fillAwsOrgName('test_fv_aws_org_002');
         await expect(pm.onboardingFormValidation.getAwsCreateLinkBtnLocator()).toBeEnabled();
 
+        // Clearing the field and submitting re-runs the schema and re-reveals the
+        // required error (the button stays enabled the whole time).
         await pm.onboardingFormValidation.clearAwsOrgName();
-        await expect(pm.onboardingFormValidation.getAwsCreateLinkBtnLocator()).toBeDisabled();
+        await pm.onboardingFormValidation.clickAwsCreateLink();
+        await expect(pm.onboardingFormValidation.getAwsOrgNameErrorLocator()).toBeVisible();
+        await expect(pm.onboardingFormValidation.getAwsCreateLinkBtnLocator()).toBeEnabled();
 
-        testLogger.info('AWS Create & Link correctly re-disabled after clearing org name');
+        testLogger.info('AWS org name required error correctly re-shown after clearing');
     });
 });
 
@@ -245,26 +250,27 @@ test.describe("Azure Marketplace Setup form validation", { tag: '@cloud' }, () =
         testLogger.info('Azure Marketplace setup page loaded');
     });
 
-    test("should disable Create & Link button when subscription ID is empty", {
+    test("should keep Create & Link button enabled when org name is empty", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing Azure Create & Link disabled for empty org name');
+        testLogger.info('Testing Azure Create & Link stays enabled for empty org name (OForm)');
 
-        // Org name is empty by default
-        await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeDisabled();
+        // Always enabled under the OForm+zod foundation — the schema (newOrgName
+        // min(1)) gates the submit, not a disabled button.
+        await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeEnabled();
 
-        testLogger.info('Azure Create & Link button correctly disabled for empty org name');
+        testLogger.info('Azure Create & Link button correctly stays enabled for empty org name');
     });
 
-    test("should show org name input visible and button disabled with empty credentials", {
+    test("should show org name input visible and button enabled with empty credentials", {
         tag: ['@onboarding-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing Azure form shows org name input and button is disabled');
+        testLogger.info('Testing Azure form shows org name input and button stays enabled');
 
         await expect(pm.onboardingFormValidation.getAzureOrgNameInputLocator()).toBeVisible();
-        await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeDisabled();
+        await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeEnabled();
 
-        testLogger.info('Azure form org name input visible, Create & Link disabled on empty credentials');
+        testLogger.info('Azure form org name input visible, Create & Link stays enabled on empty credentials');
     });
 
     test("should enable Create & Link button when org name is entered", {
@@ -279,17 +285,21 @@ test.describe("Azure Marketplace Setup form validation", { tag: '@cloud' }, () =
         testLogger.info('Azure Create & Link button correctly enabled after org name entry');
     });
 
-    test("should disable Create & Link button again when org name is cleared", {
+    test("should re-show org name error after a filled name is cleared", {
         tag: ['@onboarding-form-validation', '@P1', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('Testing Azure Create & Link re-disabled after org name cleared');
+        testLogger.info('Testing Azure org name error returns after clearing a filled name');
 
         await pm.onboardingFormValidation.fillAzureOrgName('test_fv_azure_org_002');
         await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeEnabled();
 
+        // Clearing the field and submitting re-runs the schema and re-reveals the
+        // required error (the button stays enabled the whole time).
         await pm.onboardingFormValidation.clearAzureOrgName();
-        await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeDisabled();
+        await pm.onboardingFormValidation.clickAzureCreateLink();
+        await expect(pm.onboardingFormValidation.getAzureOrgNameErrorLocator()).toBeVisible();
+        await expect(pm.onboardingFormValidation.getAzureCreateLinkBtnLocator()).toBeEnabled();
 
-        testLogger.info('Azure Create & Link correctly re-disabled after clearing org name');
+        testLogger.info('Azure org name required error correctly re-shown after clearing');
     });
 });

@@ -15,176 +15,219 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:flex tw:flex-col tw:h-full tw:p-0">
-    <div v-if="!showImportTemplate && !showTemplateEditor" class="tw:flex tw:flex-col tw:h-full">
-      <!-- Standard section header: title + actions only. Search moved to toolbar. -->
-      <AppPageHeader
-        :title="t('alert_templates.header')"
-        icon="description"
-        :subtitle="'Reusable alert message templates'"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-      >
-        <template #actions>
-          <OToggleGroup
-            :model-value="activeTab"
-            @update:model-value="(v: any) => { activeTab = v; }"
-            data-test="template-list-tabs"
-            class="tw:mr-2"
-          >
-            <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
-              <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-              {{ t("alert_templates.filterAll") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
-              <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
-              {{ t("alert_templates.filterPrebuilt") }}
-            </OToggleGroupItem>
-            <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
-              <template #icon-left><OIcon name="settings" size="sm" /></template>
-              {{ t("alert_templates.filterCustom") }}
-            </OToggleGroupItem>
-          </OToggleGroup>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="importTemplate"
-            data-test="template-import"
-            >{{ t(`dashboard.import`) }}</OButton
-          >
-          <OButton
-            data-test="template-list-add-btn"
-            variant="primary"
-            size="sm"
-            @click="editTemplate(null)"
-            >{{ t(`alert_templates.add`) }}</OButton
-          >
-        </template>
-      </AppPageHeader>
-      <div class="card-container tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-      <OTable
-        :frame="false"
-        data-test="alert-templates-list-table"
-        :data="visibleRows"
-        :columns="columns"
-        row-key="name"
-        :loading="loading"
-        :selected-ids="selectedTemplateIds"
-        selection="multiple"
-        :is-row-selectable="isTemplateRowSelectable"
-        pagination="client"
-        :page-size="20"
-        :page-size-options="[5, 10, 20, 50, 100]"
-        :footer-title="t('alert_templates.header')"
-        sorting="client"
-        filter-mode="client"
-        :default-columns="false"
-        :show-global-filter="false"
-        @update:selected-ids="handleSelectedIdsUpdate"
-      >
-        <template #toolbar>
-          <OSearchInput
-            v-model="filterQuery"
-            class="tw:flex-1"
-            :placeholder="t('template.search')"
-            data-test="template-list-search-input"
-          />
-        </template>
-        <template #empty>
-          <OEmptyState
-            size="hero"
-            preset="no-alert-templates"
-            :filtered="!!filterQuery"
-            :hide-action="!filterQuery"
-            @action="(id) => id === 'clear-filters' && (filterQuery = '')"
-          />
-        </template>
-        <template #cell-name="{ row }">
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <span>{{ row.name }}</span>
-            <OTag
-              v-if="row.isPrebuilt"
-              type="templateOrigin"
-              value="prebuilt"
-              :title="t('alert_templates.prebuiltBadgeHint')"
-              data-test="alert-template-prebuilt-badge"
-            />
-            <OTag
-              v-else
-              type="templateOrigin"
-              value="custom"
-              data-test="alert-template-custom-badge"
-            />
-          </div>
-        </template>
-        <template #cell-actions="{ row }">
-          <OButton
-            title="Export Template"
-            class="tw:ml-1"
-            variant="ghost"
-            size="icon-sm"
-            @click.stop="exportTemplate(row)"
-            data-test="destination-export"
-            data-row-action="export"
-          >
-            <OIcon name="download" size="sm" />
-          </OButton>
-          <OButton
-            :data-test="`alert-template-list-${row.name}-update-template`"
-            class="tw:ml-1"
-            variant="ghost"
-            size="icon-sm"
-            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')"
-            :disabled="row.isPrebuilt"
-            @click="editTemplate(row)"
-            data-row-action="edit"
-          >
-            <OIcon name="edit" size="sm" />
-          </OButton>
-          <OButton
-            :data-test="`alert-template-list-${row.name}-clone-template`"
-            class="tw:ml-1"
-            variant="ghost"
-            size="icon-sm"
-            :title="t('alert_templates.clone')"
-            @click="cloneTemplate(row)"
-            data-row-action="duplicate"
-          >
-            <OIcon name="content-copy" size="sm" />
-          </OButton>
-          <OButton
-            :data-test="`alert-template-list-${row.name}-delete-template`"
-            class="tw:ml-1"
-            variant="ghost"
-            size="icon-sm"
-            :title="row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')"
-            :disabled="row.isPrebuilt"
-            @click="conformDeleteDestination(row)"
-            data-row-action="delete"
-          >
-            <OIcon name="delete" size="sm" />
-          </OButton>
-        </template>
-        <template
-          v-if="selectedTemplates.length > 0"
-          #bottom
+  <div class="flex h-full flex-col p-0">
+    <OPageLayout
+      bleed
+      v-if="!showImportTemplate && !showTemplateEditor"
+      :title="t('alert_templates.header')"
+      icon="description"
+      :subtitle="t('settings.templatesDesc')"
+    >
+      <template #actions>
+        <OToggleGroup
+          :model-value="activeTab"
+          @update:model-value="
+            (v: any) => {
+              activeTab = v;
+            }
+          "
+          data-test="template-list-tabs"
+          class="mr-2"
         >
-          <span class="tw:text-xs tw:text-text-primary">
-            {{ selectedTemplates.length }} selected
-          </span>
-          <OButton
-            data-test="template-list-delete-templates-btn"
-            variant="outline-destructive"
-            size="sm"
-            icon-left="delete"
-            @click="openBulkDeleteDialog"
-          >
-            Delete
-          </OButton>
-        </template>
-      </OTable>
+          <OToggleGroupItem value="all" size="sm" data-test="template-tab-all">
+            <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+            {{ t("alert_templates.filterAll") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="prebuilt" size="sm" data-test="template-tab-prebuilt">
+            <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+            {{ t("alert_templates.filterPrebuilt") }}
+          </OToggleGroupItem>
+          <OToggleGroupItem value="custom" size="sm" data-test="template-tab-custom">
+            <template #icon-left><OIcon name="settings" size="sm" /></template>
+            {{ t("alert_templates.filterCustom") }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="importTemplate"
+          data-test="template-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+        <OButton
+          data-test="template-list-add-btn"
+          variant="primary"
+          size="sm"
+          @click="editTemplate(null)"
+          >{{ t(`alert_templates.add`) }}</OButton
+        >
+      </template>
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+        <OTable
+          :frame="false"
+          data-test="alert-templates-list-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          :selected-ids="selectedTemplateIds"
+          selection="multiple"
+          :is-row-selectable="isTemplateRowSelectable"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          :footer-title="t('alert_templates.header')"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          show-index
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="flex-1"
+              :placeholder="t('template.search')"
+              data-test="template-list-search-input"
+            />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="template-list-refresh-btn"
+              @click="getTemplates"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="alertTemplatesRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-alert-templates"
+              :filtered="!!filterQuery"
+              :actions="[
+                {
+                  id: 'create',
+                  icon: 'add',
+                  titleKey: 'emptyState.noAlertTemplates.action',
+                  descriptionKey: 'emptyState.noAlertTemplates.actionDesc',
+                },
+                {
+                  id: 'import',
+                  icon: 'upload-file',
+                  titleKey: 'emptyState.noAlertTemplates.import',
+                  descriptionKey: 'emptyState.noAlertTemplates.importDesc',
+                },
+              ]"
+              @action="
+                (id) =>
+                  id === 'clear-filters'
+                    ? (filterQuery = '')
+                    : id === 'import'
+                      ? importTemplate()
+                      : editTemplate(null)
+              "
+            />
+          </template>
+          <template #cell-name="{ row }">
+            <div class="flex items-center gap-2">
+              <span>{{ row.name }}</span>
+              <OTag
+                v-if="row.isPrebuilt"
+                type="templateOrigin"
+                value="prebuilt"
+                :title="t('alert_templates.prebuiltBadgeHint')"
+                data-test="alert-template-prebuilt-badge"
+              />
+              <OTag
+                v-else
+                type="templateOrigin"
+                value="custom"
+                data-test="alert-template-custom-badge"
+              />
+            </div>
+          </template>
+          <template #cell-actions="{ row }">
+            <OButton
+              :title="t('alert_templates.exportTemplate')"
+              class="ml-1"
+              variant="ghost"
+              size="icon-sm"
+              @click.stop="exportTemplate(row)"
+              data-test="destination-export"
+              data-row-action="export"
+            >
+              <OIcon name="download" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-template-list-${row.name}-update-template`"
+              class="ml-1"
+              variant="ghost"
+              size="icon-sm"
+              :title="
+                row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
+              "
+              :disabled="row.isPrebuilt"
+              @click="editTemplate(row)"
+              data-row-action="edit"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-template-list-${row.name}-clone-template`"
+              class="ml-1"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alert_templates.clone')"
+              @click="cloneTemplate(row)"
+              data-row-action="duplicate"
+            >
+              <OIcon name="content-copy" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-template-list-${row.name}-delete-template`"
+              class="ml-1"
+              variant="ghost"
+              size="icon-sm"
+              :title="
+                row.isPrebuilt
+                  ? t('alert_templates.systemReadOnlyDelete')
+                  : t('alert_templates.delete')
+              "
+              :disabled="row.isPrebuilt"
+              @click="conformDeleteDestination(row)"
+              data-row-action="delete"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+          </template>
+          <template v-if="selectedTemplates.length > 0" #bottom>
+            <span class="text-text-secondary text-xs">
+              {{ selectedTemplates.length }} {{ t("alert_templates.selected") }}
+            </span>
+            <OButton
+              data-test="template-list-delete-templates-btn"
+              variant="outline-destructive"
+              size="sm"
+              icon-left="delete"
+              :loading="bulkDeleteLoading"
+              @click="openBulkDeleteDialog"
+            >
+              {{ t("common.delete") }}
+            </OButton>
+          </template>
+        </OTable>
       </div>
-    </div>
-    <div v-else-if="!showImportTemplate && showTemplateEditor">
+    </OPageLayout>
+    <div v-else-if="!showImportTemplate && showTemplateEditor" class="min-h-0 flex-1">
       <AddTemplate
         :template="editingTemplate"
         :is-clone="cloningTemplate"
@@ -192,21 +235,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:templates="getTemplates"
       />
     </div>
-    <div v-else>
+    <div v-else class="min-h-0 flex-1">
       <ImportTemplate :templates="templates" @update:templates="getTemplates" />
     </div>
 
     <ConfirmDialog
-      title="Delete Template"
-      message="Are you sure you want to delete template?"
+      :title="t('alert_templates.deleteTemplateTitle')"
+      :message="t('alert_templates.deleteTemplateMessage')"
       @update:ok="deleteTemplate"
       @update:cancel="cancelDeleteTemplate"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Templates"
-      :message="`Are you sure you want to delete ${selectedTemplates.length} template(s)?`"
+      :title="t('alert_templates.deleteTemplatesTitle')"
+      :message="t('alerts.confirmDeleteTemplates', { count: selectedTemplates.length })"
       @update:ok="bulkDeleteTemplates"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -214,16 +257,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import {
-  ref,
-  onActivated,
-  onMounted,
-  watch,
-  defineAsyncComponent,
-  computed,
-} from "vue";
+import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -232,37 +268,28 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ImportTemplate from "./ImportTemplate.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
-const AddTemplate = defineAsyncComponent(
-  () => import("@/components/alerts/AddTemplate.vue"),
-);
+const AddTemplate = defineAsyncComponent(() => import("@/components/alerts/AddTemplate.vue"));
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const templates: Ref<Template[]> = ref([]);
 const columns: OTableColumnDef[] = [
-  {
-    id: "#",
-    header: "#",
-    accessorKey: "#",
-    size: TABLE_INDEX_COL_SIZE,
-    meta: { align: "left" },
-  },
   {
     id: "name",
     header: t("alert_templates.name"),
@@ -293,14 +320,13 @@ const confirmDelete: Ref<{
 }> = ref({ visible: false, data: null });
 const selectedTemplates: Ref<any[]> = ref([]);
 const confirmBulkDelete = ref(false);
+const bulkDeleteLoading = ref(false);
 const filterQuery = ref("");
 // Top-right tab filter — mirrors the alerts list pattern. "prebuilt" shows
 // system templates (name starts with `prebuilt_`), "custom" shows the rest.
 const activeTab = ref<"all" | "prebuilt" | "custom">("all");
 
-const selectedTemplateIds = computed(() =>
-  selectedTemplates.value.map((item: any) => item.name),
-);
+const selectedTemplateIds = computed(() => selectedTemplates.value.map((item: any) => item.name));
 
 const handleSelectedIdsUpdate = (ids: string[]) => {
   const map = new Map(templates.value.map((r: any) => [r.name, r]));
@@ -337,9 +363,9 @@ const loading = ref(false);
 const getTemplates = () => {
   const dismiss = toast({
     variant: "loading",
-    message: "Please wait while loading templates...",
-      timeout: 0,
-});
+    message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
+    timeout: 0,
+  });
 
   loading.value = true;
   templateService
@@ -348,10 +374,7 @@ const getTemplates = () => {
     })
     .then((res) => {
       resultTotal.value = res.data.length;
-      templates.value = res.data.map((data: any, index: number) => ({
-        ...data,
-        "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-      }));
+      templates.value = res.data;
       updateRoute();
     })
     .catch((err) => {
@@ -359,7 +382,7 @@ const getTemplates = () => {
       if (err.response.status !== 403) {
         toast({
           variant: "error",
-          message: "Error while pulling templates.",
+          message: t("toastMessages.alerts.errorWhilePullingTemplates"),
         });
       }
     })
@@ -371,9 +394,7 @@ const getTemplates = () => {
 const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
   if (router.currentRoute.value.query.action === "update")
-    editTemplate(
-      getTemplateByName(router.currentRoute.value.query.name as string),
-    );
+    editTemplate(getTemplateByName(router.currentRoute.value.query.name as string));
   if (router.currentRoute.value.query.action === "import") {
     showImportTemplate.value = true;
   }
@@ -456,7 +477,9 @@ const deleteTemplate = () => {
       .then(() => {
         toast({
           variant: "success",
-          message: `Template ${confirmDelete.value.data.name} deleted successfully`,
+          message: t("toastMessages.alerts.templateDeletedSuccessfully", {
+            name: confirmDelete.value.data.name,
+          }),
         });
 
         getTemplates();
@@ -512,7 +535,6 @@ const filterData = (rows: any, terms: any) => {
 const exportTemplate = (row: any) => {
   const findTemplate: any = getTemplateByName(row.name);
   const templateByName = { ...findTemplate };
-  if (templateByName.hasOwnProperty("#")) delete templateByName["#"];
   const templateJson = JSON.stringify(templateByName, null, 2);
   const blob = new Blob([templateJson], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -555,9 +577,8 @@ const openBulkDeleteDialog = () => {
 };
 
 const bulkDeleteTemplates = () => {
-  const templateNames = selectedTemplates.value.map(
-    (template: any) => template.name,
-  );
+  bulkDeleteLoading.value = true;
+  const templateNames = selectedTemplates.value.map((template: any) => template.name);
 
   templateService
     .bulkDelete(store.state.selectedOrganization.identifier, {
@@ -569,17 +590,24 @@ const bulkDeleteTemplates = () => {
       if (successful.length > 0 && unsuccessful.length === 0) {
         toast({
           variant: "success",
-          message: `Successfully deleted ${successful.length} template(s)`,
+          message: t("toastMessages.alerts.successfullyDeletedTemplates", {
+            count: successful.length,
+          }),
         });
       } else if (successful.length > 0 && unsuccessful.length > 0) {
         toast({
           variant: "warning",
-          message: `Deleted ${successful.length} template(s), but ${unsuccessful.length} failed`,
+          message: t("toastMessages.alerts.templatesDeletedWithFailures", {
+            count: successful.length,
+            failed: unsuccessful.length,
+          }),
         });
       } else if (unsuccessful.length > 0) {
         toast({
           variant: "error",
-          message: `Failed to delete ${unsuccessful.length} template(s)`,
+          message: t("toastMessages.alerts.failedToDeleteTemplates", {
+            count: unsuccessful.length,
+          }),
         });
       }
 
@@ -598,17 +626,24 @@ const bulkDeleteTemplates = () => {
           message: errorMessage,
         });
       }
+    })
+    .finally(() => {
+      bulkDeleteLoading.value = false;
     });
 };
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
 useShortcuts([
   {
     id: "alertTemplatesAdd",
-    handler: () => { if (!isInputFocused()) editTemplate(null); },
+    handler: () => {
+      if (!isInputFocused()) editTemplate(null);
+    },
   },
   {
     id: "alertTemplatesRefresh",
-    handler: () => { if (!isInputFocused()) getTemplates(); },
+    handler: () => {
+      if (!isInputFocused()) getTemplates();
+    },
   },
   {
     id: "alertTemplatesFocusSearch",
@@ -617,5 +652,4 @@ useShortcuts([
     },
   },
 ]);
-
 </script>

@@ -14,21 +14,20 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
-import { useStore } from "vuex";
+import { raw } from "@/types/i18n";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import useIngestion from "@/composables/useIngestion";
 const name = "couchDB";
-const store = useStore();
-const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
+const { databaseContent, databaseDocURLs } = useIngestion();
 const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
 const docURL = databaseDocURLs[name];
 </script>
 
 <template>
   <IngestionContent>
-    <CopyContent :content="content" />
+    <CopyContent :content="raw(content)" />
     <IngestionDocLink :href="docURL" />
   </IngestionContent>
 </template>

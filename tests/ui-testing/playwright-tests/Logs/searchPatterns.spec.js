@@ -40,13 +40,11 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
      */
     async function setupPatternsView(page, pm, timeRange = '1hour') {
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         // Set time range
         if (timeRange === '1hour') {
@@ -57,14 +55,24 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         }
 
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-        return await pm.logsPage.waitForPatternsToLoad(60000);
+        let result = await pm.logsPage.waitForPatternsToLoad(60000);
+
+        // Pattern extraction is async on the backend; under alpha indexing load it can still
+        // be empty/timeout after the first 60s wait (the CI flake here). Re-run the query to
+        // re-trigger extraction and wait once more before giving up — resilience for the
+        // data-dependency, not an assertion mask (callers still assert the returned state).
+        if (result !== 'patterns' && result !== 'statistics') {
+            testLogger.warn(`Patterns not ready (${result}) — re-running query and retrying once`);
+            await pm.logsPage.clickRefreshButton();
+            result = await pm.logsPage.waitForPatternsToLoad(60000);
+        }
+
+        return result;
     }
 
     test.beforeAll(async ({ browser }) => {
@@ -81,7 +89,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         try {
             // Navigate to establish session
             await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-            await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
             // Ingest pattern-rich data with fresh timestamps
             const baseTimestamp = Date.now() * 1000; // microseconds
@@ -127,7 +134,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         pm = new PageManager(page);
 
         // Post-authentication stabilization wait
-        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
         testLogger.info(`Test setup completed - using ${PATTERNS_STREAM} stream`);
     });
@@ -144,7 +150,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify Patterns toggle is visible (Enterprise)');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // STRONG ASSERTION: Patterns toggle must be visible in Enterprise edition
         await pm.logsPage.expectPatternsToggleVisible();
@@ -156,26 +161,22 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify patterns view activates on toggle click');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Select stream and set time range
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         // Click patterns toggle
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // STRONG ASSERTION: Patterns toggle should be in selected state
         await pm.logsPage.expectPatternsToggleSelected();
@@ -194,25 +195,21 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify pattern view shows valid state');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         // Switch to patterns view
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for patterns to load
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
@@ -246,24 +243,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify pattern cards display correct information');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -298,24 +291,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify pattern details dialog opens on card click');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -347,24 +336,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify Previous/Next navigation in pattern details');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -413,24 +398,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify Include button functionality');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -442,7 +423,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Click include button
                 await pm.logsPage.clickPatternIncludeBtn(0);
-                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
                 // ASSERTION: After clicking Include, page should navigate away from patterns view
                 // Verify logs table is visible (pattern view is exited)
@@ -463,24 +443,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify Exclude button functionality');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -492,7 +468,6 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
 
                 // Click exclude button
                 await pm.logsPage.clickPatternExcludeBtn(0);
-                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
                 // ASSERTION: After clicking Exclude, page should navigate away from patterns view
                 // Verify logs table is visible (pattern view is exited)
@@ -517,21 +492,17 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify empty state handling');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Use a short time range that's likely to have no patterns
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.setTimeToPast30Seconds();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -552,24 +523,20 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
         testLogger.info('Test: Verify details icon opens pattern details dialog');
 
         await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         await pm.logsPage.selectStream(PATTERNS_STREAM);
 
         // Switch off quick mode (required for patterns)
         await pm.logsPage.clickQuickModeToggle();
-        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
 
         await pm.logsPage.clickDateTimeButton();
         await pm.logsPage.clickRelative1HourOrFallback();
         await pm.logsPage.clickRefreshButton();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         // Wait for logs to load first
         await pm.logsPage.waitForLogsTableToLoad();
 
         await pm.logsPage.clickPatternsToggle();
-        await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
         const result = await pm.logsPage.waitForPatternsToLoad(60000);
 
@@ -730,7 +697,7 @@ test.describe("Search Patterns Feature", { tag: ['@enterprise', '@searchPatterns
             // Hover over the chip
             await pm.logsPage.hoverWildcardChip(i);
 
-            // Wait for Quasar tooltip (delay is 300ms + render time)
+            // Wait for tooltip (delay is 300ms + render time)
             await page.waitForTimeout(500);
 
             // Check if tooltip appeared

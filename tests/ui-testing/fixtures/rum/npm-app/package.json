@@ -1,0 +1,17 @@
+{
+  "name": "rum-e2e-npm-fixture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "NPM-package RUM instrumentation fixture for OpenObserve E2E tests. Bundles @openobserve/browser-rum + @openobserve/browser-logs and reuses the shared sample app (fixtures/rum/cdn-sample) for the DOM/interactions.",
+  "scripts": {
+    "build": "esbuild src/main.js --bundle --format=iife --outfile=dist/bundle.js"
+  },
+  "dependencies": {
+    "@openobserve/browser-logs": "0.3.4",
+    "@openobserve/browser-rum": "0.3.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.1"
+  }
+}

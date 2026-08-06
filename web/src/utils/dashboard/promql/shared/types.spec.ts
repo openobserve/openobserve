@@ -208,7 +208,7 @@ describe("PromQL Types", () => {
   describe("PromQLChartConverter", () => {
     it("should implement converter interface", () => {
       const mockConverter: PromQLChartConverter = {
-        convert: (processedData, panelSchema, store, extras, chartPanelRef) => {
+        convert: () => {
           return {
             series: [],
             xAxis: {},

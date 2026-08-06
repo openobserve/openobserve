@@ -13,10 +13,10 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="overview-tab tw:flex tw:flex-col tw:gap-0 tw:pt-[0.625rem] tw:pr-[0.875rem] tw:pb-[0.625rem] tw:pl-[0.625rem] tw:h-full tw:overflow-y-auto tw:text-(--o2-text-primary)">
+  <div class="px-page-edge text-text-body flex h-full flex-col gap-0 overflow-y-auto pt-2.5 pb-2.5">
     <!-- Header: refresh + time picker -->
-    <div class="tw:flex tw:justify-end tw:mb-4">
-      <div class="tw:flex tw:items-center tw:gap-2">
+    <div class="mb-4 flex justify-end">
+      <div class="flex items-center gap-2">
         <ORefreshButton
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading"
@@ -28,7 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           auto-apply
           menu-align="end"
           :default-type="dateTimeType"
-          :default-absolute-time="{ startTime: absoluteTime.startTime, endTime: absoluteTime.endTime }"
+          :default-absolute-time="{
+            startTime: absoluteTime.startTime,
+            endTime: absoluteTime.endTime,
+          }"
           :default-relative-time="relativeTime"
           @on:date-change="onDateChange"
         />
@@ -40,33 +43,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ACTIVE INCIDENTS (enterprise / cloud only) -->
     <section
       v-if="isIncidentsEnabled && incidents.length > 0"
-      class="tw:mb-5"
+      class="mb-5"
+      data-test="overview-incidents-section"
     >
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
-          {{ t('overview.activeIncidents') }}
+      <div class="mb-2 flex items-center justify-between pl-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.activeIncidents") }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
-          <span v-if="incidentsTotal > incidents.length" class="tw:ml-2 tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:align-middle">{{ t('overview.showingOf', { shown: incidents.length, total: incidentsTotal }) }}</span>
+          <span
+            v-if="incidentsTotal > incidents.length"
+            class="text-text-secondary ml-2 align-middle text-xs font-normal"
+            >{{ t("overview.showingOf", { shown: incidents.length, total: incidentsTotal }) }}</span
+          >
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToIncidentList">{{ t('overview.viewAll') }} →</button>
+        <button
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          @click="goToIncidentList"
+        >
+          {{ t("overview.viewAll") }} {{ "→" }}
+        </button>
       </div>
-      <div class="tw:flex tw:flex-col tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-[0.375rem] tw:overflow-hidden">
+      <div
+        class="border-border-default rounded-default flex flex-col overflow-hidden border border-[0.0625em]"
+      >
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="ov-alert-row ov-table-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
+          class="group bg-surface-base hover:bg-table-row-hover-bg border-b-border-default flex items-center gap-3 border-b-[0.0625em] border-l-[0.1875em] px-3.5 py-2.5 transition-[background] duration-150 last:border-b-0"
           :class="incidentRowClass(inc.severity)"
         >
-          <span class="tw:shrink-0 tw:flex tw:items-center" :class="incidentIconClass(inc.severity)">
+          <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-              <path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+              <path
+                d="M12 8v4m0 4h.01"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
             </svg>
           </span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1">
+          <div class="min-w-0 flex-1">
+            <div class="text-text-heading flex flex-wrap items-center gap-1 text-sm font-medium">
               <OTag type="severity" :value="(inc.severity || 'p4').toLowerCase()" />
-              {{ inc.title || t('overview.untitledIncident') }}
+              {{ inc.title || t("overview.untitledIncident") }}
               <template v-if="inc.group_values && Object.keys(inc.group_values).length > 0">
                 <ODimensionChip
                   v-for="[key, val] in sortedDimensions(inc.group_values)"
@@ -79,107 +99,190 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </div>
           </div>
-          <div class="tw:flex tw:items-center tw:shrink-0 tw:gap-[0.3rem] tw:whitespace-nowrap tw:w-48">
-            <span class="tw:text-xs tw:text-(--o2-text-muted) tw:min-w-[4.5rem]">{{ relativeTime_(inc.first_alert_at) }}</span>
-            <span class="tw:text-xs tw:text-(--o2-text-muted)">·</span>
-            <span class="tw:text-xs tw:font-normal tw:text-(--o2-text-primary)">{{ inc.alert_count }} alerts</span>
-          </div>
-          <span class="ov-investigate-hover tw:shrink-0 tw:whitespace-nowrap">
-            <OButton
-              variant="ghost-primary"
-              size="sm"
-              @click="goToIncident(inc)"
+          <div class="flex w-48 shrink-0 items-center gap-[0.3rem] whitespace-nowrap">
+            <span class="text-text-secondary min-w-[4.5rem] text-xs">{{
+              relativeTime_(inc.first_alert_at)
+            }}</span>
+            <span class="text-text-secondary text-xs">·</span>
+            <span class="text-text-secondary text-xs font-normal"
+              >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
+          </div>
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+            <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
           </span>
         </div>
       </div>
     </section>
+    <OverviewSkeleton
+      v-else-if="isIncidentsEnabled && isSectionPending('incidents')"
+      section="incidents"
+    />
 
     <!-- SERVICES (enterprise only — needs service graph data) -->
-    <section v-if="isEnterpriseOrCloud && services.length > 0" class="tw:mb-5">
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
-          {{ t('overview.services') }}
+    <section
+      v-if="isEnterpriseOrCloud && services.length > 0"
+      class="mb-5"
+      data-test="overview-services-section"
+    >
+      <div class="mb-2 flex items-center justify-between pl-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.services") }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
-          <span v-if="servicePanelVisible && selectedService" class="tw:text-xs tw:font-normal tw:text-(--o2-text-muted) tw:ml-1">
-            — viewing <strong class="tw:font-semibold tw:text-(--o2-text-primary)">{{ selectedService.label ?? selectedService.id }}</strong>
+          <span
+            v-if="servicePanelVisible && selectedService"
+            class="text-text-secondary ml-1 text-xs font-normal"
+          >
+            {{ t("overview.viewingLabel") }}
+            <strong class="text-text-body font-semibold">{{
+              selectedService.label ?? selectedService.id
+            }}</strong>
           </span>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToServiceGraph">{{ t('overview.viewAll') }} →</button>
+        <button
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          @click="goToServiceGraph"
+        >
+          {{ t("overview.viewAll") }} {{ "→" }}
+        </button>
       </div>
-      <div class="tw:flex tw:items-stretch tw:gap-2">
-        <button
-          class="tw:shrink-0 tw:w-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg-solid) tw:text-(--o2-text-secondary) tw:shadow-[0_1px_3px_rgba(0,0,0,0.06)] tw:transition-all tw:duration-150 tw:hover:not-disabled:bg-(--o2-hover-gray) tw:hover:not-disabled:text-(--o2-text-primary) tw:hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] tw:hover:not-disabled:-translate-y-px tw:active:not-disabled:translate-y-0 tw:active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] tw:disabled:opacity-25 tw:disabled:cursor-not-allowed tw:disabled:shadow-none"
-          :disabled="!svcScrollCanLeft"
-          @click="scrollServices(-1)"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-        <div ref="svcGridRef" class="ov-service-grid tw:flex tw:flex-row tw:gap-2 tw:overflow-x-auto tw:flex-1 tw:[scrollbar-width:none]" @scroll="onSvcScroll">
+      <div class="relative">
+        <!-- Left fade + floating scroll control (only present when scrollable) -->
         <div
-          v-for="svc in services"
-          :key="svc.id"
-          class="tw:py-3 tw:px-[0.875rem] tw:rounded-[0.375rem] tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-150 tw:basis-40 tw:grow-0 tw:shrink-0 tw:min-w-40 tw:max-w-40 tw:cursor-pointer tw:hover:bg-(--o2-hover-gray)"
-          :class="[serviceCardClass(svc), { 'tw:bg-(--o2-hover-gray) tw:outline tw:outline-[0.125em] tw:outline-(--o2-primary-color) tw:[outline-offset:-0.0625em]': selectedService?.id === svc.id && servicePanelVisible }]"
-          @click="goToService(svc)"
+          class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pr-8 transition-opacity duration-200"
+          :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
-          <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-            <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex-1 tw:min-w-0 tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:cursor-default" :title="svc.label ?? svc.id">{{ svc.label }}</span>
-            <span class="tw:inline-flex tw:items-center tw:shrink-0 tw:ml-1">
-              <OButton
-                variant="ghost-muted"
-                size="icon"
-                :title="t('overview.viewLatencyCharts')"
-                @click="openServicePanel(svc, $event)"
+          <button
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            :tabindex="svcScrollCanLeft ? 0 : -1"
+            :aria-hidden="!svcScrollCanLeft"
+            :aria-label="t('overview.scrollLeft')"
+            @click="scrollServices(-1)"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 18l-6-6 6-6"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div
+          ref="svcGridRef"
+          class="flex flex-row gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          @scroll="onSvcScroll"
+        >
+          <div
+            v-for="svc in services"
+            :key="svc.id"
+            class="rounded-default border-border-default bg-surface-base max-w-40 min-w-40 shrink-0 grow-0 basis-40 cursor-pointer border border-[0.0625em] px-3.5 py-3 transition-[background-color,box-shadow,outline-color] duration-150"
+            :class="[
+              serviceCardClass(svc),
+              selectedService?.id === svc.id && servicePanelVisible
+                ? 'outline-accent bg-[color-mix(in_srgb,var(--color-primary-500)_8%,var(--color-surface-base))] shadow-[0_0.125rem_0.5rem_color-mix(in_srgb,var(--color-primary-500)_22%,transparent)] outline-[0.125em] outline-offset-[-0.0625em] outline-solid'
+                : 'hover:bg-table-row-hover-bg',
+            ]"
+            @click="openServicePanel(svc)"
+          >
+            <div class="mb-2 flex items-center justify-between">
+              <span
+                class="text-text-heading block min-w-0 flex-1 cursor-default overflow-hidden text-sm font-medium text-ellipsis whitespace-nowrap"
+                :title="svc.label ?? svc.id"
+                >{{ svc.label }}</span
               >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
-                  <path d="M12 16v-4m0-4h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-              </OButton>
-            </span>
-          </div>
-          <div class="tw:flex tw:flex-col tw:gap-1 tw:mt-2">
-            <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-              <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-muted)">{{ t('overview.colErrorRate') }}</span>
-              <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary)" :class="svc.errorFlag ? 'tw:text-(--o2-status-error-text)' : ''">
-                {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + '%' : '—' }}
+              <span class="ml-1 inline-flex shrink-0 items-center">
+                <OButton
+                  variant="ghost-muted"
+                  size="icon"
+                  :title="t('traces.servicesCatalog.viewTraces')"
+                  @click="goToService(svc, $event)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
+                    <path
+                      d="M12 16v-4m0-4h.01"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </OButton>
               </span>
             </div>
-            <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-              <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-muted)">{{ t('overview.colLatency') }}</span>
-              <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary)" :class="svc.latencyFlag ? 'tw:text-(--o2-status-warning-text)' : ''">
-                {{ svc.latencyMultiplier ? svc.latencyMultiplier + 'x' : '—' }}
-              </span>
-            </div>
-            <div class="tw:flex tw:items-baseline tw:justify-between tw:gap-2">
-              <span class="tw:text-[0.625rem] tw:font-semibold tw:tracking-[0.06em] tw:uppercase tw:text-(--o2-text-muted)">{{ t('overview.colReqs') }}</span>
-              <span class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary)">{{ formatReqRate(svc.requests) }}</span>
+            <div class="mt-2 flex flex-col gap-1">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-2xs text-text-secondary font-semibold tracking-[0.04em]">{{
+                  t("overview.colErrorRate")
+                }}</span>
+                <span
+                  class="text-text-body text-sm font-medium"
+                  :class="svc.errorFlag ? 'text-error-600' : ''"
+                >
+                  {{ svc.error_rate != null ? svc.error_rate.toFixed(1) + "%" : "—" }}
+                </span>
+              </div>
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-2xs text-text-secondary font-semibold tracking-[0.04em]">{{
+                  t("overview.colLatency")
+                }}</span>
+                <span
+                  class="text-text-body text-sm font-medium"
+                  :class="svc.latencyFlag ? 'text-warning-700' : ''"
+                >
+                  {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
+                </span>
+              </div>
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-2xs text-text-secondary font-semibold tracking-[0.04em]">{{
+                  t("overview.colReqs")
+                }}</span>
+                <span class="text-text-body text-sm font-medium">{{
+                  formatReqRate(svc.requests)
+                }}</span>
+              </div>
             </div>
           </div>
         </div>
-        </div>
-        <button
-          class="tw:shrink-0 tw:w-6 tw:flex tw:items-center tw:justify-center tw:cursor-pointer tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-lg tw:bg-(--o2-card-bg-solid) tw:text-(--o2-text-secondary) tw:shadow-[0_1px_3px_rgba(0,0,0,0.06)] tw:transition-all tw:duration-150 tw:hover:not-disabled:bg-(--o2-hover-gray) tw:hover:not-disabled:text-(--o2-text-primary) tw:hover:not-disabled:shadow-[0_2px_6px_rgba(0,0,0,0.12)] tw:hover:not-disabled:-translate-y-px tw:active:not-disabled:translate-y-0 tw:active:not-disabled:shadow-[0_1px_2px_rgba(0,0,0,0.08)] tw:disabled:opacity-25 tw:disabled:cursor-not-allowed tw:disabled:shadow-none"
-          :disabled="!svcScrollCanRight"
-          @click="scrollServices(1)"
+        <!-- Right fade + floating scroll control (only present when scrollable) -->
+        <div
+          class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent pl-8 transition-opacity duration-200"
+          :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
+          <button
+            class="border-border-default bg-surface-base text-text-secondary hover:bg-table-row-hover-bg hover:text-text-body pointer-events-auto flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border-[0.0625em] shadow-[0_2px_6px_rgba(0,0,0,0.12)] transition-all duration-150 hover:shadow-[0_3px_8px_rgba(0,0,0,0.16)] active:shadow-[0_1px_2px_rgba(0,0,0,0.08)]"
+            :tabindex="svcScrollCanRight ? 0 : -1"
+            :aria-hidden="!svcScrollCanRight"
+            :aria-label="t('overview.scrollRight')"
+            @click="scrollServices(1)"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M9 18l6-6-6-6"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </section>
+    <OverviewSkeleton
+      v-else-if="isEnterpriseOrCloud && isSectionPending('services')"
+      section="services"
+    />
 
     <!-- Service node side panel (latency / RED charts) -->
     <template v-if="isEnterpriseOrCloud && selectedService">
       <div
         v-if="servicePanelVisible"
-        class="tw:fixed tw:inset-0 tw:z-[99] tw:bg-transparent"
+        class="fixed inset-0 z-99 bg-transparent"
         @click="closeServicePanel"
       />
       <ServiceGraphNodeSidePanel
@@ -194,127 +297,194 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <!-- ACTIVE ANOMALIES -->
-    <section v-if="anomalies.length > 0" class="tw:mb-5">
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
-          {{ t('overview.activeAnomalies') }}
+    <section v-if="anomalies.length > 0" class="mb-5" data-test="overview-anomalies-section">
+      <div class="mb-2 flex items-center justify-between pl-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.activeAnomalies") }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToAnomalies">{{ t('overview.viewAll') }} →</button>
+        <button
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          @click="goToAnomalies"
+        >
+          {{ t("overview.viewAll") }} {{ "→" }}
+        </button>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-[0.375rem]">
+      <div class="flex flex-col gap-1.5">
         <div
           v-for="item in anomalies"
           :key="item.id"
-          class="ov-alert-row tw:flex tw:items-center tw:gap-3 tw:py-[0.625rem] tw:px-[0.875rem] tw:rounded-[0.375rem] tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:bg-(--o2-card-bg-solid) tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
+          class="group rounded-default border-border-default bg-surface-base hover:bg-table-row-hover-bg flex items-center gap-3 border border-[0.0625em] px-3.5 py-2.5 transition-[background] duration-150"
           :class="severityRowClass(item.severity)"
         >
-          <span class="tw:shrink-0 tw:flex tw:items-center" :class="severityIconClass(item.severity)">
+          <span class="flex shrink-0 items-center" :class="severityIconClass(item.severity)">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path
+                d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             </svg>
           </span>
-          <div class="tw:flex-1 tw:min-w-0">
-            <div class="tw:text-sm tw:font-medium tw:text-(--o2-text-primary) tw:flex tw:items-center tw:flex-wrap tw:gap-1 tw:[row-gap:0.25rem]">
+          <div class="min-w-0 flex-1">
+            <div
+              class="text-text-heading flex flex-wrap items-center gap-1 [row-gap:0.25rem] text-sm font-medium"
+            >
               {{ item.title }}
-              <span class="tw:text-xs tw:text-(--o2-text-muted) tw:font-normal tw:mx-[0.1rem]">·</span>
-              <span class="tw:text-xs tw:text-(--o2-text-muted) tw:font-normal">{{ item.description }}</span>
+              <span class="text-text-secondary mx-[0.1rem] text-xs font-normal">·</span>
+              <span class="text-text-secondary text-xs font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="ov-investigate-hover tw:shrink-0 tw:whitespace-nowrap">
-            <OButton
-              variant="ghost-primary"
-              size="sm"
-              @click="goToAlert(item)"
-            >
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+            <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
               {{ t("overview.investigate") }}
             </OButton>
           </span>
         </div>
       </div>
     </section>
+    <OverviewSkeleton v-else-if="isSectionPending('anomalies')" section="anomalies" />
 
     <!-- RECENT EVENTS (alert firing feed) -->
-    <section v-if="recentEvents.length > 0" class="tw:mb-5">
-      <div class="tw:flex tw:items-center tw:justify-between tw:mb-2 tw:pl-1">
-        <div class="tw:text-sm tw:font-medium tw:tracking-[0.01em] tw:text-(--o2-text-primary)">
-          {{ t('overview.recentEvents') }}
+    <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
+      <div class="mb-2 flex items-center justify-between pl-1">
+        <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
+          {{ t("overview.recentEvents") }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
         </div>
-        <button class="tw:text-xs tw:font-medium tw:text-(--o2-primary-color) tw:bg-none tw:border-none tw:p-0 tw:cursor-pointer tw:whitespace-nowrap tw:transition-opacity tw:duration-150 tw:opacity-80 tw:hover:opacity-100 tw:hover:underline" @click="goToAlertList">{{ t('overview.viewAll') }} →</button>
+        <button
+          class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
+          @click="goToAlertList"
+        >
+          {{ t("overview.viewAll") }} {{ "→" }}
+        </button>
       </div>
-      <div class="tw:flex tw:flex-col tw:gap-0 tw:border tw:border-[0.0625em] tw:border-(--o2-border-color) tw:rounded-[0.375rem] tw:overflow-hidden tw:bg-(--o2-card-bg-solid)">
+      <div
+        class="border-border-default rounded-default bg-surface-base flex flex-col gap-0 overflow-hidden border border-[0.0625em]"
+      >
         <div
           v-for="ev in recentEvents"
           :key="ev.id"
-          class="ov-event-row tw:flex tw:items-center tw:gap-3 tw:py-2 tw:px-[0.875rem] tw:border-b tw:border-b-[0.0625em] tw:border-b-(--o2-border-color) tw:text-[0.8125rem] tw:transition-[background] tw:duration-150 tw:hover:bg-(--o2-hover-gray)"
+          class="border-b-border-default text-compact hover:bg-table-row-hover-bg flex items-center gap-3 border-b border-b-[0.0625em] px-3.5 py-2 transition-[background] duration-150 last:border-b-0"
         >
-          <OTag type="eventStatus" :value="ev.typeLabel" class="tw:shrink-0" />
-          <span class="tw:font-medium tw:text-(--o2-text-primary) tw:whitespace-nowrap tw:min-w-[7.5em] tw:max-w-[12.5em] tw:overflow-hidden tw:text-ellipsis">{{ ev.service }}</span>
-          <span class="tw:flex-1 tw:text-(--o2-text-muted) tw:truncate">{{ ev.description }}</span>
+          <OTag type="eventStatus" :value="ev.typeLabel" class="shrink-0" />
+          <span
+            class="text-text-heading max-w-[12.5em] min-w-[7.5em] overflow-hidden font-medium text-ellipsis whitespace-nowrap"
+            >{{ ev.service }}</span
+          >
+          <span class="text-text-secondary flex-1 truncate">{{ ev.description }}</span>
           <OTag
             v-if="ev.failCount > 1"
             type="countChip"
             value="error"
-            class="tw:shrink-0"
-            :title="`Failed ${ev.failCount} times in this window`"
-          >×{{ ev.failCount }}</OTag>
-          <span class="tw:shrink-0 tw:text-(--o2-text-muted) tw:text-xs tw:whitespace-nowrap">{{ ev.timeAgo }}</span>
+            class="shrink-0"
+            :title="t('common.failedTimesInWindow', { count: ev.failCount })"
+            >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
+          >
+          <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{
+            ev.timeAgo
+          }}</span>
         </div>
       </div>
     </section>
+    <OverviewSkeleton v-else-if="isSectionPending('recentEvents')" section="recentEvents" />
 
     <!-- Empty state — everything is healthy or no data yet -->
     <OEmptyState
-      v-if="!isLoading && anomalies.length === 0 && incidents.length === 0 && services.length === 0 && recentEvents.length === 0"
+      v-if="!isLoading && !hasAnyData"
       illustration="check"
       size="hero"
       :hide-action="true"
       data-test="overview-all-clear-empty-state"
     >
-      <template #title>{{ t('overview.allClear') }}</template>
-      <template #description>{{ t('overview.allClearDesc') }}</template>
+      <template #title>{{ t("overview.allClear") }}</template>
+      <template #description>{{ t("overview.allClearDesc") }}</template>
       <template #actions>
         <!-- View alerts -->
-        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-alerts-card" @click="goToAlertList">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:group-hover:bg-(--o2-primary-color) tw:group-hover:text-(--o2-primary-foreground)">
+        <button
+          v-if="showAlertsCard"
+          type="button"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          data-test="overview-empty-alerts-card"
+          @click="goToAlertList"
+        >
+          <span
+            class="rounded-default bg-icon-chip-warning-bg text-icon-chip-warning-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+          >
             <OIcon name="notifications" size="md" />
           </span>
-          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionAlerts') }}</span>
-            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionAlertsDesc') }}</span>
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+              t("overview.emptyActionAlerts")
+            }}</span>
+            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
+              t("overview.emptyActionAlertsDesc")
+            }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
+          <OIcon
+            name="chevron-right"
+            size="sm"
+            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+          />
         </button>
         <!-- Explore logs -->
-        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-logs-card" @click="goToLogs">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-(--o2-status-info-bg) tw:text-(--o2-status-info-text) tw:group-hover:bg-(--o2-primary-color) tw:group-hover:text-(--o2-primary-foreground)">
+        <button
+          v-if="showLogsCard"
+          type="button"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          data-test="overview-empty-logs-card"
+          @click="goToLogs"
+        >
+          <span
+            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+          >
             <OIcon name="search" size="md" />
           </span>
-          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionLogs') }}</span>
-            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionLogsDesc') }}</span>
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+              t("overview.emptyActionLogs")
+            }}</span>
+            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
+              t("overview.emptyActionLogsDesc")
+            }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
+          <OIcon
+            name="chevron-right"
+            size="sm"
+            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+          />
         </button>
         <!-- Explore traces -->
-        <button type="button" class="ov-action-card tw:group tw:relative tw:flex tw:items-center tw:gap-3 tw:w-64 tw:max-w-full tw:min-h-16 tw:py-[0.625rem] tw:pr-[0.875rem] tw:pl-3 tw:rounded-xl tw:border tw:border-(--color-border-default) tw:bg-(--color-surface-base) tw:shadow-(--shadow-sm) tw:text-left tw:cursor-pointer tw:transition-[color,background-color,border-color,box-shadow] tw:duration-150 tw:outline-none tw:hover:shadow-(--shadow-md) tw:hover:border-(--color-primary-400) tw:hover:bg-(--color-tabs-hover-bg)" data-test="overview-empty-traces-card" @click="goToTraces">
-          <span class="tw:inline-flex tw:items-center tw:justify-center tw:shrink-0 tw:w-10 tw:h-10 tw:rounded-lg tw:transition-[background-color,color] tw:duration-150 tw:bg-(--o2-status-info-bg) tw:text-(--o2-status-info-text) tw:group-hover:bg-(--o2-primary-color) tw:group-hover:text-(--o2-primary-foreground)">
+        <button
+          v-if="showTracesCard"
+          type="button"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:shadow-[0_0_0_0.125rem_color-mix(in_srgb,var(--color-primary-500)_40%,transparent)]"
+          data-test="overview-empty-traces-card"
+          @click="goToTraces"
+        >
+          <span
+            class="rounded-default bg-status-info-bg text-status-info-text group-hover:bg-accent group-hover:text-text-inverse inline-flex h-10 w-10 shrink-0 items-center justify-center transition-[background-color,color] duration-150"
+          >
             <OIcon name="account-tree" size="md" />
           </span>
-          <span class="tw:flex-1 tw:min-w-0 tw:flex tw:flex-col tw:gap-[0.125rem]">
-            <span class="tw:text-(length:--text-sm) tw:font-semibold tw:text-(--color-text-primary) tw:truncate">{{ t('overview.emptyActionTraces') }}</span>
-            <span class="tw:text-(length:--text-xs) tw:text-(--color-text-secondary) tw:leading-[1.4]">{{ t('overview.emptyActionTracesDesc') }}</span>
+          <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span class="text-text-heading truncate text-(length:--text-sm) font-semibold">{{
+              t("overview.emptyActionTraces")
+            }}</span>
+            <span class="text-text-secondary text-(length:--text-xs) leading-[1.4]">{{
+              t("overview.emptyActionTracesDesc")
+            }}</span>
           </span>
-          <OIcon name="chevron-right" size="sm" class="tw:shrink-0 tw:text-(--color-text-disabled) tw:transition-[transform,color] tw:duration-150 tw:group-hover:translate-x-[0.125rem] tw:group-hover:text-(--color-primary-600)" />
+          <OIcon
+            name="chevron-right"
+            size="sm"
+            class="text-text-disabled group-hover:text-accent shrink-0 transition-[transform,color] duration-150 group-hover:translate-x-0.5"
+          />
         </button>
       </template>
     </OEmptyState>
-
-    <!-- Loading skeleton (standard O2 wave shimmer) -->
-    <div v-if="isLoading" class="tw:flex tw:flex-col tw:gap-2 tw:py-2 tw:px-0">
-      <OSkeleton v-for="i in 3" :key="i" class="tw:h-[3.25em]" />
-    </div>
 
     <!-- Alert History Drawer — opened from anomaly Investigate button -->
     <AlertHistoryDrawer
@@ -328,7 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
+import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
 // Module-level cache for anomaly history — survives re-renders, cleared on org change
 const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
@@ -336,8 +506,9 @@ const _anomalyCache = new Map<
   string,
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
-import { useI18n } from "vue-i18n";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { b64EncodeUnicode } from "@/utils/zincutils";
+import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -349,7 +520,7 @@ import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OverviewSkeleton from "./OverviewSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
@@ -358,18 +529,16 @@ const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
 // ── Feature flags ────────────────────────────────────────────────────────────
 const isEnterpriseOrCloud = computed(
-  () => config.isEnterprise === "true" || config.isCloud === "true"
+  () => config.isEnterprise === "true" || config.isCloud === "true",
 );
 const isIncidentsEnabled = computed(
-  () =>
-    isEnterpriseOrCloud.value &&
-    store.state.zoConfig?.incidents_enabled === true
+  () => isEnterpriseOrCloud.value && store.state.zoConfig?.incidents_enabled === true,
 );
 
 // ── Date / time picker ───────────────────────────────────────────────────────
@@ -379,7 +548,9 @@ function loadSavedTime() {
   try {
     const raw = localStorage.getItem(LS_TIME_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    /* ignore: corrupt/absent saved time falls back to null */
+  }
   return null;
 }
 
@@ -392,13 +563,13 @@ const absoluteTime = ref(
   saved?.absolute ?? {
     startTime: (now - 15 * 60 * 1000) * 1000,
     endTime: now * 1000,
-  }
+  },
 );
 const timeRange = ref(
   saved?.timeRange ?? {
     startTime: (now - 15 * 60 * 1000) * 1000,
     endTime: now * 1000,
-  }
+  },
 );
 
 const onDateChange = (value: any) => {
@@ -434,6 +605,54 @@ const incidentsTotal = ref(0);
 const services = ref<any[]>([]);
 const recentEvents = ref<any[]>([]);
 
+// True once any section has something to show. Gates the skeleton and the empty
+// state so the three are mutually exclusive with the content: the skeleton is a
+// first-load placeholder, not a refresh indicator (ORefreshButton already spins
+// via :loading). Without this, refreshing with data on screen appends the
+// skeleton *below* the rows instead of standing in for them.
+const hasAnyData = computed(
+  () =>
+    anomalies.value.length > 0 ||
+    incidents.value.length > 0 ||
+    services.value.length > 0 ||
+    recentEvents.value.length > 0,
+);
+
+/* Per-section load state. The four datasets are fetched concurrently and land at
+   different times, so a single `isLoading` can't gate their placeholders: the
+   first dataset to arrive would clear the skeleton for the three still in
+   flight, and those would then pop in with no placeholder. Each section tracks
+   its own request instead.
+
+   `loaded` (has completed at least once) is what separates a first load from a
+   refresh. A section shows its skeleton only while `loading && !loaded`, so:
+     - first load  -> each section holds its own placeholder until ITS data lands
+     - refresh     -> nothing flashes; ORefreshButton carries the loading state
+     - empty result-> `loaded` stays true, so it never re-skeletons */
+type SectionKey = "incidents" | "services" | "anomalies" | "recentEvents";
+const sectionState = reactive<Record<SectionKey, { loading: boolean; loaded: boolean }>>({
+  incidents: { loading: false, loaded: false },
+  services: { loading: false, loaded: false },
+  anomalies: { loading: false, loaded: false },
+  recentEvents: { loading: false, loaded: false },
+});
+
+const isSectionPending = (key: SectionKey) =>
+  sectionState[key].loading && !sectionState[key].loaded;
+
+/* Wraps a loader with its section's state. The loaders swallow their own errors,
+   and `finally` also covers the early `return` in the enterprise-gated ones, so
+   a section can never be left stuck pending. */
+const runSection = async (key: SectionKey, load: () => Promise<void>) => {
+  sectionState[key].loading = true;
+  try {
+    await load();
+  } finally {
+    sectionState[key].loading = false;
+    sectionState[key].loaded = true;
+  }
+};
+
 // Alert history drawer state
 const showAlertHistoryDrawer = ref(false);
 const selectedAlertForHistory = ref<any>(null);
@@ -459,9 +678,7 @@ const scrollServices = (dir: 1 | -1) => {
 
 // Service graph raw data + panel state
 const graphData = ref<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
-const graphStream = ref(
-  localStorage.getItem("serviceGraph_streamFilter") || "",
-);
+const graphStream = ref(localStorage.getItem("serviceGraph_streamFilter") || "");
 const selectedService = ref<any>(null);
 const servicePanelVisible = ref(false);
 
@@ -472,10 +689,10 @@ const loadAll = async () => {
   if (!orgId.value) return;
   isLoading.value = true;
   await Promise.allSettled([
-    loadHistoryAndSplit(),
-    loadAnomalies(),
-    loadIncidents(),
-    loadServiceGraph(),
+    runSection("recentEvents", loadHistoryAndSplit),
+    runSection("anomalies", loadAnomalies),
+    runSection("incidents", loadIncidents),
+    runSection("services", loadServiceGraph),
   ]);
   isLoading.value = false;
   lastFetched.value = new Date();
@@ -530,15 +747,13 @@ const loadAnomalies = async () => {
       }
       const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
       const results = await Promise.allSettled(
-        configs.map((c) =>
-          anomalyService.getHistory(org, c.id ?? c.anomaly_id, limitPerConfig),
-        ),
+        configs.map((c) => anomalyService.getHistory(org, c.id ?? c.anomaly_id, limitPerConfig)),
       );
       rawHits = configs.map((cfg, idx) => ({
         cfg,
         hits:
           results[idx].status === "fulfilled"
-            ? (results[idx] as PromiseFulfilledResult<any>).value.data ?? []
+            ? ((results[idx] as PromiseFulfilledResult<any>).value.data ?? [])
             : [],
       }));
     }
@@ -547,11 +762,7 @@ const loadAnomalies = async () => {
     rawHits.forEach(({ cfg, hits }: { cfg: any; hits: any[] }) => {
       hits.forEach((h: any) => {
         const tsMs = h.timestamp ? Math.floor(h.timestamp / 1000) : 0;
-        if (
-          tsMs &&
-          (tsMs < startTime / 1000 || tsMs > endTime / 1000)
-        )
-          return;
+        if (tsMs && (tsMs < startTime / 1000 || tsMs > endTime / 1000)) return;
         if ((h.anomaly_count ?? 0) > 0) {
           found.push({
             id: h.id ?? `anm-${cfg?.id}-${tsMs}`,
@@ -599,9 +810,12 @@ const loadHistoryAndSplit = async () => {
     });
     const hits: any[] = res.data?.hits ?? [];
 
-    // Recent events: firing/error shown per-occurrence; failed deduped by alert_name with count
+    // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
+    // This previously filtered on the literal strings ["firing", "error"], neither
+    // of which the backend ever produced — so it silently matched nothing. The
+    // shared classifier covers both the current and the legacy vocabulary.
     const firingHits = hits
-      .filter((h) => ["firing", "error"].includes(h.status?.toLowerCase()))
+      .filter((h) => isFiringOutcome(h.status))
       .slice(0, 5)
       .map((h, idx) => ({
         id: h.id ?? `ev-${idx}`,
@@ -609,13 +823,16 @@ const loadHistoryAndSplit = async () => {
         service: h.stream_name ?? "—",
         description: h.alert_name ?? "",
         timeAgo: relativeTime_(h.timestamp),
+        // Firing rows need a sort key too — without rawTs they scored 0 and
+        // always sorted beneath every failure row regardless of timestamp.
+        rawTs: h.timestamp,
         failCount: 0,
       }));
 
     // Dedup failed: one row per alert_name, most recent timestamp, total count
     const failedMap = new Map<string, any>();
     hits
-      .filter((h) => h.status?.toLowerCase() === "failed")
+      .filter((h) => isErrorOutcome(h.status))
       .forEach((h) => {
         const key = h.alert_name ?? h.id ?? "unknown";
         const existing = failedMap.get(key);
@@ -722,10 +939,7 @@ const formatStatus = (status: string) => {
     failed: "Failed",
     anomaly: "Anomaly",
   };
-  return (
-    map[status.toLowerCase()] ??
-    status.charAt(0).toUpperCase() + status.slice(1)
-  );
+  return map[status.toLowerCase()] ?? status.charAt(0).toUpperCase() + status.slice(1);
 };
 
 const relativeTime_ = (tsMicros: number): string => {
@@ -754,38 +968,40 @@ const shortDimKey = (key: string): string =>
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
-    ? "tw:border-l-[0.1875em] tw:border-l-(--o2-negative)"
-    : "tw:border-l-[0.1875em] tw:border-l-(--o2-warning)";
+    ? "border-l-[0.1875em] border-l-error-600"
+    : "border-l-[0.1875em] border-l-warning-600";
 
 const severityIconClass = (severity: string) =>
-  severity === "critical" ? "tw:text-(--o2-negative)" : "tw:text-(--o2-warning)";
+  severity === "critical" ? "text-error-600" : "text-warning-600";
 
 const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "tw:border-l-(--o2-negative)";
-  if (s === "p2") return "tw:border-l-(--o2-warning)";
-  return "tw:border-l-(--o2-status-info-text)";
+  if (s === "p1") return "border-l-error-600";
+  if (s === "p2") return "border-l-warning-600";
+  return "border-l-status-info-text";
 };
 
 const incidentIconClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "tw:text-(--o2-negative)";
-  if (s === "p2") return "tw:text-(--o2-warning)";
-  return "tw:text-(--o2-status-info-text)";
+  if (s === "p1") return "text-error-600";
+  if (s === "p2") return "text-warning-600";
+  return "text-status-info-text";
 };
 
 const severityBadgeClass = (sev: string): string => {
   const s = (sev || "p4").toLowerCase();
-  if (s === "p1") return "tw:bg-(--o2-status-error-bg) tw:text-(--o2-status-error-text) tw:border tw:border-[0.0625em] tw:border-(--o2-negative)";
-  if (s === "p2") return "tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning)";
-  if (s === "p3") return "tw:bg-(--o2-status-warning-bg) tw:text-(--o2-status-warning-text) tw:border tw:border-[0.0625em] tw:border-(--o2-warning)";
-  return "tw:bg-(--o2-status-info-bg) tw:text-(--o2-status-info-text) tw:border tw:border-[0.0625em] tw:border-(--o2-status-info-text)";
+  if (s === "p1") return "bg-error-50 text-error-600 border border-[0.0625em] border-error-600";
+  if (s === "p2")
+    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
+  if (s === "p3")
+    return "bg-warning-50 text-warning-700 border border-[0.0625em] border-warning-600";
+  return "bg-status-info-bg text-status-info-text border border-[0.0625em] border-status-info-text";
 };
 
 const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "tw:border-l-[0.1875em] tw:border-l-(--o2-negative)";
-  if (svc.errorFlag || svc.latencyFlag) return "tw:border-l-[0.1875em] tw:border-l-(--o2-warning)";
-  return "tw:border-l-[0.1875em] tw:border-l-(--o2-positive)";
+  if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-error-600";
+  if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-warning-600";
+  return "border-l-[0.1875em] border-l-status-positive";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -795,14 +1011,17 @@ const goToAlert = (item: any) => {
   showAlertHistoryDrawer.value = true;
 };
 
-const goToService = (svc: any) => {
+const goToService = (svc: any, e?: MouseEvent) => {
+  // Fired from the per-card info-icon button — stop it bubbling to the card
+  // click (which opens the latency/info side panel).
+  e?.stopPropagation();
   let filter = `service_name = '${svc.label ?? svc.id}'`;
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {
-    org_identifier: orgId.value,
+    org_identifier: orgId.value ?? "",
     tab: "spans",
-    query: b64EncodeUnicode(filter),
+    query: b64EncodeUnicode(filter) ?? "",
     stream: svc.stream_name ?? graphStream.value,
   };
 
@@ -816,8 +1035,9 @@ const goToService = (svc: any) => {
   router.push({ name: "traces", query });
 };
 
-const openServicePanel = (svc: any, e: MouseEvent) => {
-  e.stopPropagation(); // don't also trigger goToService
+const openServicePanel = (svc: any) => {
+  // The card's own click handler (behaviour swapped with the info icon):
+  // clicking the card body opens the latency/info side panel.
   selectedService.value = svc;
   servicePanelVisible.value = true;
 };
@@ -835,6 +1055,14 @@ const goToIncident = (inc: any) => {
   });
 };
 
+// Reuses the same signal the left-nav flyout uses to decide whether a section
+// is reachable at all (navGroups.ts) — a route only exists on the router when
+// its feature/RBAC gate allows it, so `hasRoute` keeps this empty state from
+// ever offering a card the user has no way to actually land on.
+const showAlertsCard = computed(() => router.hasRoute("alertList"));
+const showLogsCard = computed(() => router.hasRoute("logs"));
+const showTracesCard = computed(() => router.hasRoute("traces"));
+
 const goToAlertList = () => {
   router.push({ name: "alertList", query: { org_identifier: orgId.value } });
 };
@@ -844,7 +1072,10 @@ const goToIncidentList = () => {
 };
 
 const goToAnomalies = () => {
-  router.push({ name: "alertList", query: { org_identifier: orgId.value, tab: "anomalyDetection" } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: orgId.value, tab: "anomalyDetection" },
+  });
 };
 
 const goToLogs = () => {
@@ -869,10 +1100,6 @@ const goToServiceGraph = () => {
   router.push({ name: "traces", query });
 };
 
-const goToAlertHistory = () => {
-  router.push({ name: "alertHistory", query: { org_identifier: orgId.value } });
-};
-
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 onMounted(loadAll);
 
@@ -891,45 +1118,3 @@ watch(isIncidentsEnabled, (enabled) => {
   if (enabled && incidents.value.length === 0) loadIncidents();
 });
 </script>
-
-<style>
-/* Incidents table rows — !important overrides to beat the shared .ov-alert-row
-   base border/radius, plus :last-child border removal. Not cleanly inlineable. */
-.ov-table-row {
-  border-radius: 0 !important;
-  border-left-width: 0.1875em !important;
-  border-top: none !important;
-  border-right: none !important;
-  border-bottom: 0.0625em solid var(--o2-border-color) !important;
-}
-.ov-table-row:last-child {
-  border-bottom: none !important;
-}
-
-/* Hover-only Investigate button — visible only when the parent row is hovered.
-   Descendant/combinator selector cannot be inlined. */
-.ov-investigate-hover {
-  visibility: hidden;
-}
-.ov-alert-row:hover .ov-investigate-hover {
-  visibility: visible;
-}
-
-/* Recent-events last row border removal — structural pseudo-class. */
-.ov-event-row:last-child {
-  border-bottom: none;
-}
-
-/* Empty-state action card focus ring — :focus-visible pseudo-class. */
-.ov-action-card:focus-visible {
-  box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--color-primary-500) 40%, transparent);
-}
-
-/* Hide the horizontal scrollbar on the services grid — pseudo-element. */
-.ov-service-grid::-webkit-scrollbar { display: none; }
-
-/* Overview scrollbar styling — pseudo-elements. */
-.overview-tab::-webkit-scrollbar { width: 0.375em; }
-.overview-tab::-webkit-scrollbar-track { background: transparent; }
-.overview-tab::-webkit-scrollbar-thumb { background: var(--o2-border-color); border-radius: 0.1875em; }
-</style>

@@ -51,7 +51,18 @@ interface MountOptions {
   invites?: any[];
   allowedOrgs?: string;
   org?: string;
+  // When true, render the ODrawer body slot inline (a real <OForm> + fields)
+  // instead of fully stubbing the drawer — needed for the invite-form tests.
+  renderDrawer?: boolean;
 }
+
+// Slot-rendering ODrawer stub so the real OForm in the body is mounted.
+const ODrawerSlotStub = {
+  name: "ODrawer",
+  template: "<div class='o-drawer'><slot /></div>",
+  props: ["open", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+  emits: ["update:open", "click:primary", "click:secondary"],
+};
 
 async function mountBillingGroup(opts: MountOptions = {}) {
   const {
@@ -60,6 +71,7 @@ async function mountBillingGroup(opts: MountOptions = {}) {
     invites = [],
     allowedOrgs = "default",
     org = "default",
+    renderDrawer = false,
   } = opts;
 
   billing.get_billing_group_membership.mockResolvedValue({
@@ -88,7 +100,7 @@ async function mountBillingGroup(opts: MountOptions = {}) {
         OButton: true,
         AppTabs: true,
         OTable: true,
-        ODrawer: true,
+        ODrawer: renderDrawer ? ODrawerSlotStub : true,
       },
     },
   });
@@ -330,9 +342,7 @@ describe("BillingGroup.vue", () => {
           },
         ],
       }));
-      expect(wrapper.vm.receivedInvites.map((i: any) => i.token)).toEqual([
-        "t1",
-      ]);
+      expect(wrapper.vm.receivedInvites.map((i: any) => i.token)).toEqual(["t1"]);
     });
   });
 
@@ -340,14 +350,7 @@ describe("BillingGroup.vue", () => {
     it("exposes the expected invite table columns", async () => {
       ({ wrapper } = await mountBillingGroup());
       const ids = wrapper.vm.inviteColumns.map((c: any) => c.id);
-      expect(ids).toEqual([
-        "index",
-        "org_name",
-        "org_id",
-        "inviter_id",
-        "date",
-        "actions",
-      ]);
+      expect(ids).toEqual(["index", "org_name", "org_id", "inviter_id", "date", "actions"]);
     });
   });
 
@@ -422,10 +425,7 @@ describe("BillingGroup.vue", () => {
       await wrapper.vm.acceptInvite("token-1");
       await flushPromises();
 
-      expect(billing.accept_billing_group_invite).toHaveBeenCalledWith(
-        "default",
-        "token-1"
-      );
+      expect(billing.accept_billing_group_invite).toHaveBeenCalledWith("default", "token-1");
     });
 
     it("rejects an invite by token", async () => {
@@ -435,34 +435,57 @@ describe("BillingGroup.vue", () => {
       await wrapper.vm.rejectInvite("token-2");
       await flushPromises();
 
-      expect(billing.reject_billing_group_invite).toHaveBeenCalledWith(
-        "default",
-        "token-2"
-      );
+      expect(billing.reject_billing_group_invite).toHaveBeenCalledWith("default", "token-2");
     });
 
-    it("does not send an invite to the current org itself", async () => {
-      ({ wrapper } = await mountBillingGroup({ org: "default" }));
+    // The invite form is migrated to OForm + Zod: the schema (not a disabled
+    // button) gates an empty / same-org submit. Drive the REAL <OForm>.
+    const getInviteForm = (w: VueWrapper<any>) =>
+      (w.findComponent({ name: "OForm" }).vm as any).form;
 
-      wrapper.vm.inviteOrgId = "default";
-      await wrapper.vm.sendInvite();
+    it("blocks submit + does NOT send when inviting the current org itself", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        renderDrawer: true,
+      }));
+
+      const form = getInviteForm(wrapper);
+      form.setFieldValue("inviteOrgId", "default");
+      await form.handleSubmit();
       await flushPromises();
 
+      expect(form.state.isValid).toBe(false);
+      expect(billing.send_billing_group_invite).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit + does NOT send when the org id is empty", async () => {
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        renderDrawer: true,
+      }));
+
+      const form = getInviteForm(wrapper);
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
       expect(billing.send_billing_group_invite).not.toHaveBeenCalled();
     });
 
     it("sends an invite to a different org", async () => {
       billing.send_billing_group_invite.mockResolvedValue({ data: "ok" });
-      ({ wrapper } = await mountBillingGroup({ org: "default" }));
+      ({ wrapper } = await mountBillingGroup({
+        org: "default",
+        renderDrawer: true,
+      }));
 
-      wrapper.vm.inviteOrgId = "target-org";
-      await wrapper.vm.sendInvite();
+      const form = getInviteForm(wrapper);
+      form.setFieldValue("inviteOrgId", "target-org");
+      await form.handleSubmit();
       await flushPromises();
 
-      expect(billing.send_billing_group_invite).toHaveBeenCalledWith(
-        "default",
-        "target-org"
-      );
+      expect(form.state.isValid).toBe(true);
+      expect(billing.send_billing_group_invite).toHaveBeenCalledWith("default", "target-org");
     });
   });
 });

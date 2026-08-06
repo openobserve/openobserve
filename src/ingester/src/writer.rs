@@ -132,8 +132,8 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else if get_config().common.feature_shared_memtable_enabled {
-        // When shared memtable is enabled, hash by thread_id and org_id
-        let hash_key = format!("{thread_id}_{org_id}");
+        // When shared memtable is enabled, hash by org_id and stream_name
+        let hash_key = format!("{org_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     } else {
@@ -436,11 +436,10 @@ impl Writer {
 
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         let _start_preprocess_batch = Instant::now();
-        // Serialize entries to bytes for WAL writing
-        let bytes_entries = entries
-            .iter_mut()
-            .map(|entry| entry.into_bytes())
-            .collect::<Result<Vec<_>>>()?;
+        // data_size == 0 is treated as an empty entry downstream
+        for entry in entries.iter_mut() {
+            entry.normalize_data_size();
+        }
 
         // Bulk convert to Arrow RecordBatch
         let batch_entries = entries
@@ -450,16 +449,21 @@ impl Writer {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        // Calculate total sizes for rotation check
-        let (entries_json_size, entries_arrow_size) = batch_entries
+        // Serialize entries to bytes for WAL writing, reusing the RecordBatch
+        // in Arrow IPC format instead of serializing the data back to JSON
+        let bytes_entries = entries
             .iter()
-            .map(|entry| (entry.data_json_size, entry.data_arrow_size))
-            .fold(
-                (0, 0),
-                |(acc_json_size, acc_arrow_size), (json_size, arrow_size)| {
-                    (acc_json_size + json_size, acc_arrow_size + arrow_size)
-                },
-            );
+            .zip(batch_entries.iter())
+            .map(|(entry, batch)| entry.into_bytes_arrow(&batch.data))
+            .collect::<Result<Vec<_>>>()?;
+
+        // Calculate total sizes for rotation check: the WAL grows by the
+        // serialized bytes, the memtable by the Arrow in-memory size
+        let entries_wal_size = bytes_entries.iter().map(Vec::len).sum();
+        let entries_arrow_size = batch_entries
+            .iter()
+            .map(|entry| entry.data_arrow_size)
+            .sum();
 
         // Move entries into ProcessedBatch
         // Clear the heavy data field after conversion to avoid memory duplication
@@ -476,7 +480,7 @@ impl Writer {
             entries,
             bytes_entries,
             batch_entries,
-            entries_json_size,
+            entries_wal_size,
             entries_arrow_size,
         })
     }
@@ -487,7 +491,7 @@ impl Writer {
         }
         let _start_consume_processed = Instant::now();
         // Check rotation
-        self.rotate(batch.entries_json_size, batch.entries_arrow_size)
+        self.rotate(batch.entries_wal_size, batch.entries_arrow_size)
             .await?;
 
         // Write into WAL - pure IO, no CPU-intensive processing
@@ -520,7 +524,7 @@ impl Writer {
             .observe(mem_lock_time);
         let _start_mem_processed = Instant::now();
         for (entry, batch_entry) in batch.entries.into_iter().zip(batch.batch_entries) {
-            if entry.data_size == 0 {
+            if batch_entry.data.num_rows() == 0 {
                 continue;
             }
             mem.write(entry.schema.clone().unwrap(), entry, batch_entry)?;
@@ -549,8 +553,10 @@ impl Writer {
 
     // rotate is used to rotate the wal and memtable if the size exceeds the threshold
     async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
-        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
-            && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
+        let wal_size = self.wal.read().await.size();
+        if !self
+            .should_rotate(wal_size, entry_bytes_size, entry_batch_size)
+            .await
         {
             return Ok(());
         }
@@ -562,8 +568,12 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
-            return Ok(()); // check again to avoid race condition
+        // check again to avoid race condition
+        if !self
+            .should_rotate(wal.size(), entry_bytes_size, entry_batch_size)
+            .await
+        {
+            return Ok(());
         }
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
@@ -656,6 +666,21 @@ impl Writer {
     ) -> Result<(u64, Vec<ReadRecordBatchEntry>)> {
         let memtable = self.memtable.read().await;
         memtable.read(org_id, stream_name, time_range, partition_filters)
+    }
+
+    /// Check if the wal file or memtable is over its threshold, or the wal file is too old.
+    ///
+    /// `rotate()` calls this twice - before and after taking the wal write lock - and both
+    /// calls must check the same thresholds, otherwise memtable-triggered rotations would
+    /// be dropped by the re-check.
+    async fn should_rotate(
+        &self,
+        wal_size: (usize, usize),
+        entry_bytes_size: usize,
+        entry_batch_size: usize,
+    ) -> bool {
+        self.check_wal_threshold(wal_size, entry_bytes_size)
+            || self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
     }
 
     /// Check if the wal file size is over the threshold or the file is too old

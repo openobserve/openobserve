@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,19 +14,13 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     :title="t('modelPricing.importTitle')"
     test-prefix="model-pricing"
     :is-importing="isImporting"
-    container-class=""
-    container-style="height: calc(100vh - 50px);"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 128px)',
-    }"
+    container-class="flex-1 min-h-0"
+    container-style=""
     :tabs="allTabs"
     @back="arrowBackFn"
     @cancel="arrowBackFn"
@@ -34,38 +28,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:active-tab="handleTabChange"
   >
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
+      <div
+        class="border-border-default flex h-full w-full flex-col border-l"
+        style="min-width: 400px"
+      >
         <div
           v-if="modelPricingErrorsToDisplay.length > 0"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
         >
-          {{ t('modelPricing.errorValidations') }}
+          {{ t("modelPricing.errorValidations") }}
         </div>
-        <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">{{ t('modelPricing.outputMessages') }}</div>
-        <OSeparator class="tw:mr-4 tw:mt-4" />
-        <div class="tw:overflow-auto tw:resize-none" style="height: calc(100vh - 200px)">
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+          {{ t("modelPricing.outputMessages") }}
+        </div>
+        <OSeparator class="mt-1 shrink-0" />
+        <div class="min-h-0 flex-1 resize-none overflow-auto">
           <!-- Model Pricing Errors Section -->
-          <div
-            class="tw:p-2.5 tw:mb-2.5"
-            v-if="modelPricingErrorsToDisplay.length > 0"
-          >
+          <div class="mb-2.5 p-2.5" v-if="modelPricingErrorsToDisplay.length > 0">
             <div>
-              <div
-                v-for="(errorGroup, index) in modelPricingErrorsToDisplay"
-                :key="index"
-              >
+              <div v-for="(errorGroup, index) in modelPricingErrorsToDisplay" :key="index">
                 <div
                   v-for="(errorMessage, errorIndex) in errorGroup"
                   :key="errorIndex"
-                  class="tw:py-1.25 tw:text-sm"
+                  class="py-1.25 text-sm"
                   :data-test="`model-pricing-import-error-${index}-${errorIndex}`"
                 >
                   <span
                     data-test="model-pricing-import-name-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-if="
-                      typeof errorMessage === 'object' &&
-                      errorMessage.field == 'model_pricing_name'
+                      typeof errorMessage === 'object' && errorMessage.field == 'model_pricing_name'
                     "
                   >
                     {{ errorMessage.message }}
@@ -74,13 +66,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="model-pricing-import-name-input"
                         v-model="userSelectedModelPricingName[index]"
                         :label="t('modelPricing.modelNameLabel')"
-                        @update:model-value="updateModelPricingName(userSelectedModelPricingName[index], index)"
+                        @update:model-value="
+                          updateModelPricingName(userSelectedModelPricingName[index], index)
+                        "
                       />
                     </div>
                   </span>
                   <span
                     data-test="model-pricing-import-pattern-error"
-                    class="text-red"
+                    class="text-status-negative"
                     v-else-if="
                       typeof errorMessage === 'object' &&
                       errorMessage.field == 'model_pricing_pattern'
@@ -92,22 +86,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="model-pricing-import-pattern-input"
                         v-model="userSelectedModelPricingPattern[index]"
                         :label="t('modelPricing.matchPatternLabel')"
-                        @update:model-value="updateModelPricingPattern(userSelectedModelPricingPattern[index], index)"
+                        @update:model-value="
+                          updateModelPricingPattern(userSelectedModelPricingPattern[index], index)
+                        "
                       />
                     </div>
                   </span>
-                  <span class="text-red" v-else>{{ errorMessage }}</span>
+                  <span class="text-status-negative" v-else>{{ errorMessage }}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="tw:p-2.5 tw:mb-2.5" v-if="modelPricingCreators.length > 0">
+          <div class="mb-2.5 p-2.5" v-if="modelPricingCreators.length > 0">
             <div
-              class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
+              class="text-primary mb-2.5 text-base uppercase"
               data-test="model-pricing-import-creation-title"
             >
-              {{ t('modelPricing.modelPricingCreation') }}
+              {{ t("modelPricing.modelPricingCreation") }}
             </div>
             <div
               class=""
@@ -117,31 +113,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div
                 :class="{
-                  'tw:py-1.25 tw:text-sm tw:font-bold': true,
-                  'text-green ': val.success,
-                  'text-red': !val.success,
+                  'py-1.25 text-sm font-bold': true,
+                  'text-green': val.success,
+                  'text-status-negative': !val.success,
                 }"
                 :data-test="`model-pricing-import-creation-${index}-message`"
               >
-                <pre class="creators-message" style="white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; word-break: break-word; max-width: 100%;">{{ val.message }}</pre>
+                <pre
+                  class="creators-message max-w-full whitespace-pre-wrap"
+                  style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word"
+                  >{{ val.message }}</pre
+                >
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 import modelPricingService from "@/services/model_pricing";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -155,7 +155,7 @@ const emit = defineEmits<{
   "update:list": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const baseImportRef = ref<any>(null);
@@ -193,22 +193,14 @@ const allTabs = computed(() => [
 function updateModelPricingName(name: string, index: number) {
   if (baseImportRef.value?.jsonArrayOfObj[index]) {
     baseImportRef.value.jsonArrayOfObj[index].name = name;
-    baseImportRef.value.jsonStr = JSON.stringify(
-      baseImportRef.value.jsonArrayOfObj,
-      null,
-      2
-    );
+    baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
   }
 }
 
 function updateModelPricingPattern(pattern: string, index: number) {
   if (baseImportRef.value?.jsonArrayOfObj[index]) {
     baseImportRef.value.jsonArrayOfObj[index].match_pattern = pattern;
-    baseImportRef.value.jsonStr = JSON.stringify(
-      baseImportRef.value.jsonArrayOfObj,
-      null,
-      2
-    );
+    baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
   }
 }
 
@@ -222,16 +214,14 @@ async function importJson({ jsonStr: jsonString }: any) {
 
   try {
     if (!jsonString || jsonString.trim() === "") {
-      throw new Error("JSON string is empty");
+      throw new Error(t("settings.importModelPricing.jsonEmpty"));
     }
 
     const parsedJson = JSON.parse(jsonString);
-    jsonArrayOfObj.value = Array.isArray(parsedJson)
-      ? parsedJson
-      : [parsedJson];
+    jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
   } catch (e: any) {
     toast({
-      message: e.message || "Invalid JSON format",
+      message: e.message || t("settings.importModelPricing.invalidJsonFormat"),
       variant: "error",
     });
     return;
@@ -248,7 +238,10 @@ async function importJson({ jsonStr: jsonString }: any) {
       modelPricingErrorsToDisplay.value.push([
         {
           field: "model_pricing_name",
-          message: `Model pricing - ${index + 1}: duplicate name "${jsonObj.name}" within this import batch. Each model must have a unique name.`,
+          message: t("settings.importModelPricing.duplicateNameInBatch", {
+            index: index + 1,
+            name: jsonObj.name,
+          }),
         },
       ]);
       continue;
@@ -262,7 +255,14 @@ async function importJson({ jsonStr: jsonString }: any) {
 
   if (successCount === totalCount) {
     toast({
-      message: `Successfully imported ${successCount} model pricing definition${successCount !== 1 ? "s" : ""}`,
+      message:
+        successCount !== 1
+          ? t("settings.importModelPricing.importedPlural", {
+              count: successCount,
+            })
+          : t("settings.importModelPricing.importedSingular", {
+              count: successCount,
+            }),
       variant: "success",
     });
 
@@ -296,7 +296,7 @@ async function processJsonObject(jsonObj: any, index: number) {
     return created;
   } catch (e: any) {
     toast({
-      message: "Error importing model pricing. Please check the JSON format.",
+      message: t("settings.importModelPricing.errorImporting"),
       variant: "error",
     });
     return false;
@@ -308,7 +308,7 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     modelPricingErrorsToDisplay.value.push([
       {
         field: "model_pricing_name",
-        message: `Model pricing - ${index}: name is required`,
+        message: t("settings.importModelPricing.nameRequired", { index }),
       },
     ]);
     return false;
@@ -322,7 +322,9 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     modelPricingErrorsToDisplay.value.push([
       {
         field: "model_pricing_pattern",
-        message: `Model pricing - ${index}: match_pattern is required`,
+        message: t("settings.importModelPricing.matchPatternRequired", {
+          index,
+        }),
       },
     ]);
     return false;
@@ -333,7 +335,10 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
     modelPricingErrorsToDisplay.value.push([
       {
         field: "model_pricing_name",
-        message: `Model pricing - ${index}: a model with name "${jsonObj.name}" already exists. Please choose a different name.`,
+        message: t("settings.importModelPricing.nameAlreadyExists", {
+          index,
+          name: jsonObj.name,
+        }),
       },
     ]);
     return false;
@@ -341,7 +346,7 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
 
   if (!Array.isArray(jsonObj.tiers) || jsonObj.tiers.length === 0) {
     modelPricingErrorsToDisplay.value.push([
-      `Model pricing - ${index}: tiers must be a non-empty array`,
+      t("settings.importModelPricing.tiersNonEmpty", { index }),
     ]);
     return false;
   }
@@ -353,7 +358,10 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
         modelPricingErrorsToDisplay.value.push([
           {
             field: "model_pricing_name",
-            message: `Model pricing - ${index}: usage key "${key}" cannot be a pure integer`,
+            message: t("settings.importModelPricing.usageKeyInteger", {
+              index,
+              key,
+            }),
           },
         ]);
         return false;
@@ -362,7 +370,10 @@ async function validateModelPricingInputs(jsonObj: any, index: number) {
         modelPricingErrorsToDisplay.value.push([
           {
             field: "model_pricing_name",
-            message: `Model pricing - ${index}: usage key "${key}" must not contain spaces`,
+            message: t("settings.importModelPricing.usageKeySpaces", {
+              index,
+              key,
+            }),
           },
         ]);
         return false;
@@ -384,24 +395,34 @@ async function createModelPricing(jsonObj: any, index: number) {
     });
     modelPricingCreators.value.push({
       success: true,
-      message: `Model pricing - ${index}: "${jsonObj.name}" created successfully`,
+      message: t("settings.importModelPricing.createdSuccessfully", {
+        index,
+        name: jsonObj.name,
+      }),
     });
     return true;
   } catch (error: any) {
     const errorMessage =
-      error?.response?.data?.message || "Unknown error";
+      error?.response?.data?.message || t("settings.importModelPricing.unknownError");
 
     // Skip bottom snackbar for 403 — global interceptor already shows persistent top banner.
     if (error?.response?.status !== 403) {
       toast({
-        message: `Failed to import "${jsonObj.name}": ${errorMessage}`,
+        message: t("settings.importModelPricing.failedToImport", {
+          name: jsonObj.name,
+          error: errorMessage,
+        }),
         variant: "error",
       });
     }
 
     modelPricingCreators.value.push({
       success: false,
-      message: `Model pricing - ${index}: "${jsonObj.name}" creation failed\n Reason: ${errorMessage}`,
+      message: t("settings.importModelPricing.creationFailed", {
+        index,
+        name: jsonObj.name,
+        reason: errorMessage,
+      }),
     });
     return false;
   }

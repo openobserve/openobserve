@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { format as dfFormat, sub } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { DateTime as _DateTime } from "luxon";
 
 // ---------------------------------------------------------------------------
@@ -179,16 +180,10 @@ export const getDurationObjectFromParams = (params: any) => {
     obj.absolute.startTime = `${startTimeDateObj
       .getHours()
       .toString()
-      .padStart(2, "0")}:${startTimeDateObj
-      .getMinutes()
-      .toString()
-      .padStart(2, "0")}`;
+      .padStart(2, "0")}:${startTimeDateObj.getMinutes().toString().padStart(2, "0")}`;
 
     const toTimeDateObj = new Date(toTime);
-    obj.absolute.endTime = `${toTimeDateObj
-      .getHours()
-      .toString()
-      .padStart(2, "0")}:${toTimeDateObj
+    obj.absolute.endTime = `${toTimeDateObj.getHours().toString().padStart(2, "0")}:${toTimeDateObj
       .getMinutes()
       .toString()
       .padStart(2, "0")}`;
@@ -220,6 +215,7 @@ export const getConsumableRelativeTime = (period: string) => {
       endTime: endTimeStamp.getTime() * 1000,
     };
   }
+  return undefined;
 };
 
 export const getRelativePeriod = (period: string) => {
@@ -243,8 +239,8 @@ export const isInvalidDate = (date: any) => {
 // ---------------------------------------------------------------------------
 
 /**
- * Normalize Quasar-style format tokens to date-fns (Unicode CLDR) tokens.
- * Quasar uses YYYY/DD whereas date-fns uses yyyy/dd.
+ * Normalize legacy uppercase format tokens to date-fns (Unicode CLDR) tokens.
+ * Legacy formats use YYYY/DD whereas date-fns uses yyyy/dd.
  */
 function normalizeFormat(format: string): string {
   return format
@@ -259,10 +255,7 @@ function normalizeFormat(format: string): string {
  * Format a value using date-fns format.
  * Accepts a Date object, ISO string, or number (milliseconds since epoch).
  */
-export function formatDate(
-  value: number | string | Date,
-  formatStr: string,
-): string {
+export function formatDate(value: number | string | Date, formatStr: string): string {
   const input = typeof value === "string" ? new Date(value) : value;
   return dfFormat(input, normalizeFormat(formatStr));
 }
@@ -273,6 +266,15 @@ export function formatDate(
  */
 export function formatTimestamp(us: number, format: string): string {
   return formatDate(us / 1000, format);
+}
+
+/**
+ * Format a microsecond timestamp in a specific IANA timezone.
+ * Mirrors formatTimestamp but renders in the given timezone instead of the
+ * browser's local zone, so the displayed value matches a timezone label.
+ */
+export function formatTimestampInTimezone(us: number, format: string, timezone: string): string {
+  return formatInTimeZone(us / 1000, timezone, normalizeFormat(format));
 }
 
 /**
@@ -288,16 +290,14 @@ export function formatTimestampNs(ns: number, format: string): string {
 // ---------------------------------------------------------------------------
 
 /** "YYYY-MM-DD HH:mm:ss" — standard readable datetime */
-export const formatToReadable = (us: number): string =>
-  formatTimestamp(us, "YYYY-MM-DD HH:mm:ss");
+export const formatToReadable = (us: number): string => formatTimestamp(us, "YYYY-MM-DD HH:mm:ss");
 
 /** "YYYY-MM-DD HH:mm:ss.SSS" — readable with milliseconds */
 export const formatToDetailed = (us: number): string =>
   formatTimestamp(us, "YYYY-MM-DD HH:mm:ss.SSS");
 
 /** "YYYY-MM-DDTHH:mm:ssZ" — ISO 8601 compact */
-export const formatToISO = (us: number): string =>
-  formatTimestamp(us, "YYYY-MM-DDTHH:mm:ssZ");
+export const formatToISO = (us: number): string => formatTimestamp(us, "YYYY-MM-DDTHH:mm:ssZ");
 
 /** "MMM DD, YYYY HH:mm:ss.SSS Z" — human-readable with ms + tz */
 export const formatToHuman = (us: number): string =>
@@ -308,12 +308,10 @@ export const formatToHumanShort = (us: number): string =>
   formatTimestamp(us, "MMM DD, YYYY HH:mm:ss Z");
 
 /** "MMM D, YYYY" — date only (e.g. "May 19, 2026") */
-export const formatToDateOnly = (us: number): string =>
-  formatTimestamp(us, "MMM D, YYYY");
+export const formatToDateOnly = (us: number): string => formatTimestamp(us, "MMM D, YYYY");
 
 /** "MMM DD, HH:mm" — month day + time, no year */
-export const formatToTimeCompact = (us: number): string =>
-  formatTimestamp(us, "MMM DD, HH:mm");
+export const formatToTimeCompact = (us: number): string => formatTimestamp(us, "MMM DD, HH:mm");
 
 // ---------------------------------------------------------------------------
 // Relative time
@@ -326,10 +324,7 @@ export const formatToTimeCompact = (us: number): string =>
  * subtractRelativeTime(new Date(), { minutes: 15 }) // 15 min ago
  * subtractRelativeTime(new Date(), { days: 7 })     // 7 days ago
  */
-export function subtractRelativeTime(
-  endDate: Date,
-  period: Record<string, number>,
-): Date {
+export function subtractRelativeTime(endDate: Date | number, period: Record<string, number>): Date {
   return sub(endDate, period);
 }
 
@@ -337,15 +332,28 @@ export function subtractRelativeTime(
 // Legacy / specific helpers
 // ---------------------------------------------------------------------------
 
-export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
+/** Default timestamp format. */
+export const DATE_TIMESTAMP_FORMAT = "YYYY-MM-DDTHH:mm:ssZ";
+
+/**
+ * Render a microsecond timestamp as a local-time string.
+ *
+ * Local time is deliberate: these render "created at" / "last triggered at"
+ * columns, which a user reads in their own timezone. The tests pin TZ=UTC for
+ * exactly that reason (see vitest.config.ts).
+ */
+export const convertUnixToDateFormat = (
+  unixMicroseconds: any,
+  format: string = DATE_TIMESTAMP_FORMAT,
+) => {
   try {
     if (!unixMicroseconds) return "";
     const unixSeconds = unixMicroseconds / 1e6;
     const dateToFormat = new Date(unixSeconds * 1000);
     const formattedDate = dateToFormat.toISOString();
-    return formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
+    return formatDate(formattedDate, format);
   } catch (error) {
-    console.log("Error converting unix to quasar format");
+    console.log("Error converting unix to date format");
     return "";
   }
 };
@@ -355,14 +363,9 @@ export const convertUnixToQuasarFormat = (unixMicroseconds: any) => {
  * @param {string} time - time in HH:MM 24hr format
  * @param {string} timezone - timezone
  */
-export const convertDateToTimestamp = (
-  date: string,
-  time: string,
-  timezone: string,
-) => {
+export const convertDateToTimestamp = (date: string, time: string, timezone: string) => {
   try {
-    const browserTime =
-      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
     const [day, month, year] = date.split("-");
     const [hour, minute] = time.split(":");

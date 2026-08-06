@@ -6,7 +6,7 @@
  * Used for "load more" functionality in log detail views.
  */
 
-import { ref, computed } from "vue";
+import { ref } from "vue";
 
 interface ChunkState {
   [fieldKey: string]: {
@@ -29,7 +29,7 @@ export function useChunkedContent() {
   const initializeChunk = (
     fieldKey: string,
     content: string,
-    chunkSizeBytes: number = CHUNK_SIZE_BYTES
+    chunkSizeBytes: number = CHUNK_SIZE_BYTES,
   ) => {
     const contentLength = content.length;
     const totalChunks = Math.ceil(contentLength / chunkSizeBytes);
@@ -91,7 +91,7 @@ export function useChunkedContent() {
 
     const loadedSize = Math.min(
       (state.currentChunkIndex + 1) * state.chunkSize,
-      state.fullContent.length
+      state.fullContent.length,
     );
 
     return {

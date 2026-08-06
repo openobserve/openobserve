@@ -15,8 +15,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:gap-[0.15rem] tw:w-full tw:min-w-0">
-    <span class="tw:text-[0.75rem] tw:leading-none tw:tabular-nums tw:truncate">
+  <!-- Inline: number vertically centered on the row's shared baseline, with the
+       bar pinned as a thin underline at the cell's bottom. Use when the column
+       sits alongside single-line numeric columns so the numbers line up. -->
+  <div
+    v-if="inline"
+    class="relative flex h-full min-h-7 w-full min-w-0 items-center"
+    :class="align === 'right' ? 'justify-end' : 'justify-start'"
+  >
+    <span class="min-w-0 truncate text-xs leading-none tabular-nums">
+      {{ label }}
+      <OTooltip v-if="tooltip" :content="tooltip" />
+    </span>
+    <!-- Bar wrapped in an absolute div: OProgressBar's own root is `relative w-full`,
+         so positioning it directly would keep it in flow and crush the number. -->
+    <div class="pointer-events-none absolute inset-x-0 bottom-0.5">
+      <OProgressBar :value="ratio" :variant="variant" size="xs" />
+    </div>
+  </div>
+  <!-- Stacked (default): number above a full-width bar. -->
+  <div v-else class="flex w-full min-w-0 flex-col gap-[0.15rem]">
+    <span
+      class="truncate text-xs leading-none tabular-nums"
+      :class="align === 'right' ? 'text-right' : 'text-left'"
+    >
       {{ label }}
       <OTooltip v-if="tooltip" :content="tooltip" />
     </span>
@@ -25,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -33,12 +56,14 @@ import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.typ
 const props = defineProps<{
   value: number;
   max: number;
-  label: string;
+  label: I18nText;
   variant?: ProgressBarVariant;
-  tooltip?: string;
+  tooltip?: I18nText;
+  align?: "left" | "right";
+  /** Render the number inline (row-baseline) with the bar as a bottom underline,
+   *  so it aligns with single-line numeric columns in the same table row. */
+  inline?: boolean;
 }>();
 
-const ratio = computed(() =>
-  props.max > 0 ? Math.min(1, props.value / props.max) : 0,
-);
+const ratio = computed(() => (props.max > 0 ? Math.min(1, props.value / props.max) : 0));
 </script>

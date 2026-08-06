@@ -13,45 +13,61 @@ permissions:
 jobs:
   update-dependencies:
     name: Update NPM Dependencies
-    runs-on:
-      labels: ubicloud-standard-8
+    # This job only bumps the manifest and opens the PR. Type check, unit tests
+    # and build all run as normal PR checks on the resulting pull request, so
+    # nothing here needs to install node_modules or compile anything.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          # A PAT, not GITHUB_TOKEN. Pushes made with GITHUB_TOKEN do not start
+          # workflow runs, so the resulting PR would sit there with zero checks —
+          # and the whole point of this job is to hand verification to PR CI.
+          token: ${{ secrets.ORG_ADMIN_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
       - name: Configure Git
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Commit as one of the user rather than the bot, so the commit and the PR share
+          # one author and the PR shows up under his own filters.
 
       - name: Create update branch
         run: |
-          BRANCH_NAME="automated/npm-update-$(date +%Y%m%d)"
+          BRANCH_NAME="chore/npm-update-$(date +%Y%m%d)"
           git checkout -b "$BRANCH_NAME"
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Check for outdated packages
+      - name: Check for available updates
         id: check_updates
         run: |
           cd web
-          echo "Checking for outdated packages..."
-          npm outdated --json > outdated.json || true
 
-          if [ -s outdated.json ] && [ "$(cat outdated.json)" != "{}" ]; then
+          # Snapshot the pre-update manifest so the PR body can show old → new.
+          cp package.json "$RUNNER_TEMP/package.json.before"
+
+          npx --yes npm-check-updates --target latest --peer --jsonUpgraded \
+            > "$RUNNER_TEMP/upgrades.json"
+
+          if ! jq -e 'type == "object"' "$RUNNER_TEMP/upgrades.json" > /dev/null; then
+            echo "npm-check-updates did not return valid JSON:"
+            cat "$RUNNER_TEMP/upgrades.json"
+            exit 1
+          fi
+
+          if [ "$(jq 'length' "$RUNNER_TEMP/upgrades.json")" -gt 0 ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "Found outdated packages:"
-            cat outdated.json | jq '.'
+            echo "Packages to upgrade:"
+            jq '.' "$RUNNER_TEMP/upgrades.json"
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "No outdated packages found"
+            echo "No updates available"
           fi
 
       - name: Update dependencies
@@ -60,73 +76,43 @@ jobs:
           cd web
           echo "Updating dependencies..."
 
-          # Update all dependencies to their latest versions
-          # This will update both package.json and package-lock.json
-          npm update --save
+          # Apply the same upgrades that were just reported.
+          npx --yes npm-check-updates -u --target latest --peer
 
-          # Also check for major version updates and update them
-          npx npm-check-updates -u
-
-          # Install to ensure package-lock.json is updated
-          npm install
+          # Regenerate package-lock.json only — node_modules is never needed
+          # here, and skipping the install keeps this job to well under a minute.
+          npm install --package-lock-only
 
           echo "Dependencies updated successfully"
-
-      - name: Run type check
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          cd web
-          echo "Running type check..."
-          npm run type-check
-
-      - name: Run unit tests
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          cd web
-          echo "Running unit tests..."
-          npm run test:unit:coverage
-
-      - name: Build project
-        if: steps.check_updates.outputs.has_updates == 'true'
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-        run: |
-          cd web
-          echo "Building project..."
-          npm run build
 
       - name: Generate update summary
         if: steps.check_updates.outputs.has_updates == 'true'
         id: summary
         run: |
-          cd web
+          # Map of package -> previous range, from the pre-update manifest.
+          BEFORE=$(jq -c '(.dependencies // {}) + (.devDependencies // {})' \
+            "$RUNNER_TEMP/package.json.before")
 
-          # Get the list of updated packages
-          UPDATED_PACKAGES=$(cat outdated.json | jq -r 'to_entries[] | "- **\(.key)**: \(.value.current) → \(.value.latest)"')
+          UPDATED_PACKAGES=$(jq -r --argjson before "$BEFORE" \
+            'to_entries[] | "- **\(.key)**: \($before[.key] // "n/a") → \(.value)"' \
+            "$RUNNER_TEMP/upgrades.json")
 
-          # Create PR body
-          cat > /tmp/pr_body.md <<EOF
+          cat > "$RUNNER_TEMP/pr_body.md" <<EOF
           ## 📦 Weekly NPM Dependencies Update
 
-          This automated PR updates npm packages to their latest versions.
+          This automated PR updates \`web/\` npm packages to their latest versions
+          and regenerates \`package-lock.json\`.
 
           ### Updated Packages
 
           $UPDATED_PACKAGES
 
-          ### Testing Results
+          ### Validation
 
-          - ✅ Type check passed
-          - ✅ Unit tests passed
-          - ✅ Build successful
-
-          ### Notes
-
-          - All dependencies have been updated to their latest compatible versions
-          - \`package-lock.json\` has been regenerated
-          - All tests passed successfully
-
-          Please review the changes and merge if everything looks good.
+          This workflow does **not** run any checks — type check, unit tests and
+          build all run as normal PR checks below. Review the results there before
+          merging; a red check usually means one of the upgrades above needs to be
+          pinned back or accompanied by a code change.
 
           ---
 
@@ -138,38 +124,71 @@ jobs:
       - name: Commit changes
         if: steps.check_updates.outputs.has_updates == 'true'
         run: |
-          cd web
-
-          # Check if there are changes to commit
-          if [[ -n $(git status --porcelain) ]]; then
-            git add package.json package-lock.json
-            git commit -m "chore: update npm dependencies ($(date +%Y-%m-%d))
-
-            - Updated packages to their latest versions
-            - Regenerated package-lock.json
-            - All tests passing
-
-            🤖 Automated update by GitHub Actions"
-
-            git push origin "$BRANCH_NAME"
-            echo "changes_committed=true" >> $GITHUB_ENV
-          else
-            echo "No changes to commit"
+          # Scope the check to the manifest files so stray artifacts never
+          # trigger an empty dependency PR.
+          if git diff --quiet -- web/package.json web/package-lock.json; then
+            echo "No dependency changes to commit"
             echo "changes_committed=false" >> $GITHUB_ENV
+          else
+            git add web/package.json web/package-lock.json
+            git commit \
+              -m "chore(deps): update web npm dependencies ($(date +%Y-%m-%d))" \
+              -m "- Updated packages to their latest versions" \
+              -m "- Regenerated package-lock.json" \
+              -m "🤖 Automated update by GitHub Actions"
+
+            # The branch name is date-stamped, so a second run on the same day
+            # (a re-run, or a manual dispatch after the scheduled one) finds the
+            # earlier run's branch already on the remote. This branch is entirely
+            # machine-owned and rebuilt from main every run, so replacing it is
+            # correct — a plain push would just fail non-fast-forward.
+            if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null 2>&1; then
+              echo "Branch $BRANCH_NAME already exists on the remote — replacing it"
+              git fetch origin "+refs/heads/$BRANCH_NAME:refs/remotes/origin/$BRANCH_NAME"
+              git push --force-with-lease origin "$BRANCH_NAME"
+            else
+              git push origin "$BRANCH_NAME"
+            fi
+
+            echo "changes_committed=true" >> $GITHUB_ENV
           fi
 
       - name: Create Pull Request
         if: steps.check_updates.outputs.has_updates == 'true' && env.changes_committed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          # Same PAT as the checkout — the PR author is whoever owns this token.
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
-          gh pr create \
-            --title "chore: Weekly NPM dependencies update ($(date +%Y-%m-%d))" \
-            --body-file /tmp/pr_body.md \
-            --base main \
-            --head "$BRANCH_NAME" \
-            --label "dependencies" \
-            --label "automated"
+          TITLE="chore(deps): update web npm dependencies ($(date +%Y-%m-%d))"
+
+          # If an earlier run today already opened a PR for this branch, the
+          # force-push above updated it in place — `gh pr create` would fail with
+          # "a pull request for branch ... already exists". Refresh it instead.
+          PR_URL=$(gh pr list --head "$BRANCH_NAME" --state open \
+            --json url --jq '.[0].url // empty')
+
+          if [ -n "$PR_URL" ]; then
+            gh pr edit "$PR_URL" \
+              --title "$TITLE" \
+              --body-file "$RUNNER_TEMP/pr_body.md"
+            echo "Refreshed existing $PR_URL"
+          else
+            PR_URL=$(gh pr create \
+              --title "$TITLE" \
+              --body-file "$RUNNER_TEMP/pr_body.md" \
+              --base main \
+              --head "$BRANCH_NAME")
+            echo "Opened $PR_URL"
+          fi
+
+          # Labels and assignee are applied separately and best-effort. Passing
+          # them to `gh pr create` makes a single bad value abort the whole
+          # command, leaving the already-pushed branch behind with no PR at all.
+          gh pr edit "$PR_URL" \
+            --add-assignee "bjp232004" \
+            --add-label "dependencies" \
+            --add-label "auto-generated" \
+            || echo "::warning::Could not apply assignee/labels to $PR_URL"
 
       - name: No updates needed
         if: steps.check_updates.outputs.has_updates == 'false'

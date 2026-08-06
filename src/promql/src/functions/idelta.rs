@@ -1,0 +1,117 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::time::Duration;
+
+use config::meta::promql::value::{EvalContext, Sample, Value};
+use datafusion::error::Result;
+
+use crate::functions::RangeFunc;
+
+pub(crate) fn idelta(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    super::eval_range(data, IdeltaFunc::new(), eval_ctx)
+}
+
+pub struct IdeltaFunc;
+
+impl IdeltaFunc {
+    pub fn new() -> Self {
+        IdeltaFunc {}
+    }
+}
+
+impl RangeFunc for IdeltaFunc {
+    fn name(&self) -> &'static str {
+        "idelta"
+    }
+
+    fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
+        if samples.len() < 2 {
+            return None;
+        }
+        let last = samples.last().unwrap();
+        let previous = samples.get(samples.len() - 2).unwrap();
+        Some(last.value - previous.value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+
+    use super::*;
+    // Test helper
+    fn idelta_test_helper(data: Value) -> Result<Value> {
+        let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
+        idelta(data, &eval_ctx)
+    }
+
+    #[test]
+    fn test_idelta_value_none_input() {
+        let result = idelta_test_helper(Value::None).unwrap();
+        assert!(matches!(result, Value::None));
+    }
+
+    #[test]
+    fn test_idelta_invalid_input_returns_err() {
+        let result = idelta_test_helper(Value::Float(1.0));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_idelta_exec_fewer_than_two_samples_returns_none() {
+        let func = IdeltaFunc::new();
+        assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
+        let one = vec![Sample::new(1000, 5.0)];
+        assert!(func.exec(&one, 0, &Duration::ZERO).is_none());
+    }
+
+    #[test]
+    fn test_idelta_function() {
+        // Create a range value with sample data
+        let samples = vec![
+            Sample::new(1000, 10.0),
+            Sample::new(2000, 15.0),
+            Sample::new(3000, 25.0),
+        ];
+
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples,
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+
+        let matrix = Value::Matrix(vec![range_value]);
+        let result = idelta_test_helper(matrix).unwrap();
+
+        // Should return a matrix with idelta value
+        match result {
+            Value::Matrix(m) => {
+                assert_eq!(m.len(), 1);
+                assert_eq!(m[0].samples.len(), 1);
+                // Idelta should be 25.0 - 15.0 = 10.0
+                assert!((m[0].samples[0].value - 10.0).abs() < 0.001);
+                assert_eq!(m[0].samples[0].timestamp, 3000);
+            }
+            _ => panic!("Expected Matrix result"),
+        }
+    }
+}

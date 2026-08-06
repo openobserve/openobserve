@@ -5,6 +5,12 @@ const { isCloudEnvironment } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: 'parallel' });
 
+// Service accounts are created from a NAME (lowercase slug); the UI
+// synthesizes the stored identifier as `<name>.<org>@sa.internal`
+// (see AddServiceAccount.schema.ts). List rows, delete/update/refresh
+// actions and API endpoints are keyed by that synthesized email.
+const uniqueSaName = () => `sa${Date.now()}x${Math.floor(Math.random() * 10000)}`;
+
 // Service accounts tab (data-test="iam-service-accounts-tab") does not exist on cloud UI
 test.describe("Service Account for API access", () => {
     test.skip(isCloudEnvironment(), 'Service accounts tab not available on cloud UI');
@@ -17,145 +23,156 @@ test.describe("Service Account for API access", () => {
         await page.locator('[data-test="iam-service-accounts-tab"]').waitFor({ state: 'visible', timeout: 10000 });
     }
 
-    test("Error Message displayed if Email Blank", async ({ page }, testInfo) => {
+    test("Error Message displayed if Name Blank", async ({ page }, testInfo) => {
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamURLValidation();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.iamPageAddServiceAccountEmailValidation();
-        
+        await pageManager.iamPage.iamPageAddServiceAccountNameValidation();
+
         testLogger.info('Test completed successfully');
     });
 
     test("Service Account created", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
-        
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
+
         testLogger.info('Test completed successfully');
     });
 
-    test("Service Account not created if Email already exists", async ({ page }, testInfo) => {
+    test("Service Account not created if Name already exists", async ({ page }, testInfo) => {
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterSameEmailServiceAccount();
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
+        await pageManager.iamPage.clickSaveServiceAccount();
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
+        await pageManager.iamPage.clickServiceAccountPopUpClosed();
+
+        // Creating the same name again synthesizes the same identifier email,
+        // so the backend rejects it as an existing user.
+        await pageManager.iamPage.iamPageAddServiceAccount();
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
         await pageManager.iamPage.verifySuccessMessage('User already exists');
-        
+
         testLogger.info('Test completed successfully');
     });
-    
+
     test("Service Account not created if Cancel clicked", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.enterDescriptionSA();
         await pageManager.iamPage.clickCancelServiceAccount();
-        
+
         testLogger.info('Test completed successfully');
     });
 
     test("Service Account Token copied", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickCopyToken();
-        
+
         testLogger.info('Test completed successfully');
     });
-    
+
     test("Service Account Token Pop Up Closed", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
-        
+
         await navigateToBase(page);
         pageManager = new PageManager(page);
-        
+
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
-        
+
         testLogger.info('Test completed successfully');
     });
 
     test("Service Account Created and deleted", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
         pageManager = new PageManager(page);
+        const uniqueEmail = pageManager.iamPage.serviceAccountEmailFor(uniqueName);
 
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.deletedServiceAccount(uniqueEmail);
         await pageManager.iamPage.requestServiceAccountOk();
-        await pageManager.iamPage.verifySuccessMessage('Service Account deleted successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account deleted successfully.');
 
         testLogger.info('Test completed successfully');
     });
 
     test("Service Account Created and not deleted if cancel clicked", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
         pageManager = new PageManager(page);
+        const uniqueEmail = pageManager.iamPage.serviceAccountEmailFor(uniqueName);
 
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
@@ -166,56 +183,58 @@ test.describe("Service Account for API access", () => {
     });
 
     test("Service Account Created and updated details", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
         pageManager = new PageManager(page);
+        const uniqueEmail = pageManager.iamPage.serviceAccountEmailFor(uniqueName);
 
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.updatedServiceAccount(uniqueEmail);
         await pageManager.iamPage.enterDescriptionSA();
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account updated successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account updated successfully.');
 
         testLogger.info('Test completed successfully');
     });
 
     test("Service Account Created and refresh token", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
         pageManager = new PageManager(page);
+        const uniqueEmail = pageManager.iamPage.serviceAccountEmailFor(uniqueName);
 
         await pageManager.iamPage.gotoIamPage();
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
         await pageManager.iamPage.clickServiceAccountPopUpClosed();
         await pageManager.iamPage.reloadServiceAccountPage();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.refreshServiceAccount(uniqueEmail);
         await pageManager.iamPage.requestServiceAccountOk();
-        await pageManager.iamPage.verifySuccessMessage('Service token refreshed successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Token rotated successfully.');
 
         testLogger.info('Test completed successfully');
     });
 
-    test("Token wizard Grant permissions step shows role/group actions", async ({ page }, testInfo) => {
-        const uniqueEmail = `email${Date.now()}_${Math.floor(Math.random() * 10000)}@gmail.com`;
+    test("Token reveal shows grant actions when account has no permissions", async ({ page }, testInfo) => {
+        const uniqueName = uniqueSaName();
         testLogger.testStart(testInfo.title, testInfo.file);
 
         await navigateToBase(page);
@@ -225,17 +244,17 @@ test.describe("Service Account for API access", () => {
         await pageManager.iamPage.iamPageServiceAccountsTab();
         await waitForServiceAccountsPage(page);
         await pageManager.iamPage.iamPageAddServiceAccount();
-        await pageManager.iamPage.enterEmailServiceAccount(uniqueEmail);
+        await pageManager.iamPage.enterNameServiceAccount(uniqueName);
         await pageManager.iamPage.clickSaveServiceAccount();
-        await pageManager.iamPage.verifySuccessMessage('Service Account created successfully.');
+        await pageManager.iamPage.verifySuccessMessage('Service account created successfully.');
 
-        // Advance the token wizard to step 2 (Grant permissions).
-        const nextBtn = page.locator('[data-test="service-accounts-token-next-btn"]');
-        await expect(nextBtn).toBeVisible({ timeout: 10000 });
-        await nextBtn.click();
+        // The token reveal is a single screen now (access is granted in the
+        // create form itself): token snippets + a grant nudge for accounts
+        // created without roles/groups.
+        await expect(page.locator('[data-test="service-accounts-token-step-1"]')).toBeVisible({ timeout: 10000 });
 
         // The two grant actions only render on Enterprise/Cloud (showGroupLink =
-        // isEnterprise || isCloud). On an OSS build step 2 shows a plain hint with
+        // isEnterprise || isCloud). On an OSS build the nudge is a plain hint with
         // no links, so gate-skip the label assertions there instead of failing.
         const roleLink = page.locator('[data-test="service-accounts-list-token-add-to-role"]');
         const groupLink = page.locator('[data-test="service-accounts-list-token-add-to-group"]');
@@ -247,19 +266,19 @@ test.describe("Service Account for API access", () => {
         if (!grantLinksRendered) {
             testLogger.info('Grant links absent (OSS build) — skipping label assertions');
             await page.locator('[data-test="service-accounts-token-done-btn"]').click();
-            test.skip(true, 'Token wizard grant links are Enterprise/Cloud-only (showGroupLink=false on OSS)');
+            test.skip(true, 'Token reveal grant links are Enterprise/Cloud-only (showGroupLink=false on OSS)');
             return;
         }
 
-        // Step 2 offers the two grant actions with the reworded labels.
+        // The grant nudge offers the two actions with the reworded labels.
         await expect(groupLink).toBeVisible();
         await expect(roleLink).toContainText('Assign a role');
         await expect(groupLink).toContainText('Add to a user group');
 
-        // Close the wizard.
+        // Close the token reveal.
         await page.locator('[data-test="service-accounts-token-done-btn"]').click();
 
-        testLogger.info('Grant permissions step verified');
+        testLogger.info('Grant actions verified on token reveal');
     });
 
     test("SRE Agent System Account Protection", async ({ page }, testInfo) => {

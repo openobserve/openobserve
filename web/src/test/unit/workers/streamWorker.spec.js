@@ -61,10 +61,7 @@ describe("streamWorker", () => {
                 ? msgLines[0].slice(7).trim()
                 : msgLines[0].slice(6).trim();
 
-              if (
-                msgLines[1]?.startsWith("data:") ||
-                msgLines[1]?.startsWith("data: ")
-              ) {
+              if (msgLines[1]?.startsWith("data:") || msgLines[1]?.startsWith("data: ")) {
                 const data = extractData(msgLines[1]);
 
                 try {
@@ -90,10 +87,7 @@ describe("streamWorker", () => {
               }
             }
 
-            if (
-              msgLines[0]?.startsWith("data:") ||
-              msgLines[0]?.startsWith("data: ")
-            ) {
+            if (msgLines[0]?.startsWith("data:") || msgLines[0]?.startsWith("data: ")) {
               const data = extractData(msgLines[0]);
               try {
                 // Try to parse as JSON
@@ -210,8 +204,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle event with data", () => {
-      const chunk =
-        'event: search_response\ndata: {"hits":[],"total":100}\n\n';
+      const chunk = 'event: search_response\ndata: {"hits":[],"total":100}\n\n';
 
       handleMessage({
         data: {
@@ -266,8 +259,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle multiple messages in one chunk", () => {
-      const chunk =
-        'data: {"id":1}\n\ndata: {"id":2}\n\ndata: {"id":3}\n\n';
+      const chunk = 'data: {"id":1}\n\ndata: {"id":2}\n\ndata: {"id":3}\n\n';
 
       handleMessage({
         data: {
@@ -314,7 +306,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle invalid JSON in event data", () => {
-      const chunk = 'event: test_event\ndata: {invalid json}\n\n';
+      const chunk = "event: test_event\ndata: {invalid json}\n\n";
 
       handleMessage({
         data: {
@@ -366,8 +358,7 @@ describe("streamWorker", () => {
     });
 
     it("should handle search_response_hits event", () => {
-      const chunk =
-        'event: search_response_hits\ndata: {"hits":[{"_id":"1"}]}\n\n';
+      const chunk = 'event: search_response_hits\ndata: {"hits":[{"_id":"1"}]}\n\n';
 
       handleMessage({
         data: {
@@ -468,7 +459,7 @@ describe("streamWorker", () => {
 
     it("should send error message for processing failures", () => {
       // Simulate a chunk that causes JSON parse error in event
-      const chunk = 'event: test\ndata: {invalid}\n\n';
+      const chunk = "event: test\ndata: {invalid}\n\n";
 
       handleMessage({
         data: {

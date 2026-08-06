@@ -15,23 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="step-anomaly-config tw:h-full"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'"
-  >
+  <div class="step-anomaly-config h-full">
     <div
-      class="step-content tw:px-3 tw:py-4 tw:rounded-lg tw:h-full tw:overflow-y-auto tw:overflow-x-hidden tw:bg-[var(--color-surface-overlay)] tw:border tw:border-[var(--color-border-default)]"
+      class="step-content rounded-default bg-surface-overlay border-border-default h-full overflow-x-hidden overflow-y-auto border px-3 py-4"
     >
-      <OForm ref="formRef">
+      <OForm :form="form">
         <!-- Query Mode Tabs -->
-        <div class="tw:mb-4">
-          <OToggleGroup
-            :model-value="
-              config.query_mode === 'custom_sql' ? 'custom_sql' : 'filters'
-            "
-            @update:model-value="config.query_mode = $event as string"
-            data-test="anomaly-query-tabs"
-          >
+        <div class="mb-4">
+          <OFormToggleGroup name="query_mode" data-test="anomaly-query-tabs">
             <OToggleGroupItem
               v-for="tab in queryTabOptions"
               :key="tab.value"
@@ -40,38 +31,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ tab.label }}
             </OToggleGroupItem>
-          </OToggleGroup>
+          </OFormToggleGroup>
         </div>
 
         <!-- Filters mode -->
-        <div
-          v-if="config.query_mode === 'filters'"
-          class="tw:flex tw:items-start tw:mb-4! tw:pb-0!"
-        >
-          <div
-            class="tw:font-semibold tw:flex tw:items-center"
-            style="width: 178px; min-height: 36px"
-          >
+        <div v-if="queryMode === 'filters'" class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center font-semibold" style="width: 178px; min-height: 36px">
             {{ t("alerts.anomaly.filters") }}
           </div>
           <div style="width: calc(100% - 190px)">
+            <!-- :key must be the array INDEX — the fields bind by index-based
+                 name and do not re-bind, so a stable-id key would leave inputs
+                 shifted on a mid-list delete. -->
             <div
-              v-for="(filter, idx) in config.filters"
+              v-for="(filter, idx) in filterRows"
               :key="idx"
-              class="tw:flex tw:items-center tw:gap-2 tw:mb-2"
+              class="mb-2 flex items-center gap-2"
             >
-              <OSelect
-                v-model="filter.field"
+              <OFormSelect
+                :name="`filters[${idx}].field`"
                 :options="filteredStreamFields"
-                :placeholder="
-                  filter.field ? '' : t('alerts.anomaly.fieldPlaceholder')
-                "
+                :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
                 class="alert-v3-select filter-field-select"
                 style="width: 200px"
                 :loading="loadingFields"
               >
                 <template #empty>
-                  <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                  <div class="text-muted-foreground px-3 py-2">
                     {{
                       config.stream_name
                         ? t("alerts.anomaly.noFieldsFound")
@@ -79,16 +65,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </div>
                 </template>
-              </OSelect>
-              <OSelect
-                v-model="filter.operator"
+              </OFormSelect>
+              <OFormSelect
+                :name="`filters[${idx}].operator`"
                 :options="filterOperators"
                 class="alert-v3-select"
                 style="width: 110px"
               />
-              <OInput
+              <OFormInput
                 v-if="operatorNeedsValue(filter.operator)"
-                v-model="filter.value"
+                :name="`filters[${idx}].value`"
                 :placeholder="t('alerts.placeholders.value')"
                 class="alert-v3-input"
                 style="max-width: 160px"
@@ -100,115 +86,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="close"
               />
             </div>
-            <OButton
-              variant="outline"
-              size="sm-action"
-              class="tw:mt-2"
-              @click="addFilter"
-            >
+            <OButton variant="outline" size="sm-action" class="mt-2" @click="addFilter">
               {{ t("alerts.anomaly.addFilter") }}
             </OButton>
           </div>
         </div>
 
         <!-- Custom SQL mode -->
-        <div
-          v-if="config.query_mode === 'custom_sql'"
-          class="tw:flex tw:items-start tw:mb-4! tw:pb-0!"
-        >
-          <div
-            class="tw:font-semibold tw:flex tw:items-center"
-            style="width: 190px; height: 36px"
-          >
-            SQL <span class="tw:text-red-500 tw:ml-1">*</span>
+        <div v-if="queryMode === 'custom_sql'" class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+            {{ t("alerts.alertDetails.sql") }} <span class="text-status-error-text ml-1">*</span>
           </div>
           <div style="width: calc(100% - 190px)">
             <div
-              class="custom-sql-editor-wrapper tw:h-[140px] tw:rounded tw:overflow-hidden"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tw:border tw:border-white/[0.18]'
-                  : 'tw:border tw:border-black/[0.12]'
-              "
+              class="custom-sql-editor-wrapper rounded-default h-35 overflow-hidden border"
+              :class="hasSqlError ? 'border-input-border-error' : 'border-border-default'"
             >
+              <!-- Bare Monaco: value bridged into the form from the editor's
+                   own change handler so the schema covers it. -->
               <QueryEditor
                 data-test-prefix="anomaly-custom-sql"
-                :query="config.custom_sql || ''"
-                :keywords="allStreamFields"
+                :query="customSql || ''"
+                :keywords="effectiveKeywords"
+                :suggestions="effectiveSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 :show-auto-complete="true"
                 :disable-ai="!config.stream_name"
                 :disable-ai-reason="
-                  !config.stream_name
-                    ? t('alerts.anomaly.selectStreamFirst')
-                    : ''
+                  !config.stream_name ? t('alerts.anomaly.selectStreamFirst') : raw('')
                 "
                 editor-height="100%"
                 data-test="anomaly-custom-sql"
-                @update:query="config.custom_sql = $event"
+                @update:query="onCustomSqlChange"
               />
             </div>
+            <!-- `custom_sql` is a bare editor bridged in via setFieldValue with
+                 no name= binding, so the schema's issue has no field to route to
+                 and THIS div is the only surface. It must mirror the schema's
+                 condition exactly — the schema rejects on `!custom_sql.trim()`,
+                 so a whitespace-only query must light this up too. -->
             <div
-              v-if="!config.custom_sql"
-              class="text-red-8 tw:pt-1"
-              style="font-size: 11px; line-height: 12px"
+              v-if="showSqlErrors && !customSql?.trim()"
+              class="text-input-error-text pt-1 text-xs"
+              data-test="anomaly-custom-sql-required-error"
             >
               {{ t("alerts.anomaly.sqlRequired") }}
             </div>
             <div
-              v-if="hasTimestampAlias"
-              class="text-red-8 tw:pt-1"
+              v-if="showSqlErrors && hasTimestampAlias"
+              class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-custom-sql-timestamp-alias-error"
-              style="font-size: 11px; line-height: 12px"
             >
-              <code>{{
-                store.state.zoConfig.timestamp_column || "_timestamp"
-              }}</code>
-              cannot be used as a column alias. Use
-              <code>time_bucket</code> instead.
+              <!-- Can't reuse alerts.validation.timestampAliasBanned (which
+                   bakes `time_bucket` into its text): the slotted variant needs
+                   both the column AND time_bucket as params. -->
+              <i18n-t keypath="alerts.anomaly.timestampAliasBanned" tag="span">
+                <template #column>
+                  <code>{{ store.state.zoConfig.timestamp_column || raw("_timestamp") }}</code>
+                </template>
+                <template #timeBucket
+                  ><code>{{ raw("time_bucket") }}</code></template
+                >
+              </i18n-t>
             </div>
-            <div
-              class="tw:text-xs tw:mt-1"
-              :class="
-                store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-              "
-            >
-              Query must return two columns: <code>time_bucket</code> and
-              <code>value</code>.
+            <div class="mt-1 text-xs" :class="'text-text-secondary'">
+              <i18n-t keypath="alerts.anomaly.sqlColumnsHint" tag="span">
+                <template #timeBucket
+                  ><code>{{ raw("time_bucket") }}</code></template
+                >
+                <template #valueColumn
+                  ><code>{{ raw("value") }}</code></template
+                >
+              </i18n-t>
             </div>
           </div>
         </div>
 
         <!-- Row: Detection Function + Detection Resolution (filters mode) -->
-        <div
-          v-if="config.query_mode === 'filters'"
-          class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!"
-        >
+        <div v-if="queryMode === 'filters'" class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
           <!-- Detection Function -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            >
               {{ t("alerts.detectionFunction") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
+              <span class="text-status-error-text ml-1">*</span>
             </div>
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <OSelect
-                v-model="config.detection_function"
+            <!-- items-start, not items-center: the field select renders its
+                 validation message inside its own column (OSelect's root is
+                 flex-col), so on error that column grows and centering would
+                 shove the function select down out of line with it. -->
+            <div class="flex items-start gap-2">
+              <OFormSelect
+                name="detection_function"
                 :options="detectionFunctions"
                 data-test="anomaly-detection-function"
                 class="alert-v3-select"
                 style="width: 110px"
                 @update:model-value="onDetectionFunctionChange"
               />
-              <OSelect
-                v-if="
-                  config.detection_function &&
-                  config.detection_function !== 'count'
-                "
-                v-model="config.detection_function_field"
+              <OFormSelect
+                v-if="detectionFunction && detectionFunction !== 'count'"
+                name="detection_function_field"
                 :options="filteredDetectionFields"
                 :placeholder="
-                  config.detection_function_field
-                    ? ''
-                    : t('alerts.anomaly.fieldPlaceholder')
+                  detectionFunctionField ? raw('') : t('alerts.anomaly.fieldPlaceholder')
                 "
                 :loading="loadingFields"
                 data-test="anomaly-detection-function-field"
@@ -216,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 style="width: 140px"
               >
                 <template #empty>
-                  <div class="tw:px-3 tw:py-2 tw:text-muted-foreground">
+                  <div class="text-muted-foreground px-3 py-2">
                     {{
                       config.stream_name
                         ? t("alerts.anomaly.noFieldsFound")
@@ -224,19 +206,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </div>
                 </template>
-              </OSelect>
+              </OFormSelect>
             </div>
           </div>
           <!-- Detection Resolution -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            >
               {{ t("alerts.anomaly.detectionResolution") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-              >
+              <span class="text-status-error-text ml-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -246,17 +226,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:gap-0">
-                <OInput
-                  v-model.number="config.histogram_interval_value"
+              <div class="flex items-center gap-0">
+                <OFormInput
+                  name="histogram_interval_value"
                   type="number"
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-histogram-interval-value"
-                />
-                <OSelect
-                  v-model="config.histogram_interval_unit"
+                >
+                  <!-- Message rendered below at pair width — see histogramIntervalError. -->
+                  <template #error />
+                </OFormInput>
+                <OFormSelect
+                  name="histogram_interval_unit"
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
@@ -266,31 +249,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                v-if="
-                  !config.histogram_interval_value ||
-                  config.histogram_interval_value < 1
-                "
-                class="text-red-8 tw:pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="histogramIntervalError"
+                class="text-input-error-text pt-1 text-xs"
+                data-test="anomaly-histogram-interval-error"
+                role="alert"
               >
-                Field is required!
+                {{ histogramIntervalError }}
               </div>
             </div>
           </div>
         </div>
 
         <!-- Detection Resolution alone (custom_sql mode) -->
-        <div v-else class="tw:flex tw:items-start tw:mb-4! tw:pb-0!">
-          <div
-            class="tw:font-semibold tw:flex tw:items-center"
-            style="width: 190px; height: 36px"
-          >
-            Detection Resolution <span class="tw:text-red-500 tw:ml-1">*</span>
-            <OIcon
-              name="info"
-              size="sm"
-              class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-            >
+        <div v-else class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center font-semibold" style="width: 190px; height: 36px">
+            {{ t("alerts.anomaly.detectionResolution") }}
+            <span class="text-status-error-text ml-1">*</span>
+            <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
               <OTooltip
                 side="right"
                 align="center"
@@ -300,17 +275,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div>
-            <div class="tw:flex tw:items-center tw:gap-0">
-              <OInput
-                v-model.number="config.histogram_interval_value"
+            <div class="flex items-center gap-0">
+              <OFormInput
+                name="histogram_interval_value"
                 type="number"
                 min="1"
                 class="alert-v3-input"
                 style="width: 87px"
                 data-test="anomaly-histogram-interval-value"
-              />
-              <OSelect
-                v-model="config.histogram_interval_unit"
+              >
+                <!-- Message rendered below at pair width — see histogramIntervalError. -->
+                <template #error />
+              </OFormInput>
+              <OFormSelect
+                name="histogram_interval_unit"
                 :options="intervalUnits"
                 label-key="label"
                 value-key="value"
@@ -320,30 +298,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div
-              v-if="
-                !config.histogram_interval_value ||
-                config.histogram_interval_value < 1
-              "
-              class="text-red-8 tw:pt-1"
-              style="font-size: 11px; line-height: 12px"
+              v-if="histogramIntervalError"
+              class="text-input-error-text pt-1 text-xs"
+              data-test="anomaly-histogram-interval-error"
+              role="alert"
             >
-              Field is required!
+              {{ histogramIntervalError }}
             </div>
           </div>
         </div>
 
         <!-- Row: Check Every + Look Back Window -->
-        <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
           <!-- Check Every -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            >
               {{ t("alerts.anomaly.checkEvery") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-              >
+              <span class="text-status-error-text ml-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -353,17 +327,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:gap-0">
-                <OInput
-                  v-model.number="config.schedule_interval_value"
+              <div class="flex items-center gap-0">
+                <OFormInput
+                  name="schedule_interval_value"
                   type="number"
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-schedule-interval-value"
-                />
-                <OSelect
-                  v-model="config.schedule_interval_unit"
+                >
+                  <!-- Message rendered below at pair width — see scheduleIntervalError. -->
+                  <template #error />
+                </OFormInput>
+                <OFormSelect
+                  name="schedule_interval_unit"
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
@@ -373,27 +350,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
               <div
-                v-if="
-                  !config.schedule_interval_value ||
-                  config.schedule_interval_value < 1
-                "
-                class="text-red-8 tw:pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="scheduleIntervalError"
+                class="text-input-error-text pt-1 text-xs"
+                data-test="anomaly-schedule-interval-error"
+                role="alert"
               >
-                Field is required!
+                {{ scheduleIntervalError }}
               </div>
             </div>
           </div>
           <!-- Look Back Window -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            >
               {{ t("alerts.anomaly.lookBackWindow") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-              >
+              <span class="text-status-error-text ml-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -403,17 +376,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OIcon>
             </div>
             <div>
-              <div class="tw:flex tw:items-center tw:gap-0">
-                <OInput
-                  v-model.number="config.detection_window_value"
+              <div class="flex items-center gap-0">
+                <OFormInput
+                  name="detection_window_value"
                   type="number"
                   min="1"
                   class="alert-v3-input"
                   style="width: 87px"
                   data-test="anomaly-detection-window-value"
-                />
-                <OSelect
-                  v-model="config.detection_window_unit"
+                >
+                  <!-- Message rendered below at pair width — see detectionWindowError. -->
+                  <template #error />
+                </OFormInput>
+                <OFormSelect
+                  name="detection_window_unit"
                   :options="intervalUnits"
                   label-key="label"
                   value-key="value"
@@ -422,75 +398,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="anomaly-detection-window-unit"
                 />
               </div>
+              <!-- This is the single error message for this field. -->
               <div
-                v-if="
-                  !config.detection_window_value ||
-                  config.detection_window_value < 1
-                "
-                class="text-red-8 tw:pt-1"
-                style="font-size: 11px; line-height: 12px"
+                v-if="detectionWindowError"
+                class="text-input-error-text pt-1 text-xs"
                 data-test="anomaly-detection-window-error"
+                role="alert"
               >
-                Field is required!
+                {{ detectionWindowError }}
               </div>
             </div>
           </div>
         </div>
 
         <!-- Row: Training Window + Retrain Every -->
-        <div class="tw:grid tw:grid-cols-2 tw:gap-3 tw:items-start tw:mb-4! tw:pb-0!">
+        <div class="mb-4! grid grid-cols-2 items-start gap-3 pb-0!">
           <!-- Training Window -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            >
               {{ t("alerts.trainingWindow") }}
-              <span class="tw:text-red-500 tw:ml-1">*</span>
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-              >
+              <span class="text-status-error-text ml-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip side="right" align="center" max-width="300px">
-                  <template #content><span style="font-size: 14px">
-                    How many days of historical data to use for training. Min 1
-                    day. Seasonality is auto-detected: &lt;7 days → hour-of-day;
-                    ≥7 days → hour-of-day + day-of-week.
-                  </span></template>
+                  <!-- Uses a #content slot (not :content) so the font-size
+                       span survives. -->
+                  <template #content
+                    ><span style="font-size: var(--text-sm)">{{
+                      t("alerts.anomaly.trainingWindowTooltip")
+                    }}</span></template
+                  >
                 </OTooltip>
               </OIcon>
             </div>
-            <div class="tw:flex tw:flex-col">
-              <OInput
-                v-model.number="config.training_window_days"
+            <div class="flex flex-col">
+              <OFormInput
+                name="training_window_days"
                 type="number"
                 :min="1"
                 data-test="anomaly-training-window"
                 class="alert-v3-input"
                 style="width: 87px"
               />
-              <span
-                class="static-text tw:text-xs"
-                :class="
-                  store.state.theme === 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-400'
-                "
-              >
-                days (seasonality:
+              <span class="static-text text-xs" :class="'text-text-secondary'">
                 {{
-                  config.training_window_days >= 7
-                    ? t("alerts.anomaly.seasonalityWeekly")
-                    : t("alerts.anomaly.seasonalityDaily")
-                }})
+                  t("alerts.anomaly.trainingWindowSeasonality", {
+                    seasonality:
+                      Number(trainingWindowDays) >= 7
+                        ? t("alerts.anomaly.seasonalityWeekly")
+                        : t("alerts.anomaly.seasonalityDaily"),
+                  })
+                }}
               </span>
             </div>
           </div>
           <!-- Retrain Every -->
-          <div class="tw:flex tw:flex-row tw:items-start tw:gap-2">
-            <div class="tw:w-[170px] tw:min-w-[170px] tw:min-h-8 tw:leading-[1.4] tw:text-[length:inherit] tw:font-semibold">
+          <div class="flex flex-row items-start gap-2">
+            <div
+              class="min-h-8 w-42.5 min-w-42.5 text-[length:inherit] leading-[1.4] font-semibold"
+            >
               {{ t("alerts.anomaly.retrainEvery") }}
-              <OIcon
-                name="info"
-                size="sm"
-                class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-              >
+              <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
                 <OTooltip
                   side="right"
                   align="center"
@@ -499,8 +468,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </OIcon>
             </div>
-            <OSelect
-              v-model="config.retrain_interval_days"
+            <OFormSelect
+              name="retrain_interval_days"
               :options="retrainIntervalOptions"
               label-key="label"
               value-key="value"
@@ -512,80 +481,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Threshold / Sensitivity -->
-        <div class="tw:flex tw:items-start tw:mb-4! tw:pb-0!">
-          <div
-            class="tw:font-semibold tw:flex tw:items-center"
-            style="width: 190px; padding-top: 4px"
-          >
+        <div class="mb-4! flex items-start pb-0!">
+          <div class="flex items-center pt-1 font-semibold" style="width: 190px">
             {{ t("alerts.sensitivity") }}
-            <OIcon
-              name="info"
-              size="sm"
-              class="tw:ml-1 tw:cursor-pointer tw:text-gray-400"
-            >
-                <OTooltip
-                  side="right"
-                  align="center"
-                  max-width="300px"
-                  :content="t('alerts.anomaly.sensitivityTooltip')"
-                />
+            <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+              <OTooltip
+                side="right"
+                align="center"
+                max-width="300px"
+                :content="t('alerts.anomaly.sensitivityTooltip')"
+              />
             </OIcon>
           </div>
           <div style="width: calc(100% - 190px)">
             <!-- Chart + Slider container -->
-            <div class="tw:w-full">
+            <div class="w-full">
               <!-- Header row: range labels + load button -->
-              <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                <div class="tw:flex tw:items-center tw:gap-2">
-                  <span class="tw:text-xs tw:text-gray-400">{{
+              <div class="mb-2 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="text-text-secondary text-xs">{{
                     t("alerts.anomaly.anomalyScoreRange")
                   }}</span>
-                  <span
-                    class="tw:font-semibold tw:text-xs"
-                    data-test="anomaly-threshold-range-label"
-                    >{{ config.threshold_min ?? 0 }} –
-                    {{ config.threshold }}</span
+                  <span class="text-xs font-semibold" data-test="anomaly-threshold-range-label"
+                    >{{ thresholdRange.min ?? 0 }} – {{ thresholdRange.max }}</span
                   >
                 </div>
                 <OButton
                   variant="outline"
                   size="sm-action"
-                  :disabled="
-                    !config.stream_name ||
-                    (config.query_mode === 'custom_sql' && !config.custom_sql)
-                  "
+                  :disabled="!config.stream_name || (queryMode === 'custom_sql' && !customSql)"
                   data-test="anomaly-sensitivity-load-btn"
                   @click="loadPreview"
                 >
                   {{ t("alerts.anomaly.loadData") }}
-                  <OTooltip v-if="!config.stream_name" :content="t('alerts.anomaly.selectStreamFirstTooltip')" />
                   <OTooltip
-                    v-else-if="config.query_mode === 'custom_sql' && !config.custom_sql"
+                    v-if="!config.stream_name"
+                    :content="t('alerts.anomaly.selectStreamFirstTooltip')"
+                  />
+                  <OTooltip
+                    v-else-if="queryMode === 'custom_sql' && !customSql"
                     :content="t('alerts.anomaly.enterSqlFirst')"
                   />
                 </OButton>
               </div>
 
               <!-- Chart + Vertical Slider row -->
-              <div class="tw:flex tw:gap-3">
+              <div class="flex gap-3">
                 <!-- Time series chart -->
-                <div class="tw:min-h-45 tw:relative tw:flex-1">
+                <div class="relative min-h-45 flex-1">
                   <div
                     v-if="!previewActive"
-                    class="tw:w-full tw:h-45 tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded tw:border tw:border-dashed tw:border-(--o2-border)"
-                    :class="
-                      store.state.theme === 'dark'
-                        ? 'tw:text-gray-400'
-                        : 'tw:text-gray-400'
-                    "
+                    class="rounded-default border-border-default flex h-45 w-full flex-col items-center justify-center border border-dashed"
+                    :class="'text-text-secondary'"
                     data-test="anomaly-sensitivity-empty"
                   >
-                    <OIcon
-                      name="bar-chart"
-                      size="lg"
-                      class="tw:mb-2 tw:opacity-40"
-                    />
-                    <span class="tw:text-xs">{{
+                    <OIcon name="bar-chart" size="lg" class="mb-2 opacity-40" />
+                    <span class="text-xs">{{
                       !config.stream_name
                         ? t("alerts.anomaly.selectStreamFirst")
                         : t("alerts.anomaly.clickLoadDataHint")
@@ -599,18 +550,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :variablesData="{}"
                     :forceLoad="true"
                     searchType="ui"
-                    style="height: 180px; width: 100%"
+                    class="w-full"
+                    style="height: 180px"
                     data-test="anomaly-sensitivity-chart"
                     @series-data-update="onSeriesDataUpdate"
                   />
                 </div>
 
                 <!-- Vertical dual-handle range slider -->
-                <div
-                  class="tw:flex tw:flex-col tw:items-center tw:w-15 tw:shrink-0"
-                >
-                  <ORange
-                    v-model="thresholdRange"
+                <div class="flex w-15 shrink-0 flex-col items-center">
+                  <OFormRange
+                    name="threshold_range"
                     :min="0"
                     :max="100"
                     :step="1"
@@ -619,15 +569,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     label-always
                     markers
                     :marker-labels="[
-                      { value: 0, label: '0' },
-                      { value: 25, label: '25' },
-                      { value: 50, label: '50' },
-                      { value: 75, label: '75' },
-                      { value: 100, label: '100' },
+                      { value: 0, label: raw('0') },
+                      { value: 25, label: raw('25') },
+                      { value: 50, label: raw('50') },
+                      { value: 75, label: raw('75') },
+                      { value: 100, label: raw('100') },
                     ]"
-                    class="sensitivity-range-slider tw:mt-[14px] tw:h-[145px]! tw:[--color-slider-track-fill:var(--o2-primary-color)] tw:[--color-slider-thumb:var(--o2-primary-color)] tw:[--color-slider-thumb-border:white] tw:[--color-slider-value:var(--o2-text-secondary)]"
+                    class="sensitivity-range-slider mt-3.5 h-36.25! [--color-slider-thumb-border:white] [--color-slider-thumb:var(--color-accent)] [--color-slider-track-fill:var(--color-accent)] [--color-slider-value:var(--color-text-secondary)]"
                     data-test="anomaly-threshold-range"
-                    @update:model-value="onThresholdRangeChange"
                   />
                 </div>
               </div>
@@ -640,15 +589,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  nextTick,
-  ref,
-  watch,
-  type PropType,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import useSqlSuggestions from "@/composables/useSuggestions";
+import { computed, defineComponent, ref, watch, type PropType } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamService from "@/services/stream";
 import {
@@ -661,13 +604,23 @@ import QueryEditor from "@/components/QueryEditor.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
-import ORange from "@/lib/forms/Range/ORange.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormRange from "@/lib/forms/Range/OFormRange.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import {
+  createAnomalyDetectionConfigSchema,
+  anomalyDetectionConfigDefaults,
+  hasTimestampAliasInSql,
+  makeAnomalyFilterRow,
+  type AnomalyDetectionConfigForm,
+  type AnomalyFilterRow,
+} from "./AnomalyDetectionConfig.schema";
 
 export default defineComponent({
   name: "AnomalyDetectionConfig",
@@ -676,15 +629,15 @@ export default defineComponent({
     QueryEditor,
     PanelSchemaRenderer,
     OButton,
-    OToggleGroup,
     OToggleGroupItem,
+    OFormToggleGroup,
     OIcon,
     OTooltip,
-    OInput,
-    OSelect,
     OForm,
-    ORange,
-},
+    OFormInput,
+    OFormSelect,
+    OFormRange,
+  },
 
   props: {
     config: {
@@ -694,59 +647,162 @@ export default defineComponent({
   },
 
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const formRef = ref<any>(null);
 
-    const queryTabOptions = [
-      { label: "Builder", value: "filters" },
-      { label: "SQL", value: "custom_sql" },
-    ];
+    // Option labels go through t() inside a computed so they re-resolve on a
+    // locale change (a plain const would freeze them at mount locale).
+    // "SQL" stays a literal — a proper noun, not translatable copy.
+    const queryTabOptions = computed(() => [
+      { label: t("alerts.queryBuilder"), value: "filters" },
+      { label: raw("SQL"), value: "custom_sql" },
+    ]);
 
     const filterOperators = ANOMALY_FILTER_OPERATORS;
-    const detectionFunctions = [
-      "count",
-      "avg",
-      "sum",
-      "min",
-      "max",
-      "p50",
-      "p95",
-      "p99",
-    ];
-    const intervalUnits = [
-      { label: "Minutes", value: "m" },
-      { label: "Hours", value: "h" },
-    ];
-    const retrainIntervalOptions = [
-      { label: "Never", value: 0 },
-      { label: "1 day", value: 1 },
-      { label: "7 days", value: 7 },
-      { label: "14 days", value: 14 },
-    ];
+    const detectionFunctions = ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
+    const intervalUnits = computed(() => [
+      { label: t("common.minutes"), value: "m" },
+      { label: t("common.hours"), value: "h" },
+    ]);
+    // Fixed enum labels, not dynamic counts — plain keys, no pluralization.
+    const retrainIntervalOptions = computed(() => [
+      { label: t("alerts.anomaly.retrainNever"), value: 0 },
+      { label: t("alerts.anomaly.retrainOneDay"), value: 1 },
+      { label: t("alerts.anomaly.retrainSevenDays"), value: 7 },
+      { label: t("alerts.anomaly.retrainFourteenDays"), value: 14 },
+    ]);
+
+    const getTimestampColumn = () => store.state.zoConfig.timestamp_column || "_timestamp";
+
+    // The parent (useAlertForm.saveAnomalyDetection) owns the save + payload;
+    // this step's submit exists purely to run the schema (the exposed
+    // validate() drives form.handleSubmit()), so onSubmit is a no-op.
+    const anomalyDetectionConfigSchema = createAnomalyDetectionConfigSchema(t, getTimestampColumn);
+
+    const form = useOForm<AnomalyDetectionConfigForm>({
+      defaultValues: anomalyDetectionConfigDefaults(props.config),
+      schema: anomalyDetectionConfigSchema,
+      onSubmit: () => {},
+    });
+
+    // Reactive reads via form.useStore.
+    const queryMode = form.useStore((s: any) => s.values.query_mode);
+    const customSql = form.useStore((s: any) => s.values.custom_sql);
+    const filterRows = form.useStore((s: any): AnomalyFilterRow[] => s.values.filters ?? []);
+    const detectionFunction = form.useStore((s: any) => s.values.detection_function);
+    const detectionFunctionField = form.useStore((s: any) => s.values.detection_function_field);
+    const histogramIntervalValue = form.useStore((s: any) => s.values.histogram_interval_value);
+    const histogramIntervalUnit = form.useStore((s: any) => s.values.histogram_interval_unit);
+    const detectionWindowValue = form.useStore((s: any) => s.values.detection_window_value);
+    const trainingWindowDays = form.useStore((s: any) => s.values.training_window_days);
+    const thresholdRange = form.useStore(
+      (s: any) => s.values.threshold_range ?? { min: 0, max: 100 },
+    );
+    // Bare-widget errors (Monaco custom_sql + the data-test div) render only
+    // after the first submit attempt, same timing as the wrappers.
+    const showSqlErrors = form.useStore((s: any) => s.submissionAttempts > 0);
+
+    // The interval controls are composite "number + unit" fields: a ~5.5rem
+    // OFormInput glued to a unit OFormSelect. OFormInput renders its message
+    // INSIDE the number field's own width, which wraps it into a ragged column
+    // and grows the field, pushing the unit select out of line. An empty #error
+    // slot suppresses the built-in message and we render it in a full-width
+    // sibling below the pair, reading the same field errors OFormInput surfaces.
+    const fieldError = (path: string) =>
+      form.useStore((s: any) => firstFieldError(s.fieldMeta?.[path]?.errors ?? []));
+    const histogramIntervalError = fieldError("histogram_interval_value");
+    const scheduleIntervalError = fieldError("schedule_interval_value");
+    const detectionWindowError = fieldError("detection_window_value");
+
+    // Write-back watch (form → props.config): the parent reads props.config
+    // directly (live anomalyPreviewSql computed + saveAnomalyDetection payload),
+    // so the form writes back into the parent-owned object. Numeric fields are
+    // re-coerced so the parent payload keeps number types.
+    const toModelNumber = (v: unknown) => {
+      if (v === "" || v === null || v === undefined) return v;
+      const n = Number(v);
+      return Number.isNaN(n) ? v : n;
+    };
+
+    const formValues = form.useStore((s: any) => s.values);
+    watch(
+      formValues,
+      (v: any) => {
+        const cfg = props.config;
+        if (!cfg || !v) return;
+        cfg.query_mode = v.query_mode;
+        // Replace the array only when its contents changed, so the deep
+        // preview watcher below doesn't refire on unrelated field edits.
+        if (JSON.stringify(cfg.filters ?? []) !== JSON.stringify(v.filters ?? [])) {
+          cfg.filters = (v.filters ?? []).map((f: any) => ({ ...f }));
+        }
+        cfg.custom_sql = v.custom_sql;
+        cfg.detection_function = v.detection_function;
+        cfg.detection_function_field = v.detection_function_field;
+        cfg.histogram_interval_value = toModelNumber(v.histogram_interval_value);
+        cfg.histogram_interval_unit = v.histogram_interval_unit;
+        cfg.schedule_interval_value = toModelNumber(v.schedule_interval_value);
+        cfg.schedule_interval_unit = v.schedule_interval_unit;
+        cfg.detection_window_value = toModelNumber(v.detection_window_value);
+        cfg.detection_window_unit = v.detection_window_unit;
+        cfg.training_window_days = toModelNumber(v.training_window_days);
+        cfg.retrain_interval_days = toModelNumber(v.retrain_interval_days);
+        cfg.threshold_min = v.threshold_range?.min ?? 0;
+        cfg.threshold = v.threshold_range?.max ?? 100;
+      },
+      { deep: true },
+    );
+
+    // Async edit-prefill replaces the whole config object → re-seed via
+    // form.reset(record).
+    watch(
+      () => props.config,
+      (cfg) => {
+        form.reset(anomalyDetectionConfigDefaults(cfg));
+      },
+    );
 
     // Check if the custom SQL uses the timestamp column name as an alias
-    const hasTimestampAlias = computed(() => {
-      const sql = props.config.custom_sql;
-      if (!sql || props.config.query_mode !== "custom_sql") return false;
-      const tsCol = store.state.zoConfig.timestamp_column || "_timestamp";
-      const escaped = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      return new RegExp(
-        `\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`,
-        "i",
-      ).test(sql);
-    });
+    // (display gating for the bare-editor error div; the schema enforces it).
+    const hasTimestampAlias = computed(
+      () =>
+        queryMode.value === "custom_sql" &&
+        hasTimestampAliasInSql(customSql.value || "", getTimestampColumn()),
+    );
+
+    // Bare Monaco has no field binding, so it never gets the red border the
+    // OForm* wrappers paint from field state. This drives that border, post-
+    // submit only, over the same conditions the two error divs render on.
+    const hasSqlError = computed(
+      () => showSqlErrors.value && (!customSql.value?.trim() || hasTimestampAlias.value),
+    );
+
+    // Bridge the bare Monaco editor's value into the form so the schema
+    // covers it.
+    const onCustomSqlChange = (sql: string) => {
+      form.setFieldValue("custom_sql", sql);
+    };
 
     // Build default SQL template for a given stream name and histogram interval
     const buildDefaultSql = (
       streamName: string,
-      intervalValue: number,
+      intervalValue: number | string,
       intervalUnit: string,
     ) =>
       `SELECT histogram(_timestamp, '${intervalValue}${intervalUnit}') AS time_bucket, count(*) AS value\nFROM "${streamName}"\nGROUP BY time_bucket\nORDER BY time_bucket`;
 
     // Stream fields for filter field selector and detection function field
     const allStreamFields = ref<string[]>([]);
+    // Same completion machinery every other SQL editor in the app uses, so this
+    // one also gets SQL keywords, the O2 functions and the server function
+    // catalog rather than bare field names.
+    const {
+      autoCompleteData,
+      effectiveKeywords,
+      effectiveSuggestions,
+      updateFieldKeywords,
+      resolveFieldValues,
+    } = useSqlSuggestions();
     const numericStreamFields = ref<string[]>([]); // only numeric types for avg/sum/min/max/pXX
     const filteredStreamFields = ref<string[]>([]);
     const filteredDetectionFields = ref<string[]>([]);
@@ -772,8 +828,16 @@ export default defineComponent({
     const loadStreamFields = async () => {
       const streamName = props.config.stream_name;
       const streamType = props.config.stream_type;
+
+      // Field VALUES are looked up under "org|streamType|streamName|field", so
+      // the resolver returns nothing at all until this is set.
+      autoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+      autoCompleteData.value.streamType = String(streamType ?? "");
+      autoCompleteData.value.streamName = String(streamName ?? "");
+
       if (!streamName || !streamType) {
         allStreamFields.value = [];
+        updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
@@ -792,6 +856,10 @@ export default defineComponent({
             ? schema.uds_schema
             : schema.schema || schema.fields || [];
         allStreamFields.value = fieldsArray.map((f: any) => f.name).sort();
+        // The two failure branches below already cleared the keywords; without
+        // this the success branch never set them, so the SQL editor offered
+        // functions and keywords but not one field of the selected stream.
+        updateFieldKeywords(fieldsArray);
         numericStreamFields.value = fieldsArray
           .filter((f: any) => {
             const t: string = f.field_type || f.data_type || f.type || "";
@@ -800,13 +868,12 @@ export default defineComponent({
           .map((f: any) => f.name)
           .sort();
         filteredStreamFields.value = allStreamFields.value;
-        filteredDetectionFields.value = requiresNumericField(
-          props.config.detection_function,
-        )
+        filteredDetectionFields.value = requiresNumericField(detectionFunction.value as string)
           ? numericStreamFields.value
           : allStreamFields.value;
       } catch {
         allStreamFields.value = [];
+        updateFieldKeywords([]);
         numericStreamFields.value = [];
         filteredStreamFields.value = [];
         filteredDetectionFields.value = [];
@@ -819,9 +886,7 @@ export default defineComponent({
       update(() => {
         const needle = val.toLowerCase();
         filteredStreamFields.value = needle
-          ? allStreamFields.value.filter((f) =>
-              f.toLowerCase().includes(needle),
-            )
+          ? allStreamFields.value.filter((f) => f.toLowerCase().includes(needle))
           : allStreamFields.value;
       });
     };
@@ -829,7 +894,7 @@ export default defineComponent({
     const filterDetectionFieldOptions = (val: string, update: any) => {
       update(() => {
         const needle = val.toLowerCase();
-        const base = requiresNumericField(props.config.detection_function)
+        const base = requiresNumericField(detectionFunction.value as string)
           ? numericStreamFields.value
           : allStreamFields.value;
         filteredDetectionFields.value = needle
@@ -840,22 +905,18 @@ export default defineComponent({
 
     const onDetectionFunctionChange = (fn: string) => {
       if (fn === "count") {
-        props.config.detection_function_field = "";
+        form.setFieldValue("detection_function_field", "");
       }
       // Refresh available fields based on whether the new function needs numeric fields.
-      const base = requiresNumericField(fn)
-        ? numericStreamFields.value
-        : allStreamFields.value;
+      const base = requiresNumericField(fn) ? numericStreamFields.value : allStreamFields.value;
       filteredDetectionFields.value = base;
       // Clear the selected field if it's no longer valid for the new function.
       if (
         requiresNumericField(fn) &&
-        props.config.detection_function_field &&
-        !numericStreamFields.value.includes(
-          props.config.detection_function_field,
-        )
+        form.state.values.detection_function_field &&
+        !numericStreamFields.value.includes(form.state.values.detection_function_field as string)
       ) {
-        props.config.detection_function_field = "";
+        form.setFieldValue("detection_function_field", "");
       }
     };
 
@@ -865,14 +926,17 @@ export default defineComponent({
         loadStreamFields();
         // Pre-fill default SQL when switching to custom_sql mode with a selected stream
         if (
-          props.config.query_mode === "custom_sql" &&
+          form.state.values.query_mode === "custom_sql" &&
           streamName &&
-          !props.config.custom_sql
+          !form.state.values.custom_sql
         ) {
-          props.config.custom_sql = buildDefaultSql(
-            streamName as string,
-            props.config.histogram_interval_value ?? 5,
-            props.config.histogram_interval_unit ?? "m",
+          form.setFieldValue(
+            "custom_sql",
+            buildDefaultSql(
+              streamName as string,
+              (form.state.values.histogram_interval_value as any) ?? 5,
+              (form.state.values.histogram_interval_unit as string) ?? "m",
+            ),
           );
         }
       },
@@ -880,88 +944,47 @@ export default defineComponent({
     );
 
     // When switching to custom_sql mode, seed a default query if one isn't set
-    watch(
-      () => props.config.query_mode,
-      (mode) => {
-        if (
-          mode === "custom_sql" &&
-          props.config.stream_name &&
-          !props.config.custom_sql
-        ) {
-          props.config.custom_sql = buildDefaultSql(
+    watch(queryMode, (mode) => {
+      if (mode === "custom_sql" && props.config.stream_name && !form.state.values.custom_sql) {
+        form.setFieldValue(
+          "custom_sql",
+          buildDefaultSql(
             props.config.stream_name,
-            props.config.histogram_interval_value ?? 5,
-            props.config.histogram_interval_unit ?? "m",
-          );
-        }
-      },
-    );
+            (form.state.values.histogram_interval_value as any) ?? 5,
+            (form.state.values.histogram_interval_unit as string) ?? "m",
+          ),
+        );
+      }
+    });
 
     // Sync histogram interval changes into the custom SQL histogram() call
-    watch(
-      () => [
-        props.config.histogram_interval_value,
-        props.config.histogram_interval_unit,
-      ],
-      ([newValue, newUnit]) => {
-        if (
-          props.config.query_mode !== "custom_sql" ||
-          !props.config.custom_sql
-        )
-          return;
-        props.config.custom_sql = props.config.custom_sql.replace(
+    watch([histogramIntervalValue, histogramIntervalUnit], ([newValue, newUnit]) => {
+      if (form.state.values.query_mode !== "custom_sql" || !form.state.values.custom_sql) return;
+      form.setFieldValue(
+        "custom_sql",
+        (form.state.values.custom_sql as string).replace(
           /histogram\(\s*_timestamp\s*,\s*'[^']+'\s*\)/gi,
           `histogram(_timestamp, '${newValue}${newUnit}')`,
-        );
-      },
-    );
+        ),
+      );
+    });
 
+    // Structural mutations go through the form.
     const addFilter = () => {
-      props.config.filters.push({ field: "", operator: "=", value: "" });
+      form.pushFieldValue("filters", makeAnomalyFilterRow());
     };
 
     const removeFilter = (idx: number) => {
-      props.config.filters.splice(idx, 1);
+      form.removeFieldValue("filters", idx);
     };
 
+    // The parent (AddAlert wizard via useAlertForm) still calls
+    // anomalyStep2Ref.validate() to gate Next/Save — drive it through
+    // form.handleSubmit() so it runs the schema and flips submissionAttempts
+    // so the post-submit errors render.
     const validate = async (): Promise<boolean> => {
-      const formValid = formRef.value ? await formRef.value.validate() : true;
-      if (
-        props.config.query_mode === "custom_sql" &&
-        !props.config.custom_sql
-      ) {
-        return false;
-      }
-      if (hasTimestampAlias.value) {
-        return false;
-      }
-      if (
-        !props.config.histogram_interval_value ||
-        props.config.histogram_interval_value < 1
-      ) {
-        return false;
-      }
-      if (
-        !props.config.schedule_interval_value ||
-        props.config.schedule_interval_value < 1
-      ) {
-        return false;
-      }
-      if (
-        !props.config.detection_window_value ||
-        props.config.detection_window_value < 1
-      ) {
-        return false;
-      }
-      if (
-        props.config.query_mode === "filters" &&
-        props.config.detection_function &&
-        props.config.detection_function !== "count" &&
-        !props.config.detection_function_field
-      ) {
-        return false;
-      }
-      return formValid;
+      await form.handleSubmit();
+      return form.state.isValid;
     };
 
     // ── Data Preview chart ──────────────────────────────────────────────────
@@ -970,6 +993,8 @@ export default defineComponent({
     const previewPanelSchema = ref<any>(null);
     const previewTimeObj = ref<any>(null);
 
+    // Reads props.config, which the write-back watch above keeps in sync with
+    // the form — same values the parent's own preview/save read.
     const buildPreviewSql = () => {
       let sql: string;
       if (props.config.query_mode === "custom_sql") {
@@ -987,14 +1012,8 @@ export default defineComponent({
             props.config.detection_function_field || "*",
           );
           const filterLines = (props.config.filters || [])
-            .filter(
-              (f: any) =>
-                f.field && (operatorNeedsValue(f.operator) ? f.value : true),
-            )
-            .map(
-              (f: any) =>
-                `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`,
-            );
+            .filter((f: any) => f.field && (operatorNeedsValue(f.operator) ? f.value : true))
+            .map((f: any) => `  AND ${buildAnomalyFilterExpression(f.field, f.operator, f.value)}`);
           const where = filterLines.length
             ? [
                 "WHERE",
@@ -1065,12 +1084,12 @@ export default defineComponent({
           },
           mark_line: [
             {
-              name: "max threshold",
+              name: t("alerts.anomaly.maxThresholdMarkLine"),
               type: "yAxis",
               value: String(thresholdRange.value.max),
             },
             {
-              name: "min threshold",
+              name: t("alerts.anomaly.minThresholdMarkLine"),
               type: "yAxis",
               value: String(thresholdRange.value.min),
             },
@@ -1132,7 +1151,7 @@ export default defineComponent({
     };
 
     // Auto-refresh when Look Back Window, Detection Resolution, filters, or
-    // detection function changes
+    // detection function changes (props.config stays in sync via write-back)
     let previewRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     watch(
       () => [
@@ -1156,36 +1175,12 @@ export default defineComponent({
       { deep: true },
     );
 
-    // ── Sensitivity slider ──────────────────────────────────────────────────
-    const thresholdRange = ref<{ min: number; max: number }>({
-      min: props.config.threshold_min ?? 0,
-      max: props.config.threshold ?? 100,
-    });
-
-    const onThresholdRangeChange = (val: { min: number; max: number }) => {
-      props.config.threshold_min = val.min;
-      props.config.threshold = val.max;
-    };
-
-    // sync range when config changes externally
-    watch(
-      () => [props.config.threshold, props.config.threshold_min],
-      ([max, min]) => {
-        thresholdRange.value = {
-          min: (min as number) ?? 0,
-          max: (max as number) ?? 100,
-        };
-      },
-    );
-
     const previewHasData = ref(false);
     const seriesDataMax = ref<number | null>(null);
 
     const onSeriesDataUpdate = (data: any) => {
       const series = data?.options?.series ?? data?.series ?? [];
-      previewHasData.value = series.some(
-        (s: any) => Array.isArray(s.data) && s.data.length > 0,
-      );
+      previewHasData.value = series.some((s: any) => Array.isArray(s.data) && s.data.length > 0);
 
       // Find the max y value across all series so we can convert the 0-100
       // slider percentages into actual y-axis values for the mark lines.
@@ -1195,8 +1190,7 @@ export default defineComponent({
         for (const point of s.data) {
           // Points can be [x, y], plain number, or { value: [x, y] / y }
           let raw: any = point;
-          if (raw !== null && typeof raw === "object" && !Array.isArray(raw))
-            raw = raw.value;
+          if (raw !== null && typeof raw === "object" && !Array.isArray(raw)) raw = raw.value;
           const v: any = Array.isArray(raw) ? raw[1] : raw;
           if (typeof v === "number" && isFinite(v) && v > max) max = v;
         }
@@ -1210,8 +1204,7 @@ export default defineComponent({
       if (!previewPanelSchema.value) return;
       const yMax = seriesDataMax.value;
       // If data is loaded, map 0-100% → actual y values; otherwise fall back to raw %
-      const toValue = (pct: number) =>
-        yMax !== null ? (pct / 100) * yMax : pct;
+      const toValue = (pct: number) => (yMax !== null ? (pct / 100) * yMax : pct);
       previewPanelSchema.value.config.mark_line = [
         { name: "", type: "yAxis", value: String(toValue(maxPct)) },
         { name: "", type: "yAxis", value: String(toValue(minPct)) },
@@ -1230,9 +1223,10 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       store,
-      formRef,
+      form,
       queryTabOptions,
       filterOperators,
       operatorNeedsValue,
@@ -1240,6 +1234,9 @@ export default defineComponent({
       intervalUnits,
       retrainIntervalOptions,
       allStreamFields,
+      effectiveKeywords,
+      resolveFieldValues,
+      effectiveSuggestions,
       filteredStreamFields,
       filteredDetectionFields,
       loadingFields,
@@ -1248,8 +1245,20 @@ export default defineComponent({
       removeFilter,
       validate,
       hasTimestampAlias,
+      hasSqlError,
+      queryMode,
+      customSql,
+      filterRows,
+      detectionFunction,
+      detectionFunctionField,
+      detectionWindowValue,
+      trainingWindowDays,
+      showSqlErrors,
+      histogramIntervalError,
+      scheduleIntervalError,
+      detectionWindowError,
+      onCustomSqlChange,
       thresholdRange,
-      onThresholdRangeChange,
       previewActive,
       previewKey,
       previewPanelSchema,

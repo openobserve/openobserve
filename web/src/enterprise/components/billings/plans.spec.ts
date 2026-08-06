@@ -19,7 +19,6 @@ import Plans from "./plans.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
-import config from "@/aws-exports";
 import * as zincutils from "@/utils/zincutils";
 import { nextTick } from "vue";
 
@@ -87,7 +86,6 @@ vi.mock("@/enterprise/components/billings/TrialPeriod.vue", () => ({
 describe("Plans Component", () => {
   let wrapper: any;
   let mockRouter: any;
-  let mockNotify: any;
 
   const mockSubscriptionResponse = {
     data: {
@@ -105,12 +103,8 @@ describe("Plans Component", () => {
       push: vi.fn(),
     };
 
-    mockNotify = vi.fn();
-
     // Setup mocks with default successful responses
-    (BillingService.list_subscription as any).mockResolvedValue(
-      mockSubscriptionResponse,
-    );
+    (BillingService.list_subscription as any).mockResolvedValue(mockSubscriptionResponse);
     (BillingService.resume_subscription as any).mockResolvedValue({
       data: { success: true },
     });
@@ -148,9 +142,6 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
@@ -298,10 +289,7 @@ describe("Plans Component", () => {
 
     await wrapper.vm.onLoadSubscription("pay-as-you-go");
 
-    expect(BillingService.get_hosted_url).toHaveBeenCalledWith(
-      "default",
-      "pay-as-you-go",
-    );
+    expect(BillingService.get_hosted_url).toHaveBeenCalledWith("default", "pay-as-you-go");
     expect(window.location.href).toBe("https://hosted.example.com");
   });
 
@@ -361,10 +349,7 @@ describe("Plans Component", () => {
 
     await wrapper.vm.onChangePaymentDetail("cust_123");
 
-    expect(BillingService.get_session_url).toHaveBeenCalledWith(
-      "default",
-      "cust_123",
-    );
+    expect(BillingService.get_session_url).toHaveBeenCalledWith("default", "cust_123");
     expect(window.location.href).toBe("https://session.example.com");
   });
 
@@ -399,25 +384,19 @@ describe("Plans Component", () => {
   // Test 20: retrieveHostedPage method - successful
   it("should reload page when hosted page state is succeeded", async () => {
     // Test the behavior without relying on component state
-    const mockHostedResponse = { id: "hp_123" };
     const response = {
       data: { data: { hosted_page: { state: "succeeded" } } },
     };
 
     // Mock window.location.reload
-    const reloadSpy = vi
-      .spyOn(window.location, "reload")
-      .mockImplementation(() => {});
+    const reloadSpy = vi.spyOn(window.location, "reload").mockImplementation(() => {});
 
     // Mock the service call
     (BillingService.retrieve_hosted_page as any).mockResolvedValue(response);
 
     // Test the function behavior by simulating what it should do
     const simulateRetrieveHostedPage = async () => {
-      const res = await BillingService.retrieve_hosted_page(
-        "default",
-        "hp_123",
-      );
+      const res = await BillingService.retrieve_hosted_page("default", "hp_123");
       if (res.data.data.hosted_page.state === "succeeded") {
         window.location.reload();
       }
@@ -425,10 +404,7 @@ describe("Plans Component", () => {
 
     await simulateRetrieveHostedPage();
 
-    expect(BillingService.retrieve_hosted_page).toHaveBeenCalledWith(
-      "default",
-      "hp_123",
-    );
+    expect(BillingService.retrieve_hosted_page).toHaveBeenCalledWith("default", "hp_123");
     expect(reloadSpy).toHaveBeenCalled();
 
     reloadSpy.mockRestore();
@@ -464,9 +440,6 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
@@ -602,15 +575,9 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
-
-    // Clear previous calls
-    mockNotify.mockClear();
 
     const errorTypes = [
       { error: new Error("Simple error"), expectedMessage: "Simple error" },
@@ -619,9 +586,7 @@ describe("Plans Component", () => {
 
     for (let i = 0; i < errorTypes.length; i++) {
       const errorType = errorTypes[i];
-      (BillingService.list_subscription as any).mockRejectedValue(
-        errorType.error,
-      );
+      (BillingService.list_subscription as any).mockRejectedValue(errorType.error);
 
       await freshWrapper.vm.loadSubscription();
 
@@ -655,9 +620,7 @@ describe("Plans Component", () => {
 
   // Test 33: Error handling without try-catch
   it("should handle promise rejections in async methods", async () => {
-    (BillingService.list_subscription as any).mockRejectedValue(
-      new Error("Async error"),
-    );
+    (BillingService.list_subscription as any).mockRejectedValue(new Error("Async error"));
 
     // This should not throw an unhandled promise rejection
     await expect(wrapper.vm.loadSubscription()).resolves.toBeUndefined();

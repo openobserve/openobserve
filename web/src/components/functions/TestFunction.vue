@@ -1,163 +1,126 @@
 <template>
-  <div
-    data-test="test-function-section"
-    class="tw:flex tw:items-center tw:flex-wrap tw:pb-2"
-  >
-    <div
-      data-test="test-function-query-section"
-      class="test-function-query-container tw:w-[100%]"
-    >
+  <div data-test="test-function-section" class="flex flex-wrap items-center pb-2">
+    <div data-test="test-function-query-section" class="test-function-query-container w-full">
       <FullViewContainer
-          data-test="test-function-query-title-section"
-          name="function"
-          v-model:is-expanded="expandState.query"
-          :label="t('common.query')"
-        >
-          <template #left>
-            <OIcon
-              v-if="!!sqlQueryErrorMsg"
-              name="info-outline"
-              class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
-              size="sm"
-            >
-              <OTooltip
-                side="right"
-                align="center"
-                :side-offset="10"
-                :content="sqlQueryErrorMsg"
-              />
-            </OIcon>
-          </template>
-          <template #right>
-            <OButton
-              variant="primary"
-              size="sm-action"
-              :disabled="!selectedStream.name || !inputQuery || loading.events"
-              @click="getResults"
-            >
-              <OIcon name="search" size="sm"  class="tw:mr-1" />
-              {{ t('search.runQuery') }}
-            </OButton>
-          </template>
-        </FullViewContainer>
-        <div
-          class="tw:flex tw:items-center tw:flex-wrap tw:py-2 tw:w-[100%]"
-          :class="
-            store.state.theme === 'dark' ? 'tw:bg-gray-950' : ' tw:bg-white'
-          "
-          v-show="expandState.query"
-          data-test="test-function-query-editor-section"
-        >
-          <div class="function-stream-select-input tw:w-[120px] tw:pr-3">
-            <div
-              class="tw:text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
-              "
-            >
-              {{ t("alerts.streamType") + " *" }}
-            </div>
-
-            <OSelect
-              v-model="selectedStream.type"
-              :options="streamTypes"
-              labelKey="label"
-              valueKey="value"
-              @update:model-value="updateStreams()"
-              style="width: 100px"
-            />
-          </div>
-          <div class="function-stream-select-input tw:w-[300px]">
-            <div
-              class="tw:text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
-              "
-            >
-              {{ t("alerts.stream_name") + " *" }}
-            </div>
-            <OSelect
-              v-model="selectedStream.name"
-              :options="filteredStreams"
-              :loading="isFetchingStreams"
-              :placeholder="t('pipeline.selectStream')"
-              searchable
-              style="min-width: 120px"
-              @search="filterStreams"
-              @update:model-value="updateQuery"
-            />
-          </div>
-          <div class="functions-duration-input tw:w-[330px]">
-            <div
-              class="tw:text-[12px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'tw:text-gray-200'
-                  : 'tw:text-gray-700'
-              "
-            >
-              {{ t("common.duration") + " *" }}
-            </div>
-
-            <DateTime
-              label="Start Time"
-              class="tw:py-1 tw:w-full"
-              auto-apply
-              :default-type="dateTime.type"
-              :default-absolute-time="{
-                startTime: dateTime.startTime,
-                endTime: dateTime.endTime,
-              }"
-              :default-relative-time="dateTime.relativeTimePeriod"
-              data-test="logs-search-bar-date-time-dropdown"
-              @on:date-change="updateDateTime"
-            />
-          </div>
-
-          <div
-            class="tw:text-[12px] tw:w-[100%] tw:mt-1"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-700'
-            "
+        data-test="test-function-query-title-section"
+        name="function"
+        v-model:is-expanded="expandState.query"
+        :label="t('common.query')"
+      >
+        <template #left>
+          <OIcon
+            v-if="!!sqlQueryErrorMsg"
+            name="info-outline"
+            class="text-status-error-text mx-1 cursor-pointer"
+            size="sm"
           >
-            {{ t("common.query") + " *" }}
-          </div>
-          <div
-            class="tw:border-[1px] tw:border-gray-200 tw:relative tw:w-[100%]"
-          >
-            <query-editor
-              data-test="vrl-function-test-sql-editor"
-              ref="queryEditorRef"
-              editor-id="test-function-query-input-editor"
-              class="tw:w-full tw:min-h-40"
-              v-model:query="inputQuery"
-              language="sql"
-              :keywords="effectiveKeywords"
-              :suggestions="effectiveSuggestions"
-              @focus="onQueryEditorFocus"
-              @blur="onQueryEditorBlur"
+            <OTooltip
+              side="right"
+              align="center"
+              :side-offset="10"
+              :content="raw(sqlQueryErrorMsg)"
             />
-            <div
-              v-if="!inputQuery && queryEditorPlaceholderFlag"
-              class="query-editor-placeholder-overlay tw:absolute tw:top-0 tw:left-0 tw:right-0 tw:bottom-0 tw:flex tw:items-start tw:p-[0.1875rem_0.5rem_0_2.15rem] tw:pointer-events-none tw:z-1 tw:select-none"
+          </OIcon>
+        </template>
+        <template #right>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :disabled="!selectedStream.name || !inputQuery || loading.events"
+            @click="getResults"
+          >
+            <OIcon name="search" size="sm" class="mr-1" />
+            {{ t("search.runQuery") }}
+          </OButton>
+        </template>
+      </FullViewContainer>
+      <div
+        class="bg-surface-base flex w-full flex-wrap items-center gap-x-3 py-2"
+        v-show="expandState.query"
+        data-test="test-function-query-editor-section"
+      >
+        <div class="function-stream-select-input w-25">
+          <div class="text-text-label text-xs">
+            {{ t("alerts.streamType") + " *" }}
+          </div>
+
+          <OSelect
+            v-model="selectedStream.type"
+            :options="streamTypes"
+            labelKey="label"
+            valueKey="value"
+            @update:model-value="updateStreams()"
+            style="width: 100px"
+          />
+        </div>
+        <div class="function-stream-select-input w-75">
+          <div class="text-text-label text-xs">
+            {{ t("alerts.stream_name") + " *" }}
+          </div>
+          <OSelect
+            v-model="selectedStream.name"
+            :options="filteredStreams"
+            :loading="isFetchingStreams"
+            :placeholder="t('pipeline.selectStream')"
+            searchable
+            style="min-width: 120px"
+            @search="filterStreams"
+            @update:model-value="updateQuery"
+          />
+        </div>
+        <div class="functions-duration-input w-82.5">
+          <div class="text-text-label text-xs">
+            {{ t("common.duration") + " *" }}
+          </div>
+
+          <DateTime
+            :label="t('alerts.startTime')"
+            class="w-full py-1"
+            auto-apply
+            :default-type="dateTime.type"
+            :default-absolute-time="{
+              startTime: dateTime.startTime,
+              endTime: dateTime.endTime,
+            }"
+            :default-relative-time="dateTime.relativeTimePeriod"
+            data-test="logs-search-bar-date-time-dropdown"
+            @on:date-change="updateDateTime"
+          />
+        </div>
+
+        <div class="text-text-label mt-1 w-full text-xs">
+          {{ t("common.query") + " *" }}
+        </div>
+        <div class="relative w-full">
+          <QueryEditor
+            data-test="vrl-function-test-sql-editor"
+            ref="queryEditorRef"
+            editor-id="test-function-query-input-editor"
+            class="min-h-40 w-full"
+            v-model:query="inputQuery"
+            language="sql"
+            :keywords="effectiveKeywords"
+            :suggestions="effectiveSuggestions"
+            :field-value-resolver="resolveFieldValues"
+            @focus="onQueryEditorFocus"
+            @blur="onQueryEditorBlur"
+          />
+          <div
+            v-if="!inputQuery && queryEditorPlaceholderFlag"
+            class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start p-[0.1875rem_0.5rem_0_2.15rem] select-none"
+          >
+            <span
+              class="query-editor-placeholder-typewriter text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] text-ellipsis whitespace-nowrap text-[var(--text-sm)]"
+              >{{ queryEditorPlaceholder }}</span
             >
-              <span class="query-editor-placeholder-typewriter tw:[font-family:monospace] tw:text-[var(--text-base)] tw:[line-height:1.3125rem] tw:text-[#a0aec0] tw:whitespace-nowrap tw:overflow-hidden tw:text-ellipsis" :class="store.state.theme === 'dark' ? 'tw:text-[#718096]' : ''">{{ queryEditorPlaceholder }}</span>
-            </div>
-            <div
-              class="tw:text-red-500 tw:p-1 invalid-sql-error tw:min-h-[22px]"
+          </div>
+          <div class="text-status-error-text invalid-sql-error min-h-5.5 p-1">
+            <span v-show="!!sqlQueryErrorMsg" class="text-compact">
+              {{ t("function.errorLabel") }} {{ sqlQueryErrorMsg }}</span
             >
-              <span v-show="!!sqlQueryErrorMsg" class="tw:text-[13px]">
-                Error: {{ sqlQueryErrorMsg }}</span
-              >
-            </div>
           </div>
         </div>
+      </div>
     </div>
   </div>
   <div>
@@ -172,55 +135,60 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-text-secondary text-compact ml-2 flex items-center font-bold"
           >
             <OSpinner size="xs" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
           <OIcon
             v-if="!!eventsErrorMsg"
             name="info-outline"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
               side="right"
               align="center"
               :side-offset="10"
-              :content="eventsErrorMsg"
+              :content="raw(eventsErrorMsg)"
             />
           </OIcon>
         </template>
         <template #right>
-           <!-- o2 ai context add button in the test function -->
-           <O2AIContextAddBtn
+          <!-- o2 ai context add button in the test function -->
+          <O2AIContextAddBtn
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24px"
             imageWidth="24px"
-            :class="'tw:px-2 tw:mr-4'"
-            style="width: 32px !important; height: 32px !important; min-width: 32px !important; min-height: 32px !important;"
-           />
-          </template>
+            :class="'mr-4 px-2'"
+            style="
+              width: 32px !important;
+              height: 32px !important;
+              min-width: 32px !important;
+              min-height: 32px !important;
+            "
+          />
+        </template>
       </FullViewContainer>
       <div
         v-show="expandState.events"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="relative"
         data-test="test-function-input-editor-section"
       >
-        <query-editor
+        <QueryEditor
           data-test="vrl-function-test-events-editor"
           ref="eventsEditorRef"
           editor-id="test-function-events-input-editor"
-          class="test-function-input-editor tw:w-full tw:min-h-40"
+          class="test-function-input-editor min-h-40 w-full"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="inputEvents"
           language="json"
         />
       </div>
     </div>
-    <div class="tw:mt-2">
+    <div class="mt-2">
       <FullViewContainer
         name="function"
         v-model:is-expanded="expandState.output"
@@ -231,10 +199,10 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="tw:text-sm tw:font-medium text-weight-bold tw:flex tw:items-center tw:text-gray-500 tw:ml-2 tw:text-[13px]"
+            class="text-text-secondary text-compact ml-2 flex items-center text-sm font-bold font-medium"
           >
             <OSpinner size="xs" />
-            <div class="tw:relative tw:top-[2px]">
+            <div class="relative top-0.5">
               {{ t("confirmDialog.loading") }}
             </div>
           </div>
@@ -242,14 +210,14 @@
           <OIcon
             v-if="!!outputEventsErrorMsg"
             name="info-outline"
-            class="tw:text-red-600 tw:mx-1 tw:cursor-pointer"
+            class="text-status-error-text mx-1 cursor-pointer"
             size="sm"
           >
             <OTooltip
               side="right"
               align="center"
               :side-offset="10"
-              :content="outputEventsErrorMsg"
+              :content="raw(outputEventsErrorMsg)"
             />
           </OIcon>
         </template>
@@ -257,34 +225,23 @@
 
       <div
         v-show="expandState.output"
-        class="tw:border-[1px] tw:border-gray-200 tw:relative"
+        class="relative"
         data-test="test-function-output-editor-section"
       >
         <div
           v-if="!outputEvents"
-          class="tw:absolute tw:z-10 tw:flex tw:flex-col tw:justify-center tw:items-center tw:w-full tw:h-full tw:opacity-90"
+          class="absolute z-10 flex h-full w-full flex-col items-center justify-center opacity-90"
         >
-          <OIcon
-            name="lightbulb"
-            size="xl"
-            class="tw:text-orange-400"
-          />
-          <div
-            class="tw:text-[15px] tw:text-gray-600"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tw:text-gray-200'
-                : 'tw:text-gray-600'
-            "
-          >
+          <OIcon name="lightbulb" size="xl" class="text-status-warning-text" />
+          <div class="text-text-secondary text-sm">
             {{ outputMessage }}
           </div>
         </div>
-        <query-editor
+        <QueryEditor
           data-test="vrl-function-test-events-output-editor"
           ref="outputEventsEditorRef"
           editor-id="test-function-events-output-editor"
-          class="test-function-output-editor tw:w-full tw:min-h-40"
+          class="test-function-output-editor min-h-40 w-full"
           :style="{ height: `calc((100vh - (260px + ${heightOffset}px)) / 2)` }"
           v-model:query="outputEvents"
           language="json"
@@ -299,14 +256,14 @@
 import {
   onBeforeMount,
   ref,
-  defineExpose,
   computed,
   nextTick,
   onMounted,
   defineAsyncComponent,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
+import { isJsFunction } from "@/utils/functionLanguage";
 import DateTime from "@/components/DateTime.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import useStreams from "@/composables/useStreams";
@@ -315,11 +272,10 @@ import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
-import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
+import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
-import AppTabs from "@/components/common/AppTabs.vue";
 import jstransform from "@/services/jstransform";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -338,38 +294,22 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  // Optional sample events to seed the "Events" editor with. When omitted, the
+  // generic log sample is used (pipelines / functions page). Workflows pass the
+  // fired-alert sample payload so the VRL author sees the real structure.
+  sampleEvents: {
+    type: Array,
+    default: undefined,
+  },
 });
 
-const emit = defineEmits(["function-error","sendToAiChat"]);
+const emit = defineEmits(["function-error", "sendToAiChat"]);
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const inputQuery = ref<string>("");
 const inputEvents = ref<string>("");
 const outputEvents = ref<string>("");
-
-const dummyEvents = {
-  data: {
-    results: [
-      {
-        event: {
-          _timestamp: 1735128523652186,
-          job: "test",
-          level: "info",
-          log: "test message for openobserve",
-        },
-      },
-      {
-        event: {
-          log: "test message for openobserve",
-        },
-        message: "Error in event",
-      },
-    ],
-  },
-};
 
 const originalOutputEvents = ref<any>("");
 
@@ -377,12 +317,19 @@ const eventsErrorMsg = ref<string>("");
 
 const queryEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
-const { onFocus: _sqlOnFocus, onBlur: _sqlOnBlur, onQueryChange: _sqlOnQueryChange } =
-  useSqlEditorDiagnostics({
-    queryEditorRef,
-    sqlMode: computed(() => true),
-    query: inputQuery,
-  });
+// Server-error highlight ranges, forwarded to the SQL editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef,
+  sqlMode: computed(() => true),
+  query: inputQuery,
+  externalErrors: sqlErrorRanges,
+});
 
 const onQueryEditorFocus = () => {
   queryEditorPlaceholderFlag.value = false;
@@ -399,6 +346,14 @@ const outputEventsEditorRef = ref<InstanceType<typeof QueryEditor>>();
 
 const outputEventsErrorMsg = ref<string>("");
 
+// The language the user picked on the Transform Type toggle. Every "failed to
+// apply …" message interpolates this — hardcoding "VRL" told JS authors their
+// JavaScript function failed as VRL. Reactive so flipping the toggle re-labels
+// an error already on screen.
+const functionLanguage = computed(() =>
+  isJsFunction(props.vrlFunction) ? t("function.javascript") : t("function.vrl"),
+);
+
 const loading = ref({
   events: false,
   output: false,
@@ -411,14 +366,15 @@ const selectedStream = ref<{
   type: "logs" | "metrics" | "traces";
 }>({ name: "", type: "logs" });
 
-const { getStreams, getStream } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams, getStream } = useStreams(t);
 
 const { buildQueryPayload } = useQuery();
 
 const streamTypes = [
-  { label: "Logs", value: "logs", icon: "description" },
-  { label: "Metrics", value: "metrics", icon: "bar-chart" },
-  { label: "Traces", value: "traces", icon: "activity" },
+  { label: t("common.logs"), value: "logs", icon: "description" },
+  { label: t("common.metrics"), value: "metrics", icon: "bar-chart" },
+  { label: t("common.traces"), value: "traces", icon: "activity" },
 ];
 
 const isFetchingStreams = ref(false);
@@ -426,8 +382,6 @@ const isFetchingStreams = ref(false);
 const store = useStore();
 
 let parser: any = null;
-
-const { t } = useI18n();
 
 const expandState = ref({
   stream: true,
@@ -449,6 +403,7 @@ const {
   getSuggestions,
   updateFieldKeywords,
   updateStreamKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 // ─── Query editor typewriter placeholder ─────────────────────────────
@@ -464,7 +419,6 @@ const { placeholder: queryEditorPlaceholder } = useQueryPlaceholder(
 
 const sqlQueryErrorMsg = ref<string>("");
 
-
 const streams = ref([]);
 
 onBeforeMount(async () => {
@@ -478,13 +432,15 @@ onMounted(() => {
 
 const setEventsEditor = () => {
   setTimeout(() => {
-    inputEvents.value = JSON.stringify(
-      JSON.parse(
-        `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
-      ),
-      null,
-      2,
-    );
+    // Caller-supplied sample (e.g. the workflow alert payload) takes precedence;
+    // otherwise fall back to the generic log sample.
+    const sample =
+      props.sampleEvents && props.sampleEvents.length
+        ? props.sampleEvents
+        : JSON.parse(
+            `[{"_timestamp":1735128523652186,"job":"test","level":"info","log":"test message for openobserve"},{"_timestamp":1735128522644223,"job":"test","level":"info","log":"test message for openobserve"}]`,
+          );
+    inputEvents.value = JSON.stringify(sample, null, 2);
   }, 300);
 };
 
@@ -495,19 +451,6 @@ const outputMessage = computed(() => {
 
   return "";
 });
-
-const areInputValid = () => {
-  if (!inputQuery.value) {
-    toast({
-      variant: "error",
-      message: t("function.pleaseEnterQuery"),
-    });
-    sqlQueryErrorMsg.value = t("function.pleaseEnterQuery");
-    return false;
-  }
-
-  return true;
-};
 
 const importSqlParser = async () => {
   const useSqlParser: any = await import("@/composables/useParser");
@@ -522,9 +465,7 @@ const filterStreams = (val: string) => {
 const filterColumns = (options: any[], val: string) => {
   if (val === "") return [...options];
   const value = val.toLowerCase();
-  return options.filter(
-    (column: any) => column.toLowerCase().indexOf(value) > -1,
-  );
+  return options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
 };
 
 const updateQuery = () => {
@@ -562,10 +503,11 @@ watch(
     }
     try {
       const stream = await getStream(name, selectedStream.value.type, true);
-      streamFields.value = stream?.schema?.map((f: any) => ({
-        ...f,
-        dataType: f.type,
-      })) || [];
+      streamFields.value =
+        stream?.schema?.map((f: any) => ({
+          ...f,
+          dataType: f.type,
+        })) || [];
       updateFieldKeywords(streamFields.value);
     } catch {
       // ignore — field suggestions are best-effort
@@ -578,7 +520,8 @@ watch(inputQuery, (value) => {
   _sqlOnQueryChange();
   autoCompleteData.value.query = value;
   autoCompleteData.value.cursorIndex = queryEditorRef.value?.getCursorIndex() ?? -1;
-  autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete;
+  // Ref may be unmounted; fall back to a no-op to match popup.open's non-optional type.
+  autoCompleteData.value.popup.open = queryEditorRef.value?.triggerAutoComplete ?? (() => {});
   autoCompleteData.value.org = store.state.selectedOrganization.identifier;
   autoCompleteData.value.streamType = selectedStream.value.type;
   autoCompleteData.value.streamName = selectedStream.value.name;
@@ -615,11 +558,14 @@ const getResults = async () => {
       ? getConsumableRelativeTime(dateTime.value.relativeTimePeriod)
       : dateTime.value;
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: selectedStream.value.name,
-    timestamps,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: selectedStream.value.name,
+      timestamps,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -633,29 +579,40 @@ const getResults = async () => {
     .search({
       org_identifier: store.state.selectedOrganization.identifier,
       query,
-      page_type: "logs",
+      page_type: selectedStream.value.type,
     })
     .then((res: any) => {
       expandState.value.stream = false;
       expandState.value.query = false;
       expandState.value.events = true;
-      inputEvents.value = JSON.stringify(
-        JSON.parse(JSON.stringify(res.data.hits)),
-        null,
-        2,
-      );
+      inputEvents.value = JSON.stringify(JSON.parse(JSON.stringify(res.data.hits)), null, 2);
       sqlQueryErrorMsg.value = "";
+      sqlErrorRanges.value = [];
     })
     .catch((err: any) => {
       sqlQueryErrorMsg.value = err.response?.data?.message
         ? err.response?.data?.message
         : "Invalid SQL Query";
 
+      // Locate the offending token in the SQL and squiggle it in the editor.
+      rangesFromServerError({
+        code: err.response?.data?.code,
+        message: err.response?.data?.message,
+        errorDetail: err.response?.data?.error_detail,
+        sqlMode: true,
+        query: inputQuery.value,
+        streamName: selectedStream.value?.name,
+      }).then((ranges) => {
+        sqlErrorRanges.value = ranges;
+      });
+
       // Show error only if it is not real time alert
       // This case happens when user enters invalid query and then switches to real time alert
       toast({
         variant: "error",
-        message: "Invalid SQL Query : " + err.response?.data?.message,
+        message: t("toastMessages.functions.invalidSqlQueryDetail", {
+          error: err.response?.data?.message,
+        }),
       });
     })
     .finally(() => {
@@ -670,7 +627,7 @@ const isInputValid = () => {
     eventsErrorMsg.value = `Invalid events: ${e?.message}`;
     toast({
       variant: "error",
-      message: eventsErrorMsg.value,
+      message: raw(eventsErrorMsg.value),
     });
     return false;
   }
@@ -681,18 +638,20 @@ const processTestResults = async (results: any) => {
   expandState.value.output = true;
   originalOutputEvents.value = JSON.stringify(results?.data?.results);
 
-  // Clear any previous function error shown in the parent
-  emit("function-error", "");
+  const rows = results?.data?.results || [];
 
-  const processedEvents =
-    results?.data?.results.map((event: any) => event.event || event.events) ||
-    [];
+  // Only a *syntax* error fails the request outright; a runtime throw comes back
+  // on a 200 with the message attached per event. Forward those to the parent's
+  // error section — emitting "" here unconditionally cleared it, so a runtime
+  // error showed nowhere but a hover tooltip while the editor displayed the
+  // untransformed events, which reads as success. Deduped: every event usually
+  // trips the same throw.
+  const rowErrors = [...new Set(rows.map((row: any) => row?.message?.trim()).filter(Boolean))];
+  emit("function-error", rowErrors.join("\n"));
 
-  outputEvents.value = JSON.stringify(
-    JSON.parse(JSON.stringify(processedEvents)),
-    null,
-    2,
-  );
+  const processedEvents = rows.map((event: any) => event.event || event.events);
+
+  outputEvents.value = JSON.stringify(JSON.parse(JSON.stringify(processedEvents)), null, 2);
 
   await nextTick();
   setTimeout(() => {
@@ -702,13 +661,12 @@ const processTestResults = async (results: any) => {
 
 const handleTestError = (err: any) => {
   const rawErrMsg = err.response?.data?.message || "Error in testing function";
-  const isJSFunction = String(props.vrlFunction.transType) === '1';
 
   // Display the raw error message from the backend without modification
   // The backend now extracts detailed error information from rquickjs
-  outputEventsErrorMsg.value = isJSFunction
-    ? "JavaScript error - see details below"
-    : "Error while transforming results";
+  outputEventsErrorMsg.value = isJsFunction(props.vrlFunction)
+    ? t("function.testErrorJs")
+    : t("function.testErrorVrl");
 
   toast({
     variant: "error",
@@ -796,7 +754,9 @@ function getLineRanges(object: any) {
       ranges.push({
         startLine: startLine + 1,
         endLine: endLine + 1,
-        error: `Error: Failed to apply VRL Function.\n${object.message}`,
+        error: `${t("function.testApplyFailedEvent", {
+          language: functionLanguage.value,
+        })}\n${object.message}`,
       }); // Monaco uses 1-based indexing
     }
 
@@ -804,12 +764,13 @@ function getLineRanges(object: any) {
   } catch (e) {
     console.log("Error in getLineRanges", e);
   }
+  return undefined;
 }
 
 function highlightSpecificEvent() {
   try {
-    const errorEvents = JSON.parse(originalOutputEvents.value).filter(
-      (event: any) => event.message?.trim(),
+    const errorEvents = JSON.parse(originalOutputEvents.value).filter((event: any) =>
+      event.message?.trim(),
     );
     const errorEventRanges: any[] = [];
 
@@ -820,7 +781,9 @@ function highlightSpecificEvent() {
       }
     });
     if (errorEventRanges.length) {
-      outputEventsErrorMsg.value = "Failed to apply VRL Function on few events";
+      outputEventsErrorMsg.value = t("function.testApplyFailedSome", {
+        language: functionLanguage.value,
+      });
     }
 
     if (outputEventsEditorRef.value)
@@ -837,15 +800,16 @@ const sendToAiChat = (value: any) => {
 defineExpose({
   testFunction,
   sendToAiChat,
-  store
+  store,
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(lib-override): compact run-query button + full-width date-time button (child DOM) */
 .test-function-query-container :deep(.test-function-run-query-btn) {
-  padding: 2px 8px !important;
-  font-size: 11px !important;
-  margin: 1px 2px !important;
+  padding: 0.125rem 0.5rem !important;
+  font-size: var(--text-2xs) !important;
+  margin: 1px 0.125rem !important;
 }
 
 .functions-duration-input :deep(.date-time-button) {

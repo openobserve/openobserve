@@ -1,15 +1,12 @@
 <template>
-  <div
-    class="tw:h-[calc(100vh-3.75rem)] tw:flex tw:min-h-0"
-    :class="store.state.theme === 'dark' ? 'tw:bg-(--o2-primary-background)' : ''"
-  >
-    <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:min-w-0">
-      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0">
-        <query-editor
+  <div class="dark:bg-surface-base flex h-[calc(100vh-3.75rem)] min-h-0">
+    <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+      <div class="flex min-h-0 flex-1 flex-col">
+        <QueryEditor
           data-test="common-json-editor"
           ref="queryEditorRef"
           editor-id="common-json-editor"
-          class="tw:flex-1 tw:min-h-0 tw:h-full"
+          class="h-full min-h-0 flex-1"
           :debounceTime="300"
           v-model:query="jsonContent"
           language="json"
@@ -19,41 +16,39 @@
 
       <!-- Display validation errors -->
       <div
-        v-if="validationErrors.length > 0"
+        v-if="localValidationErrors.length > 0"
         data-test="common-json-editor-validation-errors"
-        class="tw:p-3 tw:text-red-500 tw:shrink-0 tw:max-h-50 tw:overflow-y-auto"
+        class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
-        <div class="tw:font-bold tw:mb-2">Please fix the following issues:</div>
-        <ul class="tw:ml-3">
-          <li v-for="(error, index) in validationErrors" :key="index">
+        <div class="mb-2 font-bold">{{ t("common.pleaseFixIssues") }}</div>
+        <ul class="ml-3">
+          <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
           </li>
         </ul>
       </div>
 
-      <div class="tw:flex tw:justify-end tw:gap-2 tw:p-3 tw:shrink-0">
+      <div class="flex shrink-0 justify-end gap-2 p-3">
         <OButton
           variant="outline"
           size="sm-action"
           @click="$emit('close')"
           data-test="json-editor-cancel"
-        >{{ t('common.cancel') }}</OButton>
+          >{{ t("common.cancel") }}</OButton
+        >
         <OButton
           variant="primary"
           size="sm-action"
           @click="saveChanges"
           data-test="json-editor-save"
-        >{{ t('common.save') }}</OButton>
+          >{{ t("common.save") }}</OButton
+        >
       </div>
     </div>
     <!-- o2aichat enabled -->
-    <div
-      v-if="store.state.isAiChatEnabled"
-      class="tw:ml-2 tw:w-[25vw] tw:h-full"
-      :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'"
-    >
+    <div v-if="store.state.isAiChatEnabled" class="ml-2 h-full w-[25vw]">
       <O2AIChat
-        class="tw:h-full"
+        class="h-full"
         :is-open="store.state.isAiChatEnabled"
         @close="store.state.isAiChatEnabled = false"
       />
@@ -62,20 +57,27 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import {
+  defineComponent,
+  ref,
+  onMounted,
+  watch,
+  computed,
+  defineAsyncComponent,
+  type PropType,
+} from "vue";
+import { type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import O2AIChat from "../O2AIChat.vue";
 import config from "@/aws-exports";
-import { ChatMessage, ChatHistoryEntry } from "@/ts/interfaces/chat";
-import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OButton from "@/lib/core/Button/OButton.vue";
+import useTheme from "@/composables/useTheme";
 
 export default defineComponent({
   name: "JsonEditor",
   components: {
-    QueryEditor: defineAsyncComponent(() => import('@/components/CodeQueryEditor.vue')),
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     O2AIChat,
     OButton,
   },
@@ -85,7 +87,7 @@ export default defineComponent({
       required: true,
     },
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
     type: {
@@ -101,31 +103,42 @@ export default defineComponent({
       type: Boolean,
       required: false,
       default: false,
-    }
+    },
   },
   emits: ["close", "saveJson"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
+    const { isDark } = useTheme();
     const jsonContent = ref("");
     const isValidJson = ref(true);
     const queryEditorRef = ref();
-    const { pipelineObj } = useDragAndDrop();
-    const validationErrors = ref<any[]>(props.validationErrors || []);
+    const localValidationErrors = ref<any[]>(props.validationErrors || []);
     const storedFields = ref<any>({});
 
     // Define protected fields based on type
     const getProtectedFields = (type: string) => {
       switch (type) {
-        case 'pipelines':
-          return ['pipeline_id', 'org', 'name'];
-        case 'alerts':
-          const baseFields = ['id', 'name', 'org_id', 'last_triggered_at', 'last_satisfied_at', 'owner', 'last_edited_by', 'createdAt', 'updatedAt'];
+        case "pipelines":
+          return ["pipeline_id", "org", "name"];
+        case "alerts": {
+          const baseFields = [
+            "id",
+            "name",
+            "org_id",
+            "last_triggered_at",
+            "last_satisfied_at",
+            "owner",
+            "last_edited_by",
+            "createdAt",
+            "updatedAt",
+          ];
           // If editing an existing alert, also protect stream-related fields
           if (props.isEditing) {
-            return [...baseFields, 'stream_name', 'stream_type', 'is_real_time'];
+            return [...baseFields, "stream_name", "stream_type", "is_real_time"];
           }
           return baseFields;
+        }
         // Add more cases for other types
         default:
           return [];
@@ -140,7 +153,7 @@ export default defineComponent({
         const protectedFieldChanges: string[] = [];
 
         // Check for changes in protected fields
-        protectedFields.value.forEach(field => {
+        protectedFields.value.forEach((field) => {
           if (storedFields.value[field] && newContent[field] !== storedFields.value[field]) {
             protectedFieldChanges.push(field);
           }
@@ -148,15 +161,18 @@ export default defineComponent({
 
         if (protectedFieldChanges.length > 0) {
           // Add validation errors for changed protected fields
-          validationErrors.value = [
-            ...validationErrors.value.filter(err => !err.startsWith('Cannot modify')),
-            ...protectedFieldChanges.map(field => `Cannot modify ${field} field directly , will be reverted to the original value`)
+          localValidationErrors.value = [
+            ...localValidationErrors.value.filter((err) => !err.startsWith("Cannot modify")),
+            ...protectedFieldChanges.map(
+              (field) =>
+                `Cannot modify ${field} field directly , will be reverted to the original value`,
+            ),
           ];
 
           // Revert the changes by restoring protected fields
           const revertedContent = {
             ...newContent,
-            ...storedFields.value
+            ...storedFields.value,
           };
 
           // Update the editor content with reverted changes
@@ -168,15 +184,17 @@ export default defineComponent({
         jsonContent.value = value;
 
         // Clear any previous protected field validation errors
-        validationErrors.value = validationErrors.value.filter(err => !err.startsWith('Cannot modify'));
+        localValidationErrors.value = localValidationErrors.value.filter(
+          (err) => !err.startsWith("Cannot modify"),
+        );
       } catch (error) {
-        validationErrors.value = ['Invalid JSON format'];
+        localValidationErrors.value = ["Invalid JSON format"];
       }
     };
 
     onMounted(() => {
       // Store initial values of protected fields based on type
-      protectedFields.value.forEach(field => {
+      protectedFields.value.forEach((field) => {
         if (props.data[field]) {
           storedFields.value[field] = props.data[field];
         }
@@ -188,64 +206,64 @@ export default defineComponent({
     //we need to merge the stored fields with the parsed content
     //and then emit the saveJson event
 
-      const saveChanges = () => {
-        try {
-          const parsedContent = JSON.parse(jsonContent.value);
-          // Merge back the stored fields
-          const finalContent = {
-            ...parsedContent,
-            ...storedFields.value
-          };
+    const saveChanges = () => {
+      try {
+        const parsedContent = JSON.parse(jsonContent.value);
+        // Merge back the stored fields
+        const finalContent = {
+          ...parsedContent,
+          ...storedFields.value,
+        };
 
-          emit("saveJson", JSON.stringify(finalContent));
-        } catch (error) {
-          validationErrors.value = ['Invalid JSON format'];
-        }
-      };
+        emit("saveJson", JSON.stringify(finalContent));
+      } catch (error) {
+        localValidationErrors.value = ["Invalid JSON format"];
+      }
+    };
 
-      watch(
-        () => props.data,
-        (newVal) => {
-          // Update stored fields based on type
-          protectedFields.value.forEach(field => {
-            storedFields.value[field] = newVal[field] || storedFields.value[field];
-          });
+    watch(
+      () => props.data,
+      (newVal) => {
+        // Update stored fields based on type
+        protectedFields.value.forEach((field) => {
+          storedFields.value[field] = newVal[field] || storedFields.value[field];
+        });
 
-          // Show complete data in editor
-          jsonContent.value = JSON.stringify(newVal, null, 2);
-        },
-      );
-      //whenever any errors happens at the time of validating the pipeline ,
-      //we need to show the errors in the json editor
-      //so we need to watch the validationErrors array
-      watch(
-        () => props.validationErrors,
-        (newErrors) => {
-          validationErrors.value = newErrors;
-        },
-        { immediate: true, deep: true }
-      );
-      const toggleAIChat = () => {
+        // Show complete data in editor
+        jsonContent.value = JSON.stringify(newVal, null, 2);
+      },
+    );
+    //whenever any errors happens at the time of validating the pipeline ,
+    //we need to show the errors in the json editor
+    //so we need to watch the validationErrors array
+    watch(
+      () => props.validationErrors,
+      (newErrors) => {
+        localValidationErrors.value = newErrors;
+      },
+      { immediate: true, deep: true },
+    );
+    const toggleAIChat = () => {
       const isEnabled = !store.state.isAiChatEnabled;
       store.dispatch("setIsAiChatEnabled", isEnabled);
-    }
-      const isHovered = ref(false);
-      const getBtnLogo = computed(() => {
+    };
+    const isHovered = ref(false);
+    const getBtnLogo = computed(() => {
       if (isHovered.value || store.state.isAiChatEnabled) {
-        return getImageURL('images/common/ai_icon_dark.svg')
+        return getImageURL("images/common/ai_icon_dark.svg");
       }
 
-      return store.state.theme === 'dark'
-        ? getImageURL('images/common/ai_icon_dark.svg')
-        : getImageURL('images/common/ai_icon_gradient.svg')
-    })
+      return isDark.value
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg");
+    });
 
     return {
       t,
       store,
       jsonContent,
       isValidJson,
-      validationErrors,
+      localValidationErrors,
       queryEditorRef,
       handleEditorChange,
       getImageURL,

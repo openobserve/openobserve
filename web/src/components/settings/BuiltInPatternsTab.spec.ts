@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import BuiltInPatternsTab from "./BuiltInPatternsTab.vue";
 
-
 // --- Mock services ---
 vi.mock("@/services/regex_pattern", () => ({
   default: {
@@ -34,16 +33,6 @@ vi.mock("@/utils/regexPatternCache", () => ({
     clear: vi.fn(),
   },
 }));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-    }),
-  };
-});
 
 import regexPatternsService from "@/services/regex_pattern";
 import { RegexPatternCache } from "@/utils/regexPatternCache";
@@ -172,13 +161,6 @@ function mountComponent() {
       provide: { store: mockStore },
       stubs: {
         ODialog: ODialogStub,
-        "q-list": { template: "<div><slot /></div>", props: ["bordered", "separator"] },
-        "q-item": { template: "<div class='q-item'><slot /></div>", props: ["class"] },
-        "q-item-section": { template: "<div class='q-item-section'><slot /></div>", props: ["side"] },
-        "q-item-label": { template: "<div><slot /></div>", props: ["caption", "lines", "class"] },
-        "q-checkbox": { template: "<input type='checkbox' />", props: ["modelValue"], emits: ["update:modelValue"] },
-        "q-tooltip": { template: "<span><slot /></span>" },
-        "q-input": { template: "<input />", props: ["modelValue", "readonly", "outlined", "dense", "rows", "type"] },
       },
     },
   });

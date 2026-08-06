@@ -88,7 +88,7 @@ export async function deleteDashboard(page, dashboardName) {
   const deleteButton = dashboardRow.locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
 
-  // Wait for the confirm button to be visible (q-dialog teleports content to body; text element
+  // Wait for the confirm button to be visible (dialog teleports content to body; text element
   // may be in DOM but hidden during animation — confirm button visibility is more reliable)
   await page.locator('[data-test="o-dialog-primary-btn"]').waitFor({
     state: 'visible',

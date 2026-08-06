@@ -40,12 +40,13 @@ describe("useTracePatternTree", () => {
     it("should build one tree per root service when root spans have distinct services", () => {
       const treeData = getTreeData(patternTraceTrees.multiRootDistinctServices);
 
-      expect(treeData.map((n) => n.name).sort()).toEqual([
-        "alertmanager",
-        "ingester",
+      expect(treeData.map((n) => n.name).sort()).toEqual(["alertmanager", "ingester"]);
+      expect(treeData.find((n) => n.name === "alertmanager")?.children?.map((c) => c.name)).toEqual(
+        ["querier"],
+      );
+      expect(treeData.find((n) => n.name === "ingester")?.children?.map((c) => c.name)).toEqual([
+        "compactor",
       ]);
-      expect(treeData.find((n) => n.name === "alertmanager")?.children?.map((c) => c.name)).toEqual(["querier"]);
-      expect(treeData.find((n) => n.name === "ingester")?.children?.map((c) => c.name)).toEqual(["compactor"]);
     });
 
     it("should render a service node when all root spans belong to the same service", () => {
@@ -77,9 +78,7 @@ describe("useTracePatternTree", () => {
     });
 
     it("should not promote a service to root when it already appears as a child of another root", () => {
-      const treeData = getTreeData(
-        patternTraceTrees.multiRootOrphanChildService,
-      );
+      const treeData = getTreeData(patternTraceTrees.multiRootOrphanChildService);
 
       expect(treeData.length).toBe(1);
       expect(treeData[0].name).toBe("alertmanager");

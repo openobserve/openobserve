@@ -69,10 +69,11 @@ static COORDINATOR_WATCHER_PREFIXES: Lazy<RwLock<Vec<WatcherPrefix>>> =
     Lazy::new(|| RwLock::new(Vec::new()));
 
 pub async fn init() -> Result<()> {
-    // if local node is single node or meta store is not nats, return ok
+    // if local node is single node or queue store is not nats, return ok
     let cfg = config::get_config();
-    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
-    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+    let queue_store =
+        config::meta::queue_store::QueueStore::try_from(cfg.common.queue_store.as_str());
+    if cfg.common.local_mode || queue_store != Ok(config::meta::queue_store::QueueStore::Nats) {
         return Ok(());
     }
 
@@ -173,35 +174,32 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
         });
         loop {
             match receiver.recv().await {
-                Some(message) => match message {
-                    queue::Message::Nats(message) => {
-                        let event: CoordinatorEvent = match serde_json::from_slice(&message.payload)
-                        {
-                            Ok(event) => event,
-                            Err(e) => {
+                Some(message) => {
+                    let event: CoordinatorEvent = match serde_json::from_slice(message.message()) {
+                        Ok(event) => event,
+                        Err(e) => {
+                            log::error!(
+                                "[COORDINATOR::EVENTS] failed to deserialize coordinator event: {e}"
+                            );
+                            continue;
+                        }
+                    };
+                    match tx.send(event).await {
+                        Ok(_) => {
+                            if let Err(e) = message.ack().await {
                                 log::error!(
-                                    "[COORDINATOR::EVENTS] failed to deserialize coordinator event: {e}"
-                                );
-                                continue;
-                            }
-                        };
-                        match tx.send(event).await {
-                            Ok(_) => {
-                                if let Err(e) = message.ack().await {
-                                    log::error!(
-                                        "[COORDINATOR::EVENTS] failed to ack coordinator event: {e}"
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                // don't ack the message if the channel is closed
-                                log::error!(
-                                    "[COORDINATOR::EVENTS] failed to process coordinator event: {e}"
+                                    "[COORDINATOR::EVENTS] failed to ack coordinator event: {e}"
                                 );
                             }
                         }
+                        Err(e) => {
+                            // don't ack the message if the channel is closed
+                            log::error!(
+                                "[COORDINATOR::EVENTS] failed to process coordinator event: {e}"
+                            );
+                        }
                     }
-                },
+                }
                 None => {
                     log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

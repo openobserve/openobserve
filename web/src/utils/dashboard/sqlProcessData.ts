@@ -21,40 +21,9 @@ import { getDataValue } from "./aliasUtils";
  *
  * This function takes in the raw data returned from the SQL query and the
  * panel schema, and returns a processed data array that can be fed into the
- * echarts library.
- *
- * Here's a step-by-step breakdown of what this function does:
- *
- * 1. It checks if the data is empty or if the first item in the array is not
- * an object. If either condition is true, it returns an empty array.
- *
- * 2. It extracts the top_results and top_results_others values from the
- * panel schema config.
- *
- * 3. If top_results is not enabled, it simply returns the inner data array
- * without any modifications.
- *
- * 4. It extracts the breakdown key, y-axis key, and x-axis key from the
- * panel schema.
- *
- * 5. It aggregates the y-axis values by breakdown, ignoring items without a
- * breakdown key. This is done using the reduce() method.
- *
- * 6. It sorts the breakdown object by value in descending order and extracts
- * the top keys based on the configured number of top results. This is done
- * using the Object.entries() and sort() methods.
- *
- * 7. It initializes an empty result array and an empty others object.
- *
- * 8. It loops through the inner data array and checks if the breakdown value
- * is in the top keys. If it is, it adds the item to the result array. If it's
- * not, and top_results_others is enabled, it adds the item to the others
- * object.
- *
- * 9. If top_results_others is enabled, it loops through the others object and
- * adds the aggregated values to the result array.
- *
- * 10. Finally, it returns the result array.
+ * echarts library. When top_results is enabled it aggregates y-axis values by
+ * breakdown, keeps the top-N breakdown keys, and optionally folds the rest into
+ * an "others" bucket.
  *
  * @param {any[]} data - The data returned from the SQL query.
  * @param {any} panelSchema - The schema of the panel.
@@ -81,18 +50,12 @@ export const processData = (
   const { top_results, top_results_others } = panelSchema.config;
 
   // get the limit series from the config
-  // if top_results is enabled then use the top_results value
-  // otherwise use the max_dashboard_series value
   let limitSeries = top_results
-    ? (Math.min(
-        top_results,
-        store.state?.zoConfig?.max_dashboard_series ?? 100,
-      ) ?? 100)
+    ? (Math.min(top_results, store.state?.zoConfig?.max_dashboard_series ?? 100) ?? 100)
     : (store.state?.zoConfig?.max_dashboard_series ?? 100);
 
   // For multi y-axis charts, divide the limit by number of y-axes
   // to keep total series count at or below max_dashboard_series
-  // This applies when there are multiple y-axes AND breakdown fields
   if (yAxisKeys.length > 1 && breakDownKeys.length > 0) {
     limitSeries = Math.floor(limitSeries / yAxisKeys.length);
   }
@@ -112,11 +75,7 @@ export const processData = (
     let breakdownValue = getDataValue(item, breakdownKey);
 
     // Convert null, undefined, and empty string to a default empty string
-    if (
-      breakdownValue == null ||
-      breakdownValue === "" ||
-      breakdownValue === undefined
-    ) {
+    if (breakdownValue == null || breakdownValue === "" || breakdownValue === undefined) {
       breakdownValue = "";
     }
 
@@ -127,9 +86,7 @@ export const processData = (
   }, {});
 
   // Step 2: Sort and extract the top keys based on the configured number of top results
-  const allKeys = Object.entries(breakdown).sort(
-    ([, a]: any, [, b]: any) => b - a,
-  );
+  const allKeys = Object.entries(breakdown).sort(([, a]: any, [, b]: any) => b - a);
 
   // if top_results is enabled and the number of unique breakdown values is greater than the limit, add a warning message
   // if top_results is not enabled and the number of unique breakdown values is greater than the max_dashboard_series, add a warning message
@@ -137,8 +94,7 @@ export const processData = (
     (top_results &&
       top_results > (store.state?.zoConfig?.max_dashboard_series ?? 100) &&
       allKeys.length > top_results) ||
-    (!top_results &&
-      allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
+    (!top_results && allKeys.length > (store.state?.zoConfig?.max_dashboard_series ?? 100))
   ) {
     extras.limitNumberOfSeriesWarningMessage =
       "Limiting the displayed series to ensure optimal performance";
@@ -154,11 +110,7 @@ export const processData = (
     let breakdownValue = getDataValue(item, breakdownKey);
 
     // Ensure missing breakdown values are treated as empty strings
-    if (
-      breakdownValue == null ||
-      breakdownValue === "" ||
-      breakdownValue === undefined
-    ) {
+    if (breakdownValue == null || breakdownValue === "" || breakdownValue === undefined) {
       breakdownValue = "";
     }
 
@@ -166,8 +118,7 @@ export const processData = (
       resultArray.push({ ...item, [breakdownKey]: breakdownValue });
     } else if (top_results_others) {
       const xAxisValue = String(getDataValue(item, xAxisKey));
-      othersObj[xAxisValue] =
-        (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
+      othersObj[xAxisValue] = (othersObj[xAxisValue] || 0) + (+getDataValue(item, yAxisKey) || 0);
     }
   });
 

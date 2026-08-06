@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
-// ODataBarCell — the headline "bars like Datadog" cell (audit §2.2). Renders
+// ODataBarCell — the headline "bars like Datadog" cell. Renders
 // a (right-aligned) formatted value with a subtle horizontal bar behind it,
 // width proportional to value / columnMax. The caller computes the column max
 // over the visible page and passes it in, plus the already-formatted display
@@ -24,9 +25,9 @@ const props = withDefaults(
     display?: string | number;
     /** Bar tone. Default teal; "warning"/"danger" for threshold columns. */
     variant?: "default" | "warning" | "danger";
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { variant: "default", emptyLabel: "—" },
+  { variant: "default", emptyLabel: raw("—") },
 );
 
 const num = computed<number | null>(() => {
@@ -51,9 +52,9 @@ const widthPct = computed(() => {
 const barClass = computed(
   () =>
     ({
-      default: "tw:bg-progress-bar-default",
-      warning: "tw:bg-progress-bar-warning",
-      danger: "tw:bg-progress-bar-danger",
+      default: "bg-progress-bar-default",
+      warning: "bg-progress-bar-warning",
+      danger: "bg-progress-bar-danger",
     })[props.variant],
 );
 </script>
@@ -62,14 +63,15 @@ const barClass = computed(
   <!-- Value on top, a thin magnitude bar UNDERNEATH (no overlap with the
        number). Both right-aligned so the bars share a common right edge and
        lengths stay comparable across rows. -->
-  <div class="tw:flex tw:flex-col tw:items-end tw:justify-center tw:gap-0.75 tw:w-full tw:min-w-0">
+  <div class="flex w-full min-w-0 flex-col items-end justify-center gap-0.75">
     <span
-      class="tw:tabular-nums tw:whitespace-nowrap tw:leading-none"
-      :class="num === null ? 'tw:text-text-primary tw:text-xs' : ''"
-    >{{ text }}</span>
+      class="leading-none whitespace-nowrap tabular-nums"
+      :class="num === null ? 'text-text-body text-xs' : ''"
+      >{{ text }}</span
+    >
     <div
       v-if="widthPct > 0"
-      class="tw:h-0.75 tw:rounded-full tw:opacity-80 tw:pointer-events-none tw:transition-[width] tw:duration-300"
+      class="pointer-events-none h-0.75 rounded-full opacity-80 transition-[width] duration-300"
       :class="barClass"
       :style="{ width: widthPct + '%' }"
       aria-hidden="true"

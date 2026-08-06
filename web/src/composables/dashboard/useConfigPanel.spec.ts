@@ -14,11 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref, computed, nextTick } from "vue";
-import {
-  useConfigPanel,
-  filterOption,
-  filterSection,
-} from "./useConfigPanel";
+import { useConfigPanel, filterOption, filterSection } from "./useConfigPanel";
 import type { ConfigOption } from "./useConfigPanel";
 import {
   DEFAULT_EXPANDED_SECTIONS,
@@ -85,8 +81,7 @@ const makeComposable = (
   showColors = computed(() => false),
   isPivot = computed(() => false),
   pageKey: string = "dashboard",
-) =>
-  useConfigPanel(panelData, promqlMode, pageKey, showTrellis, showColors, isPivot);
+) => useConfigPanel(panelData, promqlMode, pageKey, showTrellis, showColors, isPivot);
 
 // ---------------------------------------------------------------------------
 // filterOption — pure helper
@@ -181,10 +176,26 @@ describe("filterSection", () => {
 
 describe("ORDERED_SECTION_IDS", () => {
   const expectedSections = [
-    "general", "promqlTable", "geographic", "legend", "data",
-    "axis", "labels", "lineStyle", "table", "pivotTable",
-    "valueTransformations", "fieldOverrides", "map", "gauge", "layout",
-    "colors", "drilldown", "comparison", "markLines", "background",
+    "general",
+    "promqlTable",
+    "geographic",
+    "legend",
+    "data",
+    "axis",
+    "labels",
+    "lineStyle",
+    "table",
+    "pivotTable",
+    "valueTransformations",
+    "fieldOverrides",
+    "map",
+    "gauge",
+    "layout",
+    "colors",
+    "drilldown",
+    "comparison",
+    "markLines",
+    "background",
   ];
 
   it("contains all 20 sections", () => {
@@ -205,8 +216,8 @@ describe("DEFAULT_EXPANDED_SECTIONS", () => {
     }
   });
 
-  it("defaults all sections to true", () => {
-    expect(Object.values(DEFAULT_EXPANDED_SECTIONS).every((v) => v)).toBe(true);
+  it("defaults all sections to false (collapsed)", () => {
+    expect(Object.values(DEFAULT_EXPANDED_SECTIONS).every((v) => v === false)).toBe(true);
   });
 });
 
@@ -249,6 +260,7 @@ describe("useConfigPanel – search state", () => {
 
   it("does not re-save state on subsequent query changes (non-empty → non-empty)", async () => {
     c.expandedSections.value["general"] = false;
+    c.expandedSections.value["legend"] = true;
     c.searchQuery.value = "ax";
     await nextTick();
     // Change section state after first search (should not affect saved snapshot)
@@ -289,17 +301,18 @@ describe("useConfigPanel – expand/collapse", () => {
     c = makeComposable();
   });
 
-  it("isExpanded returns true by default for all known sections", () => {
+  it("isExpanded returns false by default for all known sections", () => {
     for (const id of ORDERED_SECTION_IDS) {
-      expect(c.isExpanded(id)).toBe(true);
+      expect(c.isExpanded(id)).toBe(false);
     }
   });
 
-  it("isExpanded returns true for unknown section keys (fallback)", () => {
-    expect(c.isExpanded("unknownSection")).toBe(true);
+  it("isExpanded returns false for unknown section keys (fallback)", () => {
+    expect(c.isExpanded("unknownSection")).toBe(false);
   });
 
   it("toggleSection collapses an expanded section", () => {
+    c.expandedSections.value["general"] = true;
     c.toggleSection("general");
     expect(c.isExpanded("general")).toBe(false);
   });
@@ -312,10 +325,13 @@ describe("useConfigPanel – expand/collapse", () => {
 
   it("toggleSection does not affect other sections", () => {
     c.toggleSection("general");
-    expect(c.isExpanded("legend")).toBe(true);
+    expect(c.isExpanded("legend")).toBe(false);
   });
 
   it("allSectionsExpanded is true when all are open", () => {
+    Object.keys(c.expandedSections.value).forEach((k) => {
+      c.expandedSections.value[k] = true;
+    });
     expect(c.allSectionsExpanded.value).toBe(true);
   });
 
@@ -325,6 +341,9 @@ describe("useConfigPanel – expand/collapse", () => {
   });
 
   it("toggleAllSections collapses everything when all are expanded", () => {
+    Object.keys(c.expandedSections.value).forEach((k) => {
+      c.expandedSections.value[k] = true;
+    });
     c.toggleAllSections();
     expect(c.allSectionsExpanded.value).toBe(false);
     expect(Object.values(c.expandedSections.value).every((v) => !v)).toBe(true);
@@ -426,10 +445,7 @@ describe("useConfigPanel – promqlTable section", () => {
   });
 
   it("table-aggregations is visible when promqlMode=true, type=table, mode=all", () => {
-    const c = makeComposable(
-      makePanelData("table", { promql_table_mode: "all" }),
-      ref(true),
-    );
+    const c = makeComposable(makePanelData("table", { promql_table_mode: "all" }), ref(true));
     expect(c.isConfigOptionVisible("promqlTable", "table-aggregations")).toBe(true);
   });
 
@@ -441,27 +457,30 @@ describe("useConfigPanel – promqlTable section", () => {
     expect(c.isConfigOptionVisible("promqlTable", "table-aggregations")).toBe(false);
   });
 
-  it.each(["visible-columns", "hidden-columns", "sticky-first-column", "sticky-columns", "configure-column-order"])(
-    "%s is visible for promqlMode + table + mode=all",
-    (optionId) => {
-      const c = makeComposable(
-        makePanelData("table", { promql_table_mode: "all" }),
-        ref(true),
-      );
-      expect(c.isConfigOptionVisible("promqlTable", optionId)).toBe(true);
-    },
-  );
+  it.each([
+    "visible-columns",
+    "hidden-columns",
+    "sticky-first-column",
+    "sticky-columns",
+    "configure-column-order",
+  ])("%s is visible for promqlMode + table + mode=all", (optionId) => {
+    const c = makeComposable(makePanelData("table", { promql_table_mode: "all" }), ref(true));
+    expect(c.isConfigOptionVisible("promqlTable", optionId)).toBe(true);
+  });
 
-  it.each(["visible-columns", "hidden-columns", "sticky-first-column", "sticky-columns", "configure-column-order"])(
-    "%s is visible for promqlMode + table + mode=expanded_timeseries",
-    (optionId) => {
-      const c = makeComposable(
-        makePanelData("table", { promql_table_mode: "expanded_timeseries" }),
-        ref(true),
-      );
-      expect(c.isConfigOptionVisible("promqlTable", optionId)).toBe(true);
-    },
-  );
+  it.each([
+    "visible-columns",
+    "hidden-columns",
+    "sticky-first-column",
+    "sticky-columns",
+    "configure-column-order",
+  ])("%s is visible for promqlMode + table + mode=expanded_timeseries", (optionId) => {
+    const c = makeComposable(
+      makePanelData("table", { promql_table_mode: "expanded_timeseries" }),
+      ref(true),
+    );
+    expect(c.isConfigOptionVisible("promqlTable", optionId)).toBe(true);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -754,17 +773,35 @@ describe("useConfigPanel – pivotTable section", () => {
   const pivotMode = computed(() => true);
 
   it("pivot-show-row-totals is visible for table in sql mode with pivot", () => {
-    const c = makeComposable(makePanelData("table"), ref(false), computed(() => false), computed(() => false), pivotMode);
+    const c = makeComposable(
+      makePanelData("table"),
+      ref(false),
+      computed(() => false),
+      computed(() => false),
+      pivotMode,
+    );
     expect(c.isConfigOptionVisible("pivotTable", "pivot-show-row-totals")).toBe(true);
   });
 
   it("pivot-show-row-totals is hidden in promqlMode", () => {
-    const c = makeComposable(makePanelData("table"), ref(true), computed(() => false), computed(() => false), pivotMode);
+    const c = makeComposable(
+      makePanelData("table"),
+      ref(true),
+      computed(() => false),
+      computed(() => false),
+      pivotMode,
+    );
     expect(c.isConfigOptionVisible("pivotTable", "pivot-show-row-totals")).toBe(false);
   });
 
   it("pivot-show-row-totals is hidden when not pivot mode", () => {
-    const c = makeComposable(makePanelData("table"), ref(false), computed(() => false), computed(() => false), computed(() => false));
+    const c = makeComposable(
+      makePanelData("table"),
+      ref(false),
+      computed(() => false),
+      computed(() => false),
+      computed(() => false),
+    );
     expect(c.isConfigOptionVisible("pivotTable", "pivot-show-row-totals")).toBe(false);
   });
 
@@ -836,12 +873,20 @@ describe("useConfigPanel – gauge section", () => {
 
 describe("useConfigPanel – layout section", () => {
   it("trellis-layout is visible when showTrellisConfig=true", () => {
-    const c = makeComposable(makePanelData(), ref(false), computed(() => true));
+    const c = makeComposable(
+      makePanelData(),
+      ref(false),
+      computed(() => true),
+    );
     expect(c.isConfigOptionVisible("layout", "trellis-layout")).toBe(true);
   });
 
   it("trellis-layout is hidden when showTrellisConfig=false", () => {
-    const c = makeComposable(makePanelData(), ref(false), computed(() => false));
+    const c = makeComposable(
+      makePanelData(),
+      ref(false),
+      computed(() => false),
+    );
     expect(c.isConfigOptionVisible("layout", "trellis-layout")).toBe(false);
   });
 
@@ -888,12 +933,22 @@ describe("useConfigPanel – layout section", () => {
 
 describe("useConfigPanel – colors section", () => {
   it("colors is visible when showColorPalette=true", () => {
-    const c = makeComposable(makePanelData(), ref(false), computed(() => false), computed(() => true));
+    const c = makeComposable(
+      makePanelData(),
+      ref(false),
+      computed(() => false),
+      computed(() => true),
+    );
     expect(c.isConfigOptionVisible("colors", "colors")).toBe(true);
   });
 
   it("colors is hidden when showColorPalette=false", () => {
-    const c = makeComposable(makePanelData(), ref(false), computed(() => false), computed(() => false));
+    const c = makeComposable(
+      makePanelData(),
+      ref(false),
+      computed(() => false),
+      computed(() => false),
+    );
     expect(c.isConfigOptionVisible("colors", "colors")).toBe(false);
   });
 });

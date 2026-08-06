@@ -2,6 +2,7 @@
 import DashboardCreate from "./dashboardPages/dashboard-create";
 import DashboardListPage from "./dashboardPages/dashboard-list";
 import DashboardFolder from "./dashboardPages/dashboard-folder";
+import DashboardFavorites from "./dashboardPages/dashboard-favorites";
 import DashboardactionPage from "./dashboardPages/dashboard-panel-actions";
 import DashboardPanelConfigs from "./dashboardPages/dashboard-panel-configs";
 import DashboardPanel from "./dashboardPages/dashboard-panel-edit";
@@ -25,6 +26,7 @@ import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
+import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -47,7 +49,11 @@ import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
 import { ServiceGraphPage } from "./tracesPages/serviceGraphPage.js";
 import { ServicesCatalogPage } from "./tracesPages/servicesCatalogPage.js";
-import { RumPage } from "./logsPages/rumPage.js";
+import { RumPage } from "./rumPages/rumPage.js";
+import { RumSessionsPage } from "./rumPages/rumSessionsPage.js";
+import { RumPerformancePage } from "./rumPages/rumPerformancePage.js";
+import { RumIngestionPage } from "./rumPages/rumIngestionPage.js";
+import { RumSourcemapsPage } from "./rumPages/rumSourcemapsPage.js";
 import { ReportsPage } from "./reportsPages/reportsPage.js";
 import { ReportFoldersPage } from "./reportsPages/reportFoldersPage.js";
 import { ReportsFormValidationPage } from "./reportsPages/reportsFormValidationPage.js";
@@ -81,6 +87,7 @@ import { RumFormValidationPage } from "./generalPages/rumFormValidationPage.js";
 const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
+const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -89,6 +96,7 @@ import UnflattenedPage from "./logsPages/unflattened.js";
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
+import { SDRTracesIngestionPage } from "./sdrPages/sdrTracesIngestionPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationPage.js";
 
@@ -112,6 +120,7 @@ class PageManager {
     this.dashboardCreate = new DashboardCreate(page);
     this.dashboardList = new DashboardListPage(page);
     this.dashboardFolder = new DashboardFolder(page);
+    this.dashboardFavorites = new DashboardFavorites(page);
     this.dashboardPanelActions = new DashboardactionPage(page);
     this.dashboardPanelConfigs = new DashboardPanelConfigs(page);
     this.dashboardPanelEdit = new DashboardPanel(page);
@@ -137,9 +146,13 @@ class PageManager {
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
+    this.alertDetailPage = new AlertDetailPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
+
+    // ===== WORKFLOWS (v1) PAGE OBJECT =====
+    this.workflowsPage = new WorkflowsPage(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
@@ -197,6 +210,7 @@ class PageManager {
     // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
+    this.sdrTracesPage = new SDRTracesIngestionPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
     this.streamsFormValidation = new StreamsFormValidationPage(page);
 
@@ -216,6 +230,10 @@ class PageManager {
 
     // ===== RUM PAGE OBJECTS =====
     this.rumFormValidation = new RumFormValidationPage(page);
+    this.rumSessionsPage = new RumSessionsPage(page);
+    this.rumPerformancePage = new RumPerformancePage(page);
+    this.rumIngestionPage = new RumIngestionPage(page);
+    this.rumSourcemapsPage = new RumSourcemapsPage(page);
   }
 }
 

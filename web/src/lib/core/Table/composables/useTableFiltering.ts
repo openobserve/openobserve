@@ -1,9 +1,9 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { computed } from "vue";
-import type { OTableFilterMode, OTableFilterParams } from "../OTable.types";
+import type { OTableFilterMode } from "../OTable.types";
 
-export function useTableFiltering<TData>(
+export function useTableFiltering(
   props: {
     globalFilter?: string;
     globalFilterPlaceholder?: string;

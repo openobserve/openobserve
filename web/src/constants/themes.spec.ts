@@ -172,18 +172,14 @@ describe("theme registry", () => {
     it("converts a numeric legacy id to the theme name", () => {
       storage.setItem("appliedLightTheme", "2");
       migrateLegacyThemeStorage(storage);
-      expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "O2 Pulse",
-      );
+      expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe("O2 Pulse");
       expect(storage.getItem("appliedLightTheme")).toBeNull();
     });
 
     it("converts the legacy custom marker (-1) to CUSTOM_THEME_NAME", () => {
       storage.setItem("appliedDarkTheme", "-1");
       migrateLegacyThemeStorage(storage);
-      expect(storage.getItem(THEME_STORAGE_KEYS.dark.appliedName)).toBe(
-        CUSTOM_THEME_NAME,
-      );
+      expect(storage.getItem(THEME_STORAGE_KEYS.dark.appliedName)).toBe(CUSTOM_THEME_NAME);
       expect(storage.getItem("appliedDarkTheme")).toBeNull();
     });
 
@@ -198,9 +194,7 @@ describe("theme registry", () => {
       storage.setItem("appliedLightTheme", "2");
       storage.setItem(THEME_STORAGE_KEYS.light.appliedName, "O2 Lens");
       migrateLegacyThemeStorage(storage);
-      expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe(
-        "O2 Lens",
-      );
+      expect(storage.getItem(THEME_STORAGE_KEYS.light.appliedName)).toBe("O2 Lens");
     });
 
     it("is a no-op when there is no legacy key", () => {

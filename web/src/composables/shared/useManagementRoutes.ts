@@ -2,8 +2,6 @@ import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 
 const Settings = () => import("@/components/settings/index.vue");
-const TemplateList = () => import("@/components/alerts/TemplateList.vue");
-const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
 
 const useManagementRoutes = () => {
   const routes: any = [
@@ -33,86 +31,72 @@ const useManagementRoutes = () => {
         {
           path: "organization",
           name: "organizationSettings",
-          meta:{
+          meta: {
             title: "Organization Parameters",
           },
-          component: () =>
-            import("@/components/settings/OrganizationSettings.vue"),
+          component: () => import("@/components/settings/OrganizationSettings.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
         },
+        // Notification destinations moved to /alert-destinations (Reliability).
+        // Kept as a redirect so existing bookmarks and links still resolve.
+        // The function form is required to carry the query across: callers pass
+        // `org_identifier`, and `?action=import` opens the import view — an
+        // object redirect would silently drop both.
         {
           path: "alert_destinations",
-          name: "alertDestinations",
-          meta:{
-            title: "Alert Destinations",
-          },
-          component: AlertsDestinationList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          redirect: (to: any) => ({ name: "alertDestinations", query: to.query }),
         },
-        {
-          path: "model_pricing",
-          name: "modelPricing",
-          meta: {
-            keepAlive: true,
-            title: "LLM Model Pricing",
-          },
-          component: () =>
-            import("@/components/settings/ModelPricingList.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "model_pricing/edit",
-          name: "modelPricingEditor",
-          meta: {
-            title: "Model Pricing Editor",
-          },
-          component: () =>
-            import("@/components/settings/ModelPricingEditor.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
+        // Alert templates moved to /alert-templates (Reliability). Redirect kept
+        // for the same reason as alert_destinations above, query included.
         {
           path: "templates",
-          name: "alertTemplates",
-          meta:{
-            title: "Templates",
-          },
-          component: TemplateList,
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          redirect: (to: any) => ({ name: "alertTemplates", query: to.query }),
         },
+        // Alert Sources moved to /alert-sources (Reliability), same reasoning
+        // as alert_destinations/templates above. Redirect kept for bookmarks;
+        // the enterprise/cloud gate now lives on the target route itself
+        // (router.ts), not on whether this redirect entry exists.
         {
-          path: "gen_ai_agent_mapping",
-          name: "genAiAgentMapping",
-          component: () =>
-            import("@/components/settings/GenAiAgentMappingSettings.vue"),
-          meta: {
-            keepAlive: true,
-            title: "GenAI Agent Mapping",
-          },
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
+          path: "alert_sources",
+          redirect: (to: any) => ({ name: "alertSources", query: to.query }),
         },
       ],
     },
   ];
-  // LLM Providers (used by the AI Observability / Online Evals flows) is an
-  // enterprise/cloud-only feature — not available in OSS builds.
+  // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
+  // Observability / Online Evals flows) are enterprise/cloud-only features — the
+  // backend routes only exist behind the enterprise feature flag, so they must
+  // not be exposed in OSS builds.
   if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "model_pricing",
+      name: "modelPricing",
+      meta: {
+        keepAlive: true,
+        title: "LLM Model Pricing",
+      },
+      component: () => import("@/components/settings/ModelPricingList.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    routes[0].children.push({
+      path: "model_pricing/edit",
+      name: "modelPricingEditor",
+      meta: {
+        title: "Model Pricing Editor",
+      },
+      component: () => import("@/components/settings/ModelPricingEditor.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
     routes[0].children.push({
       path: "llm_providers",
       name: "llmProviders",
-      component: () =>
-        import("@/components/settings/LlmProvidersSettings.vue"),
+      component: () => import("@/components/settings/LlmProvidersSettings.vue"),
       meta: {
         title: "LLM Providers",
       },
@@ -120,6 +104,22 @@ const useManagementRoutes = () => {
         routeGuard(to, from, next);
       },
     });
+    routes[0].children.push({
+      path: "gen_ai_agent_mapping",
+      name: "genAiAgentMapping",
+      component: () => import("@/components/settings/GenAiAgentMappingSettings.vue"),
+      meta: {
+        keepAlive: true,
+        title: "GenAI Agent Mapping",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    // Alert Sources moved to a flat top-level route (router.ts, name
+    // "alertSources") — no longer pushed here. It used to be conditional on
+    // this same enterprise/cloud check; that gating now lives on the target
+    // route's own beforeEnter instead.
   }
   if (config.isEnterprise == "true") {
     routes[0].children.push(
@@ -163,11 +163,10 @@ const useManagementRoutes = () => {
         {
           path: "pipeline_destinations",
           name: "pipelineDestinations",
-          meta:{
+          meta: {
             title: "Pipeline Destinations",
           },
-          component: () =>
-            import("@/components/alerts/PipelinesDestinationList.vue"),
+          component: () => import("@/components/alerts/PipelinesDestinationList.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
@@ -175,8 +174,7 @@ const useManagementRoutes = () => {
         {
           path: "storage_settings",
           name: "storageSettings",
-          component: () =>
-            import("@/components/settings/OrgStorageSettings.vue"),
+          component: () => import("@/components/settings/OrgStorageSettings.vue"),
           meta: {
             title: "Storage Settings",
           },
@@ -219,7 +217,18 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-
+        },
+        {
+          path: "synthetics_locations",
+          name: "syntheticsLocations",
+          component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+          meta: {
+            keepAlive: true,
+            title: "Synthetics Locations",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
         },
         {
           path: "correlation/:tab?",
@@ -258,9 +267,9 @@ const useManagementRoutes = () => {
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
           },
-        }
-      ]
-    )
+        },
+      ],
+    );
   }
   return routes;
 };

@@ -15,66 +15,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OCard class="tw:flex tw:flex-col tw:shadow-none tw:border tw:border-(--o2-border-color) tw:bg-(--o2-card-bg) tw:rounded-lg tw:w-full tw:h-full tw:dark:bg-(--o2-card-background) tw:dark:border-(--o2-border)">
-    <div class="tw:flex tw:items-center tw:justify-between tw:px-3 tw:py-2">
+  <OCard
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default flex h-full w-full flex-col border shadow-none"
+  >
+    <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <h3 class="tw:pt-2 tw:text-base tw:font-semibold tw:leading-6 tw:text-(--o2-text-heading) tw:m-0">
+        <h3 class="text-text-heading m-0 pt-2 text-base leading-6 font-semibold">
           {{ t("billing.enterpriseLabel") }}
         </h3>
-        <p class="tw:mt-2 tw:text-sm tw:font-normal tw:leading-[1.125rem] tw:text-(--o2-text-secondary) tw:m-0">
+        <p class="text-text-secondary m-0 mt-2 text-sm leading-[1.125rem] font-normal">
           {{ t("billing.enterpriseSubtitle") }}
         </p>
       </div>
-      <OTag
-        type="billingTag"
-        value="discount"
-        class="tw:mt-2"
-      />
+      <OTag type="billingTag" value="discount" class="mt-2" />
     </div>
 
-    <OSeparator class="tw:my-2" />
+    <OSeparator class="my-2" />
 
-    <div class="tw:px-3 tw:pt-2 tw:h-[550px]">
-      <h4 class="tw:text-[0.8125rem] tw:font-semibold tw:leading-[0.983rem] tw:text-(--o2-text-heading) tw:m-0">{{ t("billing.features") }}</h4>
-      <p class="tw:mb-3 tw:mt-1 tw:text-[0.8125rem] tw:font-normal tw:leading-[1.125rem] tw:text-(--o2-text-secondary) tw:m-0">
+    <div class="h-137.5 px-3 pt-2">
+      <h4 class="text-compact text-text-heading m-0 leading-[0.983rem] font-semibold">
+        {{ t("billing.features") }}
+      </h4>
+      <p class="text-compact text-text-secondary m-0 mt-1 mb-3 leading-[1.125rem] font-normal">
         {{ t("billing.included") }}
       </p>
 
       <div
         v-if="pricingError && !features?.length"
-        class="tw:flex tw:items-center tw:mb-2 tw:text-red-500"
+        class="text-status-error-text mb-2 flex items-center"
       >
-        <OIcon name="warning" size="sm" class="tw:mr-2" />
-        <span class="tw:text-[0.938rem] tw:leading-[1.375rem] tw:text-(--o2-text-body)"
-          >Failed to load pricing details. Please refresh the page.</span
-        >
+        <OIcon name="warning" size="sm" class="mr-2" />
+        <span class="text-text-body text-base leading-[1.375rem]">{{
+          t("billing.pricingErrorMessage")
+        }}</span>
       </div>
       <div
         v-for="(feature, index) in features"
         :key="index"
-        class="tw:flex tw:items-center tw:justify-between tw:mb-2"
+        class="mb-2 flex items-center justify-between"
       >
-        <div class="tw:flex tw:items-center">
+        <div class="flex items-center">
           <OIcon
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="tw:mr-2 tw:text-green-500 check-icon"
+            class="text-status-positive check-icon mr-2"
           />
-          <div class="tw:text-[0.938rem] tw:leading-[1.375rem] tw:text-(--o2-text-body)" :class="{ 'tw:ml-6': !feature.is_parent }">{{ feature.name }}</div>
+          <div
+            class="text-text-body text-base leading-[1.375rem]"
+            :class="{ 'ml-6': !feature.is_parent }"
+          >
+            {{ feature.name }}
+          </div>
         </div>
-        <div class="tw:text-[0.938rem] tw:leading-[1.375rem] tw:text-(--o2-text-body) tw:font-bold">{{ feature.price }}</div>
+        <div class="text-text-body text-base leading-[1.375rem] font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
     <OSeparator />
 
-    <p class="tw:px-3 tw:pt-2 tw:text-[0.8125rem] tw:font-normal tw:leading-[1.125rem] tw:text-(--o2-text-secondary) tw:m-0">
+    <p class="text-compact text-text-secondary m-0 px-3 pt-2 leading-[1.125rem] font-normal">
       {{ t("billing.enterpriseNote") }}
     </p>
 
-    <div class="tw:flex tw:justify-between tw:p-3 tw:mt-[18px]">
-      <OButton variant="primary" size="sm-action" class="tw:w-full" @click="contactSales">
+    <div class="mt-4.5 flex justify-between p-3">
+      <OButton variant="primary" size="sm-action" class="w-full" @click="contactSales">
         {{ t("billing.contactLabel") }}
       </OButton>
     </div>
@@ -83,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { siteURL } from "@/constants/config";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -95,8 +100,8 @@ export default defineComponent({
   name: "enterprisePlan",
   components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["features", "pricingError"],
-  setup(props, { emit }) {
-    const { t } = useI18n();
+  setup() {
+    const { t } = useI18nTyped();
 
     const contactSales = () => {
       window.open(siteURL.contactSales, "_blank");

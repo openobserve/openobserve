@@ -15,172 +15,169 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Sections that bring their OWN page header (Functions, Enrichment Tables
+       each render a full OPageLayout) are rendered DIRECTLY — exactly like any
+       normal top-level page. Wrapping them in the shell's OPageLayout too nested
+       two page layouts and pushed their header down (a top gap). Pipelines and
+       the pipeline detail sub-pages have no own-header, so the shell owns theirs. -->
+  <RouterView v-if="sectionOwnsHeader" v-slot="{ Component }">
+    <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+  </RouterView>
+
   <!-- Pipelines is a frequently-used workspace, so it has NO landing hub (that
        would add a click every visit). It lands straight on the default section
        and uses the same breadcrumb section-switcher for fast lateral nav:
          Stream Pipelines ▾            (› Edit Pipeline on a detail page)
        Page actions (and the detail-view teleport target) live in the bar. -->
-  <div class="tw:h-full tw:min-h-0 tw:flex tw:flex-col">
-    <!-- This row hosts page actions: the pipelines-list buttons or the detail
+  <OPageLayout v-else bleed>
+    <template #header v-if="showPipelineActions || isDetailView">
+      <!-- This row hosts page actions: the pipelines-list buttons or the detail
          teleport target. Section pages (functions/enrichment/eval) render
          nothing here — their content components have their own headers. -->
-    <AppPageHeader
-      v-if="showPipelineActions || isDetailView"
-      :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
-      :subtitle="showPipelineActions ? t('pipeline.subtitle') : ''"
-      :icon="showPipelineActions ? 'lan' : undefined"
-      :back="detailBack"
-      :tabs-below="showPipelineActions"
-      class="tw:px-4 tw:border-b tw:border-border-default"
-    >
-      <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
+      <OPageHeader
+        :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
+        :subtitle="
+          showPipelineActions
+            ? t('pipeline.subtitle')
+            : routeName === 'createPipeline'
+              ? breadcrumbLabel
+              : raw('')
+        "
+        :title-overflow="routeName === 'createPipeline' ? 'visible' : 'truncate'"
+        :icon="showPipelineActions ? 'lan' : undefined"
+        :back="detailBack"
+        :tabs-below="showPipelineActions"
+        class="border-border-default border-b"
+      >
+        <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
            title on the list page; hidden on detail sub-pages (editor/history).
            Always pass the slot so hasTabs tracks showPipelineActions reactively
            via the slot function call instead of relying on slot presence tracking. -->
-      <template #tabs>
-        <PipelineSectionTabs v-if="showPipelineActions" />
-      </template>
-      <!-- Pipeline name input rendered inline with the title on the create page -->
-      <template v-if="routeName === 'createPipeline'" #title-trail>
-        <div class="tw:w-64 tw:shrink-0">
-          <OInput
-            ref="pipelineNameInputRef"
-            v-model="pipelineObj.currentSelectedPipeline.name"
-            :placeholder="t('pipeline.pipelineName')"
-            hide-bottom-space
-            :error="pipelineObj.pipelineNameError"
-            :error-message="pipelineObj.pipelineNameErrorMessage"
-            data-test="pipeline-editor-name-input"
-          />
-        </div>
-      </template>
-      <template #actions>
-        <template v-if="showPipelineActions">
-          <template v-if="!shouldCollapseActions">
-            <OButton
-              data-test="pipeline-list-history-btn"
-              variant="outline"
-              size="sm"
-              icon-left="history"
-              @click="goToPipelineHistory"
-            >
-              {{ t("pipeline.history") }}
-            </OButton>
-            <OButton
-              v-if="config.isEnterprise == 'true'"
-              data-test="pipeline-list-backfill-btn"
-              variant="outline"
-              size="sm"
-              icon-left="refresh"
-              @click="goToBackfillJobs"
-            >
-              {{ t("pipeline.backfill") }}
-            </OButton>
-            <OButton
-              data-test="pipeline-list-import-pipeline-btn"
-              variant="outline"
-              size="sm"
-              icon-left="upload-file"
-              @click="goToImportPipeline"
-            >
-              {{ t("pipeline.import") }}
-            </OButton>
-          </template>
-          <OButton
-            data-test="pipeline-list-add-pipeline-btn"
-            variant="primary"
-            size="sm"
-            @click="goToAddPipeline"
-          >
-            {{ t("pipeline.addPipeline") }}
-          </OButton>
-          <ODropdown v-if="shouldCollapseActions" align="end">
-            <template #trigger>
+        <template #tabs>
+          <PipelineSectionTabs v-if="showPipelineActions" />
+        </template>
+        <!-- Teleport target for the create-page pipeline NAME, which IS the
+           title here (the "New pipeline" label moves to the subtitle above, as
+           on the panel/alert/function editors). The control itself is owned and
+           teleported in by PipelineEditor.vue, so it sits with the save logic
+           that validates it. -->
+        <template v-if="routeName === 'createPipeline'" #title>
+          <span id="o2-page-title" class="contents"></span>
+        </template>
+        <template #actions>
+          <template v-if="showPipelineActions">
+            <template v-if="!shouldCollapseActions">
               <OButton
+                data-test="pipeline-list-history-btn"
                 variant="outline"
                 size="sm"
-                data-test="pipeline-list-overflow-menu-btn"
-                icon-left="menu"
-              />
+                icon-left="history"
+                @click="goToPipelineHistory"
+              >
+                {{ t("pipeline.history") }}
+              </OButton>
+              <OButton
+                v-if="config.isEnterprise == 'true'"
+                data-test="pipeline-list-backfill-btn"
+                variant="outline"
+                size="sm"
+                icon-left="refresh"
+                @click="goToBackfillJobs"
+              >
+                {{ t("pipeline.backfill") }}
+              </OButton>
+              <OButton
+                data-test="pipeline-list-import-pipeline-btn"
+                variant="outline"
+                size="sm"
+                icon-left="upload-file"
+                @click="goToImportPipeline"
+              >
+                {{ t("pipeline.import") }}
+              </OButton>
             </template>
-            <ODropdownItem
-              data-test="pipeline-list-menu-history-btn"
-              @select="goToPipelineHistory"
+            <OButton
+              data-test="pipeline-list-add-pipeline-btn"
+              variant="primary"
+              size="sm"
+              @click="goToAddPipeline"
             >
-              {{ t("pipeline.history") }}
-            </ODropdownItem>
-            <ODropdownItem
-              v-if="config.isEnterprise == 'true'"
-              data-test="pipeline-list-menu-backfill-btn"
-              @select="goToBackfillJobs"
-            >
-              {{ t("pipeline.backfill") }}
-            </ODropdownItem>
-            <ODropdownItem
-              data-test="pipeline-list-menu-import-btn"
-              @select="goToImportPipeline"
-            >
-              {{ t("pipeline.import") }}
-            </ODropdownItem>
-          </ODropdown>
-        </template>
-        <!-- Detail sub-pages (editor/history/backfill) teleport their actions
+              {{ t("pipeline.addPipeline") }}
+            </OButton>
+            <ODropdown v-if="shouldCollapseActions" align="end">
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  data-test="pipeline-list-overflow-menu-btn"
+                  icon-left="menu"
+                />
+              </template>
+              <ODropdownItem
+                data-test="pipeline-list-menu-history-btn"
+                @select="goToPipelineHistory"
+              >
+                {{ t("pipeline.history") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="config.isEnterprise == 'true'"
+                data-test="pipeline-list-menu-backfill-btn"
+                @select="goToBackfillJobs"
+              >
+                {{ t("pipeline.backfill") }}
+              </ODropdownItem>
+              <ODropdownItem data-test="pipeline-list-menu-import-btn" @select="goToImportPipeline">
+                {{ t("pipeline.import") }}
+              </ODropdownItem>
+            </ODropdown>
+          </template>
+          <!-- Detail sub-pages (editor/history/backfill) teleport their actions
              here, so the bar owns the single header and pages never render a 2nd. -->
-        <div
-          v-else-if="isDetailView"
-          id="o2-page-actions"
-          class="tw:flex tw:items-center tw:gap-2"
-          data-test="pipeline-detail-actions"
-        />
-      </template>
-    </AppPageHeader>
+          <div
+            v-else-if="isDetailView"
+            id="o2-page-actions"
+            class="flex items-center gap-2"
+            data-test="pipeline-detail-actions"
+          />
+        </template>
+      </OPageHeader>
+    </template>
 
-    <div class="tw:flex-1 tw:min-h-0 tw:flex tw:flex-col tw:overflow-hidden">
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <RouterView v-slot="{ Component }">
-        <component :is="Component" class="tw:h-full" @sendToAiChat="sendToAiChat" />
+        <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
       </RouterView>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import { pipelineObj } from "@/plugins/pipelines/useDnD";
-import {
-  defineComponent,
-  ref,
-  computed,
-  onBeforeMount,
-  onMounted,
-  onUnmounted,
-  onActivated,
-  onDeactivated,
-  watch,
-} from "vue";
+import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
   components: {
-    AppPageHeader,
+    OPageHeader,
+    OPageLayout,
     PipelineSectionTabs,
     OButton,
     ODropdown,
     ODropdownItem,
-    OInput,
   },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
 
     // Maps each route to the Level-2 section it belongs under. Pipeline
@@ -198,30 +195,26 @@ export default defineComponent({
 
     const routeName = computed(() => router.currentRoute.value.name as string);
 
-    const activeTab: any = ref(
-      routeToFunctionsTab[routeName.value] ?? "streamPipelines",
-    );
+    const activeTab: any = ref(routeToFunctionsTab[routeName.value] ?? "streamPipelines");
     watch(routeName, (name) => {
       if (routeToFunctionsTab[name]) activeTab.value = routeToFunctionsTab[name];
     });
 
-    const orgIdentifier = computed(
-      () => store.state.selectedOrganization.identifier,
-    );
+    const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
     // ── Level 3 detail crumb ────────────────────────────────────────────────
-    const detailLabels: Record<string, () => string> = {
-      pipelineEditor: () =>
-        (router.currentRoute.value.query.name as string) || "Edit Pipeline",
+    const detailLabels: Record<string, () => I18nText> = {
+      pipelineEditor: () => {
+        const name = router.currentRoute.value.query.name as string;
+        return name ? raw(name) : t("pipeline.editPipeline");
+      },
       createPipeline: () => t("pipeline.addPipeline"),
       importPipeline: () => t("pipeline.import"),
       pipelineHistory: () => t("pipeline.history"),
       pipelineBackfill: () => t("pipeline.backfill"),
     };
     const isDetailView = computed(() => routeName.value in detailLabels);
-    const breadcrumbLabel = computed(
-      () => detailLabels[routeName.value]?.() ?? "",
-    );
+    const breadcrumbLabel = computed(() => detailLabels[routeName.value]?.() ?? raw(""));
 
     // On a detail sub-page (editor/create/history/backfill) the leading icon
     // becomes a Back button to the pipelines list, mirroring the CRUD sub-page
@@ -241,6 +234,13 @@ export default defineComponent({
     // Header actions live on the Pipelines index page only.
     const showPipelineActions = computed(() => routeName.value === "pipelines");
 
+    // Sections that render their OWN OPageLayout header (Functions, Enrichment
+    // Tables). They're rendered directly instead of nested inside the shell's
+    // OPageLayout, so their header sits flush at the top like any normal page.
+    const sectionOwnsHeader = computed(
+      () => routeName.value === "functionList" || routeName.value === "enrichmentTables",
+    );
+
     // Responsive: collapse secondary actions into an overflow menu when narrow.
     const windowWidth = ref(window.innerWidth);
     const onWindowResize = () => {
@@ -257,14 +257,10 @@ export default defineComponent({
 
     // ── Navigation handlers ─────────────────────────────────────────────────
     const orgQuery = () => ({ org_identifier: orgIdentifier.value });
-    const goToAddPipeline = () =>
-      router.push({ name: "createPipeline", query: orgQuery() });
-    const goToImportPipeline = () =>
-      router.push({ name: "importPipeline", query: orgQuery() });
-    const goToPipelineHistory = () =>
-      router.push({ name: "pipelineHistory", query: orgQuery() });
-    const goToBackfillJobs = () =>
-      router.push({ name: "pipelineBackfill", query: orgQuery() });
+    const goToAddPipeline = () => router.push({ name: "createPipeline", query: orgQuery() });
+    const goToImportPipeline = () => router.push({ name: "importPipeline", query: orgQuery() });
+    const goToPipelineHistory = () => router.push({ name: "pipelineHistory", query: orgQuery() });
+    const goToBackfillJobs = () => router.push({ name: "pipelineBackfill", query: orgQuery() });
 
     watch(
       () => router.currentRoute.value.name,
@@ -289,20 +285,9 @@ export default defineComponent({
       emit("sendToAiChat", value, append);
     };
 
-    const pipelineNameInputRef = ref<any>(null);
-
-    // Auto-focus the pipeline name input when a validation error is triggered
-    watch(
-      () => pipelineObj.pipelineNameError,
-      (hasError) => {
-        if (hasError && pipelineNameInputRef.value) {
-          pipelineNameInputRef.value.focus();
-        }
-      },
-    );
-
     return {
       t,
+      raw,
       store,
       config,
       orgIdentifier,
@@ -311,6 +296,7 @@ export default defineComponent({
       breadcrumbLabel,
       detailBack,
       showPipelineActions,
+      sectionOwnsHeader,
       shouldCollapseActions,
       goToAddPipeline,
       goToImportPipeline,
@@ -318,8 +304,6 @@ export default defineComponent({
       goToBackfillJobs,
       sendToAiChat,
       routeName,
-      pipelineObj,
-      pipelineNameInputRef,
     };
   },
 });

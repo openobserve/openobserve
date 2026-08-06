@@ -15,46 +15,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="promql-table-chart"
-    style="
-      height: 100%;
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    "
-  >
-    <div style="height: 100%; position: relative">
+  <div class="relative flex h-full w-full flex-col" data-test="promql-table-chart">
+    <div class="relative h-full">
       <TableRenderer
         ref="innerTableRef"
         :data="{ rows: filteredTableRows, columns: tableColumns }"
-        :wrap-cells="config.wrap_table_cells"
-        :value-mapping="config.mappings ?? []"
-        :show-pagination="config.table_pagination && !store.state.printMode"
-        :rows-per-page="config.table_pagination_rows_per_page"
+        :wrap-cells="panelConfig.wrap_table_cells"
+        :value-mapping="panelConfig.mappings ?? []"
+        :show-pagination="panelConfig.table_pagination && !store.state.printMode"
+        :rows-per-page="panelConfig.table_pagination_rows_per_page"
         :enable-filtering="enableFiltering"
         @row-click="$emit('row-click', $event)"
       >
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
-          <div class="tw:flex tw:items-center tw:w-full" data-test="dashboard-table-pagination">
-            <div class="tw:flex tw:items-center tw:gap-1">
+          <div class="flex w-full items-center" data-test="dashboard-table-pagination">
+            <div class="flex items-center gap-1">
               <OSelect
+                class="max-w-100 min-w-50"
                 v-model="selectedLegend"
                 :options="legendOptions"
-                style="min-width: 200px; max-width: 400px"
-                placeholder="Select series to filter"
+                :placeholder="t('dashboard.promQLTableChart.selectSeriesToFilter')"
               >
                 <template #icon-left>
                   <OIcon name="filter-list" size="xs" />
                 </template>
               </OSelect>
             </div>
-            <div class="tw:flex-1" />
+            <div class="flex-1" />
             <TablePaginationControls
-              :show-pagination="config.table_pagination && !store.state.printMode"
+              :show-pagination="panelConfig.table_pagination && !store.state.printMode"
               :pagination="scope.pagination"
               :pagination-options="scope.paginationOptions"
               :total-rows="scope.totalRows"
@@ -77,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -98,11 +90,10 @@ export default defineComponent({
       default: false,
     },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect,
-    OIcon,
-},
+  components: { TableRenderer, TablePaginationControls, OSelect, OIcon },
   setup(props) {
     const store = useStore();
+    const { t } = useI18nTyped();
     const filter = ref("");
     const loading = ref(false);
     const innerTableRef = ref<any>(null);
@@ -121,7 +112,7 @@ export default defineComponent({
         console.warn("No rows found in table data");
         return [];
       }
-      // Add unique ID to each row for q-table
+      // Add unique ID to each row for the table
       const rows = props.data.rows.map((row: any, index: number) => ({
         id: `row_${index}`,
         ...row,
@@ -152,7 +143,7 @@ export default defineComponent({
 
       if (tableMode === "all") {
         // In "all" mode, add "All series" option
-        options.push({ label: "All series", value: "__all__" });
+        options.push({ label: t("dashboard.promQLTableChart.allSeries"), value: "__all__" });
       }
 
       // Add individual legend options
@@ -169,9 +160,7 @@ export default defineComponent({
     const showLegendFooter = computed(() => {
       const tableMode = props.config?.promql_table_mode || "single";
       // Show legend footer in both "single" and "expanded_timeseries" modes
-      return (
-        (tableMode === "single" || tableMode === "expanded_timeseries")
-      );
+      return tableMode === "single" || tableMode === "expanded_timeseries";
     });
 
     // Filter rows based on selected legend
@@ -205,7 +194,7 @@ export default defineComponent({
     // Watch for data changes and set default legend only if not already set or legend options changed
     watch(
       () => props.data,
-      (newData) => {
+      () => {
         // Only set default legend if no legend is selected yet or if current selection is invalid
         if (legendOptions.value.length > 0) {
           const currentSelectionValid = legendOptions.value.some(
@@ -230,7 +219,7 @@ export default defineComponent({
     );
 
     // Make config reactive to prop changes
-    const config = computed(() => props.config || {});
+    const panelConfig = computed(() => props.config || {});
 
     const downloadTableAsCSV = (title?: string) => {
       innerTableRef.value?.downloadTableAsCSV(title);
@@ -241,6 +230,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       filter,
       store,
       loading,
@@ -252,7 +242,7 @@ export default defineComponent({
       selectedLegend,
       legendOptions,
       showLegendFooter,
-      config,
+      panelConfig,
       downloadTableAsCSV,
       downloadTableAsJSON,
     };

@@ -40,9 +40,11 @@ describe("FrustrationEventBadge", () => {
 
       // Assert
       expect(wrapper.find('[data-test="frustration-event-badge-wrapper"]').exists()).toBe(true);
-      expect(wrapper.findAll('[data-test^="frustration-event-badge-"]').filter(
-        (el) => el.attributes("data-test") !== "frustration-event-badge-wrapper"
-      )).toHaveLength(0);
+      expect(
+        wrapper
+          .findAll('[data-test^="frustration-event-badge-"]')
+          .filter((el) => el.attributes("data-test") !== "frustration-event-badge-wrapper"),
+      ).toHaveLength(0);
     });
   });
 
@@ -108,7 +110,9 @@ describe("FrustrationEventBadge", () => {
       wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["dead_click"] } });
 
       // Assert
-      expect(wrapper.find('[data-test="frustration-event-badge-dead_click"]').attributes("title")).toBeDefined();
+      expect(
+        wrapper.find('[data-test="frustration-event-badge-dead_click"]').attributes("title"),
+      ).toBeDefined();
     });
 
     it("has a title attribute on the error_click badge", () => {
@@ -116,7 +120,9 @@ describe("FrustrationEventBadge", () => {
       wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["error_click"] } });
 
       // Assert
-      expect(wrapper.find('[data-test="frustration-event-badge-error_click"]').attributes("title")).toBeDefined();
+      expect(
+        wrapper.find('[data-test="frustration-event-badge-error_click"]').attributes("title"),
+      ).toBeDefined();
     });
   });
 
@@ -150,7 +156,9 @@ describe("FrustrationEventBadge", () => {
       // Arrange
       wrapper = mount(FrustrationEventBadge, { props: { frustrationTypes: ["unknown_type"] } });
 
-      expect(wrapper.find('[data-test="frustration-event-badge-unknown_type"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="frustration-event-badge-unknown_type"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("Unknown Type");
     });
 

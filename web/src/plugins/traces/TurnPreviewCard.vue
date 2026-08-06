@@ -28,58 +28,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Child mode (app convention): OTooltip attaches to its trigger sibling
        (the slotted chip). Wrapper is `display:contents` so it adds no box. -->
-  <span class="tw:contents">
+  <span class="contents">
     <slot />
-    <OTooltip :side="side" :delay="delay" max-width="260px" content-class="tw:p-0!">
+    <OTooltip :side="side" :delay="delay" max-width="260px" content-class="p-0!">
       <template #content>
         <div
-          class="tw:w-[252px] tw:py-[11px] tw:px-3 tw:text-xs tw:text-[var(--o2-text-primary)]"
+          class="text-text-body w-63 px-3 py-2.75 text-xs"
           :data-test="`turn-preview-${index + 1}`"
         >
           <!-- Header: Turn N · time · status -->
-          <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-            <span class="tw:text-[12.5px] tw:font-bold">
-              {{ t('traces.sessionDetail.turnLabel') }} {{ index + 1 }}
+          <div class="mb-2 flex items-center gap-2">
+            <span class="text-compact font-bold">
+              {{ t("traces.sessionDetail.turnLabel") }} {{ index + 1 }}
             </span>
-            <span class="tw:text-[10px] tw:text-[var(--o2-text-muted)]">{{ timeLabel }}</span>
+            <span class="text-3xs text-text-muted">{{ timeLabel }}</span>
             <OBadge
               size="sm"
-              class="tw:ml-auto"
+              class="ml-auto"
               :variant="turn.status === 'error' ? 'error-soft' : 'success-soft'"
             >
-              {{ turn.status === 'error' ? t('traces.sessionDetail.statusError') : t('traces.sessionDetail.statusOk') }}
+              {{
+                turn.status === "error"
+                  ? t("traces.sessionDetail.statusError")
+                  : t("traces.sessionDetail.statusOk")
+              }}
             </OBadge>
           </div>
 
           <!-- User message preview -->
-          <div class="tw:mb-[9px] tw:leading-[1.5]">
+          <div class="mb-2.25 leading-[1.5]">
             <span
-              class="tw:block tw:text-[9.5px] tw:font-bold tw:uppercase tw:tracking-[0.05em] tw:text-[var(--o2-text-muted)] tw:mb-0.5"
+              class="text-3xs text-text-muted mb-0.5 block font-bold tracking-[0.05em] uppercase"
             >
-              {{ t('traces.sessionDetail.roles.user') }}
+              {{ t("traces.sessionDetail.roles.user") }}
             </span>
-            <span class="tw:line-clamp-2">{{ userText }}</span>
+            <span class="line-clamp-2">{{ userText }}</span>
           </div>
 
           <!-- Stats grid: Cost · Latency · Tokens · Cache -->
           <div
-            class="tw:grid tw:grid-cols-2 tw:gap-x-3 tw:gap-y-[7px] tw:border-t tw:border-[var(--o2-border-color)] tw:pt-[9px]"
+            class="border-card-glass-border grid grid-cols-2 gap-x-3 gap-y-[7px] border-t pt-2.25"
           >
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.stats.cost') }}</span>
-              <span class="tw:font-[650]">{{ costLabel }}</span>
+            <div class="text-2xs flex items-center justify-between">
+              <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cost") }}</span>
+              <span class="font-[650]">{{ costLabel }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.duration') }}</span>
-              <span class="tw:font-[650]">{{ latencyLabel }}</span>
+            <div class="text-2xs flex items-center justify-between">
+              <span class="text-text-muted">{{ t("traces.sessionDetail.kpi.duration") }}</span>
+              <span class="font-[650]">{{ latencyLabel }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.kpi.tokens') }}</span>
-              <span class="tw:font-[650]">{{ tokensLabel }}</span>
+            <div class="text-2xs flex items-center justify-between">
+              <span class="text-text-muted">{{ t("traces.sessionDetail.kpi.tokens") }}</span>
+              <span class="font-[650]">{{ tokensLabel }}</span>
             </div>
-            <div class="tw:flex tw:items-center tw:justify-between tw:text-[11px]">
-              <span class="tw:text-[var(--o2-text-muted)]">{{ t('traces.sessionDetail.stats.cache') }}</span>
-              <span class="tw:font-[650]">{{ cachePct }}%</span>
+            <div class="text-2xs flex items-center justify-between">
+              <span class="text-text-muted">{{ t("traces.sessionDetail.stats.cache") }}</span>
+              <span class="font-[650]">{{ cachePct }}%</span>
             </div>
           </div>
         </div>
@@ -90,15 +94,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { formatDate } from "@/utils/date";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import type { SessionTraceRow } from "./composables/useSessions";
-import {
-  splitNumberWithUnit,
-  splitDuration,
-} from "./llmInsightsDashboard.utils";
+import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
 
 const props = withDefaults(
   defineProps<{
@@ -118,7 +119,7 @@ const props = withDefaults(
   { side: "top", delay: 120 },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // start_time is nanoseconds; ms = nanos / 1_000_000 (matches SessionsList).
 const timeLabel = computed(() =>

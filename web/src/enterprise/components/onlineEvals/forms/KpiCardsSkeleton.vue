@@ -2,31 +2,22 @@
      drawers. Renders `count` card-shaped tiles (multi-root v-for) so they drop
      straight into the parent's KPI grid as direct children, keeping the same
      columns + gap. Card chrome mirrors SessionDetails.vue's `.kpi-card` so the
-     skeleton matches the real cards it stands in for. Shimmer comes from the
-     shared SkeletonBox (theme-aware), same approach as LLMInsightsSkeleton. -->
+     skeleton matches the real cards it stands in for. Shimmer comes from
+     OSkeleton (theme-aware), the single skeleton primitive. -->
 <template>
   <div
     v-for="n in count"
     :key="n"
-    class="kpi-card-skeleton tw:rounded-lg tw:flex tw:flex-col tw:px-[0.875rem] tw:pt-[0.625rem] tw:pb-[0.625rem] tw:gap-[0.5rem]"
+    class="kpi-card-skeleton rounded-default bg-surface-base border-border-default flex flex-col gap-2 border px-3.5 pt-2.5 pb-2.5"
     data-test="kpi-cards-skeleton"
   >
-    <SkeletonBox width="55%" height="12px" rounded />
-    <SkeletonBox width="45%" height="22px" rounded />
+    <OSkeleton type="text" class="h-3 w-[55%]" />
+    <OSkeleton type="text" class="h-5.5 w-[45%]" />
   </div>
 </template>
 
 <script setup lang="ts">
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 
 withDefaults(defineProps<{ count?: number }>(), { count: 4 });
 </script>
-
-<style lang="scss" scoped>
-// Same chrome as the real `.kpi-card` (SessionDetails.vue) — scoped styles
-// don't pierce into child components, so the skeleton carries its own copy.
-.kpi-card-skeleton {
-  background: var(--o2-card-bg);
-  border: 1px solid var(--o2-border-color);
-}
-</style>

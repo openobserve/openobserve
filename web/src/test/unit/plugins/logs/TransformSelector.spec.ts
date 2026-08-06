@@ -58,10 +58,8 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mocked-${path}`),
 }));
 
-
 describe("TransformSelector.vue", () => {
   let store: any;
-  let $q: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,15 +77,6 @@ describe("TransformSelector.vue", () => {
         theme: "light",
       },
     });
-
-    // Mock Quasar - provide it properly
-    $q = {
-      dark: ref({
-        isActive: false,
-        mode: false,
-      }),
-      notify: vi.fn(),
-    };
   });
 
   const defaultProps = {
@@ -103,22 +92,8 @@ describe("TransformSelector.vue", () => {
       props,
       global: {
         plugins: [store, i18n],
-        mocks: {
-          $q,
-        },
         stubs: {
-          "q-toggle": { template: "<div class='q-toggle' />" },
-          "q-btn-group": { template: "<div class='q-btn-group'><slot /></div>" },
-          "q-btn-dropdown": { template: "<div class='q-btn-dropdown'><slot /></div>" },
-          "q-btn": { template: "<button class='q-btn'><slot /></button>" },
-          "OIcon": { template: "<span class='OIcon' />" },
-          "q-tooltip": { template: "<div class='q-tooltip'><slot /></div>" },
-          "q-list": { template: "<div class='q-list'><slot /></div>" },
-          "q-item": { template: "<div class='q-item'><slot /></div>" },
-          "q-item-section": { template: "<div class='q-item-section'><slot /></div>" },
-          "q-item-label": { template: "<div class='q-item-label'><slot /></div>" },
-          "q-select": { template: "<div class='q-select' />" },
-          "q-input": { template: "<input class='q-input' />" },
+          OIcon: { template: "<span class='OIcon' />" },
           ...options.stubs,
         },
         ...options.global,
@@ -157,7 +132,9 @@ describe("TransformSelector.vue", () => {
         },
       });
 
-      expect(wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="logs-search-bar-show-query-toggle-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render save button", () => {
@@ -165,26 +142,21 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": {
-              template: '<button class="save-btn" />',
-            },
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button class="save-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                '<button class="save-btn" :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
-            ODropdown: { template: '<div><slot name="trigger" /><slot /></div>', props: ['open'], emits: ['update:open'] },
+            ODropdown: {
+              template: '<div><slot name="trigger" /><slot /></div>',
+              props: ["open"],
+              emits: ["update:open"],
+            },
           },
         },
       });
@@ -199,19 +171,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
-            "q-select": {
-              template: '<div class="q-select"><slot /></div>',
-            },
+            OIcon: true,
           },
         },
       });
@@ -227,21 +188,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: "<div><slot /></div>",
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
-            "q-input": true,
-            "q-select": true,
-            "q-list": { template: "<div><slot /></div>" },
+            OIcon: true,
           },
         },
       });
@@ -255,18 +203,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
-            "q-input": true,
-            "q-select": true,
+            OIcon: true,
           },
         },
       });
@@ -281,36 +219,21 @@ describe("TransformSelector.vue", () => {
         },
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: "<div><slot /></div>",
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": { template: "<div><slot /></div>" },
-            "q-item-label": { template: "<div><slot /></div>" },
-            "q-select": true,
-            "q-input": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
             // ODropdown stub renders content directly (no portal/teleport)
             ODropdown: {
               template: '<div><slot name="trigger" /><slot /></div>',
-              props: ['open', 'side', 'align', 'sideOffset'],
-              emits: ['update:open'],
+              props: ["open", "side", "align", "sideOffset"],
+              emits: ["update:open"],
             },
           },
         },
@@ -327,26 +250,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: "<div><slot /></div>",
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
-            "q-list": { template: "<div><slot /></div>" },
-            "q-item": { template: "<div><slot /></div>" },
-            "q-item-section": {
-              template: '<div @click="$emit(\'click\')"><slot /></div>',
-            },
-            "q-item-label": { template: "<div><slot /></div>" },
-            "q-select": true,
-            "q-input": true,
+            OIcon: true,
           },
         },
       });
@@ -360,29 +265,20 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": {
-              template: '<button @click="$attrs.onClick" />',
-            },
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: { template: '<div class="btn-group"><slot /></div>' },
             ODropdown: {
               template: '<div><slot name="trigger" /><slot /></div>',
-              props: ['open'],
-              emits: ['update:open'],
+              props: ["open"],
+              emits: ["update:open"],
             },
           },
         },
@@ -404,18 +300,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": {
-              template: '<div :disable="$attrs.disable" />',
-            },
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -430,18 +316,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": {
-              template: '<button :disable="$attrs.disable" />',
-            },
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -464,20 +340,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": {
-              template: '<div class="toggle" :disable="$attrs.disable" />',
-            },
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: '<div :disable="$attrs.disable" />',
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -495,18 +359,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": {
-              template: '<div class="toggle" :disable="$attrs.disable" />',
-            },
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -523,18 +377,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": {
-              template: '<button :disable="$attrs.disable" />',
-            },
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -552,18 +396,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: '<div class="dropdown" :disable="$attrs.disable"><slot /></div>',
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -581,18 +415,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: '<div :label="$attrs.label"><slot /></div>',
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -607,16 +431,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -634,18 +450,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: '<div :label="$attrs.label"><slot /></div>',
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -663,16 +469,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -692,16 +490,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -720,16 +510,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -739,7 +521,11 @@ describe("TransformSelector.vue", () => {
   });
 
   describe("theme support", () => {
-    it("should apply dark theme class", () => {
+    // Theming is token-driven (.dark on <html> + --color-* tokens that flip on
+    // their own); components no longer carry a per-theme root class. This guards
+    // that the legacy `dark-theme` mechanism does not come back — the component
+    // renders its button group identically regardless of store theme.
+    it("does not apply a legacy dark-theme class", () => {
       const darkStore = createStore({
         state: {
           theme: "dark",
@@ -750,39 +536,31 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [darkStore, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": {
-              template:
-                '<div class="btn-group" :class="$attrs.class"><slot /></div>',
-            },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
             OButton: {
-              name: 'OButton',
-              template: '<button :data-test="$attrs[\'data-test\']" @click="$emit(\'click\', $event)"><slot /></button>',
-              props: ['variant', 'size', 'disabled'],
-              emits: ['click'],
+              name: "OButton",
+              template:
+                "<button :data-test=\"$attrs['data-test']\" @click=\"$emit('click', $event)\"><slot /></button>",
+              props: ["variant", "size", "disabled"],
+              emits: ["click"],
             },
             OButtonGroup: {
               template: '<div class="btn-group" :class="$attrs.class"><slot /></div>',
             },
             ODropdown: {
               template: '<div><slot name="trigger" /><slot /></div>',
-              props: ['open'],
-              emits: ['update:open'],
+              props: ["open"],
+              emits: ["update:open"],
             },
           },
         },
       });
 
       const btnGroup = wrapper.find(".btn-group");
-      expect(btnGroup.classes()).toContain("dark-theme");
+      expect(btnGroup.exists()).toBe(true);
+      expect(btnGroup.classes()).not.toContain("dark-theme");
+      expect(btnGroup.classes()).not.toContain("light-theme");
     });
   });
 
@@ -803,18 +581,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": {
-              template: '<div :label="$attrs.label"><slot /></div>',
-            },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -834,16 +602,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -862,16 +622,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": true,
+            OIcon: true,
           },
         },
       });
@@ -890,16 +642,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": { template: "<div class='tooltip'><slot /></div>" },
+            OIcon: true,
           },
         },
       });
@@ -917,16 +661,8 @@ describe("TransformSelector.vue", () => {
         props: defaultProps,
         global: {
           plugins: [store, i18n],
-          mocks: {
-            $q,
-          },
           stubs: {
-            "q-toggle": true,
-            "q-btn-group": { template: "<div><slot /></div>" },
-            "q-btn-dropdown": { template: "<div><slot /></div>" },
-            "q-btn": true,
-            "OIcon": true,
-            "q-tooltip": { template: "<div class='tooltip'><slot /></div>" },
+            OIcon: true,
           },
         },
       });

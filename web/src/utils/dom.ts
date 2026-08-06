@@ -1,10 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-export function downloadFile(
-  fileName: string,
-  data: string,
-  mimeType: string,
-): boolean {
+export function downloadFile(fileName: string, data: string, mimeType: string): boolean {
   try {
     const blob = new Blob([data], { type: mimeType });
     const url = URL.createObjectURL(blob);

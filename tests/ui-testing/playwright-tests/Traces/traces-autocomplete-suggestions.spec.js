@@ -122,14 +122,14 @@ async function tryExpandField(page, pm) {
     }
 
     // Strategy 2: Click on field expansion headers in the traces field list
-    // Traces uses q-expansion-item with class 'field-expansion-item'
+    // Traces renders field rows with class 'field-expansion-item'
     // The clickable header has class 'field-expansion-header'
     // Using page object selector for the fields table
     const fieldsTableSelector = pm.tracesPage.fieldsTable || '[data-test="log-search-index-list-fields-table"]';
     const fieldsTable = page.locator(fieldsTableSelector);
     if (await fieldsTable.isVisible({ timeout: 5000 }).catch(() => false)) {
         // Look for field expansion items directly on the page (they're inside the table)
-        // Note: .field-expansion-item is a Quasar component class, not a data-test selector
+        // Note: .field-expansion-item is a framework component class, not a data-test selector
         const fieldHeaders = page.locator('.field-expansion-item .field-expansion-header');
         const headerCount = await fieldHeaders.count();
         testLogger.info(`Found ${headerCount} field expansion headers in traces field list`);

@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { nextTick } from "vue";
 import ODrawer from "./ODrawer.vue";
 import { DialogContent } from "reka-ui";
 
@@ -94,18 +93,14 @@ describe("ODrawer", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent" },
     });
-    expect(
-      wrapper.find('button[aria-label="Close drawer"]').exists(),
-    ).toBe(true);
+    expect(wrapper.find('button[aria-label="Close drawer"]').exists()).toBe(true);
   });
 
   it("hides the close button when showClose=false even with persistent=true", () => {
     const wrapper = mount(ODrawer, {
       props: { open: true, persistent: true, title: "Persistent", showClose: false },
     });
-    expect(
-      wrapper.find('button[aria-label="Close drawer"]').exists(),
-    ).toBe(false);
+    expect(wrapper.find('button[aria-label="Close drawer"]').exists()).toBe(false);
   });
 
   it("applies right-side classes by default", () => {
@@ -113,7 +108,7 @@ describe("ODrawer", () => {
       props: { open: true },
     });
     const content = wrapper.find("[data-o2-drawer]");
-    expect(content.classes().join(" ")).toContain("tw:right-0");
+    expect(content.classes().join(" ")).toContain("right-0");
   });
 
   it("applies left-side classes when side=left", () => {
@@ -121,7 +116,7 @@ describe("ODrawer", () => {
       props: { open: true, side: "left" },
     });
     const content = wrapper.find("[data-o2-drawer]");
-    expect(content.classes().join(" ")).toContain("tw:left-0");
+    expect(content.classes().join(" ")).toContain("left-0");
   });
 
   it("accepts open prop changes without error (controlled mode)", async () => {
@@ -149,8 +144,8 @@ describe("ODrawer", () => {
         slots: { "header-right": '<button data-testid="hr-btn">Action</button>' },
       });
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
-      expect(hrWrapper.className).toContain("tw:shrink-0");
-      expect(hrWrapper.className).not.toContain("tw:flex-1");
+      expect(hrWrapper.className).toContain("shrink-0");
+      expect(hrWrapper.className).not.toContain("flex-1");
     });
 
     it("spacer appears before header-right in DOM (keeps content right-aligned)", () => {
@@ -162,7 +157,7 @@ describe("ODrawer", () => {
       const headerEl = closeBtn.element.parentElement!;
       const children = Array.from(headerEl.children) as HTMLElement[];
       const spacer = children.find(
-        (el) => el.className.includes("tw:flex-1") && !el.className.includes("tw:min-w-0"),
+        (el) => el.className.includes("flex-1") && !el.className.includes("min-w-0"),
       );
       const hrWrapper = wrapper.find('[data-testid="hr-btn"]').element.parentElement!;
       expect(spacer).toBeDefined();
@@ -178,7 +173,7 @@ describe("ODrawer", () => {
       // The close button is a direct child of the header div
       const closeBtn = wrapper.find('button[aria-label="Close drawer"]');
       const headerEl = closeBtn.element.parentElement;
-      expect(headerEl?.className).toContain("tw:shrink-0");
+      expect(headerEl?.className).toContain("shrink-0");
     });
 
     it("body has flex-1 and min-h-0 so it fills available space and the footer stays anchored", () => {
@@ -188,9 +183,9 @@ describe("ODrawer", () => {
       });
       const bodyContent = wrapper.find('[data-testid="body-content"]');
       const bodyEl = bodyContent.element.parentElement;
-      expect(bodyEl?.className).toContain("tw:flex-1");
-      expect(bodyEl?.className).toContain("tw:min-h-0");
-      expect(bodyEl?.className).toContain("tw:overflow-y-auto");
+      expect(bodyEl?.className).toContain("flex-1");
+      expect(bodyEl?.className).toContain("min-h-0");
+      expect(bodyEl?.className).toContain("overflow-y-auto");
     });
 
     it("footer has shrink-0 class (does not expand to fill space)", () => {
@@ -200,53 +195,13 @@ describe("ODrawer", () => {
       });
       const footerBtn = wrapper.find('[data-testid="footer-btn"]');
       const footerEl = footerBtn.element.parentElement;
-      expect(footerEl?.className).toContain("tw:shrink-0");
-      expect(footerEl?.className).not.toContain("tw:flex-1");
-      expect(footerEl?.className).not.toContain("tw:mt-auto");
+      expect(footerEl?.className).toContain("shrink-0");
+      expect(footerEl?.className).not.toContain("flex-1");
+      expect(footerEl?.className).not.toContain("mt-auto");
     });
   });
 
   describe("body action button validation suppression", () => {
-    it("AC-1/AC-2: focusin on a non-input body element calls resetValidation on q-fields", async () => {
-      const resetValidation = vi.fn();
-      const wrapper = mount(ODrawer, {
-        props: { open: true },
-        slots: {
-          default: `
-            <div class="q-field" data-testid="name-field"></div>
-            <button data-testid="action-btn">+</button>
-          `,
-        },
-      });
-      // Attach the vue component instance mock so clearBodyValidation can reach it
-      const qField = wrapper.find('[data-testid="name-field"]').element as any;
-      qField.__vueParentComponent = { ctx: { resetValidation } };
-
-      await wrapper.find('[data-testid="action-btn"]').trigger("focusin");
-
-      expect(resetValidation).toHaveBeenCalled();
-    });
-
-    it("AC-1/AC-2: focusin on a native input inside q-field does NOT call resetValidation", async () => {
-      const resetValidation = vi.fn();
-      const wrapper = mount(ODrawer, {
-        props: { open: true },
-        slots: {
-          default: `
-            <div class="q-field">
-              <input data-testid="name-input" />
-            </div>
-          `,
-        },
-      });
-      const qField = wrapper.find(".q-field").element as any;
-      qField.__vueParentComponent = { ctx: { resetValidation } };
-
-      await wrapper.find('[data-testid="name-input"]').trigger("focusin");
-
-      expect(resetValidation).not.toHaveBeenCalled();
-    });
-
     it("AC-4: primary button emits click:primary so consumer can trigger validation", async () => {
       const wrapper = mount(ODrawer, {
         props: { open: true, primaryButtonLabel: "Save" },
@@ -271,10 +226,7 @@ describe("ODrawer", () => {
         props: { open: true, title: "Test" },
       });
       const panel = findDrawerPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       const emitted = wrapper.emitted("update:open");
       expect(emitted).toBeTruthy();
       expect(emitted?.[0]).toEqual([false]);
@@ -285,10 +237,7 @@ describe("ODrawer", () => {
         props: { open: true, title: "Test", persistent: true },
       });
       const panel = findDrawerPanel(wrapper);
-      await panel.vm.$emit(
-        "escapeKeyDown",
-        new KeyboardEvent("keydown", { key: "Escape" }),
-      );
+      await panel.vm.$emit("escapeKeyDown", new KeyboardEvent("keydown", { key: "Escape" }));
       expect(wrapper.emitted("update:open")).toBeFalsy();
     });
   });

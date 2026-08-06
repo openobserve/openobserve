@@ -61,7 +61,10 @@ const mockSearchObj = reactive({
 });
 
 vi.mock("@/composables/useTraces", () => ({
-  default: () => ({ searchObj: mockSearchObj }),
+  default: () => ({
+    searchObj: mockSearchObj,
+    tracesParser: { value: null },
+  }),
 }));
 
 vi.mock("@/composables/useNotifications", () => ({
@@ -70,8 +73,7 @@ vi.mock("@/composables/useNotifications", () => ({
 
 // convertDashboardSchemaVersion: return the object unchanged so SQL is preserved
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
-  convertDashboardSchemaVersion: (data: any) =>
-    JSON.parse(JSON.stringify(data)),
+  convertDashboardSchemaVersion: (data: any) => JSON.parse(JSON.stringify(data)),
 }));
 
 // parseDurationWhereClause: return the input filter string unchanged
@@ -106,7 +108,6 @@ vi.mock("@/utils/zincutils", () => ({
 
 import useParser from "@/composables/useParser";
 import TracesMetricsDashboard from "./TracesMetricsDashboard.vue";
-
 
 // ---------------------------------------------------------------------------
 // Test store — minimal shape the component queries via useStore()
@@ -214,9 +215,7 @@ describe("TracesMetricsDashboard", () => {
     });
 
     it("should not render TracesAnalysisDashboard on initial mount", () => {
-      const analysisDashboard = wrapper.find(
-        '[data-test="traces-analysis-dashboard"]',
-      );
+      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
       expect(analysisDashboard.exists()).toBe(false);
     });
   });
@@ -587,9 +586,7 @@ describe("TracesMetricsDashboard", () => {
     it("should render TracesAnalysisDashboard after openUnifiedAnalysisDashboard is called", async () => {
       wrapper.vm.openUnifiedAnalysisDashboard();
       await flushPromises();
-      const analysisDashboard = wrapper.find(
-        '[data-test="traces-analysis-dashboard"]',
-      );
+      const analysisDashboard = wrapper.find('[data-test="traces-analysis-dashboard"]');
       expect(analysisDashboard.exists()).toBe(true);
     });
 

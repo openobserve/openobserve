@@ -18,7 +18,12 @@ import PageManager from "../../pages/page-manager.js";
 const testLogger = require('../utils/test-logger.js');
 const path = require('path');
 
-test.describe.configure({ mode: "serial" });
+// Parallel-safe: each test uses a unique per-test source stream
+// (generateUniqueStreamName) and its own destination stream, has no order
+// dependency, and the beforeEach hook is per-test and non-destructive. Running in
+// parallel lets these tests use idle workers instead of monopolising a single
+// worker serially (the file was the 2nd-slowest pole at ~5.4m).
+test.describe.configure({ mode: "parallel" });
 
 // Use stored authentication state from global setup instead of logging in each test
 const authFile = path.join(__dirname, '../utils/auth/user.json');
@@ -153,8 +158,10 @@ test.describe("Traces Pipeline Tests", { tag: ['@all', '@pipelines', '@traces', 
     await pageManager.pipelinesPage.addPipeline();
     await page.waitForTimeout(500);
 
-    // Verify dialog opened - check for pipeline name input using POM
-    await expect(pageManager.pipelinesPage.pipelineNameInput).toBeVisible();
+    // Verify the editor opened. The pipeline name is now an inline-edited title:
+    // in display mode it shows a trigger (the input only mounts once clicked), so
+    // the trigger is the correct "form is open" signal.
+    await expect(pageManager.pipelinesPage.pipelineNameTrigger).toBeVisible();
     testLogger.info('Pipeline name input is visible');
 
     // Enter a pipeline name using POM method

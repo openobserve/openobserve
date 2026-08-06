@@ -1,19 +1,35 @@
 
 import logsdata from "../../../test-data/logs_data.json";
 const http = require('http');
+const https = require('https');
 const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 // node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
 // "Premature close" / ECONNRESET flakiness in CI.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false });
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) ingestion URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+  parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 async function fetchWithRetry(url, options, maxRetries = 3) {
-  const requestOpts = { ...options, compress: false, agent: noKeepAliveAgent };
+  const requestOpts = { ...options, compress: false, agent: selectAgent };
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      return await nodeFetch(url, requestOpts);
+      const response = await nodeFetch(url, requestOpts);
+      // Retry transient 5xx (alpha returns 503/502 on ingestion during load spikes) —
+      // a bare fetch treats those as success and the caller throws on the first one.
+      // A persistent 5xx still returns after maxRetries, so nothing is masked.
+      if (response.status >= 500 && attempt < maxRetries) {
+        const backoffMs = 800 * (attempt + 1);
+        testLogger.warn('Transient 5xx from ingestion, retrying', { url, status: response.status, attempt: attempt + 1, maxRetries, backoffMs });
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      return response;
     } catch (err) {
       const message = String(err && err.message ? err.message : err);
       const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);

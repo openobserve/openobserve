@@ -2,6 +2,9 @@
 
 <script setup lang="ts">
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineProps<{
   message?: string | null;
@@ -17,20 +20,16 @@ defineSlots<{
 </script>
 
 <template>
-  <div data-test="o2-table-error" class="tw:py-4 tw:px-2">
+  <div data-test="o2-table-error" class="px-2 py-4">
     <slot :message="message ?? ''">
-      <OBanner
-        variant="error"
-        :content="message ?? ''"
-        inline-actions
-      >
+      <OBanner variant="error" :content="raw(message ?? '')" inline-actions>
         <template v-if="message" #actions>
           <button
             data-test="o2-table-error-retry-btn"
-            class="tw:px-3 tw:py-1 tw:text-sm tw:rounded tw:bg-white/20 tw:hover:bg-white/30 tw:transition-colors"
+            class="rounded-default bg-white/20 px-3 py-1 text-sm transition-colors hover:bg-white/30"
             @click="$emit('retry')"
           >
-            Retry
+            {{ t("common.retry") }}
           </button>
         </template>
       </OBanner>

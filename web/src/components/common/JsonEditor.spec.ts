@@ -20,7 +20,6 @@ import JsonEditor from "@/components/common/JsonEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
 vi.mock("@/utils/zincutils", () => ({
@@ -249,7 +248,7 @@ describe("JsonEditor", () => {
       const modified = JSON.stringify({ id: "hacked", name: "original" });
       (wrapper.vm as any).handleEditorChange(modified);
       await nextTick();
-      const errors: string[] = (wrapper.vm as any).validationErrors;
+      const errors: string[] = (wrapper.vm as any).localValidationErrors;
       expect(errors.some((e: string) => e.includes("Cannot modify"))).toBe(true);
     });
 
@@ -267,19 +266,19 @@ describe("JsonEditor", () => {
       wrapper = createWrapper();
       (wrapper.vm as any).handleEditorChange("not-valid-json{{{");
       await nextTick();
-      expect((wrapper.vm as any).validationErrors).toContain("Invalid JSON format");
+      expect((wrapper.vm as any).localValidationErrors).toContain("Invalid JSON format");
     });
 
     it("clears previous protected-field errors when JSON is valid and no changes", async () => {
       const data = { id: "1", name: "a" };
       wrapper = createWrapper({ data, type: "alerts" });
-      (wrapper.vm as any).validationErrors = [
+      (wrapper.vm as any).localValidationErrors = [
         "Cannot modify id field directly , will be reverted to the original value",
       ];
       const goodJson = JSON.stringify({ id: "1", name: "a" });
       (wrapper.vm as any).handleEditorChange(goodJson);
       await nextTick();
-      const errors: string[] = (wrapper.vm as any).validationErrors;
+      const errors: string[] = (wrapper.vm as any).localValidationErrors;
       expect(errors.some((e: string) => e.startsWith("Cannot modify"))).toBe(false);
     });
   });
@@ -314,7 +313,7 @@ describe("JsonEditor", () => {
       (wrapper.vm as any).jsonContent = "{ invalid json }";
       (wrapper.vm as any).saveChanges();
       await nextTick();
-      expect((wrapper.vm as any).validationErrors).toContain("Invalid JSON format");
+      expect((wrapper.vm as any).localValidationErrors).toContain("Invalid JSON format");
     });
 
     it("does not emit 'saveJson' when jsonContent is invalid JSON", async () => {
@@ -339,21 +338,17 @@ describe("JsonEditor", () => {
     it("shows validation errors section when validationErrors is non-empty", async () => {
       wrapper = createWrapper({ validationErrors: ["Field 'id' is required"] });
       await nextTick();
-      expect(
-        wrapper
-          .find('[data-test="common-json-editor-validation-errors"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="common-json-editor-validation-errors"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.text()).toContain("Field 'id' is required");
     });
 
     it("hides validation errors section when validationErrors is empty", () => {
       wrapper = createWrapper({ validationErrors: [] });
-      expect(
-        wrapper
-          .find('[data-test="common-json-editor-validation-errors"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="common-json-editor-validation-errors"]').exists()).toBe(
+        false,
+      );
     });
 
     it("renders multiple validation errors as list items", async () => {
@@ -361,9 +356,7 @@ describe("JsonEditor", () => {
         validationErrors: ["Error one", "Error two", "Error three"],
       });
       await nextTick();
-      const errors = wrapper.findAll(
-        '[data-test="common-json-editor-validation-errors"] li',
-      );
+      const errors = wrapper.findAll('[data-test="common-json-editor-validation-errors"] li');
       expect(errors.length).toBe(3);
     });
   });
@@ -492,15 +485,18 @@ describe("JsonEditor", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       await nextTick();
-      expect(wrapper.html()).toContain("tw:bg-(--o2-primary-background)");
+      // Dark background is gated behind the `dark:` variant token
+      expect(wrapper.classes()).toContain("dark:bg-surface-base");
     });
 
-    it("does not apply dark background class on root when theme is light", async () => {
+    it("does not apply a bare surface background class on root when theme is light", async () => {
       store.state.theme = "light";
       wrapper = createWrapper();
       await nextTick();
-      // Dark background class is only applied in dark theme
-      expect(wrapper.html()).not.toContain("tw:bg-(--o2-primary-background)");
+      // The surface background is only ever applied via the `dark:` variant,
+      // never as a bare `bg-surface-base` class
+      expect(wrapper.classes()).toContain("dark:bg-surface-base");
+      expect(wrapper.classes()).not.toContain("bg-surface-base");
     });
   });
 

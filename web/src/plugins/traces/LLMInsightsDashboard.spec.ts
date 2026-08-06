@@ -86,14 +86,16 @@ vi.mock("@/composables/useStreams", () => ({
 
 vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({
-    t: (key: string, params?: Record<string, any>) =>
-      params ? key + JSON.stringify(params) : key,
+    t: (key: string, params?: Record<string, any>) => (params ? key + JSON.stringify(params) : key),
   })),
 }));
 
 vi.mock("vue-router", () => ({
   useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
-  useRoute: () => ({ query: {} }),
+  // This suite exercises the stream-mode paths. The dashboard now defaults to
+  // Agent scope and only `?type=stream` (NOT a saved preference) opts into
+  // Stream mode, so drive stream mode through the URL the way the component reads it.
+  useRoute: () => ({ query: { type: "stream" } }),
 }));
 
 // Partial-mock vuex so `createStore` (used by `src/stores/index.ts`)
@@ -137,22 +139,14 @@ function mountDashboard(
       stubs: {
         // Children — all stubbed so we don't try to render echarts /
         // sparkline math during dashboard-level tests.
-        LLMSchemaPanel: { template: "<div data-test=\"llm-schema-panel\" />" },
-        LLMErrorTable: { template: "<div data-test=\"llm-error-table\" />" },
-        KpiSparkline: { template: "<div data-test=\"kpi-sparkline\" />" },
-        LLMInsightsSkeleton: { template: "<div data-test=\"llm-insights-skeleton\" />" },
+        LLMSchemaPanel: { template: '<div data-test="llm-schema-panel" />' },
+        LLMErrorTable: { template: '<div data-test="llm-error-table" />' },
+        KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
+        LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
         OButton: {
           template: "<button @click=\"$emit('click')\"><slot /></button>",
           emits: ["click"],
         },
-        // Quasar primitives the dashboard renders.
-        QSelect: {
-          template: "<div data-test=\"q-select\" />",
-          props: ["modelValue", "options", "disable"],
-          emits: ["update:model-value"],
-        },
-        QTooltip: { template: "<div />" },
-        QIcon: { template: "<i />" },
       },
     },
   });
@@ -186,6 +180,8 @@ beforeEach(() => {
   // Reset localStorage between tests so the dashboard's stream
   // initialisation doesn't bleed across cases.
   localStorage.clear();
+  // Stream mode is opted into via `?type=stream` in the useRoute mock above
+  // (the dashboard no longer reads a saved mode preference on init).
   // Default streams response.
   mockGetStreams.mockResolvedValue({
     list: [
@@ -333,7 +329,7 @@ describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
 });
 
 // ===========================================================================
-// onStreamChange — the q-select v-model handler
+// onStreamChange — the OSelect v-model handler
 // ===========================================================================
 
 describe("LLMInsightsDashboard — onStreamChange", () => {
@@ -353,6 +349,33 @@ describe("LLMInsightsDashboard — onStreamChange", () => {
       null,
     );
     expect(localStorage.getItem(STREAM_LS_KEY)).toBe("other");
+  });
+
+  // Stream is an identity dimension: the compare A/B pair belongs to the OLD
+  // stream's agents, so switching stream must exit compare mode (otherwise the
+  // comparison lingers on agents that may not exist in the new stream).
+  it("exits compare mode when the active stream changes (stream mode)", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    // Stream mode: effectiveStream follows the page stream picker (activeStream).
+    // (In agent mode effectiveStream follows the agent's source_stream, which the
+    // selectedAgentName watcher already covers.)
+    (wrapper.vm as any).filterMode = "stream";
+    (wrapper.vm as any).activeStream = "start-stream";
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+    // Enter compare AFTER the mode/stream have settled, so the identity watcher
+    // isn't fired by the setup itself.
+    (wrapper.vm as any).compareMode = true;
+    await wrapper.vm.$nextTick();
+    expect((wrapper.vm as any).compareMode).toBe(true);
+
+    // Now the real action: switch stream → compare mode must exit.
+    (wrapper.vm as any).activeStream = "another-stream";
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    expect((wrapper.vm as any).compareMode).toBe(false);
   });
 });
 

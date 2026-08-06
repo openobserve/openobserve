@@ -6,7 +6,7 @@ the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version. -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
     :title="t('onlineEvals.scoreConfig.import.title')"
     test-prefix="score-config"
@@ -18,43 +18,43 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="tw:w-full" style="min-width: 380px">
+      <div class="flex h-full w-full flex-col" style="min-width: 380px">
         <div
           v-if="errors.length"
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
           data-test="score-config-import-errors-title"
         >
           {{ t("onlineEvals.scoreConfig.import.errors.title") }}
         </div>
         <div
           v-else
-          class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
           data-test="score-config-import-output-title"
         >
           {{ t("onlineEvals.scoreConfig.import.outputMessages") }}
         </div>
-        <OSeparator class="tw:mx-4 tw:mt-4" />
+        <OSeparator class="mt-1 shrink-0" />
 
-        <div class="tw:overflow-auto">
-          <div v-if="errors.length" class="tw:p-2.5 tw:mb-2.5">
+        <div class="min-h-0 flex-1 overflow-auto">
+          <div v-if="errors.length" class="mb-2.5 p-2.5">
             <div class="error-list">
               <div
                 v-for="(err, errIdx) in errors"
                 :key="`${err.itemIndex}-${err.field}-${errIdx}`"
-                class="tw:py-1.25 tw:text-sm"
+                class="py-1.25 text-sm"
                 :data-test="`score-config-import-error-${err.itemIndex}-${err.field}`"
               >
                 <span
                   v-if="err.field === 'name'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="score-config-import-name-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="Name *"
+                      :label="t('onlineEvals.importNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -62,15 +62,15 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'nameConflict'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="score-config-import-name-conflict-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="New Name *"
+                      :label="t('onlineEvals.importNewNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -78,16 +78,16 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'dataType'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="score-config-import-datatype-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OSelect
                       :data-test="`score-config-import-datatype-select-${err.itemIndex}`"
                       v-model="dataTypeFixers[err.itemIndex]"
                       :options="dataTypeOptions"
-                      label="Data Type *"
+                      :label="t('onlineEvals.importDataTypeRequired')"
                       @update:model-value="updateDataType(err.itemIndex, $event)"
                     />
                   </div>
@@ -95,22 +95,22 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'numericRange' && numericRangeFixers[err.itemIndex]"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="score-config-import-numeric-range-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1 tw:flex tw:gap-2" style="width: 320px">
+                  <div class="mt-1 flex gap-2" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].min"
-                      label="Min *"
+                      :label="t('onlineEvals.importMinRequired')"
                       type="number"
                       @update:model-value="updateNumericRange(err.itemIndex)"
                     />
                     <OInput
                       :data-test="`score-config-import-max-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].max"
-                      label="Max *"
+                      :label="t('onlineEvals.importMaxRequired')"
                       type="number"
                       @update:model-value="updateNumericRange(err.itemIndex)"
                     />
@@ -119,28 +119,31 @@ the Free Software Foundation, either version 3 of the License, or
 
                 <span
                   v-else-if="err.field === 'categories'"
-                  class="text-red"
+                  class="text-error-600"
                   data-test="score-config-import-categories-error"
                 >
                   {{ err.message }}
-                  <div class="tw:mt-1" style="width: 320px">
+                  <div class="mt-1" style="width: 320px">
                     <OInput
                       :data-test="`score-config-import-categories-input-${err.itemIndex}`"
                       v-model="categoriesFixers[err.itemIndex]"
-                      label="Categories (comma-separated) *"
-                      placeholder="good, ok, bad"
-                      @update:model-value="updateCategories(err.itemIndex, $event)"
+                      :label="t('onlineEvals.importCategoriesRequired')"
+                      :placeholder="t('onlineEvals.importCategoriesPlaceholder')"
+                      @update:model-value="updateCategories(err.itemIndex, $event as string)"
                     />
                   </div>
                 </span>
 
-                <span v-else class="text-red">{{ err.message }}</span>
+                <span v-else class="text-error-600">{{ err.message }}</span>
               </div>
             </div>
           </div>
 
-          <div v-if="creators.length" class="tw:p-2.5 tw:mb-2.5">
-            <div class="tw:text-base tw:mb-2.5 tw:uppercase text-primary" data-test="score-config-import-creation-title">
+          <div v-if="creators.length" class="mb-2.5 p-2.5">
+            <div
+              class="text-text-heading mb-2.5 text-base uppercase"
+              data-test="score-config-import-creation-title"
+            >
               {{ t("onlineEvals.scoreConfig.import.creation") }}
             </div>
             <div
@@ -151,30 +154,31 @@ the Free Software Foundation, either version 3 of the License, or
             >
               <div
                 :class="{
-                  'tw:font-bold tw:py-1.25 tw:px-0 tw:text-sm': true,
-                  'text-green': c.status === 'success',
-                  'text-red': c.status === 'error',
-                  'text-secondary': c.status === 'exists',
+                  'px-0 py-1.25 text-sm font-bold': true,
+                  'text-status-success-text': c.status === 'success',
+                  'text-error-600': c.status === 'error',
+                  'text-text-secondary': c.status === 'exists',
                 }"
                 :data-test="`score-config-import-creation-${i}-message`"
               >
-                <pre class="tw:whitespace-pre-wrap tw:font-[inherit] tw:m-0">{{ c.message }}</pre>
+                <pre class="m-0 font-[inherit] whitespace-pre-wrap">{{ c.message }}</pre>
               </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -198,14 +202,16 @@ const emit = defineEmits<{
   (e: "saved"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
 const existingScoreConfigs = toRef(props, "existingScoreConfigs");
 
 const errors = ref<ScoreConfigImportError[]>([]);
-const creators = ref<Array<{ name: string; status: "success" | "error" | "exists"; message: string }>>([]);
+const creators = ref<
+  Array<{ name: string; status: "success" | "error" | "exists"; message: string }>
+>([]);
 
 // Local inline-fixer state. Indexed by itemIndex in the imported batch.
 const nameFixers = reactive<Record<number, string>>({});
@@ -214,9 +220,9 @@ const numericRangeFixers = reactive<Record<number, { min: string; max: string }>
 const categoriesFixers = reactive<Record<number, string>>({});
 
 const dataTypeOptions = [
-  { label: "Numeric", value: "numeric" },
-  { label: "Categorical", value: "categorical" },
-  { label: "Boolean", value: "boolean" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.categorical"), value: "categorical" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.boolean"), value: "boolean" },
 ];
 
 const editorHeights = computed(() => ({
@@ -255,14 +261,14 @@ function getBatch(): any[] | null {
   }
 }
 
-function updateName(itemIndex: number, value: string) {
+function updateName(itemIndex: number, value: string | number) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].name = value;
   syncEditor(arr);
 }
 
-function updateDataType(itemIndex: number, value: ScoreDataType) {
+function updateDataType(itemIndex: number, value: SelectModelValue) {
   const arr = getBatch();
   if (!arr || !arr[itemIndex]) return;
   arr[itemIndex].dataType = value;
@@ -313,14 +319,17 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     }
   }
 
-  const prepared = prepareScoreConfigImport(rawItems, existingScoreConfigs.value);
+  const prepared = prepareScoreConfigImport(rawItems, existingScoreConfigs.value, t);
 
   // Seed inline fixers from current values so users see the existing data
   // they're about to overwrite, rather than empty inputs.
   for (const item of prepared.items) {
     for (const e of item.errors) {
       const raw: any = rawItems[e.itemIndex] ?? {};
-      if ((e.field === "name" || e.field === "nameConflict") && nameFixers[e.itemIndex] === undefined) {
+      if (
+        (e.field === "name" || e.field === "nameConflict") &&
+        nameFixers[e.itemIndex] === undefined
+      ) {
         nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";
       }
       if (e.field === "dataType" && dataTypeFixers[e.itemIndex] === undefined) {
@@ -398,13 +407,18 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   if (successCount === payloads.length) {
     toast({
-      message: `Successfully imported ${successCount} score config(s)`,
+      message: t("toastMessages.onlineEvals.successfullyImportedScoreConfigs", {
+        count: successCount,
+      }),
       variant: "success",
     });
     setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
-      message: `Imported ${successCount} of ${payloads.length} score config(s)`,
+      message: t("toastMessages.onlineEvals.importedOfScoreConfigs", {
+        imported: successCount,
+        count: payloads.length,
+      }),
       variant: "warning",
     });
     emit("saved");

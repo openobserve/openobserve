@@ -44,15 +44,15 @@ fn main() -> Result<()> {
         };
         let entry = Entry::from_bytes(&entry)?;
         i += 1;
+        let records = match entry.batch.as_ref() {
+            Some(batch) => batch.num_rows(),
+            None => entry.data.len(),
+        };
         println!(
             "{:05}\t{}/{}/{}\t{:?}",
-            i,
-            entry.stream,
-            entry.schema_key,
-            entry.partition_key,
-            entry.data.len()
+            i, entry.stream, entry.schema_key, entry.partition_key, records
         );
-        total += entry.data.len();
+        total += records;
     }
     println!("total: {total}");
     Ok(())

@@ -15,38 +15,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="error-viewer-container"
-    class="card-container tw:h-full tw:overflow-y-auto"
-  >
+  <div data-test="error-viewer-container" class="bg-card-glass-bg h-full overflow-y-auto">
     <template v-if="isLoading.length">
-      <div
-        class="tw:pb-4 tw:flex tw:items-center tw:justify-center tw:text-center tw:h-[calc(100vh-12.5rem)]"
-      >
+      <div class="flex h-[calc(100vh-12.5rem)] items-center justify-center pb-4 text-center">
         <div>
-          <OSpinner
-            size="md"
-            class="tw:mx-auto tw:block"
-            data-test="error-viewer-loading-indicator"
-          />
-          <div class="tw:text-center tw:w-full">
+          <OSpinner size="md" class="mx-auto block" data-test="error-viewer-loading-indicator" />
+          <div class="w-full text-center">
             {{ t("rum.loadingErrorDetails") }}
           </div>
         </div>
       </div>
     </template>
     <div v-else>
-      <div class="tw:p-[0.625rem]">
+      <div class="py-2.5">
         <ErrorHeader :error="errorDetails" />
       </div>
-      <OSeparator class="tw:w-full" />
-      <div class="tw:p-[0.625rem]">
+      <OSeparator class="w-full" />
+      <div class="px-page-edge py-2.5">
         <ErrorTags :error="errorDetails" />
-        <ErrorStackTrace
-          :error_stack="errorDetails.error_stack || []"
-          :error="errorDetails"
-        />
+        <ErrorStackTrace :error_stack="errorDetails.error_stack || []" :error="errorDetails" />
         <ErrorSessionReplay :error="errorDetails" />
+        <TraceCorrelationCard
+          v-if="errorTraceId"
+          :trace-id="errorTraceId"
+          :session-id="errorDetails.session_id || ''"
+          :timestamp="errorDetails._timestamp || 0"
+          data-test="error-viewer-trace-correlation"
+        />
         <ErrorEvents :error="errorDetails" />
       </div>
     </div>
@@ -54,26 +49,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref } from "vue";
+import { rumField } from "@/utils/rum/fields";
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "ErrorViewer" });
+
+import { computed, onActivated, ref } from "vue";
 import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
 import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
 import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
 import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
 import { useRouter } from "vue-router";
-import useQuery from "@/composables/useQuery";
 import { useStore } from "vuex";
 import useErrorTracking from "@/composables/useErrorTracking";
 import searchService from "@/services/search";
 import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
-import { useI18n } from "vue-i18n";
+import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
+import { useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const isLoading = ref<boolean[]>([]);
 const router = useRouter();
-const { getTimeInterval, parseQuery, buildQueryPayload } = useQuery();
 const store = useStore();
 const { errorTrackingState } = useErrorTracking();
 const errorDetails = ref<any>({});
@@ -85,6 +85,18 @@ onActivated(async () => {
 
 const getTimestamp = computed(() => {
   return Number(router.currentRoute.value.query.timestamp) || 30000;
+});
+
+// Trace id linking this error to a backend trace: on the error itself, or
+// on the nearest xhr/fetch event captured around the failure.
+const errorTraceId = computed(() => {
+  if (rumField(errorDetails.value, "trace_id")) {
+    return rumField<string>(errorDetails.value, "trace_id");
+  }
+  const xhrWithTrace = (errorDetails.value?.events || []).find(
+    (event: any) => event.type === "resource" && rumField(event, "trace_id"),
+  );
+  return rumField<string>(xhrWithTrace, "trace_id") || "";
 });
 
 const getErrorLogs = () => {
@@ -113,16 +125,11 @@ const getErrorLogs = () => {
       const errorIndex = res.data.hits.findIndex(
         (hit: any) => hit.error_id === errorDetails.value.error_id,
       );
-      errorDetails.value.events = res.data.hits.slice(
-        errorIndex,
-        errorIndex + 100,
-      );
-      errorDetails.value.events = errorDetails.value.events.map(
-        (event: any) => ({
-          ...event,
-          category: getErrorCategory(event),
-        }),
-      );
+      errorDetails.value.events = res.data.hits.slice(errorIndex, errorIndex + 100);
+      errorDetails.value.events = errorDetails.value.events.map((event: any) => ({
+        ...event,
+        category: getErrorCategory(event),
+      }));
     })
     .finally(() => isLoading.value.pop());
 };
@@ -131,9 +138,7 @@ const getErrorCategory = (row: any) => {
   if (row["type"] === "error") return row["error_type"] || "Error";
   else if (row["type"] === "resource") return row["resource_type"];
   else if (row["type"] === "view")
-    return row["view_loading_type"] === "route_change"
-      ? "Navigation"
-      : "Reload";
+    return row["view_loading_type"] === "route_change" ? "Navigation" : "Reload";
   else if (row["type"] === "action") return row["action_type"];
   else return row["type"];
 };
@@ -166,8 +171,7 @@ const getError = () => {
         errorDetails.value["category"] = [];
         // Prioritize error_stack (actual application error) over error_handling_stack (Vue internals)
         const errorStack =
-          errorDetails.value.error_stack ||
-          errorDetails.value.error_handling_stack;
+          errorDetails.value.error_stack || errorDetails.value.error_handling_stack;
         errorDetails.value.error_stack = errorStack.split("\n");
         // Keep the original stack for translation
         errorDetails.value.original_error_stack = errorDetails.value.error_stack;
@@ -179,4 +183,3 @@ const getError = () => {
   });
 };
 </script>
-

@@ -15,11 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="tw:px-6 tw:pt-4 tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
-    data-test="organization-group-page"
-  >
-    <div v-if="loading" class="tw:flex tw:justify-center tw:py-10">
+  <div class="flex h-full flex-col overflow-hidden px-6 pt-4" data-test="organization-group-page">
+    <div v-if="loading" class="flex justify-center py-10">
       <OSpinner size="md" />
     </div>
 
@@ -27,40 +24,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- SUPER / PAYER ORG VIEW -->
       <div
         v-if="role === 'super'"
-        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0 tw:overflow-hidden"
+        class="flex min-h-0 flex-1 flex-col overflow-hidden"
         data-test="org-group-super-view"
       >
         <!-- Stat cards -->
-        <div
-          class="tw:flex tw:gap-4 tw:mb-5 tw:shrink-0"
-          data-test="org-group-stats"
-        >
-          <div class="feature-card tw:flex-1">
-            <div class="tw:text-[15px] tw:font-semibold tw:leading-5 tw:opacity-85 tw:whitespace-nowrap">
+        <div class="mb-5 flex shrink-0 gap-4" data-test="org-group-stats">
+          <div class="feature-card flex-1">
+            <div class="text-sm leading-5 font-semibold whitespace-nowrap opacity-85">
               {{ t("billing.billingGroup.statTotal") }}
             </div>
-            <div class="tw:text-[24px] tw:font-semibold tw:leading-[1.2] tw:mt-[6px]">{{ totalCount }}</div>
+            <div class="mt-1.5 text-2xl leading-[1.2] font-semibold">{{ totalCount }}</div>
           </div>
-          <div class="feature-card tw:flex-1">
-            <div class="tw:text-[15px] tw:font-semibold tw:leading-5 tw:opacity-85 tw:whitespace-nowrap">
+          <div class="feature-card flex-1">
+            <div class="text-sm leading-5 font-semibold whitespace-nowrap opacity-85">
               {{ t("billing.billingGroup.statActive") }}
             </div>
-            <div class="tw:text-[24px] tw:font-semibold tw:leading-[1.2] tw:mt-[6px] tw:text-green-600">{{ activeCount }}</div>
+            <div class="text-status-positive mt-1.5 text-2xl leading-[1.2] font-semibold">
+              {{ activeCount }}
+            </div>
           </div>
-          <div class="feature-card tw:flex-1">
-            <div class="tw:text-[15px] tw:font-semibold tw:leading-5 tw:opacity-85 tw:whitespace-nowrap">
+          <div class="feature-card flex-1">
+            <div class="text-sm leading-5 font-semibold whitespace-nowrap opacity-85">
               {{ t("billing.billingGroup.statPending") }}
             </div>
-            <div class="tw:text-[24px] tw:font-semibold tw:leading-[1.2] tw:mt-[6px] tw:text-amber-500">
+            <div class="text-status-warning-text mt-1.5 text-2xl leading-[1.2] font-semibold">
               {{ pendingCount }}
             </div>
           </div>
         </div>
 
         <!-- Status filter + view usage -->
-        <div
-          class="tw:flex tw:items-center tw:justify-between tw:gap-2 tw:mb-3 tw:shrink-0"
-        >
+        <div class="mb-3 flex shrink-0 items-center justify-between gap-2">
           <AppTabs
             :tabs="superFilterTabs"
             :activeTab="superFilter"
@@ -74,13 +68,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("billing.billingGroup.viewUsage") }}
             <template #icon-right>
-              <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+              <OIcon name="arrow-forward" size="sm" class="ml-1" />
             </template>
           </OButton>
         </div>
 
         <!-- Child orgs table (children only) -->
-        <div class="tw:flex-1 tw:min-h-0">
+        <div class="min-h-0 flex-1">
           <OTable
             :data="filteredSuperRows"
             :columns="superColumns"
@@ -93,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="org-group-members-table"
           >
             <template #empty>
-              <div class="tw:py-4 tw:text-center">
+              <div class="py-4 text-center">
                 {{ t("billing.billingGroup.noMembers") }}
               </div>
             </template>
@@ -113,88 +107,101 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- CHILD ORG VIEW -->
       <div
         v-else-if="role === 'child'"
-        class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col tw:justify-center"
+        class="flex min-h-0 flex-1 flex-col justify-center overflow-auto"
         data-test="org-group-child-view"
       >
-        <div class="tw:flex tw:items-center tw:justify-between tw:gap-[56px] tw:py-[48px] tw:px-[40px] tw:flex-wrap">
+        <div class="flex flex-wrap items-center justify-between gap-14 px-10 py-12">
           <!-- Left: headline + CTA -->
-          <div class="tw:flex-1 tw:min-w-[280px] tw:max-w-[480px]">
-            <div class="tw:inline-flex tw:items-center tw:gap-[6px] tw:text-[0.72rem] tw:font-semibold tw:tracking-[0.4px] tw:text-(--color-primary-600) tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:border tw:border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] tw:py-1 tw:px-[10px] tw:rounded-full tw:mb-5">
+          <div class="max-w-120 min-w-70 flex-1">
+            <div
+              class="text-accent mb-5 inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] px-2.5 py-1 text-xs font-semibold tracking-[0.4px]"
+            >
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="tw:text-[2.4rem] tw:font-bold tw:leading-[1.2] tw:tracking-[-0.6px] tw:mb-4">
+            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.6px]">
               {{ t("billing.billingGroup.childHeadline") }}
-              <span class="tw:text-(--color-tabs-active-text) tw:cursor-pointer tw:inline-block tw:max-w-full tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:align-bottom">
+              <span
+                class="text-tabs-active-text inline-block max-w-full cursor-pointer overflow-hidden align-bottom text-ellipsis whitespace-nowrap"
+              >
                 {{ payerName }}
                 <OTooltip side="bottom">
                   <template #content>
-                    <div v-if="membership?.payer_org_name" class="tw:break-all">
+                    <div v-if="membership?.payer_org_name" class="break-all">
                       {{ membership.payer_org_name }}
                     </div>
-                    <div class="tw:text-xs tw:opacity-70 tw:break-all">
+                    <div class="text-xs break-all opacity-70">
                       {{ membership?.payer_org_id }}
                     </div>
                   </template>
                 </OTooltip>
               </span>
             </div>
-            <div class="tw:text-[0.95rem] tw:leading-[1.7] tw:opacity-70 tw:mb-8 tw:max-w-[420px]">
+            <div class="mb-8 max-w-105 text-base leading-[1.7] opacity-70">
               {{ t("billing.billingGroup.childHeroSub") }}
             </div>
             <OButton
               variant="primary"
-              class="tw:h-[44px] tw:px-6 tw:font-semibold"
+              class="h-11 px-6 font-semibold"
               data-test="org-group-child-view-usage-btn"
               @click="goToUsage"
             >
               {{ t("billing.billingGroup.viewUsage") }}
               <template #icon-right>
-                <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+                <OIcon name="arrow-forward" size="sm" class="ml-1" />
               </template>
             </OButton>
           </div>
 
           <!-- Right: membership facts -->
-          <div class="tw:w-[340px] tw:shrink-0 tw:flex tw:flex-col tw:gap-[14px]" data-test="org-group-child-details">
-            <div class="og-feature tw:flex tw:items-start tw:gap-4 tw:p-[18px_20px] tw:rounded-2xl tw:bg-(--tile-bg) tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.08)) tw:transition-all tw:duration-200 tw:hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] tw:hover:-translate-y-px">
-              <div class="tw:w-10 tw:h-10 tw:rounded-[10px] tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:text-(--color-primary-600)">
+          <div class="flex w-85 shrink-0 flex-col gap-3.5" data-test="org-group-child-details">
+            <div
+              class="og-feature rounded-default bg-surface-base border-card-glass-border flex items-start gap-4 border px-5 py-4.5 transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
+            >
+              <div
+                class="rounded-default text-accent flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+              >
                 <OIcon name="person-add" />
               </div>
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[0.78rem] tw:font-semibold tw:opacity-60 tw:mb-1">
+              <div class="min-w-0 flex-1">
+                <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.invitedBy") }}
                 </div>
-                <div class="tw:text-[0.95rem] tw:font-semibold tw:truncate">
+                <div class="truncate text-base font-semibold">
                   {{ membership?.created_by }}
                 </div>
               </div>
             </div>
-            <div class="og-feature tw:flex tw:items-start tw:gap-4 tw:p-[18px_20px] tw:rounded-2xl tw:bg-(--tile-bg) tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.08)) tw:transition-all tw:duration-200 tw:hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] tw:hover:-translate-y-px">
-              <div class="tw:w-10 tw:h-10 tw:rounded-[10px] tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:text-(--color-primary-600)">
+            <div
+              class="og-feature rounded-default bg-surface-base border-card-glass-border flex items-start gap-4 border px-5 py-4.5 transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
+            >
+              <div
+                class="rounded-default text-accent flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+              >
                 <OIcon name="how-to-reg" />
               </div>
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[0.78rem] tw:font-semibold tw:opacity-60 tw:mb-1">
+              <div class="min-w-0 flex-1">
+                <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.acceptedBy") }}
                 </div>
-                <div class="tw:text-[0.95rem] tw:font-semibold tw:truncate">
-                  {{
-                    membership?.accepted_by ||
-                    t("billing.billingGroup.addedOnCreation")
-                  }}
+                <div class="truncate text-base font-semibold">
+                  {{ membership?.accepted_by || t("billing.billingGroup.addedOnCreation") }}
                 </div>
               </div>
             </div>
-            <div class="og-feature tw:flex tw:items-start tw:gap-4 tw:p-[18px_20px] tw:rounded-2xl tw:bg-(--tile-bg) tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.08)) tw:transition-all tw:duration-200 tw:hover:shadow-[0_8px_28px_rgba(0,0,0,0.1)] tw:hover:-translate-y-px">
-              <div class="tw:w-10 tw:h-10 tw:rounded-[10px] tw:shrink-0 tw:flex tw:items-center tw:justify-center tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:text-(--color-primary-600)">
+            <div
+              class="og-feature rounded-default bg-surface-base border-card-glass-border flex items-start gap-4 border px-5 py-4.5 transition-all duration-200 hover:-translate-y-px hover:shadow-lg"
+            >
+              <div
+                class="rounded-default text-accent flex h-10 w-10 shrink-0 items-center justify-center bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+              >
                 <OIcon name="schedule" />
               </div>
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-[0.78rem] tw:font-semibold tw:opacity-60 tw:mb-1">
+              <div class="min-w-0 flex-1">
+                <div class="mb-1 text-xs font-semibold opacity-60">
                   {{ t("billing.billingGroup.memberSince") }}
                 </div>
-                <div class="tw:text-[0.95rem] tw:font-semibold">
+                <div class="text-base font-semibold">
                   {{ formatDate(membership?.created_at) }}
                 </div>
               </div>
@@ -206,13 +213,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- STANDALONE ORG VIEW — has pending invites: invites table -->
       <div
         v-else-if="receivedInvites.length > 0"
-        class="tw:flex tw:flex-col tw:flex-1 tw:min-h-0"
+        class="flex min-h-0 flex-1 flex-col"
         data-test="org-group-standalone-invites-view"
       >
-        <p class="tw:mb-3 tw:shrink-0">
+        <p class="mb-3 shrink-0">
           {{ t("billing.billingGroup.invitesPanelHint") }}
         </p>
-        <div class="tw:flex-1 tw:min-h-0">
+        <div class="min-h-0 flex-1">
           <OTable
             :data="receivedInvites"
             :columns="inviteColumns"
@@ -221,14 +228,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :page-size="10"
             :page-size-options="[10, 20, 50, 100]"
             :default-columns="false"
-            class="tw:h-full"
+            class="h-full"
             data-test="org-group-invites-table"
           >
             <template #cell-inviter_id="{ row }">
               <OUserCell :value="row.inviter_id" />
             </template>
             <template #cell-actions="{ row }">
-              <div class="tw:flex tw:justify-end tw:pr-3 tw:gap-2">
+              <div class="flex justify-end gap-2 pr-3">
                 <OButton
                   variant="primary"
                   size="sm"
@@ -256,27 +263,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- STANDALONE ORG VIEW — no invites: polished empty state -->
       <div
         v-else
-        class="tw:flex-1 tw:min-h-0 tw:overflow-auto tw:flex tw:flex-col"
+        class="flex min-h-0 flex-1 flex-col overflow-auto"
         data-test="org-group-standalone-view"
       >
         <div
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:min-h-full tw:py-[48px] tw:px-6"
+          class="flex min-h-full flex-col items-center justify-center px-6 py-12 text-center"
           data-test="org-group-standalone-invite"
         >
-          <div class="tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] tw:flex tw:items-center tw:justify-center tw:mb-[28px]">
-            <div class="tw:w-[68px] tw:h-[68px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:border-[1.5px] tw:border-solid tw:border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] tw:flex tw:items-center tw:justify-center">
-              <OIcon name="group-add" size="lg" class="tw:text-(--color-primary-600) tw:opacity-85" />
+          <div
+            class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
+          >
+            <div
+              class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+            >
+              <OIcon name="group-add" size="lg" class="text-accent opacity-85" />
             </div>
           </div>
 
-          <div class="tw:text-[1.2rem] tw:font-bold tw:tracking-[-0.2px] tw:mb-[10px]">
+          <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")
                 : t("billing.billingGroup.notEnabledTitle")
             }}
           </div>
-          <div class="tw:text-[0.88rem] tw:leading-[1.65] tw:opacity-65 tw:max-w-[420px] tw:mb-6">
+          <div class="mb-6 max-w-105 text-sm leading-[1.65] opacity-65">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.inviteTabPrompt")
@@ -285,12 +296,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <template v-if="allowedForBillingGroup">
-            <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
-              <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-full tw:py-1 tw:px-3">
+            <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
+              <span
+                class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+              >
                 <OIcon name="receipt-long" size="xs" />
                 {{ t("billing.billingGroup.chipConsolidatedBill") }}
               </span>
-              <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-full tw:py-1 tw:px-3">
+              <span
+                class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+              >
                 <OIcon name="groups" size="xs" />
                 {{ t("billing.billingGroup.chipLinkOrgs") }}
               </span>
@@ -298,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <OButton
               variant="primary"
-              class="tw:h-[40px] tw:px-6 tw:font-semibold"
+              class="h-10 px-6 font-semibold"
               data-test="org-group-standalone-invite-btn-empty"
               @click="showInviteDialog = true"
             >
@@ -315,44 +330,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="t('billing.billingGroup.inviteTitle')"
       :primary-button-label="t('billing.billingGroup.sendInvite')"
       :secondary-button-label="t('billing.billingGroup.cancel')"
-      :primary-button-disabled="!inviteOrgId || sending"
+      form-id="billing-group-invite-form"
       data-test="org-group-invite-dialog"
       @update:open="showInviteDialog = $event"
-      @click:primary="sendInvite"
       @click:secondary="showInviteDialog = false"
     >
-      <div class="tw:p-4">
-        <OInput
-          v-model="inviteOrgId"
-          class="showLabelOnTop tw:mt-4"
-          :label="t('billing.billingGroup.inviteOrgIdLabel')"
-          :placeholder="t('billing.billingGroup.inviteOrgIdPlaceholder')"
-          data-test="org-group-invite-input"
-          autofocus
-          @keyup.enter="sendInvite"
-        />
-      </div>
+      <OForm
+        id="billing-group-invite-form"
+        :schema="billingGroupInviteSchema"
+        :default-values="billingGroupInviteDefaults()"
+        @submit="sendInvite"
+      >
+        <div class="p-4">
+          <OFormInput
+            name="inviteOrgId"
+            class="showLabelOnTop mt-4"
+            :label="t('billing.billingGroup.inviteOrgIdLabel')"
+            :placeholder="t('billing.billingGroup.inviteOrgIdPlaceholder')"
+            data-test="org-group-invite-input"
+            required
+            autofocus
+          />
+        </div>
+      </OForm>
     </ODrawer>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  onMounted,
-  inject,
-  watch,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, onMounted, inject, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import BillingService from "@/services/billings";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -363,6 +378,11 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
+import {
+  makeBillingGroupInviteSchema,
+  billingGroupInviteDefaults,
+  type BillingGroupInviteForm,
+} from "./BillingGroup.schema";
 
 interface BillingGroupMember {
   id: number;
@@ -390,24 +410,35 @@ interface BillingGroupInvite {
 
 export default defineComponent({
   name: "BillingGroup",
-  components: { OTag, OButton, OIcon, OInput, OSpinner, OTable, OUserCell, ODrawer, OTooltip, AppTabs },
+  components: {
+    OTag,
+    OButton,
+    OIcon,
+    OForm,
+    OFormInput,
+    OSpinner,
+    OTable,
+    OUserCell,
+    ODrawer,
+    OTooltip,
+    AppTabs,
+  },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const loading = ref(true);
     const membership = ref<BillingGroupMember | null>(null);
     const members = ref<BillingGroupMember[]>([]);
     const invites = ref<BillingGroupInvite[]>([]);
-    const inviteOrgId = ref("");
-    const sending = ref(false);
     const actioningToken = ref("");
     const showInviteDialog = ref(false);
     const superFilter = ref("all");
 
-    const currentOrg = computed(
-      () => store.state.selectedOrganization.identifier
-    );
+    const currentOrg = computed(() => store.state.selectedOrganization.identifier);
+
+    // inviteOrgId is OForm-owned; the schema gates required + same-org.
+    const billingGroupInviteSchema = makeBillingGroupInviteSchema(t, () => currentOrg.value);
 
     const goToUsage = () => {
       router.push({
@@ -420,9 +451,7 @@ export default defineComponent({
       if (membership.value) return "child";
       // An org that has members OR has sent any invites is acting as a payer,
       // so it gets the management view.
-      const hasSentInvites = invites.value.some(
-        (i) => i.inviter_org_id === currentOrg.value
-      );
+      const hasSentInvites = invites.value.some((i) => i.inviter_org_id === currentOrg.value);
       if (members.value.length > 0 || hasSentInvites) return "super";
       return "standalone";
     });
@@ -448,18 +477,16 @@ export default defineComponent({
       () => headerInvite?.trigger,
       () => {
         showInviteDialog.value = true;
-      }
+      },
     );
 
     const pendingSentInvites = computed(() =>
-      invites.value.filter(
-        (i) => i.inviter_org_id === currentOrg.value && i.status === "Pending"
-      )
+      invites.value.filter((i) => i.inviter_org_id === currentOrg.value && i.status === "Pending"),
     );
     const receivedInvites = computed(() =>
       invites.value
         .filter((i) => i.invitee_org_id === currentOrg.value && i.status === "Pending")
-        .map((i, idx) => ({ ...i, index: idx + 1 }))
+        .map((i, idx) => ({ ...i, index: idx + 1 })),
     );
 
     // Keep the header "Invite Organization" button in sync with this org's role
@@ -468,19 +495,14 @@ export default defineComponent({
       [role, allowedForBillingGroup],
       ([r, allowed]) => {
         if (!headerInvite) return;
-        headerInvite.canInvite =
-          (r === "super" || r === "standalone") && allowed;
+        headerInvite.canInvite = (r === "super" || r === "standalone") && allowed;
       },
-      { immediate: true }
+      { immediate: true },
     );
 
     const formatDate = (epoch?: number) => {
       if (!epoch) return "-";
-      return timestampToTimezoneDate(
-        epoch,
-        store.state.timezone || "UTC",
-        "yyyy-MM-dd HH:mm"
-      );
+      return timestampToTimezoneDate(epoch, store.state.timezone || "UTC", "yyyy-MM-dd HH:mm");
     };
 
     const payerName = computed(() => {
@@ -488,13 +510,10 @@ export default defineComponent({
       return name || membership.value?.payer_org_id || "";
     });
 
-
     // Super-org view: stats + unified child-org table
     const activeCount = computed(() => members.value.length);
     const pendingCount = computed(() => pendingSentInvites.value.length);
-    const totalCount = computed(
-      () => activeCount.value + pendingCount.value
-    );
+    const totalCount = computed(() => activeCount.value + pendingCount.value);
 
     interface SuperRow {
       key: string;
@@ -517,10 +536,9 @@ export default defineComponent({
           org_name: m.member_org_name || "",
           status: "Active",
           invited_by: m.created_by,
-          accepted_by:
-            m.accepted_by || t("billing.billingGroup.addedOnCreation"),
+          accepted_by: m.accepted_by || t("billing.billingGroup.addedOnCreation"),
           date: m.created_at,
-        })
+        }),
       );
       pendingSentInvites.value.forEach((i) =>
         rows.push({
@@ -532,7 +550,7 @@ export default defineComponent({
           invited_by: i.inviter_id,
           accepted_by: "-",
           date: i.created_at,
-        })
+        }),
       );
       return rows;
     });
@@ -540,7 +558,7 @@ export default defineComponent({
     const filteredSuperRows = computed(() =>
       superFilter.value === "all"
         ? superRows.value
-        : superRows.value.filter((r) => r.status === superFilter.value)
+        : superRows.value.filter((r) => r.status === superFilter.value),
     );
 
     const superFilterTabs = computed(() => [
@@ -552,7 +570,7 @@ export default defineComponent({
     const inviteColumns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         size: 56,
         meta: { align: "left" },
@@ -597,7 +615,7 @@ export default defineComponent({
     const superColumns = computed<OTableColumnDef[]>(() => [
       {
         id: "index",
-        header: "#",
+        header: raw("#"),
         accessorKey: "index",
         size: 56,
         meta: { align: "left" },
@@ -669,18 +687,13 @@ export default defineComponent({
       }
     };
 
-    const sendInvite = async () => {
-      const target = inviteOrgId.value.trim();
-      if (!target || sending.value) return;
-      if (target === currentOrg.value) {
-        toast({
-          variant: "error",
-          message: t("billing.billingGroup.inviteSameOrg"),
-          timeout: 5000,
-        });
-        return;
-      }
-      sending.value = true;
+    // @submit handler — the schema already gated the empty + same-org cases, so
+    // there is no imperative guard here. Loading is form-driven (the ODrawer
+    // footer Save auto-spins while OForm awaits this) and double-submit is
+    // guarded by the form. The drawer body unmounts on close, so the next open
+    // re-seeds a blank field via `:default-values` (no manual clear).
+    const sendInvite = async (value: BillingGroupInviteForm) => {
+      const target = value.inviteOrgId.trim();
       try {
         await BillingService.send_billing_group_invite(currentOrg.value, target);
         toast({
@@ -688,7 +701,6 @@ export default defineComponent({
           message: t("billing.billingGroup.inviteSent"),
           timeout: 5000,
         });
-        inviteOrgId.value = "";
         showInviteDialog.value = false;
         await loadAll();
       } catch (e: any) {
@@ -697,8 +709,6 @@ export default defineComponent({
           message: e?.response?.data?.message || e.message,
           timeout: 5000,
         });
-      } finally {
-        sending.value = false;
       }
     };
 
@@ -754,8 +764,9 @@ export default defineComponent({
       role,
       membership,
       members,
-      inviteOrgId,
-      sending,
+      // Returned from setup() so the Options-API template resolves `:schema`.
+      billingGroupInviteSchema,
+      billingGroupInviteDefaults,
       actioningToken,
       showInviteDialog,
       superFilter,

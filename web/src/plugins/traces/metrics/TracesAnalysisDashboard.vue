@@ -15,70 +15,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="traces-analysis-dashboard-drawer"
+  <ODrawer
+    data-test="traces-analysis-dashboard-drawer"
+    bleed
     v-model:open="isOpen"
     :width="80"
-    :title="drawerTitle"
+    :title="raw(drawerTitle)"
     @update:open="(v) => !v && onClose()"
   >
     <template #header-left>
       <OIcon name="timeline" size="md" />
       <!-- Time Range Display: Inline chips -->
-      <div
-        class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:ml-2"
-      >
+      <div class="ml-2 flex flex-wrap items-center gap-2">
         <!-- Baseline Chip -->
         <div
-          class="time-range-chip baseline-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          class="time-range-chip baseline-chip rounded-default flex items-center gap-1 px-2 py-1.5 text-sm"
           :style="{ '--chip-color': chipColors.baseline }"
         >
-          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-            >Baseline:</span
-          >
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-            formatSmartTimestamp(
-              baselineTimeRange.startTime,
-              baselineTimeRange.endTime,
-            ).start
+          <span class="tracking-wide uppercase opacity-70">{{
+            t("traces.tracesAnalysisDashboard.baseline")
           }}</span>
-          <span class="tw:opacity-60 tw:text-[0.65rem]">→</span>
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
-            formatSmartTimestamp(
-              baselineTimeRange.startTime,
-              baselineTimeRange.endTime,
-            ).end
+          <span class="text-2xs whitespace-nowrap">{{
+            formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).start
+          }}</span>
+          <span class="text-3xs opacity-60">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs whitespace-nowrap">{{
+            formatSmartTimestamp(baselineTimeRange.startTime, baselineTimeRange.endTime).end
           }}</span>
         </div>
 
         <!-- Selected Chip -->
         <div
           v-if="hasSelectedTimeRange"
-          class="time-range-chip selected-chip tw:flex tw:items-center tw:gap-1 tw:px-2 tw:py-[0.375rem] tw:rounded tw:text-[0.85rem]"
+          class="time-range-chip selected-chip rounded-default flex items-center gap-1 px-2 py-1.5 text-sm"
           :style="{ '--chip-color': chipColors.selected }"
         >
-          <span class="tw:uppercase tw:tracking-wide tw:opacity-70"
-            >Selected:</span
-          >
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+          <span class="tracking-wide uppercase opacity-70">{{
+            t("traces.tracesAnalysisDashboard.selected")
+          }}</span>
+          <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
-              selectedTimeRangeDisplay.startTime,
-              selectedTimeRangeDisplay.endTime,
+              selectedTimeRangeDisplay!.startTime,
+              selectedTimeRangeDisplay!.endTime,
             ).start
           }}</span>
-          <span class="tw:opacity-70 tw:text-[0.65rem]">→</span>
-          <span class="tw:whitespace-nowrap tw:text-[0.7rem]">{{
+          <span class="text-3xs opacity-70">{{ t("latencyInsights.arrowSeparator") }}</span>
+          <span class="text-2xs whitespace-nowrap">{{
             formatSmartTimestamp(
-              selectedTimeRangeDisplay.startTime,
-              selectedTimeRangeDisplay.endTime,
+              selectedTimeRangeDisplay!.startTime,
+              selectedTimeRangeDisplay!.endTime,
             ).end
           }}</span>
         </div>
 
         <!-- Additional filter info -->
-        <span
-          v-if="filterMetadata"
-          class="tw:opacity-60 tw:text-[0.65rem] tw:ml-1"
-        >
+        <span v-if="filterMetadata" class="text-3xs ml-1 opacity-60">
           {{ filterMetadata }}
         </span>
 
@@ -96,12 +87,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
+    <!-- Wrapper gives the drawer's own (block-level) scroll body a definite
+         height so the flex/min-h-0 sizing below actually bounds analysis-content
+         instead of growing to fit all content — otherwise the dimension list and
+         the charts share the drawer's outer scrollbar instead of scrolling independently. -->
+    <div class="flex h-full min-h-0 flex-col">
       <!-- Tabs (only shown if multiple analysis types available) -->
       <OTabs
         v-if="showTabs"
         v-model="activeAnalysisType"
         dense
-        class="tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-[var(--o2-text-1)]! insights-dashboard-tabs"
+        class="px-page-edge border-card-glass-border text-text-secondary! insights-dashboard-tabs shrink-0 border-b border-solid"
         align="left"
       >
         <OTab
@@ -111,90 +107,87 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="tab.label"
           :icon="tab.icon"
           :data-test="`traces-analysis-dashboard-${tab.name}-tab`"
-          class="tw:min-h-[3rem]"
+          class="min-h-12"
         />
       </OTabs>
 
       <!-- Dashboard Content with Sidebar -->
-      <div class="analysis-content tw:flex-1 tw:pt-2 tw:overflow-hidden tw:flex tw:min-h-0 tw:bg-[#f5f5f5]">
+      <div class="analysis-content bg-surface-subtle flex min-h-0 flex-1 overflow-hidden pt-2">
         <!-- Collapsed dimension sidebar bar (shown when hidden) -->
         <div
           v-if="!showDimensionSelector"
-          class="field-list-sidebar-header-collapsed card-container tw:bg-surface-panel! tw:shrink-0 tw:cursor-pointer tw:flex tw:flex-col tw:items-center tw:justify-start tw:pt-2 tw:gap-1.5"
-          style="width: 50px; height: 100%"
+          class="bg-surface-panel! flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start gap-1.5 overflow-y-auto pt-2"
           data-test="dimension-selector-collapsed-bar"
           @click="toggleDimensionSelector"
         >
-          <OIcon name="expand-all" size="sm" class="field-list-collapsed-icon rotate-90 tw:mt-2.5 tw:text-[20px]" />
-          <div class="field-list-collapsed-title tw:[writing-mode:vertical-rl] tw:[text-orientation:mixed] tw:font-bold tw:text-xs">Dimensions</div>
+          <OIcon name="expand-all" size="sm" class="mt-2.5 rotate-90 text-xl" />
+          <div class="text-xs font-bold [text-orientation:mixed] [writing-mode:vertical-rl]">
+            {{ t("traces.tracesAnalysisDashboard.dimensions") }}
+          </div>
         </div>
 
         <OSplitter
           v-model="splitterModel"
           :limits="splitterLimits"
           :style="{ width: showDimensionSelector ? '100%' : 'calc(100% - 50px)', height: '100%' }"
-          class="analysis-splitter-smooth tw:[transition:all_0.3s_ease]"
+          class="analysis-splitter-smooth [transition:all_0.3s_ease]"
           @update:model-value="onSplitterUpdate"
         >
           <!-- LEFT: Dimension Selector Sidebar -->
           <template #before>
-            <div class="relative-position tw:h-full">
+            <div class="relative-position h-full">
               <div
                 v-if="showDimensionSelector"
-                class="dimension-sidebar card-container tw:h-full tw:flex tw:flex-col tw:bg-white"
+                class="dimension-sidebar bg-card-glass-bg flex h-full flex-col"
                 data-test="dimension-selector-sidebar"
               >
                 <!-- Sidebar Header with collapse button -->
                 <div
-                  class="tw:px-3 tw:py-2 tw:flex tw:items-center tw:justify-between tw:shrink-0 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
+                  class="border-card-glass-border flex shrink-0 items-center justify-between border-b border-solid px-3 py-2"
                 >
-                  <span class="tw:font-semibold tw:text-sm">Dimensions</span>
+                  <span class="text-sm font-semibold">{{
+                    t("traces.tracesAnalysisDashboard.dimensions")
+                  }}</span>
                   <OButton
                     variant="outline"
                     size="icon-xs-sq"
-                    class="tw:rotate-90"
+                    class="rotate-90"
                     icon-left="unfold-less"
-                    title="Collapse Dimensions"
+                    :title="t('traces.tracesAnalysisDashboard.collapseDimensions')"
                     data-test="dimension-selector-collapse-btn"
                     @click="toggleDimensionSelector"
                   />
                 </div>
                 <!-- Search Input -->
-                <div
-                  class="tw:p-[0.625rem] tw:border-solid tw:border-[var(--o2-border-color)]"
-                >
+                <div class="border-card-glass-border border-solid p-2.5">
                   <OSearchInput
                     v-model="dimensionSearchText"
                     :placeholder="t('search.searchDimension')"
                     clearable
-                    class="tw:w-full"
+                    class="w-full"
                     data-test="dimension-search-input"
                   />
                 </div>
 
                 <!-- Dimension List -->
-                <div
-                  class="dimension-list-container tw:flex-1 tw:overflow-y-auto tw:px-[0.325rem]"
-                >
-                  <ul v-if="filteredDimensions.length > 0" class="tw:flex tw:flex-col">
+                <div class="dimension-list-container flex-1 overflow-y-auto px-[0.325rem]">
+                  <ul v-if="filteredDimensions.length > 0" class="flex flex-col">
                     <li
                       v-for="dimension in filteredDimensions"
                       :key="dimension.value"
-                      class="dimension-list-item tw:flex tw:items-center tw:gap-2 tw:px-3 tw:py-1 tw:border-none!"
+                      class="dimension-list-item hover:bg-interactive-hover-bg flex items-center gap-2 border-none! px-3 py-1"
                     >
-                      <div class="tw:flex tw:items-center tw:shrink-0">
+                      <div class="flex shrink-0 items-center">
                         <OCheckbox
-                          :model-value="
-                            selectedDimensions.includes(dimension.value)
-                          "
+                          :model-value="selectedDimensions.includes(dimension.value)"
                           @update:model-value="toggleDimension(dimension.value)"
                           size="xs"
                           :data-test="`dimension-checkbox-${dimension.value}`"
                         />
                       </div>
-                      <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
+                      <div class="flex min-w-0 flex-1 flex-col">
                         <span
-                          class="dimension-label tw:truncate tw:cursor-pointer tw:text-[var(--o2-text-2)]! tw:text-sm tw:[line-height:1.25rem]"
+                          class="dimension-label text-text-secondary! cursor-pointer truncate text-sm [line-height:1.25rem]"
                         >
                           {{ dimension.label }}
                           <OTooltip
@@ -211,15 +204,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </ul>
 
                   <!-- No results message -->
-                  <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
+                  <div v-else class="text-text-muted p-4 text-center">
                     {{ t("search.noResult") }}
                   </div>
                 </div>
 
                 <!-- Selected Count Footer -->
-                <div
-                  class="tw:p-3 tw:border-t tw:border-solid tw:border-[var(--o2-border-color)] o2-table-footer-title tw:text-[var(--o2-text-4)]!"
-                >
+                <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
                   {{ selectedDimensions.length }}
                   {{ t("latencyInsights.dimensionsSelected") }}
                 </div>
@@ -228,29 +219,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #separator>
-            <div class="splitter-vertical splitter-enabled"></div>
+            <div
+              class="h-full w-1 bg-transparent transition-colors duration-300 hover:bg-[var(--color-orange-500)]"
+            ></div>
           </template>
 
           <!-- RIGHT: Dashboard Charts -->
           <template #after>
-            <div class="tw:h-full">
-              <div
-                class="tw:h-full tw:w-full relative-position tw:overflow-auto"
-              >
+            <div class="h-full">
+              <div class="relative-position h-full w-full overflow-auto">
                 <!-- Loading State -->
-                <div
-                  v-if="loading"
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-                >
+                <div v-if="loading" class="flex h-full flex-col items-center justify-center py-20">
                   <OSpinner
-                    size="xl"
-                    class="tw:mb-4"
+                    size="lg"
+                    class="mb-4"
                     data-test="traces-analysis-dashboard-loading-indicator"
                   />
-                  <div class="tw:text-base">
+                  <div class="text-base">
                     {{ t("latencyInsights.analyzingDimensions") }}
                   </div>
-                  <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+                  <div class="text-text-secondary mt-2 text-xs">
                     {{
                       t("latencyInsights.computingDistributions", {
                         count: selectedDimensions.length,
@@ -263,23 +251,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-else-if="error"
                   data-test="traces-analysis-dashboard-error"
-                  class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+                  class="flex h-full flex-col items-center justify-center py-20"
                 >
                   <OIcon
                     name="error-outline"
-                    class="tw:mb-4" style="width: 3.75rem; height: 3.75rem;" />
-                  <div class="tw:text-base tw:mb-2">
+                    class="mb-4"
+                    style="width: 3.75rem; height: 3.75rem"
+                  />
+                  <div class="mb-2 text-base">
                     {{ t("latencyInsights.failedToLoad") }}
                   </div>
-                  <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
+                  <div class="text-text-secondary text-sm">{{ error }}</div>
                   <OButton
                     variant="outline"
                     size="sm-action"
-                    class="tw:mt-4"
+                    class="mt-4"
                     data-test="traces-analysis-dashboard-retry-btn"
                     @click="loadAnalysis"
                   >
-                    {{ t('latencyInsights.retryButton') }}
+                    {{ t("latencyInsights.retryButton") }}
                   </OButton>
                 </div>
 
@@ -296,27 +286,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :searchType="props.streamType === 'logs' ? 'insights' : 'dashboards'"
                   @variablesManagerReady="onVariablesManagerReady"
                   @onDeletePanel="handlePanelDelete"
-                  class="tw:p-[0.4rem] trace-analysis-dashboards"
+                  class="trace-analysis-dashboards p-[0.4rem]"
                 />
               </div>
             </div>
           </template>
         </OSplitter>
       </div>
+    </div>
   </ODrawer>
 </template>
 
 <script lang="ts" setup>
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import useTheme from "@/composables/useTheme";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
-import { formatTimeWithSuffix } from "@/utils/zincutils";
 import {
   useLatencyInsightsAnalysis,
   type LatencyInsightsConfig,
@@ -342,6 +333,8 @@ const RenderDashboardCharts = defineAsyncComponent(
 interface DurationFilter {
   start: number;
   end: number;
+  timeStart?: number;
+  timeEnd?: number;
 }
 
 interface RateFilter {
@@ -388,27 +381,32 @@ const emit = defineEmits<{
 
 const { showErrorNotification } = useNotifications();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const { isDark } = useTheme();
 const chipColors = computed(() =>
-  store.state.theme === "dark"
-    ? COMPARISON_COLORS.dark
-    : COMPARISON_COLORS.light,
+  isDark.value ? COMPARISON_COLORS.dark : COMPARISON_COLORS.light,
 );
-const { loading, error, analyzeAllDimensions } = useLatencyInsightsAnalysis();
+const { loading, error } = useLatencyInsightsAnalysis();
 const { generateDashboard } = useLatencyInsightsDashboard();
 
 // Variables manager will be initialized by RenderDashboardCharts
 // and we'll receive a reference to it via the @variablesManagerReady event
-const variablesManager = ref(null);
+interface VariablesManager {
+  hasUncommittedChanges?: boolean | { value: boolean };
+  committedVariablesData?: {
+    global?: Array<{ name: string; value?: string }>;
+  };
+}
+const variablesManager = ref<VariablesManager | null>(null);
 
 const isOpen = ref(true);
 
 // Computed title for the drawer header based on analysis type
 const drawerTitle = computed(() => {
-  if (props.analysisType === 'duration') return t('latencyInsights.title');
-  if (props.analysisType === 'volume') return t('volumeInsights.title');
-  if (props.analysisType === 'error') return t('errorInsights.title');
-  return '';
+  if (props.analysisType === "duration") return t("latencyInsights.title");
+  if (props.analysisType === "volume") return t("volumeInsights.title");
+  if (props.analysisType === "error") return t("errorInsights.title");
+  return "";
 });
 const dashboardData = ref<any>(null);
 const dashboardChartsRef = ref<any>(null);
@@ -418,7 +416,7 @@ const dimensionSearchText = ref("");
 
 // Splitter configuration for dimension selector sidebar (using percentage)
 const splitterModel = ref(25); // 25% width for dimension selector (default)
-const splitterLimits = [0, 30]; // Min 0% (allow full collapse), Max 30%
+const splitterLimits: [number, number] = [0, 30]; // Min 0% (allow full collapse), Max 30%
 const lastSplitterPosition = ref(25); // Remember last position before collapse
 
 // Percentile change tracking - use variables manager's hasUncommittedChanges
@@ -434,8 +432,7 @@ const showRefreshButton = computed(() => {
   if (manager?.hasUncommittedChanges !== undefined) {
     // Access the value if it's a ref, otherwise use directly
     const hasChanges =
-      typeof manager.hasUncommittedChanges === "object" &&
-      "value" in manager.hasUncommittedChanges
+      typeof manager.hasUncommittedChanges === "object" && "value" in manager.hasUncommittedChanges
         ? manager.hasUncommittedChanges.value
         : manager.hasUncommittedChanges;
     return hasChanges;
@@ -444,15 +441,8 @@ const showRefreshButton = computed(() => {
   return false;
 });
 
-// Detect custom SQL mode
-const isCustomSQLMode = computed(() => {
-  return props.baseFilter?.trim().toUpperCase().startsWith("SELECT") || false;
-});
-
 // Active tab management
-const activeAnalysisType = ref<"duration" | "volume" | "error">(
-  props.analysisType,
-);
+const activeAnalysisType = ref<"duration" | "volume" | "error">(props.analysisType);
 
 // Tab configuration
 const availableTabs = computed(() => {
@@ -499,11 +489,7 @@ const getInitialDimensions = () => {
   }));
 
   // For LOGS: Use sample-based analysis if we have log data
-  if (
-    streamType === "logs" &&
-    props.logSamples &&
-    props.logSamples.length >= 10
-  ) {
+  if (streamType === "logs" && props.logSamples && props.logSamples.length >= 10) {
     return selectDimensionsFromData(props.logSamples, schemaFields, 6);
   }
 
@@ -536,9 +522,7 @@ const filteredDimensions = computed(() => {
   // Filter by search text if provided
   if (dimensionSearchText.value?.trim()) {
     const searchLower = dimensionSearchText.value.toLowerCase();
-    dimensions = dimensions.filter((dim) =>
-      dim.label.toLowerCase().includes(searchLower),
-    );
+    dimensions = dimensions.filter((dim) => dim.label.toLowerCase().includes(searchLower));
   }
 
   // Sort: selected dimensions first, then unselected
@@ -577,21 +561,11 @@ const toggleDimension = (dimensionValue: string) => {
       return;
     }
     // Remove dimension - create new array to trigger reactivity
-    selectedDimensions.value = selectedDimensions.value.filter(
-      (d) => d !== dimensionValue,
-    );
+    selectedDimensions.value = selectedDimensions.value.filter((d) => d !== dimensionValue);
   } else {
     // Add dimension - create new array to trigger reactivity
     selectedDimensions.value = [...selectedDimensions.value, dimensionValue];
   }
-};
-
-// Get dimension label from value
-const getDimensionLabel = (dimensionValue: string): string => {
-  const dimension = availableDimensions.value.find(
-    (d) => d.value === dimensionValue,
-  );
-  return dimension?.label || dimensionValue;
 };
 
 // Handle panel deletion - extract dimension name from panel and remove from selection
@@ -599,9 +573,7 @@ const handlePanelDelete = (panelId: string) => {
   if (!dashboardData.value?.tabs?.[0]?.panels) return;
 
   // Find the panel by ID
-  const panel = dashboardData.value.tabs[0].panels.find(
-    (p: any) => p.id === panelId,
-  );
+  const panel = dashboardData.value.tabs[0].panels.find((p: any) => p.id === panelId);
 
   if (panel?.title) {
     // Panel title is the dimension name - remove it from selectedDimensions
@@ -621,8 +593,7 @@ const toggleDimensionSelector = () => {
   } else {
     // Expanding: restore previous position, but use 25% if it was too small (< 10) or not set
     const savedPosition = lastSplitterPosition.value;
-    splitterModel.value =
-      savedPosition && savedPosition >= 10 ? savedPosition : 25;
+    splitterModel.value = savedPosition && savedPosition >= 10 ? savedPosition : 25;
     showDimensionSelector.value = true;
   }
 
@@ -682,17 +653,9 @@ const filterMetadata = computed(() => {
     !props.durationFilter.timeStart
   ) {
     return `${t("latencyInsights.durationLabel")} ${formatTimeWithSuffix(props.durationFilter.start)} - ${formatTimeWithSuffix(props.durationFilter.end)}`;
-  } else if (
-    props.analysisType === "volume" &&
-    props.rateFilter &&
-    !props.rateFilter.timeStart
-  ) {
-    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} traces/interval`;
-  } else if (
-    props.analysisType === "error" &&
-    props.errorFilter &&
-    !props.errorFilter.timeStart
-  ) {
+  } else if (props.analysisType === "volume" && props.rateFilter && !props.rateFilter.timeStart) {
+    return `${t("volumeInsights.rateLabel")} ${props.rateFilter.start} - ${props.rateFilter.end} ${t("traces.tracesAnalysisDashboard.tracesPerInterval")}`;
+  } else if (props.analysisType === "error" && props.errorFilter && !props.errorFilter.timeStart) {
     return `${t("errorInsights.errorsGreaterThan")} ${props.errorFilter.start}`;
   }
   return null;
@@ -733,10 +696,7 @@ const loadAnalysis = async () => {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
       };
-    } else if (
-      props.durationFilter?.timeStart &&
-      props.durationFilter?.timeEnd
-    ) {
+    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.durationFilter.timeStart,
         endTime: props.durationFilter.timeEnd,
@@ -773,11 +733,7 @@ const loadAnalysis = async () => {
     }));
 
     // Generate dashboard JSON with UNION queries
-    const dashboard = generateDashboard(
-      mockAnalyses,
-      config,
-      store.state.theme,
-    );
+    const dashboard = generateDashboard(mockAnalyses, config, store.state.theme);
 
     dashboardData.value = dashboard;
     dashboardRenderKey.value++; // Increment to force re-render on full reload
@@ -808,7 +764,7 @@ const getCurrentPercentile = (): string => {
     // committedVariablesData has structure: { global: [], tabs: {}, panels: {} }
     // Percentile is likely a global variable
     const percentileVar = manager.committedVariablesData.global?.find(
-      (v: any) => v.name === "percentile",
+      (v: { name: string; value?: string }) => v.name === "percentile",
     );
     if (percentileVar && percentileVar.value !== undefined) {
       return percentileVar.value;
@@ -831,42 +787,8 @@ const onClose = () => {
   emit("close");
 };
 
-// Helper functions for formatting
-const formatTimestamp = (microseconds: number) => {
-  const date = new Date(microseconds / 1000);
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${hours}:${minutes}:${seconds}`;
-};
-
-const formatFullTimestamp = (microseconds: number) => {
-  const date = new Date(microseconds / 1000);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-};
-
-const formatCompactTimestamp = (microseconds: number) => {
-  const date = new Date(microseconds / 1000);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const seconds = String(date.getSeconds()).padStart(2, "0");
-  // Format as MM/DD HH:MM:SS (more compact)
-  return `${month}/${day} ${hours}:${minutes}:${seconds}`;
-};
-
 // Smart timestamp formatter - shows date only once if same day
-const formatSmartTimestamp = (
-  startMicroseconds: number,
-  endMicroseconds: number,
-) => {
+const formatSmartTimestamp = (startMicroseconds: number, endMicroseconds: number) => {
   const startDate = new Date(startMicroseconds / 1000);
   const endDate = new Date(endMicroseconds / 1000);
 
@@ -958,10 +880,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
         startTime: props.rateFilter.timeStart,
         endTime: props.rateFilter.timeEnd,
       };
-    } else if (
-      props.durationFilter?.timeStart &&
-      props.durationFilter?.timeEnd
-    ) {
+    } else if (props.durationFilter?.timeStart && props.durationFilter?.timeEnd) {
       selectedTimeRange = {
         startTime: props.durationFilter.timeStart,
         endTime: props.durationFilter.timeEnd,
@@ -995,8 +914,7 @@ const addDimensionPanels = async (addedDimensions: string[]) => {
     }));
 
     // Generate new panels using the same logic as generateDashboard
-    const newPanels = generateDashboard(mockAnalyses, config, store.state.theme)
-      .tabs[0].panels;
+    const newPanels = generateDashboard(mockAnalyses, config, store.state.theme).tabs[0].panels;
 
     // Update layout positions for new panels to appear after existing ones
     const timestamp = Date.now();
@@ -1063,12 +981,8 @@ watch(
       return;
     }
 
-    const addedDimensions = newDimensions.filter(
-      (d) => !oldDimensions.includes(d),
-    );
-    const removedDimensions = oldDimensions.filter(
-      (d) => !newDimensions.includes(d),
-    );
+    const addedDimensions = newDimensions.filter((d) => !oldDimensions.includes(d));
+    const removedDimensions = oldDimensions.filter((d) => !newDimensions.includes(d));
 
     if (isOpen.value && newDimensions.length > 0) {
       if (removedDimensions.length > 0) {
@@ -1089,7 +1003,7 @@ watch(
 // Reload when active analysis type (tab) changes
 watch(
   () => activeAnalysisType.value,
-  (newTab, oldTab) => {
+  () => {
     if (isOpen.value && !loading.value) {
       loadAnalysis();
     }
@@ -1114,24 +1028,22 @@ watch(
 );
 </script>
 
-<style>
-/* Non-scoped: ODrawer body for this drawer does not have flex:1 by default
- * (intentional for form drawers, but the Insights drawer needs a full-height
- * splitter layout). Override the body div — 4th child of the drawer panel after
- * the two sr-only elements (h2, p) and the header div.
- * Also adds the top gap (matching --spacing-dialog-content-py = 0.75rem)
- * that ODialog provides by default but ODrawer omits.
- */
-[data-test="traces-analysis-dashboard-drawer"] > div:nth-child(4) {
+<style scoped>
+/* keep(lib-override:o-drawer): ODrawer renders its own panel; the Insights drawer
+ * needs the body cell (4th child — after the two sr-only nodes h2/p and the header
+ * div) to flex to full height for the splitter layout, reachable only via :deep. */
+[data-test="traces-analysis-dashboard-drawer"] > :deep(div:nth-child(4)) {
   flex: 1 1 0 !important;
   overflow: hidden !important;
   display: flex;
   flex-direction: column;
 }
 
-/* Time range chips styling - matching chart colors */
+/* keep(brand): comparison chips are tinted from the runtime --chip-color
+ * (COMPARISON_COLORS baseline/selected palette) via color-mix — a dynamic brand
+ * color Tailwind can't express; the text mix flips through --color-text-heading. */
 .time-range-chip {
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
   line-height: 1.2;
   transition: all 0.2s ease;
 }
@@ -1140,39 +1052,7 @@ watch(
 .time-range-chip.selected-chip {
   background: color-mix(in srgb, var(--chip-color) 20%, transparent);
   border: 1px solid color-mix(in srgb, var(--chip-color) 50%, transparent);
-  color: color-mix(in srgb, var(--chip-color) 80%, #000) !important;
+  color: color-mix(in srgb, var(--chip-color) 80%, var(--color-text-heading)) !important;
   font-weight: 500;
-}
-
-.dimension-list-item:hover {
-  background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-}
-
-/* Splitter separator bar — visible narrow divider */
-.analysis-splitter-smooth.q-splitter--vertical > .q-splitter__separator {
-  width: 10px !important;
-}
-
-/* Dark mode support */
-body.body--dark .analysis-content {
-  background: #2a2a2a !important;
-}
-
-body.body--dark .dimension-sidebar {
-  background: #202223 !important;
-}
-
-body.body--dark .dimension-list-item {
-  border-bottom-color: rgba(255, 255, 255, 0.1);
-}
-
-body.body--dark .dimension-list-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Time range chips: dark mode text adjustment */
-body.body--dark .time-range-chip.baseline-chip,
-body.body--dark .time-range-chip.selected-chip {
-  color: color-mix(in srgb, var(--chip-color) 80%, #fff) !important;
 }
 </style>

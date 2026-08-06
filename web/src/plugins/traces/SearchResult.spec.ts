@@ -13,14 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  describe,
-  expect,
-  it,
-  beforeEach,
-  afterEach,
-  vi,
-} from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
@@ -145,10 +138,9 @@ const globalOptions = {
     store: mockStore,
   },
   stubs: {
-    "q-resize-observer": true,
     TracesSearchResultList: {
       name: "TracesSearchResultList",
-      template: '<div data-test="traces-search-result-list" class="search-list tw:w-full"></div>',
+      template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
       props: ["hits", "loading", "searchPerformed", "showHeader"],
       emits: ["row-click", "load-more"],
     },
@@ -184,14 +176,14 @@ describe("SearchResult", () => {
   it("should render the main container with correct data-test attribute", () => {
     const container = wrapper.find('[data-test="traces-search-result"]');
     expect(container.exists()).toBe(true);
-    expect(container.classes()).toContain("tw:overflow-hidden");
+    expect(container.classes()).toContain("overflow-hidden");
   });
 
   it("should render the search list container", () => {
     const searchList = wrapper.find('[data-test="traces-search-result-list"]');
     expect(searchList.exists()).toBe(true);
     expect(searchList.classes()).toContain("search-list");
-    expect(searchList.classes()).toContain("tw:w-full");
+    expect(searchList.classes()).toContain("w-full");
   });
 
   it("should render TracesMetricsDashboard component", () => {
@@ -242,7 +234,6 @@ describe("SearchResult", () => {
       expect(wrapper.emitted("update:scroll")).toBeTruthy();
 
       expect(mockSearchObj.data.resultGrid.currentPage).toBe(2);
-
     });
 
     it("should not emit update:scroll when loading is true", async () => {

@@ -30,7 +30,9 @@ vi.mock("@/services/http", () => ({
 // crypto.randomUUID is used inside create_timed_annotations — spy on it
 // without replacing the whole crypto object so Vite internals still work.
 const mockUUID = "550e8400-e29b-41d4-a716-446655440000";
-vi.spyOn(crypto, "randomUUID").mockReturnValue(mockUUID as `${string}-${string}-${string}-${string}-${string}`);
+vi.spyOn(crypto, "randomUUID").mockReturnValue(
+  mockUUID as `${string}-${string}-${string}-${string}-${string}`,
+);
 
 describe("dashboard_annotations service", () => {
   let mockHttpInstance: any;
@@ -85,7 +87,7 @@ describe("dashboard_annotations service", () => {
           headers: {
             "Content-Type": "application/json; charset=UTF-8",
           },
-        }
+        },
       );
     });
 
@@ -125,7 +127,7 @@ describe("dashboard_annotations service", () => {
           headers: {
             "Content-Type": "application/json; charset=UTF-8",
           },
-        }
+        },
       );
     });
 
@@ -174,7 +176,7 @@ describe("dashboard_annotations service", () => {
         org_id,
         dashboard_id,
         timed_annotation_id,
-        annotations
+        annotations,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
@@ -184,7 +186,7 @@ describe("dashboard_annotations service", () => {
           headers: {
             "Content-Type": "application/json; charset=UTF-8",
           },
-        }
+        },
       );
     });
 
@@ -200,7 +202,7 @@ describe("dashboard_annotations service", () => {
         org_id,
         dashboard_id,
         timed_annotation_id,
-        annotations
+        annotations,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
@@ -210,7 +212,7 @@ describe("dashboard_annotations service", () => {
           headers: {
             "Content-Type": "application/json; charset=UTF-8",
           },
-        }
+        },
       );
     });
 
@@ -226,7 +228,7 @@ describe("dashboard_annotations service", () => {
         org_id,
         dashboard_id,
         timed_annotation_id,
-        annotations
+        annotations,
       );
 
       expect(mockHttpInstance.put).toHaveBeenCalledWith(
@@ -236,7 +238,7 @@ describe("dashboard_annotations service", () => {
           headers: {
             "Content-Type": "application/json; charset=UTF-8",
           },
-        }
+        },
       );
     });
   });
@@ -249,11 +251,7 @@ describe("dashboard_annotations service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await annotationService.delete_timed_annotations(
-        organization,
-        dashboardId,
-        annotationIds
-      );
+      await annotationService.delete_timed_annotations(organization, dashboardId, annotationIds);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${organization}/dashboards/${dashboardId}/annotations`,
@@ -261,7 +259,7 @@ describe("dashboard_annotations service", () => {
           data: {
             annotation_ids: annotationIds,
           },
-        }
+        },
       );
     });
 
@@ -272,11 +270,7 @@ describe("dashboard_annotations service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await annotationService.delete_timed_annotations(
-        organization,
-        dashboardId,
-        annotationIds
-      );
+      await annotationService.delete_timed_annotations(organization, dashboardId, annotationIds);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${organization}/dashboards/${dashboardId}/annotations`,
@@ -284,7 +278,7 @@ describe("dashboard_annotations service", () => {
           data: {
             annotation_ids: ["single-ann-id"],
           },
-        }
+        },
       );
     });
 
@@ -295,11 +289,7 @@ describe("dashboard_annotations service", () => {
 
       mockHttpInstance.delete.mockResolvedValue({ data: { success: true } });
 
-      await annotationService.delete_timed_annotations(
-        organization,
-        dashboardId,
-        annotationIds
-      );
+      await annotationService.delete_timed_annotations(organization, dashboardId, annotationIds);
 
       expect(mockHttpInstance.delete).toHaveBeenCalledWith(
         `/api/${organization}/dashboards/${dashboardId}/annotations`,
@@ -307,7 +297,7 @@ describe("dashboard_annotations service", () => {
           data: {
             annotation_ids: [],
           },
-        }
+        },
       );
     });
   });
@@ -334,7 +324,7 @@ describe("dashboard_annotations service", () => {
             start_time: params.start_time,
             end_time: params.end_time,
           },
-        }
+        },
       );
     });
 
@@ -405,7 +395,7 @@ describe("dashboard_annotations service", () => {
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
         `/api/${org_id}/dashboards/${dashboard_id}/annotations`,
-        expect.any(Object)
+        expect.any(Object),
       );
     });
   });
@@ -418,7 +408,7 @@ describe("dashboard_annotations service", () => {
       await expect(
         annotationService.create_timed_annotations("org123", "dash-abc", [
           { start_time: 1000, title: "Ann" },
-        ])
+        ]),
       ).rejects.toThrow("Validation error");
     });
 
@@ -427,7 +417,7 @@ describe("dashboard_annotations service", () => {
       mockHttpInstance.put.mockRejectedValue(error);
 
       await expect(
-        annotationService.update_timed_annotations("org123", "dash-abc", "ann-id", [])
+        annotationService.update_timed_annotations("org123", "dash-abc", "ann-id", []),
       ).rejects.toThrow("Not found");
     });
 
@@ -436,7 +426,7 @@ describe("dashboard_annotations service", () => {
       mockHttpInstance.delete.mockRejectedValue(error);
 
       await expect(
-        annotationService.delete_timed_annotations("org123", "dash-abc", ["ann-1"])
+        annotationService.delete_timed_annotations("org123", "dash-abc", ["ann-1"]),
       ).rejects.toThrow("Forbidden");
     });
 
@@ -449,7 +439,7 @@ describe("dashboard_annotations service", () => {
           panels: ["p1"],
           start_time: 0,
           end_time: 1000,
-        })
+        }),
       ).rejects.toThrow("Server error");
     });
   });

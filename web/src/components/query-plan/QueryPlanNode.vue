@@ -17,51 +17,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="plan-node" data-test="query-plan-node">
     <!-- Node content -->
-    <div
-      class="node-line tw:flex tw:items-center tw:gap-0 tw:py-[2px] tw:whitespace-pre"
-    >
+    <div class="node-line flex items-center gap-0 py-0.5 whitespace-pre">
       <!-- Parent prefix indentation -->
       <span
         v-if="parentPrefix"
         data-test="query-plan-node-tree-indent"
-        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]"
-      >{{ parentPrefix }}</span>
+        class="text-text-muted font-bold whitespace-pre select-none"
+        >{{ parentPrefix }}</span
+      >
 
       <!-- Tree connector -->
       <span
         data-test="query-plan-node-tree-connector"
-        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:pr-1 tw:dark:text-[rgba(255,255,255,0.3)]"
-      >{{ connector }}</span>
+        class="text-text-muted pr-1 font-bold select-none"
+        >{{ connector }}</span
+      >
 
       <!-- Expand/collapse icon for nodes with children -->
       <span
         v-if="node.children.length > 0"
-        class="expand-icon tw:cursor-pointer tw:select-none tw:text-(--q-primary) tw:text-[10px] tw:w-4 tw:inline-block tw:text-center tw:hover:opacity-70"
+        class="expand-icon text-theme-accent text-3xs inline-block w-4 cursor-pointer text-center select-none hover:opacity-70"
         data-test="query-plan-node-expand-icon"
         @click="toggleChildrenExpanded"
       >
-        {{ childrenExpanded ? '▼' : '▶' }}
+        {{ childrenExpanded ? "▼" : "▶" }}
       </span>
-      <span
-        v-else
-        data-test="query-plan-node-expand-icon-spacer"
-        class="tw:w-4 tw:inline-block"
-      ></span>
+      <span v-else data-test="query-plan-node-expand-icon-spacer" class="inline-block w-4"></span>
 
       <!-- Operator name -->
       <span
         data-test="query-plan-node-operator-name"
-        class="tw:font-semibold tw:text-[rgba(0,0,0,0.87)] tw:pl-1 tw:dark:text-[rgba(255,255,255,0.87)]"
-      >{{ node.name }}</span>
+        class="text-text-heading pl-1 font-semibold"
+        >{{ node.name }}</span
+      >
 
       <!-- Inline details (clickable to expand if truncated) -->
       <span
         v-if="inlineDetails"
-        class="inline-details tw:text-[rgba(0,0,0,0.7)] tw:font-normal tw:text-xs tw:italic tw:dark:text-[rgba(255,255,255,0.7)]"
+        class="inline-details text-text-secondary text-xs font-normal italic"
         :class="{
-          'tw:cursor-pointer': hasLongDetails,
-          'tw:whitespace-nowrap tw:overflow-hidden tw:[text-overflow:ellipsis] tw:max-w-[600px] truncated': !detailsExpanded && hasLongDetails,
-          clickable: hasLongDetails,
+          'hover:text-text-body cursor-pointer': hasLongDetails,
+          'truncated max-w-150 overflow-hidden [text-overflow:ellipsis] whitespace-nowrap':
+            !detailsExpanded && hasLongDetails,
         }"
         data-test="query-plan-node-inline-details"
         @click="hasLongDetails ? toggleDetailsExpanded() : null"
@@ -71,29 +68,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Separator between details and metrics -->
       <span
-        v-if="inlineDetails && (isAnalyze && hasMetrics)"
+        v-if="inlineDetails && isAnalyze && hasMetrics"
         data-test="query-plan-node-separator"
-        class="tw:text-[rgba(0,0,0,0.4)] tw:px-2 tw:font-normal tw:select-none tw:dark:text-[rgba(255,255,255,0.4)]"
-      >·</span>
+        class="text-text-muted px-2 font-normal select-none"
+        >·</span
+      >
 
       <!-- Metrics (for ANALYZE mode) -->
       <span
         v-if="isAnalyze && hasMetrics"
         data-test="query-plan-node-metrics-inline"
-        class="tw:flex tw:gap-2"
+        class="flex gap-2"
       >
         <span
           v-if="node.metrics.output_rows !== undefined"
           data-test="query-plan-node-metric-badge"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+          class="rounded-default text-2xs text-theme-accent inline-flex items-center gap-1 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] px-2 py-0.5 font-medium whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="format-list-numbered" size="xs" />
-          {{ formatNumber(node.metrics.output_rows) }} rows
+          {{ formatNumber(node.metrics.output_rows) }} {{ t("search.rows") }}
         </span>
         <span
           v-if="node.metrics.elapsed_compute"
           data-test="query-plan-node-metric-badge"
-          class="tw:inline-flex tw:items-center tw:gap-1 tw:py-[2px] tw:px-2 tw:bg-[rgba(var(--q-primary-rgb),0.1)] tw:rounded tw:text-[11px] tw:font-medium tw:text-(--q-primary) tw:whitespace-nowrap tw:dark:bg-[rgba(var(--q-primary-rgb),0.2)]"
+          class="rounded-default text-2xs text-theme-accent inline-flex items-center gap-1 bg-[color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)] px-2 py-0.5 font-medium whitespace-nowrap dark:bg-[color-mix(in_srgb,var(--color-theme-accent)_20%,transparent)]"
         >
           <OIcon name="schedule" size="xs" />
           {{ node.metrics.elapsed_compute }}
@@ -105,11 +103,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="detailsExpanded && hasLongDetails"
       data-test="query-plan-node-details"
-      class="tw:pt-[2px] tw:pb-[2px] tw:text-[rgba(0,0,0,0.7)] tw:text-xs tw:italic tw:whitespace-pre-wrap tw:break-words tw:dark:text-[rgba(255,255,255,0.7)]"
+      class="text-text-secondary pt-0.5 pb-0.5 text-xs break-words whitespace-pre-wrap italic"
     >
-      <span
-        class="tw:text-[rgba(0,0,0,0.3)] tw:font-bold tw:select-none tw:whitespace-pre tw:dark:text-[rgba(255,255,255,0.3)]"
-      >{{ childPrefix }}  </span>
+      <span class="text-text-muted font-bold whitespace-pre select-none">{{ childPrefix }} </span>
       <span>{{ inlineDetails }}</span>
     </div>
 
@@ -133,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType, ref, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { OperatorNode } from "@/utils/queryPlanParser";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -156,26 +153,28 @@ export default defineComponent({
     },
     parentPrefix: {
       type: String,
-      default: '',
+      default: "",
     },
   },
   setup(props) {
+    const { t } = useI18nTyped();
     const childrenExpanded = ref(true);
     const detailsExpanded = ref(false);
 
     const connector = computed(() => {
-      return props.isLast ? '└─' : '├─';
+      return props.isLast ? "└─" : "├─";
     });
 
     const childPrefix = computed(() => {
-      const addition = props.isLast ? '  ' : '│ ';
+      const addition = props.isLast ? "  " : "│ ";
       return props.parentPrefix + addition;
     });
 
     const hasMetrics = computed(() => {
-      return props.isAnalyze && (
-        props.node.metrics.output_rows !== undefined ||
-        props.node.metrics.elapsed_compute !== undefined
+      return (
+        props.isAnalyze &&
+        (props.node.metrics.output_rows !== undefined ||
+          props.node.metrics.elapsed_compute !== undefined)
       );
     });
 
@@ -183,14 +182,14 @@ export default defineComponent({
      * Get inline details - everything after the colon, excluding metrics
      */
     const parseInlineDetails = (fullText: string): string => {
-      const colonIndex = fullText.indexOf(':');
-      if (colonIndex === -1) return '';
+      const colonIndex = fullText.indexOf(":");
+      if (colonIndex === -1) return "";
 
       let details = fullText.substring(colonIndex + 1).trim();
 
       // Remove metrics section if in analyze mode (we show them separately)
-      if (props.isAnalyze && details.includes('metrics=')) {
-        const metricsIndex = details.indexOf(', metrics=');
+      if (props.isAnalyze && details.includes("metrics=")) {
+        const metricsIndex = details.indexOf(", metrics=");
         if (metricsIndex !== -1) {
           details = details.substring(0, metricsIndex).trim();
         }
@@ -217,10 +216,11 @@ export default defineComponent({
     };
 
     const formatNumber = (num: number): string => {
-      return num.toLocaleString('en-US');
+      return num.toLocaleString("en-US");
     };
 
     return {
+      t,
       childrenExpanded,
       detailsExpanded,
       connector,
@@ -235,13 +235,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.plan-node .node-line .inline-details.clickable:hover {
-  color: rgba(0, 0, 0, 0.9);
-}
-
-.body--dark .plan-node .node-line .inline-details.clickable:hover {
-  color: rgba(255, 255, 255, 0.9);
-}
-</style>

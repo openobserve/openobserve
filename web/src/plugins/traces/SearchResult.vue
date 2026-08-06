@@ -17,10 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="traces-search-result" class="tw:overflow-hidden tw:h-full">
-    <div
-      class="card-container tw:h-full tw:flex tw:flex-col tw:overflow-hidden"
-    >
+  <div data-test="traces-search-result" class="h-full overflow-hidden">
+    <div class="bg-card-glass-bg flex h-full flex-col overflow-hidden">
       <!-- Section header: title + count badge + insights + pagination -->
       <div
         v-if="
@@ -30,22 +28,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
         ref="sectionHeaderRef"
         data-test="traces-section-header"
-        class="tw:flex tw:items-center tw:px-[0.4rem]! tw:h-[2.25rem] tw:shrink-0 tw:border-b tw:border-[rgba(0,0,0,0.07)]"
+        class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]!"
       >
         <!-- Field panel toggle — same style as logs page -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="tw:mr-1.5 tw:shrink-0"
+          class="mr-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="toggleFieldList"
         >
           <OIcon
-            :name="searchObj.meta.showFields ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+            :name="
+              searchObj.meta.showFields
+                ? 'keyboard-double-arrow-left'
+                : 'keyboard-double-arrow-right'
+            "
             size="sm"
           />
           <OTooltip
-            :content="searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')"
+            :content="
+              searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+            "
             side="bottom"
           />
         </OButton>
@@ -55,8 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-count-badge"
           type="logsResultChip"
           value="neutral"
-          class="tw:mr-[0.6rem]"
-        >{{ `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === 'spans' ? t('traces.spansFound') : t('traces.tracesFound')}` }}</OTag>
+          class="mr-[0.6rem]"
+          >{{
+            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
+          }}</OTag
+        >
         <OTag
           v-if="
             searchObj.data.queryResults.errorCount != null &&
@@ -65,26 +72,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-error-count-badge"
           variant="error"
           :clickable="true"
-          class="tw:text-xs tw:rounded! tw:py-[0.4rem]! tw:px-[0.625rem]! tw:text-[0.75rem]!"
-          :class="showErrorOnly
-            ? 'tw:bg-badge-error-solid-bg! tw:text-badge-error-solid-text!'
-            : 'tw:bg-[var(--o2-error-tag-bg)]! tw:text-[var(--o2-error-tag-text)]!'"
+          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs!"
+          :class="
+            showErrorOnly
+              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+              : 'bg-error-tag-bg! text-error-tag-text!'
+          "
           @click="toggleErrorOnly"
         >
-          {{ `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === 'traces' ? t('traces.errorTraces') : t('traces.errorSpans')}` }}
+          {{
+            `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
+          }}
           <OTooltip
             :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
             side="bottom"
           />
           <template #trailing>
-            <OIcon name="filter-alt" size="xs" class="tw:shrink-0" />
+            <OIcon name="filter-alt" size="xs" class="shrink-0" />
           </template>
         </OTag>
 
-        <div class="tw:flex-1" />
+        <div class="flex-1" />
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
-        <div class="tw:inline-flex tw:items-center tw:border tw:border-[var(--o2-border-color)] tw:rounded-md tw:px-1 tw:h-6 tw:mr-1 tw:overflow-hidden">
+        <div
+          class="border-card-glass-border rounded-default mr-1 inline-flex h-6 items-center overflow-hidden border px-1"
+        >
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
             :loading="searchObj.loading"
@@ -99,15 +112,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="insights-button"
         >
           <OIcon name="timeline" size="sm" />
-          <span v-if="showActionLabels" class="tw:whitespace-nowrap">{{ t('volumeInsights.analyzeBtnLabel') }}</span>
+          <span v-if="showActionLabels" class="whitespace-nowrap">{{
+            t("volumeInsights.analyzeBtnLabel")
+          }}</span>
           <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
         </OButton>
         <template v-if="searchObj.meta.resultGrid.showPagination">
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination tw:mr-[0.25rem] tw:mt-0! tw:ml-1"
+            class="select-pagination mt-0! mr-1 ml-1"
             size="sm"
+            :searchable="false"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
@@ -115,30 +131,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disable="searchObj.loading"
             :model-value="searchObj.data.resultGrid.currentPage + 1"
             :max="totalPages"
-            class="float-right paginator-section tw:mt-0!"
+            class="paginator-section float-right mt-0!"
             data-test="traces-search-result-pagination"
             @update:model-value="changePage"
           />
         </template>
       </div>
 
-      <!-- Combined scroll area: RED metrics + trace list scroll together -->
-      <div class="tw:flex-1 tw:overflow-y-auto tw:bg-[var(--o2-card-bg-solid)]">
+      <!-- Combined scroll area: RED metrics + trace list scroll together.
+           This is the single vertical scroller — the trace table delegates its
+           virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
+      <div ref="scrollContainerRef" class="bg-card-glass-solid flex-1 overflow-auto">
         <!-- ════════════════════ RED Metrics Section ════════════════════ -->
         <transition
           enter-active-class="transition-all duration-300 ease-in-out"
           leave-active-class="transition-all duration-300 ease-in-out"
           enter-from-class="opacity-0 -translate-y-4 max-h-0"
-          enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
-          leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
+          enter-to-class="opacity-100 translate-y-0 max-h-250"
+          leave-from-class="opacity-100 translate-y-0 max-h-250"
           leave-to-class="opacity-0 -translate-y-4 max-h-0"
         >
           <TracesMetricsDashboard
             v-show="searchObj.meta.showHistogram"
-            v-if="
-              searchObj.data.stream.selectedStream.value &&
-              searchObj.searchApplied
-            "
+            v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
             ref="metricsDashboardRef"
             :streamName="searchObj.data.stream.selectedStream.value"
             :timeRange="{
@@ -147,10 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }"
             :filter="searchObj.data.editorValue"
             :streamFields="searchObj.data.stream.selectedStreamFields"
-            :show="
-              searchObj.searchApplied &&
-              !searchObj.data.errorMsg?.trim()?.length
-            "
+            :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
             @time-range-selected="onMetricsTimeRangeSelected"
             @filters-updated="onMetricsFiltersUpdated"
           />
@@ -158,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <TracesSearchResultList
           :hits="hits"
+          :scroll-el="scrollContainerRef"
           :loading="searchObj.loading"
           :search-performed="searchPerformed"
           :total="searchObj.data.queryResults.total"
@@ -201,9 +214,10 @@ import {
   onMounted,
   ref,
   watch,
+  type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import useTraces from "../../composables/useTraces";
 import { useRouter } from "vue-router";
@@ -214,6 +228,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
@@ -231,7 +246,7 @@ export default defineComponent({
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
     OIcon,
-},
+  },
   props: {
     showErrorOnly: {
       type: Boolean,
@@ -242,11 +257,11 @@ export default defineComponent({
       default: false,
     },
     streamDocTimeRange: {
-      type: Object,
+      type: Object as PropType<{ min: number; max: number }>,
       default: undefined,
     },
     queryWindowUs: {
-      type: Object,
+      type: Object as PropType<{ start: number; end: number }>,
       default: undefined,
     },
   },
@@ -273,13 +288,10 @@ export default defineComponent({
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name,
-      );
+      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(col.name);
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
-      this.searchObj.organizationIdentifier =
-        this.store.state.selectedOrganization.identifier;
+      this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
     },
     onTimeBoxed(obj: any) {
@@ -289,13 +301,18 @@ export default defineComponent({
     },
   },
   setup(_props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
 
     const metricsDashboardRef: any = ref(null);
+
+    // Single vertical scroll container for the results area. Delegated to the
+    // trace table's virtualizer (:scroll-el) so the table doesn't render its own
+    // nested scrollbar — fixes the double-scrollbar on the traces page.
+    const scrollContainerRef = ref<HTMLElement | null>(null);
 
     const sectionHeaderRef = ref<HTMLElement | null>(null);
     const containerWidth = ref(9999);
@@ -311,7 +328,7 @@ export default defineComponent({
         headerResizeObserver.observe(sectionHeaderRef.value);
       }
     });
-    
+
     //Before unmount
     onBeforeUnmount(() => {
       headerResizeObserver?.disconnect();
@@ -333,9 +350,7 @@ export default defineComponent({
       if (searchObj.meta.searchMode === "spans") {
         // start_time / end_time are nanoseconds in raw span rows — convert to µs
         const spanStart = Math.floor((props.start_time || 0) / 1000);
-        const spanEnd = Math.ceil(
-          (props.end_time || props.start_time || 0) / 1000,
-        );
+        const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
         from = spanStart - 60_000_000; // -1 min in µs
         to = spanEnd + 3_600_000_000; // +1 hr in µs
       } else {
@@ -348,9 +363,7 @@ export default defineComponent({
         query: {
           stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
-          ...(searchObj.meta.searchMode === "spans"
-            ? { span_id: props.span_id }
-            : {}),
+          ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
           from,
           to,
           org_identifier: store.state.selectedOrganization.identifier,
@@ -360,10 +373,7 @@ export default defineComponent({
       emit("get:traceDetails", props);
     };
 
-    const onMetricsTimeRangeSelected = (range: {
-      start: number;
-      end: number;
-    }) => {
+    const onMetricsTimeRangeSelected = (range: { start: number; end: number }) => {
       emit("update:datetime", {
         start: range.start,
         end: range.end,
@@ -384,10 +394,7 @@ export default defineComponent({
     const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
 
     const searchPerformed = computed(() =>
-      Object.prototype.hasOwnProperty.call(
-        searchObj.data.queryResults,
-        "total",
-      ),
+      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
     );
 
     const rowsPerPageOptions = [10, 25, 50, 100];
@@ -396,10 +403,7 @@ export default defineComponent({
       searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
         ? Math.max(
             1,
-            Math.ceil(
-              searchObj.data.queryResults.total /
-                searchObj.meta.resultGrid.rowsPerPage,
-            ),
+            Math.ceil(searchObj.data.queryResults.total / searchObj.meta.resultGrid.rowsPerPage),
           )
         : 1,
     );
@@ -410,9 +414,10 @@ export default defineComponent({
       emit("update:scroll");
     }
 
-    function changeRowsPerPage(val: number) {
+    function changeRowsPerPage(val: SelectModelValue) {
       if (searchObj.loading) return;
-      searchObj.meta.resultGrid.rowsPerPage = val;
+      // rowsPerPageOptions are all numbers, so val is always a number here
+      searchObj.meta.resultGrid.rowsPerPage = val as number;
       searchObj.data.resultGrid.currentPage = 0;
       emit("update:scroll");
     }
@@ -441,6 +446,7 @@ export default defineComponent({
       searchObj,
       updatedLocalLogFilterField,
       metricsDashboardRef,
+      scrollContainerRef,
       sectionHeaderRef,
       showActionLabels,
       expandRowDetail,
@@ -461,3 +467,47 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
+   button DOM to compress the pagination controls into the results toolbar. */
+.paginator-section {
+  line-height: 1.5rem;
+  max-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem;
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  backdrop-filter: blur(0.625rem);
+  margin-top: 0;
+  overflow: visible;
+}
+
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
+
+.paginator-section :deep(.o-pagination__btn svg) {
+  width: 1rem !important;
+  height: 1rem !important;
+}
+
+.select-pagination {
+  position: relative;
+  width: 4rem !important;
+  height: 1.5rem !important;
+  margin-top: 0;
+}
+
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  padding-inline: 0.5rem !important;
+}
+</style>

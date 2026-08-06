@@ -22,12 +22,31 @@ import Snowflake from "./Snowflake.vue";
 import snowflakeCard from "@/components/ingestion/setupCard/content/snowflake";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
-vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "t@e.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
+}));
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "t@e.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -35,14 +54,22 @@ describe("snowflakeCard builder", () => {
   it("builds metadata + step flow", () => {
     const card = snowflakeCard(SUBS);
     expect(card.provider.name).toBe("Snowflake");
-    expect(card.detect).toMatchObject({ streamType: "metrics", match: "keyword", streamName: "snowflake" });
+    expect(card.detect).toMatchObject({
+      streamType: "metrics",
+      match: "keyword",
+      streamName: "snowflake",
+    });
     expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
   });
   it("pins the install to v0.92.0 and has a snowflake receiver config", () => {
     const card = snowflakeCard(SUBS);
-    const install = card.steps.find((s) => s.id === "install")!.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    const install = card.steps
+      .find((s) => s.id === "install")!
+      .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(install).toContain("0.92.0");
-    const config = card.steps.find((s) => s.id === "configure")!.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    const config = card.steps
+      .find((s) => s.id === "configure")!
+      .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
     expect(config).toContain("snowflake:");
     expect(config).toContain(`endpoint: ${SUBS.url}/api/${SUBS.org}`);
     expect(config).toContain(`Basic ${SUBS.token}`);
@@ -50,7 +77,9 @@ describe("snowflakeCard builder", () => {
 });
 describe("Snowflake.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card", () => {
     expect(getDataSourceCard("snowflake", SUBS)?.provider.name).toBe("Snowflake");
     wrapper = mount(Snowflake, { global: { plugins: [mockStore, mockI18n] } });

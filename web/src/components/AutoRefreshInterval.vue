@@ -15,14 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center">
+  <div class="flex items-center">
     <!-- Compact mode: Simple toggle button with dropdown menu -->
-    <ODropdown
-      v-if="isCompact"
-      v-model:open="btnRefreshInterval"
-      side="bottom"
-      align="start"
-    >
+    <ODropdown v-if="isCompact" v-model:open="btnRefreshInterval" side="bottom" align="start">
       <template #trigger>
         <OButton
           data-test="logs-search-bar-refresh-interval-btn"
@@ -32,87 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon
             name="update"
-            :class="isAnimating ? 'tw:![animation:rotate_2s_linear_infinite] tw:![transform-origin:center_center] tw:!inline-block' : ''"
+            :class="isAnimating ? 'auto-refresh-icon--spinning' : ''"
             size="sm"
           />
-          <OTooltip :content="`${t('search.autoRefresh')}: ${selectedLabel}`" />
+          <OTooltip :content="raw(`${t('search.autoRefresh')}: ${selectedLabel}`)" />
         </OButton>
       </template>
-      <div class="tw:w-75 tw:p-2">
-        <div class="tw:flex">
-          <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
-            <OButton
-              data-test="logs-search-off-refresh-interval"
-              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
-              size="sm"
-              :block="true"
-              @click="() => { onItemClick({ label: t('common.off'), value: 0 }); btnRefreshInterval = false; }"
-            >
-              {{ t("common.off") }}
-            </OButton>
-          </div>
-        </div>
-        <hr class="tw:border-0 tw:border-t tw:border-solid tw:border-(--o2-border) tw:my-0" />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
-          <div
-            v-for="(item, j) in items"
-            :key="'col_' + i + '_' + j"
-            class="tw:flex tw:flex-col tw:w-1/3 tw:p-2"
-            style="text-align: center"
-          >
-            <OButton
-              :data-test="`logs-search-bar-refresh-time-${item.value}`"
-              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
-              size="sm"
-              @click="() => { onItemClick(item); btnRefreshInterval = false; }"
-              :disabled="item.disabled"
-            >
-              <OTooltip
-                v-if="item.disabled"
-                side="right"
-                align="center"
-                max-width="18.75rem"
-                :content="minRangeRestrictionMessageVal"
-              />
-              {{ item.label }}
-            </OButton>
-          </div>
-        </div>
-      </div>
-    </ODropdown>
-
-    <!-- Full mode: Dropdown with label -->
-    <ODropdown
-      v-else
-      v-model:open="btnRefreshInterval"
-      side="bottom"
-      align="start"
-    >
-      <template #trigger>
-        <OButton
-          data-test="logs-search-bar-refresh-interval-btn-dropdown"
-          :variant="variant"
-          size="sm-toolbar"
-        >
-          <div class="tw:flex tw:items-center tw:flex-nowrap">
-            <OIcon
-              left
-              name="update"
-              size="sm"
-              :class="[
-                isAnimating ? 'tw:![animation:rotate_2s_linear_infinite] tw:![transform-origin:center_center] tw:!inline-block' : '',
-                isAnimating ? 'text-primary' : '',
-                'tw:mr-0.5',
-              ]"
-            />
-            <div class="tw:text-center tw:text-[0.8125rem] tw:leading-4">{{ selectedLabel }}</div>
-            <OIcon name="arrow-drop-down" size="sm" class="tw:ml-0.5" />
-          </div>
-        </OButton>
-      </template>
-      <div class="tw:w-75 tw:p-2">
-        <div class="tw:flex">
-          <div class="tw:flex tw:flex-col tw:w-full tw:p-2" style="text-align: center">
+      <div class="w-75 p-2">
+        <div class="flex">
+          <div class="flex w-full flex-col p-2 text-center">
             <OButton
               data-test="logs-search-off-refresh-interval"
               :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
@@ -129,13 +52,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
-        <ODropdownSeparator />
-        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="tw:flex">
+        <hr class="border-border-default my-0 border-0 border-t border-solid" />
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
           <div
             v-for="(item, j) in items"
             :key="'col_' + i + '_' + j"
-            class="tw:flex tw:flex-col tw:w-1/3 tw:p-2"
-            style="text-align: center"
+            class="flex w-1/3 flex-col p-2 text-center"
           >
             <OButton
               :data-test="`logs-search-bar-refresh-time-${item.value}`"
@@ -154,7 +76,83 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
                 align="center"
                 max-width="18.75rem"
-                :content="minRangeRestrictionMessageVal"
+                :content="raw(minRangeRestrictionMessageVal)"
+              />
+              {{ item.label }}
+            </OButton>
+          </div>
+        </div>
+      </div>
+    </ODropdown>
+
+    <!-- Full mode: Dropdown with label -->
+    <ODropdown v-else v-model:open="btnRefreshInterval" side="bottom" align="start">
+      <template #trigger>
+        <OButton
+          data-test="logs-search-bar-refresh-interval-btn-dropdown"
+          :variant="variant"
+          size="sm-toolbar"
+        >
+          <div class="flex flex-nowrap items-center">
+            <OIcon
+              left
+              name="update"
+              size="sm"
+              :class="[
+                isAnimating ? 'auto-refresh-icon--spinning' : '',
+                isAnimating ? 'text-primary' : '',
+                'mr-0.5',
+              ]"
+            />
+            <div class="text-compact text-center leading-4">{{ selectedLabel }}</div>
+            <OIcon name="arrow-drop-down" size="sm" class="ml-0.5" />
+          </div>
+        </OButton>
+      </template>
+      <div class="w-75 p-2">
+        <div class="flex">
+          <div class="flex w-full flex-col p-2 text-center">
+            <OButton
+              data-test="logs-search-off-refresh-interval"
+              :variant="modelValue.toString() === '0' ? 'primary' : 'ghost'"
+              size="sm"
+              :block="true"
+              @click="
+                () => {
+                  onItemClick({ label: t('common.off'), value: 0 });
+                  btnRefreshInterval = false;
+                }
+              "
+            >
+              {{ t("common.off") }}
+            </OButton>
+          </div>
+        </div>
+        <ODropdownSeparator />
+        <div v-for="(items, i) in refreshTimes" :key="'row_' + i" class="flex">
+          <div
+            v-for="(item, j) in items"
+            :key="'col_' + i + '_' + j"
+            class="flex w-1/3 flex-col p-2 text-center"
+          >
+            <OButton
+              :data-test="`logs-search-bar-refresh-time-${item.value}`"
+              :variant="Number(modelValue) === item.value ? 'primary' : 'ghost'"
+              size="sm"
+              @click="
+                () => {
+                  onItemClick(item);
+                  btnRefreshInterval = false;
+                }
+              "
+              :disabled="item.disabled"
+            >
+              <OTooltip
+                v-if="item.disabled"
+                side="right"
+                align="center"
+                max-width="18.75rem"
+                :content="raw(minRangeRestrictionMessageVal)"
               />
               {{ item.label }}
             </OButton>
@@ -174,20 +172,21 @@ import {
   onActivated,
   onDeactivated,
   onMounted,
+  type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { generateDurationLabel } from "../utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "AutoRefreshInterval",
-  components: { OSeparator, OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
+  components: { OButton, ODropdown, ODropdownSeparator, OTooltip, OIcon },
   props: {
     modelValue: {
       type: Number,
@@ -210,14 +209,14 @@ export default defineComponent({
       default: false,
     },
     variant: {
-      type: String,
+      type: String as PropType<ButtonVariant>,
       default: "outline",
     },
   },
   emits: ["update:modelValue", "trigger"],
   setup(props: any, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const btnRefreshInterval = ref(false);
     let intervalInstance = 0;
@@ -266,9 +265,7 @@ export default defineComponent({
       }
 
       // Find the label from refreshTimes
-      const found = refreshTimes.value
-        .flat()
-        .find((it: any) => it.value == selectedValue.value);
+      const found = refreshTimes.value.flat().find((it: any) => it.value == selectedValue.value);
       return found?.label || generateDurationLabel(selectedValue.value);
     });
 
@@ -345,10 +342,9 @@ export default defineComponent({
           item.disabled = isDisabled(item.value);
         });
       });
-      minRangeRestrictionMessageVal.value = t(
-        "common.minRefreshIntervalMessage",
-        { interval: props.minRefreshInterval },
-      );
+      minRangeRestrictionMessageVal.value = t("common.minRefreshIntervalMessage", {
+        interval: props.minRefreshInterval,
+      });
     };
 
     onMounted(() => {
@@ -366,6 +362,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       router,
       btnRefreshInterval,
@@ -382,7 +379,19 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): the spinning refresh icon is used only by this component (both
+   the icon-only and the labelled dropdown trigger share this one class). The
+   `animation` is declared here rather than as a template `[animation:…]` utility
+   so Vue's scoped compiler renames the keyframe and this reference together.
+   The class lands on an OIcon root, which carries this component's scope id too.
+   `!important` is retained from the original `!`-prefixed utilities. */
+.auto-refresh-icon--spinning {
+  display: inline-block !important;
+  transform-origin: center center !important;
+  animation: rotate 2s linear infinite !important;
+}
+
 @keyframes rotate {
   0% {
     transform: rotate(0deg);

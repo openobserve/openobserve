@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
   type EvalJob,
   type Provider,
@@ -10,7 +10,7 @@ import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
 
 export function useOnlineEvalsData() {
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const jobs = ref<EvalJob[]>([]);
   const scorers = ref<Scorer[]>([]);
   const scoreConfigs = ref<ScoreConfig[]>([]);
@@ -22,13 +22,14 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     isLoading.value = true;
     try {
-      const [providerResult, scoreConfigResult, scorerResult, jobResult] =
-        await Promise.allSettled([
+      const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
+        [
           onlineEvalsService.providers.list(orgId),
           onlineEvalsService.scoreConfigs.list(orgId),
           onlineEvalsService.scorers.list(orgId),
           onlineEvalsService.jobs.list(orgId),
-        ]);
+        ],
+      );
 
       if (providerResult.status === "fulfilled") {
         providers.value = providerResult.value;

@@ -1,7 +1,5 @@
 // Copyright 2026 OpenObserve Inc.
 
-import type { CSSProperties } from "vue";
-
 export interface OVirtualScrollProps<T = any> {
   /** The full array of items to virtualize. */
   items: T[];

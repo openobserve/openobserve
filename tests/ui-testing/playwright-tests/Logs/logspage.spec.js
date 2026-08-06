@@ -196,7 +196,7 @@ test.describe("Logs Page testcases", () => {
     await pm.logsPage.clickLiveModeButton();
     // Wait for the 5-sec live-mode option to be enabled in the dropdown
     await pm.logsPage.waitForLiveMode5SecReady();
-    // Start watching for notification before clicking - Quasar notify has 1s timeout
+    // Start watching for notification before clicking - notify toast has 1s timeout
     const liveNotifPromise = page.waitForFunction(
       () => document.querySelector('[role="alert"]')?.textContent?.includes('Live mode is enabled'),
       { timeout: 15000 }

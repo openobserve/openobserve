@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    :class="['json-field-renderer', isValidJSON ? 'tw:font-mono tw:text-xs tw:leading-[1.5]' : '']"
+    :class="['json-field-renderer', isValidJSON ? 'font-mono text-xs leading-[1.5]' : '']"
     data-test="json-field-renderer"
   >
     <div v-if="parsedData === null || parsedData === undefined">
@@ -24,77 +24,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div v-else-if="Array.isArray(parsedData)">
       <!-- Array of primitives: ["a", "b", "c"] -> render as lines -->
-      <div
-        v-if="isArrayOfPrimitives"
-        class="tw:flex tw:flex-col"
-        data-test="json-array-items"
-      >
+      <div v-if="isArrayOfPrimitives" class="flex flex-col" data-test="json-array-items">
         <div
           v-for="(item, index) in definedItems"
           :key="index"
-          class="tw:py-[2px]"
+          class="py-0.5"
           data-test="json-array-item"
         >
           <span :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
       </div>
       <!-- Array of objects: [{"user": "admin"}, ...] -> render each object -->
-      <div v-else class="tw:flex tw:flex-col" data-test="json-array-objects">
-        <div
-          v-for="(item, index) in definedItems"
-          :key="index"
-          class="tw:py-[2px] tw:break-words"
-        >
+      <div v-else class="flex flex-col" data-test="json-array-objects">
+        <div v-for="(item, index) in definedItems" :key="index" class="py-0.5 break-words">
           <span v-if="typeof item === 'object' && item !== null">
-            <span class="tw:text-[#9ca3af]">{</span>
+            <span class="text-text-muted">{</span>
             <template v-for="(val, key) in getDefinedEntries(item)" :key="key">
-              <span class="tw:inline">
-                <span class="tw:font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
-                <span class="tw:text-[#9ca3af]">: </span>
-                <span class="tw:break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
+              <span class="inline">
+                <span class="font-medium" :style="{ color: keyColor }" data-test="json-key">{{
+                  key
+                }}</span>
+                <span class="text-text-muted">: </span>
+                <span
+                  class="break-words"
+                  :style="{ color: getValueColor(val) }"
+                  data-test="json-value"
+                  >{{ formatValue(val) }}</span
+                >
               </span>
-              <span v-if="!isLastDefinedEntry(item, key)" class="tw:text-[#9ca3af]">, </span>
+              <span v-if="!isLastDefinedEntry(item, key)" class="text-text-muted">, </span>
             </template>
-            <span class="tw:text-[#9ca3af]">}</span>
+            <span class="text-text-muted">}</span>
           </span>
           <span v-else :style="{ color: getValueColor(item) }">{{ formatValue(item) }}</span>
         </div>
       </div>
     </div>
     <!-- Single object: {"key": "value"} -> render key-value pairs -->
-    <div
-      v-else-if="typeof parsedData === 'object'"
-      class="tw:break-words"
-      data-test="json-object"
-    >
-      <span class="tw:text-[#9ca3af]">{</span>
+    <div v-else-if="typeof parsedData === 'object'" class="break-words" data-test="json-object">
+      <span class="text-text-muted">{</span>
       <template v-for="(val, key, idx) in definedObjectEntries" :key="key">
-        <span class="tw:inline">
-          <span class="tw:font-medium" :style="{ color: keyColor }" data-test="json-key">{{ key }}</span>
-          <span class="tw:text-[#9ca3af]">: </span>
-          <span class="tw:break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{ formatValue(val) }}</span>
+        <span class="inline">
+          <span class="font-medium" :style="{ color: keyColor }" data-test="json-key">{{
+            key
+          }}</span>
+          <span class="text-text-muted">: </span>
+          <span class="break-words" :style="{ color: getValueColor(val) }" data-test="json-value">{{
+            formatValue(val)
+          }}</span>
         </span>
-        <span v-if="idx < definedObjectKeys.length - 1" class="tw:text-[#9ca3af]">, </span>
+        <span v-if="idx < definedObjectKeys.length - 1" class="text-text-muted">, </span>
       </template>
-      <span class="tw:text-[#9ca3af]">}</span>
+      <span class="text-text-muted">}</span>
     </div>
     <!-- Primitive value: only apply JSON coloring if the value was valid JSON -->
     <div v-else>
-      <span :style="isValidJSON ? { color: getValueColor(parsedData) } : {}">{{ formatValue(parsedData) }}</span>
+      <span :style="isValidJSON ? { color: getValueColor(parsedData) } : {}">{{
+        formatValue(parsedData)
+      }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
 
 export interface Props {
   value: any;
 }
 
 const props = defineProps<Props>();
-const store = useStore();
+const { isDark } = useTheme();
 
 // Parse the value if it's a string, otherwise use as-is
 // Also tracks whether JSON parsing succeeded so we don't color plain strings as JSON
@@ -120,9 +122,6 @@ const parsedData = computed(() => parseResult.value.data);
 // Used to avoid coloring plain non-JSON strings (e.g. timestamps) like JSON values.
 const isValidJSON = computed(() => parseResult.value.isJSON);
 
-// Check if theme is dark - memoized
-const isDarkTheme = computed(() => store.state.theme === "dark");
-
 // Check if array contains only primitives (strings, numbers, booleans, null)
 const isArrayOfPrimitives = computed(() => {
   if (!Array.isArray(parsedData.value)) return false;
@@ -132,7 +131,7 @@ const isArrayOfPrimitives = computed(() => {
       typeof item === "number" ||
       typeof item === "boolean" ||
       item === null ||
-      item === undefined
+      item === undefined,
   );
 });
 
@@ -144,7 +143,11 @@ const definedItems = computed(() => {
 
 // Memoized defined entries for single objects
 const definedObjectEntries = computed(() => {
-  if (typeof parsedData.value === 'object' && !Array.isArray(parsedData.value) && parsedData.value !== null) {
+  if (
+    typeof parsedData.value === "object" &&
+    !Array.isArray(parsedData.value) &&
+    parsedData.value !== null
+  ) {
     return getDefinedEntries(parsedData.value);
   }
   return {};
@@ -153,27 +156,27 @@ const definedObjectEntries = computed(() => {
 // Memoized keys for single objects
 const definedObjectKeys = computed(() => Object.keys(definedObjectEntries.value));
 
-// Get color for JSON keys based on theme
+// Get color for JSON keys — resolved from theme-aware design tokens.
+// Reading isDark.value keeps this reactive so it recomputes on theme switch
+// (chartColor's cache is invalidated on theme change).
 const keyColor = computed(() => {
-  return isDarkTheme.value ? "#f67a7aff" : "#B71C1C";
+  void isDark.value;
+  return chartColor("--color-json-key");
 });
 
-// Get color for values based on type and theme
+// Get color for values based on type — routed through --color-json-* tokens.
 const getValueColor = (value: any): string => {
-  const isDark = isDarkTheme.value;
-
+  void isDark.value;
   if (value === null) {
-    return isDark ? "#9CA3AF" : "#6B7280";
+    return chartColor("--color-json-null");
   } else if (typeof value === "boolean") {
-    return isDark ? "#A5B4FC" : "#6D28D9";
+    return chartColor("--color-json-boolean");
   } else if (typeof value === "number") {
-    return isDark ? "#60A5FA" : "#2563EB";
+    return chartColor("--color-json-number");
   } else if (typeof value === "string") {
-    return isDark ? "#6EE7B7" : "#047857";
-  } else if (typeof value === "object") {
-    return isDark ? "#D1D5DB" : "#4B5563";
+    return chartColor("--color-json-string");
   }
-  return isDark ? "#D1D5DB" : "#4B5563";
+  return chartColor("--color-json-object");
 };
 
 // Format value for display
@@ -191,7 +194,7 @@ const definedEntriesCache = new WeakMap<object, { entries: Record<string, any>; 
 
 // Get object entries excluding undefined values - optimized with caching
 const getDefinedEntries = (obj: any): Record<string, any> => {
-  if (!obj || typeof obj !== 'object') return {};
+  if (!obj || typeof obj !== "object") return {};
 
   // Check cache first
   if (definedEntriesCache.has(obj)) {
@@ -215,7 +218,7 @@ const getDefinedEntries = (obj: any): Record<string, any> => {
 
 // Check if current key is the last defined entry - optimized
 const isLastDefinedEntry = (obj: any, currentKey: string): boolean => {
-  if (!obj || typeof obj !== 'object') return true;
+  if (!obj || typeof obj !== "object") return true;
 
   // Use cached keys if available
   const cached = definedEntriesCache.get(obj);
@@ -224,4 +227,3 @@ const isLastDefinedEntry = (obj: any, currentKey: string): boolean => {
   return keys.indexOf(currentKey) === keys.length - 1;
 };
 </script>
-

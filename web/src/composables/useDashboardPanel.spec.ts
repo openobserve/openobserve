@@ -1,23 +1,15 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-  MockedFunction,
-} from "vitest";
-import { reactive, nextTick, ref } from "vue";
+import { describe, it, expect, beforeEach, afterEach, vi, MockedFunction } from "vitest";
+import { nextTick } from "vue";
 import useDashboardPanelData from "./dashboard/useDashboardPanel";
 import { useStore } from "vuex";
 import useNotifications from "./useNotifications";
 import useValuesWebSocket from "./dashboard/useValuesWebSocket";
-import StreamService from "@/services/stream";
 import queryService from "@/services/search";
 import * as zincutils from "@/utils/zincutils";
 import * as sqlUtils from "@/utils/query/sqlUtils";
-import * as convertDataIntoUnitValue from "@/utils/dashboard/convertDataIntoUnitValue";
 import * as panelValidation from "@/utils/dashboard/panelValidation";
+import i18nInstance from "@/locales";
+const t = (i18nInstance.global as any).t;
 
 // Mock Vue lifecycle hooks to avoid warnings
 vi.mock("vue", async () => {
@@ -101,15 +93,9 @@ describe("useDashboardPanel", () => {
     vi.mocked(panelValidation.validatePanel).mockImplementation(() => {});
 
     // Mock zinc utils
-    vi.mocked(zincutils.splitQuotedString).mockImplementation((str) =>
-      str.split(" "),
-    );
-    vi.mocked(zincutils.escapeSingleQuotes).mockImplementation((str) =>
-      str.replace(/'/g, "''"),
-    );
-    vi.mocked(zincutils.b64EncodeUnicode).mockImplementation((str) =>
-      btoa(str),
-    );
+    vi.mocked(zincutils.splitQuotedString).mockImplementation((str) => str.split(" "));
+    vi.mocked(zincutils.escapeSingleQuotes).mockImplementation((str) => str.replace(/'/g, "''"));
+    vi.mocked(zincutils.b64EncodeUnicode).mockImplementation((str) => btoa(str));
     vi.mocked(zincutils.isStreamingEnabled).mockReturnValue(false);
 
     // Mock query service
@@ -141,7 +127,7 @@ describe("useDashboardPanel", () => {
 
   describe("Basic Initialization", () => {
     it("should initialize composable successfully", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
       expect(dashboardPanelData).toBeDefined();
       expect(dashboardPanelData.data).toBeDefined();
@@ -162,21 +148,19 @@ describe("useDashboardPanel", () => {
     });
 
     it("should initialize table_pagination as false by default", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
       expect(dashboardPanelData.data.config.table_pagination).toBe(false);
     });
 
     it("should initialize table_pagination_rows_per_page as null by default", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
-      expect(
-        dashboardPanelData.data.config.table_pagination_rows_per_page,
-      ).toBeNull();
+      expect(dashboardPanelData.data.config.table_pagination_rows_per_page).toBeNull();
     });
 
     it("should initialize pagination config alongside other table config", () => {
-      const { dashboardPanelData } = useDashboardPanelData();
+      const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
       const config = dashboardPanelData.data.config;
 
       // Verify pagination config exists with other table config
@@ -192,7 +176,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should have all expected functions", () => {
@@ -210,9 +194,7 @@ describe("useDashboardPanel", () => {
       panel.cleanupDraggingFields();
 
       expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(false);
-      expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(
-        -1,
-      );
+      expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(-1);
     });
 
     it("should reset dashboard panel data", () => {
@@ -233,9 +215,7 @@ describe("useDashboardPanel", () => {
 
       panel.addQuery();
 
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialLength + 1,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialLength + 1);
       const newQuery = panel.dashboardPanelData.data.queries[initialLength];
       expect(newQuery.vrlFunctionFieldList).toEqual([]);
     });
@@ -261,9 +241,7 @@ describe("useDashboardPanel", () => {
 
       panel.removeQuery(1);
 
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialLength - 1,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialLength - 1);
     });
   });
 
@@ -271,7 +249,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -280,60 +258,55 @@ describe("useDashboardPanel", () => {
     });
 
     it("should add X-axis items", () => {
-      const initialLength =
-        panel.dashboardPanelData.data.queries[0].fields.x.length;
+      const initialLength = panel.dashboardPanelData.data.queries[0].fields.x.length;
 
       panel.addXAxisItem({ name: "timestamp" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.x.length,
-      ).toBeGreaterThan(initialLength);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThan(
+        initialLength,
+      );
     });
 
     it("should add Y-axis items", () => {
-      const initialLength =
-        panel.dashboardPanelData.data.queries[0].fields.y.length;
+      const initialLength = panel.dashboardPanelData.data.queries[0].fields.y.length;
 
       panel.addYAxisItem({ name: "count" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.y.length,
-      ).toBeGreaterThan(initialLength);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThan(
+        initialLength,
+      );
     });
 
     it("should add breakdown items", () => {
-      const initialLength =
-        panel.dashboardPanelData.data.queries[0].fields.breakdown.length;
+      const initialLength = panel.dashboardPanelData.data.queries[0].fields.breakdown.length;
 
       panel.addBreakDownAxisItem({ name: "level" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
-      ).toBeGreaterThan(initialLength);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBeGreaterThan(
+        initialLength,
+      );
     });
 
     it("should remove X-axis items", () => {
       panel.addXAxisItem({ name: "timestamp" });
-      const initialLength =
-        panel.dashboardPanelData.data.queries[0].fields.x.length;
+      const initialLength = panel.dashboardPanelData.data.queries[0].fields.x.length;
 
       panel.removeXAxisItemByIndex(0);
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.x.length,
-      ).toBeLessThanOrEqual(initialLength);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeLessThanOrEqual(
+        initialLength,
+      );
     });
 
     it("should remove Y-axis items", () => {
       panel.addYAxisItem({ name: "count" });
-      const initialLength =
-        panel.dashboardPanelData.data.queries[0].fields.y.length;
+      const initialLength = panel.dashboardPanelData.data.queries[0].fields.y.length;
 
       panel.removeYAxisItemByIndex(0);
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.y.length,
-      ).toBeLessThanOrEqual(initialLength);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeLessThanOrEqual(
+        initialLength,
+      );
     });
   });
 
@@ -341,7 +314,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "latitude", type: "Float64" },
         { name: "longitude", type: "Float64" },
@@ -352,43 +325,33 @@ describe("useDashboardPanel", () => {
     it("should add latitude field", () => {
       panel.addLatitude({ name: "latitude" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeDefined();
     });
 
     it("should add longitude field", () => {
       panel.addLongitude({ name: "longitude" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeDefined();
     });
 
     it("should add weight field", () => {
       panel.addWeight({ name: "weight" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.weight,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight).toBeDefined();
     });
 
     it("should remove latitude field", () => {
       panel.addLatitude({ name: "latitude" });
       panel.removeLatitude();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
     });
 
     it("should remove longitude field", () => {
       panel.addLongitude({ name: "longitude" });
       panel.removeLongitude();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeNull();
     });
 
     it("should remove weight field", () => {
@@ -403,7 +366,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should have promqlMode computed property", () => {
@@ -419,9 +382,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should have selectedStreamFieldsBasedOnUserDefinedSchema computed property", () => {
-      expect(
-        Array.isArray(panel.selectedStreamFieldsBasedOnUserDefinedSchema.value),
-      ).toBe(true);
+      expect(Array.isArray(panel.selectedStreamFieldsBasedOnUserDefinedSchema.value)).toBe(true);
     });
 
     it("should return correct labels for different chart types", () => {
@@ -440,7 +401,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should have validation computed properties", () => {
@@ -465,7 +426,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should get result schema", async () => {
@@ -544,7 +505,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should update array aliases", () => {
@@ -600,7 +561,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should handle empty field operations", () => {
@@ -629,8 +590,7 @@ describe("useDashboardPanel", () => {
           type: "Utf8",
         }));
 
-      panel.dashboardPanelData.meta.stream.selectedStreamFields =
-        largeFieldArray;
+      panel.dashboardPanelData.meta.stream.selectedStreamFields = largeFieldArray;
 
       expect(() => {
         panel.addXAxisItem({ name: "field_500" });
@@ -651,7 +611,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -673,7 +633,7 @@ describe("useDashboardPanel", () => {
         const firstField = yFields[0];
 
         // Verify that colors are assigned (if the field has a color property)
-        if (firstField.hasOwnProperty("color")) {
+        if (Object.prototype.hasOwnProperty.call(firstField, "color")) {
           expect(firstField.color).toBeDefined();
         }
 
@@ -687,7 +647,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "level", type: "Utf8" },
         { name: "service", type: "Utf8" },
@@ -701,13 +661,10 @@ describe("useDashboardPanel", () => {
 
     it("should add filter items with proper structure", async () => {
       const initialConditionsLength =
-        panel.dashboardPanelData.data.queries[0].fields.filter.conditions
-          .length;
+        panel.dashboardPanelData.data.queries[0].fields.filter.conditions.length;
 
       // Mock the valuesWebSocket.fetchFieldValues to prevent actual API call
-      const mockFetchFieldValues = vi
-        .fn()
-        .mockResolvedValue({ data: ["ERROR", "WARN", "INFO"] });
+      const mockFetchFieldValues = vi.fn().mockResolvedValue({ data: ["ERROR", "WARN", "INFO"] });
       mockValuesWebSocket.fetchFieldValues = mockFetchFieldValues;
 
       try {
@@ -715,20 +672,16 @@ describe("useDashboardPanel", () => {
 
         // Verify that filter condition was added
         expect(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions
-            .length,
+          panel.dashboardPanelData.data.queries[0].fields.filter.conditions.length,
         ).toBeGreaterThan(initialConditionsLength);
 
-        const addedCondition =
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions[0];
+        const addedCondition = panel.dashboardPanelData.data.queries[0].fields.filter.conditions[0];
         expect(addedCondition.column).toBe("level");
         expect(addedCondition.type).toBe("list");
         expect(addedCondition.logicalOperator).toBe("AND");
       } catch (error) {
         // If the function doesn't exist or fails, at least verify it doesn't break the system
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.filter,
-        ).toBeDefined();
+        expect(panel.dashboardPanelData.data.queries[0].fields.filter).toBeDefined();
       }
     });
 
@@ -737,9 +690,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.queries[0].fields.x = [
         { column: "timestamp", alias: "timestamp" },
       ];
-      panel.dashboardPanelData.data.queries[0].fields.y = [
-        { column: "count", alias: "count" },
-      ];
+      panel.dashboardPanelData.data.queries[0].fields.y = [{ column: "count", alias: "count" }];
       panel.dashboardPanelData.data.queries[0].fields.filter.conditions = [
         { column: "level", operator: "=", value: "ERROR" },
       ];
@@ -749,15 +700,9 @@ describe("useDashboardPanel", () => {
         panel.removeXYFilters();
 
         // Verify that fields are cleared
-        expect(panel.dashboardPanelData.data.queries[0].fields.x).toHaveLength(
-          0,
-        );
-        expect(panel.dashboardPanelData.data.queries[0].fields.y).toHaveLength(
-          0,
-        );
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ).toHaveLength(0);
+        expect(panel.dashboardPanelData.data.queries[0].fields.x).toHaveLength(0);
+        expect(panel.dashboardPanelData.data.queries[0].fields.y).toHaveLength(0);
+        expect(panel.dashboardPanelData.data.queries[0].fields.filter.conditions).toHaveLength(0);
       } else {
         // If function doesn't exist, just verify structure exists
         expect(panel.dashboardPanelData.data.queries[0].fields).toBeDefined();
@@ -769,7 +714,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -810,7 +755,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -837,9 +782,7 @@ describe("useDashboardPanel", () => {
       // Trigger SQL generation (this should happen automatically through watchers)
       // But we can test it by checking if the query is updated
       expect(panel.dashboardPanelData.data.queries[0]).toBeDefined();
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe(
-        "test_logs",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("test_logs");
     });
 
     it("should handle empty fields gracefully", () => {
@@ -862,7 +805,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "latitude", type: "Float64" },
@@ -884,12 +827,8 @@ describe("useDashboardPanel", () => {
       panel.addWeight({ name: "weight" });
 
       // Verify geo map specific fields are set
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeDefined();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeDefined();
     });
 
     it("should handle maps chart type", () => {
@@ -901,12 +840,8 @@ describe("useDashboardPanel", () => {
       panel.addMapValue({ name: "population" });
 
       // Verify map specific fields are set
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.name,
-      ).toBeDefined();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value_for_maps,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.name).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeDefined();
     });
 
     it("should handle sankey chart type", () => {
@@ -924,15 +859,9 @@ describe("useDashboardPanel", () => {
       panel.addValue({ name: "value" });
 
       // Verify sankey specific fields are set
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.source,
-      ).toBeDefined();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.target,
-      ).toBeDefined();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.source).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.target).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value).toBeDefined();
     });
   });
 
@@ -940,7 +869,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -984,8 +913,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.queryType = "sql";
 
       // Test query with single quote variable format
-      const queryWithQuotes =
-        "SELECT * FROM logs WHERE level IN (${levels:singlequote})";
+      const queryWithQuotes = "SELECT * FROM logs WHERE level IN (${levels:singlequote})";
       panel.dashboardPanelData.data.queries[0].query = queryWithQuotes;
 
       await nextTick();
@@ -1013,7 +941,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -1039,18 +967,14 @@ describe("useDashboardPanel", () => {
           await panel.loadFilterItem(filterCondition);
 
           // Verify that the filter was processed
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.filter,
-          ).toBeDefined();
+          expect(panel.dashboardPanelData.data.queries[0].fields.filter).toBeDefined();
         } catch (error) {
           // If the function fails, ensure it doesn't break the system
           expect(panel.dashboardPanelData).toBeDefined();
         }
       } else {
         // If function doesn't exist, test basic filter structure
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ).toEqual([]);
+        expect(panel.dashboardPanelData.data.queries[0].fields.filter.conditions).toEqual([]);
       }
     });
 
@@ -1061,16 +985,11 @@ describe("useDashboardPanel", () => {
         { name: "another_field", type: "Float64" },
       ];
 
-      panel.dashboardPanelData.meta.stream.selectedStreamFields =
-        newStreamFields;
+      panel.dashboardPanelData.meta.stream.selectedStreamFields = newStreamFields;
 
       // Verify the update
-      expect(
-        panel.dashboardPanelData.meta.stream.selectedStreamFields,
-      ).toHaveLength(2);
-      expect(
-        panel.dashboardPanelData.meta.stream.selectedStreamFields[0].name,
-      ).toBe("new_field");
+      expect(panel.dashboardPanelData.meta.stream.selectedStreamFields).toHaveLength(2);
+      expect(panel.dashboardPanelData.meta.stream.selectedStreamFields[0].name).toBe("new_field");
     });
 
     it("should handle user-defined schema updates", () => {
@@ -1083,8 +1002,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.meta.stream.userDefinedSchema = userSchema;
 
       // Test the computed property
-      const streamFields =
-        panel.selectedStreamFieldsBasedOnUserDefinedSchema.value;
+      const streamFields = panel.selectedStreamFieldsBasedOnUserDefinedSchema.value;
       expect(Array.isArray(streamFields)).toBe(true);
     });
   });
@@ -1093,7 +1011,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -1109,15 +1027,9 @@ describe("useDashboardPanel", () => {
       panel.addBreakDownAxisItem({ name: "level" });
 
       // Verify fields were added
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.x.length,
-      ).toBeGreaterThan(0);
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.y.length,
-      ).toBeGreaterThan(0);
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
-      ).toBeGreaterThan(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThan(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThan(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBeGreaterThan(0);
 
       // Remove fields
       panel.removeXAxisItemByIndex(0);
@@ -1130,26 +1042,18 @@ describe("useDashboardPanel", () => {
 
       // Add query
       panel.addQuery();
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialQueryCount + 1,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialQueryCount + 1);
 
       // Add another query
       panel.addQuery();
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialQueryCount + 2,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialQueryCount + 2);
 
       // Remove queries
       panel.removeQuery(2);
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialQueryCount + 1,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialQueryCount + 1);
     });
 
     it("should maintain data consistency", () => {
-      const originalData = JSON.stringify(panel.dashboardPanelData);
-
       // Perform operations
       panel.addXAxisItem({ name: "timestamp" });
       panel.cleanupDraggingFields();
@@ -1166,7 +1070,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -1216,10 +1120,9 @@ describe("useDashboardPanel", () => {
 
       // Verify z-axis field was added
       if (panel.dashboardPanelData.data.queries[0].fields.z.length > 0) {
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.z[0].args[0].value
-            .field,
-        ).toBe("count");
+        expect(panel.dashboardPanelData.data.queries[0].fields.z[0].args[0].value.field).toBe(
+          "count",
+        );
       }
 
       // Remove z-axis field
@@ -1241,16 +1144,13 @@ describe("useDashboardPanel", () => {
 
   describe("Dashboard Panel State Management", () => {
     it("should handle panel layout and configuration changes", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test layout changes
-      const originalQueryIndex =
-        panel.dashboardPanelData.layout.currentQueryIndex;
+      const originalQueryIndex = panel.dashboardPanelData.layout.currentQueryIndex;
       panel.dashboardPanelData.layout.currentQueryIndex = 1;
 
-      expect(panel.dashboardPanelData.layout.currentQueryIndex).not.toBe(
-        originalQueryIndex,
-      );
+      expect(panel.dashboardPanelData.layout.currentQueryIndex).not.toBe(originalQueryIndex);
 
       // Test panel title changes
       panel.dashboardPanelData.data.title = "Updated Panel Title";
@@ -1258,9 +1158,7 @@ describe("useDashboardPanel", () => {
 
       // Test description changes
       panel.dashboardPanelData.data.description = "Updated panel description";
-      expect(panel.dashboardPanelData.data.description).toBe(
-        "Updated panel description",
-      );
+      expect(panel.dashboardPanelData.data.description).toBe("Updated panel description");
 
       // Test config changes
       if (panel.dashboardPanelData.data.config) {
@@ -1272,7 +1170,7 @@ describe("useDashboardPanel", () => {
 
   describe("Error Boundary and Edge Cases", () => {
     it("should handle WebSocket connection and disconnection", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test WebSocket operations if available
       try {
@@ -1308,7 +1206,7 @@ describe("useDashboardPanel", () => {
 
   describe("Data Transformation and Formatting", () => {
     it("should handle data formatting and unit conversions", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test unit conversion and formatting
       panel.dashboardPanelData.data.config.unit = "bytes";
@@ -1331,16 +1229,14 @@ describe("useDashboardPanel", () => {
       // Test time range configurations
       if (panel.dashboardPanelData.data.queries[0].config) {
         panel.dashboardPanelData.data.queries[0].config.auto_sql = true;
-        expect(panel.dashboardPanelData.data.queries[0].config.auto_sql).toBe(
-          true,
-        );
+        expect(panel.dashboardPanelData.data.queries[0].config.auto_sql).toBe(true);
       }
     });
   });
 
   describe("Panel Configuration and Layout", () => {
     it("should handle panel size and position configurations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test panel layout properties
       panel.dashboardPanelData.layout.h = 400;
@@ -1369,18 +1265,14 @@ describe("useDashboardPanel", () => {
       ];
 
       expect(panel.dashboardPanelData.data.config.thresholds).toHaveLength(2);
-      expect(panel.dashboardPanelData.data.config.thresholds[0].color).toBe(
-        "red",
-      );
-      expect(panel.dashboardPanelData.data.config.thresholds[0].value).toBe(
-        100,
-      );
+      expect(panel.dashboardPanelData.data.config.thresholds[0].color).toBe("red");
+      expect(panel.dashboardPanelData.data.config.thresholds[0].value).toBe(100);
     });
   });
 
   describe("Advanced Query Operations", () => {
     it("should handle complex query operations and transformations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test different chart types with specific requirements
       panel.dashboardPanelData.data.type = "pie";
@@ -1427,7 +1319,7 @@ describe("useDashboardPanel", () => {
 
   describe("Stream and Schema Management", () => {
     it("should handle stream selection and schema operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test stream configuration
       panel.dashboardPanelData.meta.stream.selectedStream = {
@@ -1440,12 +1332,8 @@ describe("useDashboardPanel", () => {
         ],
       };
 
-      expect(panel.dashboardPanelData.meta.stream.selectedStream.name).toBe(
-        "test_stream",
-      );
-      expect(
-        panel.dashboardPanelData.meta.stream.selectedStream.schema,
-      ).toHaveLength(3);
+      expect(panel.dashboardPanelData.meta.stream.selectedStream.name).toBe("test_stream");
+      expect(panel.dashboardPanelData.meta.stream.selectedStream.schema).toHaveLength(3);
 
       // Test stream fields extraction
       if (typeof panel.extractStreamFields === "function") {
@@ -1476,27 +1364,21 @@ describe("useDashboardPanel", () => {
         { name: "count", type: "number" },
       ];
 
-      expect(
-        panel.dashboardPanelData.meta.stream.selectedStreamFields,
-      ).toHaveLength(3);
+      expect(panel.dashboardPanelData.meta.stream.selectedStreamFields).toHaveLength(3);
 
       // Test user defined schema
       panel.dashboardPanelData.meta.stream.userDefinedSchema = [
         { name: "custom_field", type: "text" },
       ];
 
-      expect(
-        panel.dashboardPanelData.meta.stream.userDefinedSchema,
-      ).toHaveLength(1);
-      expect(
-        panel.dashboardPanelData.meta.stream.userDefinedSchema[0].name,
-      ).toBe("custom_field");
+      expect(panel.dashboardPanelData.meta.stream.userDefinedSchema).toHaveLength(1);
+      expect(panel.dashboardPanelData.meta.stream.userDefinedSchema[0].name).toBe("custom_field");
     });
   });
 
   describe("Computed Properties and Watchers", () => {
     it("should test computed properties and reactive behavior", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test promqlMode computed property with different query types
       panel.dashboardPanelData.data.queryType = "sql";
@@ -1517,9 +1399,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex = 2;
 
       expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-      expect(panel.dashboardPanelData.meta.dragAndDrop.currentDragField).toBe(
-        "test_field",
-      );
+      expect(panel.dashboardPanelData.meta.dragAndDrop.currentDragField).toBe("test_field");
       expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(2);
 
       // Test field limit computations
@@ -1548,24 +1428,18 @@ describe("useDashboardPanel", () => {
 
   describe("Time Range and Date Handling", () => {
     it("should handle time range configurations and date operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test time range settings
       panel.dashboardPanelData.data.queries[0].config.startTime = 1640995200000; // Jan 1, 2022
       panel.dashboardPanelData.data.queries[0].config.endTime = 1640995260000; // Jan 1, 2022 + 1min
 
-      expect(panel.dashboardPanelData.data.queries[0].config.startTime).toBe(
-        1640995200000,
-      );
-      expect(panel.dashboardPanelData.data.queries[0].config.endTime).toBe(
-        1640995260000,
-      );
+      expect(panel.dashboardPanelData.data.queries[0].config.startTime).toBe(1640995200000);
+      expect(panel.dashboardPanelData.data.queries[0].config.endTime).toBe(1640995260000);
 
       // Test relative time settings
       panel.dashboardPanelData.data.queries[0].config.relative = "15m";
-      expect(panel.dashboardPanelData.data.queries[0].config.relative).toBe(
-        "15m",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].config.relative).toBe("15m");
 
       // Test auto refresh settings
       panel.dashboardPanelData.data.config.auto_refresh = true;
@@ -1577,9 +1451,7 @@ describe("useDashboardPanel", () => {
       // Test time shift configurations
       if (panel.dashboardPanelData.data.queries[0].config.time_shift) {
         panel.dashboardPanelData.data.queries[0].config.time_shift.push("1d");
-        expect(
-          panel.dashboardPanelData.data.queries[0].config.time_shift,
-        ).toContain("1d");
+        expect(panel.dashboardPanelData.data.queries[0].config.time_shift).toContain("1d");
       }
 
       // Test timezone handling
@@ -1588,15 +1460,13 @@ describe("useDashboardPanel", () => {
 
       // Test date format configurations
       panel.dashboardPanelData.data.config.date_format = "YYYY-MM-DD";
-      expect(panel.dashboardPanelData.data.config.date_format).toBe(
-        "YYYY-MM-DD",
-      );
+      expect(panel.dashboardPanelData.data.config.date_format).toBe("YYYY-MM-DD");
     });
   });
 
   describe("Complex Function Invocations", () => {
     it("should execute complex functions with different parameters and conditions", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test with different pageKey types to trigger different code paths
       const dashboardPanel = useDashboardPanelData("dashboard");
@@ -1618,8 +1488,7 @@ describe("useDashboardPanel", () => {
       }
 
       // Test field operations with edge cases
-      const initialYCount =
-        panel.dashboardPanelData.data.queries[0].fields.y.length;
+      const initialYCount = panel.dashboardPanelData.data.queries[0].fields.y.length;
 
       // Test adding multiple fields
       for (let i = 0; i < 3; i++) {
@@ -1627,9 +1496,9 @@ describe("useDashboardPanel", () => {
       }
 
       // Just verify the function executed without throwing
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.y.length,
-      ).toBeGreaterThanOrEqual(initialYCount);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(
+        initialYCount,
+      );
 
       // Test removing fields
       if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
@@ -1639,9 +1508,9 @@ describe("useDashboardPanel", () => {
         if (fieldName) {
           panel.removeYAxisItemByIndex(0);
           // Just verify the function executed without throwing
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.y.length,
-          ).toBeGreaterThanOrEqual(0);
+          expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(
+            0,
+          );
         }
       }
 
@@ -1665,13 +1534,7 @@ describe("useDashboardPanel", () => {
 
   describe("Panel Drag and Drop Operations", () => {
     it("should handle drag and drop field operations and state management", () => {
-      const panel = useDashboardPanelData();
-
-      // Test drag and drop state - get initial state
-      const initialDragState =
-        panel.dashboardPanelData.meta.dragAndDrop.dragging;
-      const initialTargetIndex =
-        panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test setting drag state
       panel.dashboardPanelData.meta.dragAndDrop.dragging = true;
@@ -1679,35 +1542,27 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex = 1;
 
       expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-      expect(panel.dashboardPanelData.meta.dragAndDrop.currentDragField).toBe(
-        "test_field",
-      );
+      expect(panel.dashboardPanelData.meta.dragAndDrop.currentDragField).toBe("test_field");
       expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
 
       // Test cleanup dragging fields function
       panel.cleanupDraggingFields();
 
       expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(false);
-      expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(
-        -1,
-      );
+      expect(panel.dashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(-1);
 
       // Test various meta states
       panel.dashboardPanelData.meta.filterValue = "test filter";
 
       if (panel.dashboardPanelData.meta.searchAroundData) {
         panel.dashboardPanelData.meta.searchAroundData.histogramHide = true;
-        expect(
-          panel.dashboardPanelData.meta.searchAroundData.histogramHide,
-        ).toBe(true);
+        expect(panel.dashboardPanelData.meta.searchAroundData.histogramHide).toBe(true);
       }
 
       panel.dashboardPanelData.meta.editorValue = "SELECT * FROM table";
 
       expect(panel.dashboardPanelData.meta.filterValue).toBe("test filter");
-      expect(panel.dashboardPanelData.meta.editorValue).toBe(
-        "SELECT * FROM table",
-      );
+      expect(panel.dashboardPanelData.meta.editorValue).toBe("SELECT * FROM table");
 
       // Test different field types operations
       if (typeof panel.extractFields === "function") {
@@ -1728,7 +1583,7 @@ describe("useDashboardPanel", () => {
 
   describe("Meta State and Search Operations", () => {
     it("should handle meta state changes and search functionality", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test search around data meta properties
       if (!panel.dashboardPanelData.meta.searchAroundData) {
@@ -1739,15 +1594,9 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.meta.searchAroundData.indexName = "test-index";
       panel.dashboardPanelData.meta.searchAroundData.searchType = "context";
 
-      expect(panel.dashboardPanelData.meta.searchAroundData.isLoading).toBe(
-        true,
-      );
-      expect(panel.dashboardPanelData.meta.searchAroundData.indexName).toBe(
-        "test-index",
-      );
-      expect(panel.dashboardPanelData.meta.searchAroundData.searchType).toBe(
-        "context",
-      );
+      expect(panel.dashboardPanelData.meta.searchAroundData.isLoading).toBe(true);
+      expect(panel.dashboardPanelData.meta.searchAroundData.indexName).toBe("test-index");
+      expect(panel.dashboardPanelData.meta.searchAroundData.searchType).toBe("context");
 
       // Test loading states
       panel.dashboardPanelData.meta.loading = true;
@@ -1780,15 +1629,13 @@ describe("useDashboardPanel", () => {
 
       expect(panel.dashboardPanelData.meta.resultGrid.currentPage).toBe(1);
       expect(panel.dashboardPanelData.meta.resultGrid.rowsPerPage).toBe(25);
-      expect(panel.dashboardPanelData.meta.resultGrid.maxRecordToReturn).toBe(
-        1000,
-      );
+      expect(panel.dashboardPanelData.meta.resultGrid.maxRecordToReturn).toBe(1000);
     });
   });
 
   describe("Field Validation and Chart Constraints", () => {
     it("should enforce chart type field constraints and validate operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test table chart type with unlimited fields
       panel.dashboardPanelData.data.type = "table";
@@ -1797,9 +1644,7 @@ describe("useDashboardPanel", () => {
       panel.addXAxisItem({ name: "field3" });
 
       expect(panel.dashboardPanelData.data.type).toBe("table");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.x.length,
-      ).toBeGreaterThanOrEqual(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThanOrEqual(0);
 
       // Test pie chart constraints (limited breakdown)
       panel.dashboardPanelData.data.type = "pie";
@@ -1843,26 +1688,20 @@ describe("useDashboardPanel", () => {
         });
       });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.y.length,
-      ).toBeGreaterThanOrEqual(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(0);
 
       // Test field removal by different criteria
       if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
-        const fieldCount =
-          panel.dashboardPanelData.data.queries[0].fields.y.length;
         panel.removeYAxisItemByIndex(0);
         // Field count should remain valid
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.y.length,
-        ).toBeGreaterThanOrEqual(0);
+        expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(0);
       }
     });
   });
 
   describe("Custom Query and SQL Operations", () => {
     it("should handle custom queries and SQL parsing operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test custom query mode
       panel.dashboardPanelData.data.queries[0].customQuery = true;
@@ -1883,7 +1722,7 @@ describe("useDashboardPanel", () => {
         "SELECT AVG(response_time) FROM metrics WHERE service = 'api'",
       ];
 
-      sqlQueries.forEach((query, index) => {
+      sqlQueries.forEach((query) => {
         panel.dashboardPanelData.data.queries[0].query = query;
         expect(panel.dashboardPanelData.data.queries[0].query).toBe(query);
       });
@@ -1927,21 +1766,19 @@ describe("useDashboardPanel", () => {
         timeField: "timestamp",
       };
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.queryContext.database,
-      ).toBe("logs");
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.queryContext.table,
-      ).toBe("application_logs");
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.queryContext.timeField,
-      ).toBe("timestamp");
+      expect(panel.dashboardPanelData.data.queries[0].config.queryContext.database).toBe("logs");
+      expect(panel.dashboardPanelData.data.queries[0].config.queryContext.table).toBe(
+        "application_logs",
+      );
+      expect(panel.dashboardPanelData.data.queries[0].config.queryContext.timeField).toBe(
+        "timestamp",
+      );
     });
   });
 
   describe("Dashboard Layout and Panel Management", () => {
     it("should handle dashboard layout properties and panel management", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test layout coordinates and dimensions
       panel.dashboardPanelData.layout.i = "panel-1";
@@ -1987,9 +1824,7 @@ describe("useDashboardPanel", () => {
 
       expect(panel.dashboardPanelData.data.config.show_panel).toBe(true);
       expect(panel.dashboardPanelData.data.config.panel_border).toBe(true);
-      expect(panel.dashboardPanelData.data.config.panel_background).toBe(
-        "white",
-      );
+      expect(panel.dashboardPanelData.data.config.panel_background).toBe("white");
 
       // Test responsive layout configurations
       panel.dashboardPanelData.layout.responsive = {
@@ -2010,7 +1845,7 @@ describe("useDashboardPanel", () => {
 
   describe("Advanced Chart Configuration", () => {
     it("should handle advanced chart configurations and options", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test treemap chart configuration
       panel.dashboardPanelData.data.type = "treemap";
@@ -2021,9 +1856,7 @@ describe("useDashboardPanel", () => {
       };
 
       expect(panel.dashboardPanelData.data.type).toBe("treemap");
-      expect(panel.dashboardPanelData.data.config.treemap.colorByValue).toBe(
-        true,
-      );
+      expect(panel.dashboardPanelData.data.config.treemap.colorByValue).toBe(true);
 
       // Test funnel chart configuration
       panel.dashboardPanelData.data.type = "funnel";
@@ -2045,9 +1878,7 @@ describe("useDashboardPanel", () => {
       };
 
       expect(panel.dashboardPanelData.data.type).toBe("waterfall");
-      expect(panel.dashboardPanelData.data.config.waterfall.showConnector).toBe(
-        true,
-      );
+      expect(panel.dashboardPanelData.data.config.waterfall.showConnector).toBe(true);
 
       // Test parallel coordinates chart
       panel.dashboardPanelData.data.type = "parallel";
@@ -2057,9 +1888,7 @@ describe("useDashboardPanel", () => {
       };
 
       expect(panel.dashboardPanelData.data.type).toBe("parallel");
-      expect(panel.dashboardPanelData.data.config.parallel.layout).toBe(
-        "vertical",
-      );
+      expect(panel.dashboardPanelData.data.config.parallel.layout).toBe("vertical");
 
       // Test candlestick chart configuration
       panel.dashboardPanelData.data.type = "candlestick";
@@ -2071,9 +1900,7 @@ describe("useDashboardPanel", () => {
       };
 
       expect(panel.dashboardPanelData.data.type).toBe("candlestick");
-      expect(panel.dashboardPanelData.data.config.candlestick.upColor).toBe(
-        "#00da3c",
-      );
+      expect(panel.dashboardPanelData.data.config.candlestick.upColor).toBe("#00da3c");
 
       // Test boxplot configuration
       panel.dashboardPanelData.data.type = "boxplot";
@@ -2109,7 +1936,7 @@ describe("useDashboardPanel", () => {
 
   describe("WebSocket and Real-time Operations", () => {
     it("should handle WebSocket connections and real-time data operations", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test WebSocket connection states
       panel.dashboardPanelData.meta.connection = {
@@ -2149,12 +1976,8 @@ describe("useDashboardPanel", () => {
         alerts: "subscription-id-3",
       };
 
-      expect(panel.dashboardPanelData.meta.subscriptions.dataUpdates).toBe(
-        "subscription-id-1",
-      );
-      expect(panel.dashboardPanelData.meta.subscriptions.schemaChanges).toBe(
-        "subscription-id-2",
-      );
+      expect(panel.dashboardPanelData.meta.subscriptions.dataUpdates).toBe("subscription-id-1");
+      expect(panel.dashboardPanelData.meta.subscriptions.schemaChanges).toBe("subscription-id-2");
 
       // Test WebSocket function calls (if available)
       if (typeof panel.connectToWebSocket === "function") {
@@ -2183,9 +2006,7 @@ describe("useDashboardPanel", () => {
 
       expect(panel.dashboardPanelData.meta.sync.pendingUpdates).toBe(0);
       expect(panel.dashboardPanelData.meta.sync.syncInProgress).toBe(false);
-      expect(panel.dashboardPanelData.meta.sync.conflictResolution).toBe(
-        "latest-wins",
-      );
+      expect(panel.dashboardPanelData.meta.sync.conflictResolution).toBe("latest-wins");
 
       // Test offline mode handling
       panel.dashboardPanelData.meta.offline = {
@@ -2201,7 +2022,7 @@ describe("useDashboardPanel", () => {
 
   describe("resetFields Function", () => {
     it("should reset all fields to default values", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Add some fields first
       panel.addXAxisItem({ name: "timestamp" });
@@ -2238,7 +2059,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should reset filter to default structure", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Verify filter is reset to default structure
       if (typeof panel.resetFields === "function") {
@@ -2257,7 +2078,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should work with different query indexes", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test with current query index
       const currentIndex = panel.dashboardPanelData.layout.currentQueryIndex;
@@ -2266,15 +2087,13 @@ describe("useDashboardPanel", () => {
 
       // Verify the query exists at the current index
       expect(panel.dashboardPanelData.data.queries[currentIndex]).toBeDefined();
-      expect(
-        panel.dashboardPanelData.data.queries[currentIndex].fields,
-      ).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[currentIndex].fields).toBeDefined();
     });
   });
 
   describe("setFieldsBasedOnChartTypeValidation Function", () => {
     it("should handle table chart type by merging breakdown fields into x fields", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test data for table chart
       const testFields = {
@@ -2288,9 +2107,7 @@ describe("useDashboardPanel", () => {
         panel.setFieldsBasedOnChartTypeValidation(testFields, "table");
 
         // For table charts, breakdown fields should be merged into x fields
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.x.length,
-        ).toBeGreaterThanOrEqual(0);
+        expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThanOrEqual(0);
       } else {
         // Test that the panel can handle different chart types
         panel.dashboardPanelData.data.type = "table";
@@ -2299,7 +2116,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle different field formats (string vs object)", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test with string fields
       const stringFields = {
@@ -2316,7 +2133,7 @@ describe("useDashboardPanel", () => {
       };
 
       // Test both formats
-      [stringFields, objectFields].forEach((fields, index) => {
+      [stringFields, objectFields].forEach((fields) => {
         if (typeof panel.setFieldsBasedOnChartTypeValidation === "function") {
           panel.setFieldsBasedOnChartTypeValidation(fields, "line");
         }
@@ -2328,7 +2145,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle different chart types correctly", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       const testFields = {
         x: [{ name: "timestamp" }],
@@ -2337,15 +2154,7 @@ describe("useDashboardPanel", () => {
         breakdown: [{ name: "service" }],
       };
 
-      const chartTypes = [
-        "line",
-        "bar",
-        "pie",
-        "area",
-        "scatter",
-        "table",
-        "heatmap",
-      ];
+      const chartTypes = ["line", "bar", "pie", "area", "scatter", "table", "heatmap"];
 
       chartTypes.forEach((chartType) => {
         if (typeof panel.setFieldsBasedOnChartTypeValidation === "function") {
@@ -2362,7 +2171,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should handle empty or null field arrays", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       const emptyFields = {
         x: null,
@@ -2383,7 +2192,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should call addXAxisItem, addYAxisItem, addZAxisItem functions appropriately", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       // Test that the add functions exist and are callable
       expect(typeof panel.addXAxisItem).toBe("function");
@@ -2395,16 +2204,12 @@ describe("useDashboardPanel", () => {
       panel.addYAxisItem({ name: "test_field_y" });
 
       // Verify fields were added (length should be >= 0)
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.x.length,
-      ).toBeGreaterThanOrEqual(0);
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.y.length,
-      ).toBeGreaterThanOrEqual(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThanOrEqual(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThanOrEqual(0);
     });
 
     it("should handle fields with missing name/column properties", () => {
-      const panel = useDashboardPanelData();
+      const panel = useDashboardPanelData("dashboard", t);
 
       const fieldsWithValidProps = {
         x: [{ name: "valid_field" }, { column: "valid_column" }],
@@ -2421,10 +2226,7 @@ describe("useDashboardPanel", () => {
       if (typeof panel.setFieldsBasedOnChartTypeValidation === "function") {
         // Should handle fields with valid properties
         expect(() => {
-          panel.setFieldsBasedOnChartTypeValidation(
-            fieldsWithValidProps,
-            "bar",
-          );
+          panel.setFieldsBasedOnChartTypeValidation(fieldsWithValidProps, "bar");
         }).not.toThrow();
 
         // Should handle fields where some have missing properties (skips invalid ones)
@@ -2443,7 +2245,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       panel.dashboardPanelData.meta.stream.selectedStreamFields = [
         { name: "timestamp", type: "Utf8" },
         { name: "level", type: "Utf8" },
@@ -2477,14 +2279,12 @@ describe("useDashboardPanel", () => {
         expect(panel.dashboardPanelData.data.queries[0].fields.y).toBeDefined();
       } else {
         // If function doesn't exist directly, test derived field handling
-        const derivedXFields =
-          panel.dashboardPanelData.data.queries[0].fields.x.filter(
-            (field: any) => field.isDerived,
-          );
-        const nonDerivedXFields =
-          panel.dashboardPanelData.data.queries[0].fields.x.filter(
-            (field: any) => !field.isDerived,
-          );
+        const derivedXFields = panel.dashboardPanelData.data.queries[0].fields.x.filter(
+          (field: any) => field.isDerived,
+        );
+        const nonDerivedXFields = panel.dashboardPanelData.data.queries[0].fields.x.filter(
+          (field: any) => !field.isDerived,
+        );
 
         expect(derivedXFields.length + nonDerivedXFields.length).toBe(
           panel.dashboardPanelData.data.queries[0].fields.x.length,
@@ -2502,9 +2302,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.queries[0].fields.x = [
         { column: "timestamp", alias: "timestamp" },
       ];
-      panel.dashboardPanelData.data.queries[0].fields.y = [
-        { column: "count", alias: "count" },
-      ];
+      panel.dashboardPanelData.data.queries[0].fields.y = [{ column: "count", alias: "count" }];
 
       if (typeof panel.updateXYFieldsOnCustomQueryChange === "function") {
         expect(() => {
@@ -2567,12 +2365,10 @@ describe("useDashboardPanel", () => {
         },
       ];
 
-      testCases.forEach((testCase, index) => {
+      testCases.forEach((testCase) => {
         if (typeof panel.determineChartType === "function") {
           try {
-            const chartType = panel.determineChartType(
-              testCase.extractedFields,
-            );
+            const chartType = panel.determineChartType(testCase.extractedFields);
             expect(typeof chartType).toBe("string");
             expect(chartType.length).toBeGreaterThan(0);
           } catch (error) {
@@ -2581,9 +2377,7 @@ describe("useDashboardPanel", () => {
         } else {
           // Test that extracted fields are properly structured
           expect(Array.isArray(testCase.extractedFields.group_by)).toBe(true);
-          expect(Array.isArray(testCase.extractedFields.projections)).toBe(
-            true,
-          );
+          expect(Array.isArray(testCase.extractedFields.projections)).toBe(true);
         }
       });
     });
@@ -2593,7 +2387,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
 
       // Mock date time
       panel.dashboardPanelData.meta.dateTime = {
@@ -2655,15 +2449,12 @@ describe("useDashboardPanel", () => {
 
         // Should reset data and add timestamp field
         expect(panel.dashboardPanelData.data.title).toBe("");
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.x.length,
-        ).toBeGreaterThan(0);
+        expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThan(0);
 
         // Should have timestamp field added
-        const timestampField =
-          panel.dashboardPanelData.data.queries[0].fields.x.find(
-            (field: any) => field.args?.[0]?.value?.field === "_timestamp",
-          );
+        const timestampField = panel.dashboardPanelData.data.queries[0].fields.x.find(
+          (field: any) => field.args?.[0]?.value?.field === "_timestamp",
+        );
         expect(timestampField).toBeDefined();
       } else {
         // Test basic reset functionality
@@ -2703,9 +2494,7 @@ describe("useDashboardPanel", () => {
       const initialQueryCount = panel.dashboardPanelData.data.queries.length;
 
       panel.addQuery();
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialQueryCount + 1,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialQueryCount + 1);
 
       // Test query index switching
       const originalIndex = panel.dashboardPanelData.layout.currentQueryIndex;
@@ -2719,9 +2508,7 @@ describe("useDashboardPanel", () => {
       if (panel.dashboardPanelData.data.queries.length > 1) {
         const currentCount = panel.dashboardPanelData.data.queries.length;
         panel.removeQuery(currentCount - 1);
-        expect(panel.dashboardPanelData.data.queries.length).toBe(
-          currentCount - 1,
-        );
+        expect(panel.dashboardPanelData.data.queries.length).toBe(currentCount - 1);
       }
     });
 
@@ -2732,12 +2519,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.meta.dragAndDrop.dragSource = "x_axis";
 
       expect(panel.dashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-      expect(panel.dashboardPanelData.meta.dragAndDrop.dragElement).toBe(
-        "test_element",
-      );
-      expect(panel.dashboardPanelData.meta.dragAndDrop.dragSource).toBe(
-        "x_axis",
-      );
+      expect(panel.dashboardPanelData.meta.dragAndDrop.dragElement).toBe("test_element");
+      expect(panel.dashboardPanelData.meta.dragAndDrop.dragSource).toBe("x_axis");
 
       // Test cleanup of drag state
       panel.dashboardPanelData.meta.dragAndDrop.dragging = false;
@@ -2781,19 +2564,14 @@ describe("useDashboardPanel", () => {
       const streamTypes = ["logs", "metrics", "traces"];
 
       streamTypes.forEach((streamType: any) => {
-        const originalStreamType =
-          panel.dashboardPanelData.data.queries[0].fields?.stream_type;
+        const originalStreamType = panel.dashboardPanelData.data.queries[0].fields?.stream_type;
 
         if (panel.dashboardPanelData.data.queries[0].fields) {
-          panel.dashboardPanelData.data.queries[0].fields.stream_type =
-            streamType;
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.stream_type,
-          ).toBe(streamType);
+          panel.dashboardPanelData.data.queries[0].fields.stream_type = streamType;
+          expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe(streamType);
 
           // Reset to original
-          panel.dashboardPanelData.data.queries[0].fields.stream_type =
-            originalStreamType;
+          panel.dashboardPanelData.data.queries[0].fields.stream_type = originalStreamType;
         }
       });
     });
@@ -2978,10 +2756,7 @@ describe("useDashboardPanel", () => {
           };
 
           // Test table chart type path (should return early with all projections in x-axis)
-          const tableFields = panel.convertSchemaToFields(
-            extractedFields,
-            "table",
-          );
+          const tableFields = panel.convertSchemaToFields(extractedFields, "table");
 
           // For table charts, all projections go to x-axis (line 3404)
           expect(tableFields.x).toEqual(["field1", "field2", "count"]);
@@ -3088,9 +2863,7 @@ describe("useDashboardPanel", () => {
           };
 
           // Mock result_schema to reject with error (should hit catch block around line 1444/1485)
-          vi.mocked(queryService.result_schema).mockRejectedValue(
-            new Error("Network error"),
-          );
+          vi.mocked(queryService.result_schema).mockRejectedValue(new Error("Network error"));
 
           // The function should not throw but return gracefully
           try {
@@ -3135,9 +2908,7 @@ describe("useDashboardPanel", () => {
 
           // Test empty customQueryFields
           panel.dashboardPanelData.meta.stream.customQueryFields = [];
-          expect(
-            panel.dashboardPanelData.meta.stream.customQueryFields,
-          ).toEqual([]);
+          expect(panel.dashboardPanelData.meta.stream.customQueryFields).toEqual([]);
 
           // Test various data structures
           panel.dashboardPanelData.data.queries[0].fields.x = [];
@@ -3146,9 +2917,7 @@ describe("useDashboardPanel", () => {
 
           expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
           expect(panel.dashboardPanelData.data.queries[0].fields.y).toEqual([]);
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.breakdown,
-          ).toEqual([]);
+          expect(panel.dashboardPanelData.data.queries[0].fields.breakdown).toEqual([]);
         });
 
         // Test aggregation function switch statements
@@ -3247,8 +3016,7 @@ describe("useDashboardPanel", () => {
         // Test computed properties
         it("should test computed properties", () => {
           // Test promqlMode computed property
-          panel.dashboardPanelData.data.queries[0].query =
-            "rate(http_requests_total[5m])";
+          panel.dashboardPanelData.data.queries[0].query = "rate(http_requests_total[5m])";
           panel.dashboardPanelData.data.queryType = "promql";
 
           expect(panel.promqlMode).toBeDefined();
@@ -3259,9 +3027,7 @@ describe("useDashboardPanel", () => {
             { name: "field2", type: "number" },
           ];
 
-          expect(
-            panel.selectedStreamFieldsBasedOnUserDefinedSchema,
-          ).toBeDefined();
+          expect(panel.selectedStreamFieldsBasedOnUserDefinedSchema).toBeDefined();
         });
 
         // Test different chart type configurations
@@ -3310,9 +3076,7 @@ describe("useDashboardPanel", () => {
           // Test addXAxisItem
           const xField = { name: "timestamp", type: "datetime", label: "Time" };
           panel.addXAxisItem(xField);
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.x.length,
-          ).toBeGreaterThan(0);
+          expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThan(0);
 
           // Test addYAxisItem
           const yField = {
@@ -3322,9 +3086,7 @@ describe("useDashboardPanel", () => {
             aggregationFunction: "sum",
           };
           panel.addYAxisItem(yField);
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.y.length,
-          ).toBeGreaterThan(0);
+          expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeGreaterThan(0);
 
           // Test addBreakDownAxisItem
           const breakdownField = {
@@ -3333,43 +3095,30 @@ describe("useDashboardPanel", () => {
             label: "Category",
           };
           panel.addBreakDownAxisItem(breakdownField);
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
-          ).toBeGreaterThan(0);
+          expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBeGreaterThan(
+            0,
+          );
 
           // Test removeXAxisItem (remove by name)
           if (panel.dashboardPanelData.data.queries[0].fields.x.length > 0) {
-            const fieldToRemove =
-              panel.dashboardPanelData.data.queries[0].fields.x[0].name ||
-              "timestamp";
-            const initialXCount =
-              panel.dashboardPanelData.data.queries[0].fields.x.length;
+            const initialXCount = panel.dashboardPanelData.data.queries[0].fields.x.length;
             panel.removeXAxisItemByIndex(0);
-            expect(
-              panel.dashboardPanelData.data.queries[0].fields.x.length,
-            ).toBeLessThanOrEqual(initialXCount);
+            expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeLessThanOrEqual(
+              initialXCount,
+            );
           }
 
           // Test removeYAxisItem (remove by name)
           if (panel.dashboardPanelData.data.queries[0].fields.y.length > 0) {
-            const fieldToRemove =
-              panel.dashboardPanelData.data.queries[0].fields.y[0].name ||
-              "count";
-            const initialYCount =
-              panel.dashboardPanelData.data.queries[0].fields.y.length;
+            const initialYCount = panel.dashboardPanelData.data.queries[0].fields.y.length;
             panel.removeYAxisItemByIndex(0);
-            expect(
-              panel.dashboardPanelData.data.queries[0].fields.y.length,
-            ).toBeLessThanOrEqual(initialYCount);
+            expect(panel.dashboardPanelData.data.queries[0].fields.y.length).toBeLessThanOrEqual(
+              initialYCount,
+            );
           }
 
           // Test removeBreakdownItem (remove by name)
-          if (
-            panel.dashboardPanelData.data.queries[0].fields.breakdown.length > 0
-          ) {
-            const fieldToRemove =
-              panel.dashboardPanelData.data.queries[0].fields.breakdown[0]
-                .name || "category";
+          if (panel.dashboardPanelData.data.queries[0].fields.breakdown.length > 0) {
             const initialBreakdownCount =
               panel.dashboardPanelData.data.queries[0].fields.breakdown.length;
             panel.removeBreakdownItemByIndex(0);
@@ -3394,45 +3143,30 @@ describe("useDashboardPanel", () => {
           ];
 
           streamFields.forEach((field) => {
-            panel.dashboardPanelData.meta.stream.selectedStreamFields.push(
-              field,
-            );
+            panel.dashboardPanelData.meta.stream.selectedStreamFields.push(field);
           });
 
-          expect(
-            panel.dashboardPanelData.meta.stream.selectedStreamFields,
-          ).toHaveLength(4);
+          expect(panel.dashboardPanelData.meta.stream.selectedStreamFields).toHaveLength(4);
 
           // Test customQueryFields
-          panel.dashboardPanelData.meta.stream.customQueryFields = [
-            ...streamFields,
-          ];
-          expect(
-            panel.dashboardPanelData.meta.stream.customQueryFields,
-          ).toHaveLength(4);
+          panel.dashboardPanelData.meta.stream.customQueryFields = [...streamFields];
+          expect(panel.dashboardPanelData.meta.stream.customQueryFields).toHaveLength(4);
         });
 
         // Test query operations
         it("should test query operations comprehensively", () => {
           // Test addQuery multiple times
-          const initialQueryCount =
-            panel.dashboardPanelData.data.queries.length;
+          const initialQueryCount = panel.dashboardPanelData.data.queries.length;
 
           panel.addQuery();
-          expect(panel.dashboardPanelData.data.queries).toHaveLength(
-            initialQueryCount + 1,
-          );
+          expect(panel.dashboardPanelData.data.queries).toHaveLength(initialQueryCount + 1);
 
           panel.addQuery();
-          expect(panel.dashboardPanelData.data.queries).toHaveLength(
-            initialQueryCount + 2,
-          );
+          expect(panel.dashboardPanelData.data.queries).toHaveLength(initialQueryCount + 2);
 
           // Test removeQuery
           panel.removeQuery(panel.dashboardPanelData.data.queries.length - 1);
-          expect(panel.dashboardPanelData.data.queries).toHaveLength(
-            initialQueryCount + 1,
-          );
+          expect(panel.dashboardPanelData.data.queries).toHaveLength(initialQueryCount + 1);
         });
 
         // Test date/time operations
@@ -3451,12 +3185,8 @@ describe("useDashboardPanel", () => {
 
           dateTimeConfigs.forEach((config) => {
             panel.dashboardPanelData.meta.dateTime = config;
-            expect(panel.dashboardPanelData.meta.dateTime.start_time).toEqual(
-              config.start_time,
-            );
-            expect(panel.dashboardPanelData.meta.dateTime.end_time).toEqual(
-              config.end_time,
-            );
+            expect(panel.dashboardPanelData.meta.dateTime.start_time).toEqual(config.start_time);
+            expect(panel.dashboardPanelData.meta.dateTime.end_time).toEqual(config.end_time);
           });
         });
 
@@ -3494,9 +3224,7 @@ describe("useDashboardPanel", () => {
 
           expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
           expect(panel.dashboardPanelData.data.queries[0].fields.y).toEqual([]);
-          expect(
-            panel.dashboardPanelData.data.queries[0].fields.breakdown,
-          ).toEqual([]);
+          expect(panel.dashboardPanelData.data.queries[0].fields.breakdown).toEqual([]);
 
           // Test with null values
           panel.dashboardPanelData.data.queries[0].query = null;
@@ -3515,7 +3243,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should handle complex selectedStreamFieldsBasedOnUserDefinedSchema conditions", () => {
@@ -3608,15 +3336,11 @@ describe("useDashboardPanel", () => {
       const initialQueryCount = panel.dashboardPanelData.data.queries.length;
 
       panel.addQuery();
-      expect(panel.dashboardPanelData.data.queries.length).toBe(
-        initialQueryCount + 1,
-      );
+      expect(panel.dashboardPanelData.data.queries.length).toBe(initialQueryCount + 1);
 
       if (panel.dashboardPanelData.data.queries.length > 1) {
         panel.removeQuery(1);
-        expect(panel.dashboardPanelData.data.queries.length).toBe(
-          initialQueryCount,
-        );
+        expect(panel.dashboardPanelData.data.queries.length).toBe(initialQueryCount);
       }
     });
   });
@@ -3625,7 +3349,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should handle line chart specific configurations", () => {
@@ -3651,9 +3375,7 @@ describe("useDashboardPanel", () => {
       ];
 
       expect(panel.dashboardPanelData.data.type).toBe("bar");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown,
-      ).toHaveLength(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(1);
     });
 
     it("should test table chart with field operations", () => {
@@ -3686,9 +3408,7 @@ describe("useDashboardPanel", () => {
 
       const zAxisNotAllowed = panel.isAddZAxisNotAllowed.value;
       expect(typeof zAxisNotAllowed).toBe("boolean");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.x.length,
-      ).toBeGreaterThan(0);
+      expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBeGreaterThan(0);
     });
 
     it("should handle pie chart configurations", () => {
@@ -3701,9 +3421,7 @@ describe("useDashboardPanel", () => {
       ];
 
       expect(panel.dashboardPanelData.data.type).toBe("pie");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown,
-      ).toHaveLength(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown).toHaveLength(1);
     });
 
     it("should test area chart with stacking options", () => {
@@ -3726,12 +3444,8 @@ describe("useDashboardPanel", () => {
 
       expect(panel.dashboardPanelData.data.type).toBe("h-bar");
       // Verify the arrays are defined (might not add if validation prevents it)
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
     });
 
     it("should test histogram chart configurations", () => {
@@ -3739,9 +3453,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.queries[0].config.histogram_interval = 10;
 
       expect(panel.dashboardPanelData.data.type).toBe("histogram");
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.histogram_interval,
-      ).toBe(10);
+      expect(panel.dashboardPanelData.data.queries[0].config.histogram_interval).toBe(10);
     });
 
     it("should handle heatmap chart with proper field setup", () => {
@@ -3764,18 +3476,14 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     it("should test addBreakDownAxisItem functionality", () => {
       panel.dashboardPanelData.data.type = "line";
       panel.addBreakDownAxisItem({ name: "category" });
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.breakdown,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.breakdown)).toBe(true);
     });
 
     it("should test filter operations with addFilteredItem", () => {
@@ -3786,40 +3494,30 @@ describe("useDashboardPanel", () => {
       };
 
       panel.addFilteredItem(testFilter);
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     it("should test removeXAxisItem with field name", () => {
       panel.addXAxisItem({ name: "test_field" });
       panel.removeXAxisItemByIndex(0);
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     it("should test removeYAxisItem functionality", () => {
       panel.addYAxisItem({ name: "metric_field" });
       panel.removeYAxisItemByIndex(0);
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
     });
 
     it("should test removeBreakdownItem operation", () => {
       panel.addBreakDownAxisItem({ name: "group_field" });
       panel.removeBreakdownItemByIndex(0);
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.breakdown,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.breakdown)).toBe(true);
     });
 
     it("should test resetAggregationFunction", () => {
@@ -3850,29 +3548,23 @@ describe("useDashboardPanel", () => {
       };
 
       panel.loadFilterItem(filterCondition);
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     it("should test removeFilterItem by index", () => {
       panel.addFilteredItem({ column: "test", operator: "=", value: "test" });
       panel.removeFilterItem(0);
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     it("should test removeXYFilters operation", () => {
       panel.removeXYFilters();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-      ).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[0].fields.filter.conditions).toEqual([]);
     });
 
     it("should handle updateXYFieldsForCustomQueryMode", () => {
@@ -3926,9 +3618,7 @@ describe("useDashboardPanel", () => {
       };
 
       panel.addYAxisItem(complexField);
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
     });
 
     it("should test PromQL mode field operations", () => {
@@ -3936,9 +3626,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.queries[0].query = "up";
 
       expect(panel.promqlMode.value).toBe(true);
-      expect(typeof panel.dashboardPanelData.data.queries[0].query).toBe(
-        "string",
-      );
+      expect(typeof panel.dashboardPanelData.data.queries[0].query).toBe("string");
     });
 
     it("should handle stream field selection", () => {
@@ -3948,9 +3636,7 @@ describe("useDashboardPanel", () => {
         { name: "field3", type: "DateTime" },
       ];
 
-      expect(
-        panel.dashboardPanelData.meta.stream.selectedStreamFields.length,
-      ).toBe(3);
+      expect(panel.dashboardPanelData.meta.stream.selectedStreamFields.length).toBe(3);
     });
 
     it("should test date time configuration", () => {
@@ -3989,12 +3675,8 @@ describe("useDashboardPanel", () => {
       };
 
       panel.dashboardPanelData.data.queries[0].config = queryConfig;
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.promql_legend,
-      ).toBe("{{instance}}");
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.histogram_interval,
-      ).toBe(50);
+      expect(panel.dashboardPanelData.data.queries[0].config.promql_legend).toBe("{{instance}}");
+      expect(panel.dashboardPanelData.data.queries[0].config.histogram_interval).toBe(50);
     });
 
     it("should handle field aggregation functions", () => {
@@ -4009,10 +3691,7 @@ describe("useDashboardPanel", () => {
           },
         ];
 
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.y[0]
-            .aggregationFunction,
-        ).toBe(func);
+        expect(panel.dashboardPanelData.data.queries[0].fields.y[0].aggregationFunction).toBe(func);
       });
     });
 
@@ -4028,9 +3707,7 @@ describe("useDashboardPanel", () => {
           },
         ];
 
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.x[0].sortBy,
-        ).toBe(sort);
+        expect(panel.dashboardPanelData.data.queries[0].fields.x[0].sortBy).toBe(sort);
       });
     });
 
@@ -4041,12 +3718,8 @@ describe("useDashboardPanel", () => {
       panel.addXAxisItem(derivedField);
       panel.addYAxisItem(regularField);
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
     });
 
     it("should test complex filter conditions", () => {
@@ -4060,11 +3733,9 @@ describe("useDashboardPanel", () => {
         panel.addFilteredItem(filter);
       });
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     it("should handle layout configuration changes", () => {
@@ -4077,12 +3748,8 @@ describe("useDashboardPanel", () => {
         panel.dashboardPanelData.layout.queryType = config.queryType;
         panel.dashboardPanelData.layout.showQueryBar = config.showQueryBar;
 
-        expect(panel.dashboardPanelData.layout.queryType).toBe(
-          config.queryType,
-        );
-        expect(panel.dashboardPanelData.layout.showQueryBar).toBe(
-          config.showQueryBar,
-        );
+        expect(panel.dashboardPanelData.layout.queryType).toBe(config.queryType);
+        expect(panel.dashboardPanelData.layout.showQueryBar).toBe(config.showQueryBar);
       });
     });
 
@@ -4097,12 +3764,8 @@ describe("useDashboardPanel", () => {
       };
 
       panel.dashboardPanelData.meta.stream = streamConfig;
-      expect(panel.dashboardPanelData.meta.stream.selectedStream.name).toBe(
-        "test_stream",
-      );
-      expect(
-        panel.dashboardPanelData.meta.stream.selectedStreamFields.length,
-      ).toBe(2);
+      expect(panel.dashboardPanelData.meta.stream.selectedStream.name).toBe("test_stream");
+      expect(panel.dashboardPanelData.meta.stream.selectedStreamFields.length).toBe(2);
     });
 
     it("should handle error conditions gracefully", () => {
@@ -4141,22 +3804,12 @@ describe("useDashboardPanel", () => {
 
       // Verify all operations completed without errors
       expect(panel.dashboardPanelData).toBeDefined();
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y),
-      ).toBe(true);
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.breakdown,
-        ),
-      ).toBe(true);
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.y)).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.breakdown)).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
   });
 
@@ -4164,7 +3817,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
     });
 
     // Tests 51-60: Map chart operations
@@ -4174,12 +3827,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "geomap";
       panel.addLatitude({ name: "lat_field" });
 
-      expect(
-        typeof panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBe("object");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).not.toBeNull();
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.latitude).toBe("object");
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).not.toBeNull();
     });
 
     it("should handle map chart longitude operations", () => {
@@ -4188,12 +3837,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "geomap";
       panel.addLongitude({ name: "lng_field" });
 
-      expect(
-        typeof panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).toBe("object");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).not.toBeNull();
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.longitude).toBe("object");
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).not.toBeNull();
     });
 
     it("should handle map chart weight operations", () => {
@@ -4202,12 +3847,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "geomap";
       panel.addWeight({ name: "weight_field" });
 
-      expect(
-        typeof panel.dashboardPanelData.data.queries[0].fields.weight,
-      ).toBe("object");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.weight,
-      ).not.toBeNull();
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.weight).toBe("object");
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight).not.toBeNull();
     });
 
     it("should test map chart remove operations", () => {
@@ -4218,9 +3859,7 @@ describe("useDashboardPanel", () => {
       panel.removeLatitude("lat");
 
       // After removal, latitude should be null
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
     });
 
     it("should handle additional map chart fields", () => {
@@ -4230,12 +3869,8 @@ describe("useDashboardPanel", () => {
       panel.addMapName({ name: "map_name" });
       panel.addMapValue({ name: "map_value" });
 
-      expect(typeof panel.dashboardPanelData.data.queries[0].fields.name).toBe(
-        "object",
-      );
-      expect(
-        typeof panel.dashboardPanelData.data.queries[0].fields.value_for_maps,
-      ).toBe("object");
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.name).toBe("object");
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBe("object");
     });
 
     // Tests 56-65: Node graph operations
@@ -4245,12 +3880,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "node-graph";
       panel.addSource({ name: "source_field" });
 
-      expect(
-        typeof panel.dashboardPanelData.data.queries[0].fields.source,
-      ).toBe("object");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.source,
-      ).not.toBeNull();
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.source).toBe("object");
+      expect(panel.dashboardPanelData.data.queries[0].fields.source).not.toBeNull();
     });
 
     it("should handle node graph target operations", () => {
@@ -4259,12 +3890,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "node-graph";
       panel.addTarget({ name: "target_field" });
 
-      expect(
-        typeof panel.dashboardPanelData.data.queries[0].fields.target,
-      ).toBe("object");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.target,
-      ).not.toBeNull();
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.target).toBe("object");
+      expect(panel.dashboardPanelData.data.queries[0].fields.target).not.toBeNull();
     });
 
     it("should handle node graph value operations", () => {
@@ -4273,12 +3900,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "node-graph";
       panel.addValue({ name: "value_field" });
 
-      expect(typeof panel.dashboardPanelData.data.queries[0].fields.value).toBe(
-        "object",
-      );
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value,
-      ).not.toBeNull();
+      expect(typeof panel.dashboardPanelData.data.queries[0].fields.value).toBe("object");
+      expect(panel.dashboardPanelData.data.queries[0].fields.value).not.toBeNull();
     });
 
     it("should test node graph remove operations", () => {
@@ -4361,10 +3984,9 @@ describe("useDashboardPanel", () => {
           },
         ];
 
-        expect(
-          panel.dashboardPanelData.data.queries[0].fields.y[0]
-            .aggregationFunction,
-        ).toBe(test.func);
+        expect(panel.dashboardPanelData.data.queries[0].fields.y[0].aggregationFunction).toBe(
+          test.func,
+        );
       });
     });
 
@@ -4379,9 +4001,7 @@ describe("useDashboardPanel", () => {
           },
         ];
 
-        expect(
-          panel.dashboardPanelData.meta.stream.selectedStreamFields[0].type,
-        ).toBe(type);
+        expect(panel.dashboardPanelData.meta.stream.selectedStreamFields[0].type).toBe(type);
       });
     });
 
@@ -4400,9 +4020,7 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.queries[0].fields.y = [];
       panel.dashboardPanelData.data.queries[0].fields.breakdown = [];
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
       expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(0);
     });
 
@@ -4449,9 +4067,7 @@ describe("useDashboardPanel", () => {
         panel.addXAxisItem(field);
       });
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     // Tests 71-80: Configuration validation
@@ -4479,16 +4095,7 @@ describe("useDashboardPanel", () => {
     });
 
     it("should validate filter operator types", () => {
-      const operators = [
-        "=",
-        "!=",
-        ">",
-        "<",
-        ">=",
-        "<=",
-        "contains",
-        "not_contains",
-      ];
+      const operators = ["=", "!=", ">", "<", ">=", "<=", "contains", "not_contains"];
 
       operators.forEach((operator) => {
         panel.addFilteredItem({
@@ -4498,11 +4105,9 @@ describe("useDashboardPanel", () => {
         });
       });
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     it("should handle boolean filter values", () => {
@@ -4512,11 +4117,9 @@ describe("useDashboardPanel", () => {
         value: true,
       });
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     it("should handle array filter values", () => {
@@ -4526,11 +4129,9 @@ describe("useDashboardPanel", () => {
         value: ["category1", "category2", "category3"],
       });
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].fields.filter.conditions,
-        ),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.filter.conditions)).toBe(
+        true,
+      );
     });
 
     // Tests 76-85: Performance and optimization
@@ -4552,7 +4153,7 @@ describe("useDashboardPanel", () => {
 
     it("should handle memory cleanup", () => {
       // Test that objects can be properly garbage collected
-      let tempPanel = useDashboardPanelData();
+      let tempPanel = useDashboardPanelData("dashboard", t);
       tempPanel.addXAxisItem({ name: "temp_field" });
       tempPanel = null;
 
@@ -4566,14 +4167,10 @@ describe("useDashboardPanel", () => {
       panel.addBreakDownAxisItem({ name: "field3" });
       panel.removeXAxisItemByIndex(0);
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     it("should maintain state consistency", () => {
-      const initialState = JSON.stringify(panel.dashboardPanelData);
-
       // Perform operations
       panel.addXAxisItem({ name: "test" });
       panel.removeXAxisItemByIndex(0);
@@ -4585,8 +4182,7 @@ describe("useDashboardPanel", () => {
     it("should handle rapid state changes", () => {
       for (let i = 0; i < 10; i++) {
         panel.dashboardPanelData.data.type = i % 2 === 0 ? "line" : "bar";
-        panel.dashboardPanelData.layout.queryType =
-          i % 2 === 0 ? "sql" : "promql";
+        panel.dashboardPanelData.layout.queryType = i % 2 === 0 ? "sql" : "promql";
       }
 
       expect(panel.dashboardPanelData.data.type).toBe("bar");
@@ -4617,15 +4213,11 @@ describe("useDashboardPanel", () => {
 
     it("should handle PromQL specific operations", () => {
       panel.dashboardPanelData.data.queryType = "promql";
-      panel.dashboardPanelData.data.queries[0].query =
-        "rate(http_requests_total[5m])";
-      panel.dashboardPanelData.data.queries[0].config.promql_legend =
-        "{{method}}";
+      panel.dashboardPanelData.data.queries[0].query = "rate(http_requests_total[5m])";
+      panel.dashboardPanelData.data.queries[0].config.promql_legend = "{{method}}";
 
       expect(panel.promqlMode.value).toBe(true);
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.promql_legend,
-      ).toBe("{{method}}");
+      expect(panel.dashboardPanelData.data.queries[0].config.promql_legend).toBe("{{method}}");
     });
 
     it("should handle multi-query scenarios", () => {
@@ -4648,14 +4240,8 @@ describe("useDashboardPanel", () => {
       panel.dashboardPanelData.data.type = "line";
       panel.dashboardPanelData.data.queries[0].config.time_shift = ["1h", "1d"];
 
-      expect(
-        Array.isArray(
-          panel.dashboardPanelData.data.queries[0].config.time_shift,
-        ),
-      ).toBe(true);
-      expect(
-        panel.dashboardPanelData.data.queries[0].config.time_shift.length,
-      ).toBe(2);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].config.time_shift)).toBe(true);
+      expect(panel.dashboardPanelData.data.queries[0].config.time_shift.length).toBe(2);
     });
 
     // Tests 86-95: Advanced edge cases
@@ -4697,8 +4283,7 @@ describe("useDashboardPanel", () => {
 
       panel.dashboardPanelData.data.queries[0].config = deepConfig;
       expect(
-        panel.dashboardPanelData.data.queries[0].config.level1.level2.level3
-          .level4.value,
+        panel.dashboardPanelData.data.queries[0].config.level1.level2.level3.level4.value,
       ).toBe("deep_value");
     });
 
@@ -4717,9 +4302,7 @@ describe("useDashboardPanel", () => {
         panel.addXAxisItem(field);
       });
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     it("should handle timezone considerations", () => {
@@ -4782,9 +4365,7 @@ describe("useDashboardPanel", () => {
       panel.removeBreakdownItemByIndex(0);
       panel.removeFilterItem(0);
 
-      expect(
-        Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x),
-      ).toBe(true);
+      expect(Array.isArray(panel.dashboardPanelData.data.queries[0].fields.x)).toBe(true);
     });
 
     it("should handle complex chart type transitions", () => {
@@ -4832,9 +4413,7 @@ describe("useDashboardPanel", () => {
         customQuery: true,
         fields: {
           x: [{ label: "timestamp", column: "_timestamp" }],
-          y: [
-            { label: "count", column: "count", aggregationFunction: "count" },
-          ],
+          y: [{ label: "count", column: "count", aggregationFunction: "count" }],
           breakdown: [{ label: "service", column: "service" }],
           filter: {
             conditions: [{ column: "level", operator: "=", value: "error" }],
@@ -4955,7 +4534,7 @@ describe("useDashboardPanel", () => {
     let panel: ReturnType<typeof useDashboardPanelData>;
 
     beforeEach(() => {
-      panel = useDashboardPanelData();
+      panel = useDashboardPanelData("dashboard", t);
       // useDashboardPanelData() returns shared singleton state, so reset the
       // active query index between tests — otherwise a test that selects a
       // non-zero query tab (e.g. the resetAggregationFunction multi-query
@@ -4976,9 +4555,7 @@ describe("useDashboardPanel", () => {
         },
       };
 
-      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(
-        mockError,
-      );
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
 
       const row = { name: "test_field", stream: "test_stream" };
 
@@ -5003,9 +4580,7 @@ describe("useDashboardPanel", () => {
         },
       };
 
-      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(
-        mockError,
-      );
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
 
       const row = { name: "test_field2", stream: "test_stream2" };
 
@@ -5015,17 +4590,13 @@ describe("useDashboardPanel", () => {
         // Expected to be caught internally
       }
 
-      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith(
-        "Short error message",
-      );
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith("Short error message");
     });
 
     it("should cover addFilteredItem error path with generic error", async () => {
       const mockError = {};
 
-      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(
-        mockError,
-      );
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
 
       const row = { name: "test_field3", stream: "test_stream3" };
 
@@ -5035,9 +4606,7 @@ describe("useDashboardPanel", () => {
         // Expected to be caught internally
       }
 
-      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith(
-        "Something went wrong!",
-      );
+      expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith("Something went wrong!");
     });
 
     it("should cover loadFilterItem error path with long error message", async () => {
@@ -5049,10 +4618,11 @@ describe("useDashboardPanel", () => {
         },
       };
 
-      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(
-        mockError,
-      );
+      vi.mocked(mockValuesWebSocket.fetchFieldValues).mockRejectedValueOnce(mockError);
 
+      // loadFilterItem sends nothing without a stream to read the field from,
+      // so the error path is only reachable once one is selected.
+      panel.dashboardPanelData.data.queries[0].fields.stream = "test_stream";
       const row = { field: "test_field" };
 
       try {
@@ -5067,61 +4637,56 @@ describe("useDashboardPanel", () => {
     it("should cover loadFilterItem with streamAlias parameter", async () => {
       vi.mocked(mockValuesWebSocket.fetchFieldValues).mockResolvedValueOnce({});
 
+      // An alias only resolves against the query's joins. Without one it used
+      // to send `stream_name: undefined`, which the server answers with
+      // "missing field `stream_name`" — so the alias under test has to exist.
+      panel.dashboardPanelData.data.queries[0].joins = [
+        { stream: "aliased_stream", streamAlias: "stream_alias" },
+      ];
       const row = { field: "test_field", streamAlias: "stream_alias" };
 
       await panel.loadFilterItem(row);
 
       expect(mockValuesWebSocket.fetchFieldValues).toHaveBeenCalled();
+      expect(mockValuesWebSocket.fetchFieldValues.mock.calls[0][0]).toMatchObject({
+        stream_name: "aliased_stream",
+        fields: ["test_field"],
+      });
     });
 
     it("should cover resetAggregationFunction for html chart type preserving stream", () => {
       panel.dashboardPanelData.data.type = "html";
-      panel.dashboardPanelData.data.queries[0].fields.stream =
-        "preserved_stream";
+      panel.dashboardPanelData.data.queries[0].fields.stream = "preserved_stream";
       panel.dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe(
-        "preserved_stream",
-      );
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe(
-        "metrics",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("preserved_stream");
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe("metrics");
       expect(panel.dashboardPanelData.data.markdownContent).toBe("");
     });
 
     it("should cover resetAggregationFunction for markdown chart type preserving stream", () => {
       panel.dashboardPanelData.data.type = "markdown";
-      panel.dashboardPanelData.data.queries[0].fields.stream =
-        "preserved_stream_md";
+      panel.dashboardPanelData.data.queries[0].fields.stream = "preserved_stream_md";
       panel.dashboardPanelData.data.queries[0].fields.stream_type = "logs";
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe(
-        "preserved_stream_md",
-      );
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe(
-        "logs",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("preserved_stream_md");
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe("logs");
       expect(panel.dashboardPanelData.data.htmlContent).toBe("");
     });
 
     it("should cover resetAggregationFunction for custom_chart type preserving stream", () => {
       panel.dashboardPanelData.data.type = "custom_chart";
-      panel.dashboardPanelData.data.queries[0].fields.stream =
-        "preserved_custom";
+      panel.dashboardPanelData.data.queries[0].fields.stream = "preserved_custom";
       panel.dashboardPanelData.data.queries[0].fields.stream_type = "traces";
 
       panel.resetAggregationFunction();
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe(
-        "preserved_custom",
-      );
-      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe(
-        "traces",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream).toBe("preserved_custom");
+      expect(panel.dashboardPanelData.data.queries[0].fields.stream_type).toBe("traces");
       expect(panel.dashboardPanelData.data.markdownContent).toBe("");
       expect(panel.dashboardPanelData.data.htmlContent).toBe("");
     });
@@ -5136,9 +4701,7 @@ describe("useDashboardPanel", () => {
       panel.resetAggregationFunction();
 
       expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
       expect(panel.dashboardPanelData.data.queries[0].config.limit).toBe(0);
     });
 
@@ -5154,9 +4717,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude.alias,
-      ).toBe("new_lat");
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe("new_lat");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with longitude field change", () => {
@@ -5171,9 +4732,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude.alias,
-      ).toBe("new_lng");
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe("new_lng");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with weight field change", () => {
@@ -5188,9 +4747,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.weight.alias).toBe(
-        "new_weight",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.alias).toBe("new_weight");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with name field change", () => {
@@ -5205,9 +4762,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.name.alias).toBe(
-        "new_name",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.name.alias).toBe("new_name");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with value_for_maps field change", () => {
@@ -5222,9 +4777,9 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value_for_maps.alias,
-      ).toBe("new_value");
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps.alias).toBe(
+        "new_value",
+      );
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with source field change", () => {
@@ -5239,9 +4794,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.source.alias).toBe(
-        "new_src",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.source.alias).toBe("new_src");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with target field change", () => {
@@ -5256,9 +4809,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.target.alias).toBe(
-        "new_tgt",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.target.alias).toBe("new_tgt");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with value field change", () => {
@@ -5273,9 +4824,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.value.alias).toBe(
-        "new_val",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.value.alias).toBe("new_val");
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with breakdown field change", () => {
@@ -5292,9 +4841,9 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown[0].alias,
-      ).toBe("new_breakdown");
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown[0].alias).toBe(
+        "new_breakdown",
+      );
     });
 
     it("should cover updateXYFieldsOnCustomQueryChange with z field change", () => {
@@ -5314,9 +4863,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsOnCustomQueryChange(oldFields);
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.z[0].alias).toBe(
-        "new_z",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.z[0].alias).toBe("new_z");
     });
 
     it("should cover updateXYFieldsForCustomQueryMode removing derived latitude", () => {
@@ -5331,9 +4878,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsForCustomQueryMode();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
     });
 
     it("should cover updateXYFieldsForCustomQueryMode removing derived longitude", () => {
@@ -5348,9 +4893,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsForCustomQueryMode();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeNull();
     });
 
     it("should cover updateXYFieldsForCustomQueryMode removing derived weight", () => {
@@ -5440,9 +4983,7 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsForCustomQueryMode();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value_for_maps,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeNull();
     });
 
     it("should cover updateXYFieldsForCustomQueryMode with custom field types for special fields", () => {
@@ -5510,23 +5051,16 @@ describe("useDashboardPanel", () => {
 
       panel.updateXYFieldsForCustomQueryMode();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude.alias,
-      ).toBe("latitude");
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude.alias,
-      ).toBe("longitude");
-      expect(panel.dashboardPanelData.data.queries[0].fields.weight.alias).toBe(
-        "weight",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe("latitude");
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe("longitude");
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.alias).toBe("weight");
     });
 
     it("should cover variable replacement patterns in updateQueryValue", async () => {
       (global as any).parser = mockParser;
       panel.dashboardPanelData.data.queryType = "sql";
       panel.dashboardPanelData.data.queries[0].customQuery = true;
-      panel.dashboardPanelData.data.queries[0].query =
-        "SELECT * FROM table WHERE id IN ${var:csv}";
+      panel.dashboardPanelData.data.queries[0].query = "SELECT * FROM table WHERE id IN ${var:csv}";
 
       mockParser.astify.mockReturnValue({
         columns: [{ name: "id", alias: "id" }],
@@ -5535,9 +5069,7 @@ describe("useDashboardPanel", () => {
 
       await nextTick();
 
-      expect(panel.dashboardPanelData.data.queries[0].query).toContain(
-        "${var:csv}",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].query).toContain("${var:csv}");
     });
 
     it("should cover singlequote variable pattern in updateQueryValue", async () => {
@@ -5578,8 +5110,7 @@ describe("useDashboardPanel", () => {
       (global as any).parser = mockParser;
       panel.dashboardPanelData.data.queryType = "sql";
       panel.dashboardPanelData.data.queries[0].customQuery = true;
-      panel.dashboardPanelData.data.queries[0].query =
-        "SELECT * WHERE status REGEXP '${var:pipe}'";
+      panel.dashboardPanelData.data.queries[0].query = "SELECT * WHERE status REGEXP '${var:pipe}'";
 
       mockParser.astify.mockReturnValue({
         columns: [{ name: "status", alias: "status" }],
@@ -5636,9 +5167,7 @@ describe("useDashboardPanel", () => {
       await panel.setCustomQueryFields();
 
       // Should return early due to invalid dates
-      expect(panel.dashboardPanelData.meta.dateTime.start_time).toBe(
-        "Invalid Date",
-      );
+      expect(panel.dashboardPanelData.meta.dateTime.start_time).toBe("Invalid Date");
     });
 
     it("should cover getResultSchema with abort signal", async () => {
@@ -5646,10 +5175,7 @@ describe("useDashboardPanel", () => {
       abortController.abort();
 
       try {
-        await panel.getResultSchema(
-          "SELECT * FROM test",
-          abortController.signal,
-        );
+        await panel.getResultSchema("SELECT * FROM test", abortController.signal);
       } catch (error: any) {
         expect(error.name).toBe("AbortError");
       }
@@ -5755,9 +5281,7 @@ describe("useDashboardPanel", () => {
 
       panel.resetAggregationFunction();
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
-      ).toBe(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBe(1);
       expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(1);
     });
 
@@ -5768,16 +5292,12 @@ describe("useDashboardPanel", () => {
         { name: "x2", args: [] },
         { name: "x3", args: [] },
       ];
-      panel.dashboardPanelData.data.queries[0].fields.breakdown = [
-        { name: "b1" },
-      ];
+      panel.dashboardPanelData.data.queries[0].fields.breakdown = [{ name: "b1" }];
 
       panel.resetAggregationFunction();
 
       expect(panel.dashboardPanelData.data.queries[0].fields.x.length).toBe(1);
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.breakdown.length,
-      ).toBe(1);
+      expect(panel.dashboardPanelData.data.queries[0].fields.breakdown.length).toBe(1);
     });
 
     it("should cover resetAggregationFunction for area chart with sql queryType", () => {
@@ -5799,10 +5319,7 @@ describe("useDashboardPanel", () => {
 
     it("should cover resetAggregationFunction for pie chart with multiple x fields", () => {
       panel.dashboardPanelData.data.type = "pie";
-      panel.dashboardPanelData.data.queries[0].fields.x = [
-        { name: "x1" },
-        { name: "x2" },
-      ];
+      panel.dashboardPanelData.data.queries[0].fields.x = [{ name: "x1" }, { name: "x2" }];
 
       panel.resetAggregationFunction();
 
@@ -5836,9 +5353,7 @@ describe("useDashboardPanel", () => {
       // is left unchanged; the active query's time_shift is cleared.
       expect(panel.dashboardPanelData.layout.currentQueryIndex).toBe(1);
       expect(panel.dashboardPanelData.data.queries.length).toBe(2);
-      expect(
-        panel.dashboardPanelData.data.queries[1].config.time_shift,
-      ).toEqual([]);
+      expect(panel.dashboardPanelData.data.queries[1].config.time_shift).toEqual([]);
     });
 
     it("should cover resetAggregationFunction for metric chart with multiple y fields", () => {
@@ -5888,9 +5403,7 @@ describe("useDashboardPanel", () => {
       expect(panel.dashboardPanelData.data.queries[0].fields.y).toEqual([]);
       expect(panel.dashboardPanelData.data.queries[0].fields.z).toEqual([]);
       expect(panel.dashboardPanelData.data.queries[0].fields.name).toBeNull();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value_for_maps,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeNull();
       expect(panel.dashboardPanelData.data.queries[0].config.limit).toBe(0);
     });
 
@@ -5910,12 +5423,8 @@ describe("useDashboardPanel", () => {
 
       expect(panel.dashboardPanelData.data.queries[0].fields.x).toEqual([]);
       expect(panel.dashboardPanelData.data.queries[0].fields.y).toEqual([]);
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude,
-      ).toBeNull();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude).toBeNull();
       expect(panel.dashboardPanelData.data.queries[0].fields.weight).toBeNull();
     });
 
@@ -5943,12 +5452,8 @@ describe("useDashboardPanel", () => {
 
       panel.addMapName({ name: "derived_name", streamAlias: "alias1" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.name,
-      ).toBeDefined();
-      expect(panel.dashboardPanelData.data.queries[0].fields.name.alias).toBe(
-        "derived_name",
-      );
+      expect(panel.dashboardPanelData.data.queries[0].fields.name).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.name.alias).toBe("derived_name");
     });
 
     it("should cover addMapValue with isDerived field", () => {
@@ -5958,13 +5463,10 @@ describe("useDashboardPanel", () => {
 
       panel.addMapValue({ name: "derived_value", streamAlias: "alias2" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value_for_maps,
-      ).toBeDefined();
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value_for_maps
-          .functionName,
-      ).toBe("count");
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps).toBeDefined();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value_for_maps.functionName).toBe(
+        "count",
+      );
     });
 
     it("should cover addLatitude with custom query mode", () => {
@@ -5972,9 +5474,7 @@ describe("useDashboardPanel", () => {
 
       panel.addLatitude({ name: "custom_lat", streamAlias: "stream1" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.latitude.alias,
-      ).toBe("custom_lat");
+      expect(panel.dashboardPanelData.data.queries[0].fields.latitude.alias).toBe("custom_lat");
     });
 
     it("should cover addLongitude with custom query mode", () => {
@@ -5982,9 +5482,7 @@ describe("useDashboardPanel", () => {
 
       panel.addLongitude({ name: "custom_lng", streamAlias: "stream2" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.longitude.alias,
-      ).toBe("custom_lng");
+      expect(panel.dashboardPanelData.data.queries[0].fields.longitude.alias).toBe("custom_lng");
     });
 
     it("should cover addWeight with isDerived true", () => {
@@ -5994,17 +5492,13 @@ describe("useDashboardPanel", () => {
 
       panel.addWeight({ name: "derived_weight" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.weight.functionName,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.functionName).toBeNull();
     });
 
     it("should cover addWeight with isDerived false", () => {
       panel.addWeight({ name: "normal_weight" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.weight.functionName,
-      ).toBe("count");
+      expect(panel.dashboardPanelData.data.queries[0].fields.weight.functionName).toBe("count");
     });
 
     it("should cover addSource with custom query and derived", () => {
@@ -6015,12 +5509,8 @@ describe("useDashboardPanel", () => {
 
       panel.addSource({ name: "derived_src", streamAlias: "s1" });
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.source.alias).toBe(
-        "derived_src",
-      );
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.source.isDerived,
-      ).toBe(true);
+      expect(panel.dashboardPanelData.data.queries[0].fields.source.alias).toBe("derived_src");
+      expect(panel.dashboardPanelData.data.queries[0].fields.source.isDerived).toBe(true);
     });
 
     it("should cover addTarget with custom query and derived", () => {
@@ -6031,12 +5521,8 @@ describe("useDashboardPanel", () => {
 
       panel.addTarget({ name: "derived_tgt", streamAlias: "t1" });
 
-      expect(panel.dashboardPanelData.data.queries[0].fields.target.alias).toBe(
-        "derived_tgt",
-      );
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.target.isDerived,
-      ).toBe(true);
+      expect(panel.dashboardPanelData.data.queries[0].fields.target.alias).toBe("derived_tgt");
+      expect(panel.dashboardPanelData.data.queries[0].fields.target.isDerived).toBe(true);
     });
 
     it("should cover addValue with isDerived true", () => {
@@ -6046,17 +5532,13 @@ describe("useDashboardPanel", () => {
 
       panel.addValue({ name: "derived_val" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value.functionName,
-      ).toBeNull();
+      expect(panel.dashboardPanelData.data.queries[0].fields.value.functionName).toBeNull();
     });
 
     it("should cover addValue with isDerived false", () => {
       panel.addValue({ name: "normal_val" });
 
-      expect(
-        panel.dashboardPanelData.data.queries[0].fields.value.functionName,
-      ).toBe("sum");
+      expect(panel.dashboardPanelData.data.queries[0].fields.value.functionName).toBe("sum");
     });
 
     it("should cover addXAxisItem sortBy logic for timestamp", () => {
@@ -6315,12 +5797,8 @@ describe("useDashboardPanel", () => {
         panel.dashboardPanelData.meta.stream.vrlFunctionFieldList = [];
 
         // Verify the condition check
-        expect(
-          panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length,
-        ).toBe(0);
-        expect(
-          panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0,
-        ).toBe(false);
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length).toBe(0);
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(false);
       });
 
       it("should handle single item vrlFunctionFieldList array correctly (truthy check)", () => {
@@ -6328,12 +5806,8 @@ describe("useDashboardPanel", () => {
           { name: "single_field", type: "Utf8" },
         ];
 
-        expect(
-          panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length,
-        ).toBe(1);
-        expect(
-          panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0,
-        ).toBe(true);
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length).toBe(1);
+        expect(panel.dashboardPanelData.meta.stream.vrlFunctionFieldList.length > 0).toBe(true);
       });
     });
   });

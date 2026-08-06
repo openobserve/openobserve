@@ -1,57 +1,57 @@
 <template>
   <div
-    class="quality-page tw:flex tw:flex-col tw:gap-[14px] tw:p-[14px_16px_18px] tw:min-h-0 tw:flex-1"
+    class="quality-page flex min-h-0 flex-1 flex-col gap-3.5 pt-3.5 pb-4"
     data-test="quality-page"
   >
     <!-- Agent filter — right-aligned at the top of the content container so it
          sits with the KPIs + table it scopes (matches LLM Insights). -->
-    <div class="tw:flex tw:items-center tw:justify-end tw:px-4">
-      <div class="tw:w-[14rem] tw:flex-shrink-0">
+    <div class="px-page-edge flex items-center justify-end">
+      <div class="w-[17rem] flex-shrink-0">
         <!-- While the agent list is loading we swap the select for a skeleton
              of the same height so the control reads as "loading" (and can't be
              opened on an empty list) instead of showing an empty dropdown. -->
-        <SkeletonBox
+        <OSkeleton
+          type="text"
           v-if="agentsLoading"
-          width="100%"
-          height="2.125rem"
-          rounded
           data-test="quality-agent-filter-skeleton"
+          class="h-8.5 w-full"
         />
         <OSelect
           v-else
           v-model="agentModel"
-          label="Agent"
+          :label="t('onlineEvals.quality.agentLabel')"
           label-position="inside"
+          :placeholder="t('onlineEvals.quality.agentPlaceholder')"
           :options="agentOptions || []"
           labelKey="label"
           valueKey="value"
-          class="tw:rounded"
+          class="rounded-default"
           data-test="quality-agent-filter"
         />
       </div>
     </div>
 
-    <QualityKpiSkeleton
-      v-if="showKpiSkeleton"
-      :count="visibleKpis.length"
-      class="tw:px-4"
-    />
-    <section v-else class="quality-page__kpis tw:grid tw:gap-[10px] tw:px-4" aria-label="Tier 1 KPIs"
-      style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))"
+    <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
+    <KpiCardRow
+      v-else
+      class="quality-page__kpis px-page-edge"
+      :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
     >
       <QualityKpiCard
         v-for="kpi in visibleKpis"
         :key="kpi.id"
         :kpi="kpi"
         :delta="deltaByKpi[kpi.id] ?? null"
+        :clickable="kpi.id === 'scorerFailures' && (kpi.value ?? 0) > 0"
+        @activate="openScorerFailures"
       />
-    </section>
+    </KpiCardRow>
 
-    <!-- Tier 2: the configs table is now the persistent view; selecting a
-         row opens the detail in a right-side ODrawer (70% width) instead
-         of replacing the whole page. The user keeps full context of the
-         list behind the drawer. -->
-    <div class="quality-page__tier2 tw:grid tw:gap-3 tw:min-h-0 tw:flex-1"
+    <!-- Tier 2: the configs table is the persistent view; selecting a
+         row opens the detail in a right-side ODrawer (70% width). The user
+         keeps full context of the list behind the drawer. -->
+    <div
+      class="quality-page__tier2 grid min-h-0 flex-1 gap-3"
       style="grid-template-columns: minmax(0, 1fr)"
     >
       <QualityScoreConfigsTable
@@ -63,32 +63,34 @@
     </div>
 
     <ODrawer
+      bleed
       v-model:open="detailDrawerOpen"
       side="right"
       :width="70"
-      :title="selectedConfig?.name || ''"
+      :title="raw(selectedConfig?.name || '')"
       data-test="quality-config-detail-drawer"
     >
       <!-- Type badge + version pulled out of the inner panel header so
            the drawer chrome owns the entire identification block;
            the inner panel no longer renders its own title row. -->
       <template #header-right>
-        <span
-          class="qpd-type tw:inline-flex tw:py-0 tw:px-1 tw:rounded-[2px] tw:font-bold tw:text-[13px] tw:leading-[1.4] tw:tracking-[0.02em]"
-          :class="{
-            'tw:bg-[color-mix(in_srgb,#6b76e3_14%,transparent)] tw:text-[#4f5bcf]': detailDataType === 'numeric',
-            'tw:bg-[color-mix(in_srgb,#9333ea_14%,transparent)] tw:text-[#7c3aed]': detailDataType === 'categorical',
-            'tw:bg-[color-mix(in_srgb,#16a34a_14%,transparent)] tw:text-[#15803d]': detailDataType === 'boolean',
-          }"
+        <OTag
+          v-if="
+            detailDataType === 'numeric' ||
+            detailDataType === 'categorical' ||
+            detailDataType === 'boolean'
+          "
+          type="evalDataType"
+          :value="detailDataType"
+          :label="raw(shortType(detailDataType))"
+          size="xs"
           data-test="quality-detail-type-badge"
-        >
-          {{ shortType(detailDataType) }}
-        </span>
+        />
         <span
           v-if="selectedConfig?.version"
-          class="qpd-version tw:ml-[6px] tw:text-[11px] tw:text-(--color-text-secondary) tw:[font-variant-numeric:tabular-nums]"
+          class="qpd-version text-2xs text-text-secondary ml-1.5 [font-variant-numeric:tabular-nums]"
           data-test="quality-detail-version-badge"
-          >v{{ selectedConfig.version }}</span
+          >{{ t("onlineEvals.versionPrefix") }}{{ selectedConfig.version }}</span
         >
       </template>
 
@@ -98,7 +100,7 @@
         :data-type="detailDataType"
         :kpis="detailKpis"
         :has-scores="detailHasScores"
-        :is-loading="isDetailLoading"
+        :is-loading="isDetailLoading || isChartsLoading"
         :numeric-trend="numericTrend"
         :numeric-distribution="numericDistribution"
         :numeric-threshold="numericThreshold"
@@ -107,6 +109,20 @@
         :boolean-trend="booleanTrend"
         :boolean-trend-series="booleanTrendSeries"
         :categorical-rows="categoricalRows"
+        :scope="detailScope"
+        :scope-counts="selectedConfigScopeCounts"
+        :runs="qualityRuns"
+        :runs-counts="runsCounts"
+        :runs-filter="runsFilter"
+        :runs-current-page="runsCurrentPage"
+        :runs-page-size="runsPageSize"
+        :runs-total-count="runsTotalCount"
+        :runs-loading="isRunsLoading"
+        :runs-error="runsError"
+        @update:scope="detailScope = $event"
+        @open-run="openEvaluationRun"
+        @runs-filter-change="setRunsFilter"
+        @runs-pagination-change="setRunsPagination"
         @back="clearSelection"
       />
     </ODrawer>
@@ -115,29 +131,35 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import { useQualityData, type DateWindow } from "./composables/useQualityData";
-import {
-  useQualityScoreConfigs,
-  type ScoreConfigRow,
-} from "./composables/useQualityScoreConfigs";
+import { useQualityScoreConfigs, type ScoreConfigRow } from "./composables/useQualityScoreConfigs";
 import { useQualityConfigDetail } from "./composables/useQualityConfigDetail";
 import { useQualityDetailCharts } from "./composables/useQualityDetailCharts";
+import KpiCardRow from "@/components/common/KpiCardRow.vue";
+import { useQualityRuns, type QualityRunRow } from "./composables/useQualityRuns";
 import QualityKpiCard from "./quality/QualityKpiCard.vue";
 import QualityKpiSkeleton from "./quality/QualityKpiSkeleton.vue";
 import QualityScoreConfigsTable from "./quality/QualityScoreConfigsTable.vue";
 import QualityDetailPanel from "./quality/QualityDetailPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import SkeletonBox from "@/components/shared/SkeletonBox.vue";
-import type { AgentFilterSelection } from "./utils/agentFilterSql";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import {
+  buildEvaluatorAgentFilterWhere,
+  combineWhere,
+  type AgentFilterSelection,
+} from "./utils/agentFilterSql";
+import type { QualityScope, ScopeCounts } from "./utils/qualityScope";
+import { b64EncodeUnicode } from "@/utils/zincutils";
 
 const props = defineProps<{
   scoreConfigs: ScoreConfig[];
   // Date window is owned by OnlineEvals (so the picker + refresh button live
-  // in the embedded AppPageHeader). Quality just consumes it as a reactive
+  // in the embedded OPageHeader). Quality just consumes it as a reactive
   // input to its data loaders.
   dateWindow: DateWindow;
   agentFilter?: AgentFilterSelection | null;
@@ -145,7 +167,7 @@ const props = defineProps<{
   // list + derives `agentFilter`); QualityPage just renders the control and
   // emits the selected key back via v-model.
   agentKey?: string;
-  agentOptions?: { label: string; value: string }[];
+  agentOptions?: { label: I18nText; value: string }[];
   // True while OnlineEvals is still fetching the score-configs list. Until that
   // resolves `scoreConfigs` is empty, so the table would otherwise flash "No
   // Data" before its own skeleton kicks in. OR-ing this into the table's
@@ -171,28 +193,19 @@ const agentModel = computed<string>({
   set: (value) => emit("update:agentKey", value),
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 
 const dateWindowRef = toRef(props, "dateWindow");
 const agentFilterRef = toRef(props, "agentFilter");
 
-const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(
-  dateWindowRef,
-  agentFilterRef,
-);
+const { isLoading, kpis, deltaByKpi, refresh } = useQualityData(dateWindowRef, agentFilterRef);
 
-// Evaluation cost is intentionally hidden until the backend writes cost data.
-// To restore it, remove this filter and re-add `kpis` to the v-for.
-// Now that `gen_ai_usage_cost` on `_evaluator` is populated, the
-// Evaluation Cost card is sourced live (see useQualityData) — no longer
-// hidden. Keep the set in place so future placeholder KPIs can be
-// hidden the same way without touching the render loop.
+// Placeholder KPIs can be hidden here without touching the render loop — add
+// their ids to this set to filter them out of the v-for.
 const HIDDEN_KPI_IDS = new Set<string>();
-const visibleKpis = computed(() =>
-  kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)),
-);
+const visibleKpis = computed(() => kpis.value.filter((k) => !HIDDEN_KPI_IDS.has(k.id)));
 
 const scoreConfigsRef = toRef(props, "scoreConfigs");
 const {
@@ -202,11 +215,22 @@ const {
 } = useQualityScoreConfigs(scoreConfigsRef, dateWindowRef, agentFilterRef);
 
 const selectedConfigId = ref<string | null>(routeConfigId());
+const detailScope = ref<QualityScope>("all");
 
 const selectedConfig = computed<ScoreConfig | null>(() => {
   const id = selectedConfigId.value;
   if (!id) return null;
   return props.scoreConfigs.find((c) => String(c.id) === id) ?? null;
+});
+
+const EMPTY_SCOPE_COUNTS: ScopeCounts = { span: 0, trace: 0, session: 0 };
+const selectedConfigScopeCounts = computed<ScopeCounts>(() => {
+  const id = selectedConfigId.value;
+  if (!id) return EMPTY_SCOPE_COUNTS;
+  return (
+    configRows.value.find((row) => String(row.config.id) === id || String(row.configId) === id)
+      ?.scopeCounts ?? EMPTY_SCOPE_COUNTS
+  );
 });
 
 const {
@@ -217,7 +241,7 @@ const {
   booleanAgg,
   categoricalRows,
   refresh: refreshDetail,
-} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef);
+} = useQualityConfigDetail(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
 
 const {
   isLoading: isChartsLoading,
@@ -226,13 +250,27 @@ const {
   booleanTrend,
   booleanTrendSeries,
   refresh: refreshCharts,
-} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef);
+} = useQualityDetailCharts(selectedConfig, dateWindowRef, agentFilterRef, detailScope, t);
+
+const {
+  runs: qualityRuns,
+  counts: runsCounts,
+  activeFilter: runsFilter,
+  currentPage: runsCurrentPage,
+  pageSize: runsPageSize,
+  totalCount: runsTotalCount,
+  isLoading: isRunsLoading,
+  error: runsError,
+  refresh: refreshRuns,
+  setFilter: setRunsFilter,
+  setPagination: setRunsPagination,
+  resolveEvaluatorSpanId,
+} = useQualityRuns(selectedConfig, dateWindowRef, agentFilterRef, detailScope);
 
 const numericThreshold = computed(() => {
   const cfg = selectedConfig.value;
   if (!cfg) return null;
-  const ht: any =
-    (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
+  const ht: any = (cfg as any).healthyThreshold ?? (cfg as any).healthy_threshold;
   if (!ht || ht.value == null || !ht.direction) return null;
   return {
     value: Number(ht.value),
@@ -249,12 +287,26 @@ const numericRange = computed(() => {
 });
 
 async function refreshAll() {
-  await Promise.all([
-    refresh(),
-    refreshConfigs(),
-    refreshDetail(),
-    refreshCharts(),
-  ]);
+  await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
+}
+
+function openScorerFailures() {
+  const filter = combineWhere(
+    "attributes_status IN ('error', 'timeout')",
+    buildEvaluatorAgentFilterWhere(props.agentFilter ?? null),
+  );
+  router
+    .push({
+      name: "traces",
+      query: {
+        stream: "_evaluator",
+        query: b64EncodeUnicode(filter ?? "attributes_status IN ('error', 'timeout')"),
+        from: props.dateWindow.startUs,
+        to: props.dateWindow.endUs,
+        org_identifier: route.query.org_identifier,
+      },
+    })
+    .catch(() => {});
 }
 
 const isAnyLoading = computed(
@@ -262,11 +314,12 @@ const isAnyLoading = computed(
     isLoading.value ||
     isConfigsLoading.value ||
     isDetailLoading.value ||
-    isChartsLoading.value,
+    isChartsLoading.value ||
+    isRunsLoading.value,
 );
 
 // Surface refresh + an aggregated loading flag so OnlineEvals can drive the
-// Refresh button it now renders in the embedded AppPageHeader actions slot.
+// Refresh button it now renders in the embedded OPageHeader actions slot.
 defineExpose({ refreshAll, isAnyLoading });
 
 /** Show the KPI skeleton whenever the KPI queries are running — on the initial
@@ -302,11 +355,17 @@ watch(
   () => route.query.config,
   () => {
     const id = routeConfigId();
-    if (id !== selectedConfigId.value) selectedConfigId.value = id;
+    if (id !== selectedConfigId.value) {
+      detailScope.value = "all";
+      selectedConfigId.value = id;
+    }
   },
 );
 
 function selectConfig(row: ScoreConfigRow) {
+  // Reset before changing the config so its composable watcher never runs a
+  // request for the new config with the previous config's narrow scope.
+  detailScope.value = "all";
   selectedConfigId.value = String(row.config.id);
   const query: Record<string, any> = {
     ...route.query,
@@ -322,6 +381,26 @@ function clearSelection() {
   router.replace({ name: route.name as string, query }).catch(() => {});
 }
 
+async function openEvaluationRun(run: QualityRunRow) {
+  if (!run.evaluatorTraceId) return;
+  const evaluatorSpanId = await resolveEvaluatorSpanId(run);
+  const timestampUs = run.timestampMs > 0 ? run.timestampMs * 1000 : 0;
+  const query: Record<string, any> = {
+    stream: "_evaluator",
+    trace_id: run.evaluatorTraceId,
+    from: timestampUs ? Math.max(0, timestampUs - 60_000_000) : props.dateWindow.startUs,
+    to: timestampUs ? timestampUs + 3_600_000_000 : props.dateWindow.endUs,
+    org_identifier: route.query.org_identifier,
+  };
+  if (evaluatorSpanId) query.span_id = evaluatorSpanId;
+  router
+    .push({
+      name: "traceDetails",
+      query,
+    })
+    .catch(() => {});
+}
+
 // ODrawer drives its `:open` via the presence of a selected config. Opening
 // is owned by selectConfig() (from a row click); closing the drawer
 // (backdrop click, Esc, header ×) routes through clearSelection so the
@@ -332,14 +411,13 @@ const detailDrawerOpen = computed<boolean>({
     if (!open) clearSelection();
   },
 });
-
 // Used by the drawer header's #header-right slot — same mapping the
 // detail panel used for its in-panel badge so type/version chrome looks
 // identical, just relocated into the drawer header.
 function shortType(type: string): string {
-  if (type === "numeric") return "Num";
-  if (type === "categorical") return "Cat";
-  if (type === "boolean") return "Bool";
+  if (type === "numeric") return t("onlineEvals.quality.dataTypes.numericShort");
+  if (type === "categorical") return t("onlineEvals.quality.dataTypes.categoricalShort");
+  if (type === "boolean") return t("onlineEvals.quality.dataTypes.booleanShort");
   return "—";
 }
 </script>

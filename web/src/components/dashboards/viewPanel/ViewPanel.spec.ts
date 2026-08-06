@@ -184,7 +184,6 @@ vi.mock("lodash-es", () => ({
   isEqual: vi.fn((a, b) => JSON.stringify(a) === JSON.stringify(b)),
 }));
 
-
 describe("ViewPanel", () => {
   let wrapper: VueWrapper<any>;
   let mockGetDashboard: any;
@@ -216,8 +215,7 @@ describe("ViewPanel", () => {
         },
         stubs: {
           DateTimePickerDashboard: {
-            template:
-              '<div data-test="date-time-picker-dashboard"><slot /></div>',
+            template: '<div data-test="date-time-picker-dashboard"><slot /></div>',
             methods: {
               refresh: vi.fn(),
               getConsumableDateTime: () => ({
@@ -232,14 +230,12 @@ describe("ViewPanel", () => {
             emits: ["trigger"],
           },
           HistogramIntervalDropDown: {
-            template:
-              '<div data-test="histogram-interval-dropdown"><slot /></div>',
+            template: '<div data-test="histogram-interval-dropdown"><slot /></div>',
             props: ["modelValue"],
             emits: ["update:modelValue"],
           },
           VariablesValueSelector: {
-            template:
-              '<div data-test="variables-value-selector"><slot /></div>',
+            template: '<div data-test="variables-value-selector"><slot /></div>',
             props: [
               "variablesConfig",
               "showDynamicFilters",
@@ -267,8 +263,7 @@ describe("ViewPanel", () => {
             ],
           },
           DashboardErrorsComponent: {
-            template:
-              '<div data-test="dashboard-errors-component"><slot /></div>',
+            template: '<div data-test="dashboard-errors-component"><slot /></div>',
             props: ["errors"],
           },
           RelativeTime: {
@@ -277,21 +272,21 @@ describe("ViewPanel", () => {
           },
           PanelErrorButtons: {
             template: `<div>
-              <q-btn v-if="error" data-test="panel-error-data" class="warning">
-                <q-tooltip>{{ error }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
-                <q-tooltip>{{ maxQueryRangeWarning }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
-                <q-tooltip>{{ limitNumberOfSeriesWarningMessage }}</q-tooltip>
-              </q-btn>
-              <q-btn v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
-                <q-tooltip>The data shown is cached</q-tooltip>
-              </q-btn>
-              <q-btn v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
-                <q-tooltip>Partial data</q-tooltip>
-              </q-btn>
+              <button v-if="error" data-test="panel-error-data" class="warning">
+                <span>{{ error }}</span>
+              </button>
+              <button v-if="maxQueryRangeWarning" data-test="panel-max-duration-warning" class="warning">
+                <span>{{ maxQueryRangeWarning }}</span>
+              </button>
+              <button v-if="limitNumberOfSeriesWarningMessage" data-test="panel-limit-number-of-series-warning" class="warning">
+                <span>{{ limitNumberOfSeriesWarningMessage }}</span>
+              </button>
+              <button v-if="isCachedDataDifferWithCurrentTimeRange" data-test="panel-is-cached-data-differ-with-current-time-range-warning">
+                <span>The data shown is cached</span>
+              </button>
+              <button v-if="isPartialData && !isPanelLoading" data-test="panel-partial-data-warning" class="warning">
+                <span>Partial data</span>
+              </button>
               <span v-if="lastTriggeredAt && !viewOnly" class="lastRefreshedAt">
                 <span data-test="relative-time">{{ lastTriggeredAt }}</span>
               </span>
@@ -307,43 +302,15 @@ describe("ViewPanel", () => {
               "viewOnly",
             ],
           },
-          "q-separator": {
-            template: '<div class="q-separator"></div>',
-          },
-          "q-btn": {
-            template:
-              '<button @click="$emit(\'click\', $event)" :disabled="disable" :data-test="$attrs[\'data-test\']"><slot /></button>',
-            props: [
-              "outline",
-              "padding",
-              "no-caps",
-              "icon",
-              "disable",
-              "color",
-              "text-color",
-              "flat",
-            ],
-            emits: ["click"],
-            inheritAttrs: false,
-          },
-          "OIcon": {
+          OIcon: {
             template: '<i class="OIcon"></i>',
             props: ["name"],
-          },
-          "q-tooltip": {
-            template: '<div class="q-tooltip"><slot /></div>',
           },
           OButton: {
             name: "OButton",
             template:
               '<button @click="$emit(\'click\', $event)" :disabled="disabled" :data-test="$attrs[\'data-test\']"><slot name="icon-left" /><slot /></button>',
-            props: [
-              "variant",
-              "size",
-              "disabled",
-              "loading",
-              "label",
-            ],
+            props: ["variant", "size", "disabled", "loading", "label"],
             emits: ["click"],
             inheritAttrs: false,
           },
@@ -373,12 +340,7 @@ describe("ViewPanel", () => {
               "secondaryButtonLoading",
               "neutralButtonLoading",
             ],
-            emits: [
-              "update:open",
-              "click:primary",
-              "click:secondary",
-              "click:neutral",
-            ],
+            emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
           },
           ShowLegendsPopup: {
             name: "ShowLegendsPopup",
@@ -440,9 +402,7 @@ describe("ViewPanel", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-viewpanel-title"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-title"]').exists()).toBe(true);
     });
 
     it("should have correct component name", () => {
@@ -454,9 +414,7 @@ describe("ViewPanel", () => {
     it("should display panel title", () => {
       wrapper = createWrapper();
 
-      const titleElement = wrapper.find(
-        '[data-test="dashboard-viewpanel-title"]',
-      );
+      const titleElement = wrapper.find('[data-test="dashboard-viewpanel-title"]');
       expect(titleElement.text()).toBe("Test Panel");
     });
 
@@ -511,48 +469,38 @@ describe("ViewPanel", () => {
     it("should render date time picker", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-date-time-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-date-time-picker"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render auto refresh interval", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-refresh-interval"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-refresh-interval"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render refresh button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-refresh-data-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-refresh-data-btn"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render close button", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-viewpanel-close-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-close-btn"]').exists()).toBe(true);
     });
 
     it("should render variables value selector", () => {
       wrapper = createWrapper();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-variables-value-selector"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-viewpanel-variables-value-selector"]').exists(),
       ).toBe(true);
     });
 
@@ -563,21 +511,17 @@ describe("ViewPanel", () => {
       wrapper.vm.chartData = mockDashboardPanelData.data;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-panel-schema-renderer"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-panel-schema-renderer"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render dashboard errors component", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-dashboard-errors"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-dashboard-errors"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should show last refreshed time when available", async () => {
@@ -587,9 +531,7 @@ describe("ViewPanel", () => {
       wrapper.vm.lastTriggeredAt = new Date("2023-01-01T10:00:00Z");
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="view-panel-last-refreshed-at"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="view-panel-last-refreshed-at"]').exists()).toBe(true);
       expect(wrapper.find('[data-test="relative-time"]').exists()).toBe(true);
     });
   });
@@ -603,9 +545,7 @@ describe("ViewPanel", () => {
       await wrapper.vm.$nextTick();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]').exists(),
       ).toBe(true);
     });
 
@@ -616,9 +556,7 @@ describe("ViewPanel", () => {
       await wrapper.vm.$nextTick();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]').exists(),
       ).toBe(false);
     });
 
@@ -629,9 +567,7 @@ describe("ViewPanel", () => {
       await wrapper.vm.$nextTick();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-viewpanel-histogram-interval-dropdown"]').exists(),
       ).toBe(false);
     });
   });
@@ -896,8 +832,7 @@ describe("ViewPanel", () => {
         queryType: "sql",
         queries: [
           {
-            query:
-              'SELECT histogram(_timestamp, "10m"), histogram(event_time, "30m") FROM logs',
+            query: 'SELECT histogram(_timestamp, "10m"), histogram(event_time, "30m") FROM logs',
             fields: {
               x: [histogramField1, histogramField2],
               y: [],
@@ -923,9 +858,7 @@ describe("ViewPanel", () => {
     it("should handle refresh button click", async () => {
       wrapper = createWrapper();
 
-      const refreshBtn = wrapper.find(
-        '[data-test="dashboard-viewpanel-refresh-data-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="dashboard-viewpanel-refresh-data-btn"]');
       await refreshBtn.trigger("click");
 
       // Should trigger refreshData method
@@ -935,9 +868,7 @@ describe("ViewPanel", () => {
     it("should handle close button click", async () => {
       wrapper = createWrapper();
 
-      const closeBtn = wrapper.find(
-        '[data-test="dashboard-viewpanel-close-btn"]',
-      );
+      const closeBtn = wrapper.find('[data-test="dashboard-viewpanel-close-btn"]');
       await closeBtn.trigger("click");
 
       // Should call goBack method which calls router.back
@@ -962,9 +893,7 @@ describe("ViewPanel", () => {
       wrapper.vm.disable = true;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="dashboard-viewpanel-cancel-btn"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-viewpanel-cancel-btn"]').exists()).toBe(false);
     });
   });
 
@@ -1018,12 +947,8 @@ describe("ViewPanel", () => {
       wrapper.vm.selectedDate = newDate;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.dashboardPanelData.meta.dateTime.start_time).toEqual(
-        newDate.startTime,
-      );
-      expect(wrapper.vm.dashboardPanelData.meta.dateTime.end_time).toEqual(
-        newDate.endTime,
-      );
+      expect(wrapper.vm.dashboardPanelData.meta.dateTime.start_time).toEqual(newDate.startTime);
+      expect(wrapper.vm.dashboardPanelData.meta.dateTime.end_time).toEqual(newDate.endTime);
     });
 
     it("should set time for variables", async () => {
@@ -1061,9 +986,7 @@ describe("ViewPanel", () => {
       wrapper.vm.onUpdateInitialVariableValues({ var1: "updated" });
 
       expect(wrapper.emitted("update:initialVariableValues")).toBeTruthy();
-      expect(wrapper.emitted("update:initialVariableValues")[0]).toEqual([
-        { var1: "updated" },
-      ]);
+      expect(wrapper.emitted("update:initialVariableValues")[0]).toEqual([{ var1: "updated" }]);
     });
 
     it("should detect variables changes", async () => {

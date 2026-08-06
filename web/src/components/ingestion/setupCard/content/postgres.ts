@@ -18,13 +18,11 @@
 // specifics. Follows the OpenObserve guide:
 // https://openobserve.ai/blog/how-to-monitor-postgresql-performance
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
-import {
-  collectorInstallStep,
-  writeConfigVariants,
-  sharedToolIcons,
-} from "./otelShared";
+import { collectorInstallStep, writeConfigVariants, sharedToolIcons } from "./otelShared";
 
 // Step 1 — the monitoring role. Literal name/password here and in the config (the
 // config reads the password from $POSTGRESQL_PASSWORD set at run time) — edit
@@ -75,31 +73,27 @@ service:
       processors: [memory_limiter, batch]
       exporters: [otlphttp/openobserve]`;
 
-export default function postgresCard(
-  subs: CardSubstitutions,
-): RichCardContent {
+export default function postgresCard(subs: CardSubstitutions): RichCardContent {
   const tool = sharedToolIcons();
   return {
     provider: {
       name: "Postgres",
-      tagline:
-        "Collect PostgreSQL metrics with the OpenTelemetry Collector and ship them to OpenObserve.",
+      tagline: gt("ingestion.setupCard.postgresqlTagline"),
       logo: getImageURL("images/ingestion/postgres.png"),
       tone: "#336791",
-      metaBadges: ["Metrics"],
+      metaBadges: [gt("common.metrics")],
     },
     steps: [
       {
         id: "prepare",
-        title: "Prepare PostgreSQL",
-        description:
-          "Create the monitoring role — run it in a SQL client, **not** your shell.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.preparePostgresqlTitle",
+        descriptionKey: "ingestion.setupCard.preparePostgresqlDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         completeOn: "copy",
         variants: [
           {
             id: "psql",
-            label: "psql",
+            label: raw("psql"),
             icon: tool.terminal,
             code: {
               lang: "bash",
@@ -109,7 +103,7 @@ export default function postgresCard(
           },
           {
             id: "docker",
-            label: "Docker",
+            label: raw("Docker"),
             icon: tool.docker,
             code: {
               lang: "bash",
@@ -118,7 +112,7 @@ export default function postgresCard(
           },
           {
             id: "sql-client",
-            label: "SQL Client (GUI)",
+            labelKey: "ingestion.setupCard.sqlClientGuiVariant",
             icon: getImageURL("images/ingestion/postgres.png"),
             code: { lang: "sql", raw: ROLE_SQL },
           },
@@ -127,9 +121,9 @@ export default function postgresCard(
       collectorInstallStep(),
       {
         id: "configure",
-        title: "Configure the OpenTelemetry Collector",
-        description: "Writes `config.yaml` — set the host/port below.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.configureCollectorTitle",
+        descriptionKey: "ingestion.setupCard.configureCollectorDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         // No own toggle — follow the OS picked at the install step.
@@ -139,15 +133,15 @@ export default function postgresCard(
         inputs: [
           {
             id: "host",
-            label: "PostgreSQL Host",
+            labelKey: "ingestion.setupCard.postgresqlHostLabel",
             default: "localhost",
-            placeholder: "localhost",
+            placeholder: raw("localhost"),
           },
           {
             id: "port",
-            label: "Port",
+            labelKey: "ingestion.setupCard.portLabel",
             default: "5432",
-            placeholder: "5432",
+            placeholder: raw("5432"),
             width: "sm",
           },
         ],
@@ -155,9 +149,9 @@ export default function postgresCard(
       },
       {
         id: "run",
-        title: "Run the OpenTelemetry Collector",
-        description: "Start the collector (the role's password via env var).",
-        chip: { kind: "run", label: "Run" },
+        titleKey: "ingestion.setupCard.runCollectorTitle",
+        descriptionKey: "ingestion.setupCard.runCollectorPostgresqlDesc",
+        chip: { kind: "run", labelKey: "ingestion.setupCard.chipRun" },
         completeOn: "copy",
         code: {
           lang: "bash",
@@ -166,18 +160,19 @@ export default function postgresCard(
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Hit Test below, or check Streams for the `postgresql_*` metrics.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyPostgresqlMetricsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
+        // pg_stat_database counter names — they appear verbatim in the ingested
+        // metrics, so translating the pill would desync it from the data.
         pills: [
-          "Active Backends",
-          "Commits",
-          "Rollbacks",
-          "Database Size",
-          "Blocks Read",
+          raw("Active Backends"),
+          raw("Commits"),
+          raw("Rollbacks"),
+          raw("Database Size"),
+          raw("Blocks Read"),
         ],
       },
     ],

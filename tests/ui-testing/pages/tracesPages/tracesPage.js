@@ -16,8 +16,11 @@ export class TracesPage {
     // Source: web/src/plugins/traces/SearchBar.vue
     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
-    this.serviceMapsToggle = '[data-test="traces-service-graph-toggle"]';
-    this.servicesCatalogToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
+    // Service Graph and Services are their own routes now, reached from the
+    // Traces rail tile's hover flyout — not tabs on the Traces page.
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    this.serviceMapsNavItem = '[data-test="nav-group-item-serviceGraph"]';
+    this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
 
     // Search Bar - Controls
     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
@@ -35,9 +38,9 @@ export class TracesPage {
 
     // Search Results
     // Source: web/src/plugins/traces/components/TracesSearchResultList.vue
-    // Source: web/src/components/TenstackTable.vue (rows use o2-table-detail-{ts})
+    // Source: web/src/lib/core/Table/OTable.vue (rows use o2-table-row-{index})
     this.searchResultList = '[data-test="traces-search-result-list"]';
-    this.searchResultItem = '[data-test^="o2-table-detail-"]';
+    this.searchResultItem = '[data-test="traces-search-result-list"] [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])';
     this.searchResultCount = '[data-test="traces-count-badge"]';
     this.tracesCountBadge = '[data-test="traces-count-badge"]';
     this.tracesErrorCountBadge = '[data-test="traces-error-count-badge"]';
@@ -225,6 +228,28 @@ export class TracesPage {
     const wrapper = this.page.locator(this.streamSelect);
     await wrapper.waitFor({ state: 'visible', timeout: 10000 });
 
+    // The wrapper renders immediately, but its options arrive with the async
+    // stream-list fetch. Opening the popover before then finds an empty list,
+    // every retry below misses, and selection silently no-ops — which surfaces
+    // later as "Select Stream First" and zero query results. Wait for the
+    // option to exist in the DOM first.
+    const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
+    await this.page
+      .locator(optionReady)
+      .first()
+      .waitFor({ state: 'attached', timeout: 15000 })
+      .catch(async () => {
+        // Options are only mounted while the popover is open — open it, wait,
+        // then leave it open for the selection logic below.
+        const t = wrapper.locator('button[type="button"]').first();
+        await t.click({ force: false }).catch(() => {});
+        await this.page
+          .locator(optionReady)
+          .first()
+          .waitFor({ state: 'attached', timeout: 15000 })
+          .catch(() => {});
+      });
+
     // Check the popover-trigger button's aria-expanded state — already
     // selected streams will reflect in the trigger button text.
     const trigger = wrapper.locator('button[type="button"]').first();
@@ -233,11 +258,13 @@ export class TracesPage {
     if (currentText && currentText.includes(streamName)) {
       return;
     }
-    await trigger.click({ force: false });
-
-    // Wait for the popover (OSelect forwards the data-test slug + `-popover`).
+    // Only open the popover if it isn't already (the readiness wait above may
+    // have opened it) — an unconditional click would toggle it shut.
     const popover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
-    await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    if (!(await popover.isVisible({ timeout: 500 }).catch(() => false))) {
+      await trigger.click({ force: false });
+      await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    }
 
     // Try clicking the matching option directly by data-test-value. Retry
     // up to 3 times — OSelect uses virtualised ListboxItem rendering which
@@ -364,7 +391,9 @@ export class TracesPage {
   }
 
   async switchToServiceMaps() {
-    await this.page.locator(this.serviceMapsToggle).click();
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.serviceMapsNavItem).click();
+    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
@@ -740,7 +769,7 @@ export class TracesPage {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        // A real row is rendered as a TR with data-test^="o2-table-detail-"
+        // A real row is rendered as a TR with data-test^="o2-table-row-"
         // — the count badge is shown even with 0 results, so do NOT use it
         // here as a positive signal.
         const firstRow = this.page.locator(this.searchResultItem).first();
@@ -1149,11 +1178,16 @@ export class TracesPage {
     // result-row error detection lives on TenstackTable cells; rely on the
     // top-level table row marker for error trace styling.
     const errorRow = this.page
-      .locator(`${this.searchResultList} [data-test^="o2-table-detail-"]`)
+      .locator(`${this.searchResultList} [data-test^="o2-table-row-"]:not([data-test="o2-table-row-drag-handle"])`)
       .first();
     if (await errorRow.isVisible({ timeout: 5000 }).catch(() => false)) {
       await errorRow.click();
-      await this.page.waitForTimeout(2000);
+      // Wait for the trace-details panel to actually open instead of a blind 2s.
+      // Under CI load the details tree can take longer to render, and the caller
+      // immediately asserts on it — a fixed wait raced the render and flaked.
+      await this.page.locator(this.traceDetailsTree)
+        .waitFor({ state: 'visible', timeout: 15000 })
+        .catch(() => {});
       return true;
     }
     return false;
@@ -1306,11 +1340,15 @@ export class TracesPage {
   }
 
   /**
-   * Check if service maps toggle is visible
+   * Check if the Service Graph entry is reachable from the Traces rail flyout.
    * @returns {Promise<boolean>}
    */
   async isServiceMapsToggleVisible() {
-    return await this.page.locator(this.serviceMapsToggle).isVisible({ timeout: 5000 }).catch(() => false);
+    await this.page.locator(this.tracesRailTile).hover().catch(() => {});
+    return await this.page
+      .locator(this.serviceMapsNavItem)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
   }
 
   /**
@@ -1493,6 +1531,29 @@ export class TracesPage {
     await logsMenuItem.click();
     await this.page.waitForURL('**/logs**', { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  /**
+   * Open a tab in the trace details view ('waterfall', 'flame-graph', 'map',
+   * 'dag', 'thread').
+   *
+   * Tests must not assume which tab is active on open: the view defaults to the
+   * flame graph, the last active tab is persisted per-browser, and LLM-only tabs
+   * (dag/thread) are hidden for traces without LLM spans. Anything reading the
+   * span tree has to select 'waterfall' explicitly first.
+   * @param {string} tabValue
+   * @returns {Promise<boolean>} whether the tab existed and was selected
+   */
+  async openTraceDetailsTab(tabValue) {
+    const tab = this.page.locator(`[data-test="trace-details-${tabValue}-tab"]`);
+    const appeared = await tab
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!appeared) return false;
+    await tab.click();
+    await this.page.waitForTimeout(1000);
+    return true;
   }
 
   /**
@@ -1803,6 +1864,31 @@ export class TracesPage {
    */
   async isErrorOnlyToggleVisible() {
     return await this.page.locator(this.errorOnlyToggle).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Deterministically wait for the error-count badge (which doubles as the
+   * error-only toggle) to appear. The badge renders only when the current search
+   * returns at least one error span (SearchResult.vue: v-if errorCount>0), so
+   * freshly-ingested error traces may not show on the first search due to backend
+   * indexing latency. Re-run the search until the badge appears. Used by tests
+   * that ingest guaranteed error traces in beforeAll — this converts a
+   * data/timing dependency into a bounded wait for backend processing.
+   * @param {number} [maxAttempts=8]
+   * @returns {Promise<boolean>} true once the badge is visible
+   */
+  async waitForErrorBadgeAfterSearch(maxAttempts = 8) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      await this.setupTraceSearch();
+      await this.waitForTraceSearchResults();
+      if (await this.isErrorOnlyToggleVisible()) {
+        return true;
+      }
+      // Give the backend a moment to index the just-ingested error traces
+      // before re-running the search.
+      await this.page.waitForTimeout(3000);
+    }
+    return false;
   }
 
   /**
@@ -2208,7 +2294,7 @@ export class TracesPage {
   /**
    * Get selected/active stream indicator
    * For traces, checks if stream dropdown has a selected value
-   * Uses stable selectors that don't rely on Quasar internal classes
+   * Uses stable selectors that don't rely on framework-internal CSS classes
    * @returns {Locator}
    */
   getSelectedStreamToggle() {
@@ -2347,7 +2433,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getLogsTimestampHeader() {
-    return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+    return this.page.locator('[data-test="o2-table-th-timestamp"]');
   }
 
   /**
@@ -2355,7 +2441,7 @@ export class TracesPage {
    * @returns {Locator}
    */
   getFirstLogTimestampCell() {
-    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr:first-child td').first();
+    return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]').first().locator('[data-test^="o2-table-cell-"]').first();
   }
 
   /**

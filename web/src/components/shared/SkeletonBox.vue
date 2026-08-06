@@ -1,120 +1,63 @@
 <template>
   <div
-    class="skeleton-box tw:bg-skeleton-base tw:relative tw:overflow-hidden tw:rounded"
-    :class="[
-      variantClass,
-      rounded && 'tw:rounded-lg',
-      circle && 'tw:rounded-full tw:aspect-square'
-    ]"
+    class="skeleton-box relative inline-block [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] overflow-hidden [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
+    :class="shapeClass"
     :style="{
       width: width,
       height: height,
-      borderRadius: customRadius
+      borderRadius: customRadius,
     }"
+    aria-hidden="true"
   ></div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useStore } from 'vuex'
+import { computed } from "vue";
 
 interface Props {
   // Size props
-  width?: string
-  height?: string
+  width?: string;
+  height?: string;
 
   // Variant presets
-  variant?: 'text' | 'title' | 'button' | 'avatar' | 'image' | 'custom'
+  variant?: "text" | "title" | "button" | "avatar" | "image" | "custom";
 
   // Shape props
-  rounded?: boolean
-  circle?: boolean
-  customRadius?: string
+  rounded?: boolean;
+  circle?: boolean;
+  customRadius?: string;
 
   // Text-specific props (when variant is 'text')
-  lines?: number
+  lines?: number;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  width: '100px',
-  height: '16px',
-  variant: 'custom',
+  width: "100px",
+  height: "16px",
+  variant: "custom",
   rounded: false,
   circle: false,
-  lines: 1
-})
+  lines: 1,
+});
 
-const store = useStore()
-
-const variantClass = computed(() => {
+// Corner radius resolves from a single source: an explicit circle/rounded prop
+// wins, otherwise the variant preset maps onto the sanctioned radius scale.
+const shapeClass = computed(() => {
+  if (props.circle) return "rounded-full aspect-square";
+  if (props.rounded) return "rounded-surface";
   switch (props.variant) {
-    case 'text':    return 'tw:rounded-[3px]'
-    case 'title':   return 'tw:rounded'
-    case 'button':  return 'tw:rounded-md'
-    case 'avatar':  return 'tw:rounded-full'
-    case 'image':   return 'tw:rounded-lg'
-    default:        return ''
-  }
-})
-
-// Computed styles based on variant
-const computedWidth = computed(() => {
-  switch (props.variant) {
-    case 'text':
-      return props.width
-    case 'title':
-      return props.width || '200px'
-    case 'button':
-      return props.width || '80px'
-    case 'avatar':
-      return props.width || '40px'
-    case 'image':
-      return props.width || '100px'
+    case "text":
+      return "rounded-default";
+    case "title":
+      return "rounded-default";
+    case "button":
+      return "rounded-default";
+    case "avatar":
+      return "rounded-full";
+    case "image":
+      return "rounded-surface";
     default:
-      return props.width
+      return "rounded-default";
   }
-})
-
-const computedHeight = computed(() => {
-  switch (props.variant) {
-    case 'text':
-      return props.height || '14px'
-    case 'title':
-      return props.height || '24px'
-    case 'button':
-      return props.height || '32px'
-    case 'avatar':
-      return props.height || '40px'
-    case 'image':
-      return props.height || '100px'
-    default:
-      return props.height
-  }
-})
+});
 </script>
-
-<style>
-/* Flat base colour + sliding ::after overlay.
-   The base is always solid (no moving gradient), the shimmer is a separate
-   translucent gloss that physically slides left→right via translateX.
-   ease-in-out on translateX is intentional — it mimics real light reflection. */
-.skeleton-box::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent       0%,
-    transparent      30%,
-    var(--color-skeleton-shimmer, rgba(255, 255, 255, 0.8)) 50%,
-    transparent      70%,
-    transparent     100%
-  );
-  animation: skeleton-shimmer 1.8s ease-in-out infinite;
-}
-
-@keyframes skeleton-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-</style>

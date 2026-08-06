@@ -1,26 +1,17 @@
 ﻿<template>
   <div
-    class="chat-container tw:w-full tw:h-full tw:flex tw:flex-col tw:overflow-hidden tw:rounded-md tw:text-[var(--q-primary-text)] tw:bg-[var(--o2-card-bg-solid)] tw:[box-shadow:0_0_5px_1px_var(--o2-hover-shadow)]"
-    :class="[
-      { 'chat-open': isOpen },
-      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
-    ]"
+    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    :class="[{ 'chat-open': isOpen }]"
   >
-    <div
-      v-if="isOpen"
-      class="chat-content-wrapper tw:flex tw:flex-col tw:h-full tw:bg-transparent"
-      :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
-    >
+    <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
       <div
-        class="chat-header"
+        class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-end justify-between border-b px-3 pt-0 pb-1"
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
-        <div
-          class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full"
-        >
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <div class="tw:inline-flex tw:w-6 tw:h-6 tw:rounded-full tw:overflow-hidden">
-              <img :src="o2AiTitleLogo" class="tw:w-full tw:h-full tw:object-cover" />
+        <div class="chat-title flex w-full items-center justify-between font-bold">
+          <div class="flex items-center gap-2">
+            <div class="inline-flex h-6 w-6 overflow-hidden rounded-full">
+              <img :src="o2AiTitleLogo" class="h-full w-full object-cover" />
             </div>
 
             <ODropdown @update:open="(v) => v && loadHistory()">
@@ -28,105 +19,95 @@
                 <OButton
                   variant="ghost"
                   size="sm"
-                  class="chat-title-dropdown"
+                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-52.5 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
                 >
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
+                  <div class="flex max-w-55 items-center gap-2">
                     <span
-                      class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block"
+                      class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
                     >
-                      {{ displayedTitle || "New Chat" }}
+                      {{ displayedTitle || t("common.newChat") }}
                       <OTooltip
                         v-if="displayedTitle && displayedTitle.length > 25"
                         :sideOffset="8"
                         side="bottom"
                         align="center"
-                        :content="displayedTitle"
+                        :content="raw(displayedTitle)"
                       />
                     </span>
-                    <OIcon
-                      name="arrow-drop-down"
-                      size="md"
-                      class="tw:flex-shrink-0"
-                    />
+                    <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
                   </div>
                 </OButton>
               </template>
               <!-- History menu with search -->
-              <div class="history-menu-container tw:relative tw:max-h-[450px] tw:flex tw:flex-col tw:w-[300px]">
-                <div class="search-history-bar-sticky tw:sticky tw:top-0 tw:z-[2] tw:bg-[var(--q-page-background)] tw:p-2 tw:border-b tw:border-[var(--color-separator)] tw:shrink-0">
+              <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
+                <div
+                  class="search-history-bar-sticky bg-surface-base border-separator sticky top-0 z-2 shrink-0 border-b p-2"
+                >
                   <OSearchInput
                     v-model="historySearchTerm"
-                    placeholder="Search chat history"
-                    class="tw:mt-1"
+                    :placeholder="t('aiAssistant.searchChatHistory')"
+                    class="mt-1"
                   />
                 </div>
                 <div
-                  class="history-list-container tw:flex-1 tw:overflow-y-auto tw:overflow-x-hidden tw:max-h-[350px]"
-                  style="
-                    min-width: 200px;
-                    width: 300px;
-                    max-width: 300px;
-                    border: 1px solid var(--o2-border);
-                  "
+                  class="history-list-container border-border-default max-h-87.5 w-75 max-w-75 min-w-50 flex-1 overflow-x-hidden overflow-y-auto border"
                 >
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"
-                    class="history-item tw:relative tw:group"
+                    class="history-item group relative"
                     @select="loadChat(chat.id)"
                   >
-                    <div
-                      class="tw:flex tw:items-center tw:justify-between tw:w-full"
-                    >
-                      <div class="tw:flex-1 tw:overflow-hidden">
-                        <div class="tw:text-[13px] tw:truncate">
+                    <div class="flex w-full items-center justify-between">
+                      <div class="flex-1 overflow-hidden">
+                        <div class="text-compact truncate">
                           {{ chat.title }}
                         </div>
-                        <div class="tw:text-[11px] tw:text-gray-500">
+                        <div class="text-2xs text-text-secondary">
                           {{ formatTime(chat.timestamp) }}
                         </div>
                       </div>
                       <OButton
                         variant="ghost"
                         size="icon-xs-circle"
-                        class="delete-history-btn tw:opacity-0 tw:transition-opacity tw:duration-200 tw:group-hover:opacity-100"
+                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
-                        <OTooltip content="Delete chat" />
+                        <OTooltip :content="t('aiAssistant.deleteChatTooltip')" />
                       </OButton>
                     </div>
                   </ODropdownItem>
                   <div
                     v-if="filteredChatHistory.length === 0"
-                    class="tw:text-center tw:text-gray-500 tw:p-2"
+                    class="text-text-muted p-2 text-center"
                   >
-                    No matching chats found
+                    {{ t("aiAssistant.noMatchingChatsFound") }}
                   </div>
                 </div>
 
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container tw:bg-[var(--q-page-background)] tw:p-2 tw:border-t tw:border-[var(--color-separator)] tw:shrink-0"
+                  class="clear-all-container bg-surface-base border-separator shrink-0 border-t p-2"
                 >
                   <ODropdownSeparator />
                   <OButton
                     variant="ghost"
-                    class="clear-all-btn tw:w-full tw:text-[var(--q-negative)] tw:text-[13px] tw:hover:bg-[rgba(var(--q-negative-rgb),0.1)]"
+                    class="clear-all-btn text-compact w-full text-[var(--color-status-negative)] hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
                       <OIcon name="delete-sweep" size="sm" />
                     </template>
-                    Clear all conversations
+                    {{ t("aiAssistant.clearAllConversations") }}
                   </OButton>
                 </div>
               </div>
             </ODropdown>
           </div>
 
-          <div class="tw:flex tw:items-center tw:gap-1 chat-header-actions">
+          <div class="chat-header-actions flex items-center gap-1">
             <!-- Edit title button -->
             <OButton
               v-if="currentChatId"
@@ -135,7 +116,7 @@
               @click.stop="openEditTitleDialog"
             >
               <OIcon name="edit" size="sm" />
-              <OTooltip content="Edit title" />
+              <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="addNewChat">
               <OIcon name="add" size="sm" />
@@ -147,15 +128,18 @@
               @click="toggleExpand"
             >
               <OIcon
-                :name="
-                  store.state.isAiChatExpanded
-                    ? 'close-fullscreen'
-                    : 'open-in-full'
-                "
+                :name="store.state.isAiChatExpanded ? 'close-fullscreen' : 'open-in-full'"
                 size="sm"
               />
               <OTooltip
-                :content="`${store.state.isAiChatExpanded ? 'Collapse' : 'Expand'} (${isMac ? '⌘' : 'Ctrl+'}B)`"
+                :content="
+                  t('common.collapseExpandShortcut', {
+                    action: store.state.isAiChatExpanded
+                      ? t('common.collapse')
+                      : t('common.expand'),
+                    shortcut: isMac ? '⌘' : 'Ctrl+',
+                  })
+                "
               />
             </OButton>
             <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
@@ -164,24 +148,30 @@
           </div>
         </div>
       </div>
-      <OSeparator class="tw:bg-[#DBDBDB]" />
+      <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
-      <ODrawer data-test="o2-ai-chat-history-drawer" v-model:open="showHistory" size="sm" title="Chat History">
-        <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
+      <ODrawer
+        data-test="o2-ai-chat-history-drawer"
+        bleed
+        v-model:open="showHistory"
+        size="sm"
+        :title="t('aiAssistant.chatHistory')"
+      >
+        <ul class="divide-border flex flex-col divide-y">
           <li
             v-for="chat in chatHistory"
             :key="chat.id"
             :data-test="`o2-ai-chat-history-item-${chat.id}`"
-            class="tw:flex tw:flex-col tw:px-3 tw:py-2 tw:cursor-pointer tw:hover:bg-muted/50"
+            class="hover:bg-muted/50 flex cursor-pointer flex-col px-3 py-2"
             @click="loadChat(chat.id)"
           >
-            <span class="tw:text-sm">{{ chat.title }}</span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground">
+            <span class="text-sm">{{ chat.title }}</span>
+            <span class="text-muted-foreground block text-xs">
               {{ new Date(chat.timestamp).toLocaleString() }}
             </span>
-            <span class="tw:block tw:text-xs tw:text-muted-foreground">
-              Model: {{ chat.model }}
+            <span class="text-muted-foreground block text-xs">
+              {{ t("aiAssistant.modelLabel") }} {{ chat.model }}
             </span>
           </li>
         </ul>
@@ -192,9 +182,9 @@
         data-test="o2-ai-chat-edit-title-dialog"
         v-model:open="showEditTitleDialog"
         size="sm"
-        title="Edit Chat Title"
-        secondary-button-label="Cancel"
-        primary-button-label="Save"
+        :title="t('aiAssistant.editChatTitle')"
+        :secondary-button-label="t('common.cancel')"
+        :primary-button-label="t('common.save')"
         @click:secondary="showEditTitleDialog = false"
         @click:primary="saveEditedTitle"
       >
@@ -202,15 +192,15 @@
           v-model="editingTitle"
           autofocus
           @keyup.enter="saveEditedTitle"
-          placeholder="Enter chat title"
+          :placeholder="t('aiAssistant.enterChatTitle')"
         />
       </ODialog>
 
       <!-- Delete Chat Confirmation Dialog -->
       <ConfirmDialog
         v-model="showDeleteChatConfirmDialog"
-        title="Delete Chat"
-        message="Are you sure you want to delete this chat? This action cannot be undone."
+        :title="t('aiAssistant.deleteChat')"
+        :message="t('aiAssistant.deleteChatConfirmMessage')"
         @update:ok="confirmDeleteChat"
         @update:cancel="showDeleteChatConfirmDialog = false"
       />
@@ -218,8 +208,8 @@
       <!-- Clear All Conversations Confirmation Dialog -->
       <ConfirmDialog
         v-model="showClearAllConfirmDialog"
-        title="Clear All Conversations"
-        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        :title="t('aiAssistant.clearAllConversationsTitle')"
+        :message="t('aiAssistant.clearAllConversationsMessage')"
         @update:ok="confirmClearAllConversations"
         @update:cancel="showClearAllConfirmDialog = false"
       />
@@ -230,52 +220,47 @@
         v-model:open="showImagePreview"
         @update:open="(v) => !v && closeImagePreview()"
         size="lg"
-        :title="previewImage?.filename"
+        :title="raw(previewImage?.filename)"
       >
-        <div class="tw:flex tw:justify-center">
+        <div class="flex justify-center">
           <img
             v-if="previewImage"
-            :src="
-              'data:' + previewImage.mimeType + ';base64,' + previewImage.data
-            "
+            :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
             :alt="previewImage.filename"
-            style="max-width: 100%; max-height: 80vh; object-fit: contain"
+            class="max-h-[80vh] max-w-full object-contain"
           />
         </div>
       </ODialog>
 
       <div
-        class="chat-content"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+        class="chat-content relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent"
       >
         <div
-          class="messages-container"
+          class="messages-container mx-auto flex min-h-0 w-full max-w-225 flex-1 flex-col gap-4 overflow-y-auto bg-transparent p-2"
           ref="messagesContainer"
           @scroll="checkIfShouldAutoScroll"
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section"
-            :class="{ 'welcome-section--centered': centeredStart }"
+            class="welcome-section rounded-default flex flex-1 items-center justify-center"
+            :class="
+              centeredStart
+                ? 'mb-0 bg-transparent p-0'
+                : 'mb-6 p-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
+            "
           >
             <!-- Home tab: rich V2 welcome -->
-            <O2AIHomeWelcome
-              v-if="centeredStart"
-              @select-prompt="selectWelcomePrompt"
-            />
-            <!-- Sidepanel: minimal logo + title (unchanged) -->
-            <div
-              v-else
-              class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:w-full"
-            >
-              <div class="tw:flex tw:flex-col tw:items-center">
+            <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
+            <!-- Sidepanel: minimal logo + title -->
+            <div v-else class="flex h-full w-full flex-col items-center justify-center">
+              <div class="flex flex-col items-center">
                 <img :src="o2AiTitleLogo" />
-                <div class="tw:relative tw:inline-block">
-                  <span
-                    class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center"
-                    >O2 Assistant</span
-                  >
-                  <span class="o2-ai-beta-text tw:ml-[8px] tw:relative tw:text-[var(--q-primary)] tw:text-[8px] tw:px-1 tw:rounded-[10px] tw:text-center tw:border tw:border-[var(--q-primary)] tw:uppercase tw:font-semibold tw:[letter-spacing:0.5px] tw:w-[34px]">BETA</span>
+                <div class="relative inline-block">
+                  <span class="ml-7.5 text-center text-sm font-[600]">{{
+                    t("aiAssistant.welcome.taglineHighlight")
+                  }}</span>
+                  <!-- Same shared Beta tag as the Workflows screens. -->
+                  <BetaBadge class="ml-2" />
                 </div>
               </div>
             </div>
@@ -283,37 +268,35 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message"
+            class="message rounded-default border-border-default border p-3 [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
             :class="[
               message.role,
+              message.role === 'user'
+                ? 'text-text-body dark:text-text-secondary ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)]'
+                : 'bg-surface-base text-text-body dark:text-text-secondary ml-0 w-full',
               { 'error-message': message.content.startsWith('Error:') },
             ]"
           >
-            <div class="message-content">
+            <div class="message-content flex w-full items-start gap-1.5">
               <div
                 v-if="message.role === 'user'"
-                class="tw:inline-flex tw:items-center tw:justify-center tw:w-6 tw:h-6 tw:rounded-full tw:text-white"
-                :class="
-                  store.state.theme == 'dark'
-                    ? 'tw:[background:linear-gradient(135deg,#4c63d2_0%,#5a67d8_100%)]'
-                    : 'tw:[background:linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]'
-                "
+                class="text-text-inverse inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full [background:var(--color-gradient-ai)]"
               >
-                <OIcon
-                  size="sm"
-                  name="person"
-                  class='tw:text-white'
-                />
+                <OIcon size="sm" name="person" class="text-text-inverse" />
               </div>
               <div
-                class="message-blocks"
-                style="background-color: transparent"
-                :class="
-                  store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                "
+                class="message-blocks flex max-w-full min-w-0 flex-1 flex-col gap-0 overflow-x-auto bg-transparent wrap-break-word [word-wrap:break-word]"
               >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading tw:flex tw:items-center tw:gap-[10px] tw:py-2 tw:text-[#6b7280] tw:text-sm">
+                <div
+                  v-if="
+                    message.role === 'assistant' &&
+                    (!message.contentBlocks || message.contentBlocks.length === 0) &&
+                    (!message.content || message.content.trim() === '') &&
+                    isLoading
+                  "
+                  class="inline-loading text-text-secondary flex items-center gap-2.5 py-2 text-sm"
+                >
                   <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
@@ -325,23 +308,19 @@
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item"
+                    class="tool-call-item text-text-secondary rounded-default text-compact mb-2 flex max-w-full min-w-0 flex-col px-3 py-2"
                     :class="[
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
                       { 'has-details': hasToolCallDetails(block) },
                       {
-                        error:
-                          block.success === false && !block.pendingConfirmation,
+                        error: block.success === false && !block.pendingConfirmation,
                       },
                       {
                         'pending-confirmation':
-                          block.pendingConfirmation &&
-                          block.tool !== 'navigation_action',
+                          block.pendingConfirmation && block.tool !== 'navigation_action',
                       },
                       {
                         'pending-navigation':
-                          block.pendingConfirmation &&
-                          block.tool === 'navigation_action',
+                          block.pendingConfirmation && block.tool === 'navigation_action',
                       },
                     ]"
                     @click="
@@ -350,7 +329,7 @@
                       toggleToolCallExpanded(index, blockIndex)
                     "
                   >
-                    <div class="tool-call-header">
+                    <div class="tool-call-header flex items-center gap-2">
                       <OIcon
                         :name="
                           block.pendingConfirmation
@@ -365,325 +344,361 @@
                         :class="
                           block.pendingConfirmation
                             ? block.tool === 'navigation_action'
-                              ? 'tw:text-[var(--o2-primary)]'
-                              : 'tw:text-[var(--o2-warning)]'
+                              ? 'text-accent'
+                              : 'text-warning'
                             : block.success === false
-                              ? 'tw:text-[var(--o2-negative)]'
-                              : 'tw:text-[var(--o2-positive)]'
+                              ? 'text-status-negative'
+                              : 'text-status-positive'
                         "
                       />
-                      <span class="tool-call-name">
+                      <span class="tool-call-name flex-1 font-medium">
                         {{ formatToolCallMessage(block).text
-                        }}<strong
-                          v-if="formatToolCallMessage(block).highlight"
-                          >{{ formatToolCallMessage(block).highlight }}</strong
+                        }}<strong v-if="formatToolCallMessage(block).highlight">{{
+                          formatToolCallMessage(block).highlight
+                        }}</strong
                         >{{ formatToolCallMessage(block).suffix }}
                       </span>
                       <!-- Navigation icon -->
                       <OIcon
-                        v-if="
-                          block.navigationAction && !block.pendingConfirmation
-                        "
+                        v-if="block.navigationAction && !block.pendingConfirmation"
                         name="open-in-new"
                         size="xs"
-                        class="navigation-icon"
-                        @click.stop="
-                          handleNavigationAction(block.navigationAction)
-                        "
+                        class="navigation-icon ml-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"
+                        @click.stop="handleNavigationAction(block.navigationAction)"
                       >
                         <OTooltip :content="block.navigationAction.label" />
                       </OIcon>
                       <OIcon
-                        v-if="
-                          hasToolCallDetails(block) &&
-                          !block.pendingConfirmation
-                        "
+                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
                         :name="
-                          isToolCallExpanded(index, blockIndex)
-                            ? 'expand-less'
-                            : 'expand-more'
+                          isToolCallExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
                         "
                         size="sm"
-                        class="expand-icon"
+                        class="expand-icon opacity-60 transition-transform duration-200"
                       />
                     </div>
                     <!-- Expandable details -->
                     <div
                       v-if="isToolCallExpanded(index, blockIndex)"
-                      class="tool-call-details"
+                      class="tool-call-details border-border-default mt-2.5 flex min-w-0 flex-col gap-2 border-t pt-2.5"
                       @click.stop
                     >
                       <!-- Error details for failed tool calls -->
                       <template v-if="block.success === false">
-                        <div v-if="block.resultMessage" class="detail-item">
-                          <span class="detail-label">Error</span>
-                          <span class="detail-value tool-error-message">{{
-                            block.resultMessage
+                        <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.error")
                           }}</span>
+                          <span
+                            class="detail-value text-status-negative max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.resultMessage }}</span
+                          >
                         </div>
-                        <div v-if="block.errorType" class="detail-item">
-                          <span class="detail-label">Type</span>
-                          <code class="detail-value">{{
-                            block.errorType
-                          }}</code>
-                        </div>
-                        <div v-if="block.suggestion" class="detail-item">
-                          <span class="detail-label">Suggestion</span>
-                          <span class="detail-value tool-suggestion">{{
-                            block.suggestion
+                        <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.type")
                           }}</span>
+                          <code
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.errorType }}</code
+                          >
+                        </div>
+                        <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.suggestion")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words italic opacity-85 select-text"
+                            >{{ block.suggestion }}</span
+                          >
                         </div>
                       </template>
                       <!-- Summary details for successful tool calls with summary -->
                       <template v-if="block.success !== false && block.summary">
                         <div
                           v-if="block.summary.count !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Results</span>
-                          <span class="detail-value"
-                            >{{ block.summary.count }} records</span
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.results")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.count }} {{ t("aiAssistant.recordsSuffix") }}</span
                           >
                         </div>
                         <div
                           v-if="block.summary.took !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Duration</span>
-                          <span class="detail-value"
-                            >{{ block.summary.took }}ms</span
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.duration")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.took }}{{ t("aiAssistant.ms") }}</span
                           >
                         </div>
                         <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
                         <div
                           v-if="block.summary.return_code !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Exit code</span>
-                          <code class="detail-value">{{
-                            block.summary.return_code
-                          }}</code>
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.exitCode")
+                          }}</span>
+                          <code
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.return_code }}</code
+                          >
                         </div>
                         <div
                           v-if="block.summary.stdout_lines !== undefined"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Stdout</span>
-                          <span class="detail-value"
-                            >{{ block.summary.stdout_lines }} lines</span
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.stdout")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.stdout_lines }} {{ t("aiAssistant.lines") }}</span
                           >
                         </div>
                         <div
                           v-if="block.summary.stderr_lines"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <span class="detail-label">Stderr</span>
-                          <span class="detail-value"
-                            >{{ block.summary.stderr_lines }} lines</span
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.stderr")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.stderr_lines }} {{ t("aiAssistant.lines") }}</span
                           >
                         </div>
-                        <div v-if="block.summary.truncated" class="detail-item">
-                          <span class="detail-label">Output</span>
-                          <span class="detail-value">truncated</span>
+                        <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.output")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ t("aiAssistant.truncatedLabel") }}</span
+                          >
                         </div>
                       </template>
                       <!-- Existing context details -->
                       <div
                         v-if="getToolCallDisplayData(block.context)?.query"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <div class="detail-header">
-                          <span class="detail-label">Query</span>
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.query")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.query,
-                              )
+                              copyToClipboard(getToolCallDisplayData(block.context)?.query, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy query" />
+                            <OTooltip :content="t('aiAssistant.copyQuery')" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
-                          getToolCallDisplayData(block.context)?.query
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.query }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.stream"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Stream</span>
-                        <code class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.stream
-                        }}</code>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.stream")
+                        }}</span>
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.stream }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.type"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Type</span>
-                        <code class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.type
-                        }}</code>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("common.type")
+                        }}</span>
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.type }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.start_time"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Start</span>
-                        <span class="detail-value">{{
-                          formatTimestamp(
-                            getToolCallDisplayData(block.context)?.start_time,
-                          )
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.start")
                         }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{
+                            formatTimestamp(getToolCallDisplayData(block.context)?.start_time)
+                          }}</span
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.end_time"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">End</span>
-                        <span class="detail-value">{{
-                          formatTimestamp(
-                            getToolCallDisplayData(block.context)?.end_time,
-                          )
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.end")
                         }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{
+                            formatTimestamp(getToolCallDisplayData(block.context)?.end_time)
+                          }}</span
+                        >
                       </div>
                       <div
-                        v-if="
-                          getToolCallDisplayData(block.context)?.from !==
-                          undefined
-                        "
-                        class="detail-item"
+                        v-if="getToolCallDisplayData(block.context)?.from !== undefined"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">From</span>
-                        <span class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.from
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.from")
                         }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.from }}</span
+                        >
                       </div>
                       <div
-                        v-if="
-                          getToolCallDisplayData(block.context)?.size !==
-                          undefined
-                        "
-                        class="detail-item"
+                        v-if="getToolCallDisplayData(block.context)?.size !== undefined"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Size</span>
-                        <span class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.size
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.size")
                         }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.size }}</span
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.query_type"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <span class="detail-label">Query Type</span>
-                        <code class="detail-value">{{
-                          getToolCallDisplayData(block.context)?.query_type
-                        }}</code>
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.queryType")
+                        }}</span>
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.query_type }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.vrl"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <div class="detail-header">
-                          <span class="detail-label">VRL</span>
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.welcome.taglineVrl")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.vrl,
-                              )
+                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy VRL" />
+                            <OTooltip :content="t('aiAssistant.copyVrl')" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
-                          getToolCallDisplayData(block.context)?.vrl
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.vrl }}</code
+                        >
                       </div>
                       <div
                         v-if="getToolCallDisplayData(block.context)?.command"
-                        class="detail-item"
+                        class="detail-item flex flex-col gap-1"
                       >
-                        <div class="detail-header">
-                          <span class="detail-label">Command</span>
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.command")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
-                              copyToClipboard(
-                                getToolCallDisplayData(block.context)?.command,
-                              )
+                              copyToClipboard(getToolCallDisplayData(block.context)?.command, t)
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy command" />
+                            <OTooltip :content="t('aiAssistant.copyCommand')" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
-                          getToolCallDisplayData(block.context)?.command
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.command }}</code
+                        >
                       </div>
                       <!-- Tool response: SearchSQL hits -->
                       <template v-if="block.response && block.response.hits">
-                        <div class="detail-item">
-                          <div class="detail-header">
-                            <span class="detail-label">Results</span>
+                        <div class="detail-item flex flex-col gap-1">
+                          <div class="detail-header flex items-center justify-between">
+                            <span
+                              class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >{{ t("aiAssistant.results") }}</span
+                            >
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
-                              class="copy-btn"
+                              class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(
-                                  JSON.stringify(block.response.hits, null, 2),
-                                )
+                                copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
-                              <OTooltip content="Copy results" />
+                              <OTooltip :content="t('aiAssistant.copyResults')" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits">
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(hit, hIdx) in block.response.hits"
                               :key="hIdx"
-                              class="tool-response-hit"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
                             >
                               <span
                                 v-for="(val, key) in hit"
                                 :key="key"
-                                class="hit-field"
+                                class="hit-field cursor-text break-all select-text"
                               >
-                                <span class="hit-key">{{ key }}:</span>
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                                 {{ val }}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <div class="tool-response-meta">
-                          <span
-                            v-if="block.response.total !== undefined"
-                            class="context-tag"
-                            >Total: {{ block.response.total }}</span
+                        <div class="tool-response-meta mt-1 flex flex-wrap gap-1.5">
+                          <span v-if="block.response.total !== undefined" class="context-tag"
+                            >{{ t("aiAssistant.total") }} {{ block.response.total }}</span
                           >
-                          <span
-                            v-if="block.response.took !== undefined"
-                            class="context-tag"
-                            >Took: {{ block.response.took }}ms</span
+                          <span v-if="block.response.took !== undefined" class="context-tag"
+                            >{{ t("aiAssistant.took") }} {{ block.response.took
+                            }}{{ t("aiAssistant.ms") }}</span
                           >
-                          <span
-                            v-if="block.response.hits_truncated"
-                            class="context-tag"
-                            >Showing first
+                          <span v-if="block.response.hits_truncated" class="context-tag"
+                            >{{ t("aiAssistant.showingFirst") }}
                             {{ block.response.hits.length }}</span
                           >
                         </div>
@@ -691,24 +706,27 @@
                       <!-- Tool response: testFunction input/output -->
                       <template
                         v-else-if="
-                          block.response &&
-                          (block.response.input || block.response.output)
+                          block.response && (block.response.input || block.response.output)
                         "
                       >
-                        <div v-if="block.response.input" class="detail-item">
-                          <span class="detail-label">Input Events</span>
-                          <div class="tool-response-hits">
+                        <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.inputEvents")
+                          }}</span>
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(evt, eIdx) in block.response.input"
                               :key="eIdx"
-                              class="tool-response-hit"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
                             >
                               <span
                                 v-for="(val, key) in evt"
                                 :key="key"
-                                class="hit-field"
+                                class="hit-field cursor-text break-all select-text"
                               >
-                                <span class="hit-key">{{ key }}:</span>
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                                 {{
                                   typeof val === "string" && val.length > 120
                                     ? val.substring(0, 120) + "..."
@@ -718,21 +736,25 @@
                             </div>
                           </div>
                         </div>
-                        <div v-if="block.response.output" class="detail-item">
-                          <span class="detail-label">Output</span>
-                          <div class="tool-response-hits">
+                        <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.output")
+                          }}</span>
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(res, rIdx) in block.response.output"
                               :key="rIdx"
-                              class="tool-response-hit"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
                             >
                               <template v-if="res.event">
                                 <span
                                   v-for="(val, key) in res.event"
                                   :key="key"
-                                  class="hit-field"
+                                  class="hit-field cursor-text break-all select-text"
                                 >
-                                  <span class="hit-key">{{ key }}:</span>
+                                  <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                                   {{
                                     typeof val === "string" && val.length > 120
                                       ? val.substring(0, 120) + "..."
@@ -742,9 +764,11 @@
                               </template>
                               <span
                                 v-if="res.message"
-                                class="hit-field hit-error"
+                                class="hit-field text-status-negative cursor-text break-all select-text"
                               >
-                                <span class="hit-key">error:</span>
+                                <span class="hit-key font-semibold opacity-60">{{
+                                  t("aiAssistant.errorLabel")
+                                }}</span>
                                 {{ res.message }}
                               </span>
                             </div>
@@ -761,116 +785,120 @@
                       >
                         <div
                           v-if="block.response.items.length > 0"
-                          class="detail-item"
+                          class="detail-item flex flex-col gap-1"
                         >
-                          <div class="detail-header">
-                            <span class="detail-label">Items</span>
+                          <div class="detail-header flex items-center justify-between">
+                            <span
+                              class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >{{ t("aiAssistant.items") }}</span
+                            >
                             <OButton
                               variant="ghost"
                               size="icon-xs-circle"
-                              class="copy-btn"
+                              class="copy-btn opacity-60 hover:opacity-100"
                               @click.stop="
-                                copyToClipboard(
-                                  JSON.stringify(block.response.items, null, 2),
-                                )
+                                copyToClipboard(JSON.stringify(block.response.items, null, 2), t)
                               "
                             >
                               <OIcon name="content-copy" size="sm" />
-                              <OTooltip content="Copy items" />
+                              <OTooltip :content="t('aiAssistant.copyItems')" />
                             </OButton>
                           </div>
-                          <div class="tool-response-hits">
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
                             <div
                               v-for="(item, iIdx) in block.response.items"
                               :key="iIdx"
-                              class="tool-response-list-item"
+                              class="tool-response-list-item [&:not(:last-child)]:border-border-default flex flex-col gap-0.5 py-1 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1.5"
                             >
                               <div
                                 v-for="(val, key) in item"
                                 :key="key"
-                                class="hit-field"
+                                class="hit-field cursor-text break-all select-text"
                               >
-                                <span class="hit-key">{{ key }}:</span>
-                                {{
-                                  typeof val === "object"
-                                    ? JSON.stringify(val)
-                                    : val
-                                }}
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
+                                {{ typeof val === "object" ? JSON.stringify(val) : val }}
                               </div>
                             </div>
                           </div>
                         </div>
                       </template>
                       <!-- Tool response: generic fallback (string or other) -->
-                      <div v-else-if="block.response" class="detail-item">
-                        <div class="detail-header">
-                          <span class="detail-label">Response</span>
+                      <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.response")
+                          }}</span>
                           <OButton
                             variant="ghost"
                             size="icon-xs-circle"
-                            class="copy-btn"
+                            class="copy-btn opacity-60 hover:opacity-100"
                             @click.stop="
                               copyToClipboard(
                                 typeof block.response === 'string'
                                   ? block.response
                                   : JSON.stringify(block.response, null, 2),
+                                t,
                               )
                             "
                           >
                             <OIcon name="content-copy" size="sm" />
-                            <OTooltip content="Copy response" />
+                            <OTooltip :content="t('aiAssistant.copyResponse')" />
                           </OButton>
                         </div>
-                        <code class="detail-value query-value">{{
-                          typeof block.response === "string"
-                            ? block.response
-                            : JSON.stringify(block.response, null, 2)
-                        }}</code>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{
+                            typeof block.response === "string"
+                              ? block.response
+                              : JSON.stringify(block.response, null, 2)
+                          }}</code
+                        >
                       </div>
                     </div>
                   </div>
                   <!-- Log Entry block - expandable -->
                   <div
                     v-else-if="block.type === 'log_entry'"
-                    class="log-entry-item"
-                    :class="[
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode',
-                    ]"
+                    class="log-entry-item rounded-default text-text-secondary dark:bg-surface-panel dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary mb-1 flex cursor-pointer flex-col px-2.5 py-1.5 text-xs [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:border"
                     @click="toggleLogEntryExpanded(index, blockIndex)"
                   >
-                    <div class="log-entry-header">
+                    <div class="log-entry-header flex items-center gap-1.5">
                       <OIcon name="description" size="xs" />
-                      <span class="log-entry-info">
+                      <span
+                        class="log-entry-info flex-1 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap"
+                      >
                         {{ block.preview }}
                       </span>
                       <OIcon
                         :name="
-                          isLogEntryExpanded(index, blockIndex)
-                            ? 'expand-less'
-                            : 'expand-more'
+                          isLogEntryExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
                         "
                         size="sm"
-                        class="expand-icon"
+                        class="expand-icon opacity-60 transition-transform duration-200"
                       />
                     </div>
                     <!-- Expandable details -->
                     <div
                       v-if="isLogEntryExpanded(index, blockIndex)"
-                      class="log-entry-details"
+                      class="log-entry-details mt-2.5"
                       @click.stop
                     >
-                      <div class="log-entry-content">
+                      <div
+                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                      >
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
-                          class="copy-btn"
-                          @click.stop="copyToClipboard(block.content)"
+                          class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
+                          @click.stop="copyToClipboard(block.content, t)"
                         >
                           <OIcon name="content-copy" size="sm" />
-                          <OTooltip content="Copy content" />
+                          <OTooltip :content="t('aiAssistant.copyContent')" />
                         </OButton>
                         <code
-                          class="log-entry-code"
+                          class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pr-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
                           v-html="formatLogEntryContent(block.content)"
                         ></code>
                       </div>
@@ -879,65 +907,58 @@
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
-                    class="stream-error-block"
-                    :class="
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                    "
+                    class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-l-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                   >
-                    <div class="stream-error-header">
+                    <div class="stream-error-header flex items-center gap-2">
                       <OIcon name="warning" size="sm" />
-                      <span class="stream-error-message">{{
+                      <span class="stream-error-message text-status-negative font-medium">{{
                         block.message
                       }}</span>
                     </div>
                     <div
                       v-if="block.suggestion"
-                      class="stream-error-suggestion"
+                      class="stream-error-suggestion mt-1.5 pl-6 text-xs italic opacity-85"
                     >
                       {{ block.suggestion }}
                     </div>
                     <div
                       v-if="block.recoverable"
-                      class="stream-error-recoverable"
+                      class="stream-error-recoverable text-2xs mt-1 pl-6 opacity-70"
                     >
-                      This error may be temporary. You can try again.
+                      {{ t("aiAssistant.errorMayBeTemporary") }}
                     </div>
                   </div>
                   <!-- Navigation block - standalone navigation button -->
                   <div
-                    v-else-if="
-                      block.type === 'navigation' && block.navigationAction
-                    "
-                    class="navigation-block"
-                    :class="
-                      store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'
-                    "
+                    v-else-if="block.type === 'navigation' && block.navigationAction"
+                    class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
                   >
                     <OButton
                       variant="primary"
                       size="xs"
-                      class="navigation-block-btn"
+                      class="navigation-block-btn text-compact"
                       @click="handleNavigationAction(block.navigationAction)"
                     >
-                      <template #icon-left
-                        ><OIcon :name="'open-in-new'" size="sm"
-                      /></template>
+                      <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
                       {{ block.navigationAction.label }}
                     </OButton>
                   </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
                     <template
-                      v-for="(textBlock, tbIndex) in processTextBlock(
-                        block.text,
-                      )"
+                      v-for="(textBlock, tbIndex) in processTextBlock(block.text)"
                       :key="'tb-' + blockIndex + '-' + tbIndex"
                     >
-                      <div v-if="textBlock.type === 'code'" class="code-block">
-                        <div class="code-block-header code-block-theme">
+                      <div
+                        v-if="textBlock.type === 'code'"
+                        class="code-block rounded-default m-0 overflow-hidden"
+                      >
+                        <div
+                          class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
+                        >
                           <span
                             v-if="textBlock.language"
-                            class="code-type-label"
+                            class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
                           >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
@@ -945,10 +966,10 @@
                             variant="ghost"
                             size="xs"
                             class="copy-button"
-                            @click="copyToClipboard(textBlock.content)"
+                            @click="copyToClipboard(textBlock.content, t)"
                           >
                             <OIcon size="sm" name="content-copy" />
-                            <span class="tw:ml-1">Copy</span>
+                            <span class="ml-1">{{ t("common.copy") }}</span>
                           </OButton>
                         </div>
                         <span class="generated-code-block">
@@ -958,7 +979,7 @@
                           ></code>
                         </span>
                         <div
-                          class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full"
+                          class="code-block-footer flex w-full items-center justify-between px-2 py-1"
                         >
                           <OButton
                             variant="ghost"
@@ -967,32 +988,24 @@
                             @click="retryGeneration(message)"
                           >
                             <OIcon size="sm" name="refresh" />
-                            <span class="tw:ml-1">Retry</span>
+                            <span class="ml-1">{{ t("common.retry") }}</span>
                           </OButton>
                         </div>
                       </div>
                       <div
                         v-else
-                        class="text-block"
+                        class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
                         v-html="processHtmlBlock(textBlock.content)"
                       ></div>
                     </template>
                   </template>
                 </template>
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
-                <template
-                  v-if="
-                    !message.contentBlocks || message.contentBlocks.length === 0
-                  "
-                >
+                <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
                   <!-- Display images for user messages -->
                   <div
-                    v-if="
-                      message.role === 'user' &&
-                      message.images &&
-                      message.images.length > 0
-                    "
-                    class="message-images tw:flex tw:flex-wrap tw:gap-2 tw:mb-2"
+                    v-if="message.role === 'user' && message.images && message.images.length > 0"
+                    class="message-images mb-2 flex flex-wrap gap-2"
                   >
                     <div
                       v-for="(img, imgIndex) in message.images"
@@ -1002,29 +1015,34 @@
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="tw:max-w-[200px] tw:max-h-[150px] tw:object-contain tw:rounded-lg tw:border tw:border-gray-300 tw:cursor-pointer tw:[transition:transform_0.2s_ease,box-shadow_0.2s_ease]"
+                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                         @click="openImagePreview(img)"
                       />
-                      <OTooltip :content="img.filename" />
+                      <OTooltip :content="raw(img.filename)" />
                     </div>
                   </div>
-                  <template
-                    v-for="(block, blockIndex) in message.blocks"
-                    :key="'fb-' + blockIndex"
-                  >
-                    <div v-if="block.type === 'code'" class="code-block">
-                      <div class="code-block-header code-block-theme">
-                        <span v-if="block.language" class="code-type-label">
+                  <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
+                    <div
+                      v-if="block.type === 'code'"
+                      class="code-block rounded-default m-0 overflow-hidden"
+                    >
+                      <div
+                        class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
+                      >
+                        <span
+                          v-if="block.language"
+                          class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                        >
                           {{ getLanguageDisplay(block.language) }}
                         </span>
                         <OButton
                           variant="ghost"
                           size="xs"
                           class="copy-button"
-                          @click="copyToClipboard(block.content)"
+                          @click="copyToClipboard(block.content, t)"
                         >
                           <OIcon size="sm" name="content-copy" />
-                          <span class="tw:ml-1">Copy</span>
+                          <span class="ml-1">{{ t("common.copy") }}</span>
                         </OButton>
                       </div>
                       <span class="generated-code-block">
@@ -1036,7 +1054,7 @@
                     </div>
                     <div
                       v-else
-                      class="text-block"
+                      class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
                       v-html="processHtmlBlock(block.content)"
                     ></div>
                   </template>
@@ -1044,38 +1062,32 @@
                 <!-- Feedback buttons for assistant messages -->
                 <div
                   v-if="
-                    message.role === 'assistant' &&
-                    message.content &&
-                    message.content.trim() !== ''
+                    message.role === 'assistant' && message.content && message.content.trim() !== ''
                   "
-                  class="feedback-buttons"
-                  :class="{ 'feedback-active': message.feedback }"
+                  class="feedback-buttons mt-1 flex items-center gap-0.5 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
+                  :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
                 >
                   <OButton
                     variant="ghost"
                     size="icon-xs-circle"
                     :disabled="message.feedback === 'thumbs_up'"
-                    :class="{
-                      'feedback-selected': message.feedback === 'thumbs_up',
-                    }"
+                    :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
                     data-test="o2-ai-chat-thumbs-up-btn"
                     @click="likeCodeBlock(index)"
                   >
                     <OIcon name="thumb-up-off-alt" size="xs" />
-                    <OTooltip content="Helpful" />
+                    <OTooltip :content="t('aiAssistant.helpful')" />
                   </OButton>
                   <OButton
                     variant="ghost"
                     size="icon-xs-circle"
                     :disabled="message.feedback === 'thumbs_down'"
-                    :class="{
-                      'feedback-selected': message.feedback === 'thumbs_down',
-                    }"
+                    :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
                     data-test="o2-ai-chat-thumbs-down-btn"
                     @click="dislikeCodeBlock(index)"
                   >
                     <OIcon name="thumb-down-off-alt" size="xs" />
-                    <OTooltip content="Not helpful" />
+                    <OTooltip :content="t('aiAssistant.notHelpful')" />
                   </OButton>
                 </div>
               </div>
@@ -1088,77 +1100,71 @@
             v-for="(block, pIdx) in pendingToolCalls"
             v-show="block.type === 'tool_call'"
             :key="'pending-tc-' + pIdx"
-            class="tool-call-indicator completed"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+            class="tool-call-indicator rounded-default border-border-default my-1 flex items-center border px-4 py-2 [background:var(--color-chat-bubble-user)]"
           >
-            <div class="tool-call-content">
-              <OIcon
-                :name="block.success === false ? 'error' : 'check-circle'"
-                size="sm"
-              />
-              <div class="tool-call-info">
-                <span class="tool-call-message">{{ block.message }}</span>
+            <div class="tool-call-content flex w-full items-center gap-3">
+              <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
+              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
+                <span
+                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
+                  >{{ block.message }}</span
+                >
               </div>
             </div>
           </div>
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
-            class="tool-call-indicator"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
           >
-            <div class="tool-call-content">
+            <div class="tool-call-content flex w-full items-center gap-3">
               <OSpinner variant="dots" size="xs" />
-              <div class="tool-call-info">
-                <span class="tool-call-message">{{
+              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
+                <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
                   activeToolCall.message
                 }}</span>
                 <div
                   v-if="getToolCallDisplayData(activeToolCall.context)"
-                  class="tool-call-context"
+                  class="tool-call-context flex flex-wrap items-center gap-2"
                 >
                   <div
                     v-if="getToolCallDisplayData(activeToolCall.context)?.query"
-                    class="context-item"
+                    class="context-item w-full"
                   >
-                    <code class="context-query">{{
-                      truncateQuery(
-                        getToolCallDisplayData(activeToolCall.context)?.query,
-                      )
-                    }}</code>
+                    <code
+                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
+                      >{{
+                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query)
+                      }}</code
+                    >
                   </div>
                   <div
                     v-if="
                       getToolCallDisplayData(activeToolCall.context)?.vrl &&
                       !getToolCallDisplayData(activeToolCall.context)?.query
                     "
-                    class="context-item"
+                    class="context-item w-full"
                   >
-                    <code class="context-query">{{
-                      truncateQuery(
-                        getToolCallDisplayData(activeToolCall.context)?.vrl,
-                      )
-                    }}</code>
+                    <code
+                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
+                      >{{
+                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.vrl)
+                      }}</code
+                    >
                   </div>
                   <span
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.stream
-                    "
-                    class="context-tag"
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.stream"
+                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
-                    Stream:
+                    {{ t("aiAssistant.streamPrefix") }}
                     {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
                   <span
-                    v-if="
-                      getToolCallDisplayData(activeToolCall.context)?.query_type
-                    "
-                    class="context-tag"
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.query_type"
+                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
                   >
-                    Type:
-                    {{
-                      getToolCallDisplayData(activeToolCall.context)?.query_type
-                    }}
+                    {{ t("aiAssistant.typePrefix") }}
+                    {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
                   </span>
                 </div>
               </div>
@@ -1167,12 +1173,11 @@
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
           <div
             v-if="isLoading && !activeToolCall"
-            class="tool-call-indicator"
-            :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
           >
-            <div class="tool-call-content">
+            <div class="tool-call-content flex w-full items-center gap-3">
               <OSpinner variant="dots" size="xs" />
-              <span class="tool-call-message">{{
+              <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
                 currentAnalyzingMessage
               }}</span>
             </div>
@@ -1180,15 +1185,18 @@
         </div>
 
         <!-- Scroll to bottom button -->
-        <div v-show="showScrollToBottom" class="scroll-to-bottom-container tw:absolute tw:bottom-[10px] tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:pointer-events-none tw:[transition:all_0.3s_ease]">
+        <div
+          v-show="showScrollToBottom"
+          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
+        >
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn tw:transition-all tw:duration-300 tw:[animation:fadeInUp_0.3s_ease] tw:pointer-events-auto tw:[backdrop-filter:blur(8px)] tw:shadow-[0_2px_8px_rgba(0,0,0,0.2)] tw:border-2! tw:border-[#2563eb]! tw:text-[#2563eb]! tw:bg-[rgba(255,255,255,0.95)]! tw:dark:border-[#8b5cf6]! tw:dark:text-[#8b5cf6]! tw:dark:bg-[rgba(30,30,30,0.9)]! tw:hover:scale-110 tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.3)] tw:hover:border-[#1d4ed8]! tw:hover:text-[#1d4ed8]! tw:hover:bg-white! tw:dark:hover:border-[#5a6fd8]! tw:dark:hover:text-[#5a6fd8]! tw:dark:hover:bg-[rgba(40,40,40,0.95)]! tw:active:scale-100"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] active:scale-100"
             @click="scrollToBottomSmooth"
           >
             <OIcon name="arrow-downward" size="sm" />
-            <OTooltip side="top" align="center" content="Scroll to bottom" />
+            <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
           </OButton>
         </div>
       </div>
@@ -1196,22 +1204,31 @@
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] [background:var(--color-chat-bubble-user)]"
       >
         <!-- Show tool call if active -->
-        <div v-if="activeToolCall" class="analyzing-content">
+        <div
+          v-if="activeToolCall"
+          class="analyzing-content flex w-full max-w-225 items-center gap-3"
+        >
           <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message">{{ activeToolCall.message }}</span>
+          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
+            activeToolCall.message
+          }}</span>
         </div>
         <!-- Show analyzing message if loading but no active tool call -->
-        <div v-else-if="isLoading" class="analyzing-content">
+        <div
+          v-else-if="isLoading"
+          class="analyzing-content flex w-full max-w-225 items-center gap-3"
+        >
           <OSpinner variant="dots" size="xs" />
-          <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
+          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
+            currentAnalyzingMessage
+          }}</span>
         </div>
       </div>
 
-      <div class="chat-input-container tw:m-3">
+      <div class="chat-input-container relative mx-auto my-2 w-full max-w-225 shrink-0 px-2">
         <!-- Confirmation dialog -->
         <O2AIConfirmDialog
           :visible="pendingConfirmation !== null"
@@ -1227,40 +1244,47 @@
           type="file"
           accept="image/png,image/jpeg"
           multiple
-          style="display: none"
+          class="hidden"
           @change="handleImageSelect"
         />
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box"
-          :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
         >
           <!-- Image preview strip -->
-          <div v-if="pendingImages.length > 0" class="image-preview-strip tw:flex tw:flex-wrap tw:gap-2 tw:py-2 tw:mb-2">
+          <div
+            v-if="pendingImages.length > 0"
+            class="image-preview-strip mb-2 flex flex-wrap gap-2 py-2"
+          >
             <div
               v-for="(img, index) in pendingImages"
               :key="index"
-              class="image-preview-item tw:relative tw:inline-block"
+              class="image-preview-item relative inline-block"
             >
               <img
                 :src="'data:' + img.mimeType + ';base64,' + img.data"
                 :alt="img.filename"
-                class="preview-image tw:w-16 tw:h-16 tw:object-cover tw:rounded-lg tw:border tw:border-[#d1d5db] tw:[transition:transform_0.2s_ease]"
+                class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
               />
               <OButton
                 variant="ghost"
                 size="icon-xs-circle"
-                class="image-remove-btn tw:absolute! tw:top-[-6px]! tw:right-[-6px]! tw:w-5! tw:h-5! tw:min-w-5! tw:min-h-5! tw:p-0! tw:bg-[#ef4444]! tw:z-10"
+                class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
                 @click.stop="removeImage(index)"
               >
                 <OIcon name="close" size="xs" />
               </OButton>
               <OTooltip
-                :content="`${img.filename} (${(img.size / 1024).toFixed(0)}KB)`"
+                :content="
+                  t('common.fileWithSize', {
+                    name: img.filename,
+                    size: (img.size / 1024).toFixed(0),
+                  })
+                "
               />
             </div>
           </div>
@@ -1268,7 +1292,7 @@
           <RichTextInput
             ref="chatInput"
             v-model="inputMessage"
-            :placeholder="inputPlaceholder"
+            :placeholder="raw(inputPlaceholder)"
             :disabled="isLoading"
             :theme="store.state.theme"
             :references="contextReferences"
@@ -1279,24 +1303,20 @@
           />
 
           <!-- Bottom bar with buttons -->
-          <div class="input-bottom-bar">
-            <div class="tw:flex tw:items-center tw:gap-2">
+          <div class="input-bottom-bar flex items-center justify-between pt-2">
+            <div class="flex items-center gap-2">
               <!-- Image upload button -->
               <OButton
                 v-if="!isLoading"
                 @click.stop="triggerImageUpload"
                 variant="ghost"
                 size="icon-sm"
-                class="image-upload-btn tw:opacity-70 tw:transition-opacity tw:duration-200 tw:hover:opacity-100"
+                class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
               >
-                <OIcon
-                  name="image"
-                  size="sm"
-                  :class="store.state.theme == 'dark' ? 'tw:text-white' : 'tw:text-gray-600'"
-                />
+                <OIcon name="image" size="sm" class="text-icon-color" />
                 <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
               </OButton>
-              <div v-else class="tw:w-8"></div>
+              <div v-else class="w-8"></div>
 
               <!-- Auto navigation toggle button -->
               <OButton
@@ -1304,24 +1324,21 @@
                 @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
                 variant="ghost"
                 size="sm"
-                class="auto-nav-toggle-btn tw:flex tw:items-center tw:gap-1.5 tw:px-2 tw:py-1 tw:rounded-md tw:transition-all tw:duration-200 tw:hover:bg-[#f3f4f6] tw:dark:hover:bg-[#374151]"
-                :class="{ 'auto-nav-enabled': isAutoNavigationEnabled }"
+                class="auto-nav-toggle-btn rounded-default hover:bg-surface-subtle flex items-center gap-1.5 px-2 py-1 transition-all duration-200"
               >
                 <OIcon
-                  :name="
-                    isAutoNavigationEnabled
-                      ? 'check-circle'
-                      : 'radio-button-unchecked'
-                  "
+                  :name="isAutoNavigationEnabled ? 'check-circle' : 'radio-button-unchecked'"
                   size="sm"
                   :class="[
                     'auto-nav-icon',
-                    !isAutoNavigationEnabled
-                      ? store.state.theme == 'dark' ? 'tw:text-gray-400' : 'tw:text-gray-600'
-                      : ''
+                    isAutoNavigationEnabled ? 'text-theme-accent!' : 'text-icon-color',
                   ]"
                 />
-                <span class="auto-nav-label tw:ml-1 tw:text-xs tw:font-medium tw:text-[#6b7280] tw:dark:text-[#9ca3af]">{{ t('aiAssistant.autoNavigation.label') }}</span>
+                <span
+                  class="auto-nav-label ml-1 text-xs font-medium"
+                  :class="isAutoNavigationEnabled ? 'text-theme-accent' : 'text-text-secondary'"
+                  >{{ t("aiAssistant.autoNavigation.label") }}</span
+                >
                 <OTooltip
                   :content="
                     isAutoNavigationEnabled
@@ -1332,7 +1349,7 @@
               </OButton>
             </div>
 
-            <div class="tw:flex tw:items-center tw:gap-2">
+            <div class="flex items-center gap-2">
               <!-- Send button - shown when not loading -->
               <OButton
                 v-if="!isLoading"
@@ -1340,7 +1357,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button tw:bg-[linear-gradient(135deg,#8b5cf6_0%,#ec4899_100%)]! tw:[transition:all_0.3s_ease]! tw:shadow-[0_4px_15px_0_rgba(139,92,246,0.3)]!"
+                class="send-button bg-(image:--color-gradient-ai)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1351,7 +1368,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button tw:bg-[linear-gradient(135deg,#f56565_0%,#e53e3e_100%)]! tw:[transition:all_0.3s_ease]! tw:shadow-[0_4px_15px_0_rgba(245,101,101,0.3)]!"
+                class="stop-button bg-(image:--color-gradient-danger)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>
@@ -1367,14 +1384,15 @@
 import {
   defineComponent,
   ref,
+  reactive,
   onMounted,
   nextTick,
   watch,
   computed,
   onUnmounted,
 } from "vue";
-import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
@@ -1383,12 +1401,13 @@ import { marked } from "marked";
 import { MarkedOptions } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
 import {
   ChatMessage,
   ChatHistoryEntry,
-  ToolCall,
   ContentBlock,
   NavigationAction,
   ImageAttachment,
@@ -1402,11 +1421,9 @@ import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import {
-  useAiDashboardEvents,
-  getDashboardEventType,
-} from "@/composables/useAiDashboardEvents";
+import { useAiDashboardEvents, getDashboardEventType } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -1419,7 +1436,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1454,11 +1471,62 @@ function renderMarkdown(content: any) {
   return marked.parse(content);
 }
 
+// --- Shared, cross-instance streaming registry ---
+// O2AIChat is instantiated more than once (the Home page's inline AI tab and
+// the sidebar panel in MainLayout are SEPARATE component instances). When the
+// user starts a chat on Home and navigates to another page, the Home instance
+// unmounts and the sidebar instance mounts — a brand new setup() scope.
+//
+// For an in-flight stream to keep rendering after that hand-off, the detach/
+// re-attach bookkeeping MUST live outside setup() so both instances see the
+// same live array + AbortController. When these were per-instance, the sidebar
+// instance's map was empty, so loadChat() never re-attached and fell back to
+// the stale IndexedDB snapshot — the stream kept running but its text never
+// rendered in the new instance. Module scope is what makes the hand-off work.
+const backgroundStreams = new Set<AbortController>();
+const MAX_BACKGROUND_STREAMS = 3;
+
+// Map sessionId → live stream context for re-attachment when a (possibly
+// different) instance loads the same session. loadChat swaps chatMessages.value
+// back to `msgs` so processStream's isActive() becomes true again and the UI
+// updates in real-time.
+const backgroundStreamMap = new Map<
+  string,
+  {
+    msgs: ChatMessage[];
+    controller: AbortController;
+    chatId: number | null;
+  }
+>();
+
+// Cross-instance streaming status, keyed by sessionId. processStream runs in the
+// closure of the instance that STARTED it, so its completion resets isLoading on
+// THAT instance's ref — not on a different instance that re-attached to the same
+// stream (e.g. the sidebar taking over from the Home tab). Each instance watches
+// this shared reactive map for its current session and clears its own streaming
+// UI when the background turn finishes, so the sidebar's loading indicator
+// doesn't hang forever after re-attaching. true = streaming, false/absent = done.
+const sessionStreamingState = reactive<Record<string, boolean>>({});
+
+// Detached streams deliberately outlive the component that started them, and
+// this registry is module scope, so nothing else will ever stop them. Call when
+// the turn is no longer authorized for what it is writing — org switch, logout
+// — never for ordinary navigation, which is the case detaching exists for.
+const abortBackgroundStreams = () => {
+  for (const controller of backgroundStreams) controller.abort();
+  backgroundStreams.clear();
+  backgroundStreamMap.clear();
+  for (const key of Object.keys(sessionStreamingState)) {
+    delete sessionStreamingState[key];
+  }
+};
+
 export default defineComponent({
   name: "O2AIChat",
   components: {
     OSeparator,
     OButton,
+    BetaBadge,
     ConfirmDialog,
     RichTextInput,
     O2AIConfirmDialog,
@@ -1507,23 +1575,23 @@ export default defineComponent({
   },
   setup(props) {
     const router = useRouter();
-    const inputMessage = ref(
-      props.aiChatInputContext ? props.aiChatInputContext : "",
-    );
+    const route = useRoute();
+    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : "");
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
     const chatInput = ref<any>(null); // RichTextInput component instance
-    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
     const currentStreamingMessage = ref("");
     const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
-    const chatHistory = ref<ChatHistoryEntry[]>([]);
+    // `model` is stored on persisted entries but missing from the shared interface
+    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
-    const { t } = useI18n();
+    const { isDark } = useTheme();
+    const { t } = useI18nTyped();
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
@@ -1537,16 +1605,13 @@ export default defineComponent({
     const typewriterEnabled = computed(
       () => !!props.centeredStart && chatMessages.value.length === 0,
     );
-    const { placeholder: typewriterPlaceholder } = useTypewriterPlaceholder(
-      typewriterPrompts,
-      {
-        enabled: typewriterEnabled,
-        typeSpeedMs: 85,
-        eraseSpeedMs: 45,
-        holdMs: 2800,
-        initialDelayMs: 500,
-      },
-    );
+    const { placeholder: typewriterPlaceholder } = useTypewriterPlaceholder(typewriterPrompts, {
+      enabled: typewriterEnabled,
+      typeSpeedMs: 85,
+      eraseSpeedMs: 45,
+      holdMs: 2800,
+      initialDelayMs: 500,
+    });
     const inputPlaceholder = computed(() =>
       props.centeredStart && chatMessages.value.length === 0
         ? typewriterPlaceholder.value || "Write your prompt"
@@ -1587,7 +1652,7 @@ export default defineComponent({
     const pendingConfirmation = ref<{
       tool: string;
       args: Record<string, any>;
-      message: string;
+      message: I18nText;
       navAction?: NavigationAction;
     } | null>(null);
 
@@ -1630,8 +1695,9 @@ export default defineComponent({
     // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{
       tool: string;
-      message: string;
+      message: I18nText;
       context: Record<string, any>;
+      call_id?: string;
     } | null>(null);
 
     // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
@@ -1640,22 +1706,11 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
-    // Background streams: when the user switches sessions while streaming,
-    // the detached stream continues in background and saves to IndexedDB on completion.
-    const backgroundStreams = new Set<AbortController>();
-    const MAX_BACKGROUND_STREAMS = 3;
-
-    // Map sessionId → live stream context for re-attachment when user navigates back.
-    // This allows loadChat to swap chatMessages.value back to the live array so that
-    // processStream's isActive() becomes true again and the UI updates in real-time.
-    const backgroundStreamMap = new Map<
-      string,
-      {
-        msgs: ChatMessage[];
-        controller: AbortController;
-        chatId: number | null;
-      }
-    >();
+    // NOTE: backgroundStreams / backgroundStreamMap / MAX_BACKGROUND_STREAMS are
+    // declared at MODULE scope (above defineComponent), not here. They must be
+    // shared across all O2AIChat instances so an in-flight stream started on the
+    // Home tab keeps rendering after navigating to a page where the sidebar
+    // instance takes over. See the comment on their declaration for why.
 
     // Typewriter animation state for LLM responses
     const displayedStreamingContent = ref("");
@@ -1679,6 +1734,10 @@ export default defineComponent({
     // Component readiness tracking
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
+
+    // Set true in onUnmounted so watchers firing during teardown don't re-attach
+    // a just-detached stream back to this dying instance (see chatUpdated watch).
+    const isUnmounting = ref(false);
 
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
@@ -1711,14 +1770,10 @@ export default defineComponent({
      */
     const startAnalyzingRotation = () => {
       currentAnalyzingMessage.value =
-        ANALYZING_MESSAGES[
-          Math.floor(Math.random() * ANALYZING_MESSAGES.length)
-        ];
+        ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       analyzingRotationInterval.value = setInterval(() => {
         currentAnalyzingMessage.value =
-          ANALYZING_MESSAGES[
-            Math.floor(Math.random() * ANALYZING_MESSAGES.length)
-          ];
+          ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       }, 5000);
     };
 
@@ -1730,28 +1785,6 @@ export default defineComponent({
         clearInterval(analyzingRotationInterval.value);
         analyzingRotationInterval.value = null;
       }
-    };
-
-    // Flush any in-progress streaming text into the last assistant text block
-    // and reset streaming state. Called before inserting non-text blocks
-    // (confirmation_required, navigation_action) so the text preceding them is
-    // not lost.
-    const finalizeTextBlock = () => {
-      if (currentTextSegment.value) {
-        const lm = chatMessages.value[chatMessages.value.length - 1];
-        if (lm && lm.role === "assistant" && lm.contentBlocks) {
-          const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-          if (lb && lb.type === "text") {
-            lb.text = currentTextSegment.value;
-          }
-        }
-      }
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-      currentTextSegment.value = "";
-      displayedStreamingContent.value = "";
     };
 
     // Interval ID for title animation
@@ -1852,10 +1885,7 @@ export default defineComponent({
         const codeBlockEnd = remaining.indexOf("```", codeBlockStart[0].length);
         if (codeBlockEnd !== -1) {
           const endPos = codeBlockEnd + 3;
-          displayedStreamingContent.value = target.slice(
-            0,
-            current.length + endPos,
-          );
+          displayedStreamingContent.value = target.slice(0, current.length + endPos);
         } else {
           // Code block not complete yet, reveal opening and wait
           displayedStreamingContent.value = target.slice(
@@ -1864,8 +1894,15 @@ export default defineComponent({
           );
         }
       } else {
-        // Regular text - reveal one character
-        displayedStreamingContent.value = target.slice(0, current.length + 1);
+        // Regular text - reveal one character per tick when caught up, but
+        // catch up faster when a backlog has built up (e.g. the backend
+        // delivered a large chunk in one burst). Without this, a fixed
+        // 1-char-per-tick reveal can lag the actual stream by many seconds
+        // on bursty responses, then "snap" to the full text once the stream
+        // ends and the remaining backlog is force-flushed.
+        const backlog = remaining.length;
+        const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
+        displayedStreamingContent.value = target.slice(0, current.length + revealCount);
       }
 
       // Schedule next frame
@@ -1879,16 +1916,6 @@ export default defineComponent({
     const historyIndex = ref(-1);
     const HISTORY_KEY = "ai-chat-query-history";
     const MAX_HISTORY_SIZE = 10;
-
-    const modelConfig: any = {
-      openai: ["gpt-4.1"],
-      groq: [
-        "llama-3.3-70b-versatile",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-      ],
-      xai: ["xai/grok-3-mini-beta", "xai/grok-3-latest"],
-    };
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -1936,8 +1963,7 @@ export default defineComponent({
     const scrollToBottom = async () => {
       await nextTick();
       if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop =
-          messagesContainer.value.scrollHeight;
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
       }
     };
 
@@ -1977,7 +2003,7 @@ export default defineComponent({
 
         // Show user notification about successful cancellation
         toast({
-          message: "Response generation stopped",
+          message: t("toastMessages.components.responseGenerationStopped"),
           variant: "info",
         });
 
@@ -2003,16 +2029,15 @@ export default defineComponent({
             } else if (currentStreamingMessage.value) {
               // Update final text in contentBlocks to show all buffered content
               if (lastMessage.contentBlocks) {
-                const lastBlock =
-                  lastMessage.contentBlocks[
-                    lastMessage.contentBlocks.length - 1
-                  ];
+                const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                 if (lastBlock && lastBlock.type === "text") {
                   lastBlock.text = currentTextSegment.value;
                 }
               }
               // Keep partial content but indicate it was cancelled
-              lastMessage.content += "\n\n_[Response stopped by user]_";
+              lastMessage.content = raw(
+                lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
+              );
             }
           }
         }
@@ -2024,21 +2049,17 @@ export default defineComponent({
         // message cleanup above so the empty-assistant-message pop can't drop
         // the message we attach them to.
         if (pendingToolCalls.value.length) {
-          const lastMessage =
-            chatMessages.value[chatMessages.value.length - 1];
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
           if (lastMessage && lastMessage.role === "assistant") {
             if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
             // Tools ran before any text, so place them ahead of it.
             lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
           } else {
-            const stoppedNote = "_[Response stopped by user]_";
+            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
             chatMessages.value.push({
               role: "assistant",
-              content: stoppedNote,
-              contentBlocks: [
-                ...pendingToolCalls.value,
-                { type: "text", text: stoppedNote },
-              ],
+              content: raw(stoppedNote),
+              contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
             });
           }
           pendingToolCalls.value = [];
@@ -2061,10 +2082,7 @@ export default defineComponent({
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
         nextTick(() => {
-          if (
-            chatInput.value &&
-            typeof chatInput.value.insertChip === "function"
-          ) {
+          if (chatInput.value && typeof chatInput.value.insertChip === "function") {
             // Focus input first to ensure cursor is positioned correctly
             focusInput();
 
@@ -2074,8 +2092,7 @@ export default defineComponent({
             const editableDiv =
               inputElement?.querySelector(".rich-text-input") ||
               inputElement?.querySelector("[contenteditable]");
-            const hasExistingChips =
-              editableDiv?.querySelector(".reference-chip") !== null;
+            const hasExistingChips = editableDiv?.querySelector(".reference-chip") !== null;
             const hasExistingText = editableDiv?.textContent?.trim().length > 0;
 
             // Only clear if:
@@ -2083,10 +2100,7 @@ export default defineComponent({
             // 2. AND there are no existing chips
             // 3. AND there is no existing text
             if (!props.appendMode && !hasExistingChips && !hasExistingText) {
-              if (
-                chatInput.value &&
-                typeof chatInput.value.clear === "function"
-              ) {
+              if (chatInput.value && typeof chatInput.value.clear === "function") {
                 chatInput.value.clear();
               }
               inputMessage.value = "";
@@ -2119,8 +2133,7 @@ export default defineComponent({
               .map((k) => {
                 const val = parsed[k];
                 if (typeof val === "string") {
-                  const truncatedVal =
-                    val.length > 8 ? val.substring(0, 8) + "..." : val;
+                  const truncatedVal = val.length > 8 ? val.substring(0, 8) + "..." : val;
                   return k + ': "' + truncatedVal + '"';
                 }
                 return k + ": " + String(val).substring(0, 8);
@@ -2206,7 +2219,7 @@ export default defineComponent({
         chatMessages.value = [
           {
             role: "assistant",
-            content: "Error: Unable to connect to backend",
+            content: t("aiAssistant.backendConnectionError"),
           },
         ];
         console.error("Error fetching initial message:", error);
@@ -2216,9 +2229,39 @@ export default defineComponent({
       scrollToBottom();
     };
 
-    const processStream = async (
-      reader: ReadableStreamDefaultReader<Uint8Array>,
-    ) => {
+    /**
+     * Extract streamed assistant text from an SSE event.
+     *
+     * The o2-ai (opencode) backend emits streamed text as
+     *   {"type":"message_delta","content":"<plain string>"}
+     * and non-streamed notices as {"type":"message","content":"..."} — the text
+     * is ALWAYS the plain-string `content` field. We also defensively accept the
+     * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
+     * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
+     * agent/proxy variant doesn't silently render nothing. Returns the text, or
+     * null when the event carries no assistant text.
+     */
+    const extractStreamText = (data: any): string | null => {
+      if (data == null || typeof data !== "object") return null;
+
+      // Canonical o2-ai chat shape.
+      if (typeof data.content === "string") return data.content;
+
+      // Defensive fallbacks (OpenAI-style / RCA proxy formats).
+      if (typeof data.response === "string") return data.response;
+      if (data.delta && typeof data.delta.content === "string") {
+        return data.delta.content;
+      }
+      const firstChoice = Array.isArray(data.choices) ? data.choices[0] : null;
+      if (firstChoice && typeof firstChoice.delta?.content === "string") {
+        return firstChoice.delta.content;
+      }
+      if (typeof data.text === "string") return data.text;
+
+      return null;
+    };
+
+    const processStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
       const decoder = new TextDecoder();
       let buffer = "";
       let messageComplete = false;
@@ -2252,25 +2295,15 @@ export default defineComponent({
           ctxSessionId = getUUIDv7();
           if (isActive()) currentSessionId.value = ctxSessionId;
         }
-        const title = isActive()
-          ? aiGeneratedTitle.value || undefined
-          : ctxTitle;
+        const title = isActive() ? aiGeneratedTitle.value || undefined : ctxTitle;
         const chatId = isActive() ? currentChatId.value : ctxChatId;
-        const resultId = await dbSaveToHistory(
-          msgs,
-          ctxSessionId,
-          title,
-          chatId,
-        );
+        const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
             // Carry the new-chat preference onto the chat id. Persist the actual
             // value (ON by default) so an explicit user disable is honored.
-            autoNavigationPreferences.value.set(
-              resultId,
-              pendingAutoNavigation.value,
-            );
+            autoNavigationPreferences.value.set(resultId, pendingAutoNavigation.value);
             saveAutoNavigationPreferences();
           } else {
             ctxChatId = resultId;
@@ -2353,8 +2386,7 @@ export default defineComponent({
                     // When detached, auto-deny confirmations to unblock the stream
                     if (!isActive()) {
                       try {
-                        const orgId =
-                          store.state.selectedOrganization.identifier;
+                        const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
@@ -2374,14 +2406,10 @@ export default defineComponent({
                     }
 
                     // Check if this is a navigation action and auto navigation is enabled
-                    if (
-                      data.tool === "navigation_action" &&
-                      isAutoNavigationEnabled.value
-                    ) {
+                    if (data.tool === "navigation_action" && isAutoNavigationEnabled.value) {
                       // Auto-approve navigation without showing confirmation
                       try {
-                        const orgId =
-                          store.state.selectedOrganization.identifier;
+                        const orgId = store.state.selectedOrganization.identifier;
                         await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
@@ -2392,10 +2420,7 @@ export default defineComponent({
                           },
                         );
                       } catch (error) {
-                        console.error(
-                          "Error auto-confirming navigation:",
-                          error,
-                        );
+                        console.error("Error auto-confirming navigation:", error);
                       }
                       continue;
                     }
@@ -2408,10 +2433,7 @@ export default defineComponent({
                       tool: data.tool,
                       message: activeToolCall.value?.message || data.message,
                       context: activeToolCall.value?.context || {},
-                      call_id:
-                        data.call_id ||
-                        activeToolCall.value?.call_id ||
-                        undefined,
+                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
                       pendingConfirmation: true,
                       confirmationMessage: data.message,
                       confirmationArgs: data.args || {},
@@ -2420,25 +2442,20 @@ export default defineComponent({
 
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(confirmBlock);
                     } else {
                       msgs.push({
                         role: "assistant",
-                        content: "",
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          confirmBlock,
-                        ],
+                        content: raw(""),
+                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
                       });
                       pendingToolCalls.value = [];
                     }
                     pendingConfirmation.value = {
                       tool: data.tool,
                       args: data.args || {},
-                      message:
-                        data.message || `Confirm execution of ${data.tool}?`,
+                      message: data.message || `Confirm execution of ${data.tool}?`,
                     };
                     await scrollToBottom();
                     continue;
@@ -2457,8 +2474,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2493,8 +2509,7 @@ export default defineComponent({
                         call_id: activeToolCall.value.call_id,
                       };
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2504,20 +2519,13 @@ export default defineComponent({
 
                     // Format error message with suggestion if available
                     // Handle case where error/message might be an object instead of string
-                    const rawError =
-                      data.error ??
-                      data.message ??
-                      "An unexpected error occurred";
+                    const rawError = data.error ?? data.message ?? "An unexpected error occurred";
                     const errorText =
-                      typeof rawError === "string"
-                        ? rawError
-                        : JSON.stringify(rawError, null, 2);
+                      typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                     // Check if this is an authorization/access error
                     const authErr = isAuthError(errorText, data.error_type);
-                    let errorMessage = authErr
-                      ? UNAUTHORIZED_MESSAGE
-                      : `Error: ${errorText}`;
+                    let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
                     if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
@@ -2527,7 +2535,7 @@ export default defineComponent({
                     if (!lastMessage || lastMessage.role !== "assistant") {
                       msgs.push({
                         role: "assistant",
-                        content: errorMessage,
+                        content: raw(errorMessage),
                         contentBlocks: [
                           ...pendingToolCalls.value,
                           { type: "text", text: errorMessage },
@@ -2537,9 +2545,9 @@ export default defineComponent({
                     } else {
                       // Append error to existing message
                       if (lastMessage.content) {
-                        lastMessage.content += "\n\n" + errorMessage;
+                        lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                       } else {
-                        lastMessage.content = errorMessage;
+                        lastMessage.content = raw(errorMessage);
                       }
                       if (!lastMessage.contentBlocks) {
                         lastMessage.contentBlocks = [];
@@ -2580,8 +2588,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2597,15 +2604,12 @@ export default defineComponent({
                     if (pendingToolCalls.value.length) {
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(
-                          ...pendingToolCalls.value,
-                        );
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(...pendingToolCalls.value);
                       } else {
                         msgs.push({
                           role: "assistant",
-                          content: "",
+                          content: raw(""),
                           contentBlocks: [...pendingToolCalls.value],
                         });
                       }
@@ -2640,12 +2644,9 @@ export default defineComponent({
                     // Emit dashboard event only when stream is active (foreground)
                     if (data.success !== false && isActive()) {
                       const resolvedToolName =
-                        data.tool && data.tool !== "tools_call"
-                          ? data.tool
-                          : "";
+                        data.tool && data.tool !== "tools_call" ? data.tool : "";
                       const callArgs = data.call_args || {};
-                      const dashboardEventType =
-                        getDashboardEventType(resolvedToolName);
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
                       if (dashboardEventType) {
                         const dashboardId =
                           callArgs.dashboard_id ||
@@ -2673,10 +2674,8 @@ export default defineComponent({
                     // Match by call_id if available, fall back to tool name
                     const matchesActiveToolCall =
                       activeToolCall.value &&
-                      ((data.call_id &&
-                        activeToolCall.value.call_id === data.call_id) ||
-                        (!data.call_id &&
-                          activeToolCall.value.tool === data.tool));
+                      ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                        (!data.call_id && activeToolCall.value.tool === data.tool));
 
                     // If active tool call matches, complete it with result data
                     if (matchesActiveToolCall) {
@@ -2691,8 +2690,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2702,11 +2700,7 @@ export default defineComponent({
                       // Tool was already completed — retroactively enrich the matching block
                       const lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.contentBlocks) {
-                        for (
-                          let i = lastMessage.contentBlocks.length - 1;
-                          i >= 0;
-                          i--
-                        ) {
+                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                           const block = lastMessage.contentBlocks[i];
                           const blockMatches = data.call_id
                             ? block.call_id === data.call_id
@@ -2723,11 +2717,7 @@ export default defineComponent({
                         }
                       }
                       // Also check pending tool calls
-                      for (
-                        let i = pendingToolCalls.value.length - 1;
-                        i >= 0;
-                        i--
-                      ) {
+                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                         const block = pendingToolCalls.value[i];
                         const blockMatches = data.call_id
                           ? block.call_id === data.call_id
@@ -2779,17 +2769,13 @@ export default defineComponent({
 
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(confirmBlock);
                       } else {
                         msgs.push({
                           role: "assistant",
-                          content: "",
-                          contentBlocks: [
-                            ...pendingToolCalls.value,
-                            confirmBlock,
-                          ],
+                          content: raw(""),
+                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
                         });
                         pendingToolCalls.value = [];
                       }
@@ -2826,8 +2812,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(failedToolBlock);
                       } else {
                         pendingToolCalls.value.push(failedToolBlock);
@@ -2836,34 +2821,23 @@ export default defineComponent({
                     }
 
                     // Add inline error block
-                    const rawErrorMessage =
-                      data.message || data.error || "An error occurred";
-                    const authErr = isAuthError(
-                      rawErrorMessage,
-                      data.error_type,
-                    );
+                    const rawErrorMessage = data.message || data.error || "An error occurred";
+                    const authErr = isAuthError(rawErrorMessage, data.error_type);
                     const errorBlock: ContentBlock = {
                       type: "error",
-                      message: authErr
-                        ? UNAUTHORIZED_MESSAGE
-                        : rawErrorMessage,
+                      message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
                       errorType: data.error_type || undefined,
-                      suggestion: authErr
-                        ? undefined
-                        : data.suggestion || undefined,
-                      recoverable: authErr
-                        ? false
-                        : data.recoverable ?? undefined,
+                      suggestion: authErr ? undefined : data.suggestion || undefined,
+                      recoverable: authErr ? false : (data.recoverable ?? undefined),
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(errorBlock);
                     } else {
                       msgs.push({
                         role: "assistant",
-                        content: "",
+                        content: raw(""),
                         contentBlocks: [...pendingToolCalls.value, errorBlock],
                       });
                       pendingToolCalls.value = [];
@@ -2874,7 +2848,10 @@ export default defineComponent({
                   }
 
                   // Handle streamed deltas and full/legacy message content.
-                  if (data && typeof data.content === "string") {
+                  // Tolerant of multiple shapes (content/text/delta/nested/OpenAI)
+                  // so an agent schema change doesn't silently drop text.
+                  const streamText = extractStreamText(data);
+                  if (typeof streamText === "string") {
                     // Complete any active tool call first (add green checkmark to chat)
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
@@ -2886,8 +2863,7 @@ export default defineComponent({
                       };
                       let lastMessage = msgs[msgs.length - 1];
                       if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks)
-                          lastMessage.contentBlocks = [];
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
@@ -2895,16 +2871,18 @@ export default defineComponent({
                       if (isActive()) activeToolCall.value = null;
                     }
 
-                    const isMessageDelta = data.type === "message_delta";
+                    // Deltas (append verbatim) vs full/legacy messages (reformat
+                    // code fences). o2-ai streams text as type "message_delta";
+                    // any content arriving via a non-`content` fallback field is
+                    // also an incremental delta.
+                    const isMessageDelta =
+                      data.type === "message_delta" || typeof data.content !== "string";
 
                     // Format code blocks with proper line breaks for full/legacy
                     // messages. Deltas must be appended exactly as received.
-                    let content = data.content;
+                    let content = streamText;
                     if (!isMessageDelta) {
-                      content = content.replace(
-                        /```(\w*)\s*([^`])/g,
-                        "```$1\n$2",
-                      );
+                      content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
                       content = content.replace(/([^`])\s*```/g, "$1\n```");
                     }
 
@@ -2940,7 +2918,7 @@ export default defineComponent({
                       // Create new assistant message with pending tool calls + text
                       msgs.push({
                         role: "assistant",
-                        content: streamingMsg,
+                        content: raw(streamingMsg),
                         contentBlocks: [
                           ...pendingToolCalls.value,
                           { type: "text", text: textSegment },
@@ -2951,7 +2929,7 @@ export default defineComponent({
                       await throttledSaveCtx(true);
                     } else {
                       // Update existing assistant message's total content
-                      lastMessage.content = streamingMsg;
+                      lastMessage.content = raw(streamingMsg);
 
                       // Update or add text block in contentBlocks
                       if (!lastMessage.contentBlocks) {
@@ -2960,9 +2938,7 @@ export default defineComponent({
 
                       // Find the last text block and update it, or create new one
                       const lastBlock =
-                        lastMessage.contentBlocks[
-                          lastMessage.contentBlocks.length - 1
-                        ];
+                        lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                       if (lastBlock && lastBlock.type === "text") {
                         // Append to existing text block (same segment)
                         lastBlock.text = textSegment;
@@ -2980,12 +2956,7 @@ export default defineComponent({
                     if (isActive()) await scrollToBottom();
                   }
                 } catch (jsonError) {
-                  console.debug(
-                    "JSON parse error:",
-                    jsonError,
-                    "for line:",
-                    jsonStr,
-                  );
+                  console.debug("JSON parse error:", jsonError, "for line:", jsonStr);
                   continue;
                 }
               } catch (e) {
@@ -3029,8 +3000,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3062,8 +3032,7 @@ export default defineComponent({
                       call_id: activeToolCall.value.call_id,
                     };
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3071,20 +3040,13 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawError =
-                    data.error ??
-                    data.message ??
-                    "An unexpected error occurred";
+                  const rawError = data.error ?? data.message ?? "An unexpected error occurred";
                   const errorText =
-                    typeof rawError === "string"
-                      ? rawError
-                      : JSON.stringify(rawError, null, 2);
+                    typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
                   // Check if this is an authorization/access error
                   const authErr = isAuthError(errorText, data.error_type);
-                  let errorMessage = authErr
-                    ? UNAUTHORIZED_MESSAGE
-                    : `Error: ${errorText}`;
+                  let errorMessage = authErr ? UNAUTHORIZED_MESSAGE : `Error: ${errorText}`;
                   if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
@@ -3093,7 +3055,7 @@ export default defineComponent({
                   if (!lastMessage || lastMessage.role !== "assistant") {
                     msgs.push({
                       role: "assistant",
-                      content: errorMessage,
+                      content: raw(errorMessage),
                       contentBlocks: [
                         ...pendingToolCalls.value,
                         { type: "text", text: errorMessage },
@@ -3102,9 +3064,9 @@ export default defineComponent({
                     pendingToolCalls.value = [];
                   } else {
                     if (lastMessage.content) {
-                      lastMessage.content += "\n\n" + errorMessage;
+                      lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                     } else {
-                      lastMessage.content = errorMessage;
+                      lastMessage.content = raw(errorMessage);
                     }
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
@@ -3139,8 +3101,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3164,10 +3125,8 @@ export default defineComponent({
 
                   const matchesActive =
                     activeToolCall.value &&
-                    ((data.call_id &&
-                      activeToolCall.value.call_id === data.call_id) ||
-                      (!data.call_id &&
-                        activeToolCall.value.tool === data.tool));
+                    ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                      (!data.call_id && activeToolCall.value.tool === data.tool));
 
                   if (matchesActive) {
                     const completedToolBlock: ContentBlock = {
@@ -3180,8 +3139,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3190,11 +3148,7 @@ export default defineComponent({
                   } else {
                     const lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.contentBlocks) {
-                      for (
-                        let i = lastMessage.contentBlocks.length - 1;
-                        i >= 0;
-                        i--
-                      ) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
                         const block = lastMessage.contentBlocks[i];
                         const blockMatches = data.call_id
                           ? block.call_id === data.call_id
@@ -3207,11 +3161,7 @@ export default defineComponent({
                         }
                       }
                     }
-                    for (
-                      let i = pendingToolCalls.value.length - 1;
-                      i >= 0;
-                      i--
-                    ) {
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
                       const block = pendingToolCalls.value[i];
                       const blockMatches = data.call_id
                         ? block.call_id === data.call_id
@@ -3243,8 +3193,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(failedToolBlock);
                     } else {
                       pendingToolCalls.value.push(failedToolBlock);
@@ -3252,34 +3201,23 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const rawErrorMessage =
-                    data.message || data.error || "An error occurred";
-                  const authErr = isAuthError(
-                    rawErrorMessage,
-                    data.error_type,
-                  );
+                  const rawErrorMessage = data.message || data.error || "An error occurred";
+                  const authErr = isAuthError(rawErrorMessage, data.error_type);
                   const errorBlock: ContentBlock = {
                     type: "error",
-                    message: authErr
-                      ? UNAUTHORIZED_MESSAGE
-                      : rawErrorMessage,
+                    message: authErr ? UNAUTHORIZED_MESSAGE : rawErrorMessage,
                     errorType: data.error_type || undefined,
-                    suggestion: authErr
-                      ? undefined
-                      : data.suggestion || undefined,
-                    recoverable: authErr
-                      ? false
-                      : data.recoverable ?? undefined,
+                    suggestion: authErr ? undefined : data.suggestion || undefined,
+                    recoverable: authErr ? false : (data.recoverable ?? undefined),
                   };
                   let lastMessage = msgs[msgs.length - 1];
                   if (lastMessage && lastMessage.role === "assistant") {
-                    if (!lastMessage.contentBlocks)
-                      lastMessage.contentBlocks = [];
+                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                     lastMessage.contentBlocks.push(errorBlock);
                   } else {
                     msgs.push({
                       role: "assistant",
-                      content: "",
+                      content: raw(""),
                       contentBlocks: [...pendingToolCalls.value, errorBlock],
                     });
                     pendingToolCalls.value = [];
@@ -3289,7 +3227,9 @@ export default defineComponent({
                 }
 
                 // Handle streamed deltas and full/legacy message content.
-                if (data && typeof data.content === "string") {
+                // Tolerant of multiple event shapes (see extractStreamText).
+                const streamText = extractStreamText(data);
+                if (typeof streamText === "string") {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3300,8 +3240,7 @@ export default defineComponent({
                     };
                     let lastMessage = msgs[msgs.length - 1];
                     if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks)
-                        lastMessage.contentBlocks = [];
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
@@ -3309,9 +3248,10 @@ export default defineComponent({
                     if (isActive()) activeToolCall.value = null;
                   }
 
-                  const isMessageDelta = data.type === "message_delta";
+                  const isMessageDelta =
+                    data.type === "message_delta" || typeof data.content !== "string";
 
-                  let content = data.content;
+                  let content = streamText;
                   if (!isMessageDelta) {
                     content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
                     content = content.replace(/([^`])\s*```/g, "$1\n```");
@@ -3342,7 +3282,7 @@ export default defineComponent({
                   if (!lastMessage || lastMessage.role !== "assistant") {
                     msgs.push({
                       role: "assistant",
-                      content: streamingMsg,
+                      content: raw(streamingMsg),
                       contentBlocks: [
                         ...pendingToolCalls.value,
                         { type: "text", text: textSegment },
@@ -3351,15 +3291,13 @@ export default defineComponent({
                     pendingToolCalls.value = [];
                     await throttledSaveCtx(true);
                   } else {
-                    lastMessage.content = streamingMsg;
+                    lastMessage.content = raw(streamingMsg);
 
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
                     }
                     const lastBlock =
-                      lastMessage.contentBlocks[
-                        lastMessage.contentBlocks.length - 1
-                      ];
+                      lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                     if (lastBlock && lastBlock.type === "text") {
                       lastBlock.text = textSegment;
                     } else {
@@ -3392,13 +3330,8 @@ export default defineComponent({
           }
           // Update final text in contentBlocks
           const lastMessage = msgs[msgs.length - 1];
-          if (
-            lastMessage &&
-            lastMessage.role === "assistant" &&
-            lastMessage.contentBlocks
-          ) {
-            const lastBlock =
-              lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+          if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
             if (lastBlock && lastBlock.type === "text") {
               lastBlock.text = textSegment;
             }
@@ -3451,32 +3384,13 @@ export default defineComponent({
 
           // Apply pending auto navigation preference to the new chat. Persist the
           // actual value (ON by default) so an explicit user disable is honored.
-          autoNavigationPreferences.value.set(
-            chatId,
-            pendingAutoNavigation.value,
-          );
+          autoNavigationPreferences.value.set(chatId, pendingAutoNavigation.value);
           saveAutoNavigationPreferences();
         }
       } catch (error) {
         console.error("Error saving chat history:", error);
       } finally {
         saveHistoryLoading.value = false;
-      }
-    };
-
-    /**
-     * Throttled save for streaming - saves at most every STREAMING_SAVE_INTERVAL ms
-     * This prevents data loss if the user reloads the page during streaming
-     * @param force - If true, saves immediately regardless of throttle (used for first assistant message)
-     */
-    const throttledStreamingSave = async (force: boolean = false) => {
-      const now = Date.now();
-      if (
-        force ||
-        now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL
-      ) {
-        lastStreamingSaveTime.value = now;
-        await saveToHistory();
       }
     };
 
@@ -3538,6 +3452,18 @@ export default defineComponent({
       displayedStreamingContent.value = "";
     };
 
+    // Logout has to kill the foreground turn too, not just the detached ones.
+    // MainLayout.signout() fires this as a window event because it lives in the
+    // Options API half of that file and can't reach setup scope directly (same
+    // pattern as o2:home-switch-tab).
+    const abortAllStreams = () => {
+      abortBackgroundStreams();
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+      }
+    };
+
     const toggleExpand = () => {
       if (!store.state.isAiChatEnabled) {
         // Closed → Open inline sidebar
@@ -3555,24 +3481,24 @@ export default defineComponent({
 
     useShortcuts([
       {
-        id: 'aiChatClose',
-        key: 'escape',
-        description: 'Close AI chat',
+        id: "aiChatClose",
+        key: "escape",
+        description: t("shortcuts.actions.aiChatClose"),
         // Escape must close the chat even while typing a message in its input.
         allowInInput: true,
         handler: () => {
           if (store.state.isAiChatEnabled) {
-            store.dispatch('setIsAiChatEnabled', false);
-            store.dispatch('setIsAiChatExpanded', false);
-            window.dispatchEvent(new Event('resize'));
+            store.dispatch("setIsAiChatEnabled", false);
+            store.dispatch("setIsAiChatExpanded", false);
+            window.dispatchEvent(new Event("resize"));
           }
         },
       },
       {
-        id: 'aiChatExpand',
-        key: 'ctrl+b',
-        keyForMac: 'meta+b',
-        description: 'Expand/collapse AI chat',
+        id: "aiChatExpand",
+        key: "ctrl+b",
+        keyForMac: "meta+b",
+        description: t("shortcuts.actions.aiChatExpand"),
         handler: toggleExpand,
       },
     ]);
@@ -3613,10 +3539,7 @@ export default defineComponent({
 
       try {
         // Update title using the composable
-        const success = await dbUpdateChatTitle(
-          currentChatId.value,
-          editingTitle.value.trim(),
-        );
+        const success = await dbUpdateChatTitle(currentChatId.value, editingTitle.value.trim());
 
         if (success) {
           // Update the displayed title
@@ -3817,9 +3740,7 @@ export default defineComponent({
         }
 
         const vrlFunction =
-          query.functionContent ||
-          requestBody.function ||
-          requestBody.functionContent;
+          query.functionContent || requestBody.function || requestBody.functionContent;
 
         // Don't generate navigation if time range is missing
         if (query.start_time === undefined || query.end_time === undefined) {
@@ -3843,19 +3764,21 @@ export default defineComponent({
           target.functionContent = vrlFunction;
         }
 
+        const streamLabel =
+          { logs: t("common.logs"), metrics: t("common.metrics"), traces: t("common.traces") }[
+            streamType as string
+          ] ?? raw(streamType.charAt(0).toUpperCase() + streamType.slice(1));
         return {
           resource_type: streamType,
           action: "load_query",
-          label: `View in ${streamType.charAt(0).toUpperCase() + streamType.slice(1)}`,
+          label: t("aiAssistant.viewInTarget", { target: streamLabel }),
           target,
         };
       }
 
       // Pattern 2: Create/Get tools (has ID) → navigate_direct
       // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
-      const resourceTypeMatch = toolName.match(
-        /^(create|get|update|delete)(.+)$/i,
-      );
+      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
       if (!resourceTypeMatch) return null;
 
       const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
@@ -3896,8 +3819,7 @@ export default defineComponent({
             const textContent = responseBody.content[0].text;
             const parsed = JSON.parse(textContent);
             // Extract from versioned response (v8, v7, etc.)
-            parsedResponse =
-              parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
+            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
           } catch (e) {
             console.warn("[Navigation] Failed to parse content text:", e);
           }
@@ -3950,15 +3872,25 @@ export default defineComponent({
       return {
         resource_type: resourceType,
         action: "navigate_direct",
-        label: `View ${resourceType.charAt(0).toUpperCase() + resourceType.slice(1)}`,
+        label: t("aiAssistant.viewTarget", {
+          target: resourceType.charAt(0).toUpperCase() + resourceType.slice(1),
+        }),
         target,
       };
     };
 
     const handleNavigationAction = async (action: NavigationAction) => {
+      // Detach the stream before navigating: the route change can unmount/
+      // recreate this component, and onUnmounted aborts currentAbortController
+      // to avoid leaking requests. Without detaching first, that abort races
+      // an in-flight opencode turn and kills any tool calls still queued
+      // after this navigation (e.g. create dashboard -> create alert -> nav).
+      // detachCurrentStream() moves the controller to backgroundStreams so
+      // processStream keeps running and the turn finishes in the background.
+      detachCurrentStream();
+
       // Helper to encode strings for URL (same as search history)
-      const encodeForUrl = (str: string) =>
-        btoa(unescape(encodeURIComponent(str)));
+      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
 
       // Extract page name for success message
       let pageName = action.label || "";
@@ -3966,8 +3898,7 @@ export default defineComponent({
         // Fallback: use target name or resource type
         pageName =
           action.target.name ||
-          action.resource_type.charAt(0).toUpperCase() +
-            action.resource_type.slice(1);
+          action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
       }
 
       // Perform navigation FIRST
@@ -4003,7 +3934,9 @@ export default defineComponent({
 
         // Add base64 encoded query
         if (target.query) {
-          queryParams.query = encodeForUrl(target.query);
+          queryParams.query = encodeForUrl(
+            typeof target.query === "string" ? target.query : JSON.stringify(target.query),
+          );
         }
 
         // Add VRL function if present
@@ -4022,33 +3955,30 @@ export default defineComponent({
       } else if (action.action === "navigate_direct") {
         // Direct navigation - build proper URLs based on resource type
         let path = action.target.path || `/${action.resource_type}`;
+        // navigate_direct always carries the record form of `query`
+        const targetQuery = action.target.query as Record<string, any> | undefined;
         const queryParams: Record<string, string> = {
           org_identifier: store.state.selectedOrganization.identifier,
-          ...action.target.query,
+          ...targetQuery,
         };
 
         // Resource-type-specific URL handling
         if (action.resource_type === "alert") {
           path = "/alerts";
-          const alertId =
-            action.target.alert_id || action.target.query?.alert_id;
+          const alertId = action.target.alert_id || targetQuery?.alert_id;
           if (alertId) {
             // Navigate to specific alert with update action
             queryParams.action = "update";
             queryParams.alert_id = alertId;
-            queryParams.name = action.target.name || action.target.query?.name;
+            queryParams.name = action.target.name || targetQuery?.name;
           }
-          queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
         } else if (action.resource_type === "dashboard") {
           // Dashboards use /dashboards/view path
           path = "/dashboards/view";
           queryParams.dashboard =
-            action.target.dashboard_id ||
-            action.target.dashboardId ||
-            action.target.query?.dashboardId;
-          queryParams.folder =
-            action.target.folder || action.target.query?.folder || "default";
+            action.target.dashboard_id || action.target.dashboardId || targetQuery?.dashboardId;
+          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
           queryParams.tab = action.target.tab || "tab-1";
           queryParams.refresh = "Off";
           queryParams.period = "15m";
@@ -4056,11 +3986,8 @@ export default defineComponent({
         } else if (action.resource_type === "pipeline") {
           // Pipelines use /pipeline/pipelines/edit path
           path = "/pipeline/pipelines/edit";
-          queryParams.id =
-            action.target.pipeline_id ||
-            action.target.id ||
-            action.target.query?.id;
-          queryParams.name = action.target.name || action.target.query?.name;
+          queryParams.id = action.target.pipeline_id || action.target.id || targetQuery?.id;
+          queryParams.name = action.target.name || targetQuery?.name;
         }
 
         await router.push({ path, query: queryParams });
@@ -4070,22 +3997,22 @@ export default defineComponent({
       setTimeout(async () => {
         try {
           // Add success message AFTER navigation completes
-          const successMessage = `Successfully navigated to ${pageName}`;
+          const successMessage = t("aiAssistant.navigatedTo", { page: pageName });
           let lastMessage = chatMessages.value[chatMessages.value.length - 1];
 
           if (!lastMessage || lastMessage.role !== "assistant") {
             // Create new assistant message
             chatMessages.value.push({
               role: "assistant",
-              content: successMessage,
+              content: raw(successMessage),
               contentBlocks: [{ type: "text", text: successMessage }],
             });
           } else {
             // Append to existing assistant message
             if (lastMessage.content) {
-              lastMessage.content += "\n\n" + successMessage;
+              lastMessage.content = raw(lastMessage.content + "\n\n" + successMessage);
             } else {
-              lastMessage.content = successMessage;
+              lastMessage.content = raw(successMessage);
             }
             if (!lastMessage.contentBlocks) {
               lastMessage.contentBlocks = [];
@@ -4142,9 +4069,7 @@ export default defineComponent({
           // If so, re-attach by using the LIVE array that processStream is writing to
           // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
           // same array makes processStream's isActive() true again, so UI updates resume.
-          const bgCtx = chat.sessionId
-            ? backgroundStreamMap.get(chat.sessionId)
-            : null;
+          const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
 
           if (bgCtx) {
             // Re-attach: use the live streaming array
@@ -4160,14 +4085,29 @@ export default defineComponent({
             // Restore streaming UI state so loading indicator shows
             isLoading.value = true;
             startAnalyzingRotation();
+
+            // Prime the typewriter from whatever the stream has accumulated so
+            // far, in THIS fresh instance. processStream only syncs the segment
+            // refs and (re)starts the animation on the NEXT chunk that arrives
+            // while isActive(); text already streamed before we re-attached
+            // would otherwise sit invisible until the next delta. Reveal the
+            // existing text instantly, then let the ongoing stream continue.
+            const lastMsg = chatMessages.value[chatMessages.value.length - 1];
+            if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
+              const lastBlock = lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
+              if (lastBlock?.type === "text" && lastBlock.text) {
+                currentStreamingMessage.value = lastMsg.content || lastBlock.text;
+                currentTextSegment.value = lastBlock.text;
+                // Instant reveal (no per-char catch-up) for the backlog.
+                displayedStreamingContent.value = lastBlock.text;
+              }
+            }
           } else {
             // Normal load from IndexedDB snapshot (no active stream)
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.contentBlocks
-                ? { contentBlocks: msg.contentBlocks }
-                : {}),
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
               ...(msg.images ? { images: msg.images } : {}),
               ...(msg.feedback ? { feedback: msg.feedback } : {}),
             }));
@@ -4191,9 +4131,8 @@ export default defineComponent({
           }
 
           // Scroll to bottom after loading chat
-          await nextTick(() => {
-            scrollToBottom();
-          });
+          await nextTick();
+          scrollToBottom();
         }
       } catch (error) {
         console.error("Error loading chat:", error);
@@ -4213,10 +4152,7 @@ export default defineComponent({
 
       // Get the message for backend (with unwrapped chips)
       let backendMessage = inputMessage.value;
-      if (
-        chatInput.value &&
-        typeof chatInput.value.getMessageForBackend === "function"
-      ) {
+      if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
         backendMessage = chatInput.value.getMessageForBackend();
       }
 
@@ -4233,7 +4169,7 @@ export default defineComponent({
       // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: "user",
-        content: backendMessage, // Use backend message with full context
+        content: raw(backendMessage), // Use backend message with full context
         ...(hasImages && { images: messagesToSend }),
       });
       inputMessage.value = "";
@@ -4252,6 +4188,20 @@ export default defineComponent({
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
+      // Mint the session id here rather than inside the try below. A new chat
+      // has none yet, and the cleanup on every exit path has to clear the flag
+      // for the SAME id we set it on — otherwise an instance that re-attached
+      // never sees the streaming->done transition and spins forever.
+      if (!currentSessionId.value) {
+        currentSessionId.value = getUUIDv7();
+      }
+      const streamSessionId = currentSessionId.value;
+
+      // Mark this session as actively streaming in the cross-instance registry
+      // so that if another instance re-attaches, it knows when to stop showing
+      // its own loading indicator (see sessionStreamingState declaration).
+      sessionStreamingState[streamSessionId] = true;
+
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
@@ -4261,11 +4211,6 @@ export default defineComponent({
 
         let response: any;
         try {
-          // Ensure session ID exists for tracking this chat session
-          if (!currentSessionId.value) {
-            currentSessionId.value = getUUIDv7();
-          }
-
           // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
@@ -4294,9 +4239,7 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
-          const err: any = new Error(
-            errorBody?.message || `Server error (${response.status})`,
-          );
+          const err: any = new Error(errorBody?.message || `Server error (${response.status})`);
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
@@ -4312,7 +4255,6 @@ export default defineComponent({
         // detachment and clean up after processStream
         const streamController = currentAbortController.value;
         const streamMsgs = chatMessages.value;
-        const streamSessionId = currentSessionId.value;
 
         await processStream(reader);
 
@@ -4331,25 +4273,22 @@ export default defineComponent({
         //this will impact in the case of error showing empty message above the error message in the chat
         if (
           chatMessages.value.length > 0 &&
-          chatMessages.value[chatMessages.value.length - 1].role ===
-            "assistant" &&
+          chatMessages.value[chatMessages.value.length - 1].role === "assistant" &&
           !chatMessages.value[chatMessages.value.length - 1].content
         ) {
           chatMessages.value.pop();
         }
         let errorMessage: string;
         if (error.status === 403) {
-          errorMessage =
-            UNAUTHORIZED_MESSAGE;
+          errorMessage = UNAUTHORIZED_MESSAGE;
         } else if (error.message && error.message !== "No response body") {
           errorMessage = error.message;
         } else {
-          errorMessage =
-            "Error: Unable to get response from the server. Please try again later.";
+          errorMessage = "Error: Unable to get response from the server. Please try again later.";
         }
         chatMessages.value.push({
           role: "assistant",
-          content: errorMessage,
+          content: raw(errorMessage),
         });
         await saveToHistory(); // Save after error
       }
@@ -4357,6 +4296,14 @@ export default defineComponent({
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
+
+      // Mark the session's stream as finished in the cross-instance registry so
+      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
+      // its own loading indicator. Runs on all exit paths (success/abort/error).
+      // Uses the id captured before the request, not currentSessionId — by the
+      // time an early failure lands here the user may have switched chats, and
+      // clearing the wrong session leaves the real one flagged as streaming.
+      sessionStreamingState[streamSessionId] = false;
 
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
@@ -4397,29 +4344,17 @@ export default defineComponent({
           let imageRefSpan: Element | null = null;
 
           // Case 1: Cursor is in a text node at position 0, check previous sibling
-          if (
-            cursorNode.nodeType === Node.TEXT_NODE &&
-            range.startOffset === 0
-          ) {
+          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
             const prevSibling = cursorNode.previousSibling;
-            if (
-              prevSibling &&
-              (prevSibling as Element).classList?.contains("image-reference")
-            ) {
+            if (prevSibling && (prevSibling as Element).classList?.contains("image-reference")) {
               imageRefSpan = prevSibling as Element;
             }
           }
           // Case 2: Cursor is in an element node, check the child before cursor
-          else if (
-            cursorNode.nodeType === Node.ELEMENT_NODE &&
-            range.startOffset > 0
-          ) {
+          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
             const element = cursorNode as Element;
             const prevChild = element.childNodes[range.startOffset - 1];
-            if (
-              prevChild &&
-              (prevChild as Element).classList?.contains("image-reference")
-            ) {
+            if (prevChild && (prevChild as Element).classList?.contains("image-reference")) {
               imageRefSpan = prevChild as Element;
             }
           }
@@ -4436,9 +4371,7 @@ export default defineComponent({
               const filename = match[1];
 
               // Remove the associated image from pendingImages
-              const imageIndex = pendingImages.value.findIndex(
-                (img) => img.filename === filename,
-              );
+              const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
               if (imageIndex !== -1) {
                 pendingImages.value.splice(imageIndex, 1);
               }
@@ -4449,9 +4382,7 @@ export default defineComponent({
 
             // Trigger input event to update model
             if (contenteditable) {
-              contenteditable.dispatchEvent(
-                new Event("input", { bubbles: true }),
-              );
+              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
             }
           }
         } else {
@@ -4470,13 +4401,10 @@ export default defineComponent({
             const refStart = cursorPos - match[0].length;
 
             // Remove the entire @[filename] reference from text
-            inputMessage.value =
-              text.substring(0, refStart) + text.substring(cursorPos);
+            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
 
             // Remove the associated image from pendingImages
-            const imageIndex = pendingImages.value.findIndex(
-              (img) => img.filename === filename,
-            );
+            const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
             if (imageIndex !== -1) {
               pendingImages.value.splice(imageIndex, 1);
             }
@@ -4489,10 +4417,7 @@ export default defineComponent({
         }
       } else if (e.key === "ArrowUp") {
         const target = e.target as HTMLElement;
-        const textarea =
-          target.tagName === "TEXTAREA"
-            ? (target as HTMLTextAreaElement)
-            : null;
+        const textarea = target.tagName === "TEXTAREA" ? (target as HTMLTextAreaElement) : null;
         if (textarea && isOnFirstLine(textarea)) {
           e.preventDefault();
           navigateHistory("up");
@@ -4573,7 +4498,9 @@ export default defineComponent({
       if (file.size > MAX_IMAGE_SIZE_BYTES) {
         toast({
           variant: "error",
-          message: `Image exceeds 2MB limit (${(file.size / 1024 / 1024).toFixed(1)}MB)`,
+          message: t("toastMessages.components.imageExceeds2mbLimitMb", {
+            size: (file.size / 1024 / 1024).toFixed(1),
+          }),
         });
         return false;
       }
@@ -4582,7 +4509,7 @@ export default defineComponent({
       if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
         toast({
           variant: "error",
-          message: "Only PNG and JPEG images are supported",
+          message: t("toastMessages.components.onlyPngAndJpegImagesAre"),
         });
         return false;
       }
@@ -4611,22 +4538,18 @@ export default defineComponent({
           if (contenteditable) {
             // RichTextInput - insert at cursor position in contenteditable
             const selection = window.getSelection();
-            const range =
-              selection && selection.rangeCount > 0
-                ? selection.getRangeAt(0)
-                : null;
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
 
             // Create a non-editable span for the image reference
             const imageRefSpan = document.createElement("span");
             imageRefSpan.contentEditable = "false";
             imageRefSpan.className = "image-reference";
-            imageRefSpan.style.cssText =
-              "display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 4px; font-size: 13px; color: #2e7d32; user-select: none;";
+            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; margin: 0 2px; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 4px; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
 
             // Add image icon
             const imageIcon = document.createElement("span");
             imageIcon.textContent = "🖼️";
-            imageIcon.style.cssText = "font-size: 12px;";
+            imageIcon.style.cssText = "font-size: var(--text-xs);";
 
             // Add filename text
             const filenameText = document.createElement("span");
@@ -4635,24 +4558,21 @@ export default defineComponent({
             // Add remove button
             const removeBtn = document.createElement("button");
             removeBtn.textContent = "×";
-            removeBtn.style.cssText =
-              "display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: 16px; line-height: 1; cursor: pointer; color: #2e7d32; transition: all 0.15s ease;";
+            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 14px; height: 14px; padding: 0; margin-left: 2px; background: transparent; border: none; border-radius: 3px; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
             removeBtn.onmouseover = () => {
-              removeBtn.style.background = "#c62828";
-              removeBtn.style.color = "white";
+              removeBtn.style.background = chartColor("--color-status-negative");
+              removeBtn.style.color = chartColor("--color-white");
             };
             removeBtn.onmouseout = () => {
               removeBtn.style.background = "transparent";
-              removeBtn.style.color = "#2e7d32";
+              removeBtn.style.color = chartColor("--color-status-success-text");
             };
             removeBtn.onclick = (e) => {
               e.preventDefault();
               e.stopPropagation();
 
               // Find and remove the image from pendingImages
-              const imageIndex = pendingImages.value.findIndex(
-                (img) => img.filename === file.name,
-              );
+              const imageIndex = pendingImages.value.findIndex((img) => img.filename === file.name);
               if (imageIndex !== -1) {
                 pendingImages.value.splice(imageIndex, 1);
               }
@@ -4661,9 +4581,7 @@ export default defineComponent({
               imageRefSpan.remove();
 
               // Trigger input event
-              contenteditable.dispatchEvent(
-                new Event("input", { bubbles: true }),
-              );
+              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
             };
 
             imageRefSpan.appendChild(imageIcon);
@@ -4718,9 +4636,7 @@ export default defineComponent({
             }
 
             // Trigger input event to update model
-            contenteditable.dispatchEvent(
-              new Event("input", { bubbles: true }),
-            );
+            contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
             focusInput();
           } else {
             // Legacy textarea fallback
@@ -4736,18 +4652,12 @@ export default defineComponent({
 
               // Add space before if needed
               const needsSpaceBefore =
-                before.length > 0 &&
-                !before.endsWith(" ") &&
-                !before.endsWith("\n");
+                before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n");
               const needsSpaceAfter =
-                after.length > 0 &&
-                !after.startsWith(" ") &&
-                !after.startsWith("\n");
+                after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n");
 
               const insertion =
-                (needsSpaceBefore ? " " : "") +
-                imageRef +
-                (needsSpaceAfter ? " " : "");
+                (needsSpaceBefore ? " " : "") + imageRef + (needsSpaceAfter ? " " : "");
               inputMessage.value = before + insertion + after;
 
               // Set cursor position after the inserted reference
@@ -4760,11 +4670,7 @@ export default defineComponent({
               // Final fallback: append to end
               const currentText = inputMessage.value;
               const separator =
-                currentText &&
-                !currentText.endsWith(" ") &&
-                !currentText.endsWith("\n")
-                  ? " "
-                  : "";
+                currentText && !currentText.endsWith(" ") && !currentText.endsWith("\n") ? " " : "";
               inputMessage.value = currentText + separator + imageRef + " ";
             }
           }
@@ -4774,7 +4680,7 @@ export default defineComponent({
         reader.onerror = () => {
           toast({
             variant: "error",
-            message: `Failed to read image: ${file.name}`,
+            message: t("toastMessages.components.failedToReadImage", { error: file.name }),
           });
           resolve(false);
         };
@@ -4795,8 +4701,7 @@ export default defineComponent({
 
         if (contenteditable) {
           // Find and remove all image reference spans with this filename
-          const imageRefSpans =
-            contenteditable.querySelectorAll(".image-reference");
+          const imageRefSpans = contenteditable.querySelectorAll(".image-reference");
           imageRefSpans.forEach((span: Element) => {
             if (span.textContent === imageRef) {
               span.remove();
@@ -4869,37 +4774,6 @@ export default defineComponent({
     const closeImagePreview = () => {
       showImagePreview.value = false;
       previewImage.value = null;
-    };
-
-    // Scroll input textarea to bottom to show latest appended content
-    const scrollInputToBottom = () => {
-      // Clear any pending scroll timeout
-      if (scrollTimeoutId.value !== null) {
-        clearTimeout(scrollTimeoutId.value);
-      }
-
-      // Set new timeout for scroll
-      scrollTimeoutId.value = setTimeout(() => {
-        const textarea = chatInput.value?.$el?.querySelector("textarea");
-        if (!textarea) return;
-
-        textarea.focus();
-        textarea.setSelectionRange(
-          textarea.value.length,
-          textarea.value.length,
-        );
-
-        // Scroll all scrollable parent elements
-        let element = textarea;
-        while (element && element !== document.body) {
-          if (element.scrollHeight > element.clientHeight) {
-            element.scrollTop = element.scrollHeight;
-          }
-          element = element.parentElement;
-        }
-
-        scrollTimeoutId.value = null;
-      }, 50);
     };
 
     // Load query history from localStorage
@@ -5017,10 +4891,40 @@ export default defineComponent({
       () => store.state.selectedOrganization?.identifier,
       (newOrgId, oldOrgId) => {
         if (newOrgId && newOrgId !== oldOrgId) {
+          // A turn started under the old org must not keep streaming and
+          // writing chat history after the switch.
+          abortBackgroundStreams();
           addNewChat();
           if (props.isOpen) {
             loadHistory();
           }
+        }
+      },
+    );
+
+    // When this instance has re-attached to a stream that another instance
+    // started (its processStream completion runs in the OTHER instance's
+    // closure and can't reset our isLoading), watch the shared streaming
+    // registry and clear our own streaming UI once that session finishes.
+    watch(
+      () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
+      (isStreaming) => {
+        // React to the session going false, not to a true->false transition: an
+        // instance that re-attached mid-stream never observed the `true`, so it
+        // would see undefined->false and skip the cleanup, spinning forever.
+        // isLoading guards against acting when we aren't showing a stream.
+        if (isStreaming === false && isLoading.value) {
+          isLoading.value = false;
+          activeToolCall.value = null;
+          stopAnalyzingRotation();
+          // The owning instance's processStream already wrote the final text
+          // into the message blocks, so this instance only clears its own
+          // typewriter UI.
+          resetTypewriterState();
+          // Reflect the completed turn into the sync handshake + history so a
+          // later mount reads the finished chat, not a mid-stream snapshot.
+          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
+          nextTick(() => scrollToBottom());
         }
       },
     );
@@ -5038,6 +4942,7 @@ export default defineComponent({
           setTimeout(() => {
             componentReady.value = true;
             processPendingChips();
+            focusInput();
           }, 100);
         });
       }
@@ -5047,21 +4952,45 @@ export default defineComponent({
 
       // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
+
+      window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
 
     onUnmounted(() => {
-      // Cancel any ongoing requests when component is unmounted to prevent memory leaks
-      if (currentAbortController.value) {
-        currentAbortController.value.abort();
-        currentAbortController.value = null;
+      window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
+      // Mark unmounting FIRST so any reactive watcher that fires during teardown
+      // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
+      // not re-attach the just-detached stream back to this dying instance.
+      isUnmounting.value = true;
+
+      // Detach (not abort) any in-flight request: every mount site except
+      // MainLayout's sidebar is behind a v-if (Home's AI tab, the query-editor
+      // panels), so ordinary navigation tears this instance down and used to
+      // kill the answer mid-word. Unmount is the only hook that knows the
+      // component is actually going away — a route watcher can't tell the
+      // difference between "leaving" and "the page updated its query string".
+      const wasStreaming = !!currentAbortController.value;
+      detachCurrentStream();
+
+      // Home runs the chat in its own inline tab with the sidebar closed. If we
+      // leave Home mid-stream, open the sidebar so its instance can re-attach
+      // and keep rendering. Skip when we're still on Home (the user only
+      // switched Home tabs) — MainLayout keeps the sidebar closed there, so
+      // opening it would show the panel and the Home AI tab at once.
+      if (
+        wasStreaming &&
+        props.centeredStart &&
+        route.name !== "home" &&
+        !store.state.isAiChatEnabled
+      ) {
+        store.dispatch("setIsAiChatEnabled", true);
       }
 
-      // Abort all background streams to prevent memory leaks
-      for (const controller of backgroundStreams) {
-        controller.abort();
-      }
-      backgroundStreams.clear();
-      backgroundStreamMap.clear();
+      // Note: background streams are intentionally NOT aborted here.
+      // detachCurrentStream() moves a turn's controller into backgroundStreams
+      // specifically so it keeps running after this component instance goes
+      // away (e.g. navigation, logout); aborting them on unmount would defeat
+      // that guarantee in exactly the scenario it exists for.
 
       // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
@@ -5075,22 +5004,41 @@ export default defineComponent({
         titleIntervalId = null;
       }
 
-      //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
-      //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
-      //so we need to make sure that the currentChatTimestamp is set to the correct chatId
-      //and the chat gets updated when the component is unmounted so that the main layout component can load the correct chat
+      // Clean up the trailing-edge streaming render timer. This matters more
+      // here than a typical unmount cleanup: we intentionally let the stream
+      // keep running (see detachCurrentStream above), so displayedStreamingContent
+      // may still be ticking as this instance dies and a flush is often pending.
+      // Left alone it fires after unmount and writes into this dead instance's
+      // chatMessages, keeping the whole setup closure alive across the routine
+      // home <-> sidebar hand-off.
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
+      pendingStreamingRenderContent = null;
+
+      // We use separate O2AIChat instances (home inline tab + sidebar) and sync
+      // them via the store: publish which chat is current + a "chatUpdated" pulse
+      // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
+      //
+      // CRITICAL: this dying instance must NOT call loadChat()/addNewChat() on
+      // itself here. detachCurrentStream() (above) just registered the in-flight
+      // turn in backgroundStreamMap for the survivor to re-attach to; calling
+      // loadChat() on ourselves would immediately re-attach it back to THIS
+      // instance and delete the map entry, so the survivor then finds nothing
+      // and falls back to the stale IndexedDB snapshot — the exact reason the
+      // streamed text stopped rendering after navigating away mid-stream.
+      // Only publish the handoff state; let the survivor act on it.
       store.dispatch("setCurrentChatTimestamp", currentChatId.value);
       store.dispatch("setChatUpdated", true);
-      if (store.state.currentChatTimestamp) {
-        loadChat(store.state.currentChatTimestamp);
-      }
-      if (!store.state.currentChatTimestamp) {
-        addNewChat();
-      }
     });
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
     watch(chatUpdated, (newChatUpdated: boolean) => {
+      // A dying instance must not react to the handoff pulse it just published —
+      // otherwise it re-attaches its own detached stream and steals it from the
+      // surviving instance. Let the survivor handle it.
+      if (isUnmounting.value) return;
       if (newChatUpdated && store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
       }
@@ -5100,6 +5048,46 @@ export default defineComponent({
       store.dispatch("setChatUpdated", false);
     });
 
+    // Writing displayedStreamingContent into chatMessages triggers a
+    // re-render of the message list, which re-runs formatMessage() ->
+    // marked.parse() (incl. hljs.highlight for code blocks) over the WHOLE
+    // accumulated text, not just the new characters. The typewriter ticks
+    // every ~8ms; re-parsing/re-highlighting full markdown at that rate is
+    // O(n^2) over a response and eventually can't keep up with
+    // requestAnimationFrame, so the page appears to hang with data already
+    // in memory but not painted, then "snaps" to the final text once the
+    // stream ends and the last write goes through. Throttle how often the
+    // expensive reactive write happens, independent of how often the cheap
+    // per-character animation ref ticks; the animation itself stays smooth.
+    const STREAMING_RENDER_INTERVAL = 80; // ms between reactive markdown re-renders
+    let lastStreamingRenderTime = 0;
+    let pendingStreamingRenderContent: string | null = null;
+    let streamingRenderFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushStreamingRenderNow = (content: string) => {
+      lastStreamingRenderTime = Date.now();
+      pendingStreamingRenderContent = null;
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
+
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+        if (lastBlock && lastBlock.type === "text") {
+          // Additive-only: the stream handler writes the FULL accumulated
+          // textSegment into this block as it arrives; the typewriter only
+          // reveals a prefix of it. Never let a lagging/stalled typewriter
+          // reveal (or an empty reset) shorten what's already rendered — that
+          // was a source of "text arrived but nothing/less showed". Only grow.
+          if ((content?.length || 0) >= (lastBlock.text?.length || 0)) {
+            lastBlock.text = content;
+          }
+        }
+      }
+    };
+
     // Watch for typewriter animation updates to refresh the displayed text
     watch(displayedStreamingContent, (newContent) => {
       if (!isLoading.value) return;
@@ -5108,20 +5096,25 @@ export default defineComponent({
       // "clear previous content".
       if (!newContent) return;
 
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      if (
-        lastMessage &&
-        lastMessage.role === "assistant" &&
-        lastMessage.contentBlocks
-      ) {
-        const lastBlock =
-          lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-        if (lastBlock && lastBlock.type === "text") {
-          lastBlock.text = newContent;
-        }
+      const now = Date.now();
+      if (now - lastStreamingRenderTime >= STREAMING_RENDER_INTERVAL) {
+        flushStreamingRenderNow(newContent);
+        return;
+      }
+
+      // Trailing edge: make sure the latest content always lands even if
+      // ticks keep arriving faster than the interval.
+      pendingStreamingRenderContent = newContent;
+      if (!streamingRenderFlushTimer) {
+        const delay = STREAMING_RENDER_INTERVAL - (now - lastStreamingRenderTime);
+        streamingRenderFlushTimer = setTimeout(() => {
+          streamingRenderFlushTimer = null;
+          if (pendingStreamingRenderContent !== null) {
+            flushStreamingRenderNow(pendingStreamingRenderContent);
+          }
+        }, delay);
       }
     });
-
 
     // Filter markdown headers - convert # and ## to smaller formatting
     // This should only process actual markdown headers, not code block comments
@@ -5140,12 +5133,9 @@ export default defineComponent({
       filtered = filtered.replace(/^# (.+)$/gm, "**$1:**");
 
       // Restore code blocks
-      filtered = filtered.replace(
-        /___CODE_BLOCK_(\d+)___/g,
-        (_match, index) => {
-          return codeBlocks[parseInt(index)];
-        },
-      );
+      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
+        return codeBlocks[parseInt(index)];
+      });
 
       return filtered;
     };
@@ -5170,9 +5160,7 @@ export default defineComponent({
 
           const highlightedContent =
             token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(
-                  hljs.highlight(codeText, { language: token.lang }).value,
-                )
+              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
               : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
@@ -5212,9 +5200,7 @@ export default defineComponent({
 
           const highlightedContent =
             token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(
-                  hljs.highlight(codeText, { language: token.lang }).value,
-                )
+              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
               : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
@@ -5241,7 +5227,7 @@ export default defineComponent({
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
         const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
           (match) => {
             let cls = "json-number";
             if (/^"/.test(match)) {
@@ -5275,8 +5261,7 @@ export default defineComponent({
 
     // Parse log entries from message content and maintain order
     const parseLogEntries = (content: string) => {
-      const logEntryPattern =
-        /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
+      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
       const orderedBlocks: any[] = [];
       let lastIndex = 0;
       let match;
@@ -5340,10 +5325,7 @@ export default defineComponent({
 
           return {
             ...message,
-            blocks:
-              orderedBlocks.length > 0
-                ? []
-                : processMessageContent(message.content),
+            blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
             contentBlocks: combinedContentBlocks,
           };
         }
@@ -5357,19 +5339,11 @@ export default defineComponent({
       });
     });
 
-    // Check if there's an assistant message in progress (for loading indicator positioning)
-    const hasAssistantMessage = computed(() => {
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === "assistant";
-    });
-
     const retryGeneration = async (message: any) => {
       if (!message || message.role !== "assistant") return;
 
       // Find the index of this assistant message
-      const messageIndex = chatMessages.value.findIndex(
-        (m) => m.content === message.content,
-      );
+      const messageIndex = chatMessages.value.findIndex((m) => m.content === message.content);
       if (messageIndex === -1) return;
 
       // Find the corresponding user message that came before this assistant message
@@ -5450,10 +5424,7 @@ export default defineComponent({
     };
 
     // Tool call expansion helpers
-    const toggleToolCallExpanded = (
-      messageIndex: number,
-      blockIndex: number,
-    ) => {
+    const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedToolCalls.value.has(key)) {
         expandedToolCalls.value.delete(key);
@@ -5467,10 +5438,7 @@ export default defineComponent({
     };
 
     // Log entry expansion helpers
-    const toggleLogEntryExpanded = (
-      messageIndex: number,
-      blockIndex: number,
-    ) => {
+    const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedLogEntries.value.has(key)) {
         expandedLogEntries.value.delete(key);
@@ -5503,8 +5471,7 @@ export default defineComponent({
 
       // Handle testFunction context (VRL validation)
       if (context.vrl) data.vrl = context.vrl;
-      if (context.request_body?.function)
-        data.vrl = context.request_body.function;
+      if (context.request_body?.function) data.vrl = context.request_body.function;
 
       // Handle flat SQL from SearchSQL enriched context
       if (context.sql) data.query = context.sql;
@@ -5519,15 +5486,17 @@ export default defineComponent({
       return Object.keys(data).length > 0 ? data : null;
     };
 
-    const hasToolCallDetails = (block: ContentBlock) => {
+    // `response` is stamped onto blocks by the stream handler but is not part
+    // of the shared ContentBlock interface.
+    const hasToolCallDetails = (block: ContentBlock & { response?: Record<string, any> }) => {
       // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
       if (block.success === false) return true;
-      if (block.success !== false && block.summary) return true;
+      if (block.summary) return true;
       if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };
 
-    const formatToolCallMessage = (block: ContentBlock) => {
+    const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
       // Show error message for failed tools
       // Tool-specific messages (both success and error)
       if (block.tool === "testFunction") {
@@ -5633,7 +5602,7 @@ export default defineComponent({
         await saveToHistory();
         toast({
           variant: "success",
-          message: "Thanks for your feedback!",
+          message: t("toastMessages.components.thanksForYourFeedback"),
         });
       }
     };
@@ -5656,12 +5625,12 @@ export default defineComponent({
         await saveToHistory();
         toast({
           variant: "success",
-          message: "Thanks for your feedback!",
+          message: t("toastMessages.components.thanksForYourFeedback"),
         });
       }
     };
     const o2AiTitleLogo = computed(() => {
-      return store.state.theme == "dark"
+      return isDark.value
         ? getImageURL("images/common/o2_ai_logo_dark.svg")
         : getImageURL("images/common/o2_ai_logo.svg");
     });
@@ -5674,12 +5643,11 @@ export default defineComponent({
         return chatHistory.value;
       }
       const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter((chat) =>
-        chat.title.toLowerCase().includes(searchTerm),
-      );
+      return chatHistory.value.filter((chat) => chat.title.toLowerCase().includes(searchTerm));
     });
 
     return {
+      raw,
       inputMessage,
       chatMessages,
       isLoading,
@@ -5788,233 +5756,29 @@ export default defineComponent({
 });
 </script>
 
-<style>
-/* =============================================
-   .chat-container and nested rules
-   ============================================= */
+<style scoped>
+/* keep(generated-content): markdown/log/code markup is injected with v-html, so
+   it carries no scope attribute and cannot take utility classes — it can only be
+   reached from here through :deep().
+   keep(lib-override:hljs): highlight.js emits its own .hljs-* class names; the
+   token mapping below mirrors lib/core/Code/OCodeBlock.vue exactly (D6).
+   keep(keyframes): @keyframes and the `animation:` that consumes it must live in
+   the same block — the scoped compiler renames both together.
+   keep(complex-state): .tool-call-item's status x has-details x hover matrix and
+   .send-button's :not(.disabled):not([disabled]):not(:disabled) guard have no
+   utility equivalent (`enabled:` covers :disabled, not the .disabled class). */
 
-
-.chat-container .chat-header {
-  padding: 0px 12px 4px 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
-  border-bottom: 1px solid var(--color-separator);
-  flex-shrink: 0;
-  background: var(--q-page-background);
-  z-index: 2;
+/* ============================================================
+   keep(keyframes) — each consumer sits next to its @keyframes
+   ============================================================ */
+.tool-call-indicator {
+  animation: fadeIn 0.3s ease;
 }
 
-.chat-container .chat-header .chat-title {
-  font-weight: bold;
-}
-
-.chat-container .chat-header .chat-title-dropdown {
-  padding: 6px 12px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-  max-width: 210px;
-  height: 32px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-}
-
-.chat-container .chat-header .chat-title-dropdown:hover {
-  background-color: var(--q-hover-color);
-}
-
-.chat-container .chat-header .chat-title-dropdown span {
-  color: var(--q-primary-text);
-}
-
-.chat-container .chat-header .chat-title-dropdown .chat-title-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 180px;
-}
-
-.chat-container .chat-session-title {
-  padding: 8px 16px;
-  font-size: 14px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--color-separator);
-}
-
-.chat-container .chat-session-title.light-mode {
-  color: #1a202c;
-  background: linear-gradient(
-    to right,
-    rgba(99, 102, 241, 0.08),
-    transparent
-  );
-}
-
-.chat-container .chat-session-title.dark-mode {
-  color: #e2e8f0;
-  background: linear-gradient(
-    to right,
-    rgba(99, 102, 241, 0.15),
-    transparent
-  );
-}
-
-.chat-container .chat-session-title .title-text {
-  font-weight: 600;
-}
-
-.chat-container .chat-session-title .typing-cursor {
-  animation: blink 0.7s infinite;
-  margin-left: 2px;
-  font-weight: 400;
-}
-
-@keyframes blink {
-  0%,
-  50% {
-    opacity: 1;
-  }
-  51%,
-  100% {
-    opacity: 0;
-  }
-}
-
-.chat-container .chat-content {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: transparent;
-  position: relative;
-}
-
-.chat-container .messages-container {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  background: transparent;
-  max-width: 900px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.chat-container .welcome-section {
-  padding: 24px;
-  background: linear-gradient(
-    to right,
-    rgba(var(--q-primary-rgb), 0.05),
-    rgba(var(--q-primary-rgb), 0.1)
-  );
-  border-radius: 8px;
-  margin-bottom: 24px;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.chat-container .welcome-section.welcome-section--centered {
-  background: transparent;
-  padding: 0;
-  margin-bottom: 0;
-}
-
-.chat-container .centered-input-wrap {
-  max-width: 900px;
-  width: calc(100% - 16px);
-  margin-top: 1.25em;
-  font-size: 1rem;
-}
-
-.chat-container .centered-input-wrap .rich-text-input {
-  font-size: 1rem;
-}
-
-.chat-container .fixed-analyzing-indicator {
-  padding: 12px 16px;
-  margin: 0 16px 8px 16px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeInSlide 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.chat-container .fixed-analyzing-indicator.light-mode {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-  border: 1px solid #d0d8e8;
-}
-
-.chat-container .fixed-analyzing-indicator.dark-mode {
-  background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-  border: 1px solid #3a3f55;
-}
-
-.chat-container .fixed-analyzing-indicator .analyzing-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 900px;
-  width: 100%;
-}
-
-.chat-container .fixed-analyzing-indicator .analyzing-message {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--q-primary);
-}
-
-.chat-container .fixed-analyzing-indicator .tool-call-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-}
-
-.chat-container .fixed-analyzing-indicator .tool-call-context-inline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  margin-top: 4px;
-}
-
-.chat-container .fixed-analyzing-indicator .context-query-inline {
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: rgba(0, 0, 0, 0.05);
-  max-width: 500px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-container .fixed-analyzing-indicator .context-tag-inline {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(var(--q-primary-rgb), 0.1);
-  color: var(--q-primary);
-  font-weight: 500;
-}
-
-@keyframes fadeInSlide {
+@keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translateY(-0.625rem);
   }
   to {
     opacity: 1;
@@ -6022,202 +5786,175 @@ export default defineComponent({
   }
 }
 
-.chat-container .chat-input-container {
-  position: relative;
-  flex-shrink: 0;
-  max-width: 900px;
-  width: calc(100% - 0px);
-  margin: 8px auto;
-  padding: 0 8px;
+.fixed-analyzing-indicator {
+  animation: fadeInSlide 0.3s ease;
 }
 
-.chat-container .unified-input-box {
-  display: flex;
-  flex-direction: column;
-  padding: 4px 8px;
-  border-radius: 12px;
-  transition: all 0.2s ease;
-  gap: 12px;
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-0.625rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-.chat-container .unified-input-box.light-mode {
-  background: #ffffff;
-  border: 1px solid #e4e7ec;
+/* Scroll-to-bottom button entrance. Rises from below with a slight scale-up, so
+   it is not the same curve as fadeIn/fadeInSlide above (those drop from above). */
+.scroll-to-bottom-btn {
+  animation: fadeInUp 0.3s ease;
 }
 
-.chat-container .unified-input-box.light-mode:focus-within {
-  border: 1px solid transparent;
-  box-shadow: 0 0 0 2px #8b5cf6;
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(0.625rem) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.chat-container .unified-input-box.dark-mode {
-  background: #191919;
-  border: 1px solid #323232;
+/* ============================================================
+   keep(complex-state) — tool call status matrix.
+   Status tint x (has-details) hover x light/dark. Each status maps to its
+   semantic token; the light/dark pairs differ only in mix strength, so dark
+   overrides just the percentage.
+   ============================================================ */
+.tool-call-item {
+  background: color-mix(in srgb, var(--color-status-positive) 8%, transparent);
+}
+.dark .tool-call-item {
+  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
+}
+.tool-call-item.has-details {
+  cursor: pointer;
+}
+.tool-call-item.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
+}
+.dark .tool-call-item.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-positive) 18%, transparent);
 }
 
-.chat-container .unified-input-box.dark-mode:focus-within {
-  border: 1px solid transparent;
-  box-shadow: 0 0 0 2px #5a6ec3;
+.tool-call-item.error {
+  background: color-mix(in srgb, var(--color-status-negative) 8%, transparent);
+}
+.dark .tool-call-item.error {
+  background: color-mix(in srgb, var(--color-status-negative) 12%, transparent);
+}
+.tool-call-item.error.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-negative) 15%, transparent);
+}
+.dark .tool-call-item.error.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-negative) 22%, transparent);
 }
 
-.chat-container .unified-input-box .rich-text-input-wrapper {
+.tool-call-item.timeout {
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+}
+.dark .tool-call-item.timeout {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+.tool-call-item.timeout.has-details:hover {
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+}
+.dark .tool-call-item.timeout.has-details:hover {
+  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
+}
+
+.tool-call-item.pending-confirmation {
+  cursor: default;
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+.dark .tool-call-item.pending-confirmation {
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 25%, transparent);
+}
+
+.tool-call-item.pending-navigation {
+  cursor: default;
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+}
+.dark .tool-call-item.pending-navigation {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 25%, transparent);
+}
+
+/* ============================================================
+   keep(complex-state) — send button.
+   The enabled guard is a .disabled CLASS plus [disabled] plus :disabled;
+   Tailwind's `enabled:` variant only covers the last two.
+   ============================================================ */
+.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
+  background: var(--color-gradient-ai) !important;
+  box-shadow: 0 0.375rem 1.25rem 0 color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  transform: translateY(-0.0625rem) !important;
+}
+.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
+  transform: translateY(0) !important;
+  box-shadow: 0 0.125rem 0.625rem 0 color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+}
+
+/* ============================================================
+   keep(generated-content) — RichTextInput is a child component, so its
+   internals carry no scope attribute of ours.
+   ============================================================ */
+.unified-input-box :deep(.rich-text-input-wrapper) {
   width: 100%;
-  min-height: 40px;
+  min-height: 2.5rem;
+}
+.unified-input-box :deep(.rich-text-input) {
+  padding: 0.25rem 0;
 }
 
-.chat-container .unified-input-box .rich-text-input {
-  padding: 4px 0;
-}
-
-.chat-container .input-bottom-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-top: 8px;
-}
-
-
-.chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-icon {
-  color: var(--q-primary) !important;
-}
-
-.chat-container .auto-nav-toggle-btn.auto-nav-enabled .auto-nav-label {
-  color: var(--q-primary);
-}
-
-
-.chat-container .message {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.dark .chat-container .message {
-  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
-}
-
-.chat-container .message {
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-}
-
-.chat-container .message .message-content {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-  width: 100%;
-}
-
-.chat-container .message .message-blocks {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: auto;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-.chat-container .message .feedback-buttons {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-top: 4px;
-}
-
-.chat-container .message .feedback-buttons > * {
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-
-.chat-container .message .feedback-buttons > *:hover {
-  opacity: 1;
-}
-
-.chat-container .message .feedback-buttons.feedback-active > * {
-  opacity: 1;
-}
-
-.chat-container .message .feedback-buttons .feedback-selected {
-  color: var(--o2-primary-color);
-  opacity: 1;
-}
-
-.chat-container .message .text-block {
-  width: 100%;
-  overflow-wrap: break-word;
-  max-width: 100%;
-}
-
-.chat-container .message .text-block:not(:last-child) {
-  margin-bottom: 4px;
-}
-
-.chat-container .message .text-block pre,
-.chat-container .message .text-block .generated-code-block {
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-wrap: break-word;
-  margin: 0;
-  padding: 0;
-  line-height: 1.4;
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.chat-container .message .text-block pre code,
-.chat-container .message .text-block .generated-code-block code {
-  padding: 8px;
-  margin: 0;
-  display: block;
-  max-width: 100%;
-}
-
-.chat-container .message .text-block h1 {
-  font-size: 1.5rem !important;
+/* ============================================================
+   keep(generated-content) — markdown rendered from v-html inside .text-block.
+   `!important` retained: these fight the global base-elements typography layer.
+   ============================================================ */
+.text-block :deep(h1) {
+  font-size: var(--text-2xl) !important;
   font-weight: 600 !important;
-  margin: 16px 0 8px 0 !important;
+  margin: 1rem 0 0.5rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h2) {
+  font-size: var(--text-xl) !important;
+  font-weight: 600 !important;
+  margin: 0.875rem 0 0.4375rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h3) {
+  font-size: var(--text-lg) !important;
+  font-weight: 600 !important;
+  margin: 0.75rem 0 0.375rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h4) {
+  font-size: var(--text-base) !important;
+  font-weight: 600 !important;
+  margin: 0.625rem 0 0.3125rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h5) {
+  font-size: var(--text-sm) !important;
+  font-weight: 600 !important;
+  margin: 0.5rem 0 0.25rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h6) {
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  margin: 0.5rem 0 0.25rem 0 !important;
   line-height: 1.3 !important;
 }
 
-.chat-container .message .text-block h2 {
-  font-size: 1.25rem !important;
-  font-weight: 600 !important;
-  margin: 14px 0 7px 0 !important;
-  line-height: 1.3 !important;
-}
-
-.chat-container .message .text-block h3 {
-  font-size: 1.125rem !important;
-  font-weight: 600 !important;
-  margin: 12px 0 6px 0 !important;
-  line-height: 1.3 !important;
-}
-
-.chat-container .message .text-block h4 {
-  font-size: 1rem !important;
-  font-weight: 600 !important;
-  margin: 10px 0 5px 0 !important;
-  line-height: 1.3 !important;
-}
-
-.chat-container .message .text-block h5 {
-  font-size: 0.875rem !important;
-  font-weight: 600 !important;
-  margin: 8px 0 4px 0 !important;
-  line-height: 1.3 !important;
-}
-
-.chat-container .message .text-block h6 {
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  margin: 8px 0 4px 0 !important;
-  line-height: 1.3 !important;
-}
-
-.chat-container .message .text-block table {
+.text-block :deep(table) {
   max-width: 100%;
   width: 100%;
   table-layout: fixed;
@@ -6226,142 +5963,74 @@ export default defineComponent({
   display: block;
   white-space: nowrap;
 }
-
-.chat-container .message .text-block table th,
-.chat-container .message .text-block table td {
-  padding: 8px 12px;
-  border: 1px solid #e2e8f0;
+.text-block :deep(th),
+.text-block :deep(td) {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-default);
   word-wrap: break-word;
   overflow-wrap: break-word;
   text-overflow: ellipsis;
   overflow: hidden;
 }
 
-.chat-container .message .text-block p,
-.chat-container .message .text-block div,
-.chat-container .message .text-block span {
+.text-block :deep(p),
+.text-block :deep(div),
+.text-block :deep(span) {
   word-wrap: break-word;
   overflow-wrap: break-word;
   word-break: break-word;
   max-width: 100%;
 }
 
-.chat-container .message .text-block ol {
+.text-block :deep(ol) {
   list-style-type: decimal;
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
-
-.chat-container .message .text-block ul {
+.text-block :deep(ul) {
   list-style-type: disc;
   padding-left: 1.5em;
   margin: 0.5em 0;
 }
-
-.chat-container .message .text-block li {
+.text-block :deep(li) {
   margin: 0.25em 0;
 }
 
-.chat-container .message .code-block {
-  border-radius: 4px;
-  overflow: hidden;
-  margin: 0;
-}
-
-.chat-container .message .code-block-header {
-  padding: 4px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.chat-container .message .code-type-label {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: rgba(var(--q-primary-rgb), 0.1);
-}
-
-.code-type-label {
-  color: var(--q-primary);
-}
-
-.dark .code-type-label {
-  color: #e2e2e2;
-}
-
-.chat-container .message .generated-code-block {
+/* ============================================================
+   keep(generated-content) — code blocks.
+   .generated-code-block is emitted BOTH from the template and by the markdown
+   renderer (which rewrites <pre> into <span class="generated-code-block">), so
+   it must be reachable through :deep() either way. The background/border are
+   set here rather than as utilities because they have to beat .hljs below,
+   which is unlayered and would otherwise win over @layer utilities.
+   ============================================================ */
+.message-blocks :deep(.generated-code-block),
+.text-block :deep(pre) {
+  display: block;
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: break-word;
   margin: 0;
   padding: 0;
   line-height: 1.4;
+  max-width: 100%;
+  overflow-x: auto;
 }
-
-.chat-container .message .generated-code-block code {
-  padding: 8px;
-  margin: 0;
+.message-blocks :deep(.generated-code-block code),
+.text-block :deep(pre code) {
   display: block;
-}
-
-.dark .generated-code-block code {
-  background-color: var(--o2-primary-background);
-  border: 0.5px solid #e1e1e124;
+  padding: 0.5rem;
+  margin: 0;
+  max-width: 100%;
+  background-color: var(--color-surface-base);
+  border: 1px solid var(--color-border-subtle);
   border-top: none;
 }
 
-.generated-code-block code {
-  background-color: #ffffff;
-  border: 0.5px solid #00000024;
-  border-top: none;
-  color: black;
-}
-
-.chat-container .message .code-block-footer {
-  padding: 4px 8px;
-  display: flex;
-}
-
-.chat-container .message.user {
-  background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-  border: 1px solid #e0e6ff;
-  border-radius: 12px;
-  color: #2c3e50;
-  margin-left: 40px;
-  width: calc(100% - 40px);
-}
-
-.chat-container .message.assistant {
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  color: var(--q-primary-text);
-  margin-left: 0;
-  width: 100%;
-}
-
-.dark .chat-container .message.user {
-  background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
-  border: 1px solid #3a3d5c;
-  border-radius: 12px;
-  color: #e2e8f0;
-  margin-left: 40px;
-  width: calc(100% - 40px);
-}
-
-.dark .chat-container .message.assistant {
-  background: #1a1a1a;
-  border: 1px solid #333333;
-  border-radius: 12px;
-  color: #e2e2e2;
-  margin-left: 0;
-  width: 100%;
-}
-
-.chat-container ul pre,
-.chat-container ol pre {
+/* Markdown lists can nest a fenced block; hljs sets the palette, these two
+   only need the reset. */
+.text-block :deep(ul pre),
+.text-block :deep(ol pre) {
   white-space: pre-wrap;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -6369,971 +6038,111 @@ export default defineComponent({
   padding: 0;
 }
 
-.chat-container ul pre code,
-.chat-container ol pre code {
-  background-color: white;
-  color: black;
-}
-
-/* =============================================
-   Top-level rules (outside .chat-container)
-   ============================================= */
-
-
-
-.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
-  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
-  box-shadow: 0 6px 20px 0 rgba(139, 92, 246, 0.4) !important;
-  transform: translateY(-1px) !important;
-}
-
-.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
-  transform: translateY(0) !important;
-  box-shadow: 0 2px 10px 0 rgba(139, 92, 246, 0.3) !important;
-}
-
-
-.stop-button:hover {
-  background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
-  box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
-  transform: translateY(-1px) !important;
-}
-
-.stop-button:active {
-  transform: translateY(0) !important;
-  box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
-}
-
-
-.preview-image:hover {
-  transform: scale(1.05);
-}
-
-.image-remove-btn:hover {
-  background-color: #dc2626 !important;
-}
-
-.message-images .message-image-item img:hover {
-  transform: scale(1.02);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-
-.code-block-header {
-  background-color: #ecf0f5;
-}
-
-.dark .code-block-header {
-  background-color: #3b3b3b;
-  border: 1px 1px 0px 1px solid var(--o2-border-input);
-}
-
-@keyframes bounce {
-  0%,
-  20%,
-  50%,
-  80%,
-  100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-3px);
-  }
-  60% {
-    transform: translateY(-2px);
-  }
-}
-
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.tool-call-indicator {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-radius: 12px;
-  margin: 8px 0;
-  animation: fadeIn 0.3s ease;
-}
-
-.tool-call-indicator.light-mode {
-  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-  border: 1px solid #d0d8e8;
-}
-
-.tool-call-indicator.dark-mode {
-  background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-  border: 1px solid #3a3f55;
-}
-
-/* Completed step shown live during streaming — more compact and subdued
- than the active (spinner) indicator so the in-flight step still stands out. */
-.tool-call-indicator.completed {
-    padding: 8px 16px;
-    margin: 4px 0;
-
-    .tool-call-message {
-      font-weight: 500;
-      opacity: 0.85;
-    }
-  }
-
-.tool-call-indicator .tool-call-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-
-.tool-call-indicator .tool-call-info {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1;
-  min-width: 0;
-}
-
-.tool-call-indicator .tool-call-status {
-  font-size: 12px;
-  font-style: italic;
-  opacity: 0.7;
-  margin-bottom: 2px;
-}
-
-.tool-call-indicator .tool-call-status {
-  color: #6b7280;
-}
-
-.dark .tool-call-indicator .tool-call-status {
-  color: #9ca3af;
-}
-
-.tool-call-indicator .tool-call-message {
+/* ============================================================
+   keep(generated-content) — formatLogEntryContent() emits these json spans.
+   ============================================================ */
+.log-entry-code :deep(.json-key) {
+  color: var(--color-json-key);
   font-weight: 600;
-  font-size: 14px;
 }
-
-.tool-call-indicator .tool-call-message {
-  color: #4a5568;
+.log-entry-code :deep(.json-string) {
+  color: var(--color-json-string);
 }
-
-.dark .tool-call-indicator .tool-call-message {
-  color: #e2e8f0;
+.log-entry-code :deep(.json-number) {
+  color: var(--color-json-number);
 }
-
-.tool-call-indicator .tool-call-context {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.tool-call-indicator .context-item {
-  width: 100%;
-}
-
-.tool-call-indicator .context-query {
-  display: block;
-  font-family: "Fira Code", "Consolas", monospace;
-  font-size: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  max-width: 100%;
-  overflow: hidden;
-}
-
-.tool-call-indicator .context-query {
-  background: #ffffff;
-  color: #2d3748;
-  border: 1px solid #e2e8f0;
-}
-
-.dark .tool-call-indicator .context-query {
-  background: #1a1a1a;
-  color: #a0aec0;
-  border: 1px solid #333;
-}
-
-.tool-call-indicator .context-tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: 11px;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-weight: 500;
-}
-
-.tool-call-indicator .context-tag {
-  background: rgba(139, 92, 246, 0.1);
-  color: #8b5cf6;
-}
-
-.dark .tool-call-indicator .context-tag {
-  background: rgba(139, 92, 246, 0.2);
-  color: #a0aec0;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-
-.tool-call-item {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-bottom: 8px;
-}
-
-.tool-call-item.has-details {
-  cursor: pointer;
-}
-
-.tool-call-item.has-details:hover.light-mode {
-  background: rgba(76, 175, 80, 0.12);
-}
-
-.tool-call-item.has-details:hover.dark-mode {
-  background: rgba(76, 175, 80, 0.18);
-}
-
-.tool-call-item.light-mode {
-  background: rgba(76, 175, 80, 0.08);
-  color: #4a5568;
-}
-
-.tool-call-item.dark-mode {
-  background: rgba(76, 175, 80, 0.12);
-  color: #a0aec0;
-}
-
-.tool-call-item.error.light-mode {
-  background: rgba(244, 67, 54, 0.08);
-}
-
-.tool-call-item.error.dark-mode {
-  background: rgba(244, 67, 54, 0.12);
-}
-
-.tool-call-item.error.has-details:hover.light-mode {
-  background: rgba(244, 67, 54, 0.15);
-}
-
-.tool-call-item.error.has-details:hover.dark-mode {
-  background: rgba(244, 67, 54, 0.22);
-}
-
-.tool-call-item.timeout.light-mode {
-  background: rgba(255, 152, 0, 0.08);
-}
-
-.tool-call-item.timeout.dark-mode {
-  background: rgba(255, 152, 0, 0.12);
-}
-
-.tool-call-item.timeout.has-details:hover.light-mode {
-  background: rgba(255, 152, 0, 0.15);
-}
-
-.tool-call-item.timeout.has-details:hover.dark-mode {
-  background: rgba(255, 152, 0, 0.22);
-}
-
-.tool-call-item.pending-confirmation {
-  cursor: default;
-}
-
-.tool-call-item.pending-confirmation.light-mode {
-  background: rgba(255, 193, 7, 0.12);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-}
-
-.tool-call-item.pending-confirmation.dark-mode {
-  background: rgba(255, 193, 7, 0.15);
-  border: 1px solid rgba(255, 193, 7, 0.25);
-}
-
-.tool-call-item.pending-navigation {
-  cursor: default;
-}
-
-.tool-call-item.pending-navigation.light-mode {
-  background: rgba(25, 118, 210, 0.08);
-  border: 1px solid rgba(25, 118, 210, 0.3);
-}
-
-.tool-call-item.pending-navigation.dark-mode {
-  background: rgba(66, 165, 245, 0.12);
-  border: 1px solid rgba(66, 165, 245, 0.25);
-}
-
-.tool-call-item .tool-confirmation-inline {
-  margin-top: 12px;
-}
-
-.tool-call-item .tool-confirmation-inline .confirmation-content {
-  padding: 16px;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tool-call-item .tool-confirmation-inline .confirmation-content {
-  background: #fffbeb;
-  border: 1px solid #fde68a;
-}
-
-.dark .tool-call-item .tool-confirmation-inline .confirmation-content {
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-}
-
-.tool-call-item .tool-call-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tool-call-item .tool-call-name {
-  font-weight: 500;
-  flex: 1;
-}
-
-.tool-call-item .tool-call-name code {
-  font-family: "Fira Code", "Consolas", monospace;
-  font-size: 12px;
-  padding: 1px 4px;
-  border-radius: 3px;
-}
-
-.tool-call-item .tool-call-name code {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.dark .tool-call-item .tool-call-name code {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.tool-call-item .expand-icon {
-  opacity: 0.6;
-  transition: transform 0.2s;
-}
-
-.tool-call-item .navigation-icon {
-  cursor: pointer;
-  margin-left: auto;
-  opacity: 0.7;
-  transition: opacity 0.2s;
-}
-
-.tool-call-item .navigation-icon:hover {
-  opacity: 1;
-}
-
-.tool-call-item .navigation-block {
-  margin: 4px 0;
-}
-
-.tool-call-item .navigation-block.light-mode {
-  background: rgba(66, 165, 245, 0.08);
-}
-
-.tool-call-item .navigation-block.dark-mode {
-  background: rgba(66, 165, 245, 0.12);
-}
-
-.tool-call-item .navigation-block .navigation-block-btn {
-  font-size: 13px;
-}
-
-.tool-call-item .tool-call-details {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(128, 128, 128, 0.2);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tool-call-item .tool-call-details .detail-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.tool-call-item .tool-call-details .detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.tool-call-item .tool-call-details .detail-label {
-  font-size: 11px;
+.log-entry-code :deep(.json-boolean) {
+  color: var(--color-json-boolean);
   font-weight: 600;
-  text-transform: uppercase;
-  opacity: 0.6;
 }
-
-.tool-call-item .tool-call-details .copy-btn {
-  opacity: 0.6;
-}
-
-.tool-call-item .tool-call-details .copy-btn:hover {
-  opacity: 1;
-}
-
-.tool-call-item .tool-call-details .detail-value {
-  font-size: 12px;
-  user-select: text;
-}
-
-.tool-call-item .tool-call-details .detail-value.query-value {
-  font-family: "Fira Code", "Consolas", monospace;
-  padding: 8px;
-  border-radius: 4px;
-  white-space: pre-wrap;
-  word-break: break-all;
-  user-select: text;
-  cursor: text;
-}
-
-.tool-call-item .tool-call-details .detail-value.query-value {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.dark .tool-call-item .tool-call-details .detail-value.query-value {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.log-entry-item {
-  display: flex;
-  flex-direction: column;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  margin-bottom: 4px;
-  cursor: pointer;
-}
-
-.log-entry-item.light-mode {
-  background: rgba(33, 150, 243, 0.08);
-  color: #4a5568;
-}
-
-.log-entry-item.dark-mode {
-  background: #252a31;
-  border: 1px solid #3a4149;
-  color: #e2e8f0;
-}
-
-.log-entry-item:hover.light-mode {
-  background: rgba(33, 150, 243, 0.12);
-}
-
-.log-entry-item:hover.dark-mode {
-  background: #20242e;
-  border-color: #4a5568;
-}
-
-.log-entry-item .log-entry-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.log-entry-item .log-entry-info {
-  flex: 1;
-  font-weight: 500;
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.log-entry-item .expand-icon {
-  opacity: 0.6;
-  transition: transform 0.2s;
-}
-
-.log-entry-item .log-entry-details {
-  margin-top: 10px;
-}
-
-.log-entry-item .log-entry-content {
-  position: relative;
-  border-radius: 6px;
-  border: 1px solid;
-  overflow: hidden;
-}
-
-.log-entry-item .log-entry-content {
-  background: #ffffff;
-  border-color: #e4e7ec;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.dark .log-entry-item .log-entry-content {
-  background: #1e293b;
-  border-color: #475569;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.log-entry-item .log-entry-content .copy-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0.6;
-  z-index: 1;
-  background: rgba(128, 128, 128, 0.1);
-  border-radius: 4px;
-  padding: 4px 8px;
-}
-
-.log-entry-item .log-entry-content .copy-btn:hover {
-  opacity: 1;
-}
-
-.log-entry-item .log-entry-content .copy-btn:hover {
-  background: rgba(0, 0, 0, 0.08);
-}
-
-.dark .log-entry-item .log-entry-content .copy-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
-}
-
-.log-entry-item .log-entry-content .log-entry-code {
-  display: block;
-  font-family: "Monaco", "Menlo", "Courier New", monospace;
-  font-size: 11px;
-  line-height: 1.5;
-  padding: 12px;
-  padding-right: 40px;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  user-select: text;
-  cursor: text;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.log-entry-item .log-entry-content .log-entry-code {
-  background: #f8fafc;
-  color: #1a202c;
-}
-
-.dark .log-entry-item .log-entry-content .log-entry-code {
-  background: #0d1017;
-  color: #e2e8f0;
-}
-
-.log-entry-item .log-entry-content .log-entry-code .json-key {
-  color: #0066cc;
+.log-entry-code :deep(.json-null) {
+  color: var(--color-json-null);
   font-weight: 600;
 }
 
-.log-entry-item .log-entry-content .log-entry-code .json-string {
-  color: #22863a;
-}
-
-.log-entry-item .log-entry-content .log-entry-code .json-number {
-  color: #005cc5;
-}
-
-.log-entry-item .log-entry-content .log-entry-code .json-boolean {
-  color: #d73a49;
-  font-weight: 600;
-}
-
-.log-entry-item .log-entry-content .log-entry-code .json-null {
-  color: #6f42c1;
-  font-weight: 600;
-}
-
-.dark .log-entry-code .json-key {
-  color: #60a5fa;
-}
-
-.dark .log-entry-code .json-string {
-  color: #86efac;
-}
-
-.dark .log-entry-code .json-number {
-  color: #7dd3fc;
-}
-
-.dark .log-entry-code .json-boolean {
-  color: #fca5a5;
-}
-
-.dark .log-entry-code .json-null {
-  color: #c4b5fd;
-}
-
-.tool-call-item .tool-response-hits {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 12px;
-  font-family: "Fira Code", "Consolas", monospace;
-  padding: 6px 8px;
-  border-radius: 4px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.tool-call-item .tool-response-hits {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.dark .tool-call-item .tool-response-hits {
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.tool-call-item .tool-response-hit {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 2px 0;
-}
-
-.tool-call-item .tool-response-hit:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-  padding-bottom: 4px;
-}
-
-.tool-call-item .tool-response-list-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 4px 0;
-}
-
-.tool-call-item .tool-response-list-item:not(:last-child) {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-  padding-bottom: 6px;
-}
-
-.tool-call-item .hit-field {
-  word-break: break-all;
-  user-select: text;
-  cursor: text;
-}
-
-.tool-call-item .hit-key {
-  opacity: 0.6;
-  font-weight: 600;
-}
-
-.tool-call-item .hit-error {
-  color: #f44336;
-}
-
-.tool-call-item .tool-response-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.tool-call-item .tool-call-error {
-  font-size: 11px;
-  color: #f44336;
-  font-style: italic;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tool-call-item .tool-call-query {
-  font-family: "Fira Code", "Consolas", monospace;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  max-width: 250px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tool-call-item .tool-call-query {
-  background: rgba(0, 0, 0, 0.05);
-  color: #666;
-}
-
-.dark .tool-call-item .tool-call-query {
-  background: rgba(255, 255, 255, 0.08);
-  color: #888;
-}
-
-.tool-call-item .tool-error-message {
-  color: #f44336;
-}
-
-.tool-call-item .tool-suggestion {
-  font-style: italic;
-  opacity: 0.85;
-}
-
-.stream-error-block {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border-left: 3px solid #f44336;
-  margin-bottom: 8px;
-  font-size: 13px;
-}
-
-.stream-error-block.light-mode {
-  background: rgba(244, 67, 54, 0.06);
-  color: #4a5568;
-}
-
-.stream-error-block.dark-mode {
-  background: rgba(244, 67, 54, 0.1);
-  color: #a0aec0;
-}
-
-.stream-error-block .stream-error-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.stream-error-block .stream-error-message {
-  font-weight: 500;
-  color: #f44336;
-}
-
-.stream-error-block .stream-error-suggestion {
-  margin-top: 6px;
-  padding-left: 24px;
-  font-style: italic;
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.stream-error-block .stream-error-recoverable {
-  margin-top: 4px;
-  padding-left: 24px;
-  font-size: 11px;
-  opacity: 0.7;
-}
-
-/* =============================================
-   Syntax highlighting — light mode
-   ============================================= */
-.hljs {
+/* ============================================================
+   keep(lib-override:hljs) — highlight.js output. Token mapping mirrors
+   lib/core/Code/OCodeBlock.vue (D6); tokens flip via dark.css, so one rule set
+   covers both themes.
+   ============================================================ */
+.message-blocks :deep(.hljs) {
   display: block;
   overflow-x: auto;
   padding: 0.5em;
-  color: #24292e;
-  background: #ffffff;
+  color: var(--color-syntax-text);
+  background: var(--color-syntax-bg);
 }
-
-.hljs-doctag,
-.hljs-keyword,
-.hljs-meta .hljs-keyword,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type,
-.hljs-variable.language_ {
-  color: #d73a49;
+.message-blocks :deep(.hljs-doctag),
+.message-blocks :deep(.hljs-keyword),
+.message-blocks :deep(.hljs-meta .hljs-keyword),
+.message-blocks :deep(.hljs-template-tag),
+.message-blocks :deep(.hljs-template-variable),
+.message-blocks :deep(.hljs-type),
+.message-blocks :deep(.hljs-variable.language_) {
+  color: var(--color-syntax-keyword);
 }
-
-.hljs-title,
-.hljs-title.class_,
-.hljs-title.class_.inherited__,
-.hljs-title.function_ {
-  color: #6f42c1;
+.message-blocks :deep(.hljs-title),
+.message-blocks :deep(.hljs-title.class_),
+.message-blocks :deep(.hljs-title.class_.inherited__),
+.message-blocks :deep(.hljs-title.function_) {
+  color: var(--color-syntax-function);
 }
-
-.hljs-attr,
-.hljs-attribute,
-.hljs-literal,
-.hljs-meta,
-.hljs-number,
-.hljs-operator,
-.hljs-variable,
-.hljs-selector-attr,
-.hljs-selector-class,
-.hljs-selector-id {
-  color: #005cc5;
+.message-blocks :deep(.hljs-attr),
+.message-blocks :deep(.hljs-attribute),
+.message-blocks :deep(.hljs-literal),
+.message-blocks :deep(.hljs-meta),
+.message-blocks :deep(.hljs-number),
+.message-blocks :deep(.hljs-operator),
+.message-blocks :deep(.hljs-variable),
+.message-blocks :deep(.hljs-selector-attr),
+.message-blocks :deep(.hljs-selector-class),
+.message-blocks :deep(.hljs-selector-id) {
+  color: var(--color-syntax-number);
 }
-
-.hljs-regexp,
-.hljs-string,
-.hljs-meta .hljs-string {
-  color: #032f62;
+.message-blocks :deep(.hljs-regexp),
+.message-blocks :deep(.hljs-string),
+.message-blocks :deep(.hljs-meta .hljs-string) {
+  color: var(--color-syntax-string);
 }
-
-.hljs-built_in,
-.hljs-symbol {
-  color: #e36209;
+.message-blocks :deep(.hljs-built_in),
+.message-blocks :deep(.hljs-symbol) {
+  color: var(--color-syntax-builtin);
 }
-
-.hljs-comment,
-.hljs-code,
-.hljs-formula {
-  color: #6a737d;
+.message-blocks :deep(.hljs-comment),
+.message-blocks :deep(.hljs-code),
+.message-blocks :deep(.hljs-formula) {
+  color: var(--color-syntax-comment);
 }
-
-.hljs-name,
-.hljs-quote,
-.hljs-selector-tag,
-.hljs-selector-pseudo {
-  color: #22863a;
+.message-blocks :deep(.hljs-name),
+.message-blocks :deep(.hljs-quote),
+.message-blocks :deep(.hljs-selector-tag),
+.message-blocks :deep(.hljs-selector-pseudo) {
+  color: var(--color-syntax-tag);
 }
-
-.hljs-subst {
-  color: #24292e;
+.message-blocks :deep(.hljs-subst) {
+  color: var(--color-syntax-text);
 }
-
-.hljs-section {
-  color: #005cc5;
-  font-weight: bold;
+.message-blocks :deep(.hljs-section) {
+  color: var(--color-syntax-number);
+  font-weight: 600;
 }
-
-.hljs-bullet {
-  color: #735c0f;
+.message-blocks :deep(.hljs-bullet) {
+  color: var(--color-syntax-bullet);
 }
-
-.hljs-emphasis {
-  color: #24292e;
+.message-blocks :deep(.hljs-emphasis) {
+  color: var(--color-syntax-text);
   font-style: italic;
 }
-
-.hljs-strong {
-  color: #24292e;
-  font-weight: bold;
+.message-blocks :deep(.hljs-strong) {
+  color: var(--color-syntax-text);
+  font-weight: 600;
 }
-
-.hljs-addition {
-  color: #22863a;
-  background-color: #f0fff4;
+.message-blocks :deep(.hljs-addition) {
+  color: var(--color-syntax-addition-fg);
+  background-color: var(--color-syntax-addition-bg);
 }
-
-.hljs-deletion {
-  color: #b31d28;
-  background-color: #ffeef0;
-}
-
-/* =============================================
-   Syntax highlighting — dark mode
-   ============================================= */
-.dark .hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 0.5em;
-  color: #c9d1d9;
-  background: #0d1117;
-}
-
-.dark .hljs-doctag,
-.dark .hljs-keyword,
-.dark .hljs-meta .hljs-keyword,
-.dark .hljs-template-tag,
-.dark .hljs-template-variable,
-.dark .hljs-type,
-.dark .hljs-variable.language_ {
-  color: #ff7b72;
-}
-
-.dark .hljs-title,
-.dark .hljs-title.class_,
-.dark .hljs-title.class_.inherited__,
-.dark .hljs-title.function_ {
-  color: #d2a8ff;
-}
-
-.dark .hljs-attr,
-.dark .hljs-attribute,
-.dark .hljs-literal,
-.dark .hljs-meta,
-.dark .hljs-number,
-.dark .hljs-operator,
-.dark .hljs-variable,
-.dark .hljs-selector-attr,
-.dark .hljs-selector-class,
-.dark .hljs-selector-id {
-  color: #79c0ff;
-}
-
-.dark .hljs-regexp,
-.dark .hljs-string,
-.dark .hljs-meta .hljs-string {
-  color: #a5d6ff;
-}
-
-.dark .hljs-built_in,
-.dark .hljs-symbol {
-  color: #ffa657;
-}
-
-.dark .hljs-comment,
-.dark .hljs-code,
-.dark .hljs-formula {
-  color: #8b949e;
-}
-
-.dark .hljs-name,
-.dark .hljs-quote,
-.dark .hljs-selector-tag,
-.dark .hljs-selector-pseudo {
-  color: #7ee787;
-}
-
-.dark .hljs-subst {
-  color: #c9d1d9;
-}
-
-.dark .hljs-section {
-  color: #1f6feb;
-  font-weight: bold;
-}
-
-.dark .hljs-bullet {
-  color: #f2cc60;
-}
-
-.dark .hljs-emphasis {
-  color: #c9d1d9;
-  font-style: italic;
-}
-
-.dark .hljs-strong {
-  color: #c9d1d9;
-  font-weight: bold;
-}
-
-.dark .hljs-addition {
-  color: #aff5b4;
-  background-color: #033a16;
-}
-
-.dark .hljs-deletion {
-  color: #ffdcd7;
-  background-color: #67060c;
+.message-blocks :deep(.hljs-deletion) {
+  color: var(--color-syntax-deletion-fg);
+  background-color: var(--color-syntax-deletion-bg);
 }
 </style>

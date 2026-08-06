@@ -16,6 +16,7 @@
 import config from "@/aws-exports";
 import { routeGuard } from "@/utils/zincutils";
 import SyslogNg from "@/components/ingestion/logs/SyslogNg.vue";
+import LoongCollector from "@/components/ingestion/logs/LoongCollector.vue";
 import Ingestion from "@/views/Ingestion.vue";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 import Fluentd from "@/components/ingestion/logs/Fluentd.vue";
@@ -27,6 +28,9 @@ import AzureConfig from "@/components/ingestion/recommended/AzureConfig.vue";
 import FileBeat from "@/components/ingestion/logs/FileBeat.vue";
 import OpenTelemetry from "@/components/ingestion/traces/OpenTelemetry.vue";
 import PrometheusConfig from "@/components/ingestion/metrics/PrometheusConfig.vue";
+import VMagentConfig from "@/components/ingestion/metrics/VMagentConfig.vue";
+import NightingaleConfig from "@/components/ingestion/metrics/NightingaleConfig.vue";
+import CategrafConfig from "@/components/ingestion/metrics/CategrafConfig.vue";
 import OtelCollector from "@/components/ingestion/metrics/OtelCollector.vue";
 import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
@@ -40,6 +44,7 @@ import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.v
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
 import LinuxConfig from "@/components/ingestion/recommended/LinuxConfig.vue";
+import MacOSConfig from "@/components/ingestion/recommended/MacOSConfig.vue";
 import OtelConfig from "@/components/ingestion/recommended/OtelConfig.vue";
 import WindowsConfig from "@/components/ingestion/recommended/WindowsConfig.vue";
 
@@ -108,6 +113,7 @@ import Heroku from "@/components/ingestion/others/Heroku.vue";
 import AIIntegrations from "@/components/ingestion/AIIntegrations.vue";
 import AIIntegrationDetail from "@/components/ingestion/ai/AIIntegrationDetail.vue";
 import { aiCategories } from "@/components/ingestion/ai/data";
+import McpCrossLink from "@/components/ingestion/McpCrossLink.vue";
 
 const useIngestionRoutes = () => {
   // One route per AI integration across all tabs. `aiCategories` is already
@@ -220,6 +226,14 @@ const useIngestionRoutes = () => {
                     routeGuard(to, from, next);
                   },
                 },
+                {
+                  path: "loongcollector",
+                  name: "loongcollector",
+                  component: LoongCollector,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
               ],
             },
             {
@@ -234,6 +248,30 @@ const useIngestionRoutes = () => {
                   path: "prometheus",
                   name: "prometheus",
                   component: PrometheusConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "vmagent",
+                  name: "vmagent",
+                  component: VMagentConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "nightingale",
+                  name: "nightingale",
+                  component: NightingaleConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+                {
+                  path: "categraf",
+                  name: "categraf",
+                  component: CategrafConfig,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
@@ -325,6 +363,14 @@ const useIngestionRoutes = () => {
               },
             },
             {
+              path: "macos",
+              name: "ingestFromMacOS",
+              component: MacOSConfig,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+            },
+            {
               path: "aws",
               name: "AWSConfig",
               component: AWSConfig,
@@ -364,6 +410,22 @@ const useIngestionRoutes = () => {
                 routeGuard(to, from, next);
               },
             },
+            // Discoverability pointer → the MCP setup home in IAM. Enterprise/
+            // Cloud only (matches where the tab is shown in Recommended.vue and
+            // where the target "mcpServer" route exists), so an OSS deep-link
+            // can't land here and push to a route that doesn't exist.
+            ...(config.isEnterprise == "true" || config.isCloud == "true"
+              ? [
+                  {
+                    path: "mcp",
+                    name: "recommendedMcp",
+                    component: McpCrossLink,
+                    beforeEnter(to: any, from: any, next: any) {
+                      routeGuard(to, from, next);
+                    },
+                  },
+                ]
+              : []),
           ],
         },
         {
@@ -773,6 +835,10 @@ const useIngestionRoutes = () => {
           },
           children: [
             {
+              // Named so the router doesn't warn about an unnamed empty-path
+              // child under a named parent. Nothing navigates to this name; it
+              // exists only to land /ai-integrations on the first integration.
+              name: "ai-integrations-default",
               path: "",
               redirect: () => {
                 const first = aiCategories[0].integrations[0];

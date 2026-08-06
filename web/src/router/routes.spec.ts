@@ -227,19 +227,6 @@ vi.mock("@/composables/shared/useManagementRoutes", () => ({
 // ---------------------------------------------------------------------------
 import routerInstance from "@/router/routes";
 
-// ---------------------------------------------------------------------------
-// Helper: flatten the nested route tree into a single list of route records
-// ---------------------------------------------------------------------------
-function flattenRoutes(routes: any[]): any[] {
-  return routes.reduce((acc: any[], route: any) => {
-    acc.push(route);
-    if (route.children && route.children.length) {
-      acc.push(...flattenRoutes(route.children));
-    }
-    return acc;
-  }, []);
-}
-
 describe("router/routes (singleton)", () => {
   // getRoutes() already returns a flat list of all route records including nested ones;
   // calling flattenRoutes on top of it would double-count children.
@@ -278,9 +265,7 @@ describe("router/routes (singleton)", () => {
     });
 
     it("should include a /cb callback route", () => {
-      const route = allRoutes.find(
-        (r) => r.name === "callback" || r.path === "/cb",
-      );
+      const route = allRoutes.find((r) => r.name === "callback" || r.path === "/cb");
       expect(route).toBeDefined();
     });
 
@@ -440,9 +425,7 @@ describe("router/routes (singleton)", () => {
   // -------------------------------------------------------------------------
   describe("route name uniqueness", () => {
     it("should not contain duplicate route names", () => {
-      const names = allRoutes
-        .filter((r) => r.name)
-        .map((r) => r.name as string);
+      const names = allRoutes.filter((r) => r.name).map((r) => r.name as string);
       const uniqueNames = new Set(names);
       expect(names.length).toBe(uniqueNames.size);
     });

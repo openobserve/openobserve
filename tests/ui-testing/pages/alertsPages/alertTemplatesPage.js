@@ -2,17 +2,20 @@ import { expect, test } from '@playwright/test';
 import { test as base } from '@playwright/test';
 import fs from 'fs';
 import { AlertDestinationsPage } from './alertDestinationsPage.js';
+import { openNavFlyoutChild } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertTemplatesPage {
     constructor(page) {
         this.page = page;
         this.alertDestinationsPage = new AlertDestinationsPage(page);
         
-        // Navigation locators
-        this.settingsMenuItem = '[data-test="menu-link-/settings-item"]';
-        this.templatesTab = '[data-test="alert-templates-tab"]';
-        
+        // Navigation: Templates moved out of Settings into the Reliability nav
+        // group, so there is no settings tab to click — use
+        // openNavFlyoutChild(page, 'templates'). The list table selector lives
+        // on `templateTable` below.
+
         // Template creation locators
         this.addTemplateButton = '[data-test="template-list-add-btn"]';
         // OInput wrapper (use for visibility/state assertions); inner native input gets `-field` suffix
@@ -67,11 +70,6 @@ export class AlertTemplatesPage {
     async navigateToTemplates(retryCount = 0) {
         const maxRetries = 2; // Maximum number of retry attempts
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         try {
             await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
             await this.page.waitForTimeout(1000);
@@ -79,16 +77,16 @@ export class AlertTemplatesPage {
             // Try URL-based navigation first (more reliable than menu clicking)
             const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
             const orgIdentifier = process.env.ORGNAME || 'default';
-            const templatesUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}`;
+            const templatesUrl = `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}`;
 
             try {
                 await this.page.goto(templatesUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
                 await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
                 await this.page.waitForTimeout(2000);
 
-                // Check if templates page loaded (look for templates tab content or add button)
+                // Check if templates page loaded (add button or the list table)
                 const addBtn = this.page.locator(this.addTemplateButton);
-                const templatesContent = this.page.locator('[data-test="alert-templates-tab"], [class*="template"]').first();
+                const templatesContent = this.page.locator(this.templateTable).first();
                 const addBtnVisible = await addBtn.isVisible({ timeout: 3000 }).catch(() => false);
                 const contentVisible = await templatesContent.isVisible({ timeout: 3000 }).catch(() => false);
 
@@ -100,13 +98,8 @@ export class AlertTemplatesPage {
                 testLogger.warn('URL navigation to templates failed, trying menu path', { error: navError.message });
             }
 
-            // Fallback: Navigate via Settings menu
-            await this.page.locator(this.settingsMenuItem).waitFor({ state: 'visible', timeout: 15000 });
-            await this.page.locator(this.settingsMenuItem).click();
-            await this.page.waitForTimeout(2000);
-
-            await this.page.locator(this.templatesTab).waitFor({ state: 'visible', timeout: 15000 });
-            await this.page.locator(this.templatesTab).click();
+            // Fallback: navigate via the Reliability nav group (it left Settings).
+            await openNavFlyoutChild(this.page, 'templates');
             await this.page.waitForTimeout(2000);
 
             // Wait for templates page to load
@@ -146,6 +139,13 @@ export class AlertTemplatesPage {
     }
 
     /**
+     * Wait for the templates list page to be ready (Add Template button visible).
+     */
+    async waitForTemplateListReady() {
+        await this.page.locator(this.addTemplateButton).waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    /**
      * Create a template via API first, fall back to UI if API fails
      * @param {string} templateName - Name of the template
      */
@@ -162,20 +162,15 @@ export class AlertTemplatesPage {
         await this.navigateToTemplates();
         await this.page.waitForTimeout(2000);
 
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
-
         // Try multiple fallback selectors for add button
         const addBtnLocator = this.page.locator(this.addTemplateButton);
         const addBtnFallbackLocators = [
             this.addTemplateButton,
             'button:has-text("Add Template")',
-            '.q-table__control button',
+            'table button',
             'button[data-test*="add"]',
             'button:has(.OIcon):has-text("add")',
-            '.q-toolbar button:has-text("Add")',
+            '[role="toolbar"] button:has-text("Add")',
             'button[data-o2-btn]:has-text("Add Template")'
         ];
 
@@ -243,7 +238,7 @@ export class AlertTemplatesPage {
             // Strategy 2: data-test selector for template search
             () => this.page.locator('[data-test="alert-template-search-input"]'),
             // Strategy 3: input inside the templates section (look for search/filter input)
-            () => this.page.locator('[data-o2-page-container] .q-table__control input[type="text"], [data-o2-page-container] input.q-field__input[placeholder*="Search"], [data-o2-page-container] input[placeholder*="search"]').first()
+            () => this.page.locator('[data-o2-page-container] input[placeholder*="search"]').first()
         ];
 
         for (const strategy of strategies) {
@@ -377,8 +372,10 @@ export class AlertTemplatesPage {
         }
 
         try {
-            // Use page.request to bypass the RUM SDK's window.fetch wrapper which causes "TypeError: Failed to fetch"
-            const response = await this.page.request.post(createUrl, {
+            // Use authedRequest (page.request under the hood, bypassing the RUM SDK fetch wrapper)
+            // so a rotated-passcode 401 self-heals + retries instead of failing template creation
+            // and cascading into navigateToTemplates failures (alpha1 flake).
+            const response = await authedRequest(this.page, 'post', createUrl, {
                 data: {
                     name: templateName,
                     body: templateBody
@@ -412,8 +409,8 @@ export class AlertTemplatesPage {
         const templateBody = `[{"alert_name": "{alert_name}", "alert_type": "validation", "org_name": "{org_name}", "stream_name": "{stream_name}"}]`;
 
         try {
-            // Use page.request to bypass the RUM SDK's window.fetch wrapper
-            const response = await this.page.request.post(createUrl, {
+            // authedRequest self-heals a rotated-passcode 401 (see createTemplateViaApi).
+            const response = await authedRequest(this.page, 'post', createUrl, {
                 data: {
                     name: templateName,
                     body: templateBody
@@ -507,11 +504,6 @@ export class AlertTemplatesPage {
         testLogger.info('API creation failed, falling back to UI for validation template', { templateName });
         await this.navigateToTemplates();
         await this.page.waitForTimeout(2000);
-
-        // Clean up any q-portal elements that may intercept clicks
-        await this.page.evaluate(() => {
-            document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-        }).catch(() => {});
 
         await this.page.locator(this.addTemplateButton).click({ force: true });
         await this.page.waitForTimeout(2000);
@@ -753,7 +745,7 @@ export class AlertTemplatesPage {
         // The URL with action=import triggers TemplateList's onMounted → getTemplates → updateRoute → showImportTemplate
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const orgIdentifier = process.env.ORGNAME || 'default';
-        const importUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}&action=import`;
+        const importUrl = `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}&action=import`;
 
         try {
             await this.page.goto(importUrl, { waitUntil: 'domcontentloaded', timeout: 20000 });
@@ -767,18 +759,13 @@ export class AlertTemplatesPage {
             await this.navigateToTemplates();
             await this.page.waitForTimeout(2000);
 
-            // Clean up any q-portal elements that may intercept clicks
-            await this.page.evaluate(() => {
-                document.querySelectorAll('div[id^="q-portal"]').forEach(el => { if (el.getAttribute('aria-hidden') === 'true') el.style.display = 'none'; });
-            }).catch(() => {});
-
             // Try import button selectors (avoiding overly broad selectors that click wrong elements)
             const importBtnFallbackLocators = [
                 this.templateImportButton,
                 'button:has-text("Import Template")',
                 '[data-test*="template-import"]',
                 'button:has-text("Import")',
-                '.q-table__control button:has-text("Import")',
+                'table button:has-text("Import")',
             ];
 
             let importBtnClicked = false;
@@ -1225,14 +1212,14 @@ export class AlertTemplatesPage {
     }
 
     async expectValidationErrorVisible(message) {
-        // Quasar OInput shows error in .q-field__messages or .q-field__bottom
+        // OInput shows the error message text below the field
         await expect(this.page.getByText(message)).toBeVisible({ timeout: 5000 });
     }
 
     async navigateToTemplatesPage() {
         const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
         const orgIdentifier = process.env.ORGNAME || 'default';
-        const templatesUrl = `${baseUrl}/web/settings/templates?org_identifier=${orgIdentifier}`;
+        const templatesUrl = `${baseUrl}/web/alert-templates?org_identifier=${orgIdentifier}`;
         await this.page.goto(templatesUrl, { waitUntil: 'domcontentloaded', timeout: 15000 });
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
         testLogger.info('Navigated directly to templates page via URL');
@@ -1253,7 +1240,7 @@ export class AlertTemplatesPage {
         }
         // Try paginating through pages to find prebuilt badges
         for (let pageNum = 0; pageNum < 10; pageNum++) {
-            const nextBtn = this.page.locator('button.q-pagination button[aria-label*="Next"], button:has-text("chevron_right")').first();
+            const nextBtn = this.page.locator('button:has-text("chevron_right")').first();
             if (await nextBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
                 const isDisabled = await nextBtn.isDisabled().catch(() => true);
                 if (isDisabled) break;

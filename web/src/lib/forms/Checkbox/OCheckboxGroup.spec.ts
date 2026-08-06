@@ -21,10 +21,7 @@ describe("OCheckboxGroup", () => {
     wrapper = mount(OCheckboxGroup, {
       props: { modelValue: [] },
       slots: {
-        default: [
-          '<OCheckbox value="a" label="A" />',
-          '<OCheckbox value="b" label="B" />',
-        ],
+        default: ['<OCheckbox value="a" label="A" />', '<OCheckbox value="b" label="B" />'],
       },
       global: { components: { OCheckbox } },
     });

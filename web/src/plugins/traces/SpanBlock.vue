@@ -16,11 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex wrap tw:justify-start tw:items-center"
-    :class="[
-      defocusSpan ? 'tw:opacity-30' : '',
-      store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white',
-    ]"
+    class="wrap bg-surface-base flex items-center justify-start"
+    :class="defocusSpan ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
     }"
@@ -28,12 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="span-block-container"
   >
     <div
-      class="tw:flex tw:justify-between tw:items-end tw:cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'tw:bg-[var(--o2-bg-card-dark,#1a1a1a)]' : 'tw:bg-white']"
+      class="span-block relative-position bg-surface-base flex w-full cursor-pointer items-end justify-between pb-1.5"
       :style="{
         height: spanDimensions.height + 'px',
-        width: '100%',
-        paddingBottom: '6px',
       }"
       ref="spanBlock"
       @click="selectSpan(span.spanId)"
@@ -41,12 +35,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="span-block"
     >
       <div
-        :style="{
-          width: '100%',
-          overflow: 'hidden',
-        }"
-        class="tw:cursor-pointer tw:flex tw:items-center tw:flex-nowrap position-relative"
-        :class="defocusSpan ? 'tw:opacity-30' : ''"
+        class="position-relative flex w-full cursor-pointer flex-nowrap items-center overflow-hidden"
+        :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -55,29 +45,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: spanDimensions.barHeight + 'px',
             width: spanWidth + '%',
             left: leftPosition + '%',
-            position: 'relative',
           }"
-          class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap"
+          class="relative flex flex-nowrap items-center justify-start"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
           <div
+            class="rounded-default h-full w-[calc(100%-0.375rem)]"
             :style="{
-              width: 'calc(100% - 6px)',
-              height: '100%',
-              borderRadius: '2px',
-              backgroundColor: span.style?.color || '#58508d',
+              backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"
           />
         </div>
         <div
           :style="{
-            position: 'absolute',
             ...durationStyle,
-            transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="tw:text-xs tw:flex tw:items-center"
+          class="absolute flex items-center text-xs transition-all duration-500 ease-[ease]"
           data-test="span-block-duration"
         >
           <div>
@@ -90,22 +75,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  computed,
-  ref,
-  onMounted,
-  onBeforeUnmount,
-  nextTick,
-  watch,
-  onActivated,
-} from "vue";
+import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import { b64EncodeStandard } from "@/utils/zincutils";
-import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
+
+// TODO(design-tokens): fallback bar colour for a span the trace colour allocator
+// never assigned. No semantic token fits — it is a categorical "unassigned span"
+// slate-purple, not a status/surface/accent role. Needs e.g.
+// --color-trace-span-unassigned; this const is then the only site to change.
+const DEFAULT_SPAN_COLOR = "#58508d";
 
 export default defineComponent({
   name: "SpanBlock",
@@ -158,8 +138,7 @@ export default defineComponent({
     });
 
     const durationStyle = ref({});
-    const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const leftPosition = ref(0);
 
@@ -172,38 +151,25 @@ export default defineComponent({
     const spanMarkerRef = ref(null);
 
     const getLeftPosition = () => {
-      const left =
-        props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
+      const left = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
 
       return (left / props.baseTracePosition?.durationUs) * 100;
     };
 
     const getSpanWidth = () => {
       return Number(
-        (
-          (props.span?.durationUs / props.baseTracePosition?.durationUs) *
-          100
-        ).toFixed(2),
+        ((props.span?.durationUs / props.baseTracePosition?.durationUs) * 100).toFixed(2),
       );
     };
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
-      const params = router.currentRoute.value.query;
-      const spanId = Array.isArray(params.span_id)
-        ? params.span_id[0]
-        : params.span_id; // Ensure it's a single string
 
-      if (spanId) {
-        const element = document.getElementById(spanId);
-        if (element) {
-          element.scrollIntoView({
-            behavior: "smooth", // Smooth scrolling
-            block: "center", // Attempt to align the element at the center of the screen
-            inline: "nearest", // Keep horizontal alignment as close as possible
-          });
-        }
-      }
+      // NOTE: do NOT scroll the pre-selected span into view here. Rows are
+      // virtualized, so a SpanBlock remounts every time it scrolls into the
+      // viewport — doing scrollIntoView on each mount snapped the view back to
+      // the URL's span_id and fought the user's scroll. Centering the
+      // pre-selected span is owned by TraceTree (virtualizer scrollToIndex).
 
       if (spanBlock.value) {
         _resizeObserver = new ResizeObserver(() => {
@@ -247,7 +213,7 @@ export default defineComponent({
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
-      (val) => {
+      () => {
         durationStyle.value = getDurationStyle();
       },
     );
@@ -259,18 +225,13 @@ export default defineComponent({
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
-      if (
-        (leftPosition.value + spanWidth.value) * onePercent + labelWidth >
-        spanBlockWidth.value
-      ) {
+      if ((leftPosition.value + spanWidth.value) * onePercent + labelWidth > spanBlockWidth.value) {
         style.right = 0;
         style.top = "-0.3125rem";
       } else if (leftPosition.value > 50) {
         style.left = leftPosition.value * onePercent - labelWidth + "px";
       } else {
-        const left =
-          leftPosition.value +
-          (Math.floor(spanWidth.value) ? spanWidth.value : 1);
+        const left = leftPosition.value + (Math.floor(spanWidth.value) ? spanWidth.value : 1);
 
         style.left =
           (left * onePercent - leftPosition.value * onePercent < 19
@@ -311,6 +272,7 @@ export default defineComponent({
       onSpanHover,
       durationStyle,
       searchObj,
+      DEFAULT_SPAN_COLOR,
     };
   },
 });

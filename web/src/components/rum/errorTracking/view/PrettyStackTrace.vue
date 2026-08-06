@@ -19,70 +19,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Loading state -->
     <div
       v-if="isLoadingTranslation"
-      class="loading-container tw:p-6 tw:text-center tw:min-h-[200px] tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded-md"
-      :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
+      data-test="rum-pretty-stack-trace-loading"
+      class="loading-container rounded-default flex min-h-50 flex-col items-center justify-center p-6 text-center"
+      :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
       <OSpinner variant="dots" size="lg" />
-      <div class="tw:mt-3 tw:text-gray-400" style="font-size: 14px; font-weight: 500;">
-        Translating stack trace with source maps...
+      <div class="text-text-secondary mt-3 font-medium" style="font-size: var(--text-sm)">
+        {{ t("rum.translatingStackTrace") }}
       </div>
-      <div class="tw:mt-1 tw:text-gray-400" style="font-size: 12px;">
-        This may take a few moments
+      <div class="text-text-secondary mt-1" style="font-size: var(--text-xs)">
+        {{ t("rum.translatingStackTraceHint") }}
       </div>
     </div>
 
     <!-- No source maps available message -->
     <div
       v-else-if="allSourceInfoNull"
-      class="no-source-maps-container tw:p-3 tw:text-center tw:flex tw:flex-col tw:items-center tw:justify-center tw:rounded-md tw:py-5 tw:px-6"
-      :style="{ 'background-color': backgroundColor, 'border': `1px solid ${borderColor}` }"
+      data-test="rum-pretty-stack-trace-unavailable"
+      class="no-source-maps-container rounded-default flex flex-col items-center justify-center p-3 px-6 py-5 text-center"
+      :style="{ 'background-color': backgroundColor, border: `1px solid ${borderColor}` }"
     >
-      <OIcon name="code-off" size="lg" class="tw:mb-2" />
-      <div class="tw:text-base tw:font-medium tw:text-gray-500 tw:mb-1" style="font-weight: 500;">
-        Source Maps Not Available
+      <OIcon name="code-off" size="lg" class="mb-2" />
+      <div class="text-text-secondary mb-1 text-base font-medium">
+        {{ t("rum.sourceMapsNotAvailable") }}
       </div>
-      <div class="tw:text-sm tw:text-gray-400" style="max-width: 500px; margin: 0 auto; font-size: 13px;">
-        To view detailed stack traces with original source code and line numbers, please upload source maps for this application.
+      <div
+        class="text-text-secondary text-sm"
+        style="max-width: 500px; margin: 0 auto; font-size: var(--text-compact)"
+      >
+        {{ t("rum.sourceMapsNotAvailableBody") }}
       </div>
-      <div v-if="props.error.service || props.error.version" class="tw:flex tw:items-center tw:justify-center tw:gap-2 tw:mt-2 tw:mb-2">
+      <div
+        v-if="props.error.service || props.error.version"
+        class="mt-2 mb-2 flex items-center justify-center gap-2"
+      >
         <span
           v-if="props.error.service"
-          class="service-version-badge service-badge tw:inline-flex tw:items-center tw:gap-1 tw:py-1 tw:px-[10px] tw:rounded tw:text-xs tw:font-medium"
-          :class="isDarkMode ? 'tw:bg-[rgba(149,117,205,0.2)] tw:text-[#b39ddb]' : 'tw:bg-[rgba(103,58,183,0.12)] tw:text-[#5e35b1]'"
+          class="service-version-badge service-badge rounded-default bg-badge-purple-soft-bg text-badge-purple-soft-text inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium"
         >
-          <span class="badge-label tw:opacity-80">Service:</span>
-          <span class="badge-value tw:font-semibold">{{ props.error.service }}</span>
+          <span class="badge-label opacity-80">{{ t("rum.serviceBadge") }}</span>
+          <span class="badge-value font-semibold">{{ props.error.service }}</span>
         </span>
         <span
           v-if="props.error.version"
-          class="service-version-badge version-badge tw:inline-flex tw:items-center tw:gap-1 tw:py-1 tw:px-[10px] tw:rounded tw:text-xs tw:font-medium"
-          :class="isDarkMode ? 'tw:bg-[rgba(66,165,245,0.2)] tw:text-[#90caf9]' : 'tw:bg-[rgba(25,118,210,0.12)] tw:text-[#1976d2]'"
+          class="service-version-badge version-badge rounded-default bg-badge-blue-soft-bg text-badge-blue-soft-text inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium"
         >
-          <span class="badge-label tw:opacity-80">Version:</span>
-          <span class="badge-value tw:font-semibold">{{ props.error.version }}</span>
+          <span class="badge-label opacity-80">{{ t("rum.versionBadge") }}</span>
+          <span class="badge-value font-semibold">{{ props.error.version }}</span>
         </span>
       </div>
       <OButton
         variant="primary"
         size="sm-action"
         icon-left="upload"
-        class="tw:my-2"
+        class="my-2"
         @click="navigateToUpload"
       >
-        Upload Source Maps
+        {{ t("rum.uploadSourceMaps") }}
       </OButton>
     </div>
 
     <!-- Pretty formatted view -->
-    <div v-else-if="translatedStackTrace.length > 0" class="pretty-stack-container">
+    <div
+      v-else-if="translatedStackTrace.length > 0"
+      data-test="rum-pretty-stack-trace-container"
+      class="pretty-stack-container"
+    >
       <template v-for="(stackTrace, traceIndex) in translatedStackTrace" :key="traceIndex">
         <!-- Error message -->
         <div
           v-if="stackTrace.error"
-          class="error-header tw:px-3 tw:py-2 text-weight-bold tw:border tw:border-solid tw:rounded-t-md tw:text-sm tw:font-semibold tw:[letter-spacing:0.01em] tw:!px-4 tw:!py-[10px] tw:[box-shadow:0_1px_2px_rgba(0,0,0,0.05)] tw:-mb-px"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] [box-shadow:0_1px_2px_rgba(0,0,0,0.05)]"
           :style="{
             'background-color': errorHeaderBackground,
-            'color': errorHeaderColor,
+            color: errorHeaderColor,
             'border-color': borderColor,
           }"
         >
@@ -92,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- First stack frame - expandable/collapsible -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper tw:rounded-b-md tw:[box-shadow:0_1px_3px_rgba(0,0,0,0.08)] tw:overflow-hidden tw:mt-0"
+          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
@@ -104,18 +114,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Frame header - clickable -->
           <div
-            class="frame-header tw:px-3 tw:py-2 tw:cursor-pointer tw:transition-all tw:duration-200 tw:ease-in-out tw:!px-4 tw:!py-3"
+            class="frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-3 py-2 transition-all duration-200 ease-in-out"
             @click="toggleFrame(traceIndex, 0)"
           >
-            <div class="frame-header-content tw:flex tw:items-center tw:gap-2">
+            <div class="frame-header-content flex items-center gap-2">
               <OIcon
                 :name="isFrameExpanded(traceIndex, 0) ? 'expand-more' : 'chevron-right'"
                 size="xs"
-                class="tw:mr-1 tw:text-gray-400"
+                class="text-icon-color mr-1"
               />
               <div
                 v-if="stackTrace.stack[0].line"
-                class="stack-line-header tw:[font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] tw:text-[12.5px] tw:font-medium tw:break-all tw:flex-1 tw:[line-height:1.5]"
+                data-test="rum-pretty-stack-trace-frame-line"
+                class="stack-line-header text-compact flex-1 font-mono [line-height:1.5] font-medium break-all"
                 :style="{ color: textColor }"
               >
                 {{ stackTrace.stack[0].line }}
@@ -126,26 +137,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Expandable source code context -->
           <div
             v-if="isFrameExpanded(traceIndex, 0) && stackTrace.stack[0].source_info"
-            class="source-context tw:!px-4 tw:!pb-4 tw:!pt-0"
-            :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
+            data-test="rum-pretty-stack-trace-source-context"
+            class="source-context bg-code-block-bg !px-4 !pt-0 !pb-4"
           >
             <!-- File location -->
-            <div class="source-location-header tw:text-gray-400 tw:text-xs tw:!mb-[10px] tw:text-[11px] tw:font-semibold tw:[letter-spacing:0.02em] tw:opacity-80">
-              Line {{ stackTrace.stack[0].source_info.stack_line }}:{{ stackTrace.stack[0].source_info.stack_col }}
-              <span class="tw:ml-1">
-                (Lines {{ stackTrace.stack[0].source_info.source_line_start }}-{{ stackTrace.stack[0].source_info.source_line_end }})
+            <div
+              class="source-location-header text-text-secondary text-2xs !mb-2.5 text-xs font-semibold [letter-spacing:0.02em] opacity-80"
+            >
+              {{ t("rum.stackLine") }} {{ stackTrace.stack[0].source_info.stack_line }}:{{
+                stackTrace.stack[0].source_info.stack_col
+              }}
+              <span class="ml-1">
+                ({{ t("rum.stackLines") }}
+                {{ stackTrace.stack[0].source_info.source_line_start }}-{{
+                  stackTrace.stack[0].source_info.source_line_end
+                }})
               </span>
             </div>
 
             <!-- Source code snippet with syntax highlighting -->
-            <div class="source-code-box tw:border tw:border-solid tw:rounded-md tw:h-[200px] tw:overflow-hidden tw:[box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
+            <div
+              class="source-code-box rounded-default h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+              :style="{ 'border-color': borderColor }"
+            >
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
                 :query="stackTrace.stack[0].source_info.source"
                 :read-only="true"
                 language="javascript"
-                style="height: 200px;"
+                style="height: 200px"
               />
             </div>
           </div>
@@ -154,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Remaining frames - collapsed by default -->
         <div
           v-if="stackTrace.stack.length > 1"
-          class="remaining-frames tw:rounded-b-md tw:[box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
           :style="{
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
@@ -163,20 +184,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             'background-color': backgroundColor,
           }"
         >
-          <!-- Show more button - only visible when frames are tw:hidden -->
+          <!-- Show more button - only visible when frames are hidden -->
           <div
             v-if="!expandedTraces[traceIndex]"
-            class="show-more-button tw:px-3 tw:py-2 tw:cursor-pointer tw:flex tw:items-center tw:gap-[6px] tw:transition-all tw:duration-200 tw:ease-in-out tw:!px-4 tw:!py-[10px] tw:text-xs tw:font-medium"
+            class="show-more-button hover:bg-surface-subtle flex cursor-pointer items-center gap-1.5 !px-4 px-3 !py-2.5 py-2 text-xs font-medium transition-all duration-200 ease-in-out"
             :style="{ 'border-top': `1px solid ${borderColor}` }"
             @click="showFrames(traceIndex)"
           >
-            <OIcon
-              name="expand-more"
-              size="xs"
-              class="tw:mr-1"
-            />
-            <span class="tw:text-xs tw:text-gray-400">
-              Show {{ stackTrace.stack.length - 1 }} more frame{{ stackTrace.stack.length - 1 > 1 ? 's' : '' }}
+            <OIcon name="expand-more" size="xs" class="mr-1" />
+            <span class="text-text-secondary text-xs">
+              {{
+                stackTrace.stack.length - 1 > 1
+                  ? t("rum.showMoreFrames", { count: stackTrace.stack.length - 1 })
+                  : t("rum.showMoreFrame", { count: stackTrace.stack.length - 1 })
+              }}
             </span>
           </div>
 
@@ -190,19 +211,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Frame header - clickable -->
               <div
-                class="collapsed-frame-header tw:px-3 tw:py-1 tw:cursor-pointer tw:transition-all tw:duration-200 tw:ease-in-out tw:!px-4 tw:!py-[10px]"
+                class="collapsed-frame-header hover:bg-surface-subtle cursor-pointer !px-4 px-3 !py-2.5 py-1 transition-all duration-200 ease-in-out"
                 :style="{ 'background-color': backgroundColor }"
                 @click="toggleFrame(traceIndex, frameIndex + 1)"
               >
-                <div class="collapsed-frame-content tw:flex tw:items-center tw:gap-2">
+                <div class="collapsed-frame-content flex items-center gap-2">
                   <OIcon
-                    :name="isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'"
+                    :name="
+                      isFrameExpanded(traceIndex, frameIndex + 1) ? 'expand-more' : 'chevron-right'
+                    "
                     size="xs"
-                    class="tw:mr-1 tw:text-gray-400"
+                    class="text-icon-color mr-1"
                   />
                   <div
                     v-if="frame.line"
-                    class="stack-line-collapsed tw:[font-family:'SF_Mono','Monaco','Inconsolata','Fira_Code','Droid_Sans_Mono',monospace] tw:text-[11.5px] tw:[line-height:1.5] tw:break-all tw:flex-1 tw:opacity-85"
+                    data-test="rum-pretty-stack-trace-frame-line"
+                    class="stack-line-collapsed text-2xs flex-1 font-mono [line-height:1.5] break-all opacity-85"
                     :style="{ color: mutedTextColor }"
                   >
                     {{ frame.line }}
@@ -213,24 +237,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Expandable source code context -->
               <div
                 v-if="isFrameExpanded(traceIndex, frameIndex + 1) && frame.source_info"
-                class="source-context tw:!px-4 tw:!pb-4 tw:!pt-0"
-                :style="{ 'background-color': isDarkMode ? '#0d0d0d' : '#f8f9fa' }"
+                class="source-context bg-code-block-bg !px-4 !pt-0 !pb-4"
               >
-                <div class="source-location-header tw:text-gray-400 tw:text-xs tw:!mb-[10px] tw:ml-4 tw:text-[11px] tw:font-semibold tw:[letter-spacing:0.02em] tw:opacity-80">
-                  Line {{ frame.source_info.stack_line }}:{{ frame.source_info.stack_col }}
-                  <span class="tw:ml-1">
-                    (Lines {{ frame.source_info.source_line_start }}-{{ frame.source_info.source_line_end }})
+                <div
+                  class="source-location-header text-text-secondary text-2xs !mb-2.5 ml-4 text-xs font-semibold [letter-spacing:0.02em] opacity-80"
+                >
+                  {{ t("rum.stackLine") }} {{ frame.source_info.stack_line }}:{{
+                    frame.source_info.stack_col
+                  }}
+                  <span class="ml-1">
+                    ({{ t("rum.stackLines") }} {{ frame.source_info.source_line_start }}-{{
+                      frame.source_info.source_line_end
+                    }})
                   </span>
                 </div>
 
-                <div class="source-code-box tw:ml-4 tw:border tw:border-solid tw:rounded-md tw:h-[200px] tw:overflow-hidden tw:[box-shadow:0_2px_6px_rgba(0,0,0,0.1)]" :style="{ 'border-color': borderColor }">
+                <div
+                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+                  :style="{ 'border-color': borderColor }"
+                >
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"
                     :query="frame.source_info.source"
                     :read-only="true"
                     language="javascript"
-                    style="height: 200px;"
+                    style="height: 200px"
                   />
                 </div>
               </div>
@@ -241,12 +273,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Error state -->
-    <div v-else class="tw:p-3 tw:text-center tw:text-gray-400">
-      <div v-if="translationError" class="tw:text-red-500">
+    <div v-else data-test="rum-pretty-stack-trace-error" class="text-text-muted p-3 text-center">
+      <div v-if="translationError" class="text-status-error-text">
         {{ translationError }}
       </div>
       <div v-else>
-        Unable to translate stack trace. Source maps may not be available.
+        {{ t("rum.unableToTranslateStackTrace") }}
       </div>
     </div>
   </div>
@@ -256,9 +288,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, watch, onMounted, nextTick, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
 import sourcemapsService from "@/services/sourcemaps";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
 
 import {
   generateCacheKey,
@@ -270,16 +303,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
 const router = useRouter();
+const { t } = useI18nTyped();
 
-const isDarkMode = computed(() => store.state.theme === "dark");
-
-const borderColor = computed(() => isDarkMode.value ? "#424242" : "#e0e0e0");
-const backgroundColor = computed(() => isDarkMode.value ? "#1e1e1e" : "#fafafa");
-const hoverBackgroundColor = computed(() => isDarkMode.value ? "#2a2a2a" : "#f0f0f0");
-const errorHeaderBackground = computed(() => isDarkMode.value ? "#3e2723" : "#fff3e0");
-const errorHeaderColor = computed(() => isDarkMode.value ? "#ff6b6b" : "#d32f2f");
-const textColor = computed(() => isDarkMode.value ? "#e0e0e0" : "#333");
-const mutedTextColor = computed(() => isDarkMode.value ? "#b0b0b0" : "#666");
+// Theme-reactive colors as CSS custom properties — the browser resolves them per
+// theme (light/dark) via dark.css, so no JS theme read is needed here.
+const borderColor = "var(--color-border-default)";
+const backgroundColor = "var(--color-surface-base)";
+const errorHeaderBackground = "var(--color-banner-warning-bg)";
+const errorHeaderColor = "var(--color-status-error-text)";
+const textColor = "var(--color-text-body)";
+const mutedTextColor = "var(--color-text-secondary)";
 
 const props = defineProps({
   error_stack: {
@@ -325,7 +358,7 @@ const allSourceInfoNull = computed(() => {
   if (translatedStackTrace.value.length === 0) return false;
 
   return translatedStackTrace.value.every((trace) =>
-    trace.stack.every((frame) => !frame.source_info)
+    trace.stack.every((frame) => !frame.source_info),
   );
 });
 
@@ -383,20 +416,21 @@ const highlightErrorLine = (traceIndex: number, frameIndex: number) => {
   if (!frame?.source_info) return;
 
   // Calculate the relative line number within the displayed source snippet
-  const { stack_line, source_line_start, source_line_end } = frame.source_info;
+  const { stack_line, source_line_start } = frame.source_info;
 
   // Monaco editor is 1-indexed
   // The source snippet starts at source_line_start and the error is at stack_line
   // Relative position = stack_line - source_line_start + 1
   const relativeLineNumber = stack_line - source_line_start;
 
-
   // Use the decorateRanges method to highlight the error line
   if (editorComponent.decorateRanges) {
-    editorComponent.decorateRanges([{
-      startLine: relativeLineNumber,
-      endLine: relativeLineNumber,
-    }]);
+    editorComponent.decorateRanges([
+      {
+        startLine: relativeLineNumber,
+        endLine: relativeLineNumber,
+      },
+    ]);
   }
 };
 
@@ -425,7 +459,7 @@ const translateStackTrace = async () => {
       store.state.selectedOrganization.identifier,
       service,
       version,
-      env
+      env,
     );
 
     // Check cache first
@@ -462,13 +496,11 @@ const translateStackTrace = async () => {
       payload.env = env;
     }
 
-
     // Call the API
     const response = await sourcemapsService.translateStackTrace(
       store.state.selectedOrganization.identifier,
-      payload
+      payload,
     );
-
 
     if (response.data && response.data.stacktrace) {
       // Check if stacktrace is already an array, if not wrap it in an array
@@ -480,15 +512,6 @@ const translateStackTrace = async () => {
 
       // Store in cache
       setCachedTranslation(cacheKey, translatedData);
-
-
-      // Log each frame for debugging
-      translatedStackTrace.value.forEach((trace, idx) => {
-        trace.stack.forEach((frame, frameIdx) => {
-          if (frame.source_info) {
-          }
-        });
-      });
 
       // Highlight the first frame after the editors are mounted
       await nextTick();
@@ -507,9 +530,7 @@ const translateStackTrace = async () => {
     console.error("Error response:", error?.response);
     console.error("Error response data:", error?.response?.data);
     translationError.value =
-      error?.response?.data?.message ||
-      error?.message ||
-      "Failed to translate stack trace. Source maps may not be available.";
+      error?.response?.data?.message || error?.message || t("rum.failedToTranslateStackTrace");
   } finally {
     isLoadingTranslation.value = false;
   }
@@ -548,20 +569,6 @@ watch(
   () => props.error_stack,
   () => {
     translateStackTrace();
-  }
+  },
 );
 </script>
-
-<style>
-.pretty-stack-container .stack-frame-wrapper .frame-header:hover {
-  background-color: v-bind(hoverBackgroundColor);
-}
-
-.pretty-stack-container .remaining-frames .show-more-button:hover {
-  background-color: v-bind(hoverBackgroundColor);
-}
-
-.pretty-stack-container .remaining-frames .collapsed-frame-wrapper .collapsed-frame-header:hover {
-  background-color: v-bind(hoverBackgroundColor);
-}
-</style>

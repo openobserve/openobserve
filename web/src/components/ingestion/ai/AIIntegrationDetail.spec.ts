@@ -75,12 +75,8 @@ describe("AIIntegrationDetail", () => {
     });
 
     it("renders the legacy CopyContent snippet", () => {
-      expect(
-        wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="ai-integration-card-stub"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="ai-integration-card-stub"]').exists()).toBe(false);
     });
 
     it("renders the documentation link", () => {
@@ -98,12 +94,8 @@ describe("AIIntegrationDetail", () => {
         categorySlug: "frameworks",
         integrationSlug: "langchain",
       });
-      expect(
-        wrapper.find('[data-test="ai-integration-card-stub"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="ai-integration-card-stub"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="ai-integration-detail-copy-content"]').exists()).toBe(false);
     });
 
     it("resolves content via contentSlug alias (openai-python → openai)", () => {
@@ -125,16 +117,6 @@ describe("AIIntegrationDetail", () => {
       });
       expect(wrapper.find("a").exists()).toBe(false);
       expect(wrapper.text()).toContain("Select an integration to view details.");
-    });
-  });
-
-  describe("display name", () => {
-    it("falls back to integrationSlug when integration not found", () => {
-      wrapper = mountDetail({
-        categorySlug: "frameworks",
-        integrationSlug: "unknown-integration",
-      });
-      expect((wrapper.vm as any).displayName).toBe("unknown-integration");
     });
   });
 });

@@ -1,9 +1,8 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import StepAfter from '@/components/icons/dashboards/StepAfter.vue';
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import StepAfter from "@/components/icons/dashboards/StepAfter.vue";
 
-
-describe('StepAfter.vue', () => {
+describe("StepAfter.vue", () => {
   let wrapper: VueWrapper;
 
   afterEach(() => {
@@ -12,84 +11,94 @@ describe('StepAfter.vue', () => {
 
   const createWrapper = () => mount(StepAfter, { global: { plugins: [] } });
 
-  describe('Component Rendering', () => {
-    it('renders the component correctly', () => {
+  describe("Component Rendering", () => {
+    it("renders the component correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
 
-    it('has correct component name', () => {
+    it("has correct component name", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.$options.name).toBe('StepAfter');
+      expect(wrapper.vm.$options.name).toBe("StepAfter");
     });
 
-    it('renders an SVG element', () => {
+    it("renders an SVG element", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="dashboard-icon-step-after-svg"]').exists()).toBe(true);
     });
 
-    it('has correct SVG dimensions', () => {
+    it("has correct SVG dimensions", () => {
       wrapper = createWrapper();
       const svg = wrapper.find('[data-test="dashboard-icon-step-after-svg"]');
-      expect(svg.attributes('width')).toBe('91');
-      expect(svg.attributes('height')).toBe('83');
+      expect(svg.attributes("width")).toBe("91");
+      expect(svg.attributes("height")).toBe("83");
     });
 
-    it('has correct viewBox', () => {
+    it("has correct viewBox", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="dashboard-icon-step-after-svg"]').attributes('viewBox')).toBe('0 0 91 83');
+      expect(
+        wrapper.find('[data-test="dashboard-icon-step-after-svg"]').attributes("viewBox"),
+      ).toBe("0 0 91 83");
     });
 
-    it('contains a path element for the step line', () => {
+    it("contains a path element for the step line", () => {
       wrapper = createWrapper();
       expect(wrapper.find('[data-test="dashboard-icon-step-after-path"]').exists()).toBe(true);
     });
 
-    it('path uses currentColor stroke', () => {
+    it("path uses currentColor stroke", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="dashboard-icon-step-after-path"]').attributes('stroke')).toBe('currentColor');
+      expect(
+        wrapper.find('[data-test="dashboard-icon-step-after-path"]').attributes("stroke"),
+      ).toBe("currentColor");
     });
 
-    it('path has vertical (V) steps', () => {
+    it("path has vertical (V) steps", () => {
       wrapper = createWrapper();
-      expect(wrapper.find('[data-test="dashboard-icon-step-after-path"]').attributes('d')).toContain('V');
+      expect(
+        wrapper.find('[data-test="dashboard-icon-step-after-path"]').attributes("d"),
+      ).toContain("V");
     });
 
-    it('has 3 circle elements for data points', () => {
+    it("has 3 circle elements for data points", () => {
       wrapper = createWrapper();
       expect(wrapper.findAll('[data-test="dashboard-icon-step-after-circle"]').length).toBe(3);
     });
 
-    it('circles use currentColor fill', () => {
+    it("circles use currentColor fill", () => {
       wrapper = createWrapper();
       wrapper.findAll('[data-test="dashboard-icon-step-after-circle"]').forEach((c) => {
-        expect(c.attributes('fill')).toBe('currentColor');
+        expect(c.attributes("fill")).toBe("currentColor");
       });
     });
   });
 
-  describe('Vue 3 Integration', () => {
-    it('uses defineComponent correctly', () => {
+  describe("Vue 3 Integration", () => {
+    it("uses defineComponent correctly", () => {
       wrapper = createWrapper();
       expect(wrapper.vm).toBeTruthy();
     });
 
-    it('has no reactive state', () => {
+    it("has no reactive state", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.$data).toEqual({});
     });
 
-    it('mounts without errors', () => {
-      expect(() => { wrapper = createWrapper(); }).not.toThrow();
+    it("mounts without errors", () => {
+      expect(() => {
+        wrapper = createWrapper();
+      }).not.toThrow();
     });
 
-    it('unmounts cleanly', () => {
+    it("unmounts cleanly", () => {
       wrapper = createWrapper();
-      expect(() => { wrapper.unmount(); }).not.toThrow();
+      expect(() => {
+        wrapper.unmount();
+      }).not.toThrow();
     });
 
-    it('has no side effects on mount', () => {
-      const spy = vi.spyOn(console, 'warn');
+    it("has no side effects on mount", () => {
+      const spy = vi.spyOn(console, "warn");
       wrapper = createWrapper();
       expect(spy).not.toHaveBeenCalled();
       spy.mockRestore();

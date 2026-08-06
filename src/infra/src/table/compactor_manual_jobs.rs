@@ -190,6 +190,25 @@ pub async fn bulk_update(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Er
     Ok(())
 }
 
+/// Delete all compactor manual jobs whose key starts with `{org_id}/`.
+/// The key format is `{org_id}/{stream_type}/{stream_name}/...`.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    // make sure only one client is writing to the database (only for SQLite)
+    let _lock = get_lock().await;
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let prefix = format!("{org_id}/%");
+    let res = Entity::delete_many()
+        .filter(Column::Key.like(&prefix))
+        .exec(client)
+        .await;
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => orm_err!(format!("delete_by_org error: {e}")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

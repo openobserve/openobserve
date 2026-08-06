@@ -15,35 +15,37 @@
 
 use std::sync::Arc;
 
+use async_nats::jetstream::AckKind;
 use async_trait::async_trait;
 use bytes::Bytes;
-use config::meta::meta_store::MetaStore;
+use config::meta::queue_store::QueueStore;
 use tokio::sync::{OnceCell, mpsc};
 
 use crate::errors::{Error, Result};
 
+pub mod memory;
 pub mod nats;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetentionPolicy {
     Interest,
     Limits,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DeliverPolicy {
     All,
     Last,
     New,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageType {
     File,
     Memory,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueueConfig {
     pub max_age: Option<std::time::Duration>,
     pub retention_policy: RetentionPolicy,
@@ -107,9 +109,19 @@ pub async fn init() -> Result<()> {
 }
 
 async fn default() -> Box<dyn Queue> {
-    match config::get_config().common.queue_store.as_str().into() {
-        MetaStore::Nats => Box::<nats::NatsQueue>::default(),
-        _ => Box::<nats::NatsQueue>::default(),
+    let cfg = config::get_config();
+    // config validation rejects unknown values at startup, so an error here is a bug
+    match QueueStore::try_from(cfg.common.queue_store.as_str()) {
+        Ok(QueueStore::Nats) => Box::<nats::NatsQueue>::default(),
+        Ok(QueueStore::Memory) => {
+            let queue = memory::MemoryQueue::default();
+            log::info!(
+                "queue backend=memory max_size_bytes={} durability=none scope=process",
+                queue.limit_bytes()
+            );
+            Box::new(queue)
+        }
+        Err(e) => panic!("invalid queue store configuration: {e}"),
     }
 }
 
@@ -130,29 +142,167 @@ pub trait Queue: Sync + Send + 'static {
         topic: &str,
         deliver_policy: Option<DeliverPolicy>,
     ) -> Result<Arc<mpsc::Receiver<Message>>>;
+    /// Pull-based consumption for shared work queues: consumers in the same
+    /// `group` share one durable delivery cursor, and each message's
+    /// visibility timeout starts only when [`PullConsumer::next`] hands it to
+    /// the caller.
+    async fn pull_consume(
+        &self,
+        topic: &str,
+        group: &str,
+        deliver_policy: Option<DeliverPolicy>,
+    ) -> Result<PullConsumer>;
     async fn purge(&self, topic: &str, sequence: usize) -> Result<()>;
 }
 
-pub enum Message {
+/// A backend-independent pull consumer returned by [`Queue::pull_consume`].
+///
+/// Unlike [`Queue::consume`], no messages are buffered ahead of the caller, so
+/// the ack deadline of a message never runs while it is still waiting to be
+/// picked up.
+pub struct PullConsumer {
+    inner: PullConsumerInner,
+}
+
+impl std::fmt::Debug for PullConsumer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let backend = match &self.inner {
+            PullConsumerInner::Nats(_) => "nats",
+            PullConsumerInner::Memory(_) => "memory",
+        };
+        f.debug_struct("PullConsumer")
+            .field("backend", &backend)
+            .finish()
+    }
+}
+
+// a process holds only a handful of long-lived pull consumers, so the size
+// difference between variants is fine
+#[allow(clippy::large_enum_variant)]
+enum PullConsumerInner {
+    Nats(nats::NatsPullConsumer),
+    Memory(memory::MemoryPullConsumer),
+}
+
+impl PullConsumer {
+    pub(crate) fn from_nats(consumer: nats::NatsPullConsumer) -> Self {
+        Self {
+            inner: PullConsumerInner::Nats(consumer),
+        }
+    }
+
+    pub(crate) fn from_memory(consumer: memory::MemoryPullConsumer) -> Self {
+        Self {
+            inner: PullConsumerInner::Memory(consumer),
+        }
+    }
+
+    /// The ack deadline of the backend: a message must be acked (or its
+    /// progress reported) within this duration after `next` returned it.
+    pub fn ack_wait(&self) -> std::time::Duration {
+        match &self.inner {
+            PullConsumerInner::Nats(consumer) => consumer.ack_wait(),
+            PullConsumerInner::Memory(consumer) => consumer.ack_wait(),
+        }
+    }
+
+    /// Wait for the next message. Returns `Ok(None)` when no message arrived
+    /// within the backend's poll interval; callers are expected to call again.
+    pub async fn next(&mut self) -> Result<Option<Message>> {
+        match &mut self.inner {
+            PullConsumerInner::Nats(consumer) => consumer.next().await,
+            PullConsumerInner::Memory(consumer) => consumer.next().await,
+        }
+    }
+}
+
+/// A queue message with a backend-independent payload and acknowledgement
+/// handle. Callers must use [`Message::message`] and [`Message::ack`] and must
+/// not depend on which backend produced the message.
+pub struct Message {
+    payload: Bytes,
+    ack: AckHandle,
+}
+
+// messages are transient, so the size difference between variants is fine
+#[allow(clippy::large_enum_variant)]
+enum AckHandle {
     Nats(async_nats::jetstream::Message),
+    Memory(memory::MemoryAckHandle),
 }
 
 impl Message {
-    pub fn message(&self) -> &Bytes {
-        match self {
-            Message::Nats(msg) => &msg.payload,
+    pub(crate) fn from_nats(msg: async_nats::jetstream::Message) -> Self {
+        Self {
+            // Bytes clone is a cheap refcount bump, not a payload copy
+            payload: msg.payload.clone(),
+            ack: AckHandle::Nats(msg),
         }
     }
 
+    pub(crate) fn from_memory(payload: Bytes, handle: memory::MemoryAckHandle) -> Self {
+        Self {
+            payload,
+            ack: AckHandle::Memory(handle),
+        }
+    }
+
+    pub fn message(&self) -> &Bytes {
+        &self.payload
+    }
+
     pub async fn ack(&self) -> Result<()> {
-        match self {
-            Message::Nats(msg) => msg
+        match &self.ack {
+            AckHandle::Nats(msg) => msg
                 .ack()
                 .await
                 .map_err(|e| Error::Message(format!("ack error:{e}")))?,
+            AckHandle::Memory(handle) => handle.ack(),
         }
         Ok(())
     }
+
+    pub async fn progress(&self) -> Result<()> {
+        match &self.ack {
+            AckHandle::Nats(msg) => msg
+                .ack_with(AckKind::Progress)
+                .await
+                .map_err(|e| Error::Message(format!("progress ack error:{e}")))?,
+            AckHandle::Memory(handle) => handle.progress(),
+        }
+        Ok(())
+    }
+
+    pub async fn double_ack(&self) -> Result<()> {
+        match &self.ack {
+            AckHandle::Nats(msg) => msg
+                .double_ack()
+                .await
+                .map_err(|e| Error::Message(format!("double ack error:{e}")))?,
+            AckHandle::Memory(handle) => handle.ack(),
+        }
+        Ok(())
+    }
+}
+
+/// Normalize a topic name so it is valid for every queue backend.
+///
+/// The rules follow the NATS subject-name recommendations so both backends
+/// resolve the same input to the same topic:
+/// <https://docs.nats.io/nats-concepts/subjects#characters-allowed-and-recommended-for-subject-names>
+pub(crate) fn format_key(key: &str) -> String {
+    let mut result = String::new();
+
+    for ch in key.chars() {
+        match ch {
+            // Keep recommended characters as-is
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '-' | '_' => result.push(ch),
+            // Replace other characters with underscore for safety
+            _ => result.push('_'),
+        }
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -212,5 +362,32 @@ mod tests {
         assert_eq!(cfg.max_age, Some(Duration::from_secs(60)));
         assert!(matches!(cfg.retention_policy, RetentionPolicy::Limits));
         assert!(matches!(cfg.storage_type, StorageType::File));
+    }
+
+    #[test]
+    fn test_format_key() {
+        // Test basic functionality
+        assert_eq!(format_key("test"), "test");
+        assert_eq!(format_key("test123"), "test123");
+        assert_eq!(format_key("test-key"), "test-key");
+        assert_eq!(format_key("test_key"), "test_key");
+
+        // Test forbidden characters
+        assert_eq!(format_key("test.key"), "test_key");
+        assert_eq!(format_key("test*key"), "test_key");
+        assert_eq!(format_key("test>key"), "test_key");
+        assert_eq!(format_key("test key"), "test_key");
+        assert_eq!(format_key("test\0key"), "test_key");
+
+        // Test empty string
+        assert_eq!(format_key(""), "");
+
+        // Test mixed characters
+        assert_eq!(format_key("test@#$%^&*()key"), "test_________key");
+        assert_eq!(format_key("test.key*value>data"), "test_key_value_data");
+
+        // Test unicode characters (should be replaced with _)
+        assert_eq!(format_key("test中文key"), "test__key");
+        assert_eq!(format_key("test🚀key"), "test_key");
     }
 }

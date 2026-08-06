@@ -117,9 +117,7 @@ describe("urlTimeParams · selectedDateToQueryParams", () => {
 
   it("round-trips with queryParamsToSelectedDate (relative)", () => {
     const params = { period: "1h" };
-    expect(
-      selectedDateToQueryParams(queryParamsToSelectedDate(params)),
-    ).toEqual(params);
+    expect(selectedDateToQueryParams(queryParamsToSelectedDate(params))).toEqual(params);
   });
 });
 

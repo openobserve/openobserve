@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mount, shallowMount } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import Group from "./Group.vue";
-import AddCondition from "./AddCondition.vue";
 import { createI18n } from "vue-i18n";
 
 // Mock AddCondition component
@@ -12,14 +11,14 @@ vi.mock("./AddCondition.vue", () => ({
     template: '<div data-test="add-condition-mock">AddCondition</div>',
     props: [
       "condition",
-      "dashboardVariablesFilterItems", 
+      "dashboardVariablesFilterItems",
       "schemaOptions",
       "loadFilterItem",
       "dashboardPanelData",
-      "conditionIndex"
+      "conditionIndex",
     ],
-    emits: ["remove-condition", "logical-operator-change"]
-  }
+    emits: ["remove-condition", "logical-operator-change"],
+  },
 }));
 
 const createWrapper = (props = {}) => {
@@ -31,9 +30,9 @@ const createWrapper = (props = {}) => {
         common: {
           addCondition: "Add Condition",
           addGroup: "Add Group",
-        }
-      }
-    }
+        },
+      },
+    },
   });
 
   const defaultProps = {
@@ -45,29 +44,28 @@ const createWrapper = (props = {}) => {
           column: "field1",
           operator: "=",
           value: "value1",
-          logicalOperator: "AND"
-        }
-      ]
+          logicalOperator: "AND",
+        },
+      ],
     },
     groupIndex: 0,
     groupNestedIndex: 0,
     dashboardVariablesFilterItems: [],
     schemaOptions: [],
     loadFilterItem: vi.fn(),
-    dashboardPanelData: {}
+    dashboardPanelData: {},
   };
 
   return mount(Group, {
     props: {
       ...defaultProps,
-      ...props
+      ...props,
     },
     global: {
       plugins: [i18n],
-    }
+    },
   });
 };
-
 
 describe("Group.vue", () => {
   beforeEach(() => {
@@ -87,12 +85,12 @@ describe("Group.vue", () => {
 
     it("should render group with proper CSS variable", () => {
       const wrapper = createWrapper({
-        groupNestedIndex: 2
+        groupNestedIndex: 2,
       });
-      
+
       const groupDiv = wrapper.find('[data-test="dashboard-group"]');
       expect(groupDiv.exists()).toBe(true);
-      expect(groupDiv.attributes('style')).toContain('--group-index: 2;');
+      expect(groupDiv.attributes("style")).toContain("--group-index: 2;");
     });
   });
 
@@ -101,16 +99,16 @@ describe("Group.vue", () => {
       const props = {
         group: {
           logicalOperator: "AND",
-          conditions: []
+          conditions: [],
         },
         groupIndex: 1,
         groupNestedIndex: 0,
         dashboardVariablesFilterItems: [],
         schemaOptions: [],
         loadFilterItem: vi.fn(),
-        dashboardPanelData: {}
+        dashboardPanelData: {},
       };
-      
+
       const wrapper = createWrapper(props);
       expect(wrapper.vm.group).toEqual(props.group);
       expect(wrapper.vm.groupIndex).toBe(props.groupIndex);
@@ -124,12 +122,14 @@ describe("Group.vue", () => {
         groupIndex: 1,
         group: {
           logicalOperator: "OR",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
 
       // The logical operator select is commented out in the template
-      const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-group-logical-operator"]');
+      const logicalOperatorSelect = wrapper.find(
+        '[data-test="dashboard-add-group-logical-operator"]',
+      );
       expect(logicalOperatorSelect.exists()).toBe(false);
     });
 
@@ -138,8 +138,8 @@ describe("Group.vue", () => {
         groupIndex: 1,
         group: {
           logicalOperator: "OR",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
 
       // Verify the group has the logical operator property
@@ -151,15 +151,15 @@ describe("Group.vue", () => {
         groupIndex: 1,
         group: {
           logicalOperator: "AND",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
 
       // Call the method directly since the UI element is commented out
-      wrapper.vm.emitLogicalOperatorChange('OR');
+      wrapper.vm.emitLogicalOperatorChange("OR");
 
-      expect(wrapper.emitted('logical-operator-change')).toBeTruthy();
-      expect(wrapper.emitted('logical-operator-change')[0]).toEqual(['OR']);
+      expect(wrapper.emitted("logical-operator-change")).toBeTruthy();
+      expect(wrapper.emitted("logical-operator-change")[0]).toEqual(["OR"]);
     });
 
     it("should not render logical operator select when groupIndex === 0", () => {
@@ -167,11 +167,13 @@ describe("Group.vue", () => {
         groupIndex: 0,
         group: {
           logicalOperator: "AND",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
 
-      const logicalOperatorSelect = wrapper.find('[data-test="dashboard-add-group-logical-operator"]');
+      const logicalOperatorSelect = wrapper.find(
+        '[data-test="dashboard-add-group-logical-operator"]',
+      );
       expect(logicalOperatorSelect.exists()).toBe(false);
     });
   });
@@ -186,12 +188,12 @@ describe("Group.vue", () => {
               filterType: "condition",
               column: "field1",
               operator: "=",
-              value: "value1"
-            }
-          ]
-        }
+              value: "value1",
+            },
+          ],
+        },
       });
-      
+
       const groupConditions = wrapper.find('[data-test="dashboard-group-conditions"]');
       expect(groupConditions.exists()).toBe(true);
 
@@ -208,18 +210,18 @@ describe("Group.vue", () => {
               filterType: "condition",
               column: "field1",
               operator: "=",
-              value: "value1"
+              value: "value1",
             },
             {
-              filterType: "condition", 
+              filterType: "condition",
               column: "field2",
               operator: "!=",
-              value: "value2"
-            }
-          ]
-        }
+              value: "value2",
+            },
+          ],
+        },
       });
-      
+
       const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(2);
     });
@@ -233,12 +235,12 @@ describe("Group.vue", () => {
               filterType: "condition",
               column: "field1",
               operator: "=",
-              value: "value1"
-            }
-          ]
-        }
+              value: "value1",
+            },
+          ],
+        },
       });
-      
+
       const addConditionComponent = wrapper.find('[data-test="add-condition-mock"]');
       expect(addConditionComponent.exists()).toBe(true);
     });
@@ -256,14 +258,14 @@ describe("Group.vue", () => {
                   filterType: "condition",
                   column: "nested_field",
                   operator: "=",
-                  value: "nested_value"
-                }
-              ]
-            }
-          ]
-        }
+                  value: "nested_value",
+                },
+              ],
+            },
+          ],
+        },
       });
-      
+
       const nestedGroups = wrapper.findAllComponents(Group);
       // Should find at least the parent group, nested group depends on recursive rendering
       expect(nestedGroups.length).toBeGreaterThanOrEqual(1);
@@ -273,55 +275,55 @@ describe("Group.vue", () => {
   describe("Add Button and Menu", () => {
     it("should render add button", () => {
       const wrapper = createWrapper();
-      
+
       const addBtn = wrapper.find('[data-test="dashboard-add-condition-add"]');
       expect(addBtn.exists()).toBe(true);
     });
 
     it("should show menu when add button is clicked", async () => {
       const wrapper = createWrapper();
-      
+
       const addBtn = wrapper.find('[data-test="dashboard-add-condition-add"]');
-      await addBtn.trigger('click');
-      
+      await addBtn.trigger("click");
+
       expect(wrapper.vm.showAddMenu).toBe(true);
     });
 
     it("should render add condition menu item when menu is open", async () => {
       const wrapper = createWrapper();
-      
+
       // Trigger the menu to open
       const addBtn = wrapper.find('[data-test="dashboard-add-condition-add"]');
-      await addBtn.trigger('click');
+      await addBtn.trigger("click");
       await nextTick();
-      
+
       const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
-      
-      // If not found due to Quasar menu rendering, check the menu state instead
+
+      // If not found due to menu rendering, check the menu state instead
       if (!addConditionItem.exists()) {
         expect(wrapper.vm.showAddMenu).toBe(true);
       } else {
         expect(addConditionItem.exists()).toBe(true);
-        expect(addConditionItem.text()).toBe('Add Condition');
+        expect(addConditionItem.text()).toBe("Add Condition");
       }
     });
 
     it("should render add group menu item when menu is open", async () => {
       const wrapper = createWrapper();
-      
+
       // Trigger the menu to open
       const addBtn = wrapper.find('[data-test="dashboard-add-condition-add"]');
-      await addBtn.trigger('click');
+      await addBtn.trigger("click");
       await nextTick();
-      
+
       const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
-      
-      // If not found due to Quasar menu rendering, check the menu state instead
+
+      // If not found due to menu rendering, check the menu state instead
       if (!addGroupItem.exists()) {
         expect(wrapper.vm.showAddMenu).toBe(true);
       } else {
         expect(addGroupItem.exists()).toBe(true);
-        expect(addGroupItem.text()).toBe('Add Group');
+        expect(addGroupItem.text()).toBe("Add Group");
       }
     });
   });
@@ -329,32 +331,32 @@ describe("Group.vue", () => {
   describe("Remove Group Button", () => {
     it("should render remove group button when groupNestedIndex !== 0", () => {
       const wrapper = createWrapper({
-        groupNestedIndex: 1
+        groupNestedIndex: 1,
       });
-      
+
       const removeBtn = wrapper.find('[data-test="dashboard-add-group-remove"]');
       expect(removeBtn.exists()).toBe(true);
     });
 
     it("should not render remove group button when groupNestedIndex === 0", () => {
       const wrapper = createWrapper({
-        groupNestedIndex: 0
+        groupNestedIndex: 0,
       });
-      
+
       const removeBtn = wrapper.find('[data-test="dashboard-add-group-remove"]');
       expect(removeBtn.exists()).toBe(false);
     });
 
     it("should emit remove-group event when remove button is clicked", async () => {
       const wrapper = createWrapper({
-        groupNestedIndex: 1
+        groupNestedIndex: 1,
       });
-      
+
       const removeBtn = wrapper.find('[data-test="dashboard-add-group-remove"]');
-      await removeBtn.trigger('click');
-      
-      expect(wrapper.emitted('remove-group')).toBeTruthy();
-      expect(wrapper.emitted('remove-group').length).toBe(1);
+      await removeBtn.trigger("click");
+
+      expect(wrapper.emitted("remove-group")).toBeTruthy();
+      expect(wrapper.emitted("remove-group").length).toBe(1);
     });
   });
 
@@ -363,11 +365,11 @@ describe("Group.vue", () => {
       it("should emit add-condition event and close menu", async () => {
         const wrapper = createWrapper();
         wrapper.vm.showAddMenu = true;
-        
+
         await wrapper.vm.emitAddCondition();
-        
-        expect(wrapper.emitted('add-condition')).toBeTruthy();
-        expect(wrapper.emitted('add-condition')[0]).toEqual([wrapper.vm.group]);
+
+        expect(wrapper.emitted("add-condition")).toBeTruthy();
+        expect(wrapper.emitted("add-condition")[0]).toEqual([wrapper.vm.group]);
         expect(wrapper.vm.showAddMenu).toBe(false);
       });
 
@@ -378,14 +380,14 @@ describe("Group.vue", () => {
 
         const addConditionItem = wrapper.find('[data-test="dashboard-add-group-add-condition"]');
         if (addConditionItem.exists()) {
-          // After q-item -> ODropdownItem migration, click on the data-test
+          // After the ODropdownItem migration, click on the data-test
           // element directly (ODropdownItem's @select wires up to its click).
-          await addConditionItem.trigger('click');
-          expect(wrapper.emitted('add-condition')).toBeTruthy();
+          await addConditionItem.trigger("click");
+          expect(wrapper.emitted("add-condition")).toBeTruthy();
         } else {
           // Fallback - directly call the method
           await wrapper.vm.emitAddCondition();
-          expect(wrapper.emitted('add-condition')).toBeTruthy();
+          expect(wrapper.emitted("add-condition")).toBeTruthy();
         }
       });
     });
@@ -394,11 +396,11 @@ describe("Group.vue", () => {
       it("should emit add-group event and close menu", async () => {
         const wrapper = createWrapper();
         wrapper.vm.showAddMenu = true;
-        
+
         await wrapper.vm.emitAddGroup();
-        
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('add-group')[0]).toEqual([wrapper.vm.group]);
+
+        expect(wrapper.emitted("add-group")).toBeTruthy();
+        expect(wrapper.emitted("add-group")[0]).toEqual([wrapper.vm.group]);
         expect(wrapper.vm.showAddMenu).toBe(false);
       });
 
@@ -409,14 +411,14 @@ describe("Group.vue", () => {
 
         const addGroupItem = wrapper.find('[data-test="dashboard-add-group-add-group"]');
         if (addGroupItem.exists()) {
-          // After q-item -> ODropdownItem migration, click on the data-test
+          // After the ODropdownItem migration, click on the data-test
           // element directly (ODropdownItem's @select wires up to its click).
-          await addGroupItem.trigger('click');
-          expect(wrapper.emitted('add-group')).toBeTruthy();
+          await addGroupItem.trigger("click");
+          expect(wrapper.emitted("add-group")).toBeTruthy();
         } else {
           // Fallback - directly call the method
           await wrapper.vm.emitAddGroup();
-          expect(wrapper.emitted('add-group')).toBeTruthy();
+          expect(wrapper.emitted("add-group")).toBeTruthy();
         }
       });
     });
@@ -428,14 +430,14 @@ describe("Group.vue", () => {
           conditions: [
             { filterType: "condition", column: "field1" },
             { filterType: "condition", column: "field2" },
-            { filterType: "condition", column: "field3" }
-          ]
+            { filterType: "condition", column: "field3" },
+          ],
         };
-        
+
         const wrapper = createWrapper({ group });
-        
+
         wrapper.vm.removeConditionFromGroup(1);
-        
+
         expect(wrapper.vm.group.conditions).toHaveLength(2);
         expect(wrapper.vm.group.conditions[0].column).toBe("field1");
         expect(wrapper.vm.group.conditions[1].column).toBe("field3");
@@ -444,15 +446,13 @@ describe("Group.vue", () => {
       it("should handle removing the only condition", () => {
         const group = {
           logicalOperator: "AND",
-          conditions: [
-            { filterType: "condition", column: "field1" }
-          ]
+          conditions: [{ filterType: "condition", column: "field1" }],
         };
-        
+
         const wrapper = createWrapper({ group });
-        
+
         wrapper.vm.removeConditionFromGroup(0);
-        
+
         expect(wrapper.vm.group.conditions).toHaveLength(0);
       });
     });
@@ -461,11 +461,11 @@ describe("Group.vue", () => {
       it("should emit add-condition event with provided group", () => {
         const wrapper = createWrapper();
         const testGroup = { logicalOperator: "OR", conditions: [] };
-        
+
         wrapper.vm.addConditionToGroup(testGroup);
-        
-        expect(wrapper.emitted('add-condition')).toBeTruthy();
-        expect(wrapper.emitted('add-condition')[0]).toEqual([testGroup]);
+
+        expect(wrapper.emitted("add-condition")).toBeTruthy();
+        expect(wrapper.emitted("add-condition")[0]).toEqual([testGroup]);
       });
     });
 
@@ -473,22 +473,22 @@ describe("Group.vue", () => {
       it("should emit add-group event with provided group", () => {
         const wrapper = createWrapper();
         const testGroup = { logicalOperator: "OR", conditions: [] };
-        
+
         wrapper.vm.addGroupToGroup(testGroup);
-        
-        expect(wrapper.emitted('add-group')).toBeTruthy();
-        expect(wrapper.emitted('add-group')[0]).toEqual([testGroup]);
+
+        expect(wrapper.emitted("add-group")).toBeTruthy();
+        expect(wrapper.emitted("add-group")[0]).toEqual([testGroup]);
       });
     });
 
     describe("emitLogicalOperatorChange", () => {
       it("should emit logical-operator-change event with new operator", () => {
         const wrapper = createWrapper();
-        
+
         wrapper.vm.emitLogicalOperatorChange("OR");
-        
-        expect(wrapper.emitted('logical-operator-change')).toBeTruthy();
-        expect(wrapper.emitted('logical-operator-change')[0]).toEqual(["OR"]);
+
+        expect(wrapper.emitted("logical-operator-change")).toBeTruthy();
+        expect(wrapper.emitted("logical-operator-change")[0]).toEqual(["OR"]);
       });
     });
 
@@ -498,19 +498,19 @@ describe("Group.vue", () => {
           logicalOperator: "AND",
           conditions: [
             { filterType: "condition", column: "field1" },
-            { 
-              filterType: "group", 
+            {
+              filterType: "group",
               logicalOperator: "OR",
-              conditions: [{ filterType: "condition", column: "nested1" }]
+              conditions: [{ filterType: "condition", column: "nested1" }],
             },
-            { filterType: "condition", column: "field2" }
-          ]
+            { filterType: "condition", column: "field2" },
+          ],
         };
-        
+
         const wrapper = createWrapper({ group });
-        
+
         wrapper.vm.removeGroupFromNested(1);
-        
+
         expect(wrapper.vm.group.conditions).toHaveLength(2);
         expect(wrapper.vm.group.conditions[0].column).toBe("field1");
         expect(wrapper.vm.group.conditions[1].column).toBe("field2");
@@ -520,27 +520,25 @@ describe("Group.vue", () => {
         const group = {
           logicalOperator: "AND",
           conditions: [
-            { 
-              filterType: "group", 
+            {
+              filterType: "group",
               logicalOperator: "OR",
               conditions: [
                 { filterType: "condition", column: "nested1" },
                 {
                   filterType: "group",
                   logicalOperator: "AND",
-                  conditions: [
-                    { filterType: "condition", column: "deeply_nested" }
-                  ]
-                }
-              ]
-            }
-          ]
+                  conditions: [{ filterType: "condition", column: "deeply_nested" }],
+                },
+              ],
+            },
+          ],
         };
-        
+
         const wrapper = createWrapper({ group });
-        
+
         wrapper.vm.removeGroupFromNested(0);
-        
+
         expect(wrapper.vm.group.conditions).toHaveLength(0);
       });
 
@@ -549,14 +547,14 @@ describe("Group.vue", () => {
           logicalOperator: "AND",
           conditions: [
             { filterType: "condition", column: "field1" },
-            { filterType: "condition", column: "field2" }
-          ]
+            { filterType: "condition", column: "field2" },
+          ],
         };
-        
+
         const wrapper = createWrapper({ group });
-        
+
         wrapper.vm.removeGroupFromNested(0);
-        
+
         expect(wrapper.vm.group.conditions).toHaveLength(1);
         expect(wrapper.vm.group.conditions[0].column).toBe("field2");
       });
@@ -576,7 +574,7 @@ describe("Group.vue", () => {
 
     it("should provide t function from i18n", () => {
       const wrapper = createWrapper();
-      expect(typeof wrapper.vm.t).toBe('function');
+      expect(typeof wrapper.vm.t).toBe("function");
     });
   });
 
@@ -585,10 +583,10 @@ describe("Group.vue", () => {
       const wrapper = createWrapper({
         group: {
           logicalOperator: "AND",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
-      
+
       const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBe(0);
     });
@@ -602,12 +600,12 @@ describe("Group.vue", () => {
               filterType: "condition",
               column: "field1",
               operator: "=",
-              value: "value1"
-            }
-          ]
-        }
+              value: "value1",
+            },
+          ],
+        },
       });
-      
+
       // Verify that AddCondition component is rendered (mocked)
       const addCondition = wrapper.find('[data-test="add-condition-mock"]');
       expect(addCondition.exists()).toBe(true);
@@ -622,18 +620,18 @@ describe("Group.vue", () => {
               filterType: "condition",
               column: "field1",
               operator: "=",
-              value: "value1"
+              value: "value1",
             },
             {
               filterType: "condition",
               column: "field2",
               operator: "!=",
-              value: "value2"
-            }
-          ]
-        }
+              value: "value2",
+            },
+          ],
+        },
       });
-      
+
       // Test the removeConditionFromGroup method with index bounds
       wrapper.vm.removeConditionFromGroup(0);
       expect(wrapper.vm.group.conditions.length).toBe(1);
@@ -648,7 +646,7 @@ describe("Group.vue", () => {
             filterType: "condition",
             column: "field1",
             operator: "=",
-            value: "value1"
+            value: "value1",
           },
           {
             filterType: "group",
@@ -658,7 +656,7 @@ describe("Group.vue", () => {
                 filterType: "condition",
                 column: "nested_field1",
                 operator: "=",
-                value: "nested_value1"
+                value: "nested_value1",
               },
               {
                 filterType: "group",
@@ -668,23 +666,23 @@ describe("Group.vue", () => {
                     filterType: "condition",
                     column: "deeply_nested",
                     operator: "!=",
-                    value: "deep_value"
-                  }
-                ]
-              }
-            ]
+                    value: "deep_value",
+                  },
+                ],
+              },
+            ],
           },
           {
             filterType: "condition",
             column: "field3",
             operator: "contains",
-            value: "value3"
-          }
-        ]
+            value: "value3",
+          },
+        ],
       };
 
       const wrapper = createWrapper({ group: complexGroup });
-      
+
       // Should render all condition groups (including nested ones)
       const conditionGroups = wrapper.findAll('[data-test="dashboard-group-condition-group"]');
       expect(conditionGroups.length).toBeGreaterThanOrEqual(3);
@@ -695,24 +693,24 @@ describe("Group.vue", () => {
         groupIndex: 1,
         group: {
           logicalOperator: "OR",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
-      
+
       // Test changing logical operator
       wrapper.vm.emitLogicalOperatorChange("AND");
-      expect(wrapper.emitted('logical-operator-change')).toBeTruthy();
-      expect(wrapper.emitted('logical-operator-change')[0]).toEqual(["AND"]);
+      expect(wrapper.emitted("logical-operator-change")).toBeTruthy();
+      expect(wrapper.emitted("logical-operator-change")[0]).toEqual(["AND"]);
     });
 
     it("should handle edge case with removeGroupFromNested with empty conditions", () => {
       const wrapper = createWrapper({
         group: {
           logicalOperator: "AND",
-          conditions: []
-        }
+          conditions: [],
+        },
       });
-      
+
       // Should not crash when trying to remove from empty conditions
       expect(() => wrapper.vm.removeGroupFromNested(0)).not.toThrow();
       expect(wrapper.vm.group.conditions.length).toBe(0);

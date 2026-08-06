@@ -14,9 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import QueryBuilder from "./QueryBuilder.vue";
 
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock the child components
 vi.mock("@/components/promql/components/MetricSelector.vue", () => ({
@@ -48,7 +50,7 @@ vi.mock("@/components/promql/components/OperationsList.vue", () => ({
 
 // Mock the query modeller
 vi.mock("@/components/promql/operations/queryModeller", () => ({
-  promQueryModeller: {
+  promqlRenderer: {
     renderQuery: vi.fn((query) => {
       if (!query.metric) return "";
       let result = query.metric;
@@ -85,10 +87,6 @@ describe("QueryBuilder", () => {
     return mount(QueryBuilder, {
       global: {
         stubs: {
-          QCard: false,
-          QCardSection: false,
-          QSeparator: false,
-          QBtn: false,
           MetricSelector: true,
           LabelFilterEditor: true,
           OperationsList: true,
@@ -111,9 +109,7 @@ describe("QueryBuilder", () => {
     it("should render the component", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-query-builder"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-query-builder"]').exists()).toBe(true);
     });
 
     it("should display the title and subtitle", () => {
@@ -175,10 +171,7 @@ describe("QueryBuilder", () => {
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "http_requests_total";
-      wrapper.vm.visualQuery.operations = [
-        { type: "rate" },
-        { type: "sum" },
-      ];
+      wrapper.vm.visualQuery.operations = [{ type: "rate" }, { type: "sum" }];
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.generatedQuery).toContain("sum(rate(http_requests_total))");
@@ -230,16 +223,16 @@ describe("QueryBuilder", () => {
         expect.objectContaining({
           variant: "success",
           message: "Query copied to clipboard!",
-        })
+        }),
       );
     });
 
     it("should disable copy button when no query is generated", () => {
       wrapper = createWrapper();
 
-      const copyButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Copy Query")
-      );
+      const copyButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Copy Query"));
 
       expect(copyButton?.element.disabled).toBe(true);
     });
@@ -250,9 +243,9 @@ describe("QueryBuilder", () => {
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const copyButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Copy Query")
-      );
+      const copyButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Copy Query"));
 
       expect(copyButton?.element.disabled).toBe(false);
     });
@@ -288,16 +281,16 @@ describe("QueryBuilder", () => {
         expect.objectContaining({
           variant: "info",
           message: "Query cleared",
-        })
+        }),
       );
     });
 
     it("should clear button should always be enabled", () => {
       wrapper = createWrapper();
 
-      const clearButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Clear All")
-      );
+      const clearButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Clear All"));
 
       expect(clearButton?.element.disabled).toBe(false);
     });
@@ -329,7 +322,7 @@ describe("QueryBuilder", () => {
         expect.objectContaining({
           variant: "info",
           message: "Query testing will be implemented soon",
-        })
+        }),
       );
     });
 
@@ -351,9 +344,9 @@ describe("QueryBuilder", () => {
     it("should disable test button when no query is generated", () => {
       wrapper = createWrapper();
 
-      const testButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Test Query")
-      );
+      const testButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Test Query"));
 
       expect(testButton?.element.disabled).toBe(true);
     });
@@ -364,9 +357,9 @@ describe("QueryBuilder", () => {
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const testButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Test Query")
-      );
+      const testButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Test Query"));
 
       expect(testButton?.element.disabled).toBe(false);
     });

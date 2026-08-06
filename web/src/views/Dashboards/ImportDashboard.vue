@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,170 +14,141 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="tw:mx-2">
-    <AppPageHeader
-      :title="t('dashboard.importDashboard')"
-      :back="{ label: t('dashboard.header'), onClick: goBack }"
-      class="tw:-mx-2 tw:px-4 tw:border-b tw:border-border-default"
-    >
-      <template #actions>
-        <OButton
-          variant="outline"
-          size="sm-action"
-          @click="goToCommunityDashboards"
-          data-test="dashboard-panel-tutorial-btn"
-          >{{ t("dashboard.communityDashboard") }}</OButton
-        >
-        <OButton
-          variant="outline"
-          size="sm-action"
-          v-close-popup
-          data-test="dashboard-import-cancel-btn"
-          @click="goBack()"
-          >{{ t("function.cancel") }}</OButton
-        >
-        <OButton
-          variant="primary"
-          size="sm-action"
-          :disabled="!!isLoading"
-          type="submit"
-          data-test="dashboard-import-submit-btn"
-          @click="importDashboard"
-          >{{ t("dashboard.import") }}</OButton
-        >
-      </template>
-    </AppPageHeader>
-    <div class="tw:flex tw:w-full">
-      <div class="tw:flex tw:w-full tw:min-w-0">
-        <OSplitter
-          v-model="splitterModel"
-          class="tw:w-full tw:min-w-0"
-        >
+  <OPageLayout
+    class="h-[calc(100vh-var(--navbar-height))]! overflow-hidden"
+    :title="t('dashboard.importDashboard')"
+    :back="{ label: t('dashboard.header'), onClick: goBack }"
+    bleed
+  >
+    <template #actions>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click="goToCommunityDashboards"
+        data-test="dashboard-panel-tutorial-btn"
+        >{{ t("dashboard.communityDashboard") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm-action"
+        v-close-popup
+        data-test="dashboard-import-cancel-btn"
+        @click="goBack()"
+        >{{ t("function.cancel") }}</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
+        type="submit"
+        form="import-dashboard-form"
+        :loading="!!isLoading"
+        data-test="dashboard-import-submit-btn"
+        >{{ t("dashboard.import") }}</OButton
+      >
+    </template>
+    <div class="flex min-h-0 w-full flex-1">
+      <div class="flex min-h-0 w-full min-w-0">
+        <OSplitter v-model="splitterModel" class="h-full min-h-0 w-full min-w-0">
           <template #before>
-            <div class="tw:w-full tw:h-full">
-              <div
-                class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]"
-              >
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-                  <app-tabs
-                    data-test="dashboard-import-type-tabs"
-                    class="tabs-selection-container"
-                    :tabs="tabs"
-                    v-model:active-tab="activeTab"
-                    @update:active-tab="updateActiveTab"
-                  />
-                </div>
-              </div>
-              <div
-                v-if="activeTab == 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
-              >
-                <div class="tw:mx-2 my-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:mt-2 tw:w-full tw:items-center">
-                    <div
-                      data-test="dashboard-import-url-input"
-                      style="width: 69%"
-                    >
-                      <OInput
-                        data-test="dashboard-import-url-control"
-                        v-model="url"
-                        label="URL"
-                        :placeholder="t('dashboard.addURL')"
-                      />
-                    </div>
-
-                    <div
-                      style="width: calc(30%)"
-                      data-test="dashboard-folder-dropdown"
-                      class="import-folder-dropdown-container"
-                    >
-                      <select-folder-dropdown
-                        @folder-selected="selectedFolder = $event"
-                        :activeFolderId="selectedFolder.value"
-                      />
-                    </div>
+            <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
+              <div class="flex h-full min-h-0 w-full flex-col">
+                <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
+                  <div class="app-tabs-container h-9 w-fit">
+                    <AppTabs
+                      data-test="dashboard-import-type-tabs"
+                      class="tabs-selection-container"
+                      :tabs="tabs"
+                      v-model:active-tab="activeTab"
+                      @update:active-tab="updateActiveTab"
+                    />
                   </div>
-                  <query-editor
-                    data-test="dashboard-import-url-editor"
-                    ref="queryEditorFileRef"
-                    editor-id="dashboards-query-editor-file"
-                    class="tw:my-4 tw:h-[calc(100vh-285px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
-                    :debounceTime="300"
-                    v-model:query="jsonStr"
-                    language="json"
-                  />
                 </div>
-              </div>
-              <div
-                v-if="activeTab == 'import_json_file'"
-                class="dashboard-import-json-container card-container tw:py-1"
-              >
-                <div class="tw:mx-2 tw:my-2">
-                  <div style="width: calc(100% - 10px)" class="tw:flex tw:gap-2 tw:w-full tw:items-center">
-                    <div
-                      data-test="dashboard-import-file-input"
-                      style="width: 69%"
-                    >
-                      <OFile
-                        data-test="dashboard-import-file-control"
-                        v-model="jsonFiles"
-                        :label="t('dashboard.selectFile')"
-                        :placeholder="t('dashboard.dropFileMsg')"
-                        accept=".json"
-                        multiple
-                        dropZone
-                        :disabled="!!isLoading"
-                      />
-                    </div>
-                    <div
-                      style="width: calc(30%)"
-                      class="import-folder-dropdown-container"
-                    >
-                      <select-folder-dropdown
-                        @folder-selected="selectedFolder = $event"
-                        :activeFolderId="selectedFolder.value"
-                      />
-                    </div>
-                    <div v-if="filesImportResults.length" class="tw:py-2" data-test="dashboard-import-file-results">
-                      <div v-for="importResult in filesImportResults">
-                        <span
-                          v-if="importResult.status == 'rejected'"
-                          class="text-red"
-                          data-test="dashboard-import-file-rejected"
-                        >
-                          <code
-                            style="background-color: var(--color-surface-panel); padding: 3px"
-                            >{{ importResult?.reason?.file }}</code
-                          >
-                          : {{ importResult?.reason?.error }}
-                        </span>
+                <div
+                  v-if="activeTab == 'import_json_url'"
+                  class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
+                >
+                  <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
+                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
+                      <div data-test="dashboard-import-url-input" class="w-[69%]">
+                        <OFormInput
+                          data-test="dashboard-import-url-control"
+                          name="url"
+                          :label="t('common.url')"
+                          :placeholder="t('dashboard.addURL')"
+                        />
+                      </div>
+
+                      <div
+                        data-test="dashboard-folder-dropdown"
+                        class="import-folder-dropdown-container w-[calc(30%)]"
+                      >
+                        <SelectFolderDropdown
+                          @folder-selected="selectedFolder = $event"
+                          :activeFolderId="selectedFolder.value"
+                        />
                       </div>
                     </div>
+                    <QueryEditor
+                      data-test="dashboard-import-url-editor"
+                      ref="queryEditorFileRef"
+                      editor-id="dashboards-query-editor-file"
+                      class="border-card-glass-border rounded-default mt-2 min-h-0 flex-1 resize-none overflow-hidden border"
+                      :debounceTime="300"
+                      v-model:query="jsonStr"
+                      language="json"
+                    />
                   </div>
-                  <query-editor
-                    data-test="dashboard-import-json-file-editor"
-                    ref="queryEditorJsonRef"
-                    editor-id="dashboards-query-editor-json"
-                    class="tw:my-4 tw:h-[calc(100vh-282px)]! tw:overflow-hidden tw:resize-none tw:border tw:border-(--o2-border-color) tw:rounded-md"
-                    :debounceTime="300"
-                    v-model:query="jsonStr"
-                    language="json"
-                  />
-
-                  <div></div>
+                </div>
+                <div
+                  v-if="activeTab == 'import_json_file'"
+                  class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
+                >
+                  <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
+                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
+                      <div data-test="dashboard-import-file-input" class="w-[69%]">
+                        <OFormFile
+                          data-test="dashboard-import-file-control"
+                          name="jsonFiles"
+                          :label="t('dashboard.selectFile')"
+                          :placeholder="t('dashboard.dropFileMsg')"
+                          accept=".json"
+                          multiple
+                          dropZone
+                          :disabled="!!isLoading"
+                        />
+                      </div>
+                      <div class="import-folder-dropdown-container w-[calc(30%)]">
+                        <SelectFolderDropdown
+                          @folder-selected="selectedFolder = $event"
+                          :activeFolderId="selectedFolder.value"
+                        />
+                      </div>
+                    </div>
+                    <QueryEditor
+                      data-test="dashboard-import-json-file-editor"
+                      ref="queryEditorJsonRef"
+                      editor-id="dashboards-query-editor-json"
+                      class="border-card-glass-border rounded-default mt-2 min-h-0 flex-1 resize-none overflow-hidden border"
+                      :debounceTime="300"
+                      v-model:query="jsonStr"
+                      language="json"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            </OForm>
           </template>
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:h-[calc(100vh-110px)] tw:border-l tw:border-border-default"
+              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-l"
             >
-              <div class="tw:text-center tw:text-[1.0625rem] tw:font-semibold tw:leading-[1.45] tw:tracking-[-0.02em] tw:text-text-primary tw:py-2">Error Validations</div>
-              <OSeparator class="tw:mt-4" />
+              <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+                {{ t("dashboard.importDashboardPage.errorValidations") }}
+              </div>
+              <OSeparator class="mt-1 shrink-0" />
               <div
-                class="error-section tw:p-[10px] tw:mb-[10px]"
+                class="error-section mb-2.5 min-h-0 flex-1 overflow-auto p-2.5"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">
@@ -185,26 +156,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Iterate through each inner array (the individual error message) -->
                   <div
-                    v-for="(
-                      errorMessage, errorIndex
-                    ) in dashboardErrorsToDisplay"
+                    v-for="(errorMessage, errorIndex) in dashboardErrorsToDisplay"
                     :key="errorIndex"
-                    class="error-item tw:py-[5px] tw:text-sm"
+                    class="error-item py-1.25 text-sm"
                   >
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
-                      class="text-red"
+                      class="text-status-negative"
                       data-test="dashboard-import-error-title-message"
                     >
                       {{ errorMessage.message }}
-                      <div
-                        style="width: 300px"
-                        data-test="dashboard-import-error-title-input"
-                      >
+                      <div class="w-75" data-test="dashboard-import-error-title-input">
                         <OInput
                           data-test="dashboard-import-error-title-control"
                           v-model="dashboardTitles[errorIndex]"
-                          label="Dashboard Title"
+                          :label="t('dashboard.importDashboardPage.dashboardTitle')"
                           @update:model-value="
                             updateDashboardTitle(
                               dashboardTitles[errorIndex],
@@ -216,14 +182,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     </span>
                     <span
                       v-else-if="errorMessage.field == 'stream_type'"
-                      class="text-red"
+                      class="text-status-negative"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
+                      <div class="w-75">
                         <OSelect
                           v-model="streamTypes[errorIndex]"
                           :options="streamTypeSelectOptions"
-                          label="Stream Type"
+                          :label="t('dashboard.importDashboardPage.streamType')"
                           @update:model-value="
                             updateStreamType(
                               streamTypes[errorIndex],
@@ -239,18 +205,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <span
                       v-else-if="errorMessage.field == 'dashboard_validation'"
-                      class="text-red"
+                      class="text-status-negative"
                       data-test="dashboard-import-error-validation-message"
                     >
                       {{ errorMessage.message }}
                     </span>
 
-                    <span
-                      v-else
-                      data-test="dashboard-import-error-message"
-                    >{{
+                    <span v-else data-test="dashboard-import-error-message">{{
                       errorMessage.message || errorMessage
                     }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if="filesImportResults.some((r) => r.status === 'rejected')"
+                class="error-section mb-2.5 shrink-0 overflow-auto p-2.5"
+                data-test="dashboard-import-file-results"
+              >
+                <div v-for="(importResult, index) in filesImportResults" :key="'file-' + index">
+                  <div
+                    v-if="importResult.status == 'rejected'"
+                    class="error-item text-status-negative py-1.25 text-sm"
+                    data-test="dashboard-import-file-rejected"
+                  >
+                    <code v-if="importResult?.reason?.file" class="bg-surface-panel p-0.75">{{
+                      importResult.reason.file
+                    }}</code>
+                    <template v-if="importResult?.reason?.file"> : </template
+                    >{{ importResult?.reason?.error }}
                   </div>
                 </div>
               </div>
@@ -261,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div></div>
-  </div>
+  </OPageLayout>
 </template>
 <script lang="ts">
 // @ts-nocheck
@@ -276,7 +259,7 @@ import {
   reactive,
   watch,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
@@ -287,30 +270,30 @@ import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OFile from "@/lib/forms/File/OFile.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormFile from "@/lib/forms/File/OFormFile.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
     const selectedFolder = ref({
       label:
         store.state.organizationData.folders.find(
@@ -319,19 +302,18 @@ export default defineComponent({
       value: route.query.folder,
     });
 
-    // hold the values of 3 supported import types
-    const jsonFiles = ref<any>();
-    const url = ref("");
+    // Monaco editor content (a non-OForm* code editor, bridged at @submit).
+    // url + jsonFiles are form-owned and read below via form.useStore.
     const jsonStr = ref("");
 
     const tabs = reactive([
       {
-        label: "File Upload / JSON",
+        label: t("dashboard.importDashboardPage.fileUploadJson"),
         value: "import_json_file",
         icon: "upload",
       },
       {
-        label: "URL Import",
+        label: t("dashboard.importDashboardPage.urlImport"),
         value: "import_json_url",
         icon: "link",
       },
@@ -357,6 +339,22 @@ export default defineComponent({
 
     // store the results of the import (for files)
     const filesImportResults = ref([]);
+
+    // OWNER pattern: the page owns <OForm> (url + jsonFiles) and the
+    // fetch/parse watchers + import logic read those values, so it creates the
+    // form with useOForm and reads it via form.useStore — ONE source, no mirror.
+    // url/jsonFiles are name=-owned; every write goes through setFormField. The
+    // deep JSON validation + recovery inputs + the Monaco editor stay outside the
+    // form (documented no-OForm* exceptions).
+    const form = useOForm({
+      defaultValues: importDashboardDefaults(),
+      schema: makeImportDashboardSchema(t),
+      // forward to importDashboard defined below (avoids a TDZ ref at setup time)
+      onSubmit: () => importDashboard(),
+    });
+    const setFormField = (name: string, val: unknown) => form.setFieldValue(name, val);
+    const url = form.useStore((s: any) => s.values?.url ?? "");
+    const jsonFiles = form.useStore((s: any) => s.values?.jsonFiles);
 
     onMounted(async () => {
       filesImportResults.value = [];
@@ -411,12 +409,12 @@ export default defineComponent({
             jsonStr.value = JSON.stringify(jsonObject, null, 2);
           }
         } catch (error) {
-          showErrorNotification("Invalid JSON format");
+          showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormat"));
         }
       }
       if (newVal == "") {
-        jsonFiles.value = null;
-        url.value = "";
+        setFormField("jsonFiles", null);
+        setFormField("url", "");
       }
     });
 
@@ -442,23 +440,20 @@ export default defineComponent({
             ) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
             } else {
-              showErrorNotification("Invalid JSON format in the URL");
+              showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormatUrl"));
             }
           } catch (parseError) {
             // If parsing fails, display an error message
-            showErrorNotification("Invalid JSON format");
+            showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormat"));
           }
         }
       } catch (error) {
-        showErrorNotification("Error fetching data");
+        showErrorNotification(t("dashboard.importDashboardPage.errorFetchingData"));
       }
     });
 
     //import dashboard from the json
-    const importDashboardFromJSON = async (
-      jsonObj: any,
-      selectedFolder: any,
-    ) => {
+    const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
       const data =
         typeof jsonObj == "string"
           ? JSON.parse(jsonObj)
@@ -487,7 +482,7 @@ export default defineComponent({
     // import multiple files
     const importFiles = async () => {
       if (!jsonStr.value || !jsonStr.value.length) {
-        showErrorNotification("No JSON file(s) selected for import");
+        showErrorNotification(t("dashboard.importDashboardPage.noJsonFilesSelected"));
         isLoading.value = false;
         return;
       }
@@ -497,80 +492,78 @@ export default defineComponent({
       try {
         jsonStr.value = JSON.parse(jsonStr.value);
       } catch (e) {
-        showErrorNotification("Invalid JSON content");
+        showErrorNotification(t("dashboard.importDashboardPage.invalidJsonContent"));
         isLoading.value = false;
         return;
       }
 
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
-        return new Promise(async (resolve, reject) => {
-          const fileName =
-            jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
+        return new Promise((resolve, reject) => {
+          (async () => {
+            const fileName =
+              jsonFiles.value[fileIndex]?.name ||
+              t("dashboard.importDashboardPage.fileFallback", { n: fileIndex + 1 });
 
-          try {
-            //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
-            //to support both the cases, we are using this condition\
-            //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
-            const dashboards = Array.isArray(parsedContent)
-              ? parsedContent
-              : [parsedContent];
+            try {
+              //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
+              //to support both the cases, we are using this condition\
+              //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
+              const dashboards = Array.isArray(parsedContent) ? parsedContent : [parsedContent];
 
-            const results = [];
+              const results = [];
 
-            for (let i = 0; i < dashboards.length; i++) {
-              const dashboard = dashboards[i];
-              //this is the core logic to convert the dashboard schema version
-              //it will convert the dashboard schema version to the latest version
+              for (let i = 0; i < dashboards.length; i++) {
+                const dashboard = dashboards[i];
+                //this is the core logic to convert the dashboard schema version
+                //it will convert the dashboard schema version to the latest version
 
-              try {
-                const convertedSchema =
-                  convertDashboardSchemaVersion(dashboard);
+                try {
+                  const convertedSchema = convertDashboardSchemaVersion(dashboard);
 
-                // Validate the converted schema before importing
-                const validationErrors = validateDashboardJson(convertedSchema);
-                if (validationErrors.length > 0) {
-                  const errorMessage = validationErrors.join("; ");
-                  results.push({
-                    index: i + 1,
-                    error: new Error(errorMessage),
-                  });
-                  continue;
+                  // Validate the converted schema before importing
+                  const validationErrors = validateDashboardJson(convertedSchema);
+                  if (validationErrors.length > 0) {
+                    const errorMessage = validationErrors.join("; ");
+                    results.push({
+                      index: i + 1,
+                      error: new Error(errorMessage),
+                    });
+                    continue;
+                  }
+
+                  const res = await importDashboardFromJSON(convertedSchema, selectedFolder.value);
+                  results.push({ index: i + 1, result: res });
+                } catch (e) {
+                  results.push({ index: i + 1, error: e });
                 }
-
-                const res = await importDashboardFromJSON(
-                  convertedSchema,
-                  selectedFolder.value,
-                );
-                results.push({ index: i + 1, result: res });
-              } catch (e) {
-                results.push({ index: i + 1, error: e });
               }
-            }
 
-            const failedMessages = results
-              .filter((r) => r.error)
-              .map((r) => `${r.error?.message || r.error}`);
+              const failedMessages = results
+                .filter((r) => r.error)
+                .map((r) => `${r.error?.message || r.error}`);
 
-            if (failedMessages.length) {
+              if (failedMessages.length) {
+                reject({
+                  file: t("dashboard.importDashboardPage.jsonFileLabel", { n: fileIndex + 1 }),
+                  error: failedMessages.join("; "),
+                });
+              } else {
+                resolve({ file: fileName, results });
+              }
+            } catch (e) {
               reject({
-                file: `JSON ${fileIndex + 1}`,
-                error: failedMessages.join("; "),
+                file: fileName,
+                error: t("dashboard.importDashboardPage.errorProcessingFile"),
               });
-            } else {
-              resolve({ file: fileName, results });
             }
-          } catch (e) {
-            reject({ file: fileName, error: "Error processing file" });
-          }
+          })().catch(reject);
         });
       });
 
       Promise.allSettled(data).then(async (results) => {
         filesImportResults.value = results;
 
-        const successfulImports = results.filter(
-          (r) => r.status === "fulfilled",
-        ).length;
+        const successfulImports = results.filter((r) => r.status === "fulfilled").length;
 
         if (results.length === successfulImports) {
           await resetAndRefresh(ImportType.FILES, selectedFolder.value);
@@ -578,13 +571,15 @@ export default defineComponent({
 
         if (successfulImports) {
           showPositiveNotification(
-            `${successfulImports} File(s) Imported Successfully`,
+            t("dashboard.importDashboardPage.filesImportedSuccessfully", { n: successfulImports }),
           );
         }
 
         const failedImports = results.length - successfulImports;
         if (failedImports) {
-          showErrorNotification(`${failedImports} File(s) Failed to Import`);
+          showErrorNotification(
+            t("dashboard.importDashboardPage.filesFailedToImport", { n: failedImports }),
+          );
         }
 
         isLoading.value = false;
@@ -595,12 +590,12 @@ export default defineComponent({
     const resetAndRefresh = async (type, selectedFolder) => {
       switch (type) {
         case ImportType.FILES:
-          jsonFiles.value = null;
+          setFormField("jsonFiles", null);
           jsonStr.value = "";
           isLoading.value = false;
           break;
         case ImportType.URL:
-          url.value = "";
+          setFormField("url", "");
           isLoading.value = false;
           break;
         case ImportType.JSON_STRING:
@@ -627,7 +622,7 @@ export default defineComponent({
         const urlData = url.value.trim();
 
         if (!urlData && !jsonStr.value) {
-          showErrorNotification("Please Enter a URL for import");
+          showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterUrl"));
           return;
         }
 
@@ -656,25 +651,25 @@ export default defineComponent({
 
         const results = await Promise.allSettled(importPromises);
 
-        const successCount = results.filter(
-          (r) => r.status === "fulfilled",
-        ).length;
+        const successCount = results.filter((r) => r.status === "fulfilled").length;
         const failedCount = results.length - successCount;
 
         if (successCount > 0) {
           await resetAndRefresh(ImportType.URL, selectedFolder.value);
           showPositiveNotification(
-            `${successCount} Dashboard(s) Imported Successfully`,
+            t("dashboard.importDashboardPage.dashboardsImportedSuccessfully", { n: successCount }),
           );
         }
 
         if (failedCount > 0) {
-          showErrorNotification(`${failedCount} Dashboard(s) Failed to Import`);
+          showErrorNotification(
+            t("dashboard.importDashboardPage.dashboardsFailedToImport", { n: failedCount }),
+          );
         }
 
         filesImportResults.value = results;
       } catch (error) {
-        showErrorNotification("Failed to Import Dashboard");
+        showErrorNotification(t("dashboard.importDashboardPage.failedToImportDashboard"));
       } finally {
         if (jsonStr.value && typeof jsonStr.value !== "string") {
           jsonStr.value = "";
@@ -690,29 +685,29 @@ export default defineComponent({
         // get the dashboard
 
         const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema =
-          convertDashboardSchemaVersion(oldImportedSchema);
+        const convertedSchema = convertDashboardSchemaVersion(oldImportedSchema);
 
         // Validate the converted schema before importing
         const validationErrors = validateDashboardJson(convertedSchema);
         if (validationErrors.length > 0) {
           const errorMessage = validationErrors.join("; ");
-          showErrorNotification(`Validation failed: ${errorMessage}`);
+          showErrorNotification(
+            t("dashboard.importDashboardPage.validationFailed", { error: errorMessage }),
+          );
           return;
         }
 
-        await importDashboardFromJSON(
-          convertedSchema,
-          selectedFolder.value,
-        ).then((res) => {
+        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((res) => {
           resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
           filesImportResults.value = [];
           jsonStr.value = "";
 
-          showPositiveNotification(`Dashboard Imported Successfully`);
+          showPositiveNotification(
+            t("dashboard.importDashboardPage.dashboardImportedSuccessfully"),
+          );
         });
       } catch (error) {
-        showErrorNotification("Please Enter a JSON object for import");
+        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
       } finally {
         isLoading.value = false;
       }
@@ -720,8 +715,8 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBack = () => {
-      jsonFiles.value = [];
-      url.value = "";
+      setFormField("jsonFiles", []);
+      setFormField("url", "");
       jsonStr.value = "";
       filesImportResults.value = [];
       return router.push({
@@ -735,8 +730,8 @@ export default defineComponent({
 
     const updateActiveTab = () => {
       jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
+      setFormField("jsonFiles", null);
+      setFormField("url", "");
     };
     const importDashboard = () => {
       try {
@@ -766,14 +761,16 @@ export default defineComponent({
           importFromUrl();
         }
       } catch (e) {
-        showErrorNotification("Failed to Import Dashboard");
+        showErrorNotification(t("dashboard.importDashboardPage.failedToImportDashboard"));
       }
     };
     const validateBasicInputs = (input, index = 0) => {
       // Basic title validation
       if (input.title === "" || typeof input.title !== "string") {
         dashboardErrorsToDisplay.value.push({
-          message: `Title is required for dashboard - ${index ? index + 1 : 1}  and should be a string`,
+          message: t("dashboard.importDashboardPage.titleRequired", {
+            index: index ? index + 1 : 1,
+          }),
           field: "dashboard_title",
           dashboardIndex: index,
         });
@@ -784,7 +781,10 @@ export default defineComponent({
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => {
           dashboardErrorsToDisplay.value.push({
-            message: `Dashboard ${index ? index + 1 : 1}: ${error}`,
+            message: t("dashboard.importDashboardPage.dashboardValidationError", {
+              index: index ? index + 1 : 1,
+              error,
+            }),
             field: "dashboard_validation",
             dashboardIndex: index,
           });
@@ -817,9 +817,8 @@ export default defineComponent({
           queryIndex
         ].fields.stream_type = selectedStreamType;
       } else {
-        jsonObj.tabs[tabIndex].panels[panelIndex].queries[
-          queryIndex
-        ].fields.stream_type = selectedStreamType;
+        jsonObj.tabs[tabIndex].panels[panelIndex].queries[queryIndex].fields.stream_type =
+          selectedStreamType;
       }
       jsonStr.value = JSON.stringify(jsonObj, null, 2);
     };
@@ -856,27 +855,44 @@ export default defineComponent({
       streamTypeSelectOptions,
       dashboardTitles,
       streamTypes,
+      form,
     };
   },
-  components: { OSeparator, SelectFolderDropdown, AppTabs, AppPageHeader, QueryEditor, OButton, OInput, OSelect, OFile,
-    OIcon, OSplitter,
-},
+  components: {
+    OSeparator,
+    SelectFolderDropdown,
+    AppTabs,
+    OPageLayout,
+    QueryEditor,
+    OButton,
+    OInput,
+    OSelect,
+    OForm,
+    OFormInput,
+    OFormFile,
+    OSplitter,
+  },
 });
 </script>
 
-<style>
-.editor-container-url .monaco-editor {
-  height: calc(100vh - 285px) !important;
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco editor heights for the import editors
+   plus the folder-dropdown button spacing, reaching Monaco's internal DOM via
+   :deep(). The elements carrying these container classes are this view's own,
+   so scoping matches the exact same DOM the former global rule did. BaseImport.vue
+   carries the matching .editor-container-url rule for its own editor. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
   overflow: hidden;
   resize: none;
 }
-.dashboard-import-json-container .monaco-editor {
-  height: calc(100vh - 282px) !important;
+.dashboard-import-json-container :deep(.monaco-editor) {
+  height: calc(100vh - 17.625rem) !important;
   overflow: hidden;
   resize: none;
 }
-.import-folder-dropdown-container .add-folder-btn {
+.import-folder-dropdown-container :deep(.add-folder-btn) {
   margin-bottom: 0 !important;
-  margin-top: 12px !important;
+  margin-top: 0.75rem !important;
 }
 </style>

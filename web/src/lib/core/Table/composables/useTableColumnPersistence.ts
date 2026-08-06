@@ -15,9 +15,7 @@
  *   }
  *
  * The key is versioned (-v1). The width model is Excel-style (a persisted width
- * is a frozen fixed width, not a hint). Pre-existing per-table entries from the
- * older schema (`o2-table-{tableId}-column-sizes-v2` / `-column-visibility`) are
- * intentionally not migrated and become orphaned on upgrade.
+ * is a frozen fixed width, not a hint).
  */
 const GLOBAL_STORAGE_KEY = "o2-tables-column-state-v1";
 

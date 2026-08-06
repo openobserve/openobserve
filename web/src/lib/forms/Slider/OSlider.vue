@@ -12,7 +12,7 @@ const parentDataTest = computed(() => $attrs["data-test"] as string | undefined)
 // Forward tabindex to the slider input; keep it off the wrapper (avoids a double tab-stop).
 const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
 const wrapperAttrs = computed(() => {
-  const { tabindex, ...rest } = $attrs;
+  const { tabindex: _tabindex, ...rest } = $attrs;
   return rest;
 });
 
@@ -38,9 +38,7 @@ const currentValue = computed(() => {
   return props.min;
 });
 
-const effectiveError = computed(
-  () => props.errorMessage || (props.error ? " " : null) || null,
-);
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
 const hasError = computed(() => !!effectiveError.value);
 
 const fillPercent = computed(() => {
@@ -51,15 +49,15 @@ const fillPercent = computed(() => {
 });
 
 const trackHeight: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "tw:h-1",
-  md: "tw:h-1.5",
-  lg: "tw:h-2",
+  sm: "h-1",
+  md: "h-1.5",
+  lg: "h-2",
 };
 
 const thumbSize: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "tw:size-3",
-  md: "tw:size-4",
-  lg: "tw:size-5",
+  sm: "size-3",
+  md: "size-4",
+  lg: "size-5",
 };
 
 const thumbHalf: Record<NonNullable<SliderProps["size"]>, string> = {
@@ -69,9 +67,9 @@ const thumbHalf: Record<NonNullable<SliderProps["size"]>, string> = {
 };
 
 const labelSize: Record<NonNullable<SliderProps["size"]>, string> = {
-  sm: "tw:text-xs",
-  md: "tw:text-xs",
-  lg: "tw:text-sm",
+  sm: "text-xs",
+  md: "text-xs",
+  lg: "text-sm",
 };
 
 function handleInput(event: Event) {
@@ -99,34 +97,33 @@ const resolvedSize = computed(() => props.size ?? "md");
 </script>
 
 <template>
-  <div v-bind="wrapperAttrs" class="tw:flex tw:flex-col tw:gap-1 tw:w-full">
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
     <div
       v-if="$slots.label || label || showValue || $slots.tooltip"
-      class="tw:flex tw:items-center tw:justify-between tw:gap-2"
+      class="flex items-center justify-between gap-2"
     >
       <label
         v-if="$slots.label || label || $slots.tooltip"
         :for="inputId"
         :class="[
           labelSize[resolvedSize],
-          'tw:font-medium tw:text-slider-label tw:leading-none tw:flex tw:items-center tw:gap-1',
+          'text-slider-label flex items-center gap-1 leading-none font-medium',
         ]"
       >
-        <slot name="label">{{ label }}</slot><span v-if="required" aria-hidden="true" class="tw:select-none">*</span>
+        <slot name="label">{{ label }}</slot
+        ><span v-if="required" aria-hidden="true" class="select-none">*</span>
         <OIcon
           v-if="$slots.tooltip"
           name="info-outline"
           size="sm"
           :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
-          class="tw:cursor-help tw:text-slider-label"
-        ><slot name="tooltip" /></OIcon>
+          class="text-slider-label cursor-help"
+          ><slot name="tooltip"
+        /></OIcon>
       </label>
       <span
         v-if="showValue"
-        :class="[
-          labelSize[resolvedSize],
-          'tw:tabular-nums tw:text-slider-value tw:leading-none',
-        ]"
+        :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
       >
         {{ displayValue }}
       </span>
@@ -134,25 +131,23 @@ const resolvedSize = computed(() => props.size ?? "md");
 
     <div
       :class="[
-        'tw:relative tw:flex tw:items-center tw:w-full',
-        disabled ? 'tw:cursor-not-allowed tw:opacity-60' : 'tw:cursor-pointer',
+        'relative flex w-full items-center',
+        disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
       ]"
     >
       <div
         :class="[
-          'tw:absolute tw:left-0 tw:right-0 tw:rounded-full',
+          'absolute right-0 left-0 rounded-full',
           trackHeight[resolvedSize],
-          disabled ? 'tw:bg-slider-disabled-track' : 'tw:bg-slider-track',
+          disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
         ]"
         aria-hidden="true"
       />
       <div
         :class="[
-          'tw:absolute tw:left-0 tw:rounded-full',
+          'absolute left-0 rounded-full',
           trackHeight[resolvedSize],
-          disabled
-            ? 'tw:bg-slider-disabled-track-fill'
-            : 'tw:bg-slider-track-fill',
+          disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
         ]"
         :style="{ width: fillPercent + '%' }"
         aria-hidden="true"
@@ -171,10 +166,10 @@ const resolvedSize = computed(() => props.size ?? "md");
         :aria-invalid="hasError || undefined"
         :class="[
           'o2-slider-input',
-          'tw:relative tw:z-10 tw:w-full tw:bg-transparent tw:appearance-none tw:m-0',
-          'tw:outline-none tw:ring-offset-1 tw:ring-offset-surface-base tw:focus-visible:ring-2 tw:focus-visible:ring-slider-focus-ring tw:rounded-full tw:transition-[box-shadow] tw:duration-150',
+          'relative z-10 m-0 w-full appearance-none bg-transparent',
+          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2',
           trackHeight[resolvedSize],
-          disabled ? 'tw:cursor-not-allowed' : 'tw:cursor-pointer',
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
         ]"
         @input="handleInput"
         @change="handleChange"
@@ -184,9 +179,9 @@ const resolvedSize = computed(() => props.size ?? "md");
 
       <span
         :class="[
-          'tw:absolute tw:rounded-full tw:pointer-events-none tw:shadow-sm tw:border-2 tw:border-slider-thumb-border',
+          'border-slider-thumb-border pointer-events-none absolute rounded-full border-2',
           thumbSize[resolvedSize],
-          disabled ? 'tw:bg-slider-disabled-thumb' : 'tw:bg-slider-thumb',
+          disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
         ]"
         :style="{
           left: `calc(${fillPercent}% - ${thumbHalf[resolvedSize]})`,
@@ -195,28 +190,25 @@ const resolvedSize = computed(() => props.size ?? "md");
       />
     </div>
 
-    <div
-      v-if="effectiveError || helpText"
-      class="tw:flex tw:items-center tw:justify-between tw:gap-2"
-    >
+    <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
       <span
         v-if="effectiveError && effectiveError.trim()"
-        class="tw:text-xs tw:text-slider-error-text tw:leading-none"
+        class="text-slider-error-text text-xs leading-none"
         role="alert"
       >
         {{ effectiveError }}
       </span>
-      <span
-        v-else-if="helpText"
-        class="tw:text-xs tw:text-slider-value tw:leading-none"
-      >
+      <span v-else-if="helpText" class="text-slider-value text-xs leading-none">
         {{ helpText }}
       </span>
     </div>
   </div>
 </template>
 
-<style>
+<style scoped>
+/* keep(lib-override:native-range): browser <input type=range> shadow pseudo-
+   elements. The native thumb is collapsed to 0 (a custom visual thumb is drawn
+   in the template) and the native track is cleared; not expressible as utilities. */
 .o2-slider-input::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;

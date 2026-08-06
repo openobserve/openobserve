@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,17 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Header variant: tw:w-full top bar above the toolbar -->
+  <!-- Header variant: w-full top bar above the toolbar -->
   <div
     v-if="webinarData && !isExpired && !isDismissed && variant === 'header'"
-    class="webinar-top-bar tw:w-full tw:bg-amber-400 tw:text-[#1a1a1a]"
+    class="webinar-top-bar bg-promo-webinar-accent text-promo-webinar-text w-full"
     data-test="webinar-header-banner"
     role="banner"
   >
-    <div class="webinar-top-bar-content tw:flex tw:items-center tw:justify-center tw:gap-2 tw:py-[0.2rem] tw:px-4 tw:flex-wrap tw:relative">
-      <span class="webinar-top-bar-text tw:text-[0.8125rem] tw:font-bold tw:text-[#1a1a1a] tw:text-center">
+    <div
+      class="webinar-top-bar-content relative flex flex-wrap items-center justify-center gap-2 px-4 py-[0.2rem]"
+    >
+      <span class="webinar-top-bar-text text-compact text-promo-webinar-text text-center font-bold">
         <strong>{{ webinarData.tag }}:</strong> {{ webinarData.title }}
-        <span v-if="webinarData.date" class="webinar-top-bar-date tw:font-medium">
+        <span v-if="webinarData.date" class="webinar-top-bar-date font-medium">
           {{ formattedDate }}
         </span>
       </span>
@@ -35,21 +37,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :href="webinarData.primaryButton.link"
         target="_blank"
         rel="noopener noreferrer"
-        class="webinar-top-bar-link tw:text-[0.8125rem] tw:font-bold tw:text-[#1e3a8a] tw:underline tw:whitespace-nowrap tw:hover:text-[#1e40af]"
+        class="webinar-top-bar-link text-compact text-promo-webinar-link hover:text-promo-webinar-link-hover font-bold whitespace-nowrap underline"
         data-test="webinar-top-bar-register-link"
       >
         {{ webinarData.primaryButton.text }}
       </a>
 
-      <span class="webinar-top-bar-sep tw:text-[#374151] tw:font-normal tw:opacity-60 tw:select-none" aria-hidden="true">|</span>
+      <span
+        class="webinar-top-bar-sep text-promo-webinar-sep font-normal opacity-60 select-none"
+        aria-hidden="true"
+        >|</span
+      >
 
       <OButton
         variant="webinar-dismiss"
-        aria-label="Dismiss webinar banner"
+        :aria-label="t('components.webinarBanner.dismissBannerAriaLabel')"
         @click="dismiss"
         data-test="webinar-top-bar-dismiss-btn"
       >
-        Dismiss
+        {{ t("components.webinarBanner.dismiss") }}
       </OButton>
     </div>
   </div>
@@ -57,27 +63,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Home variant: larger banner -->
   <div
     v-else-if="webinarData && !isExpired && variant === 'home'"
-    class="webinar-home-banner tw:mb-3 tw:relative tw:overflow-hidden tw:rounded-[0.625rem] tw:border tw:border-[color-mix(in_srgb,var(--q-secondary)_35%,transparent)] tw:bg-[linear-gradient(120deg,color-mix(in_srgb,var(--q-secondary)_14%,var(--o2-primary-background))_0%,var(--o2-primary-background)_55%,color-mix(in_srgb,var(--q-secondary)_7%,var(--o2-primary-background))_100%)]"
+    class="webinar-home-banner rounded-default relative mb-3 overflow-hidden border border-[color-mix(in_srgb,var(--color-promo-webinar-accent)_35%,transparent)] bg-[linear-gradient(120deg,color-mix(in_srgb,var(--color-promo-webinar-accent)_14%,var(--color-surface-base))_0%,var(--color-surface-base)_55%,color-mix(in_srgb,var(--color-promo-webinar-accent)_7%,var(--color-surface-base))_100%)]"
     data-test="webinar-home-banner"
   >
     <!-- Decorative blobs -->
-    <div class="tw:absolute tw:rounded-full tw:pointer-events-none tw:opacity-[0.18] tw:bg-(--q-secondary) tw:blur-[2.5rem] tw:w-[10rem] tw:h-[10rem] tw:top-[-3rem] tw:left-[-2rem]" aria-hidden="true" />
-    <div class="tw:absolute tw:rounded-full tw:pointer-events-none tw:opacity-[0.18] tw:bg-(--q-secondary) tw:blur-[2.5rem] tw:w-[8rem] tw:h-[8rem] tw:bottom-[-2.5rem] tw:right-[6rem]" aria-hidden="true" />
+    <div
+      class="bg-promo-webinar-accent pointer-events-none absolute top-[-3rem] left-[-2rem] h-40 w-40 rounded-full opacity-[0.18] blur-[2.5rem]"
+      aria-hidden="true"
+    />
+    <div
+      class="bg-promo-webinar-accent pointer-events-none absolute right-24 bottom-[-2.5rem] h-32 w-32 rounded-full opacity-[0.18] blur-[2.5rem]"
+      aria-hidden="true"
+    />
 
     <!-- Content row -->
-    <div class="webinar-home-content tw:relative tw:z-[1] tw:flex tw:items-center tw:justify-between tw:flex-wrap tw:gap-3 tw:p-4 tw:pr-[1.375rem]">
-      <div class="webinar-home-left tw:flex tw:flex-col tw:gap-[0.3rem]">
+    <div
+      class="webinar-home-content relative z-1 flex flex-wrap items-center justify-between gap-3 p-4 pr-[1.375rem]"
+    >
+      <div class="webinar-home-left flex flex-col gap-[0.3rem]">
         <!-- Live badge -->
-        <div class="webinar-home-badge tw:inline-flex tw:items-center tw:gap-[0.375rem] tw:text-[0.7rem] tw:font-bold tw:uppercase tw:tracking-[0.06em] tw:text-[var(--q-secondary)]">
-          <span class="webinar-home-badge-dot tw:w-[0.5rem] tw:h-[0.5rem] tw:rounded-full tw:bg-(--q-secondary) tw:shrink-0 tw:[animation:badge-pulse_1.8s_ease-in-out_infinite]" />
+        <div
+          class="webinar-home-badge text-2xs text-promo-webinar-accent-text inline-flex items-center gap-1.5 font-bold tracking-[0.06em] uppercase"
+        >
+          <span
+            class="webinar-home-badge-dot bg-promo-webinar-accent h-2 w-2 shrink-0 rounded-full"
+          />
           {{ webinarData.tag }}
         </div>
 
-        <div class="webinar-home-title tw:text-base tw:font-bold tw:text-[var(--o2-text-primary)] tw:leading-[1.35] tw:max-w-[36rem]">{{ webinarData.title }}</div>
+        <div
+          class="webinar-home-title text-text-heading max-w-[36rem] text-base leading-[1.35] font-bold"
+        >
+          {{ webinarData.title }}
+        </div>
 
-        <div v-if="webinarData.date" class="webinar-home-meta tw:flex tw:items-center tw:gap-[0.3rem] tw:text-[0.8125rem] tw:leading-none tw:text-[var(--o2-text-secondary)]">
+        <div
+          v-if="webinarData.date"
+          class="webinar-home-meta text-compact text-text-secondary flex items-center gap-[0.3rem] leading-none"
+        >
           <OIcon name="schedule" size="xs" />
-          <span class="tw:[line-height:1]">{{ formattedDate }}</span>
+          <span class="[line-height:1]">{{ formattedDate }}</span>
         </div>
       </div>
 
@@ -92,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="webinar-home-register-btn"
       >
         {{ webinarData.primaryButton.text }}
-        <OIcon name="arrow-forward" size="sm" class="tw:ml-2" />
+        <OIcon name="arrow-forward" size="sm" class="ml-2" />
       </OButton>
     </div>
   </div>
@@ -103,8 +128,10 @@ import { ref, computed, onMounted, watch } from "vue";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 
 const store = useStore();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   variant: "header" | "home";
@@ -122,14 +149,13 @@ interface WebinarData {
   id: number;
   documentId: string;
   tag: string;
-  title: string;
+  title: I18nText;
   date: string;
   primaryButton: PrimaryButton;
 }
 
 const WEBINAR_JSON_URL =
-  import.meta.env.VITE_WEBINAR_JSON_URL ??
-  "https://openobserve.ai/webinar.json";
+  import.meta.env.VITE_WEBINAR_JSON_URL ?? "https://openobserve.ai/webinar.json";
 
 const webinarData = ref<WebinarData | null>(null);
 const isDismissed = ref(false);
@@ -140,11 +166,7 @@ const isExpired = computed(() => {
 });
 
 const isBannerVisible = computed(
-  () =>
-    props.variant === "header" &&
-    !!webinarData.value &&
-    !isExpired.value &&
-    !isDismissed.value,
+  () => props.variant === "header" && !!webinarData.value && !isExpired.value && !isDismissed.value,
 );
 
 watch(isBannerVisible, (visible) => {
@@ -179,14 +201,20 @@ onMounted(async () => {
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): the "live" badge dot pulse is used only by this banner. The
+   `animation` is declared here, not as a template `[animation:…]` utility, so
+   Vue's scoped compiler renames the keyframe and this reference together. */
+.webinar-home-badge-dot {
+  animation: badge-pulse 1.8s ease-in-out infinite;
+}
+
 @keyframes badge-pulse {
   0%,
   100% {
     transform: scale(1);
     opacity: 1;
   }
-
   50% {
     transform: scale(1.5);
     opacity: 0.5;

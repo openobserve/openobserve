@@ -48,8 +48,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
       },
       axis_label_rotate: 0,
       axis_label_truncate_width: null,
-      show_symbol:
-        store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
+      show_symbol: store?.state?.zoConfig?.dashboard_show_symbol_enabled ?? false,
       line_interpolation: "smooth",
       legend_width: {
         value: null,
@@ -121,7 +120,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
     },
     htmlContent: "",
     markdownContent: "",
-    customChartContent: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+    customChartContent: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
   `,
     customChartResult: {},
     queryType: "sql",
@@ -181,10 +180,7 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
     hiddenQueries: [],
   },
   meta: {
-    queryFields: {} as Record<
-      number,
-      { customQueryFields: any[]; vrlFunctionFieldList: any[] }
-    >,
+    queryFields: {} as Record<number, { customQueryFields: any[]; vrlFunctionFieldList: any[] }>,
     parsedQuery: "",
     dragAndDrop: {
       dragging: false,
@@ -225,6 +221,6 @@ export const getDefaultDashboardPanelData: any = (store: any) => ({
 });
 
 export const getDefaultCustomChartText = () => {
-  return `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
+  return ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// 'data' variable is available for use and contains the response data from the search result and it is an array.\noption = {  \n \n};
   `;
 };

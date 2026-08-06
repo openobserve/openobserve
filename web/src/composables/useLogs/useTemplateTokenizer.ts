@@ -17,7 +17,7 @@
  * Shared utilities for rendering log pattern templates with coloured wildcard
  * chips and hover-tooltip value distributions.
  *
- * Mirrors Datadog's "Pattern Inspector" UX: each <*> / <:TYPE> token is a
+ * Pattern-inspector UX: each <*> / <:TYPE> token is a
  * clickable chip that shows the top-N actual values observed at that position
  * across the cluster's example logs, making visually similar patterns
  * immediately distinguishable.
@@ -28,11 +28,20 @@ export interface WildcardValues {
   token: string;
   sample_values: string[];
   is_variable: boolean;
+  /** Backend-computed display mask for this position. */
+  mask?: string | null;
 }
 
 export type TemplateToken =
   | { kind: "text"; value: string }
-  | { kind: "wildcard"; value: string; position: number; sampleValues: string[] };
+  | {
+      kind: "wildcard";
+      value: string;
+      position: number;
+      sampleValues: string[];
+      /** Backend display mask (e.g. "XXX.XXX.XXX.XXX", "[810-3086]") or null. */
+      mask: string | null;
+    };
 
 // Matches <*>, <:IP>, <:IPV4>, <:TIMESTAMP>, <:IDENTIFIERS>, <:NUM>, etc.
 // Must stay in sync with the Rust regex in pattern_extractor.rs:
@@ -83,6 +92,7 @@ export function tokenizeTemplate(
       value: match[0],
       position: wildcardIndex,
       sampleValues: rawValues,
+      mask: (wv as any)?.mask ?? null,
     });
 
     wildcardIndex++;
@@ -97,7 +107,7 @@ export function tokenizeTemplate(
 }
 
 /**
- * Return Tailwind/Quasar CSS classes for a wildcard chip based on the token
+ * Return Tailwind CSS classes for a wildcard chip based on the token
  * type so different data types are colour-coded at a glance.
  *
  * When the token is generic <*> and sampleValues are provided the function
@@ -118,11 +128,13 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
     return chipColorForLabel(label);
   }
 
-  if (token === "<*>") return "tw:bg-label-chip-pattern-bg tw:text-label-chip-pattern-text";
-  if (/^<:IP/.test(token)) return "tw:bg-label-chip-ip-bg tw:text-label-chip-ip-text";
-  if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token)) return "tw:bg-label-chip-num-bg tw:text-label-chip-num-text";
-  if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token)) return "tw:bg-label-chip-ts-bg tw:text-label-chip-ts-text";
-  return "tw:bg-label-chip-default-bg tw:text-label-chip-default-text";
+  if (token === "<*>") return "bg-label-chip-pattern-bg text-label-chip-pattern-text";
+  if (/^<:IP/.test(token)) return "bg-label-chip-ip-bg text-label-chip-ip-text";
+  if (/^<:(?:NUM|INT|FLOAT|HEX)/.test(token))
+    return "bg-label-chip-num-bg text-label-chip-num-text";
+  if (/^<:(?:TIMESTAMP|DATE|TIME)/.test(token))
+    return "bg-label-chip-ts-bg text-label-chip-ts-text";
+  return "bg-label-chip-default-bg text-label-chip-default-text";
 }
 
 /**
@@ -137,23 +149,23 @@ export function wildcardChipColor(token: string, sampleValues?: any[]): string {
  */
 export function chipColorForLabel(label: string): string {
   const colorMap: Record<string, string> = {
-    ip:      "tw:bg-label-chip-ip-bg tw:text-label-chip-ip-text",
-    ipv4:    "tw:bg-label-chip-ipv4-bg tw:text-label-chip-ipv4-text",
-    ipv6:    "tw:bg-label-chip-ipv6-bg tw:text-label-chip-ipv6-text",
-    method:  "tw:bg-label-chip-method-bg tw:text-label-chip-method-text",
-    url:     "tw:bg-label-chip-url-bg tw:text-label-chip-url-text",
-    num:     "tw:bg-label-chip-num-bg tw:text-label-chip-num-text",
-    float:   "tw:bg-label-chip-float-bg tw:text-label-chip-float-text",
-    hex:     "tw:bg-label-chip-hex-bg tw:text-label-chip-hex-text",
-    ts:      "tw:bg-label-chip-ts-bg tw:text-label-chip-ts-text",
-    date:    "tw:bg-label-chip-date-bg tw:text-label-chip-date-text",
-    time:    "tw:bg-label-chip-time-bg tw:text-label-chip-time-text",
-    id:      "tw:bg-label-chip-id-bg tw:text-label-chip-id-text",
-    email:   "tw:bg-label-chip-email-bg tw:text-label-chip-email-text",
-    str:     "tw:bg-label-chip-str-bg tw:text-label-chip-str-text",
-    pattern: "tw:bg-label-chip-pattern-bg tw:text-label-chip-pattern-text",
+    ip: "bg-label-chip-ip-bg text-label-chip-ip-text",
+    ipv4: "bg-label-chip-ip-bg text-label-chip-ip-text",
+    ipv6: "bg-label-chip-ip-bg text-label-chip-ip-text",
+    method: "bg-label-chip-method-bg text-label-chip-method-text",
+    url: "bg-label-chip-url-bg text-label-chip-url-text",
+    num: "bg-label-chip-num-bg text-label-chip-num-text",
+    float: "bg-label-chip-float-bg text-label-chip-float-text",
+    hex: "bg-label-chip-hex-bg text-label-chip-hex-text",
+    ts: "bg-label-chip-ts-bg text-label-chip-ts-text",
+    date: "bg-label-chip-ts-bg text-label-chip-ts-text",
+    time: "bg-label-chip-ts-bg text-label-chip-ts-text",
+    id: "bg-label-chip-id-bg text-label-chip-id-text",
+    email: "bg-label-chip-email-bg text-label-chip-email-text",
+    str: "bg-label-chip-str-bg text-label-chip-str-text",
+    pattern: "bg-label-chip-pattern-bg text-label-chip-pattern-text",
   };
-  return colorMap[label] ?? "tw:bg-label-chip-default-bg tw:text-label-chip-default-text";
+  return colorMap[label] ?? "bg-label-chip-default-bg text-label-chip-default-text";
 }
 
 /**
@@ -204,6 +216,8 @@ export function wildcardLabel(token: string, sampleValues?: any[]): string {
     "<:URL>": "url",
     "<:METHOD>": "method",
     "<:IDENTIFIERS>": "id",
+    "<:IDENTIFIER>": "id",
+    "<:UUID>": "uuid",
   };
   return labelMap[token] ?? token;
 }
@@ -222,7 +236,15 @@ function normalizeValueStrings(raw: any[]): string[] {
 }
 
 const HTTP_METHODS = new Set([
-  "GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "CONNECT", "TRACE",
+  "GET",
+  "POST",
+  "PUT",
+  "DELETE",
+  "PATCH",
+  "HEAD",
+  "OPTIONS",
+  "CONNECT",
+  "TRACE",
 ]);
 
 const IPV4_RE = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -249,27 +271,65 @@ export function inferTypeFromValues(rawValues: any[]): string {
 
   const threshold = Math.max(1, Math.floor(values.length * 0.5));
 
-  let ip = 0, method = 0, url = 0, uuid = 0, ts = 0, email = 0;
-  let int = 0, float = 0, hex = 0, pattern = 0;
+  let ip = 0,
+    method = 0,
+    url = 0,
+    uuid = 0,
+    ts = 0,
+    email = 0;
+  let int = 0,
+    float = 0,
+    hex = 0,
+    pattern = 0;
 
   // Matches wildcard placeholders like <*>, <:NUM>, <:IP>, etc.
   const templateRe = /<(?:[*]|:[A-Z0-9_]+)>/;
 
   for (const v of values) {
     // Check if the value itself looks like a log pattern template
-    if (templateRe.test(v)) { pattern++; continue; }
+    if (templateRe.test(v)) {
+      pattern++;
+      continue;
+    }
     // Timestamp — check before IP (time strings like 10:30:00 can match IPv6 regex)
-    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) { ts++; continue; }
+    if (TS_DATE_RE.test(v) || TS_TIME_RE.test(v)) {
+      ts++;
+      continue;
+    }
     // Structural patterns
-    if (IPV4_RE.test(v) || IPV6_RE.test(v)) { ip++; continue; }
-    if (HTTP_METHODS.has(v.toUpperCase())) { method++; continue; }
-    if (UUID_RE.test(v)) { uuid++; continue; }
-    if (EMAIL_RE.test(v)) { email++; continue; }
-    if (/^https?:\/\//.test(v)) { url++; continue; }
+    if (IPV4_RE.test(v) || IPV6_RE.test(v)) {
+      ip++;
+      continue;
+    }
+    if (HTTP_METHODS.has(v.toUpperCase())) {
+      method++;
+      continue;
+    }
+    if (UUID_RE.test(v)) {
+      uuid++;
+      continue;
+    }
+    if (EMAIL_RE.test(v)) {
+      email++;
+      continue;
+    }
+    if (/^https?:\/\//.test(v)) {
+      url++;
+      continue;
+    }
     // Numeric — check float before int (float pattern is more specific)
-    if (FLOAT_RE.test(v)) { float++; continue; }
-    if (INT_RE.test(v)) { int++; continue; }
-    if (HEX_RE.test(v) && v.length >= 4) { hex++; continue; }
+    if (FLOAT_RE.test(v)) {
+      float++;
+      continue;
+    }
+    if (INT_RE.test(v)) {
+      int++;
+      continue;
+    }
+    if (HEX_RE.test(v) && v.length >= 4) {
+      hex++;
+      continue;
+    }
   }
 
   if (pattern >= threshold) return "pattern";
@@ -291,7 +351,7 @@ export function inferTypeFromValues(rawValues: any[]): string {
 
 /**
  * Generate a human-readable explanation of why a pattern is flagged as an
- * anomaly, using the statistical fields the backend now provides.
+ * anomaly, using the statistical fields the backend provides.
  */
 export function anomalyExplanation(
   pattern: {
@@ -314,7 +374,11 @@ export function anomalyExplanation(
   }
   if (z < -1.5 && avg > 0) {
     const key = freq === 1 ? "search.patternAnomalyLowFreq" : "search.patternAnomalyLowFreqPlural";
-    return t(key, { freq: freq.toLocaleString(), avg: Math.round(avg).toLocaleString(), z: z.toFixed(2) });
+    return t(key, {
+      freq: freq.toLocaleString(),
+      avg: Math.round(avg).toLocaleString(),
+      z: z.toFixed(2),
+    });
   }
   const score = pattern.anomaly_score ?? 0;
   return t("search.patternAnomalyScore", { score: (score * 100).toFixed(0) });

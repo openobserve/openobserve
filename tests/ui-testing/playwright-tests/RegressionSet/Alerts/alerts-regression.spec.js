@@ -278,7 +278,7 @@ test.describe("Alerts Regression Bugs", () => {
     const addBtn = groupByRow.locator('button').first();
     await addBtn.waitFor({ state: 'visible', timeout: 5000 });
     await addBtn.click();
-    // The new QSelect needs time for Vue to mount the Quasar component fully.
+    // The new QSelect needs time for Vue to mount the component fully.
     // Without this, the DOM element exists but the QSelect isn't interactive yet.
     await page.waitForTimeout(3000);
     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});

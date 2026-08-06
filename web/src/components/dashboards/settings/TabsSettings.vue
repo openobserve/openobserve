@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="tw:flex tw:flex-col tw:h-full" data-test="dashboard-tab-settings">
+  <div class="flex h-full flex-col" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
         <OButton
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template #cell-drag>
           <div
-            class="tab-drag-handle tw:flex tw:items-center tw:justify-center tw:cursor-move"
+            class="tab-drag-handle flex cursor-move items-center justify-center"
             data-test="dashboard-tab-settings-drag-handle"
           >
             <OIcon name="drag-indicator" size="sm" />
@@ -55,16 +55,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-name="{ row }">
           <span
             v-if="row.tabId !== editTabId"
-            class="tw:block tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+            class="block overflow-hidden text-ellipsis whitespace-nowrap"
             data-test="dashboard-tab-settings-tab-name"
             :data-test-tab-name="row.name"
             >{{ row.name }}</span
           >
-          <div v-else class="tw:flex tw:items-center tw:gap-1">
+          <div v-else class="flex items-center gap-1">
             <input
-              :class="store.state.theme === 'dark' ? 'tw:bg-gray-800' : ''"
               v-model="editTabObj.data.name"
-              class="tw:flex-1 tw:border tw:border-(--q-primary) tw:rounded tw:p-1 tw:outline-none tw:min-w-0 tw:focus:border-(--q-secondary)"
+              class="border-theme-accent rounded-default focus:border-section-accent-secondary bg-input-bg min-w-0 flex-1 border p-1 outline-none"
               data-test="dashboard-tab-settings-tab-name-edit"
             />
             <OButton
@@ -90,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #cell-actions="{ row }">
-          <div class="tw:flex tw:justify-center tw:gap-1">
+          <div class="flex justify-center gap-1">
             <OButton
               variant="ghost"
               size="icon"
@@ -139,15 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, nextTick, ref } from "vue";
 import Sortable from "sortablejs";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import {
-  deleteTab,
-  editTab,
-  getDashboard,
-  updateDashboard,
-} from "@/utils/commons";
+import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -249,7 +243,7 @@ export default defineComponent({
       sortableInstance = null;
     });
 
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Wrapper around the global OTable; used to reach its rendered <tbody>
     // so SortableJS can provide row drag-and-drop (OTable has no native row
@@ -260,7 +254,7 @@ export default defineComponent({
     const columns: OTableColumnDef[] = [
       {
         id: "drag",
-        header: "",
+        header: raw(""),
         size: 32,
         minSize: 32,
         maxSize: 32,
@@ -297,21 +291,20 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        // emit refresh to rerender
         emit("refresh");
 
-        showPositiveNotification("Dashboard updated successfully.");
+        showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab reorder failed",
+              t("dashboard.tabsSettings.tabReorderFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab reorder failed");
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         }
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
@@ -320,11 +313,7 @@ export default defineComponent({
     const editItem = (tabId: any) => {
       editTabId.value = tabId;
       editTabObj.data = JSON.parse(
-        JSON.stringify(
-          currentDashboardData.data.tabs.find(
-            (tab: any) => tab.tabId === tabId,
-          ),
-        ),
+        JSON.stringify(currentDashboardData.data.tabs.find((tab: any) => tab.tabId === tabId)),
       );
     };
 
@@ -340,11 +329,10 @@ export default defineComponent({
             editTabObj.data,
           );
 
-          // emit refresh to rerender
           emit("refresh");
           await getDashboardData();
 
-          showPositiveNotification("Tab updated successfully");
+          showPositiveNotification(t("dashboard.tabsSettings.tabUpdated"));
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
@@ -354,20 +342,19 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab updation failed",
+              t("dashboard.tabsSettings.tabUpdationFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab updation failed");
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
         }
 
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
     };
 
     const cancelEdit = () => {
-      // reset edit mode
       editTabId.value = null;
       editTabObj.data = {};
     };
@@ -380,7 +367,6 @@ export default defineComponent({
     const deleteItem = async (tabId: any) => {
       tabIdToBeDeleted.value = tabId;
       await nextTick();
-      // call cancelEdit to reset edit mode
       cancelEdit();
       deletePopupVisible.value = true;
     };
@@ -396,22 +382,22 @@ export default defineComponent({
         );
         await getDashboardData();
 
-        // emit event
         emit("refresh");
 
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
 
-        showPositiveNotification("Tab deleted successfully");
+        showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab deletion failed",
+              t("dashboard.tabsSettings.tabDeletionFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab deletion failed", {
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,
           });
         }

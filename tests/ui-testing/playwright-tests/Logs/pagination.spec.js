@@ -15,20 +15,29 @@ function generateRandomStreamName() {
 
 test.describe("Pagination for logs", () => {
     let pageManager;
+    // One stream per worker process: every test asserts pagination counts against the
+    // record count of a single ingestion, so ingesting the same fixture once and reusing
+    // the stream across the worker's tests yields identical validations while removing
+    // a redundant ingest + index-wait from every test. Module state is per worker
+    // (workers are separate processes), so parallel workers stay isolated.
     let streamName;
+    let streamReady = false;
 
     const orgId = process.env.ORGNAME || "default";
 
     test.beforeEach(async ({ page }) => {
 
-        streamName = generateRandomStreamName();
         pageManager = new PageManager(page);
         await pageManager.loginPage.gotoLoginPage();
         await pageManager.loginPage.loginAsInternalUser();
         await pageManager.loginPage.login(); // Login as root user
-        await pageManager.ingestionPage.ingestionMultiOrgStream(orgId, streamName);
-        // Wait for stream to be indexed — cloud can take 30-60s
-        await pageManager.logsPage.waitForStreamAvailable(streamName, 120000, 3000);
+        if (!streamReady) {
+            streamName = generateRandomStreamName();
+            await pageManager.ingestionPage.ingestionMultiOrgStream(orgId, streamName);
+            // Wait for stream to be indexed — cloud can take 30-60s
+            await pageManager.logsPage.waitForStreamAvailable(streamName, 120000, 1000);
+            streamReady = true;
+        }
     });
 
     test("HTTP Pagination for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", { tag: ['@pagination', '@functional', '@P1'] }, async ({ page }) => {
@@ -103,7 +112,6 @@ test.describe("Pagination for logs", () => {
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
 
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
-        await page.waitForTimeout(2000);
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -122,7 +130,6 @@ test.describe("Pagination for logs", () => {
     test("Enable Streaming for running query to validate WHERE match_all('zin*')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
 
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
-        await page.waitForTimeout(2000);
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -141,7 +148,6 @@ test.describe("Pagination for logs", () => {
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T1*')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
 
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
-        await page.waitForTimeout(2000);
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -160,7 +166,6 @@ test.describe("Pagination for logs", () => {
     test("Enable Streaming for running query to validate WHERE match_all('2022-12-27T14:11:2*')", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
 
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
-        await page.waitForTimeout(2000);
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });
@@ -179,7 +184,6 @@ test.describe("Pagination for logs", () => {
     test("Enable Streaming for running query to validate pagination is not visible WHERE match_all('2022-12-27T14:11:27Z INFO  zinc_enl') limit`", { tag: ['@pagination', '@streaming', '@functional', '@P1'] }, async ({ page }) => {
 
         // Streaming is enabled via ZO_STREAMING_ENABLED env var — no need to toggle
-        await page.waitForTimeout(2000);
         await pageManager.logsPage.navigateToLogs();
         await pageManager.logsPage.selectIndexStream(streamName);
         testLogger.debug('Stream name generated', { streamName });

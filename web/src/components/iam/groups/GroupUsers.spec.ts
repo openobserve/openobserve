@@ -47,9 +47,18 @@ const o2Stubs = {
       </div>
     `,
     props: [
-      "data", "columns", "rowKey", "globalFilter", "pagination",
-      "pageSize", "sorting", "filterMode", "defaultColumns",
-      "showGlobalFilter", "footerTitle", "dense",
+      "data",
+      "columns",
+      "rowKey",
+      "globalFilter",
+      "pagination",
+      "pageSize",
+      "sorting",
+      "filterMode",
+      "defaultColumns",
+      "showGlobalFilter",
+      "footerTitle",
+      "dense",
     ],
   },
   OCheckbox: {
@@ -392,7 +401,6 @@ describe("GroupUsers Component", () => {
 
       expect(wrapper.vm.users).toHaveLength(3);
       expect(wrapper.vm.users[0]).toEqual({
-        "#": 1,
         email: "user1@example.com",
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
@@ -400,7 +408,6 @@ describe("GroupUsers Component", () => {
         is_external: false,
       });
       expect(wrapper.vm.users[1]).toEqual({
-        "#": 2,
         email: "admin@example.com",
         isInGroup: true,
         org: "TestOrg1",
@@ -408,7 +415,6 @@ describe("GroupUsers Component", () => {
         is_external: false,
       });
       expect(wrapper.vm.users[2]).toEqual({
-        "#": 3,
         email: "root@example.com",
         isInGroup: false,
         org: "",
@@ -442,7 +448,6 @@ describe("GroupUsers Component", () => {
       expect(mockUsersState.users).toHaveLength(3);
       expect(mockUsersState.users[0]).toEqual({
         email: "user1@example.com",
-        "#": 1,
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",
@@ -533,7 +538,9 @@ describe("GroupUsers Component", () => {
   describe("User Selection", () => {
     it("renders checkboxes for user selection", () => {
       // After mount, rows have user1@example.com and admin@example.com (isInGroup users)
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
@@ -1055,7 +1062,9 @@ describe("GroupUsers Component", () => {
 
       // After mount, rows contain isInGroup users; checkboxes confirm
       // OTable is rendering with the correct row-key bound ("email").
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]');
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
   });

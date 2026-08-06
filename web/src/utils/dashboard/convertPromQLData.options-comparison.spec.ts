@@ -141,7 +141,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       hoveredSeriesState,
       annotations,
-      metadata
+      metadata,
     );
 
     // Convert with full data (will be limited internally by convertPromQLData)
@@ -152,7 +152,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       hoveredSeriesState,
       annotations,
-      metadata
+      metadata,
     );
 
     // Extract comparable data
@@ -187,7 +187,6 @@ describe("convertPromQLData - Options Comparison Test", () => {
     expect(limitedOptions.xAxisType).toBe(fullOptions.xAxisType);
     expect(limitedOptions.yAxisType).toBe(fullOptions.yAxisType);
     expect(limitedOptions.isTimeSeries).toBe(fullOptions.isTimeSeries);
-
   });
 
   /**
@@ -249,7 +248,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       null,
       [],
-      null
+      null,
     );
 
     expect(result.options).toBeDefined();
@@ -266,9 +265,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       title: "Test Panel",
       type: "line",
       queryType: "promql",
-      queries: [
-        { query: "test_metric", config: { promql_legend: "{{instance}}" } },
-      ],
+      queries: [{ query: "test_metric", config: { promql_legend: "{{instance}}" } }],
       config: {
         show_legends: true,
         legends_position: "right",
@@ -289,7 +286,7 @@ describe("convertPromQLData - Options Comparison Test", () => {
       chartPanelRef,
       null,
       [],
-      null
+      null,
     );
 
     const options = extractComparableOptions(result);
@@ -303,6 +300,5 @@ describe("convertPromQLData - Options Comparison Test", () => {
       expect(options.series[0].name).toBeDefined();
       expect(options.series[0].dataLength).toBeGreaterThan(0);
     }
-
   });
 });

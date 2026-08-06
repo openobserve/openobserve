@@ -18,190 +18,202 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     v-model:open="show"
     :width="40"
-    title="Backfill Job Details"
+    :title="t('pipeline.backfillJobDetailsTitle')"
     data-test="backfill-job-details-dialog"
   >
-
-    <div v-if="loading" class="tw:flex tw:justify-center tw:p-4">
+    <div v-if="loading" class="flex justify-center p-4">
       <OSpinner size="lg" />
     </div>
 
-    <div v-else-if="job" class="tw:flex tw:flex-col tw:gap-5 tw:px-6 tw:py-4">
-          <!-- Status and Actions -->
-          <div class="tw:flex tw:items-center tw:justify-between">
-            <OTag
-              type="backfillJobStatus"
-              :value="getStatusKey(job.status, job.deletion_status)"
-            >
-              {{ getStatusLabel(job.status, job.deletion_status) }}
-            </OTag>
-            <OButton
-              v-if="canCancelJob"
-              variant="outline-destructive"
-              size="sm-action"
-              @click="confirmCancelJob"
-              data-test="cancel-job-btn"
-            >Cancel Job</OButton>
+    <div v-else-if="job" class="flex flex-col gap-5">
+      <!-- Status and Actions -->
+      <div class="flex items-center justify-between">
+        <OTag type="backfillJobStatus" :value="getStatusKey(job.status, job.deletion_status)">
+          {{ getStatusLabel(job.status, job.deletion_status) }}
+        </OTag>
+        <OButton
+          v-if="canCancelJob"
+          variant="outline-destructive"
+          size="sm-action"
+          @click="confirmCancelJob"
+          data-test="cancel-job-btn"
+          >{{ t("pipeline.cancelJob") }}</OButton
+        >
+      </div>
+
+      <!-- Job Information -->
+      <section class="flex flex-col gap-3">
+        <h3 class="text-base font-semibold">{{ t("pipeline.jobInformation") }}</h3>
+        <div
+          class="rounded-default border-card-border bg-card-bg grid grid-cols-2 gap-x-6 gap-y-3 border p-4"
+        >
+          <div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.jobId") }}</div>
+            <div class="font-mono text-sm break-all">{{ job.job_id }}</div>
+          </div>
+          <div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.pipelineLabel") }}</div>
+            <div class="text-sm font-medium">{{ job.pipeline_name || job.pipeline_id }}</div>
+          </div>
+          <div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.timeRange") }}</div>
+            <div class="text-sm">
+              {{ formatTimestamp(job.start_time) }} – {{ formatTimestamp(job.end_time) }}
+            </div>
+          </div>
+          <div>
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.created") }}</div>
+            <div class="text-sm">{{ formatTimestampFull(job.created_at) }}</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Progress -->
+      <section class="flex flex-col gap-3">
+        <h3 class="text-base font-semibold">{{ t("pipeline.progressLabel") }}</h3>
+        <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-4 border p-4">
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <div class="text-sm font-medium">{{ t("pipeline.overallProgress") }}</div>
+              <div class="text-xl font-semibold">{{ job.progress_percent }}%</div>
+            </div>
+            <OProgressBar :value="job.progress_percent / 100" variant="default" size="sm" />
           </div>
 
-          <!-- Job Information -->
-          <section class="tw:flex tw:flex-col tw:gap-3">
-            <h3 class="tw:text-base tw:font-semibold">Job Information</h3>
-            <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3 tw:rounded-md tw:border tw:border-card-border tw:bg-card-bg tw:p-4">
-              <div>
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Job ID</div>
-                <div class="tw:font-mono tw:text-sm tw:break-all">{{ job.job_id }}</div>
-              </div>
-              <div>
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Pipeline</div>
-                <div class="tw:text-sm tw:font-medium">{{ job.pipeline_name || job.pipeline_id }}</div>
-              </div>
-              <div>
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Time Range</div>
-                <div class="tw:text-sm">{{ formatTimestamp(job.start_time) }} – {{ formatTimestamp(job.end_time) }}</div>
-              </div>
-              <div>
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Created</div>
-                <div class="tw:text-sm">{{ formatTimestampFull(job.created_at) }}</div>
-              </div>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.phase") }}</div>
+              <div class="text-sm">{{ getCurrentPhase }}</div>
             </div>
-          </section>
-
-          <!-- Progress -->
-          <section class="tw:flex tw:flex-col tw:gap-3">
-            <h3 class="tw:text-base tw:font-semibold">Progress</h3>
-            <div class="tw:rounded-md tw:border tw:border-card-border tw:bg-card-bg tw:p-4 tw:flex tw:flex-col tw:gap-4">
-              <div>
-                <div class="tw:flex tw:items-center tw:justify-between tw:mb-2">
-                  <div class="tw:text-sm tw:font-medium">Overall Progress</div>
-                  <div class="tw:text-xl tw:font-semibold">{{ job.progress_percent }}%</div>
-                </div>
-                <OProgressBar
-                  :value="job.progress_percent / 100"
-                  variant="default"
-                  size="sm"
-                />
-              </div>
-
-              <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3">
-                <div>
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Phase</div>
-                  <div class="tw:text-sm">{{ getCurrentPhase }}</div>
-                </div>
-                <div v-if="job.chunks_total">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Chunks</div>
-                  <div class="tw:text-sm">{{ job.chunks_completed || 0 }} / {{ job.chunks_total }}</div>
-                </div>
-                <div>
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Current Position</div>
-                  <div class="tw:text-sm">{{ formatTimestamp(job.current_position) }}</div>
-                </div>
-                <div v-if="estimatedCompletion">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Estimated Completion</div>
-                  <div class="tw:text-sm">{{ estimatedCompletion }}</div>
-                </div>
-              </div>
+            <div v-if="job.chunks_total">
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.chunks") }}</div>
+              <div class="text-sm">{{ job.chunks_completed || 0 }} / {{ job.chunks_total }}</div>
             </div>
-          </section>
-
-          <!-- Deletion Details (if applicable) -->
-          <section v-if="job.delete_before_backfill || job.deletion_status" class="tw:flex tw:flex-col tw:gap-3">
-            <h3 class="tw:text-base tw:font-semibold">Deletion Details</h3>
-            <div class="tw:rounded-md tw:border tw:border-card-border tw:bg-card-bg tw:p-4 tw:flex tw:flex-col tw:gap-3">
-              <div class="tw:grid tw:grid-cols-2 tw:gap-x-6 tw:gap-y-3">
-                <div>
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Status</div>
-                  <OTag
-                    type="deletionStatus"
-                    :value="typeof job.deletion_status === 'object' ? 'failed' : job.deletion_status"
-                    :label="getDeletionStatusLabel(job.deletion_status)"
-                  />
-                </div>
-                <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
-                  <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Deletion Job IDs ({{ job.deletion_job_ids.length }})</div>
-                  <div v-for="(jobId, idx) in job.deletion_job_ids" :key="idx" class="tw:font-mono tw:text-xs tw:break-all">
-                    {{ jobId }}
-                  </div>
-                </div>
-              </div>
-              <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Error</div>
-                <div class="tw:text-sm tw:text-red-500">{{ job.deletion_status.failed }}</div>
-              </div>
+            <div>
+              <div class="text-text-label mb-1 text-xs">{{ t("pipeline.currentPosition") }}</div>
+              <div class="text-sm">{{ formatTimestamp(job.current_position) }}</div>
             </div>
-          </section>
-
-          <!-- Error Details (if present) -->
-          <section v-if="job.error" class="tw:flex tw:flex-col tw:gap-3">
-            <h3 class="tw:text-base tw:font-semibold">Error Details</h3>
-            <div class="tw:rounded-md tw:border tw:border-red-300 tw:bg-red-50 tw:p-4 tw:flex tw:items-start tw:gap-3">
-              <OIcon name="error" size="md" class="tw:text-red-500 tw:mt-0.5 tw:shrink-0" />
-              <div class="tw:flex-1 tw:min-w-0">
-                <div class="tw:text-xs tw:text-gray-400 tw:mb-1">Error Message</div>
-                <div class="tw:text-sm tw:text-red-700 tw:whitespace-pre-wrap tw:break-words">
-                  {{ job.error }}
-                </div>
+            <div v-if="estimatedCompletion">
+              <div class="text-text-label mb-1 text-xs">
+                {{ t("pipeline.estimatedCompletion") }}
               </div>
+              <div class="text-sm">{{ estimatedCompletion }}</div>
             </div>
-          </section>
-
-          <!-- Timeline -->
-          <section class="tw:flex tw:flex-col tw:gap-3">
-            <h3 class="tw:text-base tw:font-semibold">Timeline</h3>
-            <OTimeline>
-              <OTimelineItem
-                title="Job Created"
-                :subtitle="formatTimestampFull(job.created_at)"
-                icon="add-circle"
-              />
-              <OTimelineItem
-                v-if="job.deletion_status && job.deletion_status !== 'not_required'"
-                :title="getDeletionTimelineTitle"
-                :subtitle="getDeletionTimelineSubtitle"
-                :icon="getDeletionTimelineIcon"
-                :variant="getDeletionTimelineColor"
-              />
-              <OTimelineItem
-                v-if="job.progress_percent > 20 || (job.deletion_status === 'completed')"
-                title="Backfill Started"
-                :subtitle="getBackfillStartTime"
-                icon="play-arrow"
-              />
-              <OTimelineItem
-                v-if="job.status === 'running'"
-                :title="`Processing Chunk ${job.chunks_completed || 0}/${job.chunks_total || 'N/A'}`"
-                subtitle="In Progress"
-                icon="hourglass-empty"
-                variant="info"
-              />
-              <OTimelineItem
-                v-if="job.status === 'completed'"
-                title="Job Completed"
-                subtitle="All data processed successfully"
-                icon="check-circle"
-                variant="success"
-              />
-              <OTimelineItem
-                v-if="job.status === 'failed'"
-                title="Job Failed"
-                subtitle="An error occurred during processing"
-                icon="error"
-                variant="destructive"
-              />
-              <OTimelineItem
-                v-if="job.status === 'canceled'"
-                title="Job Canceled"
-                subtitle="Job was canceled by user"
-                icon="cancel"
-                variant="muted"
-              />
-            </OTimeline>
-          </section>
+          </div>
         </div>
+      </section>
 
-    <div v-else class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:p-4">
-      <OIcon name="error-outline" style="width: 64px; height: 64px;" />
-      <div class="tw:text-xl tw:font-semibold tw:mt-3 tw:text-gray-400">Job not found</div>
+      <!-- Deletion Details (if applicable) -->
+      <section v-if="job.delete_before_backfill || job.deletion_status" class="flex flex-col gap-3">
+        <h3 class="text-base font-semibold">{{ t("pipeline.deletionDetails") }}</h3>
+        <div class="rounded-default border-card-border bg-card-bg flex flex-col gap-3 border p-4">
+          <div class="grid grid-cols-2 gap-x-6 gap-y-3">
+            <div>
+              <div class="text-text-label mb-1 text-xs">{{ t("common.status") }}</div>
+              <OTag
+                type="deletionStatus"
+                :value="typeof job.deletion_status === 'object' ? 'failed' : job.deletion_status"
+                :label="raw(getDeletionStatusLabel(job.deletion_status))"
+              />
+            </div>
+            <div v-if="job.deletion_job_ids && job.deletion_job_ids.length > 0">
+              <div class="text-text-label mb-1 text-xs">
+                {{ t("pipeline.deletionJobIds") }} ({{ job.deletion_job_ids.length }})
+              </div>
+              <div
+                v-for="(jobId, idx) in job.deletion_job_ids"
+                :key="idx"
+                class="font-mono text-xs break-all"
+              >
+                {{ jobId }}
+              </div>
+            </div>
+          </div>
+          <div v-if="typeof job.deletion_status === 'object' && job.deletion_status.failed">
+            <div class="text-text-label mb-1 text-xs">{{ t("common.error") }}</div>
+            <div class="text-status-error-text text-sm">{{ job.deletion_status.failed }}</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Error Details (if present) -->
+      <section v-if="job.error" class="flex flex-col gap-3">
+        <h3 class="text-base font-semibold">{{ t("pipeline.errorDetails") }}</h3>
+        <div
+          class="rounded-default border-banner-error-soft-border bg-banner-error-soft-bg flex items-start gap-3 border p-4"
+        >
+          <OIcon name="error" size="md" class="text-status-error-text mt-0.5 shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="text-text-label mb-1 text-xs">{{ t("pipeline.errorMessage") }}</div>
+            <div class="text-banner-error-soft-text text-sm break-words whitespace-pre-wrap">
+              {{ job.error }}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Timeline -->
+      <section class="flex flex-col gap-3">
+        <h3 class="text-base font-semibold">{{ t("pipeline.timeline") }}</h3>
+        <OTimeline>
+          <OTimelineItem
+            :title="t('pipeline.jobCreated')"
+            :subtitle="raw(formatTimestampFull(job.created_at))"
+            icon="add-circle"
+          />
+          <OTimelineItem
+            v-if="job.deletion_status && job.deletion_status !== 'not_required'"
+            :title="raw(getDeletionTimelineTitle)"
+            :subtitle="raw(getDeletionTimelineSubtitle)"
+            :icon="getDeletionTimelineIcon"
+            :variant="getDeletionTimelineColor"
+          />
+          <OTimelineItem
+            v-if="job.progress_percent > 20 || job.deletion_status === 'completed'"
+            :title="t('pipeline.backfillStarted')"
+            :subtitle="raw(getBackfillStartTime)"
+            icon="play-arrow"
+          />
+          <OTimelineItem
+            v-if="job.status === 'running'"
+            :title="
+              t('pipeline.processingChunk', {
+                done: job.chunks_completed || 0,
+                total: job.chunks_total || t('common.notAvailable'),
+              })
+            "
+            :subtitle="t('pipeline.inProgress')"
+            icon="hourglass-empty"
+            variant="info"
+          />
+          <OTimelineItem
+            v-if="job.status === 'completed'"
+            :title="t('pipeline.jobCompleted')"
+            :subtitle="t('pipeline.allDataProcessedSuccessfully')"
+            icon="check-circle"
+            variant="success"
+          />
+          <OTimelineItem
+            v-if="job.status === 'failed'"
+            :title="t('pipeline.jobFailed')"
+            :subtitle="t('pipeline.errorOccurredDuringProcessing')"
+            icon="error"
+            variant="destructive"
+          />
+          <OTimelineItem
+            v-if="job.status === 'canceled'"
+            :title="t('pipeline.jobCanceled')"
+            :subtitle="t('pipeline.jobCanceledByUser')"
+            icon="cancel"
+            variant="muted"
+          />
+        </OTimeline>
+      </section>
+    </div>
+
+    <div v-else class="flex flex-col items-center justify-center p-4">
+      <OIcon name="error-outline" style="width: 64px; height: 64px" />
+      <div class="text-text-muted mt-3 text-xl font-semibold">{{ t("pipeline.jobNotFound") }}</div>
     </div>
   </ODrawer>
 </template>
@@ -223,6 +235,7 @@ import type { TimelineItemVariant } from "@/lib/data/Timeline/OTimelineItem.type
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 interface Props {
   modelValue: boolean;
@@ -239,6 +252,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
 const store = useStore();
+const { t } = useI18nTyped();
 
 const { confirm } = useConfirmDialog();
 
@@ -275,7 +289,7 @@ watch(
       loadJobDetails();
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 watch(
@@ -284,7 +298,7 @@ watch(
     if (newValue && props.jobId) {
       loadJobDetails();
     }
-  }
+  },
 );
 
 const canCancelJob = computed(() => {
@@ -293,8 +307,8 @@ const canCancelJob = computed(() => {
 
 const confirmCancelJob = async () => {
   const ok = await confirm({
-    title: "Cancel Backfill Job",
-    message: "Are you sure you want to cancel this backfill job?",
+    title: t("pipeline.cancelBackfillJobTitle"),
+    message: t("pipeline.cancelBackfillJobConfirm"),
   });
   if (ok) {
     await cancelJob();
@@ -305,7 +319,7 @@ const cancelJob = async () => {
   if (!job.value || !job.value.pipeline_id) {
     toast({
       variant: "error",
-      message: "Job information not available. Please try again.",
+      message: t("toastMessages.pipelines.jobInformationNotAvailablePleaseTry"),
     });
     return;
   }
@@ -319,7 +333,7 @@ const cancelJob = async () => {
 
     toast({
       variant: "success",
-      message: "Backfill job canceled successfully",
+      message: t("toastMessages.pipelines.backfillJobCanceledSuccessfully"),
     });
 
     emit("job-canceled");
@@ -374,27 +388,32 @@ const estimatedCompletion = computed(() => {
 });
 
 const getDeletionTimelineTitle = computed(() => {
-  if (!job.value?.deletion_status) return "";
+  if (!job.value?.deletion_status) return raw("");
 
-  if (job.value.deletion_status === "completed") return "Deletion Completed";
-  if (job.value.deletion_status === "in_progress") return "Deleting Data";
-  if (job.value.deletion_status === "pending") return "Deletion Pending";
+  if (job.value.deletion_status === "completed")
+    return t("pipeline.backfillDetails.deletionCompleted");
+  if (job.value.deletion_status === "in_progress")
+    return t("pipeline.backfillDetails.deletingData");
+  if (job.value.deletion_status === "pending") return t("pipeline.backfillDetails.deletionPending");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
-    return "Deletion Failed";
+    return t("pipeline.backfillDetails.deletionFailed");
   }
-  return "";
+  return raw("");
 });
 
 const getDeletionTimelineSubtitle = computed(() => {
-  if (!job.value?.deletion_status) return "";
+  if (!job.value?.deletion_status) return raw("");
 
-  if (job.value.deletion_status === "completed") return "All existing data deleted";
-  if (job.value.deletion_status === "in_progress") return "Deletion in progress";
-  if (job.value.deletion_status === "pending") return "Waiting to start deletion";
+  if (job.value.deletion_status === "completed")
+    return t("pipeline.backfillDetails.allDataDeleted");
+  if (job.value.deletion_status === "in_progress")
+    return t("pipeline.backfillDetails.deletionInProgress");
+  if (job.value.deletion_status === "pending")
+    return t("pipeline.backfillDetails.waitingToStartDeletion");
   if (typeof job.value.deletion_status === "object" && "failed" in job.value.deletion_status) {
-    return job.value.deletion_status.failed;
+    return raw(job.value.deletion_status.failed);
   }
-  return "";
+  return raw("");
 });
 
 const getDeletionTimelineIcon = computed(() => {
@@ -417,7 +436,7 @@ const getDeletionTimelineColor = computed<TimelineItemVariant>(() => {
 
 const getBackfillStartTime = computed(() => {
   // This is approximate - would need actual timestamps from backend
-  return "After deletion completed";
+  return t("pipeline.backfillDetails.afterDeletionCompleted");
 });
 
 // Helper functions
@@ -430,26 +449,20 @@ const getStatusKey = (status: string, deletionStatus?: any): string => {
 
 const getStatusLabel = (status: string, deletionStatus?: any) => {
   if (deletionStatus && typeof deletionStatus === "object" && "failed" in deletionStatus) {
-    return "Deletion Failed";
+    return t("pipeline.backfillDetails.deletionFailed");
   }
 
   return status.charAt(0).toUpperCase() + status.slice(1);
 };
 
-const getProgressColor = (deletionStatus?: any) => {
-  if (deletionStatus && typeof deletionStatus === "string" && ["pending", "in_progress"].includes(deletionStatus)) {
-    return "blue";
-  }
-  return "positive";
-};
-
 const getDeletionStatusLabel = (status?: any) => {
-  if (!status || status === "not_required") return "Not Required";
-  if (typeof status === "object" && "failed" in status) return "Failed";
-  if (status === "completed") return "Completed";
-  if (status === "in_progress") return "In Progress";
-  if (status === "pending") return "Pending";
-  return "Unknown";
+  if (!status || status === "not_required") return t("pipeline.backfillDetails.statusNotRequired");
+  if (typeof status === "object" && "failed" in status)
+    return t("pipeline.backfillDetails.statusFailed");
+  if (status === "completed") return t("pipeline.backfillDetails.statusCompleted");
+  if (status === "in_progress") return t("pipeline.backfillDetails.statusInProgress");
+  if (status === "pending") return t("pipeline.backfillDetails.statusPending");
+  return t("pipeline.backfillDetails.statusUnknown");
 };
 
 const formatTimestamp = (timestamp?: number) => {
@@ -463,9 +476,12 @@ const formatTimestampFull = (timestamp?: number) => {
   if (!timestamp) return "N/A";
   const userTimezone = store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
   const date = new Date(timestamp / 1000); // Convert from microseconds
-  const formattedDate = timestampToTimezoneDate(timestamp / 1000, userTimezone, "MMM dd, yyyy HH:mm:ss");
+  const formattedDate = timestampToTimezoneDate(
+    timestamp / 1000,
+    userTimezone,
+    "MMM dd, yyyy HH:mm:ss",
+  );
   const timezoneName = userTimezone === "UTC" ? "UTC" : userTimezone;
   return `${formattedDate} ${timezoneName} (${formatDistanceToNow(date, { addSuffix: true })})`;
 };
 </script>
-

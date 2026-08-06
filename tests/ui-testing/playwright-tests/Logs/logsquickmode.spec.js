@@ -213,7 +213,11 @@ test.describe("Logs Quickmode testcases", () => {
     await pm.logsPage.clickSQLModeToggle();
     await pm.logsPage.clickSearchBarRefreshButton();
     await pm.logsPage.page.reload();
-    await pm.logsPage.page.waitForLoadState('networkidle');
+    // Use domcontentloaded, not networkidle: with streaming enabled (cloud/alpha) the
+    // long-lived SSE/search connections keep the network busy, so networkidle never
+    // settles and times out. expectQueryEditorContainsText below already waits for the
+    // Monaco editor to mount and hydrate its model value, so it is the real readiness gate.
+    await pm.logsPage.page.waitForLoadState('domcontentloaded');
     await pm.logsPage.expectQueryEditorContainsText('SELECT _timestamp,kubernetes_pod_id FROM "e2e_automate"');
     
     testLogger.info('SQL mode order by persistence test completed');

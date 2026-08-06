@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:justify-start tw:items-center tw:bg-[color-mix(in_srgb,currentColor_5%,transparent)] tw:h-7.5 tw:top-0 tw:z-1999 tw:sticky tw:rounded-t-lg"
+    class="rounded-t-default sticky top-0 z-1999 flex h-7.5 items-center justify-start bg-[color-mix(in_srgb,currentColor_5%,transparent)]"
     data-test="trace-header"
     :style="
       isSidebarOpen && {
@@ -25,51 +25,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     "
   >
     <div
-      class="tw:relative tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:px-2"
+      class="relative flex flex-nowrap items-center justify-start px-2"
       :style="{
         width: splitterWidth + 'px',
       }"
       data-test="trace-header-operation-name"
     >
-      Operation Name
+      {{ t("traces.traceHeader.operationName") }}
       <div
-        class="tw:bg-(--o2-primary) tw:inline-flex tw:items-center tw:justify-center tw:w-5 tw:h-5 tw:rounded-full tw:absolute tw:-right-2.5 tw:-top-0.5 tw:z-10 tw:cursor-col-resize"
+        class="bg-accent absolute -top-0.5 -right-2.5 z-10 inline-flex h-5 w-5 cursor-col-resize items-center justify-center rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
       >
-        <OIcon name="drag-indicator" size="sm"  />
+        <OIcon name="drag-indicator" size="sm" class="text-white" />
       </div>
     </div>
     <div
-      class="tw:flex tw:justify-start tw:items-center tw:flex-nowrap tw:flex tw:relative"
+      class="relative flex flex-nowrap items-center justify-start"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
       data-test="trace-header-tics"
-      v-if="
-        !isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length
-      "
+      v-if="!isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length"
     >
-      <div
-        class="tw:w-1/4 tw:text-xs tw:pl-3"
-        data-test="trace-header-tic-label-0"
-      >
+      <div class="w-1/4 pl-3 text-xs" data-test="trace-header-tic-label-0">
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
-      <div
-        class="tw:w-1/4 tw:text-xs tw:pl-1"
-        data-test="trace-header-tic-label-1"
-      >
+      <div class="w-1/4 pl-1 text-xs" data-test="trace-header-tic-label-1">
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
-      <div
-        class="tw:w-1/4 tw:text-xs tw:pl-1"
-        data-test="trace-header-tic-label-2"
-      >
+      <div class="w-1/4 pl-1 text-xs" data-test="trace-header-tic-label-2">
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="tw:w-1/4 tw:text-xs tw:flex tw:justify-between tw:items-center tw:px-1"
+        class="flex w-1/4 items-center justify-between px-1 text-xs"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
@@ -77,10 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic tw:absolute tw:-top-0.75 tw:w-px tw:bg-[#cacaca] tw:z-1 tw:h-6.5"
+        class="trace-tic bg-border-default absolute -top-0.75 z-1 h-6.5 w-px"
         :class="{
-          'tw:z-5 tw:hidden': index === 0,
-          'tw:bg-[#3c3c3c]': store.state.theme === 'dark',
+          'z-5 hidden': index === 0,
         }"
         :key="tick.value + index"
         :style="{
@@ -95,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
@@ -126,8 +115,10 @@ export default defineComponent({
 
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
     return {
       store,
+      t,
     };
   },
 });

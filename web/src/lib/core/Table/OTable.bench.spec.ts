@@ -1,9 +1,8 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import { mount, VueWrapper, config } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-
 
 const i18n = createI18n({
   legacy: false,
@@ -104,7 +103,7 @@ describe("OTable Performance Benchmarks", () => {
   describe("render at 1K rows (typical usage)", () => {
     it("should mount 1K rows with virtual scroll without crashing", () => {
       const rows = generateRows(1_000);
-      const { ms } = measureTime("mount 1K rows (virtual scroll)", () => {
+      measureTime("mount 1K rows (virtual scroll)", () => {
         wrapper = mount(OTable, {
           props: {
             data: rows,
@@ -126,7 +125,7 @@ describe("OTable Performance Benchmarks", () => {
 
     it("should mount 1K rows without virtual scroll", () => {
       const rows = generateRows(1_000);
-      const { ms } = measureTime("mount 1K rows (no virtual scroll)", () => {
+      measureTime("mount 1K rows (no virtual scroll)", () => {
         wrapper = mount(OTable, {
           props: {
             data: rows,
@@ -152,7 +151,7 @@ describe("OTable Performance Benchmarks", () => {
     it("should sort 1K rows by numeric column correctly", () => {
       // Use smaller dataset (100 rows) to avoid jsdom heap issues while testing sort behavior
       const rows = generateRows(100);
-      const { ms } = measureTime("mount + sort 100 rows", () => {
+      measureTime("mount + sort 100 rows", () => {
         wrapper = mount(OTable, {
           props: {
             data: rows,
@@ -166,7 +165,7 @@ describe("OTable Performance Benchmarks", () => {
       const sortTrigger = wrapper.find('[data-test="o2-table-th-sort-trigger"]');
       expect(sortTrigger.exists()).toBe(true);
 
-      const sortMs = measureTime("click sort", () => {
+      measureTime("click sort", () => {
         sortTrigger.trigger("click");
       });
 
@@ -184,7 +183,7 @@ describe("OTable Performance Benchmarks", () => {
   describe("filter at scale", () => {
     it("should filter 1K rows to a single match with client-side global filter", () => {
       const rows = generateRows(1_000);
-      const { ms } = measureTime("mount + filter 1K rows", () => {
+      measureTime("mount + filter 1K rows", () => {
         wrapper = mount(OTable, {
           props: {
             data: rows,
@@ -237,7 +236,7 @@ describe("OTable Performance Benchmarks", () => {
       });
 
       const newRows = generateRows(1_000);
-      const { ms } = measureTime("update 1K rows via setProps", () => {
+      measureTime("update 1K rows via setProps", () => {
         wrapper.setProps({ data: newRows });
       });
 

@@ -75,22 +75,22 @@ describe("OShortcut", () => {
   describe("size", () => {
     it("should apply small keycap sizing by default", () => {
       wrapper = mount(OShortcut, { props: { keys: "?" } });
-      expect(wrapper.find("kbd").classes()).toContain("tw:h-5");
+      expect(wrapper.find("kbd").classes()).toContain("h-5");
     });
 
     it("should apply medium keycap sizing when size='md'", () => {
       wrapper = mount(OShortcut, { props: { keys: "?", size: "md" } });
       const cls = wrapper.find("kbd").classes();
-      expect(cls).toContain("tw:h-6");
-      expect(cls).not.toContain("tw:h-5");
+      expect(cls).toContain("h-6");
+      expect(cls).not.toContain("h-5");
     });
   });
 
   it("should use the theme-aware keycap tokens (auto light/dark)", () => {
     wrapper = mount(OShortcut, { props: { keys: "?" } });
     const cls = wrapper.find("kbd").classes();
-    expect(cls).toContain("tw:bg-kbd-bg");
-    expect(cls).toContain("tw:border-kbd-border");
-    expect(cls).toContain("tw:text-kbd-text");
+    expect(cls).toContain("bg-kbd-bg");
+    expect(cls).toContain("border-kbd-border");
+    expect(cls).toContain("text-kbd-text");
   });
 });

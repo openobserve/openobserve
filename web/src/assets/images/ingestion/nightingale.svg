@@ -1,0 +1,9 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="240" height="240" rx="16" fill="#3F1979"/>
+  <circle cx="120" cy="88" r="44" fill="white" opacity="0.95"/>
+  <path d="M81 98C95 74 120 64 150 74C138 80 129 89 122 102C113 98 101 96 81 98Z" fill="#3F1979"/>
+  <path d="M79 106C103 100 121 108 131 126C114 124 97 124 79 106Z" fill="#3F1979"/>
+  <path d="M154 63L190 92L154 121L144 112L169 92L144 72L154 63Z" fill="#3F1979"/>
+  <text x="120" y="188" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="white">Nightingale</text>
+</svg>
+

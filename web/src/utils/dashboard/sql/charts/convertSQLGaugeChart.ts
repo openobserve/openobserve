@@ -16,12 +16,13 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { calculateGridPositions } from "../../calculateGridForSubPlot";
 import { getSeriesColor } from "../../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 import { type SQLContext } from "../shared/types";
 
 /**
  * Applies chart-specific options for: gauge
  *
- * Mutates `ctx.options` in place, exactly as the original switch case did.
+ * Mutates `ctx.options` in place.
  */
 export function applyGaugeChart(ctx: SQLContext): void {
   const {
@@ -54,7 +55,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
     show: true,
     trigger: "item",
     textStyle: {
-      color: store.state.theme === "dark" ? "#fff" : "#000",
+      color: chartColor("--color-tooltip-text"),
       fontSize: 12,
     },
     valueFormatter: (value: any) => {
@@ -73,8 +74,7 @@ export function applyGaugeChart(ctx: SQLContext): void {
       }
     },
     enterable: true,
-    backgroundColor:
-      store.state.theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)",
+    backgroundColor: chartColor("--color-tooltip-bg"),
     extraCssText:
       "max-height: 200px; overflow: auto; max-width: 500px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent;",
   };
@@ -102,22 +102,14 @@ export function applyGaugeChart(ctx: SQLContext): void {
       //which grid will be used
       gridIndex: index,
       // radius, progress and axisline width will be calculated based on grid width and height
-      radius: `${
-        Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 -
-        5
-      }px`,
+      radius: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 2 - 5}px`,
       progress: {
         show: true,
-        width: `${
-          Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6
-        }`,
+        width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
       },
       axisLine: {
         lineStyle: {
-          width: `${
-            Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) /
-            6
-          }`,
+          width: `${Math.min(gridDataForGauge.gridWidth, gridDataForGauge.gridHeight) / 6}`,
         },
       },
       title: {
@@ -132,14 +124,8 @@ export function applyGaugeChart(ctx: SQLContext): void {
       // x: left + width / 2,
       // y: top + height / 2,
       center: [
-        `${
-          parseFloat(options.grid[index].left) +
-          parseFloat(options.grid[index].width) / 2
-        }%`,
-        `${
-          parseFloat(options.grid[index].top) +
-          parseFloat(options.grid[index].height) / 2
-        }%`,
+        `${parseFloat(options.grid[index].left) + parseFloat(options.grid[index].width) / 2}%`,
+        `${parseFloat(options.grid[index].top) + parseFloat(options.grid[index].height) / 2}%`,
       ],
 
       data: [

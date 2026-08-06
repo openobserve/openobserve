@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-end tw:gap-2">
+  <div class="flex items-end gap-2">
     <!-- select new tab -->
     <OSelect
       v-model="selectedTab"
@@ -23,14 +23,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :options="tabList"
       data-test="dashboard-dropdown-tab-selection"
       labelKey="label"
-      class="tw:flex-1"
+      class="flex-1"
     />
 
     <OButton
       data-test="dashboard-tab-new-add"
       variant="outline"
       size="icon-xs-sq"
-      class="tw:h-8! tw:w-8!"
+      class="h-8! w-8!"
       @click="
         () => {
           showAddTabDialog = true;
@@ -53,12 +53,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddTab from "../../components/dashboards/tabs/AddTab.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import { useRoute } from "vue-router";
 import { getDashboard } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
@@ -83,13 +82,12 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const store: any = useStore();
-    const route = useRoute();
     const showAddTabDialog: any = ref(false);
     const tabList: any = ref([]);
 
     //dropdown selected tab id (primitive string for OSelect)
     const selectedTab = ref<string | null>(null);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // on add tab, select added tab
     const updateTabList = async (newTab: any) => {
@@ -102,11 +100,7 @@ export default defineComponent({
     const getTabList = useLoading(async () => {
       if (!props.dashboardId || !props.folderId) return;
 
-      const dashboardData = await getDashboard(
-        store,
-        props.dashboardId,
-        props.folderId,
-      );
+      const dashboardData = await getDashboard(store, props.dashboardId, props.folderId);
 
       tabList.value = dashboardData?.tabs?.map((tab: any) => ({
         label: tab.name,

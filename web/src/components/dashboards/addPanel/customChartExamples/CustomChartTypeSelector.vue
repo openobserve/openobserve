@@ -15,30 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- Height matches the host ODialog's own max-h-[90vh] cap (minus its body
+       padding + borders) so the dialog body never overflows. That keeps the
+       inner right-content area as the single scroller instead of stacking a
+       second scrollbar on the dialog body. -->
   <OCard
+    class="flex h-[calc(90vh_-_2rem)] w-full flex-col overflow-hidden p-0"
     data-test="custom-chart-type-selector-popup"
-    style="
-      padding: 0;
-      width: 100%;
-      height: calc(100vh - 57px);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    "
   >
     <!-- Header -->
     <OCardSection role="header">
-      <div class="tw:flex tw:items-center tw:gap-3 tw:w-full">
+      <div class="flex w-full items-center gap-3">
         <OIcon name="bar-chart" size="sm" />
-        <span class="tw:text-xl tw:font-semibold tw:whitespace-nowrap">Example of custom charts</span>
+        <span class="text-xl font-semibold whitespace-nowrap">{{
+          t("dashboard.customChartTypeSelector.exampleOfCustomCharts")
+        }}</span>
         <OSearchInput
           v-model="searchQuery"
-          placeholder="Search charts..."
+          :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
-          style="width: 280px; flex: 0 0 280px; margin-left: 16px;"
+          class="ml-4 w-70 flex-[0_0_17.5rem]"
           @clear="searchQuery = ''"
         />
-        <div class="tw:flex-1" />
+        <div class="flex-1" />
         <OButton
           variant="ghost"
           size="icon"
@@ -53,29 +52,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OSeparator />
 
     <!-- Main Content -->
-    <OCardSection
-      class="tw:flex"
-      style="height: calc(100% - 60px); overflow: hidden; padding: 0"
-    >
-      <div class="tw:flex tw:flex-nowrap" style="height: 100%; width: 100%">
+    <OCardSection class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0">
+      <div class="flex h-full w-full flex-nowrap">
         <!-- Left Sidebar -->
-        <OCard
-          class="tw:p-4"
-          style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
-        >
-          <div class="tw:text-sm tw:font-medium tw:mb-3 text-weight-bold">Chart Types</div>
-          <ul class="tw:flex tw:flex-col tw:list-none tw:p-0 tw:m-0">
+        <OCard class="h-full w-40 shrink-0 overflow-y-auto p-4">
+          <div class="mb-3 text-sm font-bold font-medium">
+            {{ t("dashboard.customChartTypeSelector.chartTypes") }}
+          </div>
+          <ul class="m-0 flex list-none flex-col p-0">
             <li
               v-for="(category, index) in chartCategories"
               :key="index"
               @click="scrollToCategory(category.chartLabel)"
-              class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:cursor-pointer tw:rounded tw:mb-1 tw:transition-all tw:duration-200 tw:hover:bg-black/4"
-              :class="{
-                'tw:bg-(--q-primary) tw:text-white tw:font-semibold': selectedCategory === category.chartLabel,
-              }"
+              class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
+              :class="
+                selectedCategory === category.chartLabel
+                  ? 'bg-theme-accent text-text-inverse font-semibold'
+                  : 'hover:bg-button-ghost-hover-bg'
+              "
               data-test="chart-category-item"
             >
-              <span class="tw:text-sm">{{ category.chartLabel }}</span>
+              <span class="text-sm">{{ category.chartLabel }}</span>
             </li>
           </ul>
         </OCard>
@@ -83,21 +80,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="tw:p-3"
-          style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
+          class="h-full flex-1 overflow-x-hidden overflow-y-auto p-3"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="tw:flex tw:justify-center tw:items-center"
-            style="height: 100%"
+            class="flex h-full items-center justify-center"
           >
-            <div class="tw:text-center">
-              <OIcon name="search-off" style="width: 4rem; height: 4rem;" />
-              <div class="tw:text-xl tw:font-semibold tw:text-gray-400 tw:mt-3">No results found</div>
-              <div class="tw:text-sm tw:text-gray-400 tw:mt-2">
-                Try searching with different keywords
+            <div class="text-center">
+              <OIcon class="h-16 w-16" name="search-off" />
+              <div class="text-text-muted mt-3 text-xl font-semibold">
+                {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
+              </div>
+              <div class="text-text-muted mt-2 text-sm">
+                {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
               </div>
             </div>
           </div>
@@ -106,40 +103,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
-            class="chart-category-section tw:mb-6 tw:scroll-mt-5"
+            class="chart-category-section mb-6 scroll-mt-5"
             :data-category="category.chartLabel"
             data-test="chart-category-section"
           >
-            <div class="tw:text-xl tw:font-semibold tw:mb-3 text-weight-medium">
+            <div class="mb-3 text-xl font-medium font-semibold">
               {{ category.chartLabel }}
             </div>
-            <div class="tw:flex tw:gap-3">
+            <div class="flex gap-3">
               <div
                 v-for="(chart, chartIndex) in category.type"
                 :key="chartIndex"
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="tw:cursor-pointer tw:transition-all tw:duration-200 tw:h-full tw:hover:shadow-[0_4px_12px_rgba(0,0,0,0.15)] tw:hover:-translate-y-0.5"
+                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
                   :class="{
-                    'tw:border-2 tw:border-(--q-primary) tw:shadow-[0_4px_12px_rgba(var(--q-primary-rgb),0.3)]': selectedChart?.value === chart.value,
+                    'border-theme-accent border-2 shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
+                      selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
-                  <OCardSection class="tw:p-2">
-                    <div class="tw:w-full tw:h-37.5 tw:flex tw:items-center tw:justify-center tw:bg-[#f8f8f8] tw:rounded tw:overflow-hidden">
+                  <OCardSection class="p-2">
+                    <div
+                      class="bg-surface-subtle rounded-default flex h-37.5 w-full items-center justify-center overflow-hidden"
+                    >
                       <img
                         :src="chart.asset"
-                        :alt="chart.label"
-                        class="tw:w-full tw:h-full tw:object-cover"
+                        :alt="t(chart.labelKey)"
+                        class="h-full w-full object-cover"
                         loading="lazy"
                       />
                     </div>
                   </OCardSection>
-                  <OCardSection class="tw:pt-0 tw:px-2 tw:pb-2">
-                    <div class="tw:text-xs tw:text-center text-weight-medium">
-                      {{ chart.label }}
+                  <OCardSection class="px-2 pt-0 pb-2">
+                    <div class="text-center text-xs font-medium">
+                      {{ t(chart.labelKey) }}
                     </div>
                   </OCardSection>
                 </OCard>
@@ -152,8 +152,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
-      title="Confirm Chart Type Selection"
-      message="By selecting this chart type, the existing chart code will be replaced by the selected chart type's code. Do you want to continue?"
+      :title="t('dashboard.customChartTypeSelector.confirmChartTypeSelection')"
+      :message="t('dashboard.customChartTypeSelector.confirmChartTypeSelectionMessage')"
       :currentQuery="currentQuery"
       @update:ok="confirmChartSelection"
       @update:cancel="cancelChartSelection"
@@ -163,15 +163,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  nextTick,
-  computed,
-  inject,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onMounted, nextTick, computed, inject } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
@@ -179,7 +172,7 @@ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
@@ -193,22 +186,15 @@ export default defineComponent({
     OCard,
     OCardSection,
     OIcon,
-},
+  },
   emits: ["close", "select"],
   setup(props, { emit }) {
-    const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
-    const selectedCategory = ref<string>(
-      chartCategories.value[0]?.chartLabel || "",
-    );
+    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
     const selectedChart = ref<ChartType | null>(null);
     const contentArea = ref<HTMLElement | null>(null);
     const confirmChartSelectionDialog = ref<boolean>(false);
@@ -218,9 +204,8 @@ export default defineComponent({
     // Get current query for the dialog
     const currentQuery = computed(
       () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex || 0
-        ]?.query || "",
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex || 0]?.query ||
+        "",
     );
 
     // Computed property to filter categories and charts based on search query
@@ -233,8 +218,9 @@ export default defineComponent({
       const filtered: ChartCategory[] = [];
 
       chartCategories.value.forEach((category) => {
+        // Match the resolved name, not the key — users search what they can see.
         const filteredCharts = category.type.filter((chart) =>
-          chart.label.toLowerCase().includes(query),
+          t(chart.labelKey).toLowerCase().includes(query),
         );
 
         if (filteredCharts.length > 0) {
@@ -264,9 +250,7 @@ export default defineComponent({
       if (!contentArea.value) return;
 
       const scrollTop = contentArea.value.scrollTop;
-      const sections = contentArea.value.querySelectorAll(
-        ".chart-category-section",
-      );
+      const sections = contentArea.value.querySelectorAll(".chart-category-section");
 
       // Find which category is currently in view
       for (const section of Array.from(sections)) {

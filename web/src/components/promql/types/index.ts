@@ -14,94 +14,106 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Represents a label filter in a PromQL query
- * Example: {label="value"}
+ * The vocabulary of the visual PromQL builder.
+ *
+ * A builder query is a metric, a set of label matchers, and an ordered list of
+ * STEPS. Each step wraps the expression built so far — `[rate, sum]` renders as
+ * `sum(rate(metric{...}[5m]))` — so the list reads in the order a person would
+ * describe it and renders inside-out.
+ *
+ * `PromqlStep`'s field names (`id`, `params`) are the panel's WIRE FORMAT: a
+ * dashboard persists them verbatim under `fields.promql_operations` (see
+ * `PromQLOperation` in src/config/src/meta/dashboards/v8). They cannot be
+ * renamed without a stored-dashboard migration. Everything else here is
+ * in-memory only and free to change.
  */
-export interface QueryBuilderLabelFilter {
-  label: string;
-  op: "=" | "!=" | "=~" | "!~"; // Operators: equals, not equals, regex match, regex not match
+
+/** A single `label="value"` matcher inside the selector braces. */
+import type { I18nKey, I18nText } from "@/types/i18n";
+
+export interface PromqlLabelMatcher {
+  label: I18nText;
+  /** The four matchers PromQL defines: equal, not-equal, regex, negated regex. */
+  op: "=" | "!=" | "=~" | "!~";
   value: string;
 }
 
-/**
- * Represents an operation in the query builder
- * Example: rate(), sum(), avg()
- */
-export interface QueryBuilderOperation {
-  id: string; // Operation identifier (e.g., "rate", "sum")
-  params: QueryBuilderOperationParamValue[]; // Parameters for the operation
+/** One step in the chain. PERSISTED — see the note above. */
+export interface PromqlStep {
+  /** A {@link PromqlStepId} value. Typed as a bare string because panels persist it. */
+  id: string;
+  params: PromqlStepArg[];
+}
+
+/** A step's argument. `string[]` carries the label list of a `by (...)` clause. */
+export type PromqlStepArg = string | number | boolean | string[];
+
+/** How the editor should present one argument of a step. */
+export interface PromqlStepArgSpec {
+  name: string;
+  type: "string" | "number" | "boolean" | "select";
+  /**
+   * A fixed list of choices, or `true` to mean "offer the metric's own labels".
+   * Absent means free text.
+   */
+  options?: Array<string | number> | boolean;
+  optional?: boolean;
+  /** Example-value placeholder only (`"5m"`, `"0.95"`) — a code token, so untranslated. */
+  placeholder?: I18nText;
+  /**
+   * Prose placeholder ("Select labels"), translated by `OperationsList.vue` at
+   * render time — the catalog is built at import, so it cannot call `t()`.
+   * Wins over {@link placeholder} when both are set.
+   */
+  placeholderKey?: I18nKey;
+  /** i18n KEY for the argument's help text. Stored as data — see `placeholderKey`. */
+  descriptionKey?: I18nKey;
+}
+
+/** The catalog entry for a step: what it is called, and what it takes. */
+export interface PromqlStepSpec {
+  id: string;
+  name: string;
+  params: PromqlStepArgSpec[];
+  defaultParams: PromqlStepArg[];
+  group: string;
+  documentation?: string;
+}
+
+/** A query as the builder holds it, before it is rendered to PromQL text. */
+export interface PromqlBuilderQuery {
+  metric: string;
+  labels: PromqlLabelMatcher[];
+  operations: PromqlStep[];
 }
 
 /**
- * Main visual query structure for PromQL
+ * How the step picker groups the catalog. Grouping is ours to choose — PromQL
+ * has no notion of it; we group by what a step DOES to the data.
  */
-export interface PromVisualQuery {
-  metric: string; // Metric name
-  labels: QueryBuilderLabelFilter[]; // Label filters
-  operations: QueryBuilderOperation[]; // Applied operations
-  binaryQueries?: PromVisualQueryBinary[]; // Binary operations with other queries
+export enum PromqlStepGroup {
+  /** Counter -> per-second rate, and anything else that reads over a window. */
+  RateAndRange = "Rate & range",
+  /** Collapse many series into fewer. */
+  Aggregation = "Aggregation",
+  /** Element-wise math on a single series. */
+  Math = "Math",
+  /** Arithmetic against a constant. */
+  ScalarMath = "Scalar math",
+  Trigonometry = "Trigonometry",
+  TimeAndDate = "Time & date",
 }
 
 /**
- * Binary operation between queries
- * Example: query1 + query2
+ * Every step the builder can render.
+ *
+ * The values are PromQL function names, so a step id renders as itself — except
+ * for the scalar-arithmetic steps. Those have no function name in PromQL (they
+ * render as the operators `+`, `*`, …), so they need an id of our own coining;
+ * `scalar_*` says what they are.
  */
-export interface PromVisualQueryBinary {
-  operator: string; // +, -, *, /, %, ^, ==, !=, >, <, >=, <=
-  vectorMatchesType?: "on" | "ignoring"; // Vector matching type
-  vectorMatches?: string; // Vector matching labels
-  query: PromVisualQuery; // The other query
-}
-
-/**
- * Operation parameter value types
- */
-export type QueryBuilderOperationParamValue = string | number | boolean | string[];
-
-/**
- * Parameter definition for an operation
- */
-export interface QueryBuilderOperationParamDef {
-  name: string; // Parameter name
-  type: "string" | "number" | "boolean" | "select"; // Parameter type
-  options?: boolean; // Predefined options
-  optional?: boolean; // Whether parameter is optional
-  placeholder?: string; // Placeholder text
-  description?: string; // Parameter description
-}
-
-/**
- * Operation definition/metadata
- */
-export interface QueryBuilderOperationDef {
-  id: string; // Unique operation ID
-  name: string; // Display name
-  params: QueryBuilderOperationParamDef[]; // Parameter definitions
-  defaultParams: QueryBuilderOperationParamValue[]; // Default parameter values
-  category: string; // Category for grouping
-  documentation?: string; // Documentation text
-  hideFromList?: boolean; // Hide from operation list
-  alternativesKey?: string; // Key for alternative operations
-  orderRank?: number; // Order in list
-}
-
-/**
- * Operation categories
- */
-export enum PromVisualQueryOperationCategory {
-  Aggregations = "Aggregations",
-  RangeFunctions = "Range Functions",
-  Functions = "Functions",
-  BinaryOps = "Binary Operations",
-  Trigonometric = "Trigonometric",
-  Time = "Time Functions",
-}
-
-/**
- * Common PromQL operation IDs
- */
-export enum PromOperationId {
-  // Range functions
+export enum PromqlStepId {
+  // Rate & range
   Rate = "rate",
   Irate = "irate",
   Increase = "increase",
@@ -116,21 +128,18 @@ export enum PromOperationId {
   QuantileOverTime = "quantile_over_time",
   LastOverTime = "last_over_time",
 
-  // Aggregations
+  // Aggregation
   Sum = "sum",
   Avg = "avg",
   Max = "max",
   Min = "min",
   Count = "count",
   Stddev = "stddev",
-  Stdvar = "stdvar",
   TopK = "topk",
   BottomK = "bottomk",
   Quantile = "quantile",
-  CountValues = "count_values",
-  Group = "group",
 
-  // Functions
+  // Math
   HistogramQuantile = "histogram_quantile",
   Abs = "abs",
   Ceil = "ceil",
@@ -147,9 +156,7 @@ export enum PromOperationId {
   ClampMax = "clamp_max",
   ClampMin = "clamp_min",
 
-  // Time functions
-  Time = "time",
-  Timestamp = "timestamp",
+  // Time & date
   Hour = "hour",
   Minute = "minute",
   Month = "month",
@@ -158,7 +165,7 @@ export enum PromOperationId {
   DayOfWeek = "day_of_week",
   DaysInMonth = "days_in_month",
 
-  // Trigonometric functions
+  // Trigonometry
   Sin = "sin",
   Cos = "cos",
   Tan = "tan",
@@ -175,23 +182,88 @@ export enum PromOperationId {
   Rad = "rad",
   Pi = "pi",
 
-  // Binary operations
-  Addition = "__addition",
-  Subtraction = "__subtraction",
-  MultiplyBy = "__multiply_by",
-  DivideBy = "__divide_by",
-  Modulo = "__modulo",
-  Exponent = "__exponent",
+  // Scalar math
+  Addition = "scalar_add",
+  Subtraction = "scalar_subtract",
+  MultiplyBy = "scalar_multiply",
+  DivideBy = "scalar_divide",
+  Modulo = "scalar_modulo",
+  Exponent = "scalar_power",
 }
 
 /**
- * Query modeller interface for rendering and operations
+ * Legacy step ids for the scalar-math steps under their old names.
+ *
+ * A dashboard persists the step id verbatim, so an id that has ever been
+ * written to a panel must keep resolving. Every id is READ through
+ * {@link normalizeStepId}, and {@link normalizeSteps} rewrites it so a panel is
+ * upgraded to the current ids the next time it is saved.
+ *
+ * GOTCHA: do not delete an entry until a backfill has run over stored
+ * dashboards. A panel only migrates when someone opens it in the builder and
+ * saves; a panel nobody edits keeps its old ids indefinitely. Deleting an entry
+ * silently breaks every panel that still has it — the scalar step stops
+ * resolving and vanishes from the rendered query, changing the numbers on the
+ * chart with nothing to indicate it happened.
  */
-export interface PromQueryModeller {
-  renderQuery(query: PromVisualQuery): string;
-  renderLabels(labels: QueryBuilderLabelFilter[]): string;
-  getOperationDef(id: string): QueryBuilderOperationDef | undefined;
-  getOperationsForCategory(category: string): QueryBuilderOperationDef[];
-  getCategories(): string[];
-  getAllOperations(): QueryBuilderOperationDef[];
+const LEGACY_STEP_IDS: Readonly<Record<string, PromqlStepId>> = {
+  __addition: PromqlStepId.Addition,
+  __subtraction: PromqlStepId.Subtraction,
+  __multiply_by: PromqlStepId.MultiplyBy,
+  __divide_by: PromqlStepId.DivideBy,
+  __modulo: PromqlStepId.Modulo,
+  __exponent: PromqlStepId.Exponent,
+};
+
+/**
+ * Maps a persisted step id onto the id the catalog knows it by today.
+ *
+ * `Object.hasOwn`, not `LEGACY_STEP_IDS[id] ?? id`: a plain object inherits from
+ * `Object.prototype`, so indexing it with an id like `"constructor"` or
+ * `"toString"` — which a hand-edited or imported dashboard can perfectly well
+ * contain — would return a FUNCTION rather than a string. That value then flows
+ * into {@link normalizeSteps}, gets written back into the panel, and is dropped
+ * on save, because `JSON.stringify` omits function-valued properties: the step
+ * would come back with no id at all.
+ */
+export function normalizeStepId(id: string): string {
+  return Object.hasOwn(LEGACY_STEP_IDS, id) ? LEGACY_STEP_IDS[id] : id;
+}
+
+/**
+ * Upgrades a saved operations array to the current step ids.
+ *
+ * Applied wherever the builder loads state OUT of a panel, so its in-memory
+ * state is always canonical; the builder then writes that state straight back,
+ * which is what migrates the stored panel.
+ *
+ * Returns the ARRAY IT WAS GIVEN when nothing needed upgrading. The builder
+ * hangs a deep watcher off this state and copies it into the panel on every
+ * change, so handing back a fresh array each time would make every panel look
+ * dirty the moment it was opened. Identity is the signal that nothing happened.
+ */
+export function normalizeSteps<T extends { id: string }>(steps: T[]): T[] {
+  if (!Array.isArray(steps)) return [];
+
+  let changed = false;
+  const upgraded = steps.map((step) => {
+    const id = normalizeStepId(step?.id);
+    if (step && id !== step.id) {
+      changed = true;
+      return { ...step, id };
+    }
+    return step;
+  });
+
+  return changed ? upgraded : steps;
+}
+
+/** Renders builder state to PromQL text. */
+export interface PromqlRenderer {
+  renderQuery(query: PromqlBuilderQuery): string;
+  renderLabels(labels: PromqlLabelMatcher[]): string;
+  getStepSpec(id: string): PromqlStepSpec | undefined;
+  getStepsForGroup(group: string): PromqlStepSpec[];
+  getGroups(): string[];
+  getAllSteps(): PromqlStepSpec[];
 }

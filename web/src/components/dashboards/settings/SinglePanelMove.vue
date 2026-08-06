@@ -23,19 +23,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     size="sm"
     :title="title"
     :secondary-button-label="t('confirmDialog.cancel')"
-    primary-button-label="Move"
+    :primary-button-label="t('dashboard.singlePanelMove.move')"
     :primary-button-disabled="selectedMoveTabId === null"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
     <div>
-      <p class="tw:text-sm">{{ message }}</p>
-      <div class="tw:flex tw:items-center tw:gap-2">
+      <p class="text-sm">{{ message }}</p>
+      <div class="flex items-center gap-2">
         <OSelect
-          label="Select Tab"
+          :label="t('dashboard.singlePanelMove.selectTab')"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="tw:flex-1"
+          class="flex-1"
           data-test="dashboard-tab-move-select"
           label-position="inside"
         />
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="add"
         >
           <template #icon-left><OIcon name="add" size="sm" /></template>
-          <OTooltip content="Add Tab" />
+          <OTooltip :content="t('dashboard.singlePanelMove.addTab')" />
         </OButton>
         <AddTab
           v-model:open="showAddTabDialog"
@@ -73,7 +73,7 @@ import { getDashboard } from "@/utils/commons";
 import { reactive } from "vue";
 import { onMounted } from "vue";
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -86,10 +86,10 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "SinglePanelMove",
   components: { AddTab, OButton, OSelect, ODialog, OTooltip, OIcon },
-  emits: ["update:ok", "update:cancel", "refresh"],
+  emits: ["update:ok", "update:cancel", "refresh", "update:modelValue"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");
@@ -151,9 +151,7 @@ export default defineComponent({
       await getTabOptions();
       // set selectedMoveTabId to first tab from move tab options
       selectedMoveTabId.value =
-        moveTabOptions.value.length > 0
-          ? (moveTabOptions.value[0] as any).value
-          : null;
+        moveTabOptions.value.length > 0 ? (moveTabOptions.value[0] as any).value : null;
     });
 
     const onCancel = () => {
@@ -181,4 +179,3 @@ export default defineComponent({
   },
 });
 </script>
-

@@ -37,11 +37,8 @@ describe("OForm", () => {
     expect(wrapper.exists()).toBe(true);
   });
 
-  describe("q-form compatibility ref methods", () => {
-    function mountWithRequiredField(
-      initial = "",
-      onSubmit?: (_v: unknown) => unknown,
-    ) {
+  describe("legacy-compatibility ref methods", () => {
+    function mountWithRequiredField(initial = "", onSubmit?: (_v: unknown) => unknown) {
       return mount(OForm, {
         props: {
           defaultValues: { name: initial },
@@ -57,16 +54,12 @@ describe("OForm", () => {
 
     it("exposes validate(), resetValidation(), submit(), reset()", () => {
       wrapper = mount(OForm, { props: { defaultValues: { v: 1 } } });
-      expect(typeof (wrapper.vm as unknown as { validate: unknown }).validate)
-        .toBe("function");
-      expect(
-        typeof (wrapper.vm as unknown as { resetValidation: unknown })
-          .resetValidation,
-      ).toBe("function");
-      expect(typeof (wrapper.vm as unknown as { submit: unknown }).submit)
-        .toBe("function");
-      expect(typeof (wrapper.vm as unknown as { reset: unknown }).reset)
-        .toBe("function");
+      expect(typeof (wrapper.vm as unknown as { validate: unknown }).validate).toBe("function");
+      expect(typeof (wrapper.vm as unknown as { resetValidation: unknown }).resetValidation).toBe(
+        "function",
+      );
+      expect(typeof (wrapper.vm as unknown as { submit: unknown }).submit).toBe("function");
+      expect(typeof (wrapper.vm as unknown as { reset: unknown }).reset).toBe("function");
     });
 
     // Schema-only: the form schema (not per-field validators) gates submit.

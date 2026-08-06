@@ -16,33 +16,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div data-test="dashboard-header-root">
-    <div
-      data-test="dashboard-header-row"
-      class="tw:flex tw:items-center tw:flex-nowrap tw:my-2 tw:mx-2"
-    >
-      <div
-        v-if="backButton"
-        data-test="dashboard-header-back-button-container"
-        class="col-auto"
-      >
+    <div data-test="dashboard-header-row" class="mx-2 my-2 flex flex-nowrap items-center">
+      <div v-if="backButton" data-test="dashboard-header-back-button-container" class="col-auto">
         <OButton
           data-test="dashboard-header-back-button"
           variant="outline"
           size="icon-xs"
-          class="tw:mr-2"
+          class="mr-2"
           @click="onBackClicked"
           icon-left="arrow-back-ios-new"
         >
         </OButton>
       </div>
-      <div
-        data-test="dashboard-header-title-container"
-        class="tw:flex tw:flex-col tw:flex-1"
-      >
-        <div
-          data-test="dashboard-header-title"
-          class="tw:text-base tw:font-semibold"
-        >
+      <div data-test="dashboard-header-title-container" class="flex flex-1 flex-col">
+        <div data-test="dashboard-header-title" class="text-base font-semibold">
           {{ title }}
         </div>
       </div>
@@ -50,12 +37,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <slot name="right"></slot>
       </div>
     </div>
-    <OSeparator data-test="dashboard-header-separator"/>
+    <OSeparator data-test="dashboard-header-separator" />
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { raw, type I18nText } from "@/types/i18n";
+import { defineComponent, type PropType } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
@@ -64,8 +52,8 @@ export default defineComponent({
   components: { OSeparator, OButton },
   props: {
     title: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     backButton: {
       type: Boolean,
@@ -79,9 +67,9 @@ export default defineComponent({
     };
 
     return {
+      raw,
       onBackClicked,
     };
   },
 });
 </script>
-

@@ -443,6 +443,19 @@ pub async fn delete_all<C: ConnectionTrait>(conn: &C) -> Result<(), Error> {
     Ok(())
 }
 
+/// Deletes all reports belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    let _lock = super::get_lock().await;
+    let client = crate::db::ORM_CLIENT
+        .get_or_init(crate::db::connect_to_orm)
+        .await;
+    reports::Entity::delete_many()
+        .filter(reports::Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
 /// Lists the reports the satisfy the given parameters.
 pub async fn list_reports<C: ConnectionTrait>(
     conn: &C,

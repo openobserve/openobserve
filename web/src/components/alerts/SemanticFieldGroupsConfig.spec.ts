@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
 
 // Minimal stub for the in-house ODrawer. Mirrors the public surface
@@ -87,17 +86,23 @@ describe("SemanticFieldGroupsConfig - rendering", () => {
 
   it("renders the export button", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="correlation-semanticfieldgroup-export-json-btn"]').exists()).toBe(true);
+    expect(w.find('[data-test="correlation-semanticfieldgroup-export-json-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders the import button", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="correlation-semanticfieldgroup-import-json-btn"]').exists()).toBe(true);
+    expect(w.find('[data-test="correlation-semanticfieldgroup-import-json-btn"]').exists()).toBe(
+      true,
+    );
   });
 
   it("renders the add custom group button", async () => {
     const w = await mountComp();
-    expect(w.find('[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]').exists()).toBe(true);
+    expect(
+      w.find('[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]').exists(),
+    ).toBe(true);
   });
 
   it("renders the category select", async () => {

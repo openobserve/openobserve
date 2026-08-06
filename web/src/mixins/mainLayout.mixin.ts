@@ -1,7 +1,7 @@
-import { onActivated, onMounted, ref, Ref, h } from "vue";
+import { onActivated, onMounted, ref, Ref } from "vue";
 import { useStore } from "vuex";
 import organizationService from "@/services/organizations";
-import { getImageURL, useLocalOrganization } from "@/utils/zincutils";
+import { useLocalOrganization } from "@/utils/zincutils";
 
 const MainLayoutOpenSourceMixin = {
   setup() {
@@ -29,42 +29,35 @@ const MainLayoutOpenSourceMixin = {
      * Get default organization
      */
     const getDefaultOrganization = async () => {
-      await organizationService
-        .os_list(0, 100000, "id", false, "", "default")
-        .then((res: any) => {
-          store.dispatch("setOrganizations", res.data.data);
-          const localOrg: any = useLocalOrganization();
-          orgOptions.value = res.data.data.map(
-            (data: {
-              id: any;
-              name: any;
-              type: any;
-              identifier: any;
-              UserObj: any;
-            }) => {
-              const optiondata: any = {
-                label: data.name,
-                id: data.id,
-                identifier: data.identifier,
-                user_email: store.state.userInfo.email,
-              };
+      await organizationService.os_list(0, 100000, "id", false, "", "default").then((res: any) => {
+        store.dispatch("setOrganizations", res.data.data);
+        const localOrg: any = useLocalOrganization();
+        orgOptions.value = res.data.data.map(
+          (data: { id: any; name: any; type: any; identifier: any; UserObj: any }) => {
+            const optiondata: any = {
+              label: data.name,
+              id: data.id,
+              identifier: data.identifier,
+              user_email: store.state.userInfo.email,
+            };
 
-              if (
-                (Object.keys(selectedOrg.value).length == 0 &&
-                  (data.type == "default" || data.id == "1") &&
-                  store.state.userInfo.email == data.UserObj.email) ||
-                res.data.data.length == 1
-              ) {
-                selectedOrg.value = localOrg.value && Object.keys(localOrg.value).length > 0
+            if (
+              (Object.keys(selectedOrg.value).length == 0 &&
+                (data.type == "default" || data.id == "1") &&
+                store.state.userInfo.email == data.UserObj.email) ||
+              res.data.data.length == 1
+            ) {
+              selectedOrg.value =
+                localOrg.value && Object.keys(localOrg.value).length > 0
                   ? localOrg.value
                   : optiondata;
-                useLocalOrganization(selectedOrg.value);
-                store.dispatch("setSelectedOrganization", selectedOrg.value);
-              }
-              return optiondata;
-            },
-          );
-        });
+              useLocalOrganization(selectedOrg.value);
+              store.dispatch("setSelectedOrganization", selectedOrg.value);
+            }
+            return optiondata;
+          },
+        );
+      });
     };
 
     onActivated(() => {

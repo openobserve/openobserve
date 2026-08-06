@@ -1,14 +1,21 @@
 // Copyright 2026 OpenObserve Inc.
 
 import { computed, ref, watch } from "vue";
-import type { Row } from "@tanstack/vue-table";
 import type { OTableExpansionMode } from "../OTable.types";
 
 export function useTableExpansion<TData>(
   props: {
     expansion: OTableExpansionMode;
-    expandedIds?: string[];
-    rowKey?: string;
+    /** Getter for expanded row IDs.
+     *
+     *  Must be a **getter**, not a plain array. When OTable's setup()
+     *  reads `props.expandedIds` and passes the value into this plain
+     *  object, Vue unwraps the reactive prop → the composable receives
+     *  a frozen snapshot that never changes. A getter (OTable passes
+     *  `() => props.expandedIds`) closes over OTable's reactive props
+     *  so the watcher below can track the dependency reactively. */
+    expandedIds?: () => string[] | undefined;
+    rowKey?: string | ((row: TData) => string);
     getSubRows?: (row: TData) => TData[];
   },
   emit: any,
@@ -20,19 +27,23 @@ export function useTableExpansion<TData>(
 
   const keyField = computed(() => props.rowKey ?? "id");
 
-  const localExpandedIds = ref<Set<string>>(
-    new Set(props.expandedIds ?? []),
-  );
+  /** Resolve the expanded IDs, falling back to empty array. */
+  const resolveExpandedIds = () => props.expandedIds?.() ?? [];
+
+  const localExpandedIds = ref<Set<string>>(new Set(resolveExpandedIds()));
 
   watch(
-    () => props.expandedIds,
+    () => resolveExpandedIds(),
     (ids) => {
-      localExpandedIds.value = new Set(ids ?? []);
+      localExpandedIds.value = new Set(ids);
     },
+    { flush: "sync" },
   );
 
   function getRowId(row: TData): string {
-    return (row as any)[keyField.value]?.toString() ?? "";
+    const key = keyField.value;
+    if (typeof key === "function") return key(row);
+    return (row as any)[key]?.toString() ?? "";
   }
 
   function isExpanded(row: TData): boolean {

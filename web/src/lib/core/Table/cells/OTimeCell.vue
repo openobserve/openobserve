@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
-// OTimeCell — the ONE timestamp renderer for every table (audit §2.1).
+// OTimeCell — the ONE timestamp renderer for every table.
 // Default display is relative ("2m ago"); set mode="absolute" to show the full
 // timezone-aware datetime instead. Relative cells get a hover tooltip (OTooltip,
 // not the native browser title) revealing the full absolute datetime; absolute/
@@ -32,7 +33,7 @@ const props = withDefaults(
     /** IANA timezone for the absolute rendering. Defaults to the browser zone. */
     timezone?: string;
     /** Text shown when the value is empty/zero/invalid. Default "—". */
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
     /**
      * In "relative" mode, only show "x ago" for timestamps within this many
      * days; older ones fall back to an absolute date (e.g. "Jun 24, 2024").
@@ -41,7 +42,7 @@ const props = withDefaults(
      */
     relativeCutoffDays?: number;
   }>(),
-  { unit: "auto", mode: "relative", emptyLabel: "—", relativeCutoffDays: 30 },
+  { unit: "auto", mode: "relative", emptyLabel: raw("—"), relativeCutoffDays: 30 },
 );
 
 /** Normalise any supported input to epoch milliseconds, or null if invalid. */
@@ -93,10 +94,7 @@ function numberToMs(n: number, unit: TimeUnit): number {
 }
 
 const zone = computed(
-  () =>
-    props.timezone ||
-    Intl.DateTimeFormat().resolvedOptions().timeZone ||
-    "UTC",
+  () => props.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
 );
 
 /** Pretty absolute date used as the relative-mode fallback for old timestamps. */
@@ -127,11 +125,7 @@ const relative = computed(() => {
 const absolute = computed(() => {
   if (epochMs.value === null) return null;
   try {
-    return formatInTimeZone(
-      new Date(epochMs.value),
-      zone.value,
-      "yyyy-MM-dd HH:mm:ss",
-    );
+    return formatInTimeZone(new Date(epochMs.value), zone.value, "yyyy-MM-dd HH:mm:ss");
   } catch {
     return new Date(epochMs.value).toISOString();
   }
@@ -153,24 +147,22 @@ const display = computed(() => {
 });
 
 /**
- * Hover tooltip — shown for RELATIVE mode only, revealing the full absolute
- * datetime. Absolute/date cells already show the full datetime, so they get no
- * tooltip. Suppressed when it would duplicate the cell text.
+ * Whether to OFFER the hover tooltip — RELATIVE mode only, revealing the full
+ * absolute datetime (absolute/date cells already show it, so they get none).
+ * This decision is deliberately cheap: it does NOT format the absolute string.
+ * The string is built lazily in the #content slot below, which the (lazy)
+ * OTooltip only renders on hover — so a cell that is merely scrolled past in a
+ * long/virtualized table never runs the timezone formatter.
  */
-const tooltip = computed(() => {
-  if (props.mode !== "relative") return null;
-  const text = absolute.value;
-  return text && text !== display.value ? text : null;
-});
+const showAbsoluteTooltip = computed(() => props.mode === "relative" && epochMs.value !== null);
 </script>
 
 <template>
-  <span
-    v-if="display === null"
-    class="tw:text-text-primary tw:text-xs"
-  >{{ emptyLabel }}</span>
+  <span v-if="display === null" class="text-text-body text-xs">{{ emptyLabel }}</span>
   <template v-else>
-    <span class="tw:tabular-nums tw:whitespace-nowrap">{{ display }}</span>
-    <OTooltip v-if="tooltip" :content="tooltip" />
+    <span class="whitespace-nowrap tabular-nums">{{ display }}</span>
+    <OTooltip v-if="showAbsoluteTooltip">
+      <template #content>{{ absolute }}</template>
+    </OTooltip>
   </template>
 </template>

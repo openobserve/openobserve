@@ -1,5 +1,5 @@
 import { mount, flushPromises } from "@vue/test-utils";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, vi } from "vitest";
 import GroupRoles from "@/components/iam/groups/GroupRoles.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -35,7 +35,7 @@ describe("debug", () => {
 
     const table = wrapper.find('[data-test="iam-roles-selection-table"]');
     const html = table.html();
-    
+
     const lines: string[] = [];
     lines.push("TABLE HTML length: " + html.length);
     lines.push("=== FIRST 3000 CHARS ===");
@@ -51,17 +51,17 @@ describe("debug", () => {
     });
 
     lines.push("=== ALL DATA-TEST IN TABLE ===");
-    const allDataTests = table.findAll('[data-test]');
+    const allDataTests = table.findAll("[data-test]");
     allDataTests.forEach((el, i) => {
       lines.push(`  ${i}: ${el.attributes("data-test")}`);
     });
 
     const o2Root = wrapper.find('[data-test="o2-table-root"]');
     lines.push("OTable root exists: " + o2Root.exists());
-    
+
     fs.writeFileSync("/tmp/debug_output.txt", lines.join("\n"));
     wrapper.unmount();
-    
+
     // Read back to verify
     const written = fs.readFileSync("/tmp/debug_output.txt", "utf8");
     console.error("DEBUG_OUTPUT_LENGTH:", written.length);

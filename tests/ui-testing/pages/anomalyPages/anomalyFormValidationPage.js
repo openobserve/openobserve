@@ -23,10 +23,16 @@ class AnomalyFormValidationPage {
         this.streamTypeSelect  = '[data-test="add-alert-stream-type-select-dropdown"]';
         // OSelect: stream name dropdown
         this.streamNameSelect  = '[data-test="add-alert-stream-name-select-dropdown"]';
-        // Next / Save / Cancel buttons shared across the wizard
-        this.nextBtn    = '[data-test="add-alert-next-btn"]';
+        // Save / Cancel buttons shared across the wizard. There is no Next button:
+        // the V3 layout is a single pane navigated by tabs, not a stepper.
         this.saveBtn    = '[data-test="add-alert-submit-btn"]';
         this.cancelBtn  = '[data-test="add-alert-cancel-btn"]';
+
+        // ── Validation feedback ────────────────────────────────────────────
+        // OInput derives its error node's data-test from the consumer's own
+        // data-test, so the topbar OFormInput yields <name>-error.
+        this.anomalyNameError = '[data-test="add-anomaly-name-input-error"]';
+        this.toastMessage     = '[data-test="o-toast-message"]';
 
         // ── Step 2 — AnomalyDetectionConfig fields ─────────────────────────
         this.queryTabsToggle     = '[data-test="anomaly-query-tabs"]';
@@ -72,11 +78,6 @@ class AnomalyFormValidationPage {
         testLogger.info('Add Anomaly wizard opened');
     }
 
-    async clickNext() {
-        testLogger.info('Clicking Next in anomaly wizard');
-        await this.page.locator(this.nextBtn).click();
-    }
-
     async clickSave() {
         testLogger.info('Clicking Save in anomaly wizard');
         await this.page.locator(this.saveBtn).click();
@@ -91,8 +92,22 @@ class AnomalyFormValidationPage {
 
     getStreamTypeSelectLocator()     { return this.page.locator(this.streamTypeSelect); }
     getStreamNameSelectLocator()     { return this.page.locator(this.streamNameSelect); }
-    getNextBtnLocator()              { return this.page.locator(this.nextBtn); }
     getSaveBtnLocator()              { return this.page.locator(this.saveBtn); }
+    getAnomalyNameErrorLocator()     { return this.page.locator(this.anomalyNameError); }
+
+    /**
+     * Toast message node, narrowed to the one we care about.
+     *
+     * Toasts STACK (OToastProvider v-for's over every open record) and error
+     * toasts live 30s, so an unrelated earlier error is very likely still on
+     * screen. Matching the bare selector would resolve to several nodes and trip
+     * Playwright strict mode, so always filter by the expected text.
+     *
+     * @param {string|RegExp} hasText text the target toast must contain
+     */
+    getToastMessageLocator(hasText) {
+        return this.page.locator(this.toastMessage).filter({ hasText });
+    }
     getCancelBtnLocator()            { return this.page.locator(this.cancelBtn); }
     getDetectionWindowErrorLocator() { return this.page.locator(this.detectionWindowError); }
     getCustomSqlTimestampErrorLocator() { return this.page.locator(this.customSqlTimestampError); }

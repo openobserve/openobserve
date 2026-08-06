@@ -530,6 +530,26 @@ fn inner_data_as_json(dashboard: Dashboard) -> Result<JsonValue, errors::Error> 
     Ok(data)
 }
 
+/// Deletes all dashboards belonging to the given org (via folder join).
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    // Collect folder PKs for this org
+    let folder_ids: Vec<String> = folders::Entity::find()
+        .filter(folders::Column::Org.eq(org_id))
+        .all(client)
+        .await?
+        .into_iter()
+        .map(|f| f.id)
+        .collect();
+    if !folder_ids.is_empty() {
+        dashboards::Entity::delete_many()
+            .filter(dashboards::Column::FolderId.is_in(folder_ids))
+            .exec(client)
+            .await?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{DatabaseBackend, MockDatabase, Transaction, entity::prelude::*};

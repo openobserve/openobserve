@@ -9,14 +9,17 @@ export class ServiceGraphPage {
     this.page = page;
 
     // ===== NAVIGATION =====
-    this.serviceGraphToggle = '[data-test="traces-service-graph-toggle"]';
+    // Service Graph is its own route (/traces/service-graph), reached from the
+    // Traces rail tile's hover flyout — it is no longer a tab on the Traces page.
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-serviceGraph"]';
 
     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
 
-    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — q-btn with .selected class) =====
+    // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 
@@ -69,16 +72,20 @@ export class ServiceGraphPage {
   // ===== NAVIGATION =====
 
   async navigateToServiceGraph() {
-    await this.page.locator(this.serviceGraphToggle).click();
-    await this.page.waitForURL(/tab=service-graph/, { timeout: 10000 });
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.serviceGraphFlyoutItem).click();
+    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 });
   }
 
   /**
    * Navigate directly to service graph via URL (more reliable than click-based navigation).
    * Sets the stream filter in localStorage before navigating to ensure the correct stream is shown.
    * @param {string} streamName - Stream to filter by (default: 'default')
+   * @param {string} [period='6h'] - Relative time window passed via the `period` URL param.
+   *   Defaults to a WIDE 6h window (not the page default "Past 15 Minutes") so the
+   *   daemon-processed topology reliably falls inside the query window and the chart renders.
    */
-  async navigateToServiceGraphUrl(streamName = 'default') {
+  async navigateToServiceGraphUrl(streamName = 'default', period = '6h') {
     // Set stream filter in localStorage before navigation — the Vue component reads from here
     await this.page.evaluate((stream) => {
       localStorage.setItem('serviceGraph_streamFilter', stream);
@@ -86,9 +93,40 @@ export class ServiceGraphPage {
 
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    const url = `${baseUrl}/web/traces?tab=service-graph&org_identifier=${org}`;
+    // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
+    // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
+    // the 15m default the just-ingested topology often falls outside the window and the chart
+    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The route
+    // honours the `period` URL param (verified: label shows "Past 6 Hours").
+    const url = `${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=${period}`;
     await this.page.goto(url);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+  }
+
+  /**
+   * Navigate to the service graph and wait until the chart actually renders, tolerating
+   * service-graph-daemon lag: if the page shows the empty "No service graph data" state,
+   * refresh and retry within the budget. Returns once the chart is visible; if it never
+   * renders the caller's own assertion still fails (non-masking).
+   * @param {string} streamName
+   * @param {object} [opts] { period, timeout }
+   */
+  async navigateToServiceGraphAndWaitForChart(streamName = 'default', opts = {}) {
+    const period = opts.period || '6h';
+    const timeout = opts.timeout || 90000;
+    await this.navigateToServiceGraphUrl(streamName, period);
+
+    const chart = this.page.locator(this.chartContainer);
+    const deadline = Date.now() + timeout;
+    // Date.now() is allowed here (test/page-object runtime, not a workflow script).
+    while (Date.now() < deadline) {
+      if (await chart.isVisible().catch(() => false)) return true;
+      // Empty-state → nudge the daemon result by refreshing, then wait a cycle.
+      await this.page.locator(this.refreshButton).click({ timeout: 5000 }).catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await chart.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    }
+    return await chart.isVisible().catch(() => false);
   }
 
   async expectServiceGraphPageVisible() {

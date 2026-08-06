@@ -17,267 +17,309 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="enrichment-tables-list-page"
-    class="tw:flex tw:flex-col tw:h-full tw:min-h-0"
-  >
-    <div v-if="!showAddJSTransformDialog" class="tw:flex tw:flex-col tw:h-full tw:min-h-0">
-      <!-- Standard section header: title + actions only. Type filter + search
-           moved into the table's own toolbar below. -->
-      <AppPageHeader
-        :title="t('function.enrichmentTables')"
-        icon="dataset"
-        :subtitle="t('function.enrichmentTablesSubtitle')"
-        tabs-below
-        class="tw:shrink-0 tw:px-4"
-      >
-        <template #tabs>
-          <PipelineSectionTabs />
-        </template>
-        <template #actions>
-          <OButton
-            data-test="enrichment-tables-add-btn"
-            variant="primary"
-            size="sm"
-            @click="showAddUpdateFn(null)"
+  <div data-test="enrichment-tables-list-page" class="flex h-full min-h-0 flex-col">
+    <OPageLayout
+      v-if="!showAddJSTransformDialog"
+      :title="t('function.enrichmentTables')"
+      icon="dataset"
+      :subtitle="t('function.enrichmentTablesSubtitle')"
+      tabs-below
+      bleed
+    >
+      <template #header-tabs>
+        <PipelineSectionTabs />
+      </template>
+      <template #actions>
+        <OButton
+          data-test="enrichment-tables-add-btn"
+          variant="primary"
+          size="sm"
+          @click="showAddUpdateFn(null)"
+        >
+          {{ t(`function.addEnrichmentTable`) }}
+        </OButton>
+      </template>
+      <div class="min-h-0 w-full flex-1 overflow-hidden">
+        <div class="bg-card-glass-bg h-full">
+          <OTable
+            ref="qTable"
+            :frame="false"
+            data-test="enrichment-tables-list-table"
+            :data="visibleRows"
+            :columns="columns"
+            row-key="name"
+            :loading="loading"
+            pagination="client"
+            :page-size="selectedPerPage"
+            :page-size-options="perPageOptionsList"
+            sorting="client"
+            filter-mode="client"
+            show-index
+            :show-global-filter="false"
+            :default-columns="false"
+            :enable-column-resize="true"
+            :persist-columns="true"
+            table-id="pipelines-enrichment-tables"
+            selection="multiple"
+            :selected-ids="selectedEnrichmentTableIds"
+            @update:selected-ids="handleSelectedIdsUpdate"
+            width="100%"
+            class="h-full w-full"
           >
-            {{ t(`function.addEnrichmentTable`) }}
-          </OButton>
-        </template>
-      </AppPageHeader>
-      <div class="tw:w-full tw:flex-1 tw:min-h-0 tw:overflow-hidden">
-        <div class="card-container tw:h-full">
-            <OTable
-              ref="qTable"
-              :frame="false"
-              data-test="enrichment-tables-list-table"
-              :data="visibleRows"
-              :columns="columns"
-              row-key="name"
-              :loading="loading"
-              pagination="client"
-              :page-size="selectedPerPage"
-              :page-size-options="perPageOptionsList"
-              sorting="client"
-              filter-mode="client"
-              :show-global-filter="false"
-              :default-columns="false"
-              :enable-column-resize="true"
-              :persist-columns="true"
-              table-id="pipelines-enrichment-tables"
-              selection="multiple"
-              :selected-ids="selectedEnrichmentTableIds"
-              @update:selected-ids="handleSelectedIdsUpdate"
-              width="100%"
-              class="tw:w-full tw:h-full"
-            >
-              <!-- Toolbar: type filter + search -->
-              <template #toolbar>
-                <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                  <OToggleGroup
-                    :model-value="selectedFilter"
-                    @update:model-value="(v) => { selectedFilter = v as string; updateActiveTab(); }"
-                    data-test="enrichment-tables-list-tabs"
-                  >
-                    <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                      <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                      {{ t("function.filterAll") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
-                      <template #icon-left><OIcon name="upload" size="sm" /></template>
-                      {{ t("function.filterFile") }}
-                    </OToggleGroupItem>
-                    <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
-                      <template #icon-left><OIcon name="link" size="sm" /></template>
-                      {{ t("function.filterUrl") }}
-                    </OToggleGroupItem>
-                  </OToggleGroup>
-                  <OSearchInput
-                    data-test="enrichment-tables-search-input"
-                    v-model="filterQuery"
-                    class="tw:ml-auto tw:w-64"
-                    :placeholder="t('function.searchEnrichmentTable')"
-                  />
-                </div>
-              </template>
-              <template #empty>
-                <OEmptyState
-                  size="hero"
-                  preset="no-enrichment-tables"
-                  :filtered="!!filterQuery"
-                  @action="
-                    (id) =>
-                      id === 'clear-filters'
-                        ? (filterQuery = '')
-                        : showAddUpdateFn(null)
+            <!-- Toolbar: type filter + search -->
+            <template #toolbar>
+              <div class="flex w-full items-center gap-2">
+                <OToggleGroup
+                  :model-value="selectedFilter"
+                  @update:model-value="
+                    (v) => {
+                      selectedFilter = v as string;
+                      updateActiveTab();
+                    }
                   "
-                />
-              </template>
-              <template #cell-type="{ row }">
-                <div
-                  :data-test="`${row.name}-type-cell`"
-                  class="tw:flex tw:items-center tw:gap-2"
+                  data-test="enrichment-tables-list-tabs"
                 >
-                  <OTag v-if="!row.urlJobs || row.urlJobs.length === 0" type="enrichmentType" value="file" :data-test="`${row.name}-type-file`" />
-                  <template v-else>
-                    <span
-                      :data-test="`${row.name}-type-url-trigger`"
-                      class="tw:cursor-pointer tw:inline-flex tw:items-center tw:gap-1"
+                  <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                    <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                    {{ t("function.filterAll") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="uploaded" size="sm" data-test="tab-uploaded">
+                    <template #icon-left><OIcon name="upload" size="sm" /></template>
+                    {{ t("function.filterFile") }}
+                  </OToggleGroupItem>
+                  <OToggleGroupItem value="file_url" size="sm" data-test="tab-file-url">
+                    <template #icon-left><OIcon name="link" size="sm" /></template>
+                    {{ t("function.filterUrl") }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
+                <OSearchInput
+                  data-test="enrichment-tables-search-input"
+                  v-model="filterQuery"
+                  class="ml-auto w-64"
+                  :placeholder="t('function.searchEnrichmentTable')"
+                />
+              </div>
+            </template>
+            <template #toolbar-trailing>
+              <OButton
+                variant="outline"
+                size="icon-sm"
+                icon-left="refresh"
+                :loading="loading"
+                data-test="enrichment-tables-list-refresh-btn"
+                @click="refreshList"
+              >
+                <OTooltip
+                  side="bottom"
+                  :content="t('common.refresh')"
+                  shortcut-id="enrichmentTablesRefresh"
+                />
+              </OButton>
+            </template>
+            <template #empty>
+              <OEmptyState
+                size="hero"
+                preset="no-enrichment-tables"
+                :filtered="!!filterQuery"
+                @action="
+                  (id) => (id === 'clear-filters' ? (filterQuery = '') : showAddUpdateFn(null))
+                "
+              />
+            </template>
+            <template #cell-type="{ row }">
+              <div :data-test="`${row.name}-type-cell`" class="flex items-center gap-2">
+                <OTag
+                  v-if="!row.urlJobs || row.urlJobs.length === 0"
+                  type="enrichmentType"
+                  value="file"
+                  :data-test="`${row.name}-type-file`"
+                />
+                <template v-else>
+                  <span
+                    :data-test="`${row.name}-type-url-trigger`"
+                    class="inline-flex cursor-pointer items-center gap-1"
+                    @click="showUrlJobsDialog(row)"
+                  >
+                    <OTag type="enrichmentType" value="url" />
+                    <span v-if="row.urlJobs.length > 1" class="text-text-body">
+                      ({{ row.urlJobs.length }})</span
+                    >
+                  </span>
+                  <span v-if="row.aggregateStatus === 'completed'">
+                    <OIcon name="check-circle" size="sm" class="text-status-positive">
+                      <OTooltip>
+                        <template #content>
+                          <div style="max-width: 300px">
+                            <strong>{{ t("function.statusAllCompleted") }}</strong
+                            ><br />
+                            {{ t("function.urlJobsCompleted", { count: row.urlJobs.length })
+                            }}<br />
+                            <br />
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlToSeeDetails")
+                            }}</em>
+                          </div>
+                        </template>
+                      </OTooltip>
+                    </OIcon>
+                  </span>
+                  <span v-else-if="row.aggregateStatus === 'processing'">
+                    <OIcon name="sync" size="sm" class="animate-spin">
+                      <OTooltip>
+                        <template #content>
+                          <div style="max-width: 300px">
+                            <strong>{{ t("function.statusProcessing") }}</strong
+                            ><br />
+                            {{ t("function.jobsCurrentlyProcessing") }}<br />
+                            <br />
+                            <em style="font-size: 0.85em"
+                              >{{ t("function.progressNotRealTimeNote") }}<br />{{
+                                t("function.clickUrlForDetails")
+                              }}</em
+                            >
+                          </div>
+                        </template>
+                      </OTooltip>
+                    </OIcon>
+                  </span>
+                  <span v-else-if="row.aggregateStatus === 'failed'">
+                    <OIcon
+                      name="warning"
+                      size="sm"
+                      class="cursor-pointer"
                       @click="showUrlJobsDialog(row)"
                     >
-                      <OTag type="enrichmentType" value="url" />
-                      <span v-if="row.urlJobs.length > 1" class="tw:text-text-primary"> ({{ row.urlJobs.length }})</span>
-                    </span>
-                    <span v-if="row.aggregateStatus === 'completed'">
-                      <OIcon name="check-circle" size="sm" class="tw:text-(--o2-positive)">
-                        <OTooltip>
-                          <template #content>
-                            <div style="max-width: 300px;">
-                              <strong>Status: All Completed</strong><br/>
-                              {{ row.urlJobs.length }} URL job(s) completed<br/>
-                              <br/>
-                              <em style="font-size: 0.85em;">Click "Url" to see details</em>
-                            </div>
-                          </template>
-                        </OTooltip>
-                      </OIcon>
-                    </span>
-                    <span v-else-if="row.aggregateStatus === 'processing'">
-                      <OIcon name="sync" size="sm" class="tw:[animation:rotate_1s_linear_infinite]">
-                        <OTooltip>
-                          <template #content>
-                            <div style="max-width: 300px;">
-                              <strong>Status: Processing</strong><br/>
-                              One or more jobs are currently processing<br/>
-                              <br/>
-                              <em style="font-size: 0.85em;">Note: Progress is not real-time. Refresh to see latest updates.<br/>Click "Url" for details</em>
-                            </div>
-                          </template>
-                        </OTooltip>
-                      </OIcon>
-                    </span>
-                    <span v-else-if="row.aggregateStatus === 'failed'">
-                      <OIcon
-                        name="warning"
-                        size="sm"
-                        class="tw:cursor-pointer"
-                        @click="showUrlJobsDialog(row)"
-                      >
-                        <OTooltip>
-                          <template #content>
-                            <div style="max-width: 350px;">
-                              <strong>Status: Failed</strong><br/>
-                              One or more jobs have failed<br/>
-                              <br/>
-                              Click to see details and retry failed jobs
-                            </div>
-                          </template>
-                        </OTooltip>
-                      </OIcon>
-                    </span>
-                    <span v-else-if="row.aggregateStatus === 'pending'">
-                      <OIcon name="schedule" size="sm">
-                        <OTooltip>
-                          <template #content>
-                            <div style="max-width: 300px;">
-                              <strong>Status: Pending</strong><br/>
-                              Job(s) waiting to be processed<br/>
-                              <br/>
-                              <em style="font-size: 0.85em;">Click "Url" for details</em>
-                            </div>
-                          </template>
-                        </OTooltip>
-                      </OIcon>
-                    </span>
+                      <OTooltip>
+                        <template #content>
+                          <div style="max-width: 350px">
+                            <strong>{{ t("function.statusFailed") }}</strong
+                            ><br />
+                            {{ t("function.jobsFailedNote") }}<br />
+                            <br />
+                            {{ t("function.clickToRetryFailedJobs") }}
+                          </div>
+                        </template>
+                      </OTooltip>
+                    </OIcon>
+                  </span>
+                  <span v-else-if="row.aggregateStatus === 'pending'">
+                    <OIcon name="schedule" size="sm">
+                      <OTooltip>
+                        <template #content>
+                          <div style="max-width: 300px">
+                            <strong>{{ t("function.statusPending") }}</strong
+                            ><br />
+                            {{ t("function.jobsWaitingToBeProcessed") }}<br />
+                            <br />
+                            <em style="font-size: 0.85em">{{
+                              t("function.clickUrlForDetails")
+                            }}</em>
+                          </div>
+                        </template>
+                      </OTooltip>
+                    </OIcon>
+                  </span>
+                </template>
+              </div>
+            </template>
+            <template #cell-actions="{ row }">
+              <div class="flex items-center justify-center">
+                <OButton
+                  v-if="
+                    !row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'
+                  "
+                  :data-test="`${row.name}-explore-btn`"
+                  :title="t('logStream.explore')"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="exploreEnrichmentTable(row)"
+                  icon-left="search"
+                  data-row-action="view"
+                />
+
+                <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
+                <OButton
+                  v-if="
+                    !row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'
+                  "
+                  :data-test="`${row.name}-schema-btn`"
+                  :title="t('logStream.schemaHeader')"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="listSchema(row)"
+                  icon-left="format-list-bulleted"
+                  data-row-action="view"
+                />
+
+                <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
+                <OButton
+                  v-if="
+                    !row.urlJobs ||
+                    row.urlJobs.length === 0 ||
+                    row.aggregateStatus === 'completed' ||
+                    row.aggregateStatus === 'failed'
+                  "
+                  :data-test="`${row.name}-edit-btn`"
+                  :title="t('function.enrichmentTables')"
+                  variant="ghost"
+                  size="icon-sm"
+                  @click="showAddUpdateFn(row)"
+                  icon-left="edit"
+                  data-row-action="edit"
+                />
+
+                <!-- Delete button - always visible -->
+                <OButton
+                  :data-test="`${row.name}-delete-btn`"
+                  :title="t('function.delete')"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  @click="showDeleteDialogFn(row)"
+                  icon-left="delete"
+                  data-row-action="delete"
+                />
+              </div>
+            </template>
+
+            <template #cell-doc_num="{ row }">
+              <ONumberCell :value="row.doc_num" format="number" />
+            </template>
+
+            <template #cell-function="{ row }">
+              <div>
+                <OTooltip>
+                  <template #content>
+                    <pre>{{ row.function }}</pre>
                   </template>
+                </OTooltip>
+                <pre style="white-space: break-spaces">{{ row.function }}</pre>
+              </div>
+            </template>
+
+            <template #bottom>
+              <div class="flex w-full items-center justify-between py-2">
+                <div class="mr-4 flex items-center text-xs font-normal">
+                  {{ resultTotal }} {{ t("function.enrichmentTables") }}
                 </div>
-              </template>
-              <template #cell-actions="{ row }">
-                <div class="tw:flex tw:items-center tw:justify-center">
-                  <OButton
-                    v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
-                    :data-test="`${row.name}-explore-btn`"
-                    :title="t('logStream.explore')"
-                    variant="ghost"
-                    size="icon-sm"
-                    @click="exploreEnrichmentTable(row)"
-                    icon-left="search"
-                    data-row-action="view"
-                  />
-
-                  <!-- Schema Settings button - show for uploaded tables or completed URL jobs -->
-                  <OButton
-                    v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed'"
-                    :data-test="`${row.name}-schema-btn`"
-                    :title="t('logStream.schemaHeader')"
-                    variant="ghost"
-                    size="icon-sm"
-                    @click="listSchema(row)"
-                    icon-left="format-list-bulleted"
-                    data-row-action="view"
-                  />
-
-                  <!-- Edit button - show for uploaded tables, completed URL jobs, or failed URL jobs (to add more URLs) -->
-                  <OButton
-                    v-if="!row.urlJobs || row.urlJobs.length === 0 || row.aggregateStatus === 'completed' || row.aggregateStatus === 'failed'"
-                    :data-test="`${row.name}-edit-btn`"
-                    :title="t('function.enrichmentTables')"
-                    variant="ghost"
-                    size="icon-sm"
-                    @click="showAddUpdateFn(row)"
-                    icon-left="edit"
-                    data-row-action="edit"
-                  />
-
-                  <!-- Delete button - always visible -->
-                  <OButton
-                    :data-test="`${row.name}-delete-btn`"
-                    :title="t('function.delete')"
-                    variant="ghost-destructive"
-                    size="icon-sm"
-                    @click="showDeleteDialogFn(row)"
-                    icon-left="delete"
-                    data-row-action="delete"
-                  />
-                </div>
-              </template>
-
-              <template #cell-doc_num="{ row }">
-                <ONumberCell :value="row.doc_num" format="number" />
-              </template>
-
-              <template #cell-function="{ row }">
-                <div>
-                  <OTooltip>
-                    <template #content><pre>{{ row.function }}</pre></template>
-                  </OTooltip>
-                  <pre style="white-space: break-spaces">{{ row.function }}</pre>
-                </div>
-              </template>
-
-              <template #bottom>
-                <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:py-2">
-                  <div class="tw:flex tw:items-center tw:font-bold tw:text-[14px] tw:mr-4">
-                    {{ resultTotal }} {{ t('function.enrichmentTables') }}
-                  </div>
-                  <OButton
-                    v-if="selectedEnrichmentTables.length > 0"
-                    data-test="enrichment-tables-bulk-delete-btn"
-                    variant="outline-destructive"
-                    size="sm"
-                    icon-left="delete"
-                    @click="openBulkDeleteDialog"
-                  >
-                    Delete
-                  </OButton>
-                </div>
-              </template>
-            </OTable>
-          </div>
+                <OButton
+                  v-if="selectedEnrichmentTables.length > 0"
+                  data-test="enrichment-tables-bulk-delete-btn"
+                  variant="outline-destructive"
+                  size="sm"
+                  icon-left="delete"
+                  :loading="bulkDeleteLoading"
+                  @click="openBulkDeleteDialog"
+                >
+                  {{ t("common.delete") }}
+                </OButton>
+              </div>
+            </template>
+          </OTable>
         </div>
-    </div>
+      </div>
+    </OPageLayout>
     <div v-else>
-      <add-enrichment-table
+      <AddEnrichmentTable
         v-model="formData"
         :isUpdating="isUpdated"
         @update:list="refreshList"
@@ -285,15 +327,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </div>
     <ConfirmDialog
-      title="Delete Enrichment Table"
-      message="Are you sure you want to delete enrichment table?"
+      :title="t('function.deleteEnrichmentTableTitle')"
+      :message="t('function.deleteEnrichmentTableConfirm')"
       @update:ok="deleteLookupTable"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
     <ConfirmDialog
-      title="Bulk Delete Enrichment Tables"
-      :message="`Are you sure you want to delete ${selectedEnrichmentTables.length} enrichment table(s)?`"
+      :title="t('function.bulkDeleteEnrichmentTablesTitle')"
+      :message="
+        t('functions.confirmDeleteEnrichmentTables', { count: selectedEnrichmentTables.length })
+      "
       @update:ok="bulkDeleteEnrichmentTables"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -304,21 +348,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- URL Jobs Dialog -->
-    <ODrawer data-test="enrichment-table-list-url-jobs-drawer"
+    <ODrawer
+      data-test="enrichment-table-list-url-jobs-drawer"
+      bleed
       v-model:open="showUrlJobsDialogState"
       size="lg"
     >
-      <div class="tw:p-4">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
-          <div class="tw:text-xl tw:font-semibold">URL Jobs for {{ selectedTableForUrlJobs?.name }}</div>
+      <div class="p-4">
+        <div class="mb-4 flex items-center justify-between">
+          <div class="text-xl font-semibold">
+            {{ t("function.urlJobsFor") }} {{ selectedTableForUrlJobs?.name }}
+          </div>
         </div>
         <div v-if="selectedTableForUrlJobs?.urlJobs && selectedTableForUrlJobs.urlJobs.length > 0">
-          <ul class="tw:flex tw:flex-col tw:divide-y tw:divide-border">
-            <li v-for="(job, index) in selectedTableForUrlJobs.urlJobs" :key="job.id" :data-test="`enrichment-url-jobs-item-${index}`" class="tw:flex tw:items-center tw:gap-2 tw:p-4">
-              <div class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0">
-                <span class="tw:text-sm tw:font-bold">Job {{ index + 1 }}</span>
-                <span class="tw:block tw:text-xs tw:text-muted-foreground">{{ job.url }}</span>
-                <span class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
+          <ul class="divide-border flex flex-col divide-y">
+            <li
+              v-for="(job, index) in selectedTableForUrlJobs.urlJobs"
+              :key="job.id"
+              :data-test="`enrichment-url-jobs-item-${index}`"
+              class="flex items-center gap-2 p-4"
+            >
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="text-sm font-bold"
+                  >{{ t("function.jobLabelPrefix") }} {{ (index as number) + 1 }}</span
+                >
+                <span class="text-muted-foreground block text-xs">{{ job.url }}</span>
+                <span class="text-muted-foreground mt-2 block text-xs">
                   <OTag
                     :data-test="`enrichment-url-jobs-item-${index}-status-badge`"
                     :data-test-value="job.status"
@@ -326,31 +381,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :value="job.status"
                   />
                 </span>
-                <span v-if="job.status === 'completed'" class="tw:block tw:text-xs tw:text-muted-foreground tw:mt-2">
-                    Records: {{ job.total_records_processed?.toLocaleString() }}<br/>
-                    Size: {{ job.total_bytes_fetched ? formatSizeFromMB(((job.total_bytes_fetched / 1024 / 1024).toFixed(2))) : '0 MB' }}
-                  </span>
-                  <span v-if="job.status === 'failed'" :data-test="`enrichment-url-jobs-item-${index}-error`" class="tw:block tw:text-xs tw:text-red-500 tw:mt-2">
-                    Error: {{ job.error_message }}
-                  </span>
-                </div>
-              </li>
-            </ul>
-          </div>
-          <div v-else class="tw:text-center tw:p-3 tw:text-gray-400">
-            No URL jobs found
-          </div>
+                <span
+                  v-if="job.status === 'completed'"
+                  class="text-muted-foreground mt-2 block text-xs"
+                >
+                  {{ t("function.recordsLabel") }} {{ job.total_records_processed?.toLocaleString()
+                  }}<br />
+                  {{ t("function.sizeLabel") }}
+                  {{
+                    job.total_bytes_fetched
+                      ? formatSizeFromMB((job.total_bytes_fetched / 1024 / 1024).toFixed(2))
+                      : raw("0 MB")
+                  }}
+                </span>
+                <span
+                  v-if="job.status === 'failed'"
+                  :data-test="`enrichment-url-jobs-item-${index}-error`"
+                  class="text-status-error-text mt-2 block text-xs"
+                >
+                  {{ t("function.errorLabel") }} {{ job.error_message }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </div>
+        <div v-else class="text-text-muted p-3 text-center">
+          {{ t("function.noUrlJobsFound") }}
+        </div>
       </div>
     </ODrawer>
   </div>
 </template>
 
 <script lang="ts">
-
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import AddEnrichmentTable from "./AddEnrichmentTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -358,11 +425,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import segment from "../../services/segment_analytics";
-import {
-  formatSizeFromMB,
-  getImageURL,
-  verifyOrganizationStatus,
-} from "../../utils/zincutils";
+import { formatSizeFromMB, getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
@@ -373,20 +436,21 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ONumberCell from "@/lib/core/Table/cells/ONumberCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "EnrichmentTableList",
   components: {
-    AppPageHeader,
+    OPageLayout,
     PipelineSectionTabs,
     AddEnrichmentTable,
     OEmptyState,
@@ -398,20 +462,15 @@ export default defineComponent({
     ODrawer,
     OSearchInput,
     OTooltip,
-    OCheckbox,
     OIcon,
     OTag,
     ONumberCell,
     OTable,
-},
-  emits: [
-    "updated:fields",
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
-  ],
-  setup(props, { emit }) {
+  },
+  emits: ["updated:fields", "update:changeRecordPerPage", "update:maxRecordToReturn"],
+  setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
@@ -421,6 +480,7 @@ export default defineComponent({
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref<boolean>(false);
     const selectedEnrichmentTables = ref<any[]>([]);
     const showEnrichmentSchema = ref<boolean>(false);
     const showUrlJobsDialogState = ref<boolean>(false);
@@ -430,17 +490,72 @@ export default defineComponent({
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
-      { id: "#", header: "#", accessorKey: "#", size: TABLE_INDEX_COL_SIZE, meta: { align: "left" } },
-      { id: "name", header: t("common.name"), accessorKey: "name", sortable: true, resizable: true, hideable: true, size: COL.name, minSize: 160, meta: { align: "left", flex: true } },
-      { id: "type", header: "Type", accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0) ? "Url" : "File", sortable: true, resizable: true, hideable: true, meta: { align: "left" }, size: COL.type },
-      { id: "doc_num", header: t("logStream.docNum"), accessorKey: "doc_num", sortable: true, resizable: true, hideable: true, meta: { align: "right" }, size: COL.count },
-      { id: "storage_size", header: t("logStream.storageSize"), accessorKey: "original_storage_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) }, size: COL.sizeBytes },
-      { id: "compressed_size", header: t("logStream.compressedSize"), accessorKey: "original_compressed_size", sortable: true, resizable: true, hideable: true, meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size) }, size: COL.sizeBytes },
-      { id: "actions", header: t("function.actions"), accessorKey: "actions", sortable: false, meta: { align: "left", headerClass: "tw:!text-center tw:!justify-center", actionCount: 4 }, isAction: true },
+      {
+        id: "name",
+        header: t("common.name"),
+        accessorKey: "name",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
+      },
+      {
+        id: "type",
+        header: t("common.type"),
+        accessorFn: (row: any) => (row.urlJobs && row.urlJobs.length > 0 ? "Url" : "File"),
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        meta: { align: "left" },
+        size: COL.type,
+      },
+      {
+        id: "doc_num",
+        header: t("logStream.docNum"),
+        accessorKey: "doc_num",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        meta: { align: "right" },
+        size: COL.count,
+      },
+      {
+        id: "storage_size",
+        header: t("logStream.storageSize"),
+        accessorKey: "original_storage_size",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        meta: { align: "right", format: (_v: any, row: any) => formatSizeFromMB(row.storage_size) },
+        size: COL.sizeBytes,
+      },
+      {
+        id: "compressed_size",
+        header: t("logStream.compressedSize"),
+        accessorKey: "original_compressed_size",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        meta: {
+          align: "right",
+          format: (_v: any, row: any) => formatSizeFromMB(row.compressed_size),
+        },
+        size: COL.sizeBytes,
+      },
+      {
+        id: "actions",
+        header: t("function.actions"),
+        accessorKey: "actions",
+        sortable: false,
+        meta: { align: "center", actionCount: 4 },
+        isAction: true,
+      },
     ];
 
     const selectedEnrichmentTableIds = computed(() =>
-      selectedEnrichmentTables.value.map((t: any) => t.name)
+      selectedEnrichmentTables.value.map((t: any) => t.name),
     );
 
     const handleSelectedIdsUpdate = (ids: string[]) => {
@@ -450,7 +565,7 @@ export default defineComponent({
     };
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
-    const { getStreams, resetStreamType, getStream } = useStreams();
+    const { getStreams, resetStreamType, getStream } = useStreams(t);
 
     onBeforeMount(() => {
       getLookupTables();
@@ -459,43 +574,46 @@ export default defineComponent({
     //because if action is there user before refresh the page user was there in add / update page
     //so to maitain consistency we are checking the action and if action is there we are showing the add / update page
     //else we are showing the list of enrichment tables
-    onMounted(()=>{
+    onMounted(() => {
       //it is for showing empty add page when user refresh the page
-      if(router.currentRoute.value.query.action === "add"){
-        showAddUpdateFn(null)
+      if (router.currentRoute.value.query.action === "add") {
+        showAddUpdateFn(null);
       }
       //it is for showing the update page when user refresh the page
       //we are passing the name of the enrichment table to the update page
-      else if(router.currentRoute.value.query.action === "update" && router.currentRoute.value.query.name){
+      else if (
+        router.currentRoute.value.query.action === "update" &&
+        router.currentRoute.value.query.name
+      ) {
         showAddUpdateFn({
           name: router.currentRoute.value.query.name,
-        })
+        });
       }
       //fallback: if action=update came in without a name, treat it as an add
-      else if(router.currentRoute.value.query.action === "update"){
-        showAddUpdateFn(null)
+      else if (router.currentRoute.value.query.action === "update") {
+        showAddUpdateFn(null);
       }
-    })
+    });
 
     const getLookupTables = async (force: boolean = false) => {
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading enrichment tables...",
-              timeout: 0,
-});
+        message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
+        timeout: 0,
+      });
 
       try {
         // Fetch both streams and URL job statuses in parallel
         const [streamsRes, statusRes] = await Promise.all([
           getStreams("enrichment_tables", false, false, force),
-          jsTransformService.get_all_enrichment_table_statuses(
-            store.state.selectedOrganization.identifier
-          ).catch((err: any) => {
-            // If status API fails, continue with empty status map
-            console.warn("Error fetching URL statuses:", err);
-            return { data: {} };
-          })
+          jsTransformService
+            .get_all_enrichment_table_statuses(store.state.selectedOrganization.identifier)
+            .catch((err: any) => {
+              // If status API fails, continue with empty status map
+              console.warn("Error fetching URL statuses:", err);
+              return { data: {} };
+            }),
         ]);
 
         const res: any = streamsRes;
@@ -516,18 +634,18 @@ export default defineComponent({
           if (!urlJobs || urlJobs.length === 0) return null;
 
           // If any job is failed, aggregate status is failed
-          if (urlJobs.some((job: any) => job.status === 'failed')) return 'failed';
+          if (urlJobs.some((job: any) => job.status === "failed")) return "failed";
 
           // If any job is processing, aggregate status is processing
-          if (urlJobs.some((job: any) => job.status === 'processing')) return 'processing';
+          if (urlJobs.some((job: any) => job.status === "processing")) return "processing";
 
           // If any job is pending, aggregate status is pending
-          if (urlJobs.some((job: any) => job.status === 'pending')) return 'pending';
+          if (urlJobs.some((job: any) => job.status === "pending")) return "pending";
 
           // If all jobs are completed, aggregate status is completed
-          if (urlJobs.every((job: any) => job.status === 'completed')) return 'completed';
+          if (urlJobs.every((job: any) => job.status === "completed")) return "completed";
 
-          return 'pending';
+          return "pending";
         };
 
         // Add all streams
@@ -549,8 +667,7 @@ export default defineComponent({
           const urlJobs = urlJobMap[data.name] || [];
 
           allTables.set(data.name, {
-            "#": counter <= 9 ? `0${counter++}` : counter++,
-            id: data.name + counter,
+            id: data.name + counter++,
             name: data.name,
             doc_num: doc_num,
             storage_size: storage_size,
@@ -569,8 +686,7 @@ export default defineComponent({
           if (!allTables.has(tableName)) {
             // This is a URL job without a schema yet
             allTables.set(tableName, {
-              "#": counter <= 9 ? `0${counter++}` : counter++,
-              id: tableName + counter,
+              id: tableName + counter++,
               name: tableName,
               doc_num: "",
               storage_size: "",
@@ -594,9 +710,7 @@ export default defineComponent({
         if (err.response?.status != 403) {
           toast({
             variant: "error",
-            message:
-              err.response?.data?.message ||
-              "Error while fetching functions.",
+            message: err.response?.data?.message || "Error while fetching functions.",
           });
         }
       } finally {
@@ -638,7 +752,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Add Enrichment Table",
-          page: "Functions"
+          page: "Functions",
         });
       } else {
         isUpdated.value = true;
@@ -653,7 +767,7 @@ export default defineComponent({
         });
         track("Button Click", {
           button: "Update Enrichment Table",
-          page: "Functions"
+          page: "Functions",
         });
       }
       addLookupTable();
@@ -698,7 +812,9 @@ export default defineComponent({
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: `${selectedDelete.value.name} deleted successfully.`,
+              message: t("toastMessages.functions.deletedSuccessfully", {
+                name: selectedDelete.value.name,
+              }),
               variant: "success",
             });
             resetStreamType("enrichment_tables");
@@ -708,8 +824,7 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message:
-                err.response?.data?.message || "Error while deleting stream.",
+              message: err.response?.data?.message || "Error while deleting stream.",
               variant: "error",
             });
           }
@@ -730,6 +845,7 @@ export default defineComponent({
     };
 
     const bulkDeleteEnrichmentTables = () => {
+      bulkDeleteLoading.value = true;
       const selectedItems = selectedEnrichmentTables.value;
       const promises: Promise<any>[] = [];
 
@@ -749,7 +865,7 @@ export default defineComponent({
           let failedDeletions = 0;
 
           results.forEach((result) => {
-            if (result.status === 'fulfilled') {
+            if (result.status === "fulfilled") {
               // Check if the response indicates success
               if (result.value?.data?.code === 200) {
                 successfulDeletions++;
@@ -768,17 +884,24 @@ export default defineComponent({
 
           if (successfulDeletions > 0 && failedDeletions === 0) {
             toast({
-              message: `Successfully deleted ${successfulDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.successfullyDeletedEnrichmentTables", {
+                count: successfulDeletions,
+              }),
               variant: "success",
             });
           } else if (successfulDeletions > 0 && failedDeletions > 0) {
             toast({
-              message: `Deleted ${successfulDeletions} enrichment table(s). Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.enrichmentTablesDeletedWithFailures", {
+                count: successfulDeletions,
+                failed: failedDeletions,
+              }),
               variant: "warning",
             });
           } else if (failedDeletions > 0) {
             toast({
-              message: `Failed to delete ${failedDeletions} enrichment table(s).`,
+              message: t("toastMessages.functions.failedToDeleteEnrichmentTables", {
+                count: failedDeletions,
+              }),
               variant: "error",
             });
           }
@@ -787,6 +910,9 @@ export default defineComponent({
           getLookupTables(true);
           selectedEnrichmentTables.value = [];
           confirmBulkDelete.value = false;
+        })
+        .finally(() => {
+          bulkDeleteLoading.value = false;
         });
     };
 
@@ -804,19 +930,15 @@ export default defineComponent({
 
       const dismiss = toast({
         variant: "loading",
-        message: "Redirecting to explorer...",
-              timeout: 0,
-});
+        message: t("toastMessages.functions.redirectingToExplorer"),
+        timeout: 0,
+      });
 
       try {
         await getStream(stream.name, stream.stream_type, true)
           .then((streamResponse) => {
-            if (
-              streamResponse.stats.doc_time_min &&
-              streamResponse.stats.doc_time_max
-            ) {
-              //reducing the doc_time_min by 1000000 to get the exact time range
-              //previously we were subtracting 60000000 which might confuse some users so we are using 1000000 (1sec)
+            if (streamResponse.stats.doc_time_min && streamResponse.stats.doc_time_max) {
+              //reducing the doc_time_min by 1000000 (1sec) to get the exact time range
               dateTime["from"] = streamResponse.stats.doc_time_min - 1000000;
               //adding 60000000(1min)
               dateTime["to"] = streamResponse.stats.doc_time_max + 60000000;
@@ -872,23 +994,23 @@ export default defineComponent({
     };
 
     const filterData = (rows: any, terms: any) => {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i]["name"].toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
+      var filtered = [];
+      terms = terms.toLowerCase();
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i]["name"].toLowerCase().includes(terms)) {
+          filtered.push(rows[i]);
         }
-        return filtered;
-      };
+      }
+      return filtered;
+    };
 
     const visibleRows = computed(() => {
       let rows = jsTransforms.value || [];
 
       // Apply type filter
-      if (selectedFilter.value === 'uploaded') {
+      if (selectedFilter.value === "uploaded") {
         rows = rows.filter((row: any) => !row.urlJobs || row.urlJobs.length === 0);
-      } else if (selectedFilter.value === 'file_url') {
+      } else if (selectedFilter.value === "file_url") {
         rows = rows.filter((row: any) => row.urlJobs && row.urlJobs.length > 0);
       }
 
@@ -899,11 +1021,26 @@ export default defineComponent({
     const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
+
+    useShortcuts([
+      {
+        id: "enrichmentTablesRefresh",
+        handler: () => {
+          if (!isInputFocused()) refreshList();
+        },
+      },
+    ]);
+
     return {
       t,
+      raw,
       qTable,
       store,
       router,
@@ -927,7 +1064,7 @@ export default defineComponent({
       changePagination,
       maxRecordToReturn,
       showAddJSTransformDialog,
-      "delete": "delete",
+      delete: "delete",
       filterQuery,
       filterData,
       getImageURL,
@@ -945,6 +1082,7 @@ export default defineComponent({
       handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteEnrichmentTables,
+      bulkDeleteLoading,
       selectedFilter,
       showUrlJobsDialog,
       showUrlJobsDialogState,
@@ -960,10 +1098,7 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router,
-      );
+      this.verifyOrganizationStatus(this.store.state.organizations, this.router);
       if (
         (newVal != oldVal || this.jsTransforms.value == undefined) &&
         this.router.currentRoute.value.name == "pipeline"
@@ -976,14 +1111,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-</style>

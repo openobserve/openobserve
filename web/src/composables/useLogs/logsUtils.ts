@@ -17,7 +17,8 @@ import { computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import { b64EncodeUnicode, useLocalLogFilterField, } from "@/utils/zincutils";
+import { b64EncodeUnicode, useLocalLogFilterField } from "@/utils/zincutils";
+import { canvasFont } from "@/utils/fonts";
 
 import {
   encodeVisualizationConfig,
@@ -28,13 +29,10 @@ import {
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { Parser } from "@openobserve/node-sql-parser/build/datafusionsql";
-import {
-  TimestampRange,
-  ParsedSQLResult,
-  TimePeriodUnit,
-} from "@/ts/interfaces";
+import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces";
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { TranslateFn } from "@/types/i18n";
 
 interface SQLColumn {
   expr?: {
@@ -55,10 +53,7 @@ interface SQLColumn {
  * Returns `null` when the entire sub-tree has been removed (caller should treat
  * a `null` WHERE as "no WHERE clause").
  */
-export const removeFieldFromWhereAST = (
-  whereNode: any,
-  fieldName: string,
-): any => {
+export const removeFieldFromWhereAST = (whereNode: any, fieldName: string): any => {
   if (!whereNode) return null;
 
   const operator = whereNode.operator?.toUpperCase();
@@ -86,6 +81,20 @@ export const removeFieldFromWhereAST = (
   return whereNode;
 };
 
+// node-sql-parser CTE entry: a named WITH clause whose statement is another AST node
+export interface ParsedSQLWithClause {
+  name?: unknown;
+  stmt?: ExtendedParsedSQLResult | Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+// node-sql-parser AST extras not covered by ParsedSQLResult (union chains, CTEs)
+export type ExtendedParsedSQLResult = ParsedSQLResult & {
+  // union chains continue recursively in the same shape
+  _next?: ExtendedParsedSQLResult | null;
+  with?: ParsedSQLWithClause[] | null;
+};
+
 export const logsUtils = () => {
   const { searchObj } = searchState();
   let parser: Parser | null = new Parser();
@@ -105,9 +114,8 @@ export const logsUtils = () => {
   /**
    * Parses a SQL query string into a structured AST (Abstract Syntax Tree) object.
    *
-   * This function takes a SQL query string, removes comment lines (lines starting with '--'),
-   * and parses it using the DataFusion SQL parser to return a structured object containing
-   * the query components like columns, tables, conditions, etc.
+   * Removes comment lines (starting with '--') before parsing with the DataFusion
+   * SQL parser.
    *
    * @param queryString - The SQL query string to parse. If empty or not provided,
    *                      it will use the query from searchObj.data.query
@@ -118,16 +126,8 @@ export const logsUtils = () => {
    *          - limit: LIMIT clause (null if none)
    *          - groupby: GROUP BY clauses (null if none)
    *          - where: WHERE conditions (null if none)
-   *
-   * @example
-   * ```typescript
-   * const result = fnParsedSQL("SELECT name, age FROM users WHERE age > 25");
-   * console.log(result.columns); // Array of column definitions
-   * console.log(result.from);    // Array with 'users' table
-   * console.log(result.where);   // WHERE condition object
-   * ```
    */
-  const fnParsedSQL = (queryString: string = ""): ParsedSQLResult => {
+  const fnParsedSQL = (queryString: string = ""): ExtendedParsedSQLResult => {
     try {
       const finalQueryString: string = queryString || searchObj.data.query;
       const filteredQuery: string = finalQueryString
@@ -135,9 +135,9 @@ export const logsUtils = () => {
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
 
-      const parsedQuery: ParsedSQLResult | null = parser?.astify(
+      const parsedQuery: ExtendedParsedSQLResult | null = parser?.astify(
         filteredQuery,
-      ) as unknown as ParsedSQLResult;
+      ) as unknown as ExtendedParsedSQLResult;
       return parsedQuery || DEFAULT_PARSED_RESULT;
 
       // return convertPostgreToMySql(parser.astify(filteredQuery));
@@ -149,29 +149,11 @@ export const logsUtils = () => {
   /**
    * Converts a parsed SQL AST object back into a SQL query string.
    *
-   * This function takes a structured SQL object (typically returned by fnParsedSQL)
-   * and converts it back into a valid SQL query string using the DataFusion SQL parser.
-   *
    * @param parsedObj - The parsed SQL object to convert back to string.
    *                    Can be a ParsedSQLResult interface or any AST object
    *                    from the SQL parser
    * @returns A SQL query string representation of the parsed object.
    *          Returns empty string if parsing fails or input is invalid
-   *
-   * @example
-   * ```typescript
-   * const parsedSQL = fnParsedSQL("SELECT * FROM users");
-   * const sqlString = fnUnparsedSQL(parsedSQL);
-   * console.log(sqlString); // "SELECT * FROM users"
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Handle conversion errors gracefully
-   * const malformedObj = { invalid: "structure" };
-   * const result = fnUnparsedSQL(malformedObj);
-   * console.log(result); // "" (empty string on error)
-   * ```
    */
   const fnUnparsedSQL = (parsedObj: ParsedSQLResult | any): string => {
     try {
@@ -187,36 +169,16 @@ export const logsUtils = () => {
   /**
    * Extracts timestamp range based on a relative time period string.
    *
-   * This function parses a time period string (e.g., "5m", "2h", "1d") and returns
-   * a timestamp range from the calculated past time to the current time. It supports
-   * seconds, minutes, hours, days, weeks, and months with special handling for
-   * month calculations to account for variable month lengths.
+   * Parses a time period string (e.g., "5m", "2h", "1d") and returns a range from
+   * the calculated past time to now. Supports s/m/h/d/w/M, with special handling
+   * for months to account for variable month lengths.
    *
    * @param period - Time period string ending with unit (s/m/h/d/w/M)
    *                 Examples: "30s", "5m", "2h", "1d", "1w", "1M"
    * @returns Object containing 'from' and 'to' timestamps in milliseconds,
    *          or undefined if the period format is invalid
-   *
-   * @example
-   * ```typescript
-   * // Get timestamps for last 5 minutes
-   * const range = extractTimestamps("5m");
-   * console.log(range); // { from: 1640000000000, to: 1640000300000 }
-   *
-   * // Get timestamps for last 2 hours
-   * const hourRange = extractTimestamps("2h");
-   * console.log(hourRange); // { from: 1639992800000, to: 1640000000000 }
-   *
-   * // Handle invalid format
-   * const invalid = extractTimestamps("5x");
-   * console.log(invalid); // undefined
-   * ```
-   *
-   * @throws {Error} Logs error to console for invalid period formats
    */
-  const extractTimestamps = (
-    period: string,
-  ): TimestampRange | undefined => {
+  const extractTimestamps = (period: string): TimestampRange | undefined => {
     if (!period || typeof period !== "string") {
       console.error("Invalid period: must be a non-empty string");
       return undefined;
@@ -248,9 +210,7 @@ export const logsUtils = () => {
       const multiplier = TIME_MULTIPLIERS[unit];
       fromTimestamp = toTimestamp - value * multiplier;
     } else {
-      console.error(
-        `Invalid period unit: "${unit}". Supported units: s, m, h, d, w, M`,
-      );
+      console.error(`Invalid period unit: "${unit}". Supported units: s, m, h, d, w, M`);
       return undefined;
     }
 
@@ -263,30 +223,11 @@ export const logsUtils = () => {
   /**
    * Determines if a SQL query contains aggregation functions or GROUP BY clauses.
    *
-   * This function checks for aggregation by examining both the parsed column expressions
-   * for aggregation functions (like COUNT, SUM, AVG) and the raw query string for
-   * GROUP BY keywords. It's used to determine whether a query requires aggregation
-   * processing or can be handled as a simple select query.
+   * Checks the parsed column expressions for aggregation functions and the raw
+   * query string for GROUP BY.
    *
    * @param columns - Array of parsed SQL column objects from the query AST
    * @returns true if aggregation is detected, false otherwise
-   *
-   * @example
-   * ```typescript
-   * // Query with aggregation function
-   * const parsedQuery = fnParsedSQL("SELECT COUNT(*) FROM users");
-   * const hasAgg = hasAggregation(parsedQuery.columns);
-   * console.log(hasAgg); // true
-   *
-   * // Query with GROUP BY
-   * searchObj.data.query = "SELECT name FROM users GROUP BY department";
-   * const hasGroupBy = hasAggregation([]);
-   * console.log(hasGroupBy); // true
-   *
-   * // Simple select query
-   * const simpleQuery = hasAggregation([{ expr: { type: 'column' } }]);
-   * console.log(simpleQuery); // false
-   * ```
    */
   const hasAggregation = (columns: SQLColumn[]): boolean => {
     // Check for aggregation functions in column expressions
@@ -310,125 +251,45 @@ export const logsUtils = () => {
   /**
    * Determines if a parsed SQL query contains a LIMIT clause.
    *
-   * This function checks whether the parsed SQL AST includes a LIMIT clause
-   * with valid values. It's used to identify queries that restrict the number
-   * of returned results, which affects result processing and pagination behavior.
-   *
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if a LIMIT clause with values is present, false otherwise
-   *
-   * @example
-   * ```typescript
-   * const query1 = fnParsedSQL("SELECT * FROM users LIMIT 10");
-   * console.log(isLimitQuery(query1)); // true
-   *
-   * const query2 = fnParsedSQL("SELECT * FROM users");
-   * console.log(isLimitQuery(query2)); // false
-   *
-   * // Handle null/undefined input
-   * console.log(isLimitQuery(null)); // false
-   * ```
    */
-  const isLimitQuery = (
-    parsedSQL: ParsedSQLResult | null = null,
-  ): boolean => {
+  const isLimitQuery = (parsedSQL: ParsedSQLResult | null = null): boolean => {
     return Boolean(
       parsedSQL?.limit &&
-        parsedSQL.limit.value &&
-        Array.isArray(parsedSQL.limit.value) &&
-        parsedSQL.limit.value.length > 0,
+      parsedSQL.limit.value &&
+      Array.isArray(parsedSQL.limit.value) &&
+      parsedSQL.limit.value.length > 0,
     );
   };
 
   /**
    * Determines if a parsed SQL query contains a DISTINCT clause.
    *
-   * This function checks whether the parsed SQL AST includes a DISTINCT modifier
-   * in the SELECT statement. DISTINCT queries eliminate duplicate rows from
-   * results, which affects query execution and result processing strategies.
-   *
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if DISTINCT clause is present, false otherwise
-   *
-   * @example
-   * ```typescript
-   * const query1 = fnParsedSQL("SELECT DISTINCT name FROM users");
-   * console.log(isDistinctQuery(query1)); // true
-   *
-   * const query2 = fnParsedSQL("SELECT name FROM users");
-   * console.log(isDistinctQuery(query2)); // false
-   *
-   * // Handle null/undefined input
-   * console.log(isDistinctQuery(null)); // false
-   * ```
    */
-  const isDistinctQuery = (
-    parsedSQL: ParsedSQLResult | any = null,
-  ): boolean => {
+  const isDistinctQuery = (parsedSQL: ParsedSQLResult | any = null): boolean => {
     return parsedSQL?.distinct?.type === "DISTINCT";
   };
 
   /**
    * Determines if a parsed SQL query contains WITH clauses (Common Table Expressions).
    *
-   * This function checks whether the parsed SQL AST includes WITH clauses,
-   * also known as Common Table Expressions (CTEs). WITH clauses allow for
-   * complex query structuring and temporary result set definitions.
-   *
    * @param parsedSQL - The parsed SQL AST object (typically from fnParsedSQL)
    * @returns true if WITH clauses are present, false otherwise
-   *
-   * @example
-   * ```typescript
-   * const query1 = fnParsedSQL(`
-   *   WITH user_stats AS (SELECT COUNT(*) as total FROM users)
-   *   SELECT * FROM user_stats
-   * `);
-   * console.log(isWithQuery(query1)); // true
-   *
-   * const query2 = fnParsedSQL("SELECT * FROM users");
-   * console.log(isWithQuery(query2)); // false
-   *
-   * // Handle null/undefined input
-   * console.log(isWithQuery(null)); // false
-   * ```
    */
-  const isWithQuery = (
-    parsedSQL: ParsedSQLResult | any = null,
-  ): boolean => {
-    return Boolean(
-      parsedSQL?.with &&
-        Array.isArray(parsedSQL.with) &&
-        parsedSQL.with.length > 0,
-    );
+  const isWithQuery = (parsedSQL: ParsedSQLResult | any = null): boolean => {
+    return Boolean(parsedSQL?.with && Array.isArray(parsedSQL.with) && parsedSQL.with.length > 0);
   };
 
   // Todo: Duplicate function in IndexList.vue same for removeTraceId
   /**
-   * Adds a trace ID to the appropriate trace ID collection based on communication method.
-   *
-   * This function adds a trace ID to either the HTTP request trace IDs or WebSocket
-   * trace IDs array, depending on the current communication method. It prevents
-   * duplicate trace IDs by checking if the ID already exists before adding it.
-   * This is essential for tracking ongoing search operations and preventing
-   * duplicate request handling.
+   * Adds a trace ID to the search request trace-ID collection, skipping duplicates.
    *
    * @param traceId - The unique trace identifier to add to the collection.
    *                  Must be a non-empty string representing a valid trace ID
    * @returns void - No return value, modifies searchObj state directly
-   *
-   * @example
-   * ```typescript
-   * // Add trace ID for HTTP communication
-   * searchObj.communicationMethod = "http";
-   * addTraceId("trace-123-456-789");
-   * console.log(searchObj.data.searchRequestTraceIds); // ["trace-123-456-789"]
-   *
-   * // Attempting to add duplicate trace ID (no-op)
-   * addTraceId("trace-123-456-789"); // Won't add duplicate
-   * ```
-   *
-   * @throws {Error} Implicitly throws if traceId is not a string or searchObj is undefined
    */
   const addTraceId = (traceId: string): void => {
     // Validate input parameter
@@ -450,30 +311,11 @@ export const logsUtils = () => {
   };
 
   /**
-   * Removes a trace ID from the appropriate trace ID collection based on communication method.
-   *
-   * This function removes a specific trace ID from either the HTTP request trace IDs
-   * or WebSocket trace IDs array, depending on the current communication method.
-   * It uses the filter method to create a new array without the specified trace ID,
-   * which is essential for cleanup when search operations complete or are cancelled.
+   * Removes a trace ID from the search request trace-ID collection.
    *
    * @param traceId - The unique trace identifier to remove from the collection.
    *                  Must be a string representing the trace ID to be removed
    * @returns void - No return value, modifies searchObj state directly
-   *
-   * @example
-   * ```typescript
-   * // Remove trace ID from HTTP communication
-   * searchObj.communicationMethod = "http";
-   * searchObj.data.searchRequestTraceIds = ["trace-123", "trace-456"];
-   * removeTraceId("trace-123");
-   * console.log(searchObj.data.searchRequestTraceIds); // ["trace-456"]
-   *
-   * // Attempting to remove non-existent trace ID (no effect)
-   * removeTraceId("non-existent-id"); // Array remains unchanged
-   * ```
-   *
-   * @throws {Error} Implicitly throws if searchObj or its data properties are undefined
    */
   const removeTraceId = (traceId: string): void => {
     // Validate input parameter
@@ -482,36 +324,25 @@ export const logsUtils = () => {
       return;
     }
     // Remove trace ID from HTTP request trace IDs array
-    searchObj.data.searchRequestTraceIds =
-      searchObj.data.searchRequestTraceIds.filter(
-        (existingTraceId: string) => existingTraceId !== traceId,
-      );
+    searchObj.data.searchRequestTraceIds = searchObj.data.searchRequestTraceIds.filter(
+      (existingTraceId: string) => existingTraceId !== traceId,
+    );
   };
 
   const shouldAddFunctionToSearch = () => {
     if (!isActionsEnabled.value)
-      return (
-        searchObj.data.tempFunctionContent != "" &&
-        searchObj.meta.showTransformEditor
-      );
+      return searchObj.data.tempFunctionContent != "" && searchObj.meta.showTransformEditor;
 
-    return (
-      searchObj.data.transformType === "function" &&
-      searchObj.data.tempFunctionContent != ""
-    );
+    return searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "";
   };
 
   const addTransformToQuery = (queryReq: any) => {
     if (shouldAddFunctionToSearch()) {
-      queryReq.query["query_fn"] =
-        b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
+      queryReq.query["query_fn"] = b64EncodeUnicode(searchObj.data.tempFunctionContent) || "";
     }
 
     // Add action ID if it exists
-    if (
-      searchObj.data.transformType === "action" &&
-      searchObj.data.selectedTransform?.id
-    ) {
+    if (searchObj.data.transformType === "action" && searchObj.data.selectedTransform?.id) {
       queryReq.query["action_id"] = searchObj.data.selectedTransform.id;
     }
   };
@@ -530,19 +361,18 @@ export const logsUtils = () => {
    * @returns - Width of the column
    */
   const getColumnWidth = (context: any, field: string) => {
-    // Font of table header
-    context.font = "bold 14px sans-serif";
+    // Font of table header — must match what actually renders, or the measured
+    // width is wrong and cells truncate/overflow.
+    context.font = canvasFont("14px", "sans", "bold");
     let max = context.measureText(field).width + 16;
 
     // Font of the table content
-    context.font = "12px monospace";
+    context.font = canvasFont("12px", "mono");
     let width = 0;
     try {
       for (let i = 0; i < 5; i++) {
         if (searchObj.data.queryResults.hits?.[i]?.[field]) {
-          width = context.measureText(
-            searchObj.data.queryResults.hits[i][field],
-          ).width;
+          width = context.measureText(searchObj.data.queryResults.hits[i][field]).width;
 
           if (width > max) max = width;
         }
@@ -560,10 +390,10 @@ export const logsUtils = () => {
     return max;
   };
 
-  const showCancelSearchNotification = () => {
+  const showCancelSearchNotification = (t: TranslateFn) => {
     toast({
       variant: "info",
-      message: "Running query cancelled successfully",
+      message: t("toastMessages.useLogs.runningQueryCancelledSuccessfully"),
     });
   };
 
@@ -580,16 +410,18 @@ export const logsUtils = () => {
       query["stream_type"] = searchObj.data.stream.streamType;
     }
 
-    if (
-      searchObj.data.stream.selectedStream.length > 0 &&
-      typeof searchObj.data.stream.selectedStream != "object"
-    ) {
-      query["stream"] = searchObj.data.stream.selectedStream.join(",");
+    // selectedStream is string[] in state; branches below defensively handle
+    // legacy string / { value } shapes that may still reach this code path
+    const selectedStream: string[] = searchObj.data.stream.selectedStream;
+    if (selectedStream.length > 0 && typeof selectedStream != "object") {
+      // Dead defensive branch for a legacy non-array shape (TS narrows the
+      // array type to never here); cast keeps it compiling, runtime unchanged.
+      query["stream"] = (selectedStream as string[]).join(",");
     } else if (
-      typeof searchObj.data.stream.selectedStream == "object" &&
-      searchObj.data.stream.selectedStream.hasOwnProperty("value")
+      typeof selectedStream === "object" &&
+      Object.prototype.hasOwnProperty.call(selectedStream, "value")
     ) {
-      query["stream"] = searchObj.data.stream.selectedStream.value;
+      query["stream"] = (selectedStream as unknown as { value: string }).value;
     } else {
       query["stream"] = searchObj.data.stream.selectedStream.join(",");
     }
@@ -616,13 +448,8 @@ export const logsUtils = () => {
     //add the function editor toggle is true or false
     //it will help to retain the function editor state when we refresh the page
     query["fn_editor"] = searchObj.meta.showTransformEditor;
-    if (
-      searchObj.data.transformType === "function" &&
-      searchObj.data.tempFunctionContent != ""
-    ) {
-      query["functionContent"] = b64EncodeUnicode(
-        searchObj.data.tempFunctionContent.trim(),
-      );
+    if (searchObj.data.transformType === "function" && searchObj.data.tempFunctionContent != "") {
+      query["functionContent"] = b64EncodeUnicode(searchObj.data.tempFunctionContent.trim());
     }
 
     // TODO : Add type in query params for all types
@@ -635,17 +462,11 @@ export const logsUtils = () => {
     query["quick_mode"] = searchObj.meta.quickMode;
     query["show_histogram"] = searchObj.meta.showHistogram;
 
-    if (
-      store.state.zoConfig?.super_cluster_enabled &&
-      searchObj.meta?.regions?.length
-    ) {
+    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.regions?.length) {
       query["regions"] = searchObj.meta.regions.join(",");
     }
 
-    if (
-      store.state.zoConfig?.super_cluster_enabled &&
-      searchObj.meta?.clusters?.length
-    ) {
+    if (store.state.zoConfig?.super_cluster_enabled && searchObj.meta?.clusters?.length) {
       query["clusters"] = searchObj.meta.clusters.join(",");
     }
 
@@ -655,10 +476,7 @@ export const logsUtils = () => {
 
     // Preserve visualization data in URL
     // - If in visualize mode and panel data is provided, encode the dashboardPanelData
-    if (
-      searchObj.meta.logsVisualizeToggle === "visualize" &&
-      dashboardPanelData
-    ) {
+    if (searchObj.meta.logsVisualizeToggle === "visualize" && dashboardPanelData) {
       const visualizationData = getVisualizationConfig(dashboardPanelData);
       if (visualizationData) {
         const encoded = encodeVisualizationConfig(visualizationData);
@@ -668,8 +486,9 @@ export const logsUtils = () => {
       }
     } else {
       // else preserve existing visualization data from the current URL
-      const existingEncodedConfig = router.currentRoute.value?.query
-        ?.visualization_data as string | undefined;
+      const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as
+        | string
+        | undefined;
       if (existingEncodedConfig) {
         query["visualization_data"] = existingEncodedConfig;
       }
@@ -677,10 +496,7 @@ export const logsUtils = () => {
 
     // Preserve build data in URL
     // - If in build mode and build panel data is provided, encode the buildPanelData
-    if (
-      searchObj.meta.logsVisualizeToggle === "build" &&
-      buildPanelData
-    ) {
+    if (searchObj.meta.logsVisualizeToggle === "build" && buildPanelData) {
       const buildData = getBuildConfig(buildPanelData);
       if (buildData) {
         const encoded = encodeBuildConfig(buildData);
@@ -690,8 +506,9 @@ export const logsUtils = () => {
       }
     } else {
       // else preserve existing build data from the current URL
-      const existingEncodedBuildConfig = router.currentRoute.value?.query
-        ?.build_data as string | undefined;
+      const existingEncodedBuildConfig = router.currentRoute.value?.query?.build_data as
+        | string
+        | undefined;
       if (existingEncodedBuildConfig) {
         query["build_data"] = existingEncodedBuildConfig;
       }
@@ -732,25 +549,18 @@ export const logsUtils = () => {
     }
     const identifier: string = searchObj.organizationIdentifier || "default";
     const selectedFields: any =
-      useLocalLogFilterField()?.value != null
-        ? useLocalLogFilterField()?.value
-        : {};
+      useLocalLogFilterField()?.value != null ? useLocalLogFilterField()?.value : {};
     const stream = searchObj.data.stream.selectedStream.sort().join("_");
-    selectedFields[`${identifier}_${stream}`] =
-      searchObj.data.stream.selectedFields.filter(
-        (_field) =>
-          _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
-      );
+    selectedFields[`${identifier}_${stream}`] = searchObj.data.stream.selectedFields.filter(
+      (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
     useLocalLogFilterField(selectedFields);
   };
 
   function isTimestampASC(orderby: any) {
     if (orderby) {
       for (const order of orderby) {
-        if (
-          order.expr &&
-          order.expr.column === store.state.zoConfig.timestamp_column
-        ) {
+        if (order.expr && order.expr.column === store.state.zoConfig.timestamp_column) {
           if (order.type && order.type === "ASC") {
             return true;
           }
@@ -762,25 +572,19 @@ export const logsUtils = () => {
 
   // validate if timestamp column alias is used for any field
   const checkTimestampAlias = (query: string): boolean => {
-    const tsCol =
-      timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
+    const tsCol = timestampColumnName ?? store.state.zoConfig.timestamp_column ?? "_timestamp";
     const parsedSQL = fnParsedSQL(query);
 
     const columns = parsedSQL?.columns;
     if (Array.isArray(columns)) {
-      const invalid = columns.some(
-        (field: any) => field.as === tsCol,
-      );
+      const invalid = columns.some((field: any) => field.as === tsCol);
       if (invalid) {
         return false;
       }
     }
 
     // Escape special regex characters in timestamp column name
-    const escapedTimestamp = tsCol.replace(
-      /[.*+?^${}()|[\]\\]/g,
-      "\\$&",
-    );
+    const escapedTimestamp = tsCol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
     // Patterns for alias check
     const patterns = [

@@ -1,16 +1,13 @@
 <template>
-  <div
-    :data-test="`${dataTest}-list-page`"
-    class="tw:flex tw:flex-col tw:flex-1 tw:min-w-0 tw:h-full tw:min-h-0"
-  >
-    <div v-if="showEmpty" class="tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:h-full tw:flex tw:items-center tw:justify-center">
+  <div :data-test="`${dataTest}-list-page`" class="flex h-full min-h-0 min-w-0 flex-1 flex-col">
+    <div v-if="showEmpty" class="min-h-0 flex-1">
+      <div class="bg-card-glass-bg flex h-full items-center justify-center">
         <slot name="empty" />
       </div>
     </div>
 
-    <div v-else class="tw:flex-1 tw:min-h-0">
-      <div class="card-container tw:h-full">
+    <div v-else class="min-h-0 flex-1">
+      <div class="bg-card-glass-bg h-full">
         <slot name="table" />
       </div>
     </div>

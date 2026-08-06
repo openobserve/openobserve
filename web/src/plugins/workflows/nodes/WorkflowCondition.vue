@@ -1,0 +1,96 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  Condition node body — a thin wrapper over the shared ConditionBuilder (same
+  FilterGroup body the pipeline condition form uses). A workflow has no upstream
+  stream node, so the fields are the CURRENT trigger's payload fields (resolved
+  from the trigger registry by kind — alert vs incident); the guidelines below
+  carry the workflow filter wording.
+
+  A Condition is a filter (single output): matching records continue, the rest
+  are dropped. WorkflowNodeDrawer's Save calls submit() → { version, conditions }
+  or null when nothing is configured.
+-->
+<template>
+  <div data-test="workflow-condition-body" class="w-full">
+    <ConditionBuilder ref="builder" :fields="fields" :initial-conditions="savedConditions">
+      <!-- The examples below are CODE SAMPLES held in en-US.json: only the
+           illustrative column name ("severity") is meant to vary per locale —
+           the operators and literals (`!=`, `""`, `null`) are expression syntax
+           and must be copied verbatim, so translators should leave them alone. -->
+      <template #guidelines>
+        <div
+          class="bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default mt-4 flex w-full flex-col gap-2 border p-3"
+          data-test="workflow-condition-note"
+        >
+          <div class="text-sm font-bold">
+            {{ t("workflow.node.conditionNoteTitle") }}
+          </div>
+          <div class="flex flex-col gap-1 text-sm">
+            <div class="flex items-start gap-2">
+              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
+              <span>
+                {{ t("workflow.node.conditionNoteEmpty") }}
+                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
+                  t("workflow.node.conditionExampleEmpty")
+                }}</span>
+              </span>
+            </div>
+            <div class="flex items-start gap-2">
+              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
+              <span>
+                {{ t("workflow.node.conditionNoteNull") }}
+                <span class="rounded-default bg-code-bg text-code-text px-1 py-px font-mono">{{
+                  t("workflow.node.conditionExampleNull")
+                }}</span>
+              </span>
+            </div>
+            <div class="flex items-start gap-2">
+              <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
+              <span>{{ t("workflow.node.conditionNoteCustom") }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+    </ConditionBuilder>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { ref } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ConditionBuilder from "@/components/flow/forms/ConditionBuilder.vue";
+import { workflowObj, currentTriggerKind } from "@/plugins/workflows/useWorkflowCanvas";
+import { triggerDef } from "@/plugins/workflows/triggers";
+
+const { t } = useI18nTyped();
+// The pickable fields are the CURRENT trigger's payload fields, so an incident
+// workflow branches on incident fields and an alert workflow on alert fields.
+// With no trigger (it was deleted), we offer nothing rather than a wrong set —
+// the user can still type any column via allow-custom-columns.
+const kind = currentTriggerKind();
+const fields = kind ? triggerDef(kind).conditionFields : [];
+const savedConditions = workflowObj.currentSelectedNodeData?.data?.conditions ?? null;
+
+const builder = ref<any>(null);
+// The builder validates through its zod schema (async) and renders the error
+// inline, returning null when the rule is empty/incomplete.
+const submit = async () => (await builder.value?.submit()) ?? null;
+
+defineExpose({ submit });
+</script>

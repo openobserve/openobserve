@@ -111,14 +111,7 @@ export function useStreamDetect(opts: UseStreamDetectOptions) {
   ): Promise<{ exists: boolean; matched: number }> => {
     const stream = cfg.streamName || "default";
     try {
-      const res = await streamService.nameList(
-        cfg.orgId,
-        cfg.streamType,
-        false,
-        -1,
-        -1,
-        stream,
-      );
+      const res = await streamService.nameList(cfg.orgId, cfg.streamType, false, -1, -1, stream);
       const list: any[] = res?.data?.list ?? [];
       // "keyword" mode: nameList already filters by substring, so any returned
       // stream is a match (e.g. sqlserver_user_connection_count for "sqlserver").

@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <ODialog
     :open="open"
-    @update:open="(v) => { if (!v) cancelEdit() }"
+    @update:open="
+      (v) => {
+        if (!v) cancelEdit();
+      }
+    "
     :title="t('dashboard.columnOrder')"
     size="lg"
     :secondary-button-label="t('common.cancel')"
@@ -28,19 +32,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Content -->
     <div>
-      <div class="tw:text-xs tw:text-gray-400 tw:mb-3" data-test="dashboard-column-order-description">
+      <div class="text-text-secondary mb-3 text-xs" data-test="dashboard-column-order-description">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="tw:text-center tw:p-6 tw:text-gray-400"
+        class="text-text-muted p-6 text-center"
         data-test="dashboard-column-order-empty-state"
       >
-        <OIcon name="view-column" class="tw:mb-3" style="width: 48px; height: 48px;" />
-        <div class="tw:text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
-        <div class="tw:text-xs">
+        <OIcon name="view-column" class="mb-3 h-12 w-12" />
+        <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
+        <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
         </div>
       </div>
@@ -56,11 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="tw:flex tw:items-center tw:px-3 tw:py-2 tw:mb-1 tw:border-b tw:border-[#cccccc70] tw:transition-colors tw:hover:bg-black/[0.02] tw:last:border-b-0 tw:dark:border-b-[rgba(255,255,255,0.12)] tw:dark:hover:bg-[rgba(255,255,255,0.05)]"
+          class="border-border-default hover:bg-surface-subtle-hover mb-1 flex items-center border-b px-3 py-2 transition-colors last:border-b-0"
           :data-test="`column-order-row-${index}`"
         >
           <!-- Drag handle -->
-          <div class="tw:cursor-move tw:px-1 tw:mr-2 tw:flex tw:items-center" data-test="dashboard-column-order-drag-handle">
+          <div
+            class="mr-2 flex cursor-move items-center px-1"
+            data-test="dashboard-column-order-drag-handle"
+          >
             <OIcon
               name="drag-indicator"
               size="md"
@@ -69,13 +76,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Column number -->
-          <div class="tw:min-w-8 tw:font-medium tw:text-[13px] tw:text-[#666] tw:dark:text-[#aaa]" data-test="dashboard-column-order-column-number">{{ index + 1 }}.</div>
+          <div
+            class="text-compact text-text-secondary min-w-8 font-medium"
+            data-test="dashboard-column-order-column-number"
+          >
+            {{ index + 1 }}.
+          </div>
 
           <!-- Column name -->
-          <div class="tw:flex-1 tw:font-medium tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-[13px]" data-test="dashboard-column-order-column-name">{{ column }}</div>
+          <div
+            class="text-compact flex-1 overflow-hidden font-medium text-ellipsis whitespace-nowrap"
+            data-test="dashboard-column-order-column-name"
+          >
+            {{ column }}
+          </div>
 
           <!-- Actions -->
-          <div class="tw:flex tw:gap-0.5 tw:ml-2" data-test="dashboard-column-order-column-actions">
+          <div class="ml-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
             <OButton
               variant="ghost"
               size="icon"
@@ -105,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -120,7 +137,7 @@ export default defineComponent({
     ODialog,
     OIcon,
     OTooltip,
-},
+  },
   props: {
     open: {
       type: Boolean,
@@ -137,7 +154,7 @@ export default defineComponent({
   },
   emits: ["cancel", "save"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const editColumnOrder = ref<string[]>([]);
 
     // Drag options
@@ -151,14 +168,10 @@ export default defineComponent({
     const initializeColumnOrder = () => {
       if (props.columnOrder && props.columnOrder.length > 0) {
         // Filter the column order to only include columns that are in availableColumns
-        const filtered = props.columnOrder.filter((col) =>
-          props.availableColumns.includes(col),
-        );
+        const filtered = props.columnOrder.filter((col) => props.availableColumns.includes(col));
 
         // Find columns in availableColumns that are not in columnOrder
-        const remaining = props.availableColumns.filter(
-          (col) => !filtered.includes(col),
-        );
+        const remaining = props.availableColumns.filter((col) => !filtered.includes(col));
 
         // Combine: ordered columns first, then remaining in their natural order
         editColumnOrder.value = [...filtered, ...remaining];

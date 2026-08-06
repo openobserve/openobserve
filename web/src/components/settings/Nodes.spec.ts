@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import Nodes from "./Nodes.vue";
 
-
 vi.mock("@/services/common", () => ({
   default: {
     list_nodes: vi.fn(),
@@ -31,16 +30,6 @@ vi.mock("@/composables/useIsMetaOrg", () => ({
     isMetaOrg: { value: true },
   }),
 }));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(() => vi.fn()), // returns dismiss function
-    }),
-  };
-});
 
 import CommonService from "@/services/common";
 
@@ -147,19 +136,12 @@ function mountComponent() {
       plugins: [mockI18n],
       provide: { store: mockStore },
       stubs: {
-                "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue", "limits", "unit", "style"] },
-        "q-table": { template: '<div class="q-table"><slot name="bottom" :scope="{}" /><slot name="no-data" /></div>', props: ["rows", "columns", "rowKey", "pagination", "filter", "filterMethod", "loading", "dense", "style", "hideTop"] },
-        "q-expansion-item": { template: '<div><slot /></div>', props: ["expandSeparator", "label", "class"] },
-        "q-card": { template: "<div><slot /></div>" },
-        "q-card-section": { template: "<div><slot /></div>", props: ["class"] },
-        "q-checkbox": { template: "<input type='checkbox' />", props: ["modelValue", "size"], emits: ["update:modelValue"] },
-        "q-range": { template: '<div class="q-range" />', props: ["modelValue", "min", "max", "disable"], emits: ["change"] },
-        "q-tooltip": { template: "<span><slot /></span>" },
-        "q-list": { template: "<div><slot /></div>" },
-        "q-btn": { template: '<button @click="$emit(\'click\')"><slot /></button>', props: ["label", "icon", "flat"], emits: ["click"] },
-        "q-td": { template: "<td><slot /></td>", props: ["props"] },
-        "QTablePagination": { template: "<div class='pagination' />", props: ["scope", "resultTotal", "perPageOptions", "position"], emits: ["update:changeRecordPerPage"] },
-        "NoData": { template: "<div class='no-data'>No Data</div>" },
+        Pagination: {
+          template: "<div class='pagination' />",
+          props: ["scope", "resultTotal", "perPageOptions", "position"],
+          emits: ["update:changeRecordPerPage"],
+        },
+        NoData: { template: "<div class='no-data'>No Data</div>" },
       },
     },
   });
@@ -403,18 +385,8 @@ describe("Nodes", () => {
           plugins: [mockI18n],
           provide: { store: storeWithoutSuperCluster },
           stubs: {
-                        "q-splitter": { template: '<div><slot name="before" /><slot name="after" /></div>', props: ["modelValue"] },
-            "q-table": { template: "<div />", props: ["rows", "columns", "rowKey", "pagination", "filter", "filterMethod", "loading"] },
-            "q-expansion-item": { template: "<div><slot /></div>", props: ["label"] },
-            "q-card": { template: "<div><slot /></div>" },
-            "q-card-section": { template: "<div><slot /></div>" },
-            "q-checkbox": { template: "<input type='checkbox' />" },
-            "q-range": { template: "<div />" },
-            "q-tooltip": { template: "<span><slot /></span>" },
-            "q-list": { template: "<div><slot /></div>" },
-            "q-btn": { template: "<button />" },
-            "QTablePagination": { template: "<div />" },
-            "NoData": { template: "<div />" },
+            Pagination: { template: "<div />" },
+            NoData: { template: "<div />" },
           },
         },
       });

@@ -31,9 +31,7 @@
  *   21-24 → FATAL
  *   0     → unspecified
  */
-export function normalizeSeverity(
-  raw: string | number | null | undefined,
-): string | null {
+export function normalizeSeverity(raw: string | number | null | undefined): string | null {
   if (raw == null || raw === "") return null;
 
   // Numeric path — OTel severity_number.
@@ -69,9 +67,7 @@ export function normalizeSeverity(
  * Pull the best-available severity field from a log row and normalize it.
  * Returns null when no field is set or all values are unrecognized.
  */
-export function extractSeverity(
-  row: Record<string, any> | null | undefined,
-): string | null {
+export function extractSeverity(row: Record<string, any> | null | undefined): string | null {
   if (!row) return null;
   const candidates = [
     row.severity_text,

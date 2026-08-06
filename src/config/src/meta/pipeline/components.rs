@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -112,6 +112,19 @@ impl MemorySize for DerivedStream {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct WorkflowDestination {
+    pub destination_id: String,
+    pub template_override: Option<String>,
+}
+impl MemorySize for WorkflowDestination {
+    fn mem_size(&self) -> usize {
+        std::mem::size_of::<WorkflowDestination>()
+            + self.destination_id.mem_size()
+            + self.template_override.mem_size()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct Node {
@@ -131,7 +144,7 @@ pub struct Node {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, String>>,
     /// Visual position for UI rendering
-    position: Position,
+    pub position: Position,
     /// Node role in the pipeline. MUST be one of:
     /// - "input": Source stream node (first node in pipeline)
     /// - "output": Destination stream node (last node in pipeline)
@@ -227,6 +240,8 @@ pub enum NodeData {
     Function(FunctionParams),
     Condition(ConditionParams),
     LlmEvaluation(LlmEvaluationParams),
+    WorkflowTrigger,
+    Destination(WorkflowDestination),
 }
 
 impl MemorySize for NodeData {
@@ -239,7 +254,40 @@ impl MemorySize for NodeData {
                 NodeData::Function(function_params) => function_params.mem_size(),
                 NodeData::Condition(condition_params) => condition_params.mem_size(),
                 NodeData::LlmEvaluation(llm_evaluation_params) => llm_evaluation_params.mem_size(),
+                NodeData::WorkflowTrigger => 0, // no sub-members
+                NodeData::Destination(dest) => dest.mem_size(),
             }
+    }
+}
+
+impl NodeData {
+    pub fn is_pipeline_node(&self) -> bool {
+        matches!(
+            self,
+            Self::RemoteStream(_)
+                | Self::Stream(_)
+                | Self::Query(_)
+                | Self::Function(_)
+                | Self::Condition(_)
+                | Self::LlmEvaluation(_)
+        )
+    }
+    pub fn is_workflow_node(&self) -> bool {
+        matches!(
+            self,
+            Self::WorkflowTrigger
+                | Self::Query(_)
+                | Self::Function(_)
+                | Self::Condition(_)
+                | Self::Destination(_)
+        )
+    }
+
+    pub fn is_a_leaf_node(&self) -> bool {
+        matches!(
+            self,
+            Self::Stream(_) | Self::RemoteStream(_) | Self::Destination(_)
+        )
     }
 }
 
@@ -327,10 +375,15 @@ pub struct LlmEvaluationParams {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub scorers: Vec<ScorerRef>,
     /// Optional job ID for online eval jobs. When set, the evaluation pipeline
-    /// runs in span-bounded mode (single-span evaluation via Provider API)
-    /// rather than the trace-buffered mode (multi-span aggregation via sre-agent).
+    /// runs in span-bounded mode and publishes durable span evaluation tasks.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub job_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub job_version: Option<i32>,
+    /// Per-scorer bindings used to resolve the compact task payload before it
+    /// crosses the durable queue boundary.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_mapping: Option<BTreeMap<String, BTreeMap<String, String>>>,
 }
 
 fn default_sampling_rate() -> f64 {
@@ -380,6 +433,8 @@ impl Default for LlmEvaluationParams {
             sampling_rate: default_sampling_rate(),
             scorers: Vec::new(),
             job_id: None,
+            job_version: None,
+            input_mapping: None,
         }
     }
 }
@@ -389,6 +444,7 @@ impl MemorySize for LlmEvaluationParams {
         std::mem::size_of::<LlmEvaluationParams>()
             + self.name.mem_size()
             + self.scorers.iter().map(|s| s.mem_size()).sum::<usize>()
+            + self.input_mapping.mem_size()
     }
 }
 
@@ -478,9 +534,15 @@ impl Serialize for ConditionParams {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
-struct Position {
+pub struct Position {
     x: f32,
     y: f32,
+}
+
+impl Position {
+    pub fn is_valid(&self) -> bool {
+        !self.x.is_nan() && !self.y.is_nan() && !self.x.is_infinite() && !self.y.is_infinite()
+    }
 }
 
 impl MemorySize for Position {
@@ -1061,6 +1123,25 @@ mod tests {
         };
         let json = serde_json::to_value(&params).unwrap();
         assert!(json.as_object().unwrap().contains_key("scorers"));
+    }
+
+    #[test]
+    fn test_llm_evaluation_params_job_version_is_optional() {
+        let params = LlmEvaluationParams {
+            job_id: Some("job-1".to_string()),
+            job_version: Some(3),
+            ..LlmEvaluationParams::default()
+        };
+        let json = serde_json::to_value(&params).unwrap();
+        assert_eq!(json["job_id"], "job-1");
+        assert_eq!(json["job_version"], 3);
+
+        let without_version = LlmEvaluationParams {
+            job_id: Some("job-1".to_string()),
+            ..LlmEvaluationParams::default()
+        };
+        let json = serde_json::to_value(&without_version).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("job_version"));
     }
 
     #[test]

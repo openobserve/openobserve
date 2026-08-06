@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,7 +30,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import IncidentTimeline from "@/components/alerts/IncidentTimeline.vue";
 import incidentsService from "@/services/incidents";
-
 
 const makeEvent = (overrides: Record<string, any> = {}) => ({
   type: "Alert",
@@ -196,38 +195,6 @@ describe("IncidentTimeline - getUserId", () => {
   });
 });
 
-describe("IncidentTimeline - getInitials", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
-  });
-
-  it("returns S for System", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    expect((w.vm as any).getInitials("System")).toBe("S");
-  });
-
-  it("returns first two chars for single word", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    expect((w.vm as any).getInitials("bob")).toBe("BO");
-  });
-
-  it("returns first letters of two words", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    expect((w.vm as any).getInitials("john doe")).toBe("JD");
-  });
-
-  it("handles email addresses", async () => {
-    const w = await mountComp();
-    await flushPromises();
-    const result = (w.vm as any).getInitials("john.doe@example.com");
-    expect(result).toBe("JD");
-  });
-});
-
 describe("IncidentTimeline - getEventIcon", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -268,25 +235,29 @@ describe("IncidentTimeline - getEventBadgeColor", () => {
   it("returns green for Resolved", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventBadgeColor({ type: "Resolved" })).toBe("#059669");
+    expect((w.vm as any).getEventBadgeColor({ type: "Resolved" })).toBe("var(--color-success-600)");
   });
 
   it("returns red for SeverityUpgrade", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventBadgeColor({ type: "SeverityUpgrade" })).toBe("#EF4444");
+    expect((w.vm as any).getEventBadgeColor({ type: "SeverityUpgrade" })).toBe(
+      "var(--color-error-500)",
+    );
   });
 
   it("returns purple for ai_analysis_begin", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventBadgeColor({ type: "ai_analysis_begin" })).toBe("#8B5CF6");
+    expect((w.vm as any).getEventBadgeColor({ type: "ai_analysis_begin" })).toBe(
+      "var(--color-ai-accent)",
+    );
   });
 
   it("returns gray for unknown type", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getEventBadgeColor({ type: "unknown" })).toBe("#6B7280");
+    expect((w.vm as any).getEventBadgeColor({ type: "unknown" })).toBe("var(--color-grey-500)");
   });
 });
 
@@ -324,25 +295,25 @@ describe("IncidentTimeline - getSeverityColor", () => {
   it("returns red for P1", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getSeverityColor("P1")).toBe("#EF4444");
+    expect((w.vm as any).getSeverityColor("P1")).toBe("var(--color-error-500)");
   });
 
   it("returns orange for P2", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getSeverityColor("P2")).toBe("#F97316");
+    expect((w.vm as any).getSeverityColor("P2")).toBe("var(--color-orange-500)");
   });
 
   it("returns blue for P4", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getSeverityColor("P4")).toBe("#3B82F6");
+    expect((w.vm as any).getSeverityColor("P4")).toBe("var(--color-blue-500)");
   });
 
   it("returns gray for unknown severity", async () => {
     const w = await mountComp();
     await flushPromises();
-    expect((w.vm as any).getSeverityColor("P99")).toBe("#6B7280");
+    expect((w.vm as any).getSeverityColor("P99")).toBe("var(--color-grey-500)");
   });
 });
 
@@ -446,7 +417,11 @@ describe("IncidentTimeline - submitComment", () => {
     w.vm.commentText = "test comment";
     await (w.vm as any).submitComment();
     await flushPromises();
-    expect(incidentsService.postComment).toHaveBeenCalledWith("default", "incident-1", "test comment");
+    expect(incidentsService.postComment).toHaveBeenCalledWith(
+      "default",
+      "incident-1",
+      "test comment",
+    );
   });
 
   it("clears commentText after successful submit", async () => {
@@ -505,11 +480,11 @@ describe("IncidentTimeline - getAvatarColor", () => {
     (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
   });
 
-  it("returns a hex color string", async () => {
+  it("returns a color token string", async () => {
     const w = await mountComp();
     await flushPromises();
     const color = (w.vm as any).getAvatarColor("alice");
-    expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    expect(color).toMatch(/^var\(--color-[a-z0-9-]+\)$/);
   });
 
   it("returns consistent color for same username", async () => {

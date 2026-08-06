@@ -7,18 +7,18 @@ import store from "@/test/unit/helpers/store";
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn(() => "mock-image-url")
+  getImageURL: vi.fn(() => "mock-image-url"),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock the clipboard utility that the component actually uses
@@ -31,22 +31,15 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "custom",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
   useRouter: () => mockRouter,
   useRoute: () => mockRouter.currentRoute.value,
-}));
-
-// Mock Quasar — kept as safety net for any transitive dependency that might need it.
-// Does NOT use importOriginal() since quasar has been removed from the project.
-vi.mock("quasar", () => ({
-  useQuasar: () => ({ notify: vi.fn() }),
-  copyToClipboard: vi.fn(),
 }));
 
 describe("Custom Component", () => {
@@ -55,14 +48,14 @@ describe("Custom Component", () => {
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset router state
     mockRouter.currentRoute.value.name = "custom";
     mockRouter.currentRoute.value.query = {};
 
     wrapper = mount(Custom, {
       props: {
-        currOrgIdentifier: "test-org"
+        currOrgIdentifier: "test-org",
       },
       global: {
         plugins: [i18n],
@@ -70,13 +63,13 @@ describe("Custom Component", () => {
           store,
         },
         stubs: {
-          'OSplitter': {
-            template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+          OSplitter: {
+            template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
           },
-          'OTabs': true,
-          'ORouteTab': true,
-          'router-view': true
-        }
+          OTabs: true,
+          ORouteTab: true,
+          "router-view": true,
+        },
       },
     });
   });
@@ -106,14 +99,17 @@ describe("Custom Component", () => {
       expect(Array.isArray(wrapper.vm.rumRoutes)).toBe(true);
       expect(Array.isArray(wrapper.vm.traceRoutes)).toBe(true);
       expect(Array.isArray(wrapper.vm.metricRoutes)).toBe(true);
-      
+
       expect(wrapper.vm.metricRoutes).toEqual([
         "prometheus",
-        "otelCollector", 
+        "vmagent",
+        "nightingale",
+        "categraf",
+        "otelCollector",
         "telegraf",
-        "cloudwatchMetrics"
+        "cloudwatchMetrics",
       ]);
-      
+
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP", "ingestTracesFromOtel"]);
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
     });
@@ -122,67 +118,67 @@ describe("Custom Component", () => {
   describe("Route-based Tab Setting", () => {
     it("should set tabs to 'ingestLogs' for log routes", () => {
       mockRouter.currentRoute.value.name = "curl";
-      
+
       wrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(wrapper.vm.tabs).toBe("ingestLogs");
     });
 
     it("should set tabs to 'ingestMetrics' for metric routes", () => {
       mockRouter.currentRoute.value.name = "prometheus";
-      
+
       wrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(wrapper.vm.tabs).toBe("ingestMetrics");
     });
 
     it("should set tabs to 'ingestTraces' for trace routes", () => {
       mockRouter.currentRoute.value.name = "tracesOTLP";
-      
+
       wrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(wrapper.vm.tabs).toBe("ingestTraces");
     });
 
@@ -199,23 +195,23 @@ describe("Custom Component", () => {
 
     it("should handle ingest routes by updating query params", () => {
       mockRouter.currentRoute.value.name = "ingestLogs";
-      
+
       wrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "ingestLogs",
         query: {
@@ -231,12 +227,12 @@ describe("Custom Component", () => {
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
       const mockContent = {
-        innerText: "test content to copy"
+        innerText: "test content to copy",
       };
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -248,7 +244,7 @@ describe("Custom Component", () => {
       vi.mocked(copyToClipboard).mockRejectedValueOnce(new Error("Copy failed"));
 
       const mockContent = {
-        innerText: "test content to copy"
+        innerText: "test content to copy",
       };
 
       try {
@@ -257,7 +253,7 @@ describe("Custom Component", () => {
         // Expected error
       }
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -271,7 +267,7 @@ describe("Custom Component", () => {
       const segment = await import("@/services/segment_analytics");
 
       const mockContent = {
-        innerText: "test content"
+        innerText: "test content",
       };
 
       await wrapper.vm.copyToClipboardFn(mockContent);
@@ -290,16 +286,17 @@ describe("Custom Component", () => {
     it("should have correct log routes array", () => {
       const logRoutes = [
         "curl",
-        "fluentbit", 
+        "fluentbit",
         "fluentd",
         "kinesisfirehose",
         "vector",
         "filebeat",
         "gcpLogs",
+        "loongcollector",
       ];
-      
+
       // Test each log route sets correct tab
-      logRoutes.forEach(route => {
+      logRoutes.forEach((route) => {
         mockRouter.currentRoute.value.name = route;
         const testWrapper = mount(Custom, {
           props: { currOrgIdentifier: "test-org" },
@@ -307,16 +304,16 @@ describe("Custom Component", () => {
             plugins: [i18n],
             provide: { store },
             stubs: {
-              'OSplitter': {
-                template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+              OSplitter: {
+                template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
               },
-              'OTabs': true,
-              'ORouteTab': true,
-              'router-view': true
-            }
+              OTabs: true,
+              ORouteTab: true,
+              "router-view": true,
+            },
           },
         });
-        
+
         expect(testWrapper.vm.tabs).toBe("ingestLogs");
         testWrapper.unmount();
       });
@@ -324,23 +321,23 @@ describe("Custom Component", () => {
 
     it("should handle rum routes", () => {
       mockRouter.currentRoute.value.name = "frontendMonitoring";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("rumMonitoring");
       testWrapper.unmount();
     });
@@ -366,92 +363,115 @@ describe("Custom Component", () => {
   describe("Additional Route Combinations", () => {
     it("should handle otelCollector metric route", () => {
       mockRouter.currentRoute.value.name = "otelCollector";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
+      expect(testWrapper.vm.tabs).toBe("ingestMetrics");
+      testWrapper.unmount();
+    });
+
+    it("should handle vmagent metric route", () => {
+      mockRouter.currentRoute.value.name = "vmagent";
+
+      const testWrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            },
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
+        },
+      });
+
       expect(testWrapper.vm.tabs).toBe("ingestMetrics");
       testWrapper.unmount();
     });
 
     it("should handle telegraf metric route", () => {
       mockRouter.currentRoute.value.name = "telegraf";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestMetrics");
       testWrapper.unmount();
     });
 
     it("should handle cloudwatchMetrics metric route", () => {
       mockRouter.currentRoute.value.name = "cloudwatchMetrics";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestMetrics");
       testWrapper.unmount();
     });
 
     it("should handle ingestTraces route", () => {
       mockRouter.currentRoute.value.name = "ingestTraces";
-      
-      const testWrapper = mount(Custom, {
+
+      mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "ingestTraces",
         query: {
@@ -462,23 +482,23 @@ describe("Custom Component", () => {
 
     it("should handle ingestMetrics route", () => {
       mockRouter.currentRoute.value.name = "ingestMetrics";
-      
-      const testWrapper = mount(Custom, {
+
+      mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "ingestMetrics",
         query: {
@@ -489,23 +509,23 @@ describe("Custom Component", () => {
 
     it("should handle rumMonitoring route", () => {
       mockRouter.currentRoute.value.name = "rumMonitoring";
-      
-      const testWrapper = mount(Custom, {
+
+      mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "rumMonitoring",
         query: {
@@ -516,23 +536,23 @@ describe("Custom Component", () => {
 
     it("should handle unknown route", () => {
       mockRouter.currentRoute.value.name = "unknownRoute";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       // Unknown route defaults to 'ingestLogs' after the tab-persistence fix
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
@@ -542,138 +562,161 @@ describe("Custom Component", () => {
   describe("Individual Log Routes", () => {
     it("should handle fluentbit route", () => {
       mockRouter.currentRoute.value.name = "fluentbit";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
 
     it("should handle fluentd route", () => {
       mockRouter.currentRoute.value.name = "fluentd";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
 
     it("should handle kinesisfirehose route", () => {
       mockRouter.currentRoute.value.name = "kinesisfirehose";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
 
     it("should handle vector route", () => {
       mockRouter.currentRoute.value.name = "vector";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
 
     it("should handle filebeat route", () => {
       mockRouter.currentRoute.value.name = "filebeat";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
 
     it("should handle gcpLogs route", () => {
       mockRouter.currentRoute.value.name = "gcpLogs";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
+
+      expect(testWrapper.vm.tabs).toBe("ingestLogs");
+      testWrapper.unmount();
+    });
+
+    it("should handle loongcollector route", () => {
+      mockRouter.currentRoute.value.name = "loongcollector";
+
+      const testWrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            },
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
+        },
+      });
+
       expect(testWrapper.vm.tabs).toBe("ingestLogs");
       testWrapper.unmount();
     });
@@ -683,34 +726,34 @@ describe("Custom Component", () => {
     it("should handle custom route in onUpdated", async () => {
       // First mount with different route
       mockRouter.currentRoute.value.name = "curl";
-      
+
       const testWrapper = mount(Custom, {
         props: { currOrgIdentifier: "test-org" },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
 
       // Reset mock call count
       mockRouter.push.mockClear();
-      
+
       // Change route to trigger onUpdated
       mockRouter.currentRoute.value.name = "custom";
-      
+
       // Force update
       await testWrapper.vm.$nextTick();
       testWrapper.vm.$forceUpdate();
       await testWrapper.vm.$nextTick();
-      
+
       testWrapper.unmount();
     });
   });
@@ -726,17 +769,17 @@ describe("Custom Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'OSplitter': {
-              template: '<div><slot name="before"></slot><slot name="after"></slot></div>'
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            'OTabs': true,
-            'ORouteTab': true,
-            'router-view': true
-          }
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
         },
       });
-      
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       testWrapper.unmount();
     });
 
@@ -762,7 +805,7 @@ describe("Custom Component", () => {
       mockRouter.currentRoute.value.name = "prometheus";
 
       const mockContent = {
-        innerText: "test analytics content"
+        innerText: "test analytics content",
       };
 
       await wrapper.vm.copyToClipboardFn(mockContent);
@@ -783,7 +826,7 @@ describe("Custom Component", () => {
       const segment = await import("@/services/segment_analytics");
 
       const mockContent = {
-        innerText: "test analytics content"
+        innerText: "test analytics content",
       };
 
       try {
@@ -803,12 +846,12 @@ describe("Custom Component", () => {
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
       const mockContent = {
-        innerText: ""
+        innerText: "",
       };
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", {
+      expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -820,12 +863,12 @@ describe("Custom Component", () => {
       vi.mocked(copyToClipboard).mockResolvedValue(true);
 
       const mockContent = {
-        innerText: null
+        innerText: null,
       };
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(null, {
+      expect(copyToClipboard).toHaveBeenCalledWith(null, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -840,7 +883,7 @@ describe("Custom Component", () => {
 
       await wrapper.vm.copyToClipboardFn(mockContent);
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

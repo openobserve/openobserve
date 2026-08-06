@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from './types';
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Email prebuilt destination configuration
  * Uses HTML email template for rich formatting
  */
 export const emailTemplate = {
-  name: 'prebuilt_email',
+  name: "prebuilt_email",
   body: `<!DOCTYPE html>
 <html>
 <head>
@@ -27,6 +27,10 @@ export const emailTemplate = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenObserve Alert</title>
     <style>
+        /* INTENTIONAL EXCEPTION to the two-font rule: this markup renders inside a
+           mail client, which cannot load our self-hosted webfont and has no access
+           to our CSS custom properties. A system stack is correct here — do not
+           replace with var(--font-sans). */
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
         .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
         .header { background-color: #d63638; color: white; padding: 20px; text-align: center; }
@@ -89,34 +93,39 @@ export const emailTemplate = {
     </div>
 </body>
 </html>`,
-  type: 'email' as const,
-  title: 'OpenObserve Alert Notification',
-  isDefault: false
+  type: "email" as const,
+  title: "OpenObserve Alert Notification",
+  isDefault: false,
 };
 
 export const emailConfig: PrebuiltConfig = {
-  templateName: 'prebuilt_email',
+  templateName: "prebuilt_email",
   templateBody: emailTemplate.body,
   headers: {
-    'Content-Type': 'text/html'
+    "Content-Type": "text/html",
   },
-  method: 'post',
-  urlValidator: (url: string) => false, // Email doesn't use URLs - always return false
+  method: "post",
+  urlValidator: () => false, // Email doesn't use URLs - always return false
   credentialFields: [
     {
-      key: 'recipients',
-      label: 'Recipient Email Addresses',
-      type: 'email',
+      key: "recipients",
+      labelKey: "alerts.prebuiltDestinations.emailRecipients",
+      type: "email",
       required: true,
-      hint: 'Comma-separated email addresses',
+      hintKey: "alerts.prebuiltDestinations.emailRecipientsHelp",
       validator: (emails: string) => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const emailList = emails.split(',').map(e => e.trim());
-        const invalidEmails = emailList.filter(email => !emailRegex.test(email));
-        return invalidEmails.length === 0 || `Invalid email addresses: ${invalidEmails.join(', ')}`;
-      }
-    }
-    // CC and Subject fields removed - not supported by backend Email struct
+        const emailList = emails.split(",").map((e) => e.trim());
+        const invalidEmails = emailList.filter((email) => !emailRegex.test(email));
+        return (
+          invalidEmails.length === 0 || {
+            key: "alerts.prebuiltDestinations.invalidEmailAddresses",
+            params: { emails: invalidEmails.join(", ") },
+          }
+        );
+      },
+    },
+    // CC and Subject are not supported by the backend Email struct
     // {
     //   key: 'ccRecipients',
     //   label: 'CC Recipients (optional)',
@@ -131,17 +140,17 @@ export const emailConfig: PrebuiltConfig = {
     //   required: false,
     //   hint: 'Custom subject line (defaults to alert name)'
     // }
-  ]
+  ],
 };
 
-import emailLogo from '@/assets/images/alerts/destinations/email.png';
+import emailLogo from "@/assets/images/alerts/destinations/email.png";
 
-export const emailDestinationType = {
-  id: 'email',
-  name: 'Email',
-  description: 'Send HTML formatted email notifications',
-  icon: 'email',
+export const emailDestinationType: PrebuiltType = {
+  id: "email",
+  name: "Email",
+  descriptionKey: "alert_destinations.prebuilt.emailDescription",
+  icon: "email",
   image: emailLogo,
   popular: true,
-  category: 'email'
+  category: "email",
 };

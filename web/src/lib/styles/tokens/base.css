@@ -2,497 +2,18 @@
 
 /* Geist variable fonts — served locally */
 @font-face {
-  font-family: 'Geist';
-  src: url(@/styles/fonts/Geist-Variable.woff2) format('woff2-variations');
+  font-family: "Geist";
+  src: url(@/styles/fonts/Geist-Variable.woff2) format("woff2-variations");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Geist Mono';
-  src: url(@/styles/fonts/GeistMono-Variable.woff2) format('woff2-variations');
+  font-family: "Geist Mono";
+  src: url(@/styles/fonts/GeistMono-Variable.woff2) format("woff2-variations");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-}
-
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-RaLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-1aLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-ZaLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-daLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-laLZx3lE4.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-RaLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-1aLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-ZaLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-daLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-laLZx3lE4.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-RaLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-1aLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-ZaLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-daLZx3lE4-Hw.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: italic;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0RMImSLYBIv1o4X1M8cce4OdVisMz5nZRqy6cmmmU3t2FQWEAEOvV9wNvrwlNstMKW3Y6K5WMwd-laLZx3lE4.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t4R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7txR-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t6R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t7R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 300;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t1R-tQKr51.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t4R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7txR-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t6R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t7R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t1R-tQKr51.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t4R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7txR-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t6R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t7R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t1R-tQKr51.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* cyrillic-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t4R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
-}
-/* cyrillic */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7txR-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
-}
-/* vietnamese */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t6R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
-}
-/* latin-ext */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t7R-tQKr51pE8.woff2) format('woff2');
-  unicode-range: U+0100-02AF, U+0304, U+0308, U+0329, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* latin */
-@font-face {
-  font-family: 'Nunito Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-stretch: 100%;
-  font-display: swap;
-  src: url(@/styles/fonts/pe0TMImSLYBIv1o4X1M8ce2xCx3yop4tQpF_MeTm0lfGWVpNn64CL7U8upHZIbMV51Q42ptCp7t1R-tQKr51.woff2) format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-/* IBM Plex Sans — latin (weight 400) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-400.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Sans — latin-ext (weight 400) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-ext-400.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* IBM Plex Sans — latin (weight 500) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-500.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Sans — latin-ext (weight 500) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-ext-500.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* IBM Plex Sans — latin (weight 600) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-600.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Sans — latin-ext (weight 600) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-ext-600.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* IBM Plex Sans — latin (weight 700) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-700.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Sans — latin-ext (weight 700) */
-@font-face {
-  font-family: 'IBM Plex Sans';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-sans-latin-ext-700.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-
-/* IBM Plex Mono — latin (weight 400) */
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Mono — latin-ext (weight 400) */
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-mono-latin-ext-400.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* IBM Plex Mono — latin (weight 500) */
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-mono-latin-500.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Mono — latin-ext (weight 500) */
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-mono-latin-ext-500.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-/* IBM Plex Mono — latin (weight 600) */
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-mono-latin-600.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-/* IBM Plex Mono — latin-ext (weight 600) */
-@font-face {
-  font-family: 'IBM Plex Mono';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('@/styles/fonts/ibm-plex-mono-latin-ext-600.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 /* ============================================================
@@ -503,65 +24,76 @@
 
 :root {
   /* --- Font family tokens --- */
-  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  /* Fallbacks are per-glyph: any character Geist Mono lacks (CJK, box-drawing,
+     symbols in log data) falls through to the next family automatically. Do NOT
+     add families we don't ship a @font-face for — they resolve only on machines
+     that happen to have them installed, giving a different look per OS. */
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
-  /* --- Font size scale --- */
-  --text-xs:   0.75rem;   /* 12px */
-  --text-sm:   0.8125rem; /* 13px */
-  --text-base: 0.875rem; /* 16px */
-  --text-md:   1rem;      /* 16px */
-  --text-lg:   1.125rem;  /* 18px */
-  --text-xl:   1.25rem;   /* 20px */
-  --text-2xl:  1.5rem;    /* 24px */
-  --text-3xl:  1.875rem;  /* 30px */
-  --text-4xl:  2.25rem;   /* 36px */
+  /* --- Font size scale — single source of truth ---
+     Values match Tailwind's conventional scale, so token-driven element rules and
+     the text-* utilities agree pixel-for-pixel. Do NOT use raw text-[..px]. */
+  --text-3xs: 0.625rem; /* 10px — chart axis micro-labels, dense table sub-text */
+  --text-2xs: 0.6875rem; /* 11px — tiny labels, chips, badge text */
+  --text-xs: 0.75rem; /* 12px — captions, metadata, timestamps */
+  --text-compact: 0.8125rem; /* 13px — dense body / data tables */
+  --text-sm: 0.875rem; /* 14px — DEFAULT body text */
+  --text-base: 1rem; /* 16px — comfortable body, form inputs */
+  --text-lg: 1.125rem; /* 18px — card / panel titles */
+  --text-xl: 1.25rem; /* 20px — section headings */
+  --text-2xl: 1.5rem; /* 24px — page / modal titles */
+  --text-3xl: 1.875rem; /* 30px — hero numbers / large display */
+  --text-4xl: 2.25rem; /* 36px — display */
 
   /* --- Line-height scale --- */
-  --leading-xs:    1rem;      /* 16px */
-  --leading-sm:    1.125rem;  /* 18px */
-  --leading-base:  1.25rem;   /* 20px */
-  --leading-md:    1.375rem;  /* 22px */
-  --leading-lg:    1.5rem;    /* 24px */
-  --leading-xl:    1.75rem;   /* 28px */
-  --leading-2xl:   2rem;      /* 32px */
-  --leading-3xl:   2.25rem;   /* 36px */
-  --leading-4xl:   2.5rem;    /* 40px */
+  --leading-sm: 1.125rem; /* 18px */
+  --leading-base: 1.25rem; /* 20px */
+  --leading-md: 1.375rem; /* 22px */
+  --leading-lg: 1.5rem; /* 24px */
+  --leading-xl: 1.75rem; /* 28px */
+  --leading-2xl: 2rem; /* 32px */
+  --leading-3xl: 2.25rem; /* 36px */
+  --leading-4xl: 2.5rem; /* 40px */
 
   /* --- Letter-spacing scale --- */
-  --tracking-tighter: -0.05em;
-  --tracking-tight:   -0.025em;
-  --tracking-normal:   0;
-  --tracking-wide:     0.025em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
 
   /* --- Font weight scale --- */
   --font-normal: normal;
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
-  --font-black: 900;
-  /* --- Primary palette — blue-teal #3F7994 --- */
-  --color-primary-50:  #f5f8fa;
+  /* --- Primary palette — blue-teal #3F7994 ---
+     The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`
+     defines the selectable themes; `utils/theme.ts#generatePrimaryPalette` derives the
+     full 50–950 ramp from the chosen base and writes it as inline styles on <html>,
+     which beat this stylesheet. The values below are the DEFAULT O2 theme only —
+     theme.ts removes its inline overrides when the default theme is active, so these
+     then apply. To change the brand: edit constants/themes.ts (or pick a theme in the
+     UI) — do NOT edit this ramp and expect custom themes to follow. */
+  --color-primary-50: #f5f8fa;
   --color-primary-100: #e2ebef;
   --color-primary-200: #c5d7df;
   --color-primary-300: #9fbcca;
   --color-primary-400: #79a1b4;
   --color-primary-500: #5c8da4;
-  --color-primary-600: #3F7994;   /* brand accent — buttons, links, active tabs */
-  --color-primary-700: #326176;   /* hover */
+  --color-primary-600: #3f7994; /* brand accent — buttons, links, active tabs */
+  --color-primary-700: #326176; /* hover */
   --color-primary-800: #264959;
   --color-primary-900: #19303b;
-  --color-primary-950: #0d181e;   /* darkest — dark-mode hover/drag bgs */
+  --color-primary-950: #0d181e; /* darkest — dark-mode hover/drag bgs */
 
   /* --- Grey palette --- */
-  /* Tailwind "neutral" palette — true greys with no blue undertone.
-     Previously used "gray" (#1f2937, #111827, …) which has a cool/blue tint,
-     causing inputs / selects / dropdowns / dialogs to read as dark blue in
-     dark mode. Neutral matches user expectation of "dark grey, not blue". */
-  --color-grey-0:   #ffffff;
-  --color-grey-50:  #fafafa;
+  /* Tailwind "neutral" palette — true greys with no blue undertone. Tailwind's
+     "gray" has a cool/blue tint that makes inputs / selects / dropdowns / dialogs
+     read as dark blue in dark mode; neutral reads as "dark grey, not blue". */
+  --color-grey-0: #ffffff;
+  --color-grey-50: #fafafa;
   --color-grey-100: #f5f5f5;
-  --color-grey-150: #ededed;   /* soft divider step (between 100 and 200) */
+  --color-grey-150: #ededed; /* soft divider step (between 100 and 200) */
   --color-grey-200: #e5e5e5;
   --color-grey-300: #d4d4d4;
   --color-grey-400: #a3a3a3;
@@ -574,26 +106,26 @@
   --color-grey-950: #0a0a0a;
 
   /* --- Error palette --- */
-  --color-error-50:  #fef2f2;
+  --color-error-50: #fef2f2;
   --color-error-100: #fee2e2;
-  --color-error-300: #fca5a5;   /* referenced by destructive-disabled / focus-ring */
+  --color-error-300: #fca5a5;
   --color-error-400: #f87171;
   --color-error-500: #ef4444;
   --color-error-600: #dc2626;
   --color-error-700: #b91c1c;
 
   /* --- Success palette --- */
-  --color-success-50:  #f0fdf4;
+  --color-success-50: #f0fdf4;
   --color-success-100: #dcfce7;
   --color-success-200: #bbf7d0;
-  --color-success-400: #4ade80;   /* referenced by EmptyState check illustration */
+  --color-success-400: #4ade80;
   --color-success-500: #22c55e;
-  --color-success-600: #16a34a;   /* parity with error-600 — ghost-success play/resume text */
+  --color-success-600: #16a34a;
   --color-success-700: #15803d;
   --color-success-900: #14532d;
 
   /* --- Warning palette (Tailwind yellow scale) --- */
-  --color-warning-50:  #fefce8;
+  --color-warning-50: #fefce8;
   --color-warning-100: #fef9c3;
   --color-warning-300: #fcd34d;
   --color-warning-400: #facc15;
@@ -603,7 +135,7 @@
   --color-warning-900: #78350f;
 
   /* --- Purple palette (used by OBadge purple-outline for metrics stream type) --- */
-  --color-purple-50:  #faf5ff;
+  --color-purple-50: #faf5ff;
   --color-purple-100: #f3e8ff;
   --color-purple-400: #c084fc;
   --color-purple-500: #a855f7;
@@ -611,63 +143,33 @@
   --color-purple-700: #7e22ce;
   --color-purple-900: #581c87;
 
-  /* --- Info palette (blue, used by OBanner info variant) --- */
-  --color-info-50:  #eff6ff;
-  --color-info-100: #dbeafe;
-  --color-info-200: #bfdbfe;
-  --color-info-700: #1d4ed8;
-  --color-info-800: #1e3a8a;
-  --color-info-900: #1e3a5f;
-
-  /* --- Note container palette (pipeline guideline cards) --- */
-  --color-note-light-bg:        #f9f290;
-  --color-note-light-border:    #f5a623;
-  --color-note-light-text:      #865300;
-  --color-note-dark-border:     #b45309;
-  --color-note-dark-text:       #fef3c7;
-  --color-note-highlight-light: #007bff;
-  --color-note-highlight-dark:  #93c5fd;
-  --color-note-code-light:      #d63384;
-  --color-note-code-dark:       #f9a8d4;
-
   /* --- Teal palette --- */
-  --color-teal-50:  #f0fdfa;
-  --color-teal-100: #ccfbf1;
-  --color-teal-200: #99f6e4;
+  --color-teal-50: #f0fdfa;
   --color-teal-300: #5eead4;
   --color-teal-400: #2dd4bf;
   --color-teal-500: #14b8a6;
   --color-teal-600: #0d9488;
   --color-teal-700: #0f766e;
-  --color-teal-800: #115e59;
-  --color-teal-900: #134e4a;
 
   /* --- Orange palette --- */
-  --color-orange-50:  #fff7ed;
-  --color-orange-100: #ffedd5;
-  --color-orange-200: #fed7aa;
+  --color-orange-50: #fff7ed;
   --color-orange-300: #fdba74;
   --color-orange-400: #fb923c;
   --color-orange-500: #f97316;
   --color-orange-600: #ea580c;
   --color-orange-700: #c2410c;
-  --color-orange-800: #9a3412;
   --color-orange-900: #7c2d12;
 
   /* --- Lime palette --- */
-  --color-lime-50:  #f7fee7;
-  --color-lime-100: #ecfccb;
-  --color-lime-200: #d9f99d;
+  --color-lime-50: #f7fee7;
   --color-lime-300: #bef264;
   --color-lime-400: #a3e635;
   --color-lime-500: #84cc16;
   --color-lime-600: #65a30d;
   --color-lime-700: #4d7c0f;
-  --color-lime-800: #365314;
-  --color-lime-900: #1a2e05;
 
   /* --- Amber palette --- */
-  --color-amber-50:  #fffbeb;
+  --color-amber-50: #fffbeb;
   --color-amber-100: #fef3c7;
   --color-amber-200: #fde68a;
   --color-amber-300: #fcd34d;
@@ -675,23 +177,18 @@
   --color-amber-500: #f59e0b;
   --color-amber-600: #d97706;
   --color-amber-700: #b45309;
-  --color-amber-800: #92400e;
-  --color-amber-900: #78350f;
 
   /* --- Cyan palette --- */
-  --color-cyan-50:  #ecfeff;
-  --color-cyan-100: #cffafe;
-  --color-cyan-200: #a5f3fc;
+  --color-cyan-50: #ecfeff;
   --color-cyan-300: #67e8f9;
   --color-cyan-400: #22d3ee;
   --color-cyan-500: #06b6d4;
   --color-cyan-600: #0891b2;
   --color-cyan-700: #0e7490;
-  --color-cyan-800: #155e75;
   --color-cyan-900: #164e63;
 
   /* --- Blue palette --- */
-  --color-blue-50:  #eff6ff;
+  --color-blue-50: #eff6ff;
   --color-blue-100: #dbeafe;
   --color-blue-200: #bfdbfe;
   --color-blue-300: #93c5fd;
@@ -703,7 +200,7 @@
   --color-blue-900: #1e3a8a;
 
   /* --- Indigo palette --- */
-  --color-indigo-50:  #eef2ff;
+  --color-indigo-50: #eef2ff;
   --color-indigo-100: #e0e7ff;
   --color-indigo-200: #c7d2fe;
   --color-indigo-300: #a5b4fc;
@@ -714,30 +211,510 @@
   --color-indigo-800: #3730a3;
   --color-indigo-900: #312e81;
 
+  /* --- Trace span categorical palette (50 colors) ---
+     Theme-neutral (same in light/dark); consumed as --color-span-{n} by
+     utils/traces/traceColors.ts. */
+  --color-span-1: #3b82f6;
+  --color-span-2: #ef4444;
+  --color-span-3: #10b981;
+  --color-span-4: #a855f7;
+  --color-span-5: #f97316;
+  --color-span-6: #06b6d4;
+  --color-span-7: #ec4899;
+  --color-span-8: #84cc16;
+  --color-span-9: #6366f1;
+  --color-span-10: #f59e0b;
+  --color-span-11: #14b8a6;
+  --color-span-12: #d946ef;
+  --color-span-13: #16a34a;
+  --color-span-14: #7c3aed;
+  --color-span-15: #f59e0b;
+  --color-span-16: #0284c7;
+  --color-span-17: #e11d48;
+  --color-span-18: #84cc16;
+  --color-span-19: #6366f1;
+  --color-span-20: #ef4444;
+  --color-span-21: #10b981;
+  --color-span-22: #8b5cf6;
+  --color-span-23: #f97316;
+  --color-span-24: #06b6d4;
+  --color-span-25: #ec4899;
+  --color-span-26: #22c55e;
+  --color-span-27: #a855f7;
+  --color-span-28: #fbbf24;
+  --color-span-29: #3b82f6;
+  --color-span-30: #f43f5e;
+  --color-span-31: #14b8a6;
+  --color-span-32: #d946ef;
+  --color-span-33: #84cc16;
+  --color-span-34: #6366f1;
+  --color-span-35: #fb923c;
+  --color-span-36: #0ea5e9;
+  --color-span-37: #f472b6;
+  --color-span-38: #22d3ee;
+  --color-span-39: #a78bfa;
+  --color-span-40: #34d399;
+  --color-span-41: #fca5a5;
+  --color-span-42: #818cf8;
+  --color-span-43: #fcd34d;
+  --color-span-44: #2dd4bf;
+  --color-span-45: #f9a8d4;
+  --color-span-46: #67e8f9;
+  --color-span-47: #c4b5fd;
+  --color-span-48: #86efac;
+  --color-span-49: #fde68a;
+  --color-span-50: #fca5a5;
+
+  /* --- Dashboard classic series palette — light values (dark overrides in dark.css).
+     Read by utils/dashboard/colorPalette.ts getColorPalette() via chartColor(), so the
+     light/dark swap lives in CSS instead of a `theme === "dark"` branch in JS. --- */
+  --color-chart-series-1: #5b8ef0;
+  --color-chart-series-2: #34d399;
+  --color-chart-series-3: #fb923c;
+  --color-chart-series-4: #f472b6;
+  --color-chart-series-5: #a78bfa;
+  --color-chart-series-6: #fbbf24;
+  --color-chart-series-7: #38bdf8;
+  --color-chart-series-8: #f87171;
+  --color-chart-series-9: #2dd4bf;
+  --color-chart-series-10: #4ade80;
+  --color-chart-series-11: #e879f9;
+  --color-chart-series-12: #facc15;
+
+  /* --- Dashboard table row-highlight palette — light values (dark overrides in
+     dark.css). Read by colorPalette.ts getColorForTable() via chartColor(). --- */
+  --color-chart-table-1: #ffcdee;
+  --color-chart-table-2: #ffd2d3;
+  --color-chart-table-3: #c8fcfa;
+  --color-chart-table-4: #b2dafb;
+  --color-chart-table-5: #c0e9fc;
+  --color-chart-table-6: #ffcde5;
+  --color-chart-table-7: #c0eff5;
+  --color-chart-table-8: #fffdba;
+  --color-chart-table-9: #e6f3ff;
+  --color-chart-table-10: #f2b9b9;
+  --color-chart-table-11: #a6e8f0;
+  --color-chart-table-12: #c8e5fc;
+  --color-chart-table-13: #e8a3f4;
+  --color-chart-table-14: #c0e5e2;
+  --color-chart-table-15: #c9ffbd;
+  --color-chart-table-16: #f8b1c9;
+  --color-chart-table-17: #bddfff;
+  --color-chart-table-18: #d2b9ff;
+  --color-chart-table-19: #d2ebda;
+  --color-chart-table-20: #c0e3c2;
+  --color-chart-table-21: #f0f8e8;
+  --color-chart-table-22: #fff2cc;
+  --color-chart-table-23: #ffe6e6;
+  --color-chart-table-24: #e8f4fd;
+
+  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css --- */
+  --color-chart-gridline: rgba(0, 0, 0, 0.08);
+
+  /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
+     dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
+     empty value ECharts reads as its own "auto" default — preserving today's look. --- */
+
+  /* --- Trace span palette (35 colors, HEX/canvas variant) — light values; dark
+     overrides in dark.css. Read by traceColors.ts getSpanColorHex()/getAllSpanColors()
+     via chartColor(). Distinct from --color-span-* (the 50-colour var() palette). --- */
+  --color-trace-span-1: #10b981;
+  --color-trace-span-2: #06b6d4;
+  --color-trace-span-3: #84cc16;
+  --color-trace-span-4: #6366f1;
+  --color-trace-span-5: #f59e0b;
+  --color-trace-span-6: #3b82f6;
+  --color-trace-span-7: #14b8a6;
+  --color-trace-span-8: #d946ef;
+  --color-trace-span-9: #7c3aed;
+  --color-trace-span-10: #f59e0b;
+  --color-trace-span-11: #0284c7;
+  --color-trace-span-12: #84cc16;
+  --color-trace-span-13: #6366f1;
+  --color-trace-span-14: #f9a8d4;
+  --color-trace-span-15: #10b981;
+  --color-trace-span-16: #8b5cf6;
+  --color-trace-span-17: #f97316;
+  --color-trace-span-18: #22d3ee;
+  --color-trace-span-19: #06b6d4;
+  --color-trace-span-20: #21cb60;
+  --color-trace-span-21: #a855f7;
+  --color-trace-span-22: #fbbf24;
+  --color-trace-span-23: #3b82f6;
+  --color-trace-span-24: #14b8a6;
+  --color-trace-span-25: #6366f1;
+  --color-trace-span-26: #fb923c;
+  --color-trace-span-27: #0ea5e9;
+  --color-trace-span-28: #f472b6;
+  --color-trace-span-29: #a855f7;
+  --color-trace-span-30: #818cf8;
+  --color-trace-span-31: #f97316;
+  --color-trace-span-32: #fca5a5;
+  --color-trace-span-33: #06b6d4;
+  --color-trace-span-34: #a78bfa;
+  --color-trace-span-35: #3b82f6;
+
+  /* --- Chart metric-panel text default — contrast fallback when a panel has no
+     background; read via chartColor() by getContrastColor's callers. --- */
+  --color-chart-metric-text: #000000;
+
+  /* --- Chart NUMERIC tokens (not colours) — read via chartNumber(); light/dark
+     swap lives in dark.css, so chart JS branches on neither token nor theme. --- */
+  --chart-area-fill-top-opacity: 0.9;
+  --chart-area-fill-bottom-opacity: 0.4;
+  --chart-metric-contrast-threshold: 0.5;
+
   /* --- White / Black --- */
   --color-white: #ffffff;
   --color-black: #000000;
 
   /* --- Spacing scale --- */
-  --spacing-px:  1px;
-  --spacing-3:   0.75rem;   /* 12px */
-  --spacing-4:   1rem;      /* 16px */
-  --spacing-5:   1.25rem;   /* 20px */
-  --spacing-6:   1.5rem;    /* 24px */
-  --spacing-8:   2rem;      /* 32px */
-  --spacing-10:  2.5rem;    /* 40px */
+  --spacing-px: 1px;
+  --spacing-3: 0.75rem; /* 12px */
+  --spacing-4: 1rem; /* 16px */
+  --spacing-5: 1.25rem; /* 20px */
+  --spacing-6: 1.5rem; /* 24px */
+  --spacing-8: 2rem; /* 32px */
+  --spacing-10: 2.5rem; /* 40px */
 
   /* --- Radius scale --- */
-  --radius-sm:   0.25rem;   /* 4px  */
-  --radius-md:   0.375rem;  /* 6px  */
-  --radius-lg:   0.5rem;    /* 8px  */
-  --radius-xl:   0.75rem;   /* 12px */
-  --radius-full: 9999px;
+  /* Two real corner radii, one job each — no fake tiers:
+       --radius-default (6px)   tight interactive controls (buttons, inputs,
+                                chips, small icon buttons)
+       --radius-surface (12px)  large surfaces (dialogs, drawers, cards/panels,
+                                the app-shell content area)
+     plus --radius-full for pills/avatars/circles. Changing either knob retunes
+     its whole tier at once. The old sm/md/lg/xl scale was retired — it exposed
+     five names for what was one value; every former ref was repointed
+     (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
+  --radius-default: 0.375rem; /* 6px  — control tier */
+  --radius-surface: 0.75rem; /* 12px — surface tier (matches the historical dialog curve) */
+  --radius-full: 9999px; /* pills / avatars / circles */
+  /* Checkboxes stay at the original 4px: the tick box is tiny (12–16px), and the
+     control tier's 6px reads as visibly round on a box that small. Pinned to its
+     own knob so it holds independent of --radius-default. */
+  --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
-     sm is intentionally none: cards use a 1px border, not a drop shadow.
-     md/lg retained for overlays (dialogs, menus) that need real elevation. */
-  --shadow-sm: none;
+     Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
+     1px border, not a drop shadow — a flat surface needs NO shadow class. */
   --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.10), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+}
+
+/* ============================================================
+   DOMAIN / DATA-VIZ / BRAND LITERAL TOKENS
+   Fixed categorical / brand values (label chips, trace DAG nodes, code
+   syntax, external-brand replicas, json / service-health / wildcard,
+   gradients, …) — raw values that belong with the palette, not the
+   semantic intent layer. Registered for utilities in semantic.css /
+   component.css @theme inline; dark overrides in dark.css.
+   ============================================================ */
+/* Label chips (field-value type chips). Dark overrides in dark.css;
+   component.css's @theme inline registers these for Tailwind. */
+:root {
+  --color-label-chip-ip-bg: #f2fcf3;
+  --color-label-chip-ip-text: #208a3c;
+  --color-label-chip-method-bg: #fff2f3;
+  --color-label-chip-method-text: #cc3645;
+  --color-label-chip-url-bg: #e4e9fe;
+  --color-label-chip-url-text: #575fc5;
+  --color-label-chip-num-bg: #fff4eb;
+  --color-label-chip-num-text: #a14916;
+  /* Amber highlight for pattern variables (inline masks) */
+  --color-pattern-var-bg: #f8d88a;
+  --color-pattern-var-text: #7a4d00;
+  --color-label-chip-float-bg: #fff4eb;
+  --color-label-chip-float-text: #a14916;
+  --color-label-chip-hex-bg: #fffaeb;
+  --color-label-chip-hex-text: #c27d04;
+  --color-label-chip-ts-bg: #faf5ff;
+  --color-label-chip-ts-text: #643cb8;
+  --color-label-chip-id-bg: #f2fcfc;
+  --color-label-chip-id-text: #077a7f;
+  --color-label-chip-email-bg: #fff7f7;
+  --color-label-chip-email-text: #e55765;
+  --color-label-chip-str-bg: #e8ecf0;
+  --color-label-chip-str-text: #5a5d6b;
+  --color-label-chip-default-bg: #e8ecf0;
+  --color-label-chip-default-text: #5a5d6b;
+  --color-label-chip-pattern-bg: #edf3ff;
+  --color-label-chip-pattern-text: #2e55a3;
+}
+
+/* Domain data-viz color tokens */
+:root {
+  --color-actions-column-shadow: rgba(0, 0, 0, 0.1);
+  --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
+  --color-card-glass-border: rgba(0, 0, 0, 0.12);
+  --color-cancel-query-bg: #f67a7a;
+  --color-highlight-bg: #e7e6e6; /* syntax-guide highlight chip (dark: #747474) */
+  --color-brand-indigo: #5960b2; /* brand indigo — loading bar, AI accents (theme-independent) */
+  --color-card-glass-bg: rgba(255, 255, 255, 0.8);
+  --color-card-glass-solid: rgba(255, 255, 255);
+  --color-dashboard-placeholder-bg: #b3bdf1;
+  --color-error-tag-bg: #f9d3d3;
+  --color-error-tag-text: #e74c3c;
+  --color-field-type-boolean-bg: #e74c3c;
+  --color-field-type-boolean-text: #fff;
+  --color-field-type-float-bg: oklch(94.6% 0.033 307.174);
+  --color-field-type-float-text: oklch(55.8% 0.288 302.321);
+  --color-field-type-number-bg: oklch(95.4% 0.038 75.164);
+  --color-field-type-number-text: oklch(64.6% 0.222 41.116);
+  --color-field-type-string-bg: oklch(95% 0.052 163.051);
+  --color-field-type-string-text: oklch(59.6% 0.145 163.225);
+  --color-field-type-timestamp-bg: oklch(93.2% 0.032 255.585);
+  --color-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
+  --color-focus-ring: #282d5d;
+  --color-gray: #818594;
+  /* AI-assistant identity accents (welcome hero + prompt chips). Same values in
+     both themes — translucent bgs sit fine on light and dark surfaces. */
+  --color-ai-accent: #7b61ff;
+  /* SQL / query-editor violet accent (stream-name label, sql status bar). Theme-aware:
+     lighter in dark for legibility. */
+  --color-sql-accent: #7c3aed;
+  /* VRL-function blue accent, the sibling of --color-sql-accent: the two mark the
+     SQL vs function halves of an expanded search-history / scheduler row.
+     Theme-aware: lighter in dark for legibility. */
+  --color-function-accent: #0a7ebc;
+  --color-lang-sql-text: #7b61ff;
+  --color-lang-sql-bg: rgba(123, 97, 255, 0.1);
+  --color-lang-vrl-text: #f59e0b;
+  --color-lang-vrl-bg: rgba(245, 158, 11, 0.12);
+  --color-lang-promql-text: #10b981;
+  --color-lang-promql-bg: rgba(16, 185, 129, 0.12);
+  /* Trace DAG node-type palette (LLM span types). ONE base color per type;
+     at the call site border = base, bg = base@12% over surface, text = base
+     mixed toward the foreground. Dark values live in dark.css — the base flips,
+     so consumers need NO dark: variant. */
+  --color-dag-node-generation: #4caf50;
+  --color-dag-node-embedding: #2196f3;
+  --color-dag-node-agent: #9c27b0;
+  --color-dag-node-tool: #ff9800;
+  --color-dag-node-chain: #3f51b5;
+  --color-dag-node-retriever: #00bcd4;
+  --color-dag-node-task: #009688;
+  --color-dag-node-evaluator: #e91e63;
+  --color-dag-node-workflow: #673ab7;
+  --color-dag-node-rerank: #03a9f4;
+  --color-dag-node-guardrail: #f44336;
+  --color-dag-node-event: #ffc107;
+  --color-dag-node-default: #9e9e9e;
+  /* Code syntax highlighting (highlight.js) — GitHub light palette. Shared by
+     O2AIChat + OCodeBlock; dark values in dark.css so one rule covers both themes. */
+  --color-syntax-bg: #f6f8fa;
+  --color-syntax-text: #24292e;
+  --color-syntax-keyword: #d73a49;
+  --color-syntax-function: #6f42c1;
+  --color-syntax-number: #005cc5;
+  --color-syntax-string: #032f62;
+  --color-syntax-builtin: #e36209;
+  --color-syntax-comment: #6a737d;
+  --color-syntax-tag: #22863a;
+  --color-syntax-bullet: #735c0f;
+  --color-syntax-addition-fg: #22863a;
+  --color-syntax-addition-bg: #f0fff4;
+  --color-syntax-deletion-fg: #b31d28;
+  --color-syntax-deletion-bg: #ffeef0;
+  /* Brand gradients — theme-independent (same in light/dark) unless noted.
+     One AI gradient reused widely; -subtle/-faint are its idle washes
+     (dark alpha bumped in dark.css). */
+  --color-gradient-ai: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --color-gradient-ai-subtle: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  );
+  --color-gradient-ai-faint: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.05) 0%,
+    rgba(236, 72, 153, 0.05) 100%
+  );
+  --color-gradient-brand-ribbon: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
+  --color-gradient-danger: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  /* External brand colors (destination-preview CTAs, promo banner) — fixed,
+     theme-independent by design (replicate other products' brands). */
+  --color-brand-slack: #007a5a;
+  --color-brand-slack-hover: #005a42;
+  --color-brand-teams: #6264a7;
+  --color-brand-teams-hover: #464775;
+  --color-brand-email: #007bff;
+  --color-brand-email-hover: #0056b3;
+  --color-promo-webinar-link: #1e3a8a;
+  --color-promo-webinar-link-hover: #1e40af;
+  /* Home-banner accent (theme-independent, matches the amber header top-bar).
+     `-accent` is decorative only (gradient wash, border tint, blur blobs, badge
+     dot); `-accent-text` is the darker step the badge LABEL needs to stay legible
+     on the near-white banner. */
+  --color-promo-webinar-accent: var(--color-amber-400);
+  --color-promo-webinar-accent-text: var(--color-amber-700);
+  /* Body text + separator on the amber top-bar. Fixed (theme-independent) like
+     the rest of the promo art — the bar is always amber, so the text is always
+     the same near-black and the pipe the same muted slate. */
+  --color-promo-webinar-text: #1a1a1a;
+  --color-promo-webinar-sep: #374151;
+
+  /* Tool-call thread identity accent (traces LLM thread view). A distinct GREEN
+     that is deliberately NOT --color-dag-node-tool (orange) nor a status/success
+     green — collapsing it onto either would merge two visually-distinct roles.
+     `-accent` is the base the borders/fills derive from via color-mix; `-text`
+     is the readable label colour (flips lighter in dark, see dark.css). */
+  --color-tool-thread-accent: #4caf50;
+  --color-tool-thread-accent-text: #2f7a31;
+  /* Flame-graph tooltip (traces) — the tooltip is a FIXED dark glass
+     (rgba(30,41,59,.95), white text) in both themes, so its label/error colours
+     are deliberately theme-independent, like the brand replicas. */
+  --color-flame-tooltip-label: #cbd5e1;
+  --color-flame-tooltip-error: #f87171;
+  /* Global scrollbar treatment (consumed by styles/base-elements.css).
+     Dark steps in dark.css. */
+  --color-scrollbar-thumb: var(--color-grey-300);
+  --color-scrollbar-thumb-hover: var(--color-grey-400);
+  /* Secondary section-header accent bar. The alert/query editors mark most
+     sections with a --color-theme-accent bar and VRL-editor sections with a
+     deliberately DIFFERENT hue; this token carries that distinction. Dark step
+     in dark.css. */
+  --color-section-accent-secondary: var(--color-teal-600);
+  /* AI-chat message bubbles — subtle theme-aware gradient tints (dark in dark.css). */
+  --color-chat-bubble-user: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  --color-chat-bubble-ai: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
+  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) —
+     FIXED, theme-independent (must look like the real product in any app theme). */
+  --color-brand-msg-text: #4a5568;
+  --color-brand-msg-meta: #6c757d;
+  --color-brand-msg-border: #e9ecef;
+  --color-brand-teams-bg: #f3f2f1;
+  --color-brand-teams-text: #605e5c;
+  --color-brand-msg-text-strong: #495057;
+  --color-brand-teams-ink: #323130;
+  --color-brand-slack-text: #1d1c1d;
+  --color-brand-slack-meta: #616061;
+  --color-brand-msg-divider: #ddd;
+  --color-brand-slack-green: #06ac38;
+  --color-brand-msg-bg: #f8f9fa;
+  --color-brand-msg-error: #d63638;
+  --color-brand-email-ink: #172b4d;
+  --color-brand-msg-text-dark: #2d3748;
+  --color-brand-email-warning: #ffab00;
+  --color-brand-msg-border-2: #e1e5e9;
+  --color-brand-email-accent: #d13212;
+  --color-brand-slack-avatar: #81b5a1;
+  --color-brand-slack-aubergine: #4a154b;
+  --color-brand-slack-link: #1264a3;
+  --color-brand-email-ink-deep: #0f1c2e;
+  --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
+  --color-hover-shadow: #dddddd;
+  --color-icon-color: #808080;
+  --color-info: #4682fa;
+  --color-json-boolean: #6d28d9;
+  --color-json-key: #b71c1c;
+  --color-json-null: #6b7280;
+  --color-json-number: #2563eb;
+  --color-json-object: #4b5563;
+  --color-json-string: #047857;
+  --color-latency-p95: #0a4ce8;
+  --color-log-table-header-bg: #f1f3f7;
+  --color-log-table-row-bg: #ffffff;
+  --color-log-table-row-border: #e4e6ec;
+  --color-log-table-row-hover: #eff1fd;
+  --color-pivot-header-border: rgba(0, 0, 0, 0.15);
+  --color-section-header-bg: color-mix(in srgb, var(--color-theme-accent) 3%, rgb(247, 247, 247));
+  --color-service-health-critical: #f5222d;
+  --color-service-health-degraded: #faad14;
+  --color-service-health-healthy: #52c41a;
+  --color-service-health-warning: #fa8c16;
+  --color-severity-error-color: #ef5350;
+  --color-severity-warning-color: #fb8c00;
+  --color-status-info-bg: #edf3ff;
+  --color-status-info-text: #588cf3;
+  --color-status-neutral-text: #6c707e;
+  --color-status-warning-bg: #fff4eb;
+  --color-status-warning-text: #e56d17;
+  --color-sticky-col-header-bg: #e0e0e0;
+  --color-tab-text-color: #19191e;
+  --color-trace-border: #e8ecf0;
+  --color-trace-hover: #f7f8fa;
+  --color-trace-selected: #f5f8fe;
+  --color-trace-surface: #ffffff;
+  --color-trace-text-primary: #19191e;
+  --color-trace-text-secondary: #5a5d6b;
+  --color-warning: #df9303;
+  --color-wildcard-bar-blue: #88adf7;
+  --color-wildcard-bar-green: #55a76a;
+  --color-wildcard-bar-orange: #e56d17;
+  --color-wildcard-bar-purple: #834df0;
+
+  /* Empty-state illustration palette — a fixed warm-earth decorative set for the
+     empty-state character/scene art. Theme-independent: the illustrations read the
+     same in light and dark. Consumed as SVG fill/stroke in
+     lib/core/EmptyState/illustrations/**; not registered as Tailwind utilities.
+     Ordered light → dark. */
+  --color-illustration-sand: #f0c29a;
+  --color-illustration-tan: #e8b48c;
+  --color-illustration-clay: #b5764a;
+  --color-illustration-bark: #8a6d4f;
+  --color-illustration-wood: #7a5e43;
+  --color-illustration-umber: #5b4a3a;
+  --color-illustration-cocoa: #4a3b2d;
+  --color-illustration-espresso: #3a2f25;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Z-index scale — the single source for every z-index in the app, in Tailwind's
+   `--z-index-*` theme namespace (same pattern as the color/radius/shadow tokens).
+   The numeric `z-<n>` utilities (z-10, z-1000, z-9999, …) are generated from
+   these and compile to `z-index: var(--z-index-<n>)`, backed by the :root custom
+   property emitted here — components only ever write the class (`z-9999`), never
+   var(). Change a value here and every matching class follows (verified:
+   --z-index-10 = 777 makes `.z-10` resolve to 777). Grouped by tier; values
+   preserve today's usage exactly (no stacking change). NOTE: Tailwind still
+   generates an *undefined* z-<n> on demand — this block is the sanctioned set by
+   convention, the source, not a hard gate. ── */
+@theme {
+  /* Local / intra-component — relative layering inside one stacking context */
+  --z-index-0: 0;
+  --z-index-1: 1;
+  --z-index-2: 2;
+  --z-index-3: 3;
+  --z-index-5: 5;
+  --z-index-8: 8;
+  --z-index-10: 10;
+  --z-index-11: 11;
+  --z-index-12: 12;
+  --z-index-15: 15;
+  --z-index-16: 16;
+  --z-index-20: 20;
+  --z-index-30: 30;
+  --z-index-50: 50;
+  --z-index-51: 51;
+  --z-index-60: 60;
+  /* Sticky / raised */
+  --z-index-99: 99;
+  --z-index-100: 100;
+  --z-index-200: 200;
+  /* Dropdowns, menus, popovers */
+  --z-index-999: 999;
+  --z-index-1000: 1000;
+  --z-index-1001: 1001;
+  --z-index-1999: 1999;
+  /* Drawers, side panels */
+  --z-index-5000: 5000;
+  --z-index-5100: 5100;
+  /* 6000 = drawer/dialog content AND page menu overlays (dropdown, context menu).
+     App stack for context: header 2000, drawer/dialog scrim 5999, content 6000
+     (+1000 per nesting level, computed in ODialog/ODrawer). A page-opened menu
+     must clear the header; a dialog-opened one is portaled after that dialog's
+     content, so equal z + later DOM order puts it on top. */
+  --z-index-6000: 6000;
+  /* Modal / dialog overlays */
+  --z-index-9998: 9998;
+  --z-index-9999: 9999;
+  /* Tooltips / toasts above modals */
+  --z-index-10001: 10001;
+  --z-index-10100: 10100;
+  /* Absolute top */
+  --z-index-100000: 100000;
+  --z-index-9999999: 9999999;
 }

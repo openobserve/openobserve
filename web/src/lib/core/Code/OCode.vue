@@ -2,8 +2,9 @@
 import type { CodeProps, CodeSlots } from "./OCode.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { ref } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 
-const props = withDefaults(defineProps<CodeProps>(), {
+withDefaults(defineProps<CodeProps>(), {
   block: false,
   copyable: false,
   truncate: false,
@@ -34,26 +35,28 @@ async function copy() {
     // Never alert or throw; this is a convenience feature, not critical.
   }
 }
+
+const { t } = useI18nTyped();
 </script>
 
 <template>
   <!-- ── Block mode: full-width scrollable pre/code ── -->
   <pre
     v-if="block"
-    class="tw:relative tw:block tw:w-full tw:rounded-md tw:border tw:border-code-border tw:bg-code-block-bg tw:text-code-block-text tw:overflow-x-auto"
+    class="rounded-default border-code-border bg-code-block-bg text-code-block-text relative block w-full overflow-x-auto border"
   ><code
       ref="codeRef"
-      class="tw:block tw:px-3 tw:py-2 tw:text-xs tw:[font-family:var(--font-mono)] tw:leading-relaxed tw:whitespace-pre"
+      class="block px-3 py-2 text-xs font-mono leading-relaxed whitespace-pre"
     ><slot /></code><button
       v-if="copyable"
       type="button"
-      :aria-label="copied ? 'Copied!' : 'Copy to clipboard'"
-      class="tw:absolute tw:top-2 tw:right-2 tw:rounded tw:p-1 tw:transition-colors tw:duration-150 tw:text-code-copy-icon tw:hover:text-code-copy-hover-icon tw:hover:bg-code-copy-hover-bg tw:focus-visible:outline-none tw:focus-visible:ring-2 tw:focus-visible:ring-primary-400"
+      :aria-label="copied ? t('common.copiedExclaim') : t('common.copyToClipboard')"
+      class="absolute top-2 right-2 rounded-default p-1 transition-colors duration-150 text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       @click.prevent="copy"
     ><OIcon
         :name="copied ? 'check' : 'content-copy'"
         size="xs"
-        class="tw:pointer-events-none tw:text-inherit!"
+        class="pointer-events-none text-inherit!"
       /></button></pre>
 
   <!-- ── Inline mode: pill-shaped inline chip ── -->
@@ -61,25 +64,25 @@ async function copy() {
     v-else
     ref="codeRef"
     :class="[
-      'tw:inline-flex tw:items-center tw:gap-1',
-      'tw:rounded tw:border tw:border-code-border tw:bg-code-bg tw:text-code-text',
-      'tw:px-1 tw:py-px',
-      'tw:text-xs tw:[font-family:var(--font-mono)] tw:leading-none',
-      truncate ? 'tw:max-w-full tw:truncate' : '',
+      'inline-flex items-center gap-1',
+      'rounded-default border-code-border bg-code-bg text-code-text border',
+      'px-1 py-px',
+      'font-mono text-xs leading-none',
+      truncate ? 'max-w-full truncate' : '',
     ]"
   >
     <slot />
     <button
       v-if="copyable"
       type="button"
-      :aria-label="copied ? 'Copied!' : 'Copy'"
-      class="tw:shrink-0 tw:rounded tw:p-px tw:transition-colors tw:duration-150 tw:text-code-copy-icon tw:hover:text-code-copy-hover-icon tw:hover:bg-code-copy-hover-bg tw:focus-visible:outline-none tw:focus-visible:ring-1 tw:focus-visible:ring-primary-400"
+      :aria-label="copied ? t('common.copiedExclaim') : t('common.copy')"
+      class="rounded-default text-code-copy-icon hover:text-code-copy-hover-icon hover:bg-code-copy-hover-bg focus-visible:ring-accent shrink-0 p-px transition-colors duration-150 focus-visible:ring-1 focus-visible:outline-none"
       @click.prevent="copy"
     >
       <OIcon
         :name="copied ? 'check' : 'content-copy'"
         size="xs"
-        class="tw:pointer-events-none tw:text-inherit!"
+        class="pointer-events-none text-inherit!"
       />
     </button>
   </code>

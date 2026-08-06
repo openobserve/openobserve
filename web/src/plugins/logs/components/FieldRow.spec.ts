@@ -13,8 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount } from "@vue/test-utils";
 import FieldRow from "@/components/common/FieldRow.vue";
 
 vi.mock("vue-i18n", () => ({
@@ -31,17 +31,11 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-vi.mock("@quasar/extras/material-icons-outlined", () => ({
-  "add": "add",
-  "visibility": "visibility",
-  "visibility-off": "visibility_off",
-}));
-
 const componentStubs = {
   OButton: {
     name: "OButton",
     template:
-      '<button class="q-btn-stub" :data-test="$attrs[\'data-test\']" @click.stop="$emit(\'click\', $event)"><slot /></button>',
+      "<button :data-test=\"$attrs['data-test']\" @click.stop=\"$emit('click', $event)\"><slot /></button>",
     props: ["icon", "size", "round"],
     emits: ["click"],
   },
@@ -71,11 +65,6 @@ const defaultProps = {
   showQuickMode: false,
 };
 
-// Default slot for the expansion (when field would use expansion)
-const expansionSlot = {
-  expansion: `<template #expansion="{ field }"><div class="expansion-slot-stub" :data-field-name="field.name">expansion</div></template>`,
-};
-
 function createWrapper(props = {}, slots = {}) {
   return mount(FieldRow, {
     props: { ...defaultProps, ...props },
@@ -102,9 +91,7 @@ describe("FieldRow", () => {
         field: { ...defaultField, ftsKey: true },
       });
       // OFieldRow renders with data-test="logs-field-list-item-{name}"
-      const container = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const container = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(container.exists()).toBe(true);
     });
 
@@ -112,9 +99,7 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, isSchemaField: false },
       });
-      const container = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const container = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(container.exists()).toBe(true);
     });
 
@@ -122,9 +107,7 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, showValues: false },
       });
-      const container = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const container = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(container.exists()).toBe(true);
     });
 
@@ -132,17 +115,13 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: false, isSchemaField: true, showValues: false },
       });
-      const container = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const container = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(container.exists()).toBe(true);
     });
 
     it("displays field name in the label", () => {
       const wrapper = createWrapper({ field: { ...defaultField, ftsKey: true } });
-      const label = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const label = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(label.exists()).toBe(true);
       expect(label.text()).toContain(defaultField.name);
     });
@@ -169,7 +148,7 @@ describe("FieldRow", () => {
         },
         {
           expansion: `<template #expansion="{ field }"><div class="expansion-slot-content">slot</div></template>`,
-        }
+        },
       );
       const expansionContent = wrapper.find(".expansion-slot-content");
       expect(expansionContent.exists()).toBe(true);
@@ -187,7 +166,7 @@ describe("FieldRow", () => {
         },
         {
           expansion: `<template #expansion="{ field }"><div class="expansion-slot-content">slot</div></template>`,
-        }
+        },
       );
       const container = wrapper.find(".field-container");
       expect(container.exists()).toBe(false);
@@ -201,7 +180,7 @@ describe("FieldRow", () => {
         selectedFields: [],
       });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(true);
     });
@@ -212,7 +191,7 @@ describe("FieldRow", () => {
         selectedFields: [defaultField.name],
       });
       const removeIcon = wrapper.find(
-        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`,
       );
       expect(removeIcon.exists()).toBe(true);
     });
@@ -223,7 +202,7 @@ describe("FieldRow", () => {
         selectedFields: [defaultField.name],
       });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(false);
     });
@@ -234,7 +213,7 @@ describe("FieldRow", () => {
         selectedFields: [],
       });
       const removeIcon = wrapper.find(
-        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`,
       );
       expect(removeIcon.exists()).toBe(false);
     });
@@ -247,9 +226,7 @@ describe("FieldRow", () => {
         timestampColumn: "_timestamp",
       });
       // Timestamp column has no action buttons rendered in the #actions slot
-      const addIcon = wrapper.find(
-        '[data-test="log-search-index-list-add-_timestamp-field-btn"]'
-      );
+      const addIcon = wrapper.find('[data-test="log-search-index-list-add-_timestamp-field-btn"]');
       expect(addIcon.exists()).toBe(false);
     });
 
@@ -260,7 +237,7 @@ describe("FieldRow", () => {
       });
       // Non-timestamp fields show action buttons in the #actions slot (add icon is rendered)
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(true);
     });
@@ -272,7 +249,7 @@ describe("FieldRow", () => {
         showQuickMode: true,
       });
       const interestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-_timestamp-field-btn"]`
+        `[data-test="log-search-index-list-interesting-_timestamp-field-btn"]`,
       );
       expect(interestingIcons.length).toBe(0);
     });
@@ -282,9 +259,7 @@ describe("FieldRow", () => {
         field: { ...defaultField, name: "_timestamp", ftsKey: true },
         timestampColumn: "_timestamp",
       });
-      const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-_timestamp-field-btn"]`
-      );
+      const addIcon = wrapper.find(`[data-test="log-search-index-list-add-_timestamp-field-btn"]`);
       expect(addIcon.exists()).toBe(false);
     });
 
@@ -295,7 +270,7 @@ describe("FieldRow", () => {
         timestampColumn: "_timestamp",
       });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(true);
     });
@@ -308,7 +283,7 @@ describe("FieldRow", () => {
         showQuickMode: false,
       });
       const interestingIcon = wrapper.find(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       expect(interestingIcon.exists()).toBe(false);
     });
@@ -319,7 +294,7 @@ describe("FieldRow", () => {
         showQuickMode: true,
       });
       const interestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       expect(interestingIcons.length).toBeGreaterThan(0);
     });
@@ -330,10 +305,10 @@ describe("FieldRow", () => {
         showQuickMode: true,
       });
       const infoIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       const infoIcon = infoIcons.find(
-        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-filled"
+        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-filled",
       );
       expect(infoIcon).toBeDefined();
     });
@@ -344,10 +319,10 @@ describe("FieldRow", () => {
         showQuickMode: true,
       });
       const infoIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       const outlineIcon = infoIcons.find(
-        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-outline"
+        (i) => i.find(".OIcon-stub").attributes("data-name") === "info-outline",
       );
       expect(outlineIcon).toBeDefined();
     });
@@ -360,7 +335,7 @@ describe("FieldRow", () => {
         timestampColumn: "_timestamp",
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`,
       );
       expect(filterBtn.exists()).toBe(true);
     });
@@ -370,7 +345,7 @@ describe("FieldRow", () => {
         field: { ...defaultField, isSchemaField: false, ftsKey: true },
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`,
       );
       expect(filterBtn.exists()).toBe(false);
     });
@@ -386,7 +361,7 @@ describe("FieldRow", () => {
         timestampColumn: "_timestamp",
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-_timestamp-field-btn"]`
+        `[data-test="log-search-index-list-filter-_timestamp-field-btn"]`,
       );
       expect(filterBtn.exists()).toBe(false);
     });
@@ -399,13 +374,11 @@ describe("FieldRow", () => {
         timestampColumn: "_timestamp",
       });
       const filterBtn = wrapper.find(
-        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-filter-${defaultField.name}-field-btn"]`,
       );
       await filterBtn.trigger("click");
       expect(wrapper.emitted("add-to-filter")).toBeTruthy();
-      expect(wrapper.emitted("add-to-filter")![0]).toEqual([
-        `${defaultField.name}=''`,
-      ]);
+      expect(wrapper.emitted("add-to-filter")![0]).toEqual([`${defaultField.name}=''`]);
     });
   });
 
@@ -417,7 +390,7 @@ describe("FieldRow", () => {
         selectedFields: [],
       });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       await addIcon.trigger("click");
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
@@ -431,7 +404,7 @@ describe("FieldRow", () => {
         selectedFields: [defaultField.name],
       });
       const removeIcon = wrapper.find(
-        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-remove-${defaultField.name}-field-btn"]`,
       );
       await removeIcon.trigger("click");
       expect(wrapper.emitted("toggle-field")).toBeTruthy();
@@ -451,16 +424,13 @@ describe("FieldRow", () => {
         showQuickMode: true,
       });
       const allInterestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       // In the overlay the icon is at the last position
       const overlayIcon = allInterestingIcons[allInterestingIcons.length - 1];
       await overlayIcon.trigger("click");
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
-      expect(wrapper.emitted("toggle-interesting")![0]).toEqual([
-        fieldWithInterest,
-        false,
-      ]);
+      expect(wrapper.emitted("toggle-interesting")![0]).toEqual([fieldWithInterest, false]);
     });
 
     it("emits toggle-interesting with isInteresting=true when field is currently interesting", async () => {
@@ -474,15 +444,12 @@ describe("FieldRow", () => {
         showQuickMode: true,
       });
       const allInterestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       const overlayIcon = allInterestingIcons[allInterestingIcons.length - 1];
       await overlayIcon.trigger("click");
       expect(wrapper.emitted("toggle-interesting")).toBeTruthy();
-      expect(wrapper.emitted("toggle-interesting")![0]).toEqual([
-        interestingField,
-        true,
-      ]);
+      expect(wrapper.emitted("toggle-interesting")![0]).toEqual([interestingField, true]);
     });
   });
 
@@ -494,10 +461,12 @@ describe("FieldRow", () => {
         theme: "dark",
       });
       const labelInterestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       expect(labelInterestingIcons.length).toBeGreaterThan(0);
-      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe("info-outline");
+      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe(
+        "info-outline",
+      );
     });
 
     it("renders interesting icon in label for light theme", () => {
@@ -507,10 +476,12 @@ describe("FieldRow", () => {
         theme: "light",
       });
       const labelInterestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-interesting-${defaultField.name}-field-btn"]`,
       );
       expect(labelInterestingIcons.length).toBeGreaterThan(0);
-      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe("info-outline");
+      expect(labelInterestingIcons[0].find(".OIcon-stub").attributes("data-name")).toBe(
+        "info-outline",
+      );
     });
   });
 
@@ -533,7 +504,7 @@ describe("FieldRow", () => {
         selectedFields: ["other_field"],
       });
       const addIcon = wrapper.find(
-        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`
+        `[data-test="log-search-index-list-add-${defaultField.name}-field-btn"]`,
       );
       expect(addIcon.exists()).toBe(true);
     });
@@ -550,7 +521,7 @@ describe("FieldRow", () => {
       });
       // No interesting icons should be shown for timestamp column
       const interestingIcons = wrapper.findAll(
-        `[data-test="log-search-index-list-interesting-_timestamp-field-btn"]`
+        `[data-test="log-search-index-list-interesting-_timestamp-field-btn"]`,
       );
       expect(interestingIcons.length).toBe(0);
     });
@@ -559,9 +530,7 @@ describe("FieldRow", () => {
       const wrapper = createWrapper({
         field: { ...defaultField, ftsKey: true },
       });
-      const label = wrapper.find(
-        `[data-test="logs-field-list-item-${defaultField.name}"]`
-      );
+      const label = wrapper.find(`[data-test="logs-field-list-item-${defaultField.name}"]`);
       expect(label.exists()).toBe(true);
     });
   });

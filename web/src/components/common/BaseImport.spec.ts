@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { mount, VueWrapper } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { nextTick } from "vue";
 import BaseImport from "@/components/common/BaseImport.vue";
 import i18n from "@/locales";
@@ -39,8 +39,7 @@ const globalConfig = {
       template: '<div class="monaco-editor-stub" data-test="query-editor-stub" />',
     },
     AppTabs: {
-      template:
-        '<div class="app-tabs-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
+      template: '<div class="app-tabs-stub" :data-test="$attrs[\'data-test\']"><slot /></div>',
       props: ["tabs", "activeTab"],
       emits: ["update:active-tab"],
     },
@@ -50,7 +49,8 @@ const globalConfig = {
       props: ["label", "disabled", "loading", "variant", "size", "type"],
     },
     OSplitter: {
-      template: '<div data-test="o-splitter-stub"><slot name="before" /><slot name="after" /></div>',
+      template:
+        '<div data-test="o-splitter-stub"><slot name="before" /><slot name="after" /></div>',
       props: ["modelValue", "limits", "horizontal"],
       emits: ["update:modelValue"],
     },
@@ -60,10 +60,14 @@ const globalConfig = {
       props: ["modelValue", "placeholder"],
     },
     OFile: {
-      template: '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
+      template:
+        '<div class="o-file-stub" :data-test="$attrs[\'data-test\']"><slot /><slot name="prepend" /><slot name="append" /><slot name="hint" /></div>',
       props: ["modelValue", "label", "accept", "multiple", "bottomSlots"],
     },
-    OIcon: { template: '<i :data-test="$attrs[\'data-test\']" :class="name" />', props: ["name", "size"] },
+    OIcon: {
+      template: '<i :data-test="$attrs[\'data-test\']" :class="name" />',
+      props: ["name", "size"],
+    },
     OSeparator: { template: "<hr />" },
   },
   plugins: [i18n],
@@ -114,23 +118,17 @@ describe("BaseImport.vue", () => {
 
     it("renders back button with testPrefix-based data-test", () => {
       wrapper = createWrapper({ testPrefix: "alert" });
-      expect(
-        wrapper.find('[data-test="alert-import-back-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-import-back-btn"]').exists()).toBe(true);
     });
 
     it("renders cancel button with testPrefix-based data-test", () => {
       wrapper = createWrapper({ testPrefix: "alert" });
-      expect(
-        wrapper.find('[data-test="alert-import-cancel-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-import-cancel-btn"]').exists()).toBe(true);
     });
 
     it("renders import button with testPrefix-based data-test", () => {
       wrapper = createWrapper({ testPrefix: "alert" });
-      expect(
-        wrapper.find('[data-test="alert-import-json-btn"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-import-json-btn"]').exists()).toBe(true);
     });
 
     it("disables import button when isImporting is true", () => {
@@ -325,16 +323,16 @@ describe("BaseImport.vue", () => {
       expect(style.height).toBe("100%");
     });
 
-    it("outputContainerStyle uses editorHeights.outputContainer", () => {
-      wrapper = createWrapper({
-        editorHeights: {
-          outputContainer: "500px",
-          urlEditor: "300px",
-          fileEditor: "300px",
-          errorReport: "200px",
-        },
-      });
-      expect((wrapper.vm as any).outputContainerStyle.height).toBe("500px");
+    it("output editor container fills its pane via flex instead of a fixed height", () => {
+      wrapper = createWrapper();
+      const outputEditor = wrapper.find('[data-test="dashboard-import-output-editor"]');
+      expect(outputEditor.exists()).toBe(true);
+      // The pane fills the splitter height with flex (no brittle calc(100vh-Npx)).
+      const classes = outputEditor.classes();
+      expect(classes).toContain("h-full");
+      expect(classes).toContain("flex");
+      expect(classes).toContain("flex-col");
+      expect(outputEditor.attributes("style") || "").not.toContain("calc(");
     });
   });
 

@@ -2,7 +2,11 @@
 // Copyright 2026 OpenObserve Inc.
 
 import type { SelectItemProps, SelectItemSlots } from "./OSelect.types";
-import { SELECT_VALUE_MAP_KEY, SELECT_PARENT_DATA_TEST_KEY, NULL_VALUE_SENTINEL } from "./OSelect.types";
+import {
+  SELECT_VALUE_MAP_KEY,
+  SELECT_PARENT_DATA_TEST_KEY,
+  NULL_VALUE_SENTINEL,
+} from "./OSelect.types";
 import { SelectItem, SelectItemText } from "reka-ui";
 import { computed, inject, onMounted, onUnmounted } from "vue";
 
@@ -44,14 +48,14 @@ onUnmounted(() => {
     :data-test-value="rekaValue"
     :data-test-label="props.label"
     :class="[
-      'tw:relative tw:flex tw:items-center tw:w-full',
-      'tw:ps-3 tw:pe-3 tw:py-1.5 tw:text-sm',
-      'tw:text-select-item-text tw:rounded-sm',
-      'tw:cursor-pointer tw:select-none tw:outline-none',
-      'tw:transition-colors tw:duration-100',
-      'tw:data-highlighted:bg-select-item-hover-bg',
-      'tw:data-[state=checked]:bg-select-item-selected-bg tw:data-[state=checked]:text-select-item-selected-text',
-      'tw:data-disabled:text-select-item-disabled tw:data-disabled:cursor-not-allowed tw:data-disabled:pointer-events-none',
+      'relative flex w-full items-center',
+      'py-1.5 ps-3 pe-3 text-sm',
+      'text-select-item-text rounded-default',
+      'cursor-pointer outline-none select-none',
+      'transition-colors duration-100',
+      'data-highlighted:bg-select-item-hover-bg',
+      'data-[state=checked]:bg-select-item-selected-bg data-[state=checked]:text-select-item-selected-text',
+      'data-disabled:text-select-item-disabled data-disabled:pointer-events-none data-disabled:cursor-not-allowed',
     ]"
   >
     <SelectItemText>

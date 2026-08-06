@@ -35,7 +35,7 @@ export class SanityPage {
         // generic "source" column OR an FTS column (e.g. body/message/log), so
         // target whichever first-row cell is rendered. A click on any cell
         // bubbles to the row handler that opens the detail dialog.
-        this.resultColumnSource = page.locator('[data-test^="log-table-column-0-"]').first();
+        this.resultColumnSource = page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         this.closeDialog = page.locator('[data-test="logs-search-result-detail-dialog"] [data-test="o-drawer-close-btn"]');
 
         // ============================================================
@@ -49,7 +49,7 @@ export class SanityPage {
         // Saved View / Function dialog locators
         // ============================================================
         // Saved view dialog (SearchBar.vue:1654) and saved function dialog (SearchBar.vue:1703) were migrated
-        // from q-dialog to ODialog. The legacy shared data-test "saved-view-dialog-save-btn" no longer exists;
+        // from the legacy dialog to ODialog. The legacy shared data-test "saved-view-dialog-save-btn" no longer exists;
         // each dialog now exposes its own ODialog primary button. The dialogs are mutually exclusive at runtime.
         this.savedViewDialogSave = page.locator('[data-test="search-bar-store-state-saved-view-dialog"] [data-test="o-dialog-primary-btn"], [data-test="search-bar-store-state-saved-function-dialog"] [data-test="o-dialog-primary-btn"]');
         // After ConfirmDialog migrated to ODialog, the OK button no longer
@@ -120,7 +120,10 @@ export class SanityPage {
         this.functionListSearchInputField = page.locator('[data-test="functions-list-search-input-field"]');
         this.functionListAddButton = page.locator('[data-test="function-list-add-function-btn"]');
         this.functionListDeleteFirstBtn = page.locator('[data-test="function-list-delete-function-btn"]').first();
-        this.addFunctionNameInputField = page.locator('[data-test="add-function-name-input-field"]');
+        // Function name is an inline-edited title (OFormInlineEdit): a display
+        // trigger swaps to an input on click.
+        this.addFunctionNameTrigger = page.locator('[data-test="add-function-name-input-trigger"]');
+        this.addFunctionNameInputField = page.locator('[data-test="add-function-name-input-input"]');
         this.addFunctionSaveBtn = page.locator('[data-test="add-function-save-btn"]');
 
         // ============================================================
@@ -156,8 +159,8 @@ export class SanityPage {
         // ============================================================
         // Advanced Histogram / Timestamp locators
         // ============================================================
-        this.timestampColumn = page.locator('[data-test="log-table-column-1-_timestamp"]');
-        this.timestampExpandMenu = page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
+        this.timestampColumn = page.locator('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]');
+        this.timestampExpandMenu = page.locator('[data-test="o2-table-expand-0"]');
 
         // ============================================================
         // Toast locators (used for success / error verification)
@@ -468,8 +471,10 @@ export class SanityPage {
         await this.functionListAddButton.waitFor({ state: 'visible', timeout: 10000 });
         await this.functionListAddButton.click();
 
+        // Open the inline editor via its trigger, then fill the revealed input.
+        await this.addFunctionNameTrigger.waitFor({ state: 'visible', timeout: 10000 });
+        await this.addFunctionNameTrigger.click();
         await this.addFunctionNameInputField.waitFor({ state: 'visible', timeout: 10000 });
-        await this.addFunctionNameInputField.click();
         await this.addFunctionNameInputField.fill(uniqueFunctionName);
 
         // Drive the Monaco VRL editor via keyboard input — Monaco's setValue does not
@@ -730,7 +735,7 @@ export class SanityPage {
         await this.page.reload();
         await this.page.waitForLoadState('domcontentloaded');
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-        // Click the first stream row indicator (was the "01" cell in the legacy q-table).
+        // Click the first stream row indicator (was the "01" cell in the legacy table).
         await this.firstStreamRow.waitFor({ state: 'visible', timeout: 15000 });
         await this.firstStreamRow.click();
     }

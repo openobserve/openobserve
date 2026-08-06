@@ -27,9 +27,11 @@ class FunctionsPage {
     this.vrlRadio = this.page.locator('[data-test="function-transform-type-vrl-radio"]');
     this.jsRadio = this.page.locator('[data-test="function-transform-type-js-radio"]');
 
-    // Function form elements
+    // Function form elements. The name is an inline-edited title (OFormInlineEdit):
+    // a display trigger swaps to an input on click.
     this.functionNameInputWrapper = this.page.locator('[data-test="add-function-name-input"]');
-    this.functionNameInputField = this.page.locator('[data-test="add-function-name-input-field"]');
+    this.functionNameTrigger = this.page.locator('[data-test="add-function-name-input-trigger"]');
+    this.functionNameInputField = this.page.locator('[data-test="add-function-name-input-input"]');
     this.functionEditor = this.page.locator('[data-test="logs-vrl-function-editor"]');
     // Monaco mounts inside `data-test="query-editor"` (child of the function editor wrapper)
     this.functionEditorQueryDiv = this.page.locator('[data-test="logs-vrl-function-editor"] [data-test="query-editor"]');
@@ -43,6 +45,11 @@ class FunctionsPage {
     this.testEventsEditor = this.page.locator('[data-test="vrl-function-test-events-editor"]');
     this.testEventsEditorQueryDiv = this.page.locator('[data-test="vrl-function-test-events-editor"] [data-test="query-editor"]');
     this.testOutputEditor = this.page.locator('[data-test="vrl-function-test-events-output-editor"]');
+
+    // Runtime (non-syntax) errors come back on a 200 with the message attached
+    // per event, so they land in this section rather than the output editor —
+    // the editor keeps showing the events so you can see which ones failed.
+    this.functionErrorDetails = this.page.locator('[data-test="function-error-details"]');
 
     // Confirm dialog (delete confirmation) — primary/secondary buttons
     this.confirmDialog = this.page.locator('[data-test="confirm-dialog"]');
@@ -104,8 +111,9 @@ class FunctionsPage {
 
     await expect(this.addFunctionButton).toBeVisible({ timeout: 10000 });
     await this.addFunctionButton.click();
-    // Wait for the function dialog to actually open
-    await expect(this.functionNameInputField).toBeVisible({ timeout: 10000 });
+    // Wait for the function dialog to actually open — the name trigger is what
+    // renders in display mode (the input only appears once the trigger is clicked).
+    await expect(this.functionNameTrigger).toBeVisible({ timeout: 10000 });
   }
 
   /**
@@ -134,7 +142,10 @@ class FunctionsPage {
   }
 
   async fillFunctionName(name) {
-    // OInput convention: fill the auto-derived `-field` (native input), not the wrapper
+    // Inline-edit convention: click the trigger to open the editor, then fill
+    // the revealed input.
+    await expect(this.functionNameTrigger).toBeVisible({ timeout: 15000 });
+    await this.functionNameTrigger.click();
     await expect(this.functionNameInputField).toBeVisible({ timeout: 15000 });
     await this.functionNameInputField.fill(name);
   }
@@ -198,6 +209,10 @@ class FunctionsPage {
     // then click the per-row edit button using its stable data-test.
     const functionRow = this.getRowByName(name);
     const editButton = functionRow.locator(this.rowEditButtonSelector);
+    // After a cross-org (_meta) navigation the functions list can take a while
+    // to stream in — wait for the row's edit button before clicking so a slow
+    // list render doesn't fail the click.
+    await editButton.waitFor({ state: 'visible', timeout: 30000 });
     await editButton.click();
     await this.page.waitForTimeout(1000);
   }
@@ -323,6 +338,14 @@ class FunctionsPage {
   async expectTestOutputContains(text) {
     const outputText = await this.getTestOutput();
     expect(outputText).toContain(text);
+  }
+
+  /**
+   * Assert the runtime-error section shows the given text.
+   * @param {string} text - Expected substring (e.g. 'ReferenceError')
+   */
+  async expectFunctionErrorContains(text) {
+    await expect(this.functionErrorDetails).toContainText(text, { timeout: 15000 });
   }
 
   async expectFunctionInList(functionName) {

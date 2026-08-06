@@ -1,7 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 
-import { computed, ref } from "vue";
-import type { Row } from "@tanstack/vue-table";
+import { ref } from "vue";
 
 /**
  * Manages recursive row grouping / tree expansion state.
@@ -28,9 +27,7 @@ export function useTableRowGrouping<TData>(
   const mode = options.mode ?? "tree";
   const getRowId = options.getRowId ?? ((row: any) => row?.id?.toString() ?? "");
 
-  const expandedIds = ref<Set<string>>(
-    new Set(options.initialExpandedIds ?? []),
-  );
+  const expandedIds = ref<Set<string>>(new Set(options.initialExpandedIds ?? []));
 
   function isExpanded(row: TData): boolean {
     return expandedIds.value.has(getRowId(row));

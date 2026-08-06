@@ -40,7 +40,6 @@ vi.mock("@/utils/alerts/anomalySqlBuilder", () => ({
 
 import alertsService from "@/services/alerts";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -50,10 +49,12 @@ document.body.appendChild(node);
 // the events the test suite drives state through.
 const ODrawerStub = {
   name: "ODrawer",
-  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
+  props: ["open", "width", "showClose", "persistent", "size", "title", "titleDataTest", "subTitle"],
   emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
   template: `
     <div data-test-stub="o-drawer" :data-open="open">
+      <span v-if="title" :data-test="titleDataTest">{{ title }}</span>
+      <span v-if="subTitle" data-test-stub="o-drawer-sub-title">{{ subTitle }}</span>
       <div data-test-stub="o-drawer-header"><slot name="header" /></div>
       <div data-test-stub="o-drawer-header-left"><slot name="header-left" /></div>
       <div data-test-stub="o-drawer-header-right"><slot name="header-right" /></div>
@@ -179,7 +180,7 @@ describe("AlertHistoryDrawer.vue", () => {
     try {
       wrapper?.unmount();
     } catch {
-      // Quasar teleported components can throw during unmount in jsdom
+      // Teleported components can throw during unmount in jsdom
     }
   });
 
@@ -214,14 +215,8 @@ describe("AlertHistoryDrawer.vue", () => {
 
     it("should have correct data-test attributes", async () => {
       await mountComponent();
-      expect(
-        wrapper.find('[data-test="alert-details-title"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="alert-history-drawer-date-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-details-title"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="alert-history-drawer-date-picker"]').exists()).toBe(true);
     });
 
     it("should fetch alert history on mount", async () => {
@@ -271,9 +266,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Query/Conditions Block", () => {
     const switchToConditionTab = async () => {
-      const conditionBtn = wrapper.find(
-        '[data-test="alert-history-tab-condition"]',
-      );
+      const conditionBtn = wrapper.find('[data-test="alert-history-tab-condition"]');
       await conditionBtn.trigger("click");
       await flushPromises();
     };
@@ -300,19 +293,13 @@ describe("AlertHistoryDrawer.vue", () => {
     it("should display the query text", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(wrapper.text()).toContain(
-        "SELECT count(*) FROM logs WHERE level='error'",
-      );
+      expect(wrapper.text()).toContain("SELECT count(*) FROM logs WHERE level='error'");
     });
 
     it("should have a copy button for conditions", async () => {
       await mountComponent();
       await switchToConditionTab();
-      expect(
-        wrapper
-          .find('[data-test="alert-details-copy-conditions-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-details-copy-conditions-btn"]').exists()).toBe(true);
     });
 
     it("should display the description when provided", async () => {
@@ -335,9 +322,7 @@ describe("AlertHistoryDrawer.vue", () => {
   describe("History Table", () => {
     it("should display history table with data", async () => {
       await mountComponent();
-      expect(
-        wrapper.find('[data-test="alert-details-history-table"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-details-history-table"]').exists()).toBe(true);
     });
 
     it("should display correct number of rows", async () => {
@@ -379,7 +364,7 @@ describe("AlertHistoryDrawer.vue", () => {
     });
 
     it("should show empty state when no history", async () => {
-      vi.mocked(alertsService.getHistory).mockResolvedValueOnce({
+      vi.mocked(alertsService.getHistory).mockResolvedValue({
         data: { hits: [], total: 0 },
       } as any);
 
@@ -391,9 +376,7 @@ describe("AlertHistoryDrawer.vue", () => {
 
   describe("Error Handling", () => {
     it("should handle API errors gracefully", async () => {
-      vi.mocked(alertsService.getHistory).mockRejectedValueOnce(
-        new Error("API Error"),
-      );
+      vi.mocked(alertsService.getHistory).mockRejectedValue(new Error("API Error"));
 
       await mountComponent();
       expect(wrapper.exists()).toBe(true);
@@ -411,7 +394,7 @@ describe("AlertHistoryDrawer.vue", () => {
           },
         },
       };
-      vi.mocked(alertsService.getHistory).mockRejectedValueOnce(error);
+      vi.mocked(alertsService.getHistory).mockRejectedValue(error);
 
       await mountComponent();
       expect(wrapper.exists()).toBe(true);
@@ -423,11 +406,7 @@ describe("AlertHistoryDrawer.vue", () => {
   describe("Date Time Picker", () => {
     it("should have date time picker component", async () => {
       await mountComponent();
-      expect(
-        wrapper
-          .find('[data-test="alert-history-drawer-date-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="alert-history-drawer-date-picker"]').exists()).toBe(true);
     });
 
     it("should refresh history when date changes with relative time", async () => {
@@ -531,9 +510,7 @@ describe("AlertHistoryDrawer.vue", () => {
       expect(wrapper.exists()).toBe(true);
 
       // The content section (with v-if="alertDetails") should not render
-      expect(
-        wrapper.find('[data-test="alert-details-history-table"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="alert-details-history-table"]').exists()).toBe(false);
     });
   });
 
@@ -584,47 +561,15 @@ describe("AlertHistoryDrawer.vue", () => {
   });
 
   describe("Helper Functions", () => {
-
     it("getRowClass should return error class for error/firing status", async () => {
       await mountComponent();
       const vm = wrapper.vm as any;
       // Store theme is "dark" by default in test helper
       // getRowClass takes a row object with status property
-      expect(vm.getRowClass({ status: "firing" })).toBe("tw:!bg-[#2d1b1b]");
-      expect(vm.getRowClass({ status: "error" })).toBe("tw:!bg-[#2d1b1b]");
+      expect(vm.getRowClass({ status: "firing" })).toBe("!bg-status-error-bg");
+      expect(vm.getRowClass({ status: "error" })).toBe("!bg-status-error-bg");
       expect(vm.getRowClass({ status: "ok" })).toBe("");
       expect(vm.getRowClass({ status: "success" })).toBe("");
-    });
-
-    it("formatTimestamp should return N/A for falsy timestamps", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      expect(vm.formatTimestamp(0)).toBe("N/A");
-      expect(vm.formatTimestamp(null)).toBe("N/A");
-    });
-
-    it("formatTimestamp should format recent timestamps as relative minutes", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 5 minutes ago in microseconds
-      const fiveMinAgo = (Date.now() - 5 * 60 * 1000) * 1000;
-      expect(vm.formatTimestamp(fiveMinAgo)).toBe("5 min ago");
-    });
-
-    it("formatTimestamp should format hours-old timestamps as relative hours", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 3 hours ago in microseconds
-      const threeHoursAgo = (Date.now() - 3 * 3600 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeHoursAgo)).toBe("3h ago");
-    });
-
-    it("formatTimestamp should format days-old timestamps as relative days", async () => {
-      await mountComponent();
-      const vm = wrapper.vm as any;
-      // 3 days ago in microseconds
-      const threeDaysAgo = (Date.now() - 3 * 86400 * 1000) * 1000;
-      expect(vm.formatTimestamp(threeDaysAgo)).toBe("3d ago");
     });
   });
 
@@ -653,6 +598,7 @@ describe("AlertHistoryDrawer.vue", () => {
         "#",
         "timestamp",
         "status",
+        "condition",
         "evaluation_time",
         "query_time",
         "error",

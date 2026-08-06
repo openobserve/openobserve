@@ -5,6 +5,7 @@ import { inject } from "vue";
 import OTextarea from "./OTextarea.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormTextareaProps } from "./OFormTextarea.types";
 
 defineOptions({ inheritAttrs: false });
@@ -19,11 +20,7 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <OTextarea
         v-bind="$attrs"
@@ -42,12 +39,10 @@ if (import.meta.env.DEV && !form) {
         :size="props.size"
         :width="props.width"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
           field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
+            ? raw(firstFieldError(field.state.meta.errors))
             : undefined
         "
         @update:model-value="field.handleChange"

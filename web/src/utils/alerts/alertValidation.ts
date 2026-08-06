@@ -4,15 +4,32 @@
  */
 
 import searchService from "@/services/search";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 import CronExpressionParser from "cron-parser";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import type { I18nText } from "@/types/i18n";
 
+/**
+ * Injected translator. Same shape as the one the alerts `*.schema.ts` factories
+ * take (see `Translator` in components/alerts/steps/QueryConfig.schema.ts) —
+ * re-declared here rather than imported so this pure util keeps NO dependency on
+ * the component layer. Callers pass vue-i18n's `t` (from `useI18n()`), which
+ * this module cannot obtain itself: it has no Vue context.
+ */
+export type Translator = (key: string, named?: Record<string, unknown>) => I18nText;
+
+/** Last-resort translator for `validateAlert(alert)` — the context (and hence
+ *  `t`) is optional there. Echoes the key back. The ONLY production caller
+ *  (saveAlertJson) always supplies `t`; this exists so the no-context overload
+ *  stays callable (it is exercised by validateAlerts.spec.ts, which asserts
+ *  validity rather than message text on that path). */
+const echoKeyTranslator: Translator = (key) => key as unknown as I18nText;
 
 interface QueryCondition {
   conditions?: {
     groupId?: string;
-    label?: string;
+    label?: I18nText;
     items?: Array<{
       column: string;
       operator: string;
@@ -35,7 +52,7 @@ interface QueryCondition {
   };
   sql?: string | null;
   promql?: string | null;
-  type: 'custom' | 'sql' | 'promql';
+  type: "custom" | "sql" | "promql";
   aggregation?: {
     group_by: string[];
     function: string;
@@ -57,7 +74,7 @@ interface TriggerCondition {
   cron: string;
   threshold: number;
   silence: number;
-  frequency_type: 'minutes' | 'cron';
+  frequency_type: "minutes" | "cron";
   timezone: string;
 }
 
@@ -71,7 +88,7 @@ interface Alert {
   destinations: string[];
   context_attributes: any[];
   enabled: boolean;
-  description?: string;
+  description?: I18nText;
   lastTriggeredAt?: number;
   createdAt?: string;
   updatedAt?: string;
@@ -85,6 +102,9 @@ interface AlertValidationContext {
   streamList: string[];
   destinationsList: string[];
   selectedOrgId: string;
+  /** vue-i18n `t`. Optional only because `context` itself is optional; supply it
+   *  from any caller whose errors reach a user. */
+  t?: Translator;
 }
 
 export interface ValidationResult {
@@ -93,159 +113,202 @@ export interface ValidationResult {
 }
 
 export function validateAlert(alert: Alert, context?: AlertValidationContext): ValidationResult {
+  const t = context?.t ?? echoKeyTranslator;
   const result: ValidationResult = {
     isValid: true,
-    errors: []
+    errors: [],
   };
 
   // Validate name
-  if (!alert.name || typeof alert.name !== 'string' || alert.name.trim() === '') {
-    result.errors.push('Name is mandatory and should be a valid string');
+  if (!alert.name || typeof alert.name !== "string" || alert.name.trim() === "") {
+    result.errors.push(t("alerts.validation.nameMandatoryString"));
   }
 
   // Validate org_id if provided
   if (alert.org_id) {
     if (alert.org_id !== context?.selectedOrgId) {
-      result.errors.push(`Organization Id should be equal to ${context?.selectedOrgId}`);
+      result.errors.push(t("alerts.validation.orgIdMismatch", { orgId: context?.selectedOrgId }));
     }
   }
 
   // Validate stream_type
-  const validStreamTypes = ['logs', 'metrics', 'traces'];
+  const validStreamTypes = ["logs", "metrics", "traces"];
   if (!alert.stream_type || !validStreamTypes.includes(alert.stream_type)) {
-    result.errors.push('Stream Type is mandatory and should be one of: logs, metrics, traces');
+    result.errors.push(t("alerts.validation.streamTypeMandatory"));
   }
 
   // Validate stream_name
-  if (!alert.stream_name || typeof alert.stream_name !== 'string') {
-    result.errors.push('Stream Name is mandatory and should be a valid string');
+  if (!alert.stream_name || typeof alert.stream_name !== "string") {
+    result.errors.push(t("alerts.validation.streamNameMandatoryString"));
   } else if (context?.streamList && !context.streamList.includes(alert.stream_name)) {
-    result.errors.push(`Stream "${alert.stream_name}" does not exist in the stream list`);
+    result.errors.push(t("alerts.validation.streamNotInList", { streamName: alert.stream_name }));
   }
 
   // Validate is_real_time
-  if (typeof alert.is_real_time === 'string') {
+  if (typeof alert.is_real_time === "string") {
     // Convert string 'true'/'false' to boolean
-    alert.is_real_time = alert.is_real_time.toLowerCase() === 'true';
+    alert.is_real_time = alert.is_real_time.toLowerCase() === "true";
   }
-  if (typeof alert.is_real_time !== 'boolean') {
-    result.errors.push('Is Real-Time is mandatory and should be a boolean value');
+  if (typeof alert.is_real_time !== "boolean") {
+    result.errors.push(t("alerts.validation.isRealTimeMandatoryBoolean"));
   }
 
   // Validate query_condition
   if (alert.query_condition) {
     // Validate based on query type
     switch (alert.query_condition.type) {
-      case 'custom':
+      case "custom":
         // Handle both condition formats
         if (alert.query_condition.conditions) {
           // Format 1: Using groupId and items
           if (alert.query_condition.conditions.items) {
             if (!Array.isArray(alert.query_condition.conditions.items)) {
-              result.errors.push('Query conditions items should be an array');
+              result.errors.push(t("alerts.validation.conditionItemsArray"));
             } else {
               // Validate each condition item
               alert.query_condition.conditions.items.forEach((item, index) => {
                 if (!item.column || !item.operator || item.value === undefined) {
-                  result.errors.push(`Query condition item ${index + 1} must have column, operator, and value`);
+                  result.errors.push(
+                    t("alerts.validation.conditionItemIncomplete", { index: index + 1 }),
+                  );
                 }
-                
-                const validOperators = ['=', '>', '<', '>=', '<=', 'Contains', 'NotContains'];
+
+                const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
                 if (!validOperators.includes(item.operator)) {
-                  result.errors.push(`Invalid operator "${item.operator}" in query condition item ${index + 1}`);
+                  result.errors.push(
+                    t("alerts.validation.invalidOperatorInConditionItem", {
+                      operator: item.operator,
+                      index: index + 1,
+                    }),
+                  );
                 }
               });
             }
           }
           // Format 2: Using or/and array
           else if (alert.query_condition.conditions.or || alert.query_condition.conditions.and) {
-            const conditions = alert.query_condition.conditions.or || alert.query_condition.conditions.and;
+            const conditions =
+              alert.query_condition.conditions.or || alert.query_condition.conditions.and;
             if (!Array.isArray(conditions)) {
-              result.errors.push('Query conditions or/and should be an array');
+              result.errors.push(t("alerts.validation.conditionsOrAndArray"));
             } else {
               conditions.forEach((condition, index) => {
                 if (!condition.column || !condition.operator || condition.value === undefined) {
-                  result.errors.push(`Query condition ${index + 1} must have column, operator, and value`);
+                  result.errors.push(
+                    t("alerts.validation.conditionIncomplete", { index: index + 1 }),
+                  );
                 }
 
-                const validOperators = ['=', '>', '<', '>=', '<=', 'Contains', 'NotContains'];
+                const validOperators = ["=", ">", "<", ">=", "<=", "Contains", "NotContains"];
                 if (!validOperators.includes(condition.operator)) {
-                  result.errors.push(`Invalid operator "${condition.operator}" in condition ${index + 1}`);
+                  result.errors.push(
+                    t("alerts.validation.invalidOperatorInCondition", {
+                      operator: condition.operator,
+                      index: index + 1,
+                    }),
+                  );
                 }
 
                 // Validate ignore_case if present
-                if (condition.ignore_case !== undefined && typeof condition.ignore_case !== 'boolean') {
-                  result.errors.push(`ignore_case must be a boolean in condition ${index + 1}`);
+                if (
+                  condition.ignore_case !== undefined &&
+                  typeof condition.ignore_case !== "boolean"
+                ) {
+                  result.errors.push(
+                    t("alerts.validation.ignoreCaseBoolean", { index: index + 1 }),
+                  );
                 }
               });
             }
           } else {
-            result.errors.push('Invalid conditions format. Must use either items array or or/and array');
+            result.errors.push(t("alerts.validation.invalidConditionsFormat"));
           }
         }
 
         // Validate multi_time_range for custom type
-        if (alert.query_condition.multi_time_range !== null && 
-            (!Array.isArray(alert.query_condition.multi_time_range) || alert.query_condition.multi_time_range.length !== 0)) {
-          result.errors.push('Multi Time Range should be an empty array or null');
+        if (
+          alert.query_condition.multi_time_range !== null &&
+          (!Array.isArray(alert.query_condition.multi_time_range) ||
+            alert.query_condition.multi_time_range.length !== 0)
+        ) {
+          result.errors.push(t("alerts.validation.multiTimeRangeEmpty"));
         }
 
         // Remove the SQL/PromQL validation for custom type since it's not needed
         break;
 
-      case 'sql':
-        if (!alert.query_condition.sql || typeof alert.query_condition.sql !== 'string' || alert.query_condition.sql.trim() === '') {
-          result.errors.push('SQL query is required');
+      case "sql":
+        if (
+          !alert.query_condition.sql ||
+          typeof alert.query_condition.sql !== "string" ||
+          alert.query_condition.sql.trim() === ""
+        ) {
+          result.errors.push(t("alerts.validation.sqlQueryRequired"));
         } else {
           const sqlQuery = alert.query_condition.sql.trim().toLowerCase();
           // Check for select * pattern
-          if (sqlQuery.includes('select *') || sqlQuery.includes('select\n*') || sqlQuery.includes('select\t*')) {
-            result.errors.push('Selecting all columns is not allowed. Please specify the columns explicitly');
+          if (
+            sqlQuery.includes("select *") ||
+            sqlQuery.includes("select\n*") ||
+            sqlQuery.includes("select\t*")
+          ) {
+            result.errors.push(t("alerts.validation.selectAllNotAllowed"));
           }
           // Check if it's a valid SELECT query
-          if (!sqlQuery.startsWith('select ')) {
-            result.errors.push('SQL query must start with SELECT');
+          if (!sqlQuery.startsWith("select ")) {
+            result.errors.push(t("alerts.validation.sqlQueryMustStartWithSelect"));
           }
         }
         break;
 
-      case 'promql':
-        if (!alert.query_condition.promql || typeof alert.query_condition.promql !== 'string' || alert.query_condition.promql.trim() === '') {
-          result.errors.push('PromQL query is required');
+      case "promql":
+        if (
+          !alert.query_condition.promql ||
+          typeof alert.query_condition.promql !== "string" ||
+          alert.query_condition.promql.trim() === ""
+        ) {
+          result.errors.push(t("alerts.validation.promqlQueryRequired"));
         }
         break;
 
       default:
-        result.errors.push('Invalid query condition type');
+        result.errors.push(t("alerts.validation.invalidQueryConditionType"));
     }
 
     // Validate VRL function if present
-    if (alert.query_condition.vrl_function && typeof alert.query_condition.vrl_function !== 'string') {
-      result.errors.push('VRL function should be a string when provided');
+    if (
+      alert.query_condition.vrl_function &&
+      typeof alert.query_condition.vrl_function !== "string"
+    ) {
+      result.errors.push(t("alerts.validation.vrlFunctionString"));
     }
 
     // Validate aggregation if present
     if (alert.query_condition.aggregation) {
       const agg = alert.query_condition.aggregation;
-      
+
       // Validate group_by array
       if (!Array.isArray(agg.group_by)) {
-        result.errors.push('Aggregation group_by should be an array');
+        result.errors.push(t("alerts.validation.aggregationGroupByArray"));
       }
 
       // Validate function
-      if (!agg.function || typeof agg.function !== 'string' || agg.function.trim() === '') {
-        result.errors.push('Aggregation function is required and should be a non-empty string');
+      if (!agg.function || typeof agg.function !== "string" || agg.function.trim() === "") {
+        result.errors.push(t("alerts.validation.aggregationFunctionRequired"));
       }
 
       // Validate having clause structure
-      if (agg.having && typeof agg.having === 'object') {
+      if (agg.having && typeof agg.having === "object") {
         // Only validate operator and value if they are provided
-        if (agg.having.operator && (typeof agg.having.operator !== 'string' || !['>=', '<=', '>', '<', '=', '!='].includes(agg.having.operator))) {
-          result.errors.push('Aggregation having clause operator must be a valid comparison operator');
+        if (
+          agg.having.operator &&
+          (typeof agg.having.operator !== "string" ||
+            ![">=", "<=", ">", "<", "=", "!="].includes(agg.having.operator))
+        ) {
+          result.errors.push(t("alerts.validation.aggregationHavingOperator"));
         }
-        if (agg.having.value !== undefined && typeof agg.having.value !== 'number') {
-          result.errors.push('Aggregation having clause value must be a number when provided');
+        if (agg.having.value !== undefined && typeof agg.having.value !== "number") {
+          result.errors.push(t("alerts.validation.aggregationHavingValue"));
         }
       }
     }
@@ -256,67 +319,78 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
     const trigger = alert.trigger_condition;
 
     // Validate period
-    if (typeof trigger.period !== 'number' || trigger.period < 1) {
-      result.errors.push('Period should be a positive number greater than 0');
+    if (typeof trigger.period !== "number" || trigger.period < 1) {
+      result.errors.push(t("alerts.validation.periodPositiveNumber"));
     }
 
     // Validate operator
-    const validOperators = ['=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'];
+    const validOperators = ["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"];
     if (!validOperators.includes(trigger.operator)) {
-      result.errors.push(`Invalid operator "${trigger.operator}" in trigger condition`);
+      result.errors.push(
+        t("alerts.validation.invalidOperatorInTrigger", { operator: trigger.operator }),
+      );
     }
 
     // Validate frequency
-    if (typeof trigger.frequency !== 'number' || trigger.frequency < 1) {
-      result.errors.push('Frequency should be a positive number greater than 0');
+    if (typeof trigger.frequency !== "number" || trigger.frequency < 1) {
+      result.errors.push(t("alerts.validation.frequencyPositiveNumber"));
     }
 
     // Validate threshold
-    if (typeof trigger.threshold !== 'number' || trigger.threshold < 1) {
-      result.errors.push('Threshold should be a positive number greater than 0');
+    if (typeof trigger.threshold !== "number" || trigger.threshold < 1) {
+      result.errors.push(t("alerts.validation.thresholdPositiveNumber"));
     }
 
     // Validate silence
-    if (typeof trigger.silence !== 'number' || trigger.silence < 1) {
-      result.errors.push('Silence should be a positive number greater than 0');
+    if (typeof trigger.silence !== "number" || trigger.silence < 1) {
+      result.errors.push(t("alerts.validation.silencePositiveNumber"));
     }
 
     // Validate frequency_type and related fields
-    if (!['minutes', 'cron'].includes(trigger.frequency_type)) {
-      result.errors.push('Frequency Type must be either minutes or cron');
+    if (!["minutes", "cron"].includes(trigger.frequency_type)) {
+      result.errors.push(t("alerts.validation.frequencyTypeMinutesOrCron"));
     }
 
-    if (trigger.frequency_type === 'cron') {
-      if (!trigger.cron || trigger.cron.trim() === '') {
-        result.errors.push('Cron expression is required when frequency type is cron');
+    if (trigger.frequency_type === "cron") {
+      if (!trigger.cron || trigger.cron.trim() === "") {
+        result.errors.push(t("alerts.validation.cronRequiredForCronType"));
       }
-      if (!trigger.timezone || trigger.timezone.trim() === '') {
-        result.errors.push('Timezone is required when frequency type is cron');
+      if (!trigger.timezone || trigger.timezone.trim() === "") {
+        result.errors.push(t("alerts.validation.timezoneRequiredForCronType"));
       }
     }
   } else {
-    result.errors.push('Trigger condition is required');
+    result.errors.push(t("alerts.validation.triggerConditionRequired"));
   }
   // Validate destinations
   if (!Array.isArray(alert.destinations)) {
-    result.errors.push('Destinations must be an array');
+    result.errors.push(t("alerts.validation.destinationsArray"));
   } else if (alert.destinations.length === 0) {
-    result.errors.push('At least one destination is required');
+    // NOTE: no trailing period — deliberately NOT the same string as
+    // `alerts.validation.destinationRequired` ("At least one destination is
+    // required."), which the AlertSettings schema owns.
+    result.errors.push(t("alerts.validation.destinationRequiredPlain"));
   } else if (context?.destinationsList) {
     // Debug check for destinations list
     if (!Array.isArray(context.destinationsList) || context.destinationsList.length === 0) {
-      result.errors.push('No available destinations found in system');
+      result.errors.push(t("alerts.validation.noDestinationsInSystem"));
     } else {
-      const invalidDestinations = alert.destinations.filter(dest => !context.destinationsList.includes(dest));
+      const invalidDestinations = alert.destinations.filter(
+        (dest) => !context.destinationsList.includes(dest),
+      );
       if (invalidDestinations.length > 0) {
-        result.errors.push(`Invalid destinations: ${invalidDestinations.map(dest => `"${dest}"`).join(', ')} - must be from available destinations list`);
+        result.errors.push(
+          t("alerts.validation.invalidDestinations", {
+            destinations: invalidDestinations.map((dest) => `"${dest}"`).join(", "),
+          }),
+        );
       }
     }
   }
 
   // Validate enabled flag
-  if (typeof alert.enabled !== 'boolean') {
-    result.errors.push('Enabled flag must be a boolean');
+  if (typeof alert.enabled !== "boolean") {
+    result.errors.push(t("alerts.validation.enabledFlagBoolean"));
   }
 
   result.isValid = result.errors.length === 0;
@@ -325,8 +399,12 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
 
 export interface ValidationContext {
   store: any;
+  /** vue-i18n `t`, injected by the composable (this module has no Vue context). */
+  t: Translator;
   validateSqlQueryPromise: any;
   sqlQueryErrorMsg: any;
+  /** Ref<SqlErrorRange[]> — editor squiggle ranges (optional). */
+  sqlErrorRanges?: any;
   vrlFunctionError: any;
   buildQueryPayload: any;
   getParser: (sqlQuery: string) => boolean;
@@ -340,6 +418,8 @@ export interface AlertFormData {
     operator: string;
     frequency_type: string;
     cron?: string;
+    timezone?: string;
+    frequency?: number | string;
   };
   is_real_time: boolean | string;
   query_condition: {
@@ -360,6 +440,8 @@ export interface AlertFormData {
 
 export interface JsonValidationContext {
   store: any;
+  /** vue-i18n `t`, injected by the composable (this module has no Vue context). */
+  t: Translator;
   streams: any;
   getStreams: (streamType: string, schema: boolean) => Promise<any>;
   getParser: (sql: string) => boolean;
@@ -372,11 +454,13 @@ export const validateInputs = (
   context: ValidationContext,
   notify: boolean = true,
 ): boolean => {
+  const { t } = context;
+
   if (isNaN(Number(input.trigger_condition.silence))) {
     notify &&
       toast({
         variant: "error",
-        message: "Silence Notification should not be empty",
+        message: t("alerts.validation.silenceNotificationRequired"),
         timeout: 1500,
       });
     return false;
@@ -384,14 +468,11 @@ export const validateInputs = (
 
   if (input.is_real_time) return true;
 
-  if (
-    Number(input.trigger_condition.period) < 1 ||
-    isNaN(Number(input.trigger_condition.period))
-  ) {
+  if (Number(input.trigger_condition.period) < 1 || isNaN(Number(input.trigger_condition.period))) {
     notify &&
       toast({
         variant: "error",
-        message: "Period should be greater than 0",
+        message: t("alerts.validation.periodPositive"),
         timeout: 1500,
       });
     return false;
@@ -400,15 +481,14 @@ export const validateInputs = (
   if (input.query_condition.aggregation) {
     if (
       isNaN(Number(input.trigger_condition.threshold)) ||
-      !input.query_condition.aggregation.having.value.toString().trim()
-        .length ||
+      !input.query_condition.aggregation.having.value.toString().trim().length ||
       !input.query_condition.aggregation.having.column ||
       !input.query_condition.aggregation.having.operator
     ) {
       notify &&
         toast({
           variant: "error",
-          message: "Threshold should not be empty",
+          message: t("alerts.validation.thresholdNotEmpty"),
           timeout: 1500,
         });
       return false;
@@ -425,7 +505,7 @@ export const validateInputs = (
     notify &&
       toast({
         variant: "error",
-        message: "Threshold should not be empty",
+        message: t("alerts.validation.thresholdNotEmpty"),
         timeout: 1500,
       });
     return false;
@@ -434,27 +514,28 @@ export const validateInputs = (
   // Validate cron expression if frequency type is cron
   if (input.trigger_condition.frequency_type === "cron") {
     try {
+      // `utc` is a cron-parser v4 option; v5 types only accept `tz` — cast keeps runtime unchanged
       CronExpressionParser.parse(input.trigger_condition.cron!, {
         currentDate: new Date(),
         utc: true,
-      });
+      } as Parameters<typeof CronExpressionParser.parse>[1]);
     } catch (err) {
       console.log(err);
       notify &&
         toast({
           variant: "error",
-          message: "Invalid cron expression!",
+          message: t("alerts.validation.invalidCronExpressionBang"),
           timeout: 1500,
         });
       return false;
     }
 
     // Validate timezone is set for cron
-    if (!input.trigger_condition.timezone || input.trigger_condition.timezone.trim() === '') {
+    if (!input.trigger_condition.timezone || input.trigger_condition.timezone.trim() === "") {
       notify &&
         toast({
           variant: "error",
-          message: "Timezone is required for cron schedule",
+          message: t("alerts.validation.timezoneRequiredForCron"),
           timeout: 1500,
         });
       return false;
@@ -466,7 +547,7 @@ export const validateInputs = (
       notify &&
         toast({
           variant: "error",
-          message: "Frequency should be greater than 0",
+          message: t("alerts.validation.frequencyPositive"),
           timeout: 1500,
         });
       return false;
@@ -482,19 +563,25 @@ export const validateSqlQuery = async (
 ): Promise<void> => {
   const {
     store,
+    t,
     validateSqlQueryPromise,
     sqlQueryErrorMsg,
+    sqlErrorRanges,
     vrlFunctionError,
     buildQueryPayload,
     getParser,
   } = context;
+  const clearRanges = () => {
+    if (sqlErrorRanges) sqlErrorRanges.value = [];
+  };
 
   // Delaying the validation by 300ms, as editor has debounce of 300ms. Else old value will be used for validation
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   // Skip validation if SQL query is empty or only whitespace
-  if (!formData.query_condition.sql || formData.query_condition.sql.trim() === '') {
+  if (!formData.query_condition.sql || formData.query_condition.sql.trim() === "") {
     sqlQueryErrorMsg.value = "";
+    clearRanges();
     return;
   }
 
@@ -502,10 +589,13 @@ export const validateSqlQuery = async (
     return;
   }
 
-  const query = buildQueryPayload({
-    sqlMode: true,
-    streamName: formData.stream_name,
-  });
+  const query = buildQueryPayload(
+    {
+      sqlMode: true,
+      streamName: formData.stream_name,
+    },
+    t,
+  );
 
   delete query.aggs;
 
@@ -515,7 +605,7 @@ export const validateSqlQuery = async (
   query.query.sql = formData.query_condition.sql;
 
   if (formData.query_condition.vrl_function)
-    query.query.query_fn = b64EncodeUnicode(formData.query_condition.vrl_function)
+    query.query.query_fn = b64EncodeUnicode(formData.query_condition.vrl_function);
 
   validateSqlQueryPromise.value = new Promise((resolve, reject) => {
     searchService
@@ -527,12 +617,13 @@ export const validateSqlQuery = async (
       })
       .then((res: any) => {
         sqlQueryErrorMsg.value = "";
+        clearRanges();
 
         if (res.data?.function_error) {
           vrlFunctionError.value = res.data.function_error;
           toast({
             variant: "error",
-            message: "Invalid VRL Function",
+            message: t("alerts.validation.invalidVrlFunction"),
           });
           reject("function_error");
         } else vrlFunctionError.value = "";
@@ -542,10 +633,24 @@ export const validateSqlQuery = async (
       .catch((err: any) => {
         sqlQueryErrorMsg.value = err.response?.data?.message
           ? err.response?.data?.message
-          : "Invalid SQL Query";
+          : t("alerts.validation.invalidSqlQuery");
 
         // Error message is displayed inline below the editor
         // No need for toast notification as it's redundant
+
+        // Locate the offending token in the SQL and squiggle it in the editor.
+        if (sqlErrorRanges) {
+          rangesFromServerError({
+            code: err.response?.data?.code,
+            message: err.response?.data?.message,
+            errorDetail: err.response?.data?.error_detail,
+            sqlMode: true,
+            query: formData.query_condition.sql,
+            streamName: formData.stream_name,
+          }).then((ranges) => {
+            sqlErrorRanges.value = ranges;
+          });
+        }
 
         reject("sql_error");
       });
@@ -557,24 +662,18 @@ export const saveAlertJson = async (
   props: any,
   validationErrors: any,
   showJsonEditorDialog: any,
-  formData: any,
+  applyFormData: (obj: any) => void,
   context: JsonValidationContext,
 ): Promise<void> => {
-  const {
-    store,
-    streams,
-    getParser,
-    buildQueryPayload,
-    getStreams,
-    prepareAndSaveAlert,
-  } = context;
+  const { store, t, streams, getParser, buildQueryPayload, getStreams, prepareAndSaveAlert } =
+    context;
 
   let jsonPayload = JSON.parse(json);
-  let destinationsList = [];
+  let destinationsList: string[] = [];
   props.destinations.forEach((destination: any) => {
     destinationsList.push(destination.name);
   });
-  let streamList = [];
+  let streamList: string[] = [];
 
   if (!streams.value[jsonPayload.stream_type]) {
     try {
@@ -584,7 +683,7 @@ export const saveAlertJson = async (
       if (err.response.status !== 403) {
         toast({
           variant: "error",
-          message: err.response?.data?.message || "Error fetching streams",
+          message: err.response?.data?.message || t("alerts.validation.errorFetchingStreams"),
         });
       }
     }
@@ -597,6 +696,7 @@ export const saveAlertJson = async (
     streamList: streamList,
     selectedOrgId: store.state.selectedOrganization.identifier,
     destinationsList: destinationsList,
+    t,
   });
 
   if (!validationResult.isValid) {
@@ -605,20 +705,16 @@ export const saveAlertJson = async (
   }
 
   // Validate SQL query if type is sql and not real-time
-  if (
-    jsonPayload.is_real_time === false &&
-    jsonPayload.query_condition.type === "sql"
-  ) {
+  if (jsonPayload.is_real_time === false && jsonPayload.query_condition.type === "sql") {
     try {
       // First check if query has SELECT *
       if (!getParser(jsonPayload.query_condition.sql)) {
-        validationErrors.value = [
-          "Selecting all columns is not allowed. Please specify the columns explicitly",
-        ];
+        validationErrors.value = [t("alerts.validation.selectAllNotAllowed")];
         return;
       }
 
       // Set up query for validation
+      // No `t` here: JsonValidationContext's buildQueryPayload is already bound (see useAlertForm).
       const query = buildQueryPayload({
         sqlMode: true,
         streamName: jsonPayload.stream_name,
@@ -629,9 +725,7 @@ export const saveAlertJson = async (
       query.query.sql = jsonPayload.query_condition.sql;
 
       if (jsonPayload.query_condition.vrl_function) {
-        query.query.query_fn = b64EncodeUnicode(
-          jsonPayload.query_condition.vrl_function,
-        );
+        query.query.query_fn = b64EncodeUnicode(jsonPayload.query_condition.vrl_function);
       }
 
       // Validate SQL query
@@ -643,18 +737,18 @@ export const saveAlertJson = async (
 
       // If we get here, SQL is valid
       showJsonEditorDialog.value = false;
-      formData.value = jsonPayload;
+      applyFormData(jsonPayload);
       await prepareAndSaveAlert(jsonPayload);
     } catch (err: any) {
       // Handle SQL validation errors
-      const errorMessage = err.response?.data?.message || "Invalid SQL Query";
-      validationErrors.value = [`SQL validation error: ${errorMessage}`];
+      const errorMessage = err.response?.data?.message || t("alerts.validation.invalidSqlQuery");
+      validationErrors.value = [t("alerts.validation.sqlValidationError", { error: errorMessage })];
       return;
     }
   } else {
     // If not SQL or is real-time, just close and update
     showJsonEditorDialog.value = false;
-    formData.value = jsonPayload;
+    applyFormData(jsonPayload);
     await prepareAndSaveAlert(jsonPayload);
   }
 };

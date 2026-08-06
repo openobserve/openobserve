@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-end tw:gap-2">
+  <div class="flex items-end gap-2">
     <!-- select new folder -->
     <OSelect
       v-model="selectedFolder"
@@ -28,14 +28,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       "
       data-test="index-dropdown-stream_type"
       labelKey="label"
-      class="tw:flex-1"
+      class="flex-1"
     />
 
     <OButton
       data-test="dashboard-folder-move-new-add"
       variant="outline"
       size="icon-xs-sq"
-      class="tw:h-8! tw:w-8!"
+      class="h-8! w-8!"
       @mousedown.prevent
       @click="
         () => {
@@ -57,17 +57,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     form-id="add-folder-dashboards-form"
     @click:secondary="showAddFolderDialog = false"
   >
-    <AddFolder
-      ref="addFolderRef"
-      @update:modelValue="updateFolderList"
-      :edit-mode="false"
-    />
+    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
   </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, onActivated, ref, watch, computed, type PropType } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -87,7 +83,7 @@ export default defineComponent({
       },
     },
     labelPosition: {
-      type: String,
+      type: String as PropType<"inside" | "outside">,
       default: "outside",
     },
   },
@@ -108,7 +104,7 @@ export default defineComponent({
 
     //dropdown selected folder id (primitive string for OSelect)
     const selectedFolder = ref<string>(getInitialFolderValue());
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;

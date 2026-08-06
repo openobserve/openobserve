@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent class="copy-content-container-cls" :content="content" />
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
     <IngestionDocLink
       href="https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/"
     />
@@ -24,7 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { raw } from "@/types/i18n";
+import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
@@ -71,6 +72,7 @@ log {
     flags(flow-control);
 };`;
     return {
+      raw,
       store,
       config,
       endpoint,

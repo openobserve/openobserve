@@ -13,9 +13,7 @@ describe("ODateTimeRange", () => {
 
   it("should render a trigger button", () => {
     wrapper = mount(ODateTimeRange, { attachTo: document.body });
-    expect(wrapper.find('[data-test="datetimerange-trigger"]').exists()).toBe(
-      true,
-    );
+    expect(wrapper.find('[data-test="datetimerange-trigger"]').exists()).toBe(true);
   });
 
   it("should show placeholder text in the trigger when no value set", () => {
@@ -23,9 +21,7 @@ describe("ODateTimeRange", () => {
       attachTo: document.body,
       props: { placeholder: "Pick a range" },
     });
-    expect(wrapper.find('[data-test="datetimerange-trigger"]').text()).toContain(
-      "Pick a range",
-    );
+    expect(wrapper.find('[data-test="datetimerange-trigger"]').text()).toContain("Pick a range");
   });
 
   it("should render a label when provided", () => {
@@ -85,9 +81,7 @@ describe("ODateTimeRange", () => {
         relativeAmount: 3,
       },
     });
-    expect(
-      wrapper.find('[data-test="datetimerange-trigger"]').text(),
-    ).toContain("Past 3 Days");
+    expect(wrapper.find('[data-test="datetimerange-trigger"]').text()).toContain("Past 3 Days");
   });
 
   it("should show absolute date range in trigger when mode=absolute", () => {
@@ -139,9 +133,7 @@ describe("ODateTimeRange", () => {
     await wrapper.vm.$nextTick();
 
     // Relative panel should now be visible — click a quick-select button
-    const panel = document.body.querySelector(
-      '[data-test="datetimerange-relative-panel"]',
-    );
+    const panel = document.body.querySelector('[data-test="datetimerange-relative-panel"]');
     const btn = panel?.querySelectorAll("button")[0] as HTMLElement | null;
 
     // Ensure button exists before clicking
@@ -171,9 +163,7 @@ describe("ODateTimeRange", () => {
     });
     await wrapper.find('[data-test="datetimerange-trigger"]').trigger("click");
     // Popup should not appear
-    const popup = document.body.querySelector(
-      '[data-test="datetimerange-popup"]',
-    );
+    const popup = document.body.querySelector('[data-test="datetimerange-popup"]');
     expect(popup).toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,25 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
-    title="Import Alert"
+    :title="t('alerts.importAlertTitle')"
     test-prefix="alert"
+    class="min-h-0 flex-1"
     :is-importing="isAlertImporting"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 285px)',
-      fileEditor: 'calc(100vh - 282px)',
-      outputContainer: 'calc(100vh - 110px)',
-      errorReport: 'calc(100vh - 192px)',
-    }"
     @back="router.back()"
     @cancel="router.back()"
     @import="importJson"
   >
     <!-- Custom URL Input Section with Folder Dropdown -->
     <template #url-input-section="{ url, updateUrl }">
-      <div class="tw:flex tw:items-end tw:gap-2 tw:my-[0.725rem]">
-        <div style="width: calc(69%)">
+      <div class="my-[0.725rem] flex items-end gap-2">
+        <div class="w-[69%]">
           <OInput
             data-test="alert-import-url-input"
             :model-value="url"
@@ -43,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
 
-        <div style="width: calc(30%)" data-test="alert-folder-dropdown">
+        <div class="w-[30%]" data-test="alert-folder-dropdown">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -55,8 +50,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Custom File Input Section with Folder Dropdown -->
     <template #file-input-section="{ jsonFiles, updateFiles }">
-      <div class="tw:mb-1 tw:flex tw:items-start tw:gap-2" style="width: calc(100% - 10px)">
-        <div style="width: calc(69%)">
+      <div class="mb-1 flex w-[calc(100%-0.625rem)] items-start gap-2">
+        <div class="w-[69%]">
           <OFile
             data-test="alert-import-json-file-input"
             :model-value="jsonFiles"
@@ -65,11 +60,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             accept=".json"
             multiple
             drop-zone
-            help-text=".json files only"
+            :help-text="t('alerts.jsonFilesOnlyHint')"
             size="md"
           />
         </div>
-        <div style="width: calc(30%)">
+        <div class="w-[30%]">
           <SelectFolderDropDown
             :type="'alerts'"
             @folder-selected="updateActiveFolderId"
@@ -81,227 +76,226 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="tw:w-full tw:h-full tw:border-l tw:border-border-default" style="min-width: 400px;">
-      <div
-        v-if="alertErrorsToDisplay.length > 0"
-        class="tw:text-center tw:text-xl tw:font-semibold tw:py-2"
-      >
-        Error Validations
-      </div>
-      <div v-else class="tw:text-center tw:text-xl tw:font-semibold tw:py-2">Output Messages</div>
-      <OSeparator class="tw:mr-4 tw:mt-4" />
-      <div class="error-report-container" style="height: calc(100vh - 192px) !important; overflow: auto; resize: none;">
-        <!-- Alert Errors Section -->
-        <div class="tw:p-2.5 tw:mb-2.5" v-if="alertErrorsToDisplay.length > 0">
-          <div class="error-list">
-            <!-- Iterate through the outer array -->
-            <div
-              v-for="(errorGroup, index) in alertErrorsToDisplay"
-              :key="index"
-              :data-test="`alert-import-error-${index}`"
-            >
-              <!-- Iterate through each inner array (the individual error message) -->
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+        <div
+          v-if="alertErrorsToDisplay.length > 0"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
+        >
+          {{ t("dashboard.importDashboardPage.errorValidations") }}
+        </div>
+        <div v-else class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+          {{ t("alerts.outputMessages") }}
+        </div>
+        <OSeparator class="mt-1 shrink-0" />
+        <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
+          <!-- Alert Errors Section -->
+          <div class="mb-2.5 p-2.5" v-if="alertErrorsToDisplay.length > 0">
+            <div class="error-list">
+              <!-- Iterate through the outer array -->
               <div
-                v-for="(errorMessage, errorIndex) in errorGroup"
-                :key="errorIndex"
-                class="tw:py-1.25 tw:px-0 tw:text-sm"
-                :data-test="`alert-import-error-${index}-${errorIndex}`"
+                v-for="(errorGroup, index) in alertErrorsToDisplay"
+                :key="index"
+                :data-test="`alert-import-error-${index}`"
               >
-                <span
-                  class="text-red"
-                  v-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'alert_name'
-                  "
+                <!-- Iterate through each inner array (the individual error message) -->
+                <div
+                  v-for="(errorMessage, errorIndex) in errorGroup"
+                  :key="errorIndex"
+                  class="px-0 py-1.25 text-sm"
+                  :data-test="`alert-import-error-${index}-${errorIndex}`"
                 >
-                  {{ errorMessage.message }}
+                  <span
+                    class="text-status-negative"
+                    v-if="typeof errorMessage === 'object' && errorMessage.field == 'alert_name'"
+                  >
+                    {{ errorMessage.message }}
 
-                  <div style="width: 300px">
-                    <OInput
-                      data-test="alert-import-name-input"
-                      :model-value="userSelectedAlertName[index] || ''"
-                      :label="t('alerts.name') + ' *'"
-                      :error="!userSelectedAlertName[index]?.toString().trim()"
-                      error-message="Field is required!"
-                      @update:model-value="(val) => {
-                        userSelectedAlertName[index] = val;
-                        updateAlertName(val, index);
-                      }"
-                    />
-                  </div>
-                </span>
-                <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'stream_name'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div style="width: 300px">
-                    <OSelect
-                      data-test="alert-import-stream-name-input"
-                      :model-value="userSelectedStreamName[index] || ''"
-                      :options="streamList"
-                      :label="t('alerts.stream_name') + ' *'"
-                      searchable
-                      :error="!userSelectedStreamName[index]"
-                      error-message="Field is required!"
-                      @update:model-value="(val) => {
-                        userSelectedStreamName[index] = val;
-                        updateStreamFields(val, index);
-                      }"
-                    />
-                  </div>
-                </span>
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'destination_name'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div>
-                    <OSelect
-                      data-test="alert-import-destination-name-input"
-                      :model-value="userSelectedDestinations[index] || []"
-                      :options="filteredDestinations"
-                      label="Destinations *"
-                      multiple
-                      searchable
-                      @search="filterDestinations"
-                      style="width: 300px"
-                      :error="!userSelectedDestinations[index]?.length"
-                      error-message="Field is required!"
-                      @update:model-value="(val) => {
-                        userSelectedDestinations[index] = val;
-                        updateUserSelectedDestinations(val, index);
-                      }"
-                    />
-                  </div>
-                </span>
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'stream_type'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div>
-                    <OSelect
-                      data-test="alert-import-stream-type-input"
-                      :model-value="userSelectedStreamType[index] || ''"
-                      :options="streamTypes"
-                      :label="t('alerts.streamType') + ' *'"
-                      style="width: 300px"
-                      :error="!userSelectedStreamType[index]"
-                      error-message="Field is required!"
-                      @update:model-value="(val) => {
-                        userSelectedStreamType[index] = val;
-                        updateStreams(val, index);
-                      }"
-                    />
-                  </div>
-                </span>
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'timezone'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div>
-                    <OSelect
-                      data-test="alert-import-timezone-input"
-                      :model-value="userSelectedTimezone[index] || ''"
-                      :options="filteredTimezone"
-                      label="Timezone *"
-                      searchable
-                      @search="timezoneFilterFn"
-                      style="width: 300px"
-                      :error="!userSelectedTimezone[index]"
-                      error-message="Field is required!"
-                      @update:model-value="(val) => {
-                        userSelectedTimezone[index] = val;
-                        updateTimezone(val, index);
-                      }"
-                    />
-                  </div>
-                </span>
-                <span
-                  class="text-red"
-                  v-else-if="
-                    typeof errorMessage === 'object' &&
-                    errorMessage.field == 'org_id'
-                  "
-                >
-                  {{ errorMessage.message }}
-                  <div style="width: 300px">
-                    <OSelect
-                      data-test="alert-import-org-id-input"
-                      :model-value="userSelectedOrgId[index] || null"
-                      :options="organizationDataList"
-                      label="Organization Id"
-                      labelKey="label"
-                      valueKey="value"
-                      @update:model-value="(val) => {
-                        userSelectedOrgId[index] = val;
-                        updateOrgId(val?.value || val, index);
-                      }"
-                    />
-                  </div>
-                </span>
+                    <div class="w-75">
+                      <OInput
+                        data-test="alert-import-name-input"
+                        :model-value="userSelectedAlertName[index] || ''"
+                        :label="raw(t('alerts.name') + ' *')"
+                        :error="!userSelectedAlertName[index]?.toString().trim()"
+                        :error-message="t('alerts.validation.fieldRequired')"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedAlertName[index] = val as string;
+                            updateAlertName(val as string, index);
+                          }
+                        "
+                      />
+                    </div>
+                  </span>
+                  <!-- Check if the errorMessage is an object, if so, display the 'message' property -->
+                  <span
+                    class="text-status-negative"
+                    v-else-if="
+                      typeof errorMessage === 'object' && errorMessage.field == 'stream_name'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div class="w-75">
+                      <OSelect
+                        data-test="alert-import-stream-name-input"
+                        :model-value="userSelectedStreamName[index] || ''"
+                        :options="streamList"
+                        :label="raw(t('alerts.stream_name') + ' *')"
+                        searchable
+                        :error="!userSelectedStreamName[index]"
+                        :error-message="t('alerts.validation.fieldRequired')"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedStreamName[index] = val as string;
+                            updateStreamFields(val as string, index);
+                          }
+                        "
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-status-negative"
+                    v-else-if="
+                      typeof errorMessage === 'object' && errorMessage.field == 'destination_name'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <OSelect
+                        data-test="alert-import-destination-name-input"
+                        :model-value="userSelectedDestinations[index] || []"
+                        :options="filteredDestinations"
+                        :label="t('alerts.destinationsRequiredLabel')"
+                        multiple
+                        searchable
+                        @search="filterDestinations"
+                        class="w-75!"
+                        :error="!userSelectedDestinations[index]?.length"
+                        :error-message="t('alerts.validation.fieldRequired')"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedDestinations[index] = val as string[];
+                            updateUserSelectedDestinations(val as string[], index);
+                          }
+                        "
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-status-negative"
+                    v-else-if="
+                      typeof errorMessage === 'object' && errorMessage.field == 'stream_type'
+                    "
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <OSelect
+                        data-test="alert-import-stream-type-input"
+                        :model-value="userSelectedStreamType[index] || ''"
+                        :options="streamTypes"
+                        :label="raw(t('alerts.streamType') + ' *')"
+                        class="w-75!"
+                        :error="!userSelectedStreamType[index]"
+                        :error-message="t('alerts.validation.fieldRequired')"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedStreamType[index] = val as string;
+                            updateStreams(val as string, index);
+                          }
+                        "
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'timezone'"
+                  >
+                    {{ errorMessage.message }}
+                    <div>
+                      <OSelect
+                        data-test="alert-import-timezone-input"
+                        :model-value="userSelectedTimezone[index] || ''"
+                        :options="filteredTimezone"
+                        :label="t('alerts.timezoneRequiredLabel')"
+                        searchable
+                        @search="timezoneFilterFn"
+                        class="w-75!"
+                        :error="!userSelectedTimezone[index]"
+                        :error-message="t('alerts.validation.fieldRequired')"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedTimezone[index] = val as string;
+                            updateTimezone(val as string, index);
+                          }
+                        "
+                      />
+                    </div>
+                  </span>
+                  <span
+                    class="text-status-negative"
+                    v-else-if="typeof errorMessage === 'object' && errorMessage.field == 'org_id'"
+                  >
+                    {{ errorMessage.message }}
+                    <div class="w-75">
+                      <OSelect
+                        data-test="alert-import-org-id-input"
+                        :model-value="userSelectedOrgId[index] || null"
+                        :options="organizationDataList"
+                        :label="t('alerts.organizationIdLabel')"
+                        labelKey="label"
+                        valueKey="value"
+                        @update:model-value="
+                          (val) => {
+                            userSelectedOrgId[index] = val;
+                            updateOrgId(
+                              ((val as unknown as { value?: string })?.value || val) as string,
+                              index,
+                            );
+                          }
+                        "
+                      />
+                    </div>
+                  </span>
 
-                <span v-else>{{ errorMessage }}</span>
+                  <span v-else>{{ errorMessage }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-2.5 p-2.5" v-if="alertCreators.length > 0">
+            <div
+              class="text-primary mb-2.5 text-base uppercase"
+              data-test="alert-import-creation-title"
+            >
+              {{ t("alerts.alertCreationTitle") }}
+            </div>
+            <div
+              class="error-list"
+              v-for="(val, index) in alertCreators"
+              :key="index"
+              :data-test="`alert-import-creation-${index}`"
+            >
+              <div
+                :class="{
+                  'px-0 py-1.25 text-sm font-bold': true,
+                  'text-green': val.success,
+                  'text-status-negative': !val.success,
+                }"
+                :data-test="`alert-import-creation-${index}-message`"
+              >
+                <pre>{{ val.message }}</pre>
               </div>
             </div>
           </div>
         </div>
-
-        <div class="tw:p-2.5 tw:mb-2.5" v-if="alertCreators.length > 0">
-          <div
-            class="tw:text-base tw:mb-2.5 tw:uppercase text-primary"
-            data-test="alert-import-creation-title"
-          >
-            Alert Creation
-          </div>
-          <div
-            class="error-list"
-            v-for="(val, index) in alertCreators"
-            :key="index"
-            :data-test="`alert-import-creation-${index}`"
-          >
-            <div
-              :class="{
-                'tw:py-1.25 tw:px-0 tw:text-sm tw:font-bold': true,
-                'text-green ': val.success,
-                'text-red': !val.success,
-              }"
-              :data-test="`alert-import-creation-${index}-message`"
-            >
-              <pre>{{ val.message }}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  computed,
-  watch,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onMounted, computed, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "../../services/alerts";
@@ -313,7 +307,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -353,19 +347,19 @@ export default defineComponent({
   setup(props, { emit }) {
     type ErrorMessage = {
       field: string;
-      message: string;
+      message: I18nText;
     };
     type alertCreator = {
-      message: string;
+      message: I18nText;
       success: boolean;
     }[];
 
     type AlertErrors = (ErrorMessage | string)[][];
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const baseImportRef = ref<any>(null);
     const alertErrorsToDisplay = ref<AlertErrors>([]);
@@ -389,7 +383,7 @@ export default defineComponent({
         if (baseImportRef.value) {
           baseImportRef.value.jsonArrayOfObj = val;
         }
-      }
+      },
     });
     const streamTypes = ["logs", "metrics", "traces"];
     const selectedFolderId = ref<any>(
@@ -406,11 +400,10 @@ export default defineComponent({
     const organizationDataList = computed(() => {
       return store.state.organizations.map((org: any) => {
         return {
-          label: org.identifier,
+          label: raw(org.identifier),
           value: org.identifier,
           disabled:
-            !org.identifier ||
-            org.identifier !== store.state.selectedOrganization.identifier,
+            !org.identifier || org.identifier !== store.state.selectedOrganization.identifier,
         };
       });
     });
@@ -423,7 +416,7 @@ export default defineComponent({
 
     // Keep filteredDestinations in sync with the destinations prop so the
     // dropdown is pre-populated on first open (OSelect @search only fires
-    // on user input, not on initial open like Quasar's @filter).
+    // on user input, not on initial open).
     watch(
       () => props.destinations,
       () => {
@@ -441,25 +434,17 @@ export default defineComponent({
     const filteredTimezone = ref<any>([]);
     filteredTimezone.value = [...timezoneOptions];
 
-    const browserTime =
-      "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
+    const browserTime = "Browser Time (" + Intl.DateTimeFormat().resolvedOptions().timeZone + ")";
 
     // Add the UTC option
     timezoneOptions.unshift("UTC");
     timezoneOptions.unshift(browserTime);
 
-    const updateUserSelectedDestinations = (
-      destinations: string[],
-      index: number,
-    ) => {
+    const updateUserSelectedDestinations = (destinations: string[], index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].destinations = destinations;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -467,11 +452,7 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].stream_name = stream_name;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -479,11 +460,7 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].name = alertName;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -495,7 +472,7 @@ export default defineComponent({
       getActiveFolderAlerts(activeFolderId.value as string);
     });
 
-    const importJson = async ({ jsonStr: jsonString, jsonArray }: any) => {
+    const importJson = async ({ jsonStr: jsonString }: any) => {
       alertErrorsToDisplay.value = [];
       templateErrorsToDisplay.value = [];
       destinationErrorsToDisplay.value = [];
@@ -510,9 +487,7 @@ export default defineComponent({
 
         const parsedJson = JSON.parse(jsonString);
         // Convert single object to array if needed
-        jsonArrayOfObj.value = Array.isArray(parsedJson)
-          ? parsedJson
-          : [parsedJson];
+        jsonArrayOfObj.value = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
       } catch (e: any) {
         toast({
           variant: "error",
@@ -539,7 +514,9 @@ export default defineComponent({
       if (allAlertsCreated) {
         toast({
           variant: "success",
-          message: "Alert(s) imported successfully",
+          message: t("toastMessages.alerts.alertsImportedSuccessfully", {
+            count: jsonArrayOfObj.value.length,
+          }),
         });
 
         // Delay navigation to allow Monaco editor to complete all debounced operations
@@ -591,13 +568,17 @@ export default defineComponent({
         };
         await anomalyDetectionService.create(org, payload);
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" imported successfully`,
+          message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,
         });
         return true;
       } catch (e: any) {
         alertCreators.value.push({
-          message: `Anomaly Detection - ${index}: "${jsonObj.name}" import failed — ${e?.response?.data?.message || "Unknown Error"}`,
+          message: t("alerts.import.anomalyImportFailed", {
+            index,
+            name: jsonObj.name,
+            reason: e?.response?.data?.message || t("alerts.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -623,7 +604,7 @@ export default defineComponent({
       } catch (e: any) {
         toast({
           variant: "error",
-          message: "Error importing Alert(s) please check the JSON",
+          message: t("toastMessages.alerts.errorImportingAlertPleaseCheck"),
         });
         return false;
       }
@@ -631,21 +612,15 @@ export default defineComponent({
     };
 
     const validateAlertInputs = async (input: any, index: number) => {
-      let alertErrors: (string | { message: string; field: string })[] = [];
+      let alertErrors: (string | ErrorMessage)[] = [];
 
       // 1. Validate 'name' field
-      if (
-        !input.name ||
-        typeof input.name !== "string" ||
-        input.name.trim() === ""
-      ) {
+      if (!input.name || typeof input.name !== "string" || input.name.trim() === "") {
         alertErrors.push({
-          message: `Alert - ${index}: Name is mandatory and should be a valid string.`,
+          message: t("alerts.import.nameRequired", { index }),
           field: "alert_name",
         });
       }
-      const organizationData = store.state.organizations;
-      const orgList = organizationData.map((org: any) => org.identifier);
 
       // 2. Validate 'org_id' field
       if (
@@ -655,7 +630,10 @@ export default defineComponent({
         input.org_id != store.state.selectedOrganization.identifier
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Organization Id is mandatory, should exist in organization list and should be equal to ${store.state.selectedOrganization.identifier}.`,
+          message: t("alerts.import.orgIdInvalid", {
+            index,
+            orgId: store.state.selectedOrganization.identifier,
+          }),
           field: "org_id",
         });
       }
@@ -664,16 +642,14 @@ export default defineComponent({
       const validStreamTypes = ["logs", "metrics", "traces"];
       if (!input.stream_type || !validStreamTypes.includes(input.stream_type)) {
         alertErrors.push({
-          message: `Alert - ${index}: Stream Type is mandatory and should be one of: 'logs', 'metrics', 'traces'.`,
+          message: t("alerts.import.streamTypeInvalid", { index }),
           field: "stream_type",
         });
       }
 
       try {
         const streamResponse: any = await getStreams(input.stream_type, false);
-        streamList.value = streamResponse.list.map(
-          (stream: any) => stream.name,
-        );
+        streamList.value = streamResponse.list.map((stream: any) => stream.name);
       } catch (e) {
         const err: any = {
           message: `Alert - ${index}: Error fetching stream list. Please try again.`,
@@ -689,7 +665,7 @@ export default defineComponent({
         !streamList.value.includes(input.stream_name)
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Stream Name is mandatory, should exist in the stream list and should be a valid string.`,
+          message: t("alerts.import.streamNameInvalid", { index }),
           field: "stream_name",
         });
       }
@@ -704,17 +680,15 @@ export default defineComponent({
       // 6. Validate 'query_condition' field
       if (input.query_condition && input.query_condition.conditions) {
         const validateV2Condition = (item: any): boolean => {
-          if (item.filterType === 'group') {
+          if (item.filterType === "group") {
             // V2 group - validate it has conditions array
             if (!Array.isArray(item.conditions)) {
-              alertErrors.push(
-                `Alert - ${index}: V2 group must have a conditions array.`,
-              );
+              alertErrors.push(`Alert - ${index}: V2 group must have a conditions array.`);
               return false;
             }
             // Recursively validate nested conditions
             return item.conditions.every((nestedItem: any) => validateV2Condition(nestedItem));
-          } else if (item.filterType === 'condition') {
+          } else if (item.filterType === "condition") {
             // V2 condition - validate required fields
             if (!item.column || !item.operator || item.value === undefined) {
               alertErrors.push(
@@ -725,9 +699,18 @@ export default defineComponent({
             // Validate operator for custom type
             if (
               input.query_condition.type === "custom" &&
-              !["=", "!=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
-                item.operator,
-              )
+              ![
+                "=",
+                "!=",
+                ">",
+                "<",
+                ">=",
+                "<=",
+                "Contains",
+                "NotContains",
+                "contains",
+                "not_contains",
+              ].includes(item.operator)
             ) {
               alertErrors.push(
                 `Alert - ${index}: Invalid operator '${item.operator}'. Allowed: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
@@ -744,9 +727,18 @@ export default defineComponent({
           if (condition.column && condition.operator && condition.value !== undefined) {
             if (
               input.query_condition.type === "custom" &&
-              !["=", "!=", ">", "<", ">=", "<=", "Contains", "NotContains","contains","not_contains"].includes(
-                condition.operator,
-              )
+              ![
+                "=",
+                "!=",
+                ">",
+                "<",
+                ">=",
+                "<=",
+                "Contains",
+                "NotContains",
+                "contains",
+                "not_contains",
+              ].includes(condition.operator)
             ) {
               alertErrors.push(
                 `Alert - ${index}: Invalid operator in query condition. Allowed operators: '=', '!=', '>', '<', '>=', '<=', 'Contains', 'NotContains'.`,
@@ -759,9 +751,7 @@ export default defineComponent({
           if (condition.and || condition.or) {
             const conditions = condition.and || condition.or;
             if (!Array.isArray(conditions)) {
-              alertErrors.push(
-                `Alert - ${index}: 'and'/'or' conditions must be an array.`,
-              );
+              alertErrors.push(`Alert - ${index}: 'and'/'or' conditions must be an array.`);
               return;
             }
             conditions.forEach(validateV1Condition);
@@ -785,14 +775,14 @@ export default defineComponent({
         // Determine format and validate accordingly
         if (Array.isArray(conditionsToValidate)) {
           // V0 format - flat array of conditions
-          conditionsToValidate.forEach((condition:any) => {
+          conditionsToValidate.forEach((condition: any) => {
             if (!condition.column || !condition.operator || condition.value === undefined) {
               alertErrors.push(
                 `Alert - ${index}: Each query condition must have 'column', 'operator', and 'value'.`,
               );
             }
           });
-        } else if (conditionsToValidate.filterType === 'group') {
+        } else if (conditionsToValidate.filterType === "group") {
           // V2 format - new structure with filterType
           validateV2Condition(conditionsToValidate);
         } else if (conditionsToValidate.and || conditionsToValidate.or) {
@@ -800,28 +790,19 @@ export default defineComponent({
           validateV1Condition(conditionsToValidate);
         } else {
           // Unknown format
-          alertErrors.push(
-            `Alert - ${index}: Unrecognized query condition format.`,
-          );
+          alertErrors.push(`Alert - ${index}: Unrecognized query condition format.`);
         }
       }
       // 7. Validate 'sql' and 'promql'
-      if (
-        input.query_condition.type === "sql" &&
-        typeof input.query_condition.sql !== "string"
-      ) {
-        alertErrors.push(
-          `Alert - ${index}: SQL should be provided when the type is 'sql'.`,
-        );
+      if (input.query_condition.type === "sql" && typeof input.query_condition.sql !== "string") {
+        alertErrors.push(`Alert - ${index}: SQL should be provided when the type is 'sql'.`);
       }
 
       if (
         input.query_condition.type === "promql" &&
         typeof input.query_condition.promql !== "string"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: PromQL should be provided when the type is 'promql'.`,
-        );
+        alertErrors.push(`Alert - ${index}: PromQL should be provided when the type is 'promql'.`);
       }
 
       // 8. Validate 'vrl_function'
@@ -829,9 +810,7 @@ export default defineComponent({
         input.query_condition.vrl_function &&
         typeof input.query_condition.vrl_function !== "string"
       ) {
-        alertErrors.push(
-          `Alert - ${index}: VRL function should be a string or null.`,
-        );
+        alertErrors.push(`Alert - ${index}: VRL function should be a string or null.`);
       }
 
       // 9. Validate 'multi_time_range'
@@ -841,9 +820,7 @@ export default defineComponent({
         (!Array.isArray(input.query_condition.multi_time_range) ||
           input.query_condition.multi_time_range.length > 0)
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Multi Time Range should be an empty array or null.`,
-        );
+        alertErrors.push(`Alert - ${index}: Multi Time Range should be an empty array or null.`);
       }
 
       // 10. Validate 'trigger_condition'
@@ -861,16 +838,7 @@ export default defineComponent({
         );
       }
 
-      const validOperators = [
-        "=",
-        "!=",
-        ">=",
-        "<=",
-        ">",
-        "<",
-        "Contains",
-        "NotContains",
-      ];
+      const validOperators = ["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"];
       if (!validOperators.includes(triggerCondition.operator)) {
         alertErrors.push(
           `Alert - ${index}: Operator should be one of: '=', '!=', '>=', '<=', '>', '<', 'Contains', 'NotContains'.`,
@@ -888,9 +856,7 @@ export default defineComponent({
       }
 
       if (triggerCondition.cron && typeof triggerCondition.cron !== "string") {
-        alertErrors.push(
-          `Alert - ${index}: Cron expression should be a string.`,
-        );
+        alertErrors.push(`Alert - ${index}: Cron expression should be a string.`);
       }
 
       if (
@@ -925,12 +891,9 @@ export default defineComponent({
 
       if (
         triggerCondition.frequency_type === "cron" &&
-        (triggerCondition.cron.trim() === "" ||
-          typeof triggerCondition.cron !== "string")
+        (triggerCondition.cron.trim() === "" || typeof triggerCondition.cron !== "string")
       ) {
-        alertErrors.push(
-          `Alert - ${index}: Cron expression should be a valid cron expression.`,
-        );
+        alertErrors.push(`Alert - ${index}: Cron expression should be a valid cron expression.`);
       }
 
       if (
@@ -939,31 +902,26 @@ export default defineComponent({
         input.destinations.length === 0
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Destinations are required and should be an array.`,
+          message: t("alerts.import.destinationsRequired", { index }),
           field: "destination_name",
         });
       }
 
       if (typeof input.enabled !== "boolean") {
-        alertErrors.push(`Alert - ${index}: Enabled should be Boolean.`);
+        alertErrors.push(t("alerts.import.enabledBoolean", { index }));
       }
 
-      if (
-        input.tz_offset &&
-        (typeof input.tz_offset !== "number" || input.tz_offset < 0)
-      ) {
-        alertErrors.push(
-          `Alert - ${index}: Timezone offset should be a number.`,
-        );
+      if (input.tz_offset && (typeof input.tz_offset !== "number" || input.tz_offset < 0)) {
+        alertErrors.push(t("alerts.import.tzOffsetNumber", { index }));
       }
 
       if (
         (input.trigger_condition.frequency_type == "cron" &&
-          !input.trigger_condition.hasOwnProperty("timezone")) ||
+          !Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) ||
         input.trigger_condition.timezone === ""
       ) {
         alertErrors.push({
-          message: `Alert - ${index}: Timezone is required when frequency type is 'cron'.`,
+          message: t("alerts.import.timezoneRequiredForCron", { index }),
           field: "timezone",
         });
       }
@@ -971,7 +929,7 @@ export default defineComponent({
       input.destinations.forEach((destination: any) => {
         if (!checkDestinationInList(props.destinations, destination)) {
           alertErrors.push({
-            message: `Alert - ${index}: "${destination}" destination does not exist`,
+            message: t("alerts.import.destinationNotExist", { index, destination }),
             field: "destination_name",
           });
         }
@@ -991,30 +949,25 @@ export default defineComponent({
       return true;
     };
 
-    const checkDestinationInList = (
-      destinations: any,
-      destinationName: any,
-    ) => {
-      const destinationsList = destinations.map(
-        (destination: any) => destination.name,
-      );
+    const checkDestinationInList = (destinations: any, destinationName: any) => {
+      const destinationsList = destinations.map((destination: any) => destination.name);
       return destinationsList.includes(destinationName);
     };
 
     const createAlert = async (input: any, index: any, folderId: any) => {
-      if (!input.hasOwnProperty("context_attributes")) {
+      if (!Object.prototype.hasOwnProperty.call(input, "context_attributes")) {
         input.context_attributes = {};
       }
-      if (!input.trigger_condition.hasOwnProperty("timezone")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "timezone")) {
         input.trigger_condition.timezone = store.state.timezone;
       }
-      if (!input.trigger_condition.hasOwnProperty("tolerance_in_secs")) {
+      if (!Object.prototype.hasOwnProperty.call(input.trigger_condition, "tolerance_in_secs")) {
         input.trigger_condition.tolerance_in_secs = null;
       }
       input.folder_id = folderId;
       input.owner = store.state.userInfo.email;
       input.last_edited_by = store.state.userInfo.email;
-      if (input.hasOwnProperty("id")) delete input.id;
+      if (Object.prototype.hasOwnProperty.call(input, "id")) delete input.id;
 
       // VERSION DETECTION AND CONVERSION
       // Convert V0 and V1 conditions to V2 format before creating alert
@@ -1060,7 +1013,7 @@ export default defineComponent({
 
         // Success
         alertCreators.value.push({
-          message: `Alert - ${index}: "${input.name}" created successfully \nNote: please remove the created alert object ${input.name} from the json file`,
+          message: t("alerts.import.createSuccess", { index, name: input.name }),
           success: true,
         });
         // Emit update after each successful creation
@@ -1070,7 +1023,11 @@ export default defineComponent({
       } catch (error: any) {
         // Failure
         alertCreators.value.push({
-          message: `Alert - ${index}: "${input.name}" creation failed --> \n Reason: ${error?.response?.data?.message || "Unknown Error"}`,
+          message: t("alerts.import.createFailed", {
+            index,
+            name: input.name,
+            reason: error?.response?.data?.message || t("alerts.import.unknownError"),
+          }),
           success: false,
         });
         return false;
@@ -1081,18 +1038,12 @@ export default defineComponent({
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].stream_type = streamType;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
 
       try {
         const streamResponse: any = await getStreams(streamType, false);
-        streamList.value = streamResponse.list.map(
-          (stream: any) => stream.name,
-        );
+        streamList.value = streamResponse.list.map((stream: any) => stream.name);
       } catch (error) {
         console.error("Error fetching streams:", error);
       }
@@ -1103,9 +1054,8 @@ export default defineComponent({
         filteredDestinations.value = getFormattedDestinations.value;
         return;
       }
-      filteredDestinations.value = getFormattedDestinations.value.filter(
-        (destination: string) =>
-          destination.toLowerCase().includes(val.toLowerCase()),
+      filteredDestinations.value = getFormattedDestinations.value.filter((destination: string) =>
+        destination.toLowerCase().includes(val.toLowerCase()),
       );
     };
 
@@ -1133,11 +1083,7 @@ export default defineComponent({
         }
         baseImportRef.value.jsonArrayOfObj[index].trigger_condition.timezone = timezone;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -1175,19 +1121,14 @@ export default defineComponent({
           [folderId]: response.data.list.map((alert: any) => alert.name),
         });
       }
-      activeFolderAlerts.value =
-        store.state.organizationData.allAlertsListByNames[folderId];
+      activeFolderAlerts.value = store.state.organizationData.allAlertsListByNames[folderId];
     };
 
     const updateOrgId = (orgId: string, index: number) => {
       if (baseImportRef.value?.jsonArrayOfObj[index]) {
         baseImportRef.value.jsonArrayOfObj[index].org_id = orgId;
         // Directly update jsonStr without triggering editor re-render
-        baseImportRef.value.jsonStr = JSON.stringify(
-          baseImportRef.value.jsonArrayOfObj,
-          null,
-          2
-        );
+        baseImportRef.value.jsonStr = JSON.stringify(baseImportRef.value.jsonArrayOfObj, null, 2);
       }
     };
 
@@ -1204,6 +1145,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       importJson,
       router,
       baseImportRef,

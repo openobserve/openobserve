@@ -84,7 +84,6 @@ vi.mock("../../utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
-
 describe("DashboardSettings.vue", () => {
   let wrapper: VueWrapper;
   let store: any;
@@ -197,7 +196,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("tw:bg-white");
+      // Theme is handled by design tokens; container markup is theme-independent.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
@@ -207,8 +208,10 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("dark-mode");
-      expect(mainContainer.classes()).not.toContain("tw:bg-white");
+      // Theme is handled by design tokens; container markup is identical in both themes.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
+      expect(mainContainer.classes()).not.toContain("bg-white");
     });
 
     it("should pass the title 'Dashboard Settings' to ODrawer", () => {
@@ -239,12 +242,8 @@ describe("DashboardSettings.vue", () => {
     it("should render all three tabs with correct names and labels", () => {
       wrapper = mountComponent();
 
-      const generalTab = wrapper.find(
-        '[data-test="dashboard-settings-general-tab"]',
-      );
-      const variableTab = wrapper.find(
-        '[data-test="dashboard-settings-variable-tab"]',
-      );
+      const generalTab = wrapper.find('[data-test="dashboard-settings-general-tab"]');
+      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
       const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
 
       expect(generalTab.exists()).toBe(true);
@@ -277,7 +276,6 @@ describe("DashboardSettings.vue", () => {
       wrapper = mountComponent();
 
       const vm = wrapper.vm as any;
-      // OTabPanels is used instead of QTabPanels; verify via active tab state
       expect(vm.activeTab).toBe("generalSettings");
     });
 
@@ -477,8 +475,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is undefined
-      expect(mainContainer.classes()).toContain("tw:bg-white");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle null theme state", () => {
@@ -490,8 +489,9 @@ describe("DashboardSettings.vue", () => {
 
       const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is null
-      expect(mainContainer.classes()).toContain("tw:bg-white");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle empty templates array", () => {

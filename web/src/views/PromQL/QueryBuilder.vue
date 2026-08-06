@@ -1,112 +1,110 @@
 <template>
-  <div
+  <OPageLayout
+    class="h-[calc(100vh-50px)]!"
     data-test="promql-query-builder"
-    class="tw:px-2.5 tw:max-w-350 tw:mx-auto tw:h-[calc(100vh-50px)] tw:overflow-auto"
+    :title="t('metrics.queryBuilder.title')"
+    :subtitle="t('metrics.queryBuilder.subtitle')"
+    icon="query-stats"
+    scroll
   >
-    <OCard>
-      <OCardSection role="header">
-        <div class="tw:text-2xl tw:font-semibold">PromQL Query Builder</div>
-        <div class="tw:text-sm tw:font-medium tw:text-gray-400">
-          Build and test PromQL queries visually
-        </div>
-      </OCardSection>
+    <div class="mx-auto max-w-350 py-2.5">
+      <OCard>
+        <OCardSection role="body">
+          <!-- Query Builder Section -->
+          <div class="flex flex-col gap-5">
+            <!-- Metric Selector -->
+            <MetricSelector v-model:metric="visualQuery.metric" :datasource="datasourceOptions" />
 
-      <OSeparator />
+            <!-- Label Filters -->
+            <LabelFilterEditor v-model:labels="visualQuery.labels" :metric="visualQuery.metric" />
 
-      <OCardSection role="body">
-        <!-- Query Builder Section -->
-        <div class="tw:flex tw:flex-col tw:gap-5">
-          <!-- Metric Selector -->
-          <MetricSelector
-            v-model:metric="visualQuery.metric"
-            :datasource="datasourceOptions"
-          />
+            <!-- Operations List -->
+            <OperationsList v-model:operations="visualQuery.operations" />
+          </div>
+        </OCardSection>
 
-          <!-- Label Filters -->
-          <LabelFilterEditor
-            v-model:labels="visualQuery.labels"
-            :metric="visualQuery.metric"
-          />
+        <OSeparator />
 
-          <!-- Operations List -->
-          <OperationsList
-            v-model:operations="visualQuery.operations"
-          />
-        </div>
-      </OCardSection>
+        <!-- Generated Query Display -->
+        <OCardSection>
+          <div class="mb-2 text-base font-medium">
+            {{ t("metrics.queryBuilder.generatedQuery") }}
+          </div>
+          <OCard class="bg-surface-panel">
+            <OCardSection>
+              <pre
+                class="text-text-link m-0 p-3 font-mono text-sm leading-relaxed font-medium wrap-break-word whitespace-pre-wrap"
+                >{{ generatedQuery || t("metrics.queryBuilder.noQueryBuilt") }}</pre
+              >
+            </OCardSection>
+          </OCard>
 
-      <OSeparator />
+          <div class="mt-3 flex gap-2">
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="copyQuery"
+              :disabled="!generatedQuery"
+            >
+              <OIcon name="content-copy" size="xs" class="mr-1" />
+              {{ t("metrics.queryBuilder.copyQuery") }}
+            </OButton>
+            <OButton variant="outline" size="sm-action" @click="clearQuery">
+              <OIcon name="close" size="xs" class="mr-1" />
+              {{ t("metrics.queryBuilder.clearAll") }}
+            </OButton>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              @click="testQuery"
+              :disabled="!generatedQuery"
+            >
+              <OIcon name="play-arrow" size="xs" class="mr-1" />
+              {{ t("metrics.queryBuilder.testQuery") }}
+            </OButton>
+          </div>
+        </OCardSection>
 
-      <!-- Generated Query Display -->
-      <OCardSection>
-        <div class="tw:text-base tw:font-medium tw:mb-2">Generated PromQL Query:</div>
-        <OCard class="tw:bg-surface-panel">
-          <OCardSection>
-            <pre class="tw:m-0 tw:p-3 tw:font-mono tw:text-sm tw:leading-relaxed tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#1976d2] tw:font-medium">{{ generatedQuery || "No query built yet" }}</pre>
-          </OCardSection>
-        </OCard>
-
-        <div class="tw:mt-3 tw:flex tw:gap-2">
-          <OButton
-            variant="primary"
-            size="sm-action"
-            @click="copyQuery"
-            :disabled="!generatedQuery"
-          >
-            <OIcon name="content-copy" size="xs" class="tw:mr-1" />
-            Copy Query
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="clearQuery"
-          >
-            <OIcon name="close" size="xs" class="tw:mr-1" />
-            Clear All
-          </OButton>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            @click="testQuery"
-            :disabled="!generatedQuery"
-          >
-            <OIcon name="play-arrow" size="xs" class="tw:mr-1" />
-            Test Query
-          </OButton>
-        </div>
-      </OCardSection>
-
-      <!-- Query Result Preview -->
-      <OCardSection v-if="queryResult">
-        <div class="tw:text-base tw:font-medium tw:mb-2">Query Result Preview:</div>
-        <OCard class="tw:bg-surface-panel">
-          <OCardSection>
-            <pre class="tw:m-0 tw:p-3 tw:font-mono tw:text-sm tw:leading-relaxed tw:whitespace-pre-wrap tw:wrap-break-word tw:text-[#424242] tw:max-h-100 tw:overflow-y-auto">{{ queryResult }}</pre>
-          </OCardSection>
-        </OCard>
-      </OCardSection>
-    </OCard>
-  </div>
+        <!-- Query Result Preview -->
+        <OCardSection v-if="queryResult">
+          <div class="mb-2 text-base font-medium">
+            {{ t("metrics.queryBuilder.queryResultPreview") }}
+          </div>
+          <OCard class="bg-surface-panel">
+            <OCardSection>
+              <pre
+                class="text-text-body m-0 max-h-100 overflow-y-auto p-3 font-mono text-sm leading-relaxed wrap-break-word whitespace-pre-wrap"
+                >{{ queryResult }}</pre
+              >
+            </OCardSection>
+          </OCard>
+        </OCardSection>
+      </OCard>
+    </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { PromVisualQuery } from "@/components/promql/types";
-import { promQueryModeller } from "@/components/promql/operations/queryModeller";
+import { useI18nTyped } from "@/types/i18n";
+import { PromqlBuilderQuery } from "@/components/promql/types";
+import { promqlRenderer } from "@/components/promql/operations/queryModeller";
 import MetricSelector from "@/components/promql/components/MetricSelector.vue";
 import LabelFilterEditor from "@/components/promql/components/LabelFilterEditor.vue";
 import OperationsList from "@/components/promql/components/OperationsList.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 
+const { t } = useI18nTyped();
 
 // State
-const visualQuery = ref<PromVisualQuery>({
+const visualQuery = ref<PromqlBuilderQuery>({
   metric: "",
   labels: [],
   operations: [],
@@ -126,14 +124,14 @@ const generatedQuery = computed(() => {
   if (!visualQuery.value.metric && visualQuery.value.labels.length === 0) {
     return "";
   }
-  return promQueryModeller.renderQuery(visualQuery.value);
+  return promqlRenderer.renderQuery(visualQuery.value);
 });
 
 // Methods
 const copyQuery = () => {
   if (generatedQuery.value) {
-    copyToClipboard(generatedQuery.value, {
-      successMessage: "Query copied to clipboard!",
+    copyToClipboard(generatedQuery.value, t, {
+      successMessage: t("metrics.queryBuilder.queryCopied"),
     });
   }
 };
@@ -147,24 +145,25 @@ const clearQuery = () => {
   queryResult.value = null;
   toast({
     variant: "info",
-    message: "Query cleared",  });
+    message: t("metrics.queryBuilder.queryCleared"),
+  });
 };
 
 const testQuery = () => {
   // TODO: Implement actual query execution
   toast({
     variant: "info",
-    message: "Query testing will be implemented soon",  });
+    message: t("metrics.queryBuilder.testingSoon"),
+  });
 
   // Mock result for now
   queryResult.value = JSON.stringify(
     {
       status: "success",
-      message: "Query execution will be implemented in the next phase",
+      message: t("metrics.queryBuilder.executionSoon"),
     },
     null,
-    2
+    2,
   );
 };
 </script>
-

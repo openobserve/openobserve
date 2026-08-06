@@ -43,7 +43,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     }
 
     // Navigate directly to alert destinations page
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${getOrgIdentifier()}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/alert-destinations?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
     // Anchor on the list title rendering — deterministic signal that the destinations page is ready.
     await pm.alertDestinationsPage.expectDestinationsListTitleVisible();
@@ -244,8 +244,12 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     // ----- SERVICENOW -----
     testLogger.info('===== Testing ServiceNow Destination =====');
     const servicenowName = `auto_dest_servicenow_${sharedRandomValue}`;
-    const instanceUrl = 'https://dev12345.service-now.com/api/now/table/incident';
-    const instanceUrlUpdated = 'https://dev67890.service-now.com/api/now/table/incident';
+    // Use resolvable ServiceNow hosts: the cloud SSRF guard does a DNS lookup at
+    // create time and rejects unresolvable hosts (the old dev12345/dev67890 dev-instance
+    // subdomains don't exist → "Failed to resolve host"). The other prebuilt types
+    // already use real base domains (discord.com, outlook.office.com) for the same reason.
+    const instanceUrl = 'https://developer.service-now.com/api/now/table/incident';
+    const instanceUrlUpdated = 'https://www.service-now.com/api/now/table/incident';
     const username = 'test_user';
     const password = 'test_password';
 

@@ -1,8 +1,6 @@
-import type {
-  Provider,
-  ScoreConfig,
-  ScorerType,
-} from "@/services/online-evals.service";
+import { type I18nText, type TranslateFn } from "@/types/i18n";
+
+import type { Provider, ScoreConfig, ScorerType } from "@/services/online-evals.service";
 
 const VALID_SCORER_TYPES: ScorerType[] = ["llm_judge", "remote"];
 
@@ -47,7 +45,7 @@ export type ScorerImportField =
 export interface ScorerImportError {
   itemIndex: number;
   field: ScorerImportField;
-  message: string;
+  message: I18nText;
   fixable?: boolean;
 }
 
@@ -88,8 +86,7 @@ export function normalizeScorerInput(raw: unknown): NormalizedScorerInput | null
   const scName = src.producesScoreConfigName ?? src.produces_score_config_name;
   if (typeof scName === "string" && scName) scorer.producesScoreConfigName = scName;
 
-  const scVer =
-    src.producesScoreConfigVersion ?? src.produces_score_config_version;
+  const scVer = src.producesScoreConfigVersion ?? src.produces_score_config_version;
   if (scVer !== undefined) scorer.producesScoreConfigVersion = scVer;
 
   if (typeof src.template === "string") scorer.template = src.template;
@@ -125,12 +122,7 @@ function scoreConfigEntityId(row: ScoreConfig): string {
 }
 
 function findScoreConfigById(rows: ReadonlyArray<ScoreConfig>, id: string) {
-  return (
-    rows.find(
-      (r) =>
-        scoreConfigEntityId(r) === id || String(r.id) === id,
-    ) ?? null
-  );
+  return rows.find((r) => scoreConfigEntityId(r) === id || String(r.id) === id) ?? null;
 }
 
 function findScoreConfigByName(rows: ReadonlyArray<ScoreConfig>, name: string) {
@@ -176,7 +168,9 @@ function resolveProviderRef(
   const byId = params.provider_id ? findProviderById(ctx.providers, params.provider_id) : null;
   if (byId) return { id: byId.id };
 
-  const byName = params.providerName ? findProviderByName(ctx.providers, params.providerName) : null;
+  const byName = params.providerName
+    ? findProviderByName(ctx.providers, params.providerName)
+    : null;
   if (byName) return { id: byName.id };
 
   if (!params.provider_id && !params.providerName) {
@@ -189,6 +183,7 @@ export interface ValidateScorerCtx extends ResolveCtx {
   itemIndex: number;
   existingNames: Set<string>;
   nameCounts: Map<string, number>;
+  t: TranslateFn;
 }
 
 export function validateScorer(
@@ -196,6 +191,7 @@ export function validateScorer(
   ctx: ValidateScorerCtx,
 ): { payload: ScorerPayload | null; errors: ScorerImportError[] } {
   const errors: ScorerImportError[] = [];
+  const t = ctx.t;
   const idx = ctx.itemIndex;
   const display = idx + 1;
 
@@ -203,7 +199,7 @@ export function validateScorer(
     errors.push({
       itemIndex: idx,
       field: "shape",
-      message: `Scorer ${display}: must be a JSON object`,
+      message: t("onlineEvals.scorer.import.validation.shape", { index: display }),
     });
     return { payload: null, errors };
   }
@@ -213,7 +209,7 @@ export function validateScorer(
     errors.push({
       itemIndex: idx,
       field: "name",
-      message: `Scorer ${display}: name is required and must be a non-empty string`,
+      message: t("onlineEvals.scorer.import.validation.nameRequired", { index: display }),
       fixable: true,
     });
   }
@@ -223,14 +219,20 @@ export function validateScorer(
     errors.push({
       itemIndex: idx,
       field: "type",
-      message: `Scorer ${display}: scorer.type must be one of ${VALID_SCORER_TYPES.join(", ")}`,
+      message: t("onlineEvals.scorer.import.validation.typeInvalid", {
+        index: display,
+        types: VALID_SCORER_TYPES.join(", "),
+      }),
       fixable: true,
     });
   } else if (!VALID_SCORER_TYPES.includes(scorer.type)) {
     errors.push({
       itemIndex: idx,
       field: "type",
-      message: `Scorer ${display}: scorer.type must be one of ${VALID_SCORER_TYPES.join(", ")}`,
+      message: t("onlineEvals.scorer.import.validation.typeInvalid", {
+        index: display,
+        types: VALID_SCORER_TYPES.join(", "),
+      }),
       fixable: true,
     });
   }
@@ -246,8 +248,10 @@ export function validateScorer(
         field: "scoreConfigRef",
         message:
           ref.error === "missing"
-            ? `Scorer ${display}: producesScoreConfigId or producesScoreConfigName is required`
-            : `Scorer ${display}: referenced score config not found in this org`,
+            ? t("onlineEvals.scorer.import.validation.scoreConfigRefMissing", { index: display })
+            : t("onlineEvals.scorer.import.validation.scoreConfigRefUnresolved", {
+                index: display,
+              }),
         fixable: true,
       });
     }
@@ -265,8 +269,8 @@ export function validateScorer(
         field: "providerRef",
         message:
           ref.error === "missing"
-            ? `Scorer ${display}: provider_id or providerName is required for llm_judge scorers`
-            : `Scorer ${display}: referenced provider not found in this org`,
+            ? t("onlineEvals.scorer.import.validation.providerRefMissing", { index: display })
+            : t("onlineEvals.scorer.import.validation.providerRefUnresolved", { index: display }),
         fixable: true,
       });
     }
@@ -275,7 +279,7 @@ export function validateScorer(
       errors.push({
         itemIndex: idx,
         field: "template",
-        message: `Scorer ${display}: scorer.template is required for llm_judge scorers`,
+        message: t("onlineEvals.scorer.import.validation.templateRequired", { index: display }),
       });
     }
   }
@@ -286,7 +290,10 @@ export function validateScorer(
       errors.push({
         itemIndex: idx,
         field: "nameConflict",
-        message: `Scorer ${display}: name "${trimmed}" already exists in this org`,
+        message: t("onlineEvals.scorer.import.validation.nameConflict", {
+          index: display,
+          name: trimmed,
+        }),
         fixable: true,
       });
     }
@@ -294,7 +301,10 @@ export function validateScorer(
       errors.push({
         itemIndex: idx,
         field: "duplicate",
-        message: `Scorer ${display}: name "${trimmed}" is used more than once in this import`,
+        message: t("onlineEvals.scorer.import.validation.duplicateName", {
+          index: display,
+          name: trimmed,
+        }),
       });
     }
   }
@@ -334,6 +344,7 @@ export function prepareScorerImport(
     existingScorerNames: ReadonlyArray<{ name: string }>;
     scoreConfigs: ReadonlyArray<ScoreConfig>;
     providers: ReadonlyArray<Provider>;
+    t: TranslateFn;
   },
 ): PreparedScorerImport {
   const existingNames = new Set(
@@ -356,6 +367,7 @@ export function prepareScorerImport(
       nameCounts,
       scoreConfigs: ctx.scoreConfigs,
       providers: ctx.providers,
+      t: ctx.t,
     }),
   );
 

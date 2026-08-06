@@ -11,9 +11,18 @@ import { ref } from "vue";
 // Reactive state that tests can mutate to drive component rendering
 const mockSessions = ref<any[]>([]);
 const mockTotal = ref(0);
+const mockTotalIsExact = ref(true);
 const mockLoading = ref(false);
 const mockError = ref<string | null>(null);
 const mockHasLoadedOnce = ref(false);
+// These refs are module-scoped in useSessions (survive remount) — the
+// component reads/mutates them directly, so the mock must supply real refs.
+const mockLastRunAt = ref<number | null>(null);
+const mockLoadedOrg = ref<string | null>(null);
+const mockCurrentPage = ref(1);
+const mockRowsPerPage = ref(20);
+const mockAgents = ref<any[]>([]);
+const mockAgentsLoaded = ref(false);
 const mockFetchPage = vi.fn();
 const mockCancelAll = vi.fn();
 const mockListAgents = vi.fn();
@@ -25,9 +34,16 @@ vi.mock("./composables/useSessions", () => ({
   useSessions: vi.fn(() => ({
     sessions: mockSessions,
     total: mockTotal,
+    totalIsExact: mockTotalIsExact,
     loading: mockLoading,
     error: mockError,
     hasLoadedOnce: mockHasLoadedOnce,
+    lastRunAt: mockLastRunAt,
+    loadedOrg: mockLoadedOrg,
+    currentPage: mockCurrentPage,
+    rowsPerPage: mockRowsPerPage,
+    agents: mockAgents,
+    agentsLoaded: mockAgentsLoaded,
     fetchPage: mockFetchPage,
     cancelAll: mockCancelAll,
   })),
@@ -62,32 +78,13 @@ vi.mock("vuex", () => ({
   })),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string, params?: Record<string, any>) => {
-      if (params) {
-        // Simple interpolation for count pill and other keys
-        return key + JSON.stringify(params);
-      }
-      return key;
-    },
-  })),
-}));
-
 // The component now renders sessions through the design-system OTable
 // (props: `data`/`columns`/`loading`, emits `row-click`, cell slots receive
 // `{ row }`). The mock mirrors just that contract.
 vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
     name: "OTable",
-    props: [
-      "data",
-      "columns",
-      "loading",
-      "rowKey",
-      "totalCount",
-      "footerTitle",
-    ],
+    props: ["data", "columns", "loading", "rowKey", "totalCount", "totalCountExact", "footerTitle"],
     emits: ["row-click"],
     // Mirrors the OTable contract the component relies on: a loading state, one
     // row per item, the `#empty` slot when there are no rows, and a footer that
@@ -107,7 +104,7 @@ vi.mock("@/lib/core/Table/OTable.vue", () => ({
             @click="$emit('row-click', row)"
           >
             <slot name="cell-sessionId" :row="row">{{ row.sessionId }}</slot>
-            <slot name="cell-firstSeenNanos" :row="row">{{ row.firstSeenNanos }}</slot>
+            <slot name="cell-lastSeenNanos" :row="row">{{ row.lastSeenNanos }}</slot>
             <slot name="cell-turns" :row="row">{{ row.turns }}</slot>
             <slot name="cell-durationNanos" :row="row">{{ row.durationNanos }}</slot>
             <span data-test="sessions-list-token-cell">
@@ -186,7 +183,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import SessionsList from "./SessionsList.vue";
 
-
 const defaultProps = {
   streamName: "test-stream",
   startTime: 1000,
@@ -222,16 +218,21 @@ beforeEach(() => {
   localStorage.clear();
   mockSessions.value = [];
   mockTotal.value = 0;
+  mockTotalIsExact.value = true;
   mockLoading.value = false;
   mockError.value = null;
   mockHasLoadedOnce.value = false;
+  mockLastRunAt.value = null;
+  mockLoadedOrg.value = null;
+  mockCurrentPage.value = 1;
+  mockRowsPerPage.value = 20;
+  mockAgents.value = [];
+  mockAgentsLoaded.value = false;
   mockRouteQuery = {};
 
   // Default: streams load fine
   mockGetStreams.mockResolvedValue({
-    list: [
-      { name: "test-stream", settings: { is_llm_stream: true } },
-    ],
+    list: [{ name: "test-stream", settings: { is_llm_stream: true } }],
   });
   mockListAgents.mockResolvedValue({ agents: [] });
   mockFetchPage.mockImplementation(async () => {
@@ -244,14 +245,7 @@ async function mountComponent(props = defaultProps) {
   const wrapper = mount(SessionsList, {
     props,
     global: {
-      stubs: {
-        QSelect: { template: '<div class="q-select-stub"><slot /></div>' },
-        QPagination: { template: '<div class="q-pagination-stub" />' },
-        QIcon: { template: '<span class="q-icon-stub"><slot /></span>' },
-        QTooltip: { template: '<div class="q-tooltip-stub"><slot /></div>' },
-        QSpinnerHourglass: { template: '<div class="q-spinner-stub" />' },
-        QSkeleton: { template: '<div class="q-skeleton-stub" />' },
-      },
+      stubs: {},
     },
   });
   await flushPromises();
@@ -274,9 +268,7 @@ describe("SessionsList — no LLM streams", () => {
 
     // With no LLM streams at all, the dedicated first-run empty state renders
     // on its own — the table (and its `#empty` slot) is not mounted.
-    expect(
-      wrapper.find("[data-test='sessions-empty-no-streams']").exists(),
-    ).toBe(true);
+    expect(wrapper.find("[data-test='sessions-empty-no-streams']").exists()).toBe(true);
   });
 });
 
@@ -290,7 +282,7 @@ describe("SessionsList — error state", () => {
 
     const wrapper = await mountComponent();
     const text = wrapper.text();
-    expect(text).toContain("traces.sessionsList.failedToLoad");
+    expect(text).toContain("Failed to load sessions");
     expect(text).toContain("Connection refused");
   });
 
@@ -304,7 +296,7 @@ describe("SessionsList — error state", () => {
     const wrapper = await mountComponent();
     const retryBtn = wrapper.find(".o-button");
     expect(retryBtn.exists()).toBe(true);
-    expect(retryBtn.text()).toContain("traces.sessionsList.retry");
+    expect(retryBtn.text()).toContain("Retry");
   });
 });
 
@@ -327,28 +319,39 @@ describe("SessionsList — loading state", () => {
 
     const wrapper = await mountComponent();
     // The TenstackTable mock renders the loading slot when loading=true
-    expect(wrapper.find("[data-test='sessions-list-loading']").exists()).toBe(
-      true,
-    );
+    expect(wrapper.find("[data-test='sessions-list-loading']").exists()).toBe(true);
   });
 });
 
 describe("SessionsList — sessions table", () => {
-  it("fetches stream sessions with no agent filter by default", async () => {
+  it("uses the session end time for the Last activity column", async () => {
+    mockHasLoadedOnce.value = true;
+    mockSessions.value = [makeSession()];
+
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+    const column = (table.props("columns") as any[]).find((item) => item.id === "lastSeenNanos");
+
+    // setupTests installs the real en-US catalogue, so `t()` resolves here
+    // rather than echoing the key.
+    expect(column.header).toBe("Last activity");
+    expect(column.accessorKey).toBe("lastSeenNanos");
+    expect(wrapper.text()).toContain("2023-11-14 22:30:00");
+    expect(wrapper.text()).not.toContain("2023-11-14 22:13:20");
+  });
+
+  it("should fetch stream sessions with no agent filter when in stream mode", async () => {
+    // Default scope is "agent" now — stream mode is opted into ONLY via the URL
+    // `?type=stream` param (a stale saved preference must not land on stream).
+    mockRouteQuery = { type: "stream" };
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
-    expect(mockFetchPage).toHaveBeenCalledWith(
-      "test-stream",
-      1000,
-      2000,
-      0,
-      20,
-      "",
-    );
+    expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "");
   });
 
-  it("does not load agents while refreshing in stream mode", async () => {
+  it("should not load agents while refreshing when in stream mode", async () => {
+    mockRouteQuery = { type: "stream" };
     const wrapper = await mountComponent();
     await refreshComponent(wrapper);
 
@@ -382,6 +385,18 @@ describe("SessionsList — sessions table", () => {
     expect(footer.text()).toContain("42");
   });
 
+  it("passes lower-bound count metadata to server pagination", async () => {
+    mockHasLoadedOnce.value = true;
+    mockSessions.value = [makeSession()];
+    mockTotal.value = 21;
+    mockTotalIsExact.value = false;
+
+    const wrapper = await mountComponent();
+    const table = wrapper.findComponent({ name: "OTable" });
+    expect(table.props("totalCount")).toBe(21);
+    expect(table.props("totalCountExact")).toBe(false);
+  });
+
   it("status badge shows 'ok' status for ok sessions", async () => {
     mockHasLoadedOnce.value = true;
     mockSessions.value = [makeSession({ sessionId: "sess-ok", status: "ok" })];
@@ -397,15 +412,11 @@ describe("SessionsList — sessions table", () => {
 
   it("status badge shows 'error' status for error sessions", async () => {
     mockHasLoadedOnce.value = true;
-    mockSessions.value = [
-      makeSession({ sessionId: "sess-err", status: "error", errorCount: 1 }),
-    ];
+    mockSessions.value = [makeSession({ sessionId: "sess-err", status: "error", errorCount: 1 })];
     mockTotal.value = 1;
 
     const wrapper = await mountComponent();
-    const statusCell = wrapper.find(
-      '[data-test="sessions-list-status-sess-err"]',
-    );
+    const statusCell = wrapper.find('[data-test="sessions-list-status-sess-err"]');
     expect(statusCell.exists()).toBe(true);
     // Migrated to <OTag type="sessionStatus">: registry label + error-soft variant.
     expect(statusCell.text()).toContain("Error");
@@ -414,9 +425,7 @@ describe("SessionsList — sessions table", () => {
 
   it("token column renders input → output (Σ total) format", async () => {
     mockHasLoadedOnce.value = true;
-    mockSessions.value = [
-      makeSession({ inputTokens: 10, outputTokens: 20, tokens: 30 }),
-    ];
+    mockSessions.value = [makeSession({ inputTokens: 10, outputTokens: 20, tokens: 30 })];
     mockTotal.value = 1;
 
     const wrapper = await mountComponent();
@@ -453,7 +462,7 @@ describe("SessionsList — agent filter", () => {
       2000,
       0,
       20,
-      `gen_ai_conversation_id IN (SELECT gen_ai_conversation_id FROM "agent-stream" WHERE gen_ai_conversation_id IS NOT NULL AND gen_ai_conversation_id != '' AND gen_ai_agent_id = 'agent-1' GROUP BY gen_ai_conversation_id)`,
+      `gen_ai_agent_id = 'agent-1'`,
     );
   });
 

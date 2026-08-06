@@ -1,10 +1,10 @@
 // Copyright 2026 OpenObserve Inc.
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-import enLocale from "@/locales/languages/en.json";
+import enLocale from "@/locales/languages/en-US.json";
 import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
@@ -24,7 +24,6 @@ vi.mock("@/aws-exports", () => ({
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((url: string) => `mocked-${url}`),
 }));
-
 
 // Mock vue-router
 const mockPush = vi.fn();
@@ -46,19 +45,8 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Global mock notify for Quasar
+// Global mock notify
 const globalMockNotify = vi.fn(() => vi.fn());
-
-// Mock Quasar composables
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: globalMockNotify,
-    }),
-  };
-});
 
 const mockStore = createStore({
   state: {
@@ -156,11 +144,11 @@ describe("SettingsIndex.vue", () => {
         },
         stubs: {
           "router-view": true,
-          PageLayout: {
+          OPageLayout: {
             template: '<div><slot name="sidebar" /><slot /></div>',
           },
           SectionRail: true,
-          AppPageHeader: true,
+          OPageHeader: true,
           ConstrainedPage: {
             template: "<div><slot /></div>",
           },
@@ -332,11 +320,8 @@ describe("SettingsIndex.vue", () => {
       // Create wrapper with dark theme via store override
       wrapper = createWrapper({ theme: "dark" });
       // The regex_patterns item uses regexIcon internally - verify via sectionGroups
-      const allItems = wrapper.vm.sectionGroups.flatMap(
-        (g: any) => g.items ?? [],
-      );
-      const regexItem = allItems.find((i: any) => i.key === "regex_patterns");
-      // regexItem may be undefined if not enterprise (isEnterprise defaults to 'false')
+      const allItems = wrapper.vm.sectionGroups.flatMap((g: any) => g.items ?? []);
+      // regex_patterns item may be undefined if not enterprise (isEnterprise defaults to 'false')
       // so this test just verifies the structure is accessible without throwing
       expect(Array.isArray(allItems)).toBe(true);
     });
@@ -383,17 +368,18 @@ describe("SettingsIndex.vue", () => {
       expect(keys).toContain("organization");
     });
 
-    it("should include DESTINATIONS & TEMPLATES group with alert destinations", () => {
+    it("should include a Destinations group without the alerting entries", () => {
+      // Notification Destinations and Templates moved to Reliability; only
+      // Pipeline Destinations is still deployment configuration.
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups;
-      const destGroup = groups.find(
-        (g: any) => g.label === "Destinations & Templates",
-      );
+      const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
       const keys = destGroup.items.map((i: any) => i.key);
-      expect(keys).toContain("alert_destinations");
-      expect(keys).toContain("templates");
+      expect(keys).toContain("pipeline_destinations");
+      expect(keys).not.toContain("alert_destinations");
+      expect(keys).not.toContain("templates");
     });
   });
 

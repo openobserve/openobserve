@@ -14,25 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * REFACTORED VERSION OF useSearchStream
- *
- * This is a refactored version that demonstrates how to split the large useSearchStream
- * composable into smaller, more focused composables. The original file had 2100+ lines
- * and handled multiple responsibilities.
- *
- * STRUCTURE:
- * - Main orchestrator (this file) - coordinates between split composables
- * - useSearchQuery - handles SQL query building and validation
- * - useSearchConnection - manages WebSocket/HTTP streaming connections
+ * Orchestrator that coordinates the split search composables:
+ * - useSearchQuery - SQL query building and validation
+ * - useSearchConnection - WebSocket/HTTP streaming connections
  * - useSearchResponseHandler - processes different response types
  * - useSearchHistogramManager - histogram-specific logic
  * - useSearchPagination - pagination calculations and state
- *
- * BENEFITS:
- * - Better separation of concerns
- * - Easier testing of individual components
- * - Improved maintainability
- * - Cleaner code organization
  */
 
 import { searchState } from "@/composables/useLogs/searchState";
@@ -45,15 +32,15 @@ import useSearchConnection from "@/composables/useLogs/useSearchConnection";
 import useSearchResponseHandler from "@/composables/useLogs/useSearchResponseHandler";
 import useSearchHistogramManager from "@/composables/useLogs/useSearchHistogramManager";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { raw, type TranslateFn } from "@/types/i18n";
 
-export const useSearchStream = () => {
+export const useSearchStream = (t: TranslateFn) => {
   const { showErrorNotification } = useNotifications();
   const { addTraceId } = logsUtils();
 
   // Initialize all the split composables
   const queryBuilder = useSearchQuery();
-  const connectionManager = useSearchConnection();
+  const connectionManager = useSearchConnection(t);
   const responseProcessor = useSearchResponseHandler();
   const histogramHandler = useSearchHistogramManager();
   const paginationManager = useSearchPagination();
@@ -85,24 +72,24 @@ export const useSearchStream = () => {
     } catch (error: any) {
       console.error("Search operation failed:", error);
       searchObj.loading = false;
-      showErrorNotification("Error occurred during the search operation.");
+      showErrorNotification(t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"));
     }
   };
 
-  const getHistogramData = (queryReq: any,meta: any) => {
+  const getHistogramData = (queryReq: any, meta: any) => {
     const histogramCallbacks = {
       onData: responseProcessor.handleSearchResponse,
       onError: responseProcessor.handleSearchError,
       onComplete: handleSearchComplete,
       onReset: handleSearchReset,
-          };
+    };
 
     histogramHandler.processHistogramRequest(
       queryReq,
       connectionManager.buildWebSocketPayload,
       connectionManager.initializeSearchConnection,
       histogramCallbacks,
-      meta
+      meta,
     );
   };
 
@@ -110,15 +97,11 @@ export const useSearchStream = () => {
    * Handle search completion
    * Orchestrates histogram processing if needed
    */
-  const handleSearchComplete = (payload: any, response: any) => {
+  const handleSearchComplete = (payload: any) => {
     // Process histogram if needed
-    if (
-      payload.type === "search" &&
-      !payload.isPagination &&
-      searchObj.meta.refreshInterval == 0
-    ) {
-      getHistogramData(payload.queryReq,{
-        clear_cache: payload.clear_cache
+    if (payload.type === "search" && !payload.isPagination && searchObj.meta.refreshInterval == 0) {
+      getHistogramData(payload.queryReq, {
+        clear_cache: payload.clear_cache,
       });
     }
 
@@ -135,20 +118,18 @@ export const useSearchStream = () => {
       searchObj.loadingHistogramProgressPercentage = 0;
     }
 
-    //we need ot make if false
-    if(searchObj.meta.clearCache){
+    if (searchObj.meta.clearCache) {
       searchObj.meta.clearCache = false;
     }
 
     // Clean up connection
     connectionManager.cleanupConnection(payload.traceId);
-
   };
 
   /**
    * Handle search reset/retry
    */
-  const handleSearchReset = (data: any, traceId?: string) => {
+  const handleSearchReset = (data: any) => {
     try {
       if (data.type === "search") {
         if (!data.isPagination) {
@@ -164,7 +145,8 @@ export const useSearchStream = () => {
             breakdownField: null,
             breakdownSeries: null,
             chartParams: {
-              title: "",
+              title: raw(""),
+              titleParts: null,
               unparsed_x_data: [],
               timezone: "",
             },
@@ -190,8 +172,7 @@ export const useSearchStream = () => {
   };
 
   /**
-   * Expose the necessary methods for backward compatibility
-   * This maintains the same interface as the original composable
+   * Expose the composable's public methods.
    */
   return {
     // Main search method
@@ -228,7 +209,7 @@ export const useSearchStream = () => {
     extractFilterColumns: queryBuilder.extractFilterColumns,
     constructErrorMessage: responseProcessor.constructErrorMessage,
 
-    // Backward compatibility - expose individual composables if needed
+    // Expose individual composables if needed
     queryBuilder,
     connectionManager,
     responseProcessor,
@@ -237,28 +218,5 @@ export const useSearchStream = () => {
     getHistogramData,
   };
 };
-
-/**
- * How to migrate to the refactored version:
- *
- * 1. Replace imports:
- *    - Change: import useSearchStream from "@/composables/useLogs/useSearchStream";
- *    - To: import { useSearchStreamRefactored } from "@/composables/useLogs/useSearchStreamRefactored";
- *
- * 2. Update usage:
- *    - Change: const { getDataThroughStream } = useSearchStream();
- *    - To: const { getDataThroughStream } = useSearchStreamRefactored();
- *
- * 3. Test thoroughly to ensure all functionality works
- *
- * 4. If needed, access individual composables:
- *    - const { queryBuilder, connectionManager } = useSearchStreamRefactored();
- *
- * MIGRATION STRATEGY:
- * - Start with components that use simple methods from useSearchStream
- * - Gradually migrate more complex usage
- * - Keep the original file until all migrations are complete
- * - Add comprehensive tests for each split composable
- */
 
 export default useSearchStream;

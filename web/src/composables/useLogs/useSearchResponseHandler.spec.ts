@@ -15,12 +15,8 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchResponseHandler } from "./useSearchResponseHandler";
-import { searchState } from "./searchState";
 import { logsUtils } from "./logsUtils";
-import { useHistogram } from "./useHistogram";
 import useNotifications from "@/composables/useNotifications";
-import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import useStreamFields from "@/composables/useLogs/useStreamFields";
 
 // Create a shared mock state
 const createMockState = () => ({
@@ -90,18 +86,20 @@ const mockSearchPartitionMap: Record<
 // Create shared mock functions
 const mockNotifications = {
   showErrorNotification: vi.fn(),
-  showCancelSearchNotification: vi.fn(),
 };
 
+// showCancelSearchNotification is provided by logsUtils, not useNotifications.
 const mockLogsUtils = {
   fnParsedSQL: vi.fn(() => ({})),
   hasAggregation: vi.fn(() => false),
   removeTraceId: vi.fn(),
   updateUrlQueryParams: vi.fn(),
+  showCancelSearchNotification: vi.fn(),
 };
 
 const mockHistogram = {
   getHistogramTitle: vi.fn(() => "Histogram"),
+  getHistogramTitleParts: vi.fn(() => null),
   generateHistogramData: vi.fn(),
   resetHistogramWithError: vi.fn(),
 };
@@ -188,15 +186,13 @@ describe("useSearchResponseHandler", () => {
     mockState = createMockState();
 
     // Clear the shared searchPartitionMap
-    Object.keys(mockSearchPartitionMap).forEach(
-      (key) => delete mockSearchPartitionMap[key],
-    );
+    Object.keys(mockSearchPartitionMap).forEach((key) => delete mockSearchPartitionMap[key]);
 
     vi.clearAllMocks();
 
     // Reset all shared mock functions
     mockNotifications.showErrorNotification.mockClear();
-    mockNotifications.showCancelSearchNotification.mockClear();
+    mockLogsUtils.showCancelSearchNotification.mockClear();
     mockLogsUtils.fnParsedSQL.mockReturnValue({});
     mockLogsUtils.hasAggregation.mockReturnValue(false);
     mockLogsUtils.removeTraceId.mockClear();
@@ -259,9 +255,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.setCancelSearchError();
 
-      expect(Array.isArray(mockState.searchObj.data.queryResults.hits)).toBe(
-        true,
-      );
+      expect(Array.isArray(mockState.searchObj.data.queryResults.hits)).toBe(true);
     });
 
     it("should clear error when no hits", () => {
@@ -292,7 +286,7 @@ describe("useSearchResponseHandler", () => {
   describe("handleSearchError", () => {
     it("should handle generic search error", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
 
       const request = { type: "search" };
       const error = {
@@ -329,7 +323,7 @@ describe("useSearchResponseHandler", () => {
 
     it("should handle cancelled search error", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
 
       const request = { type: "search" };
       const error = {
@@ -342,7 +336,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleSearchError(request, error as any);
 
-      expect(notifications.showCancelSearchNotification).toHaveBeenCalled();
+      expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
 
     it("should handle rate limit error", () => {
@@ -377,9 +371,7 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.countErrorMsg).toContain(
         "Error while retrieving total events",
       );
-      expect(mockState.searchObj.data.countErrorMsg).toContain(
-        "TraceID: trace-pc",
-      );
+      expect(mockState.searchObj.data.countErrorMsg).toContain("TraceID: trace-pc");
     });
 
     it("should handle histogram error", () => {
@@ -396,13 +388,9 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleSearchError(request, error as any);
 
-      expect(mockState.searchObj.data.histogram.errorMsg).toContain(
-        "Histogram failed",
-      );
+      expect(mockState.searchObj.data.histogram.errorMsg).toContain("Histogram failed");
       expect(mockState.searchObj.data.histogram.errorCode).toBe(404);
-      expect(mockState.searchObj.data.histogram.errorDetail).toBe(
-        "Data not found",
-      );
+      expect(mockState.searchObj.data.histogram.errorDetail).toBe("Data not found");
     });
   });
 
@@ -431,10 +419,7 @@ describe("useSearchResponseHandler", () => {
         },
       };
 
-      responseHandler.handleSearchResponse(
-        metadataPayload as any,
-        metadataResponse as any,
-      );
+      responseHandler.handleSearchResponse(metadataPayload as any, metadataResponse as any);
 
       // Now test the hits response
       const payload = {
@@ -553,7 +538,7 @@ describe("useSearchResponseHandler", () => {
 
     it("should handle cancel_response", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
       mockState.searchObj.loading = true;
       mockState.searchObj.loadingHistogram = true;
 
@@ -570,7 +555,7 @@ describe("useSearchResponseHandler", () => {
 
       expect(mockState.searchObj.loading).toBe(false);
       expect(mockState.searchObj.loadingHistogram).toBe(false);
-      expect(notifications.showCancelSearchNotification).toHaveBeenCalled();
+      expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
   });
 
@@ -589,9 +574,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleFunctionError(queryReq as any, response);
 
-      expect(mockState.searchObj.data.functionError).toBe(
-        "Invalid function syntax",
-      );
+      expect(mockState.searchObj.data.functionError).toBe("Invalid function syntax");
     });
 
     it("should update datetime when function error has new time range", () => {
@@ -706,11 +689,7 @@ describe("useSearchResponseHandler", () => {
   describe("trimPageCountExtraHit", () => {
     it("should trim last hit when at page boundary", () => {
       // Use mockState directly
-      mockState.searchObj.data.queryResults.hits = [
-        { id: 1 },
-        { id: 2 },
-        { id: 3 },
-      ];
+      mockState.searchObj.data.queryResults.hits = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const queryReq = { query: { size: 3, from: 0 } };
 

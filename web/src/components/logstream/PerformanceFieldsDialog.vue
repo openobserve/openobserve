@@ -15,33 +15,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODialog data-test="performance-fields-dialog" :open="modelValue" @update:open="(v) => $emit('update:modelValue', v)" persistent size="md" title="Index Fields Detected"
-    secondary-button-label="Skip"
-    primary-button-label="Add Fields"
+  <ODialog
+    data-test="performance-fields-dialog"
+    :open="modelValue"
+    @update:open="(v) => $emit('update:modelValue', v)"
+    persistent
+    size="md"
+    :title="t('logStream.performanceFieldsDialog.title')"
+    :secondary-button-label="t('logStream.performanceFieldsDialog.skipButton')"
+    :primary-button-label="t('logStream.performanceFieldsDialog.addFieldsButton')"
     @click:secondary="$emit('skip')"
     @click:primary="$emit('add-fields')"
   >
-    <div v-if="fieldsByType.fts.length > 0" class="tw:mb-2">
-      <div class="tw:text-xs text-weight-medium tw:mb-1">
-        Full Text Search ({{ fieldsByType.fts.length }})
+    <div v-if="fieldsByType.fts.length > 0" class="mb-2">
+      <div class="mb-1 text-xs font-medium">
+        {{ t("logStream.performanceFieldsDialog.ftsCount", { count: fieldsByType.fts.length }) }}
       </div>
       <div
-        class="tw:p-2 tw:max-h-50 tw:overflow-y-auto tw:border tw:rounded"
-        :class="store.state.theme === 'dark' ? 'tw:border-[#3a3a3a] tw:bg-[#1e1e1e]' : 'tw:border-(--o2-border) tw:bg-[#f5f5f5]'"
+        class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
         <OTag
           v-for="field in fieldsByType.fts"
           :key="field.name"
           type="indexFieldType"
           value="fts"
-          class="tw:mr-1 tw:mb-1"
+          class="mr-1 mb-1"
         >
           {{ field.name }}
           <template #trailing>
             <button
               type="button"
-              :aria-label="`Remove ${field.name}`"
-              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              :aria-label="t('common.removeField', { name: field.name })"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'fts', field.name)"
             >
               <OIcon name="close" size="xs" />
@@ -52,26 +57,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-if="fieldsByType.secondaryIndex.length > 0">
-      <div class="tw:text-xs text-weight-medium tw:mb-1">
-        Secondary Index ({{ fieldsByType.secondaryIndex.length }})
+      <div class="mb-1 text-xs font-medium">
+        {{
+          t("logStream.performanceFieldsDialog.secondaryIndexCount", {
+            count: fieldsByType.secondaryIndex.length,
+          })
+        }}
       </div>
       <div
-        class="tw:p-2 tw:max-h-50 tw:overflow-y-auto tw:border tw:rounded"
-        :class="store.state.theme === 'dark' ? 'tw:border-[#3a3a3a] tw:bg-[#1e1e1e]' : 'tw:border-(--o2-border) tw:bg-[#f5f5f5]'"
+        class="rounded-default border-border-default bg-surface-subtle max-h-50 overflow-y-auto border p-2"
       >
         <OTag
           v-for="field in fieldsByType.secondaryIndex"
           :key="field.name"
           type="indexFieldType"
           value="secondaryIndex"
-          class="tw:mr-1 tw:mb-1"
+          class="mr-1 mb-1"
         >
           {{ field.name }}
           <template #trailing>
             <button
               type="button"
-              :aria-label="`Remove ${field.name}`"
-              class="tw:inline-flex tw:items-center tw:justify-center tw:cursor-pointer tw:hover:opacity-70"
+              :aria-label="t('common.removeField', { name: field.name })"
+              class="inline-flex cursor-pointer items-center justify-center hover:opacity-70"
               @click="$emit('remove-field', 'secondaryIndex', field.name)"
             >
               <OIcon name="close" size="xs" />
@@ -85,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed, PropType } from "vue";
-import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -111,23 +119,19 @@ export default defineComponent({
   },
   emits: ["update:modelValue", "add-fields", "skip", "remove-field"],
   setup(props) {
-    const store = useStore();
-
+    const { t } = useI18nTyped();
     // Computed property to group missing fields by type
     const fieldsByType = computed(() => {
       return {
         fts: props.missingFields.filter((f) => f.type === "Full Text Search"),
-        secondaryIndex: props.missingFields.filter(
-          (f) => f.type === "Secondary Index"
-        ),
+        secondaryIndex: props.missingFields.filter((f) => f.type === "Secondary Index"),
       };
     });
 
     return {
-      store,
+      t,
       fieldsByType,
     };
   },
 });
 </script>
-

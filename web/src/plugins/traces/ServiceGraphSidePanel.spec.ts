@@ -17,7 +17,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
 
-
 // vi.mock calls are hoisted — must appear before imports of mocked modules
 vi.mock("@/services/search", () => ({
   default: {
@@ -35,20 +34,34 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("vue-i18n", () => ({
-  useI18n: vi.fn(() => ({
-    t: (key: string) => key,
-  })),
-}));
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
+// Resolve translation keys against the real app locale so serviceHealth
+// labels and other text ("Healthy", "View Related", ...) come through instead
+// of raw key paths.
+vi.mock("vue-i18n", async () => {
+  const enLocaleFull = (await import("@/locales/languages/en-US.json")).default as Record<
+    string,
+    unknown
+  >;
+  const resolve = (key: string): unknown =>
+    key
+      .split(".")
+      .reduce<unknown>(
+        (obj, part) =>
+          obj && typeof obj === "object" ? (obj as Record<string, unknown>)[part] : undefined,
+        enLocaleFull,
+      );
   return {
-    ...actual,
-    useQuasar: () => ({
-      notify: vi.fn(),
-      dialog: vi.fn(),
-    }),
+    useI18n: vi.fn(() => ({
+      t: (key: string, params?: Record<string, unknown>) => {
+        const value = resolve(key);
+        if (typeof value !== "string") return key;
+        return params
+          ? value.replace(/\{(\w+)\}/g, (_, name) =>
+              params[name] != null ? String(params[name]) : `{${name}}`,
+            )
+          : value;
+      },
+    })),
   };
 });
 
@@ -248,16 +261,12 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should render panel when visible is true", () => {
       wrapper = createWrapper({ visible: true });
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
     });
 
     it("should not render panel when visible is false", () => {
       wrapper = createWrapper({ visible: false });
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
     });
 
     it("should pass the service name as the drawer title", () => {
@@ -268,18 +277,14 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should display close button", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(true);
     });
 
     it("should display view-related button", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-view-related-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-view-related-btn"]').exists()).toBe(
+        true,
+      );
     });
   });
 
@@ -460,9 +465,7 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("Event Handlers - handleClose", () => {
     it("should emit close event when close button is clicked", async () => {
       wrapper = createWrapper();
-      await wrapper
-        .find('[data-test="o-drawer-close-btn"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-drawer-close-btn"]').trigger("click");
       expect(wrapper.emitted("close")).toBeTruthy();
       expect(wrapper.emitted("close")).toHaveLength(1);
     });
@@ -475,9 +478,7 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("Event Handlers - handleShowTelemetry", () => {
     it("should render view-related button with correct label", () => {
       wrapper = createWrapper();
-      const btn = wrapper.find(
-        '[data-test="service-graph-node-panel-view-related-btn"]',
-      );
+      const btn = wrapper.find('[data-test="service-graph-node-panel-view-related-btn"]');
       expect(btn.exists()).toBe(true);
       expect(btn.text()).toContain("View Related");
     });
@@ -600,12 +601,8 @@ describe("ServiceGraphSidePanel.vue", () => {
     });
 
     it("should keep recentOperations empty and reset loadingOperations on error", async () => {
-      const consoleError = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-      vi.mocked(searchService.search).mockRejectedValueOnce(
-        new Error("API Error"),
-      );
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(searchService.search).mockRejectedValueOnce(new Error("API Error"));
 
       wrapper = createWrapper({ visible: true, streamFilter: "default" });
       await flushPromises();
@@ -651,9 +648,7 @@ describe("ServiceGraphSidePanel.vue", () => {
       await wrapper.setProps({ selectedNode: mockNodes[1] });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
-        callCount,
-      );
+      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(callCount);
     });
 
     it("should call searchService.search again when streamFilter changes to another stream", async () => {
@@ -664,9 +659,7 @@ describe("ServiceGraphSidePanel.vue", () => {
       await wrapper.setProps({ streamFilter: "another-stream" });
       await flushPromises();
 
-      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(
-        callCount,
-      );
+      expect(vi.mocked(searchService.search).mock.calls.length).toBeGreaterThan(callCount);
     });
 
     it("should NOT call searchService.search when streamFilter changes to 'all'", async () => {
@@ -688,25 +681,19 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("UI Rendering - Tabs", () => {
     it("should show tabs when streamFilter is not 'all'", () => {
       wrapper = createWrapper({ streamFilter: "default" });
-      expect(
-        wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(true);
     });
 
     it("should hide tabs when streamFilter is 'all'", () => {
       wrapper = createWrapper({ streamFilter: "all" });
-      expect(
-        wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tabs"]').exists()).toBe(false);
     });
 
     it("should render the operations tab", () => {
       wrapper = createWrapper({ streamFilter: "default" });
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-tab-operations"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-tab-operations"]').exists()).toBe(
+        true,
+      );
     });
 
     it.skip("should render the nodes tab", () => {
@@ -740,14 +727,10 @@ describe("ServiceGraphSidePanel.vue", () => {
 
     it("should handle visible prop toggle — show then hide panel", async () => {
       wrapper = createWrapper({ visible: true });
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
 
       await wrapper.setProps({ visible: false });
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(false);
     });
 
     it("should handle negative error_rate without crashing", () => {
@@ -783,17 +766,11 @@ describe("ServiceGraphSidePanel.vue", () => {
   describe("Accessibility", () => {
     it("should have all required data-test attributes in the rendered panel", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="service-graph-side-panel"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="o-drawer-close-btn"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="service-graph-node-panel-view-related-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-side-panel"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="o-drawer-close-btn"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="service-graph-node-panel-view-related-btn"]').exists()).toBe(
+        true,
+      );
     });
   });
 });

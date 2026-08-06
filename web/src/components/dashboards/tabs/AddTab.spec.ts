@@ -28,6 +28,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import AddTab from "./AddTab.vue";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
 // Mock vue-router
 const mockRoute = {
@@ -41,14 +42,35 @@ vi.mock("vue-router", () => ({
 }));
 
 // Mock vue-i18n
+// Inline overrides the assertions depend on. These are merged on top of the
+// real en locale so every migrated key resolves to its actual English text
+// while these explicit values still win.
+const inlineOverrides: any = {
+  "dashboard.nameRequired": "Name is required",
+  "dashboard.cancel": "Cancel",
+  "dashboard.save": "Save",
+  "dashboard.name": "Name",
+  "dashboard.newTab": "Add Tab",
+  "dashboard.editTab": "Edit Tab",
+};
+
+// Resolve a dotted key path against the full en.json locale.
+const resolveFromLocale = (key: string): string | undefined => {
+  return key
+    .split(".")
+    .reduce(
+      (acc: any, part: string) => (acc && typeof acc === "object" ? acc[part] : undefined),
+      enLocaleFull as any,
+    );
+};
+
 const mockI18n = {
   t: (key: string) => {
-    const translations: any = {
-      "dashboard.nameRequired": "Name is required",
-      "dashboard.cancel": "Cancel",
-      "dashboard.save": "Save",
-    };
-    return translations[key] || key;
+    if (Object.prototype.hasOwnProperty.call(inlineOverrides, key)) {
+      return inlineOverrides[key];
+    }
+    const resolved = resolveFromLocale(key);
+    return typeof resolved === "string" ? resolved : key;
   },
 };
 
@@ -305,9 +327,7 @@ describe("AddTab", () => {
 
     it("should seed blank default-values into OForm in add mode", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.findComponent({ name: "OForm" }).props("defaultValues"),
-      ).toEqual({ name: "" });
+      expect(wrapper.findComponent({ name: "OForm" }).props("defaultValues")).toEqual({ name: "" });
     });
 
     it("should expose primary (Save) and secondary (Cancel) buttons via ODialog", () => {
@@ -328,12 +348,10 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       await wrapper.vm.onSubmit({ name: "New Tab" });
 
-      expect(mockAddTab).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "test-folder",
-        { name: "New Tab", panels: [] },
-      );
+      expect(mockAddTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "test-folder", {
+        name: "New Tab",
+        panels: [],
+      });
     });
 
     it("should call addTab when the OForm emits submit", async () => {
@@ -342,12 +360,10 @@ describe("AddTab", () => {
       await form.vm.$emit("submit", { name: "From Primary" });
       await flushPromises();
 
-      expect(mockAddTab).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "test-folder",
-        { name: "From Primary", panels: [] },
-      );
+      expect(mockAddTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "test-folder", {
+        name: "From Primary",
+        panels: [],
+      });
     });
 
     it("should emit refresh event after successful add", async () => {
@@ -374,9 +390,7 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       await wrapper.vm.onSubmit({ name: "New Tab" });
 
-      expect(mockShowPositiveNotification).toHaveBeenCalledWith(
-        "Tab added successfully",
-      );
+      expect(mockShowPositiveNotification).toHaveBeenCalledWith("Tab added successfully");
     });
   });
 
@@ -386,11 +400,7 @@ describe("AddTab", () => {
       await wrapper.setProps({ open: true });
       await flushPromises();
 
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "test-folder",
-      );
+      expect(mockGetDashboard).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "test-folder");
     });
 
     it("should call editTab utility with the submitted value in edit mode", async () => {
@@ -443,9 +453,7 @@ describe("AddTab", () => {
       wrapper.vm.editingTab = { tabId: "tab1", name: "Updated Tab", panels: [] };
       await wrapper.vm.onSubmit({ name: "Updated Tab" });
 
-      expect(mockShowPositiveNotification).toHaveBeenCalledWith(
-        "Tab updated successfully",
-      );
+      expect(mockShowPositiveNotification).toHaveBeenCalledWith("Tab updated successfully");
     });
   });
 
@@ -491,6 +499,7 @@ describe("AddTab", () => {
 
       expect(mockShowConflictErrorNotification).toHaveBeenCalledWith(
         "Tab already exists",
+        expect.any(Function),
       );
     });
 
@@ -523,10 +532,9 @@ describe("AddTab", () => {
 
       await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      expect(mockShowErrorNotification).toHaveBeenCalledWith(
-        "Failed to update tab",
-        { timeout: 2000 },
-      );
+      expect(mockShowErrorNotification).toHaveBeenCalledWith("Failed to update tab", {
+        timeout: 2000,
+      });
     });
   });
 
@@ -535,24 +543,20 @@ describe("AddTab", () => {
       wrapper = createWrapper({ folderId: "custom-folder" });
       await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      expect(mockAddTab).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "custom-folder",
-        { name: "Test Tab", panels: [] },
-      );
+      expect(mockAddTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "custom-folder", {
+        name: "Test Tab",
+        panels: [],
+      });
     });
 
     it("should fall back to route query folder", async () => {
       wrapper = createWrapper();
       await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      expect(mockAddTab).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "test-folder",
-        { name: "Test Tab", panels: [] },
-      );
+      expect(mockAddTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "test-folder", {
+        name: "Test Tab",
+        panels: [],
+      });
     });
 
     it("should use default folder when no folder specified", async () => {
@@ -562,12 +566,10 @@ describe("AddTab", () => {
       wrapper = createWrapper();
       await wrapper.vm.onSubmit({ name: "Test Tab" });
 
-      expect(mockAddTab).toHaveBeenCalledWith(
-        mockStore,
-        "test-dashboard-id",
-        "default",
-        { name: "Test Tab", panels: [] },
-      );
+      expect(mockAddTab).toHaveBeenCalledWith(mockStore, "test-dashboard-id", "default", {
+        name: "Test Tab",
+        panels: [],
+      });
 
       mockRoute.query = originalQuery;
     });

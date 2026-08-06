@@ -108,12 +108,14 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     // Open popup in URL mode to test validation before saving
     await pm.dashboardDrilldown.openURLPopup("URL Drilldown");
 
-    // Invalid URL — no protocol → error message shown
+    // Invalid URL — no protocol. The form uses submit-then-change validation,
+    // so submit once to surface the error (submit is blocked → popup stays open).
     await pm.dashboardDrilldown.urlTextarea.fill("not-a-valid-url");
+    await pm.dashboardDrilldown.confirmButton.click();
     await expect(pm.dashboardDrilldown.urlErrorMessage).toBeVisible({ timeout: 3000 });
     testLogger.info("Invalid URL shows error message");
 
-    // Valid URL — error clears, Save becomes enabled
+    // Valid URL — error clears (re-validates on change), Save becomes enabled
     await pm.dashboardDrilldown.urlTextarea.fill("https://openobserve.ai");
     await expect(pm.dashboardDrilldown.urlErrorMessage).not.toBeVisible({ timeout: 3000 });
     await expect(pm.dashboardDrilldown.confirmButton).toBeEnabled({ timeout: 3000 });

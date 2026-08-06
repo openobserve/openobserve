@@ -16,11 +16,11 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
-    
+
     expect(result).toBeDefined();
     expect(result.options).toBeDefined();
     expect(result.options.series).toHaveLength(1);
@@ -33,12 +33,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const options = result.options;
-    
+
     // Verify main structure
     expect(options.title).toBeDefined();
     expect(options.backgroundColor).toBe("transparent");
@@ -48,10 +48,10 @@ describe("alertChartData", () => {
     expect(options.yAxis).toBeDefined();
     expect(options.toolbox).toBeDefined();
     expect(options.series).toBeDefined();
-    
+
     // Verify xAxis configuration
     expect(options.xAxis.type).toBe("time");
-    
+
     // Verify yAxis configuration
     expect(options.yAxis.type).toBe("value");
     expect(options.yAxis.axisLine.show).toBe(true);
@@ -63,12 +63,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const options = result.options;
-    
+
     // yAxis interval should be Math.max(...y) / 2 = 50 / 2 = 25
     expect(options.yAxis.interval).toBe(25);
   });
@@ -79,12 +79,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const formatter = result.options.yAxis.axisLabel.formatter;
-    
+
     // Test the formatter function
     expect(formatter(10.7)).toBe(11); // should round up
     expect(formatter(10.3)).toBe(10); // should round down
@@ -98,12 +98,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const seriesData = result.options.series[0].data;
-    
+
     // For UTC timezone, timestamps should remain unchanged
     expect(seriesData[0][0]).toBe(1640995200000);
     expect(seriesData[0][1]).toBe(10);
@@ -117,12 +117,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "America/New_York"
+      timezone: "America/New_York",
     };
 
     const result = getChartData(x, y, params);
     const seriesData = result.options.series[0].data;
-    
+
     // For non-UTC timezone, toZonedTime should be called
     // The exact result depends on the date-fns-tz implementation
     // but we can verify it's a Date object and the y value is correct
@@ -136,16 +136,16 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const seriesData = result.options.series[0].data;
-    
+
     expect(seriesData).toHaveLength(3);
     expect(seriesData[0][1]).toBe(10); // first y value
     expect(seriesData[1][1]).toBe(20); // second y value
-    expect(seriesData[2][1]).toBe(0);  // missing y value defaults to 0
+    expect(seriesData[2][1]).toBe(0); // missing y value defaults to 0
   });
 
   it("should handle empty array in tooltip formatter", () => {
@@ -154,12 +154,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "America/New_York"
+      timezone: "America/New_York",
     };
 
     const result = getChartData(x, y, params);
     const formatter = result.options.tooltip.formatter_test;
-    
+
     // Test with empty array
     expect(formatter([])).toBe("");
   });
@@ -170,20 +170,20 @@ describe("alertChartData", () => {
     const params = {
       title: "Test Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const formatter = result.options.tooltip.formatter_test;
-    
+
     // Mock tooltip data structure
     const mockTooltipData = [
       {
         data: [1640995200000, 10],
-        value: [1640995200000, 10]
-      }
+        value: [1640995200000, 10],
+      },
     ];
-    
+
     const formatted = formatter(mockTooltipData);
     expect(formatted).toContain("UTC");
     expect(formatted).toContain("<b>10</b>");
@@ -197,12 +197,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Empty Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const seriesData = result.options.series[0].data;
-    
+
     expect(seriesData).toHaveLength(0);
     expect(result.options.yAxis.interval).toBe(-Infinity); // Math.max(...[]) returns -Infinity
   });
@@ -213,12 +213,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Zero Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const seriesData = result.options.series[0].data;
-    
+
     expect(seriesData[0][1]).toBe(0);
     expect(seriesData[1][1]).toBe(0);
     expect(result.options.yAxis.interval).toBe(0); // Math.max(0, 0) / 2 = 0
@@ -230,12 +230,12 @@ describe("alertChartData", () => {
     const params = {
       title: "Negative Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
     const seriesData = result.options.series[0].data;
-    
+
     expect(seriesData[0][1]).toBe(-10);
     expect(seriesData[1][1]).toBe(-20);
     expect(seriesData[2][1]).toBe(5);
@@ -248,11 +248,11 @@ describe("alertChartData", () => {
     const params = {
       title: "Large Numbers Chart",
       unparsed_x_data: x,
-      timezone: "UTC"
+      timezone: "UTC",
     };
 
     const result = getChartData(x, y, params);
-    
+
     expect(result.options.yAxis.interval).toBe(500000); // 1000000 / 2
     expect(result.options.series[0].data[0][1]).toBe(1000000);
   });

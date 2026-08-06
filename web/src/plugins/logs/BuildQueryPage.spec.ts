@@ -172,20 +172,9 @@ vi.mock("@/utils/query/sqlUtils", () => ({
 vi.mock("@/components/dashboards/PanelEditor/PanelEditor.vue", () => ({
   default: {
     name: "PanelEditor",
-    template:
-      '<div class="panel-editor-mock" data-test="panel-editor"><slot /></div>',
-    props: [
-      "pageType",
-      "editMode",
-      "selectedDateTime",
-      "showAddToDashboardButton",
-    ],
-    emits: [
-      "addToDashboard",
-      "chartApiError",
-      "queryGenerated",
-      "customQueryModeChanged",
-    ],
+    template: '<div class="panel-editor-mock" data-test="panel-editor"><slot /></div>',
+    props: ["pageType", "editMode", "selectedDateTime", "showAddToDashboardButton"],
+    emits: ["addToDashboard", "chartApiError", "queryGenerated", "customQueryModeChanged"],
     methods: {
       runQuery: vi.fn(),
     },
@@ -249,8 +238,7 @@ function createWrapper(props = {}) {
       },
       stubs: {
         PanelEditor: {
-          template:
-            '<div class="panel-editor-mock" data-test="panel-editor"><slot /></div>',
+          template: '<div class="panel-editor-mock" data-test="panel-editor"><slot /></div>',
           methods: {
             runQuery: vi.fn(),
           },
@@ -269,7 +257,6 @@ function createWrapper(props = {}) {
     },
   });
 }
-
 
 describe("BuildQueryPage Component", () => {
   let wrapper: any;
@@ -295,9 +282,7 @@ describe("BuildQueryPage Component", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(
-        wrapper.find('[data-test="logs-build-query-page"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="logs-build-query-page"]').exists()).toBe(true);
     });
 
     it("should render the PanelEditor component", async () => {
@@ -373,12 +358,8 @@ describe("BuildQueryPage Component", () => {
       });
       await flushPromises();
 
-      expect(mockDashboardPanelData.data.queries[0].fields.stream).toBe(
-        "my_logs_stream",
-      );
-      expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe(
-        "logs",
-      );
+      expect(mockDashboardPanelData.data.queries[0].fields.stream).toBe("my_logs_stream");
+      expect(mockDashboardPanelData.data.queries[0].fields.stream_type).toBe("logs");
     });
 
     it("should call updateGroupedFields when stream is set", async () => {
@@ -443,8 +424,7 @@ describe("BuildQueryPage Component", () => {
       // PR #11586: SELECT * queries are treated as empty (default fields).
       // Use a non-SELECT* query to test parse behavior.
       wrapper = createWrapper({
-        searchQuery:
-          'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
+        searchQuery: 'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
         selectedStream: "test_stream",
       });
       await flushPromises();
@@ -453,8 +433,7 @@ describe("BuildQueryPage Component", () => {
     });
 
     it("should use custom mode for complex queries", async () => {
-      const { shouldUseCustomMode } =
-        await import("@/utils/query/sqlQueryParser");
+      const { shouldUseCustomMode } = await import("@/utils/query/sqlQueryParser");
       (shouldUseCustomMode as any).mockReturnValueOnce(true);
 
       // PR #11586: SELECT * queries are treated as empty (default fields).
@@ -489,8 +468,7 @@ describe("BuildQueryPage Component", () => {
       // This tests that the forwarding logic works
       const testQuery = "SELECT * FROM logs";
       // Access the internal handler via the component's setup
-      wrapper.vm.onQueryGenerated?.(testQuery) ||
-        wrapper.vm.$emit("queryGenerated", testQuery); // Fallback
+      wrapper.vm.onQueryGenerated?.(testQuery) || wrapper.vm.$emit("queryGenerated", testQuery); // Fallback
 
       await flushPromises();
 
@@ -632,9 +610,7 @@ describe("BuildQueryPage Component", () => {
 
   describe("Error Handling", () => {
     it("should handle chart API errors gracefully", async () => {
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = createWrapper();
       await flushPromises();
@@ -642,10 +618,7 @@ describe("BuildQueryPage Component", () => {
       // Simulate chart API error
       wrapper.vm.handleChartApiError("Test error");
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        "Chart API error:",
-        "Test error",
-      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Chart API error:", "Test error");
 
       consoleErrorSpy.mockRestore();
     });
@@ -654,9 +627,7 @@ describe("BuildQueryPage Component", () => {
       const { parseSQL } = await import("@/utils/query/sqlQueryParser");
       (parseSQL as any).mockRejectedValueOnce(new Error("Parse error"));
 
-      const consoleErrorSpy = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       wrapper = createWrapper({
         searchQuery: "INVALID SQL",
@@ -688,8 +659,7 @@ describe("BuildQueryPage Component", () => {
     });
 
     it("should set table type with dynamic columns for custom mode", async () => {
-      const { shouldUseCustomMode } =
-        await import("@/utils/query/sqlQueryParser");
+      const { shouldUseCustomMode } = await import("@/utils/query/sqlQueryParser");
       (shouldUseCustomMode as any).mockReturnValueOnce(true);
 
       wrapper = createWrapper({
@@ -699,9 +669,7 @@ describe("BuildQueryPage Component", () => {
       await flushPromises();
 
       expect(mockDashboardPanelData.data.type).toBe("table");
-      expect(mockDashboardPanelData.data.config.table_dynamic_columns).toBe(
-        true,
-      );
+      expect(mockDashboardPanelData.data.config.table_dynamic_columns).toBe(true);
     });
 
     it("should auto-select metric chart type when only Y-axis fields are present", async () => {
@@ -743,8 +711,7 @@ describe("BuildQueryPage Component", () => {
       (shouldUseCustomMode as any).mockReturnValueOnce(false);
 
       wrapper = createWrapper({
-        searchQuery:
-          'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
+        searchQuery: 'SELECT count(_timestamp) as "y_axis_1" FROM "test_stream"',
         selectedStream: "test_stream",
       });
       await flushPromises();
@@ -761,9 +728,7 @@ describe("BuildQueryPage Component", () => {
       (parseSQL as any).mockResolvedValueOnce({
         stream: "test_stream",
         streamType: "logs",
-        xFields: [
-          { column: "method", alias: "x_axis_1", aggregationFunction: null },
-        ],
+        xFields: [{ column: "method", alias: "x_axis_1", aggregationFunction: null }],
         yFields: [],
         breakdownFields: [],
         filters: {
@@ -875,8 +840,7 @@ describe("BuildQueryPage Component - Integration Tests", () => {
   });
 
   it("should handle full workflow: select stream, build query, apply", async () => {
-    const { parseSQL, parsedQueryToPanelFields } =
-      await import("@/utils/query/sqlQueryParser");
+    const { parseSQL, parsedQueryToPanelFields } = await import("@/utils/query/sqlQueryParser");
 
     // Mock successful parse
     (parseSQL as any).mockResolvedValueOnce({

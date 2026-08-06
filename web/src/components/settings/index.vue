@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
        always present; the chosen section renders to the right. -->
-  <PageLayout :sidebar-width="232">
+  <OPageLayout bleed :sidebar-width="230">
     <template #sidebar>
       <SectionRail
         :groups="sectionGroups"
@@ -28,57 +28,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Form-style sections (general, org params, license, domain): a section
          header above a centered reading column. -->
-    <div
-      v-if="isConstrainedSection"
-      class="tw:h-full tw:min-h-0 tw:flex tw:flex-col"
-    >
-      <AppPageHeader
-        :subtitle="activeSectionItem?.description || ''"
-        :icon="(activeSectionItem?.icon as any)"
-        class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-subtle"
-      >
-        <template #title>
-          <span :data-test="`settings-${activeSectionItem?.key}-page-title`">{{ activeSectionItem?.label || '' }}</span>
-        </template>
-      </AppPageHeader>
-      <ConstrainedPage
-        size="lg"
-        align="left"
-        :padded="false"
-        class="tw:flex-1 tw:min-h-0 tw:px-4 tw:py-3"
-      >
+    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
+      <OPageHeader
+        :title="raw(activeSectionItem?.label || '')"
+        :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
+        :subtitle="raw(activeSectionItem?.description || '')"
+        :icon="activeSectionItem?.icon as any"
+        class="border-border-default shrink-0 border-b"
+      />
+      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
         <router-view title="" />
       </ConstrainedPage>
     </div>
-    <!-- Table/list sections render their own AppPageHeader inside. -->
-    <section v-else class="tw:h-full tw:min-w-0 tw:min-h-0 tw:overflow-y-auto tw:overflow-x-hidden">
-      <router-view title="" />
+    <!-- Table/list sections render their own header (OPageLayout) inside. Do NOT
+         pass a `title` attr here: these children are OPageLayout-rooted, so a
+         fallthrough `title` would clobber their own `:title` prop and blank the
+         header (regression seen on Query Management / Nodes). -->
+    <section v-else class="h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+      <router-view />
     </section>
-  </PageLayout>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
-import PageLayout from "@/components/common/PageLayout.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
-import {
-  type SectionHubGroup,
-  type SectionHubItem,
-} from "@/components/common/SectionHub.vue";
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  onActivated,
-  onDeactivated,
-  onUnmounted,
-  onUpdated,
-  computed,
-  watch,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
@@ -87,39 +68,40 @@ import { getImageURL } from "@/utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
-    AppPageHeader,
+    OPageHeader,
     ConstrainedPage,
-    PageLayout,
+    OPageLayout,
     SectionRail,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
+    const { isDark } = useTheme();
     const router: any = useRouter();
     const route = useRoute();
 
     // Maps a route name → the section key used by the hub/switcher.
     const routeToSettingsTab: Record<string, string> = {
-      general:               "general",
-      organization:          "organization",
-      organizationSettings:  "organization",
-      nodes:                 "nodes",
-      queryManagement:       "queryManagement",
-      query_management:      "queryManagement",
-      domainManagement:      "domain_management",
-      alertDestinations:     "alert_destinations",
-      pipelineDestinations:  "pipeline_destinations",
-      alertTemplates:        "templates",
-      modelPricing:          "model_pricing",
-      modelPricingEditor:    "model_pricing",
-      llmProviders:          "llm_providers",
-      storageSettings:       "storageSettings",
-      cipherKeys:            "cipher-keys",
-      license:               "license",
+      general: "general",
+      organization: "organization",
+      organizationSettings: "organization",
+      nodes: "nodes",
+      queryManagement: "queryManagement",
+      query_management: "queryManagement",
+      domainManagement: "domain_management",
+      pipelineDestinations: "pipeline_destinations",
+      alertTemplates: "templates",
+      modelPricing: "model_pricing",
+      modelPricingEditor: "model_pricing",
+      llmProviders: "llm_providers",
+      storageSettings: "storageSettings",
+      cipherKeys: "cipher-keys",
+      license: "license",
       orgnizationManagement: "organization_management",
-      regexPatterns:         "regex_patterns",
-      correlationSettings:   "correlation_settings",
-      genAiAgentMapping:     "gen_ai_agent_mapping",
+      regexPatterns: "regex_patterns",
+      syntheticsLocations: "synthetics_locations",
+      correlationSettings: "correlation_settings",
+      genAiAgentMapping: "gen_ai_agent_mapping",
     };
 
     const settingsTab = ref(
@@ -133,9 +115,7 @@ export default defineComponent({
       name: "settings",
       query: { org_identifier: store.state.selectedOrganization?.identifier },
     }));
-    const activeSection = computed(
-      () => routeToSettingsTab[route.name as string] ?? "",
-    );
+    const activeSection = computed(() => routeToSettingsTab[route.name as string] ?? "");
 
     // Form-style sections render in a centered reading column (ConstrainedPage);
     // table/list sections (nodes, destinations, templates, …) stay full-width.
@@ -145,9 +125,7 @@ export default defineComponent({
       "license",
       "domain_management",
     ]);
-    const isConstrainedSection = computed(() =>
-      CONSTRAINED_SECTIONS.has(activeSection.value),
-    );
+    const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
     // Full-width sections that still want the shell-owned header (their content
     // fills the whole width instead of a centered reading column).
@@ -169,9 +147,8 @@ export default defineComponent({
         return;
       }
       const notMeta =
-        store.state.zoConfig.meta_org &&
-        (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license") && notMeta) {
+        store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
+      if ((name === "nodes" || name === "license" || name === "syntheticsLocations") && notMeta) {
         settingsTab.value = "general";
         router.push({
           path: "/settings/general",
@@ -186,7 +163,7 @@ export default defineComponent({
 
     const regexIcon = computed(() =>
       getImageURL(
-        store.state.theme === "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       ),
@@ -196,9 +173,10 @@ export default defineComponent({
     const settingsGroupOrder = [
       "General",
       "Access & Security",
-      "Destinations & Templates",
+      "Destinations",
       "Data & AI",
       "Operations",
+      "Synthetics",
       "Account",
     ];
 
@@ -259,15 +237,10 @@ export default defineComponent({
           dataTest: "domain-management-tab",
           group: "Access & Security",
         },
-        {
-          key: "alert_destinations",
-          label: t("alert_destinations.header"),
-          description: t("settings.alertDestinationsDesc"),
-          icon: "location-on",
-          to: { name: "alertDestinations", query: { org_identifier: org } },
-          dataTest: "alert-destinations-tab",
-          group: "Destinations & Templates",
-        },
+        // Notification Destinations and Templates are alerting configuration and
+        // now live under Reliability (/alert-destinations, /alert-templates).
+        // Pipeline Destinations stays here — it belongs to pipelines, not
+        // alerting — so the group is just "Destinations" now.
         {
           key: "pipeline_destinations",
           label: t("pipeline_destinations.header"),
@@ -276,16 +249,7 @@ export default defineComponent({
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "pipeline-destinations-tab",
-          group: "Destinations & Templates",
-        },
-        {
-          key: "templates",
-          label: t("alert_templates.header"),
-          description: t("settings.templatesDesc"),
-          icon: "description",
-          to: { name: "alertTemplates", query: { org_identifier: org } },
-          dataTest: "alert-templates-tab",
-          group: "Destinations & Templates",
+          group: "Destinations",
         },
         {
           key: "storageSettings",
@@ -296,8 +260,7 @@ export default defineComponent({
           visible:
             isEnt &&
             (!isCloud ||
-              store.state.organizationData.organizationSettings
-                .org_storage_enabled === true),
+              store.state.organizationData.organizationSettings.org_storage_enabled === true),
           dataTest: "storage-settings-tab",
           group: "Data & AI",
         },
@@ -307,7 +270,7 @@ export default defineComponent({
           description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled,
+          visible: (isEnt || isCloud) && !!z.model_pricing_enabled,
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },
@@ -334,9 +297,10 @@ export default defineComponent({
         {
           key: "gen_ai_agent_mapping",
           label: t("settings.genAiAgentMapping.tabLabel"),
-          description: "Map GenAI spans to agent identifiers",
+          description: t("settings.index.genAiAgentMappingDesc"),
           icon: "smart-toy",
           to: { name: "genAiAgentMapping", query: { org_identifier: org } },
+          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
           dataTest: "gen-ai-agent-mapping-tab",
           group: "Data & AI",
         },
@@ -359,6 +323,16 @@ export default defineComponent({
           visible: isEnt && meta,
           dataTest: "nodes-tab",
           group: "Operations",
+        },
+        {
+          key: "synthetics_locations",
+          label: t("synthetics.locations.title"),
+          description: t("synthetics.locations.description"),
+          icon: "location-on",
+          to: { name: "syntheticsLocations", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "synthetics-locations-tab",
+          group: "Synthetics",
         },
         {
           key: "license",
@@ -404,20 +378,22 @@ export default defineComponent({
       };
       // Internal group keys stay English (used for bucketing + rank); only the
       // displayed label is translated so sorting/ranking is unaffected.
-      const groupLabels: Record<string, string> = {
-        "General": t("settings.groupGeneral"),
+      const groupLabels: Record<string, I18nText> = {
+        General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
-        "Destinations & Templates": t("settings.groupDestinationsTemplates"),
+        Destinations: t("settings.groupDestinations"),
         "Data & AI": t("settings.groupDataAI"),
-        "Operations": t("settings.groupOperations"),
-        "Account": t("settings.groupAccount"),
+        Operations: t("settings.groupOperations"),
+        Synthetics: t("settings.groupSynthetics"),
+        Account: t("settings.groupAccount"),
       };
       return [...buckets.keys()]
         .sort((a, b) => rank(a) - rank(b))
-        .map((label) => ({ label: groupLabels[label] ?? label, items: buckets.get(label)! }));
+        .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
     });
 
     return {
+      raw,
       t,
       store,
       router,

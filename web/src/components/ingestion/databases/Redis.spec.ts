@@ -22,13 +22,32 @@ import Redis from "./Redis.vue";
 import redisCard from "@/components/ingestion/setupCard/content/redis";
 import { getDataSourceCard } from "@/components/ingestion/setupCard/registry";
 
-const mockEndpoint = ref({ url: "https://test.openobserve.ai", host: "h", port: 443, protocol: "https", tls: true });
-vi.mock("@/composables/useIngestion", () => ({ default: vi.fn(() => ({ endpoint: mockEndpoint })) }));
+const mockEndpoint = ref({
+  url: "https://test.openobserve.ai",
+  host: "h",
+  port: 443,
+  protocol: "https",
+  tls: true,
+});
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
+}));
 vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
-  default: { name: "SetupCardRenderer", props: ["content", "subs", "logoUrl", "logoUrlDark"], template: '<div data-test="rich-card-stub" />' },
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
 }));
 
-const mockStore = createStore({ state: { selectedOrganization: { identifier: "test-org" }, userInfo: { email: "test@example.com" }, organizationData: { organizationPasscode: "pc" }, theme: "light" } });
+const mockStore = createStore({
+  state: {
+    selectedOrganization: { identifier: "test-org" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "pc" },
+    theme: "light",
+  },
+});
 const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 const SUBS = { url: "https://test.openobserve.ai", org: "test-org", token: "dGVzdEB0b2tlbg==" };
 
@@ -36,7 +55,11 @@ describe("redisCard builder", () => {
   it("builds metadata + step flow (no prepare step)", () => {
     const card = redisCard(SUBS);
     expect(card.provider.name).toBe("Redis");
-    expect(card.detect).toMatchObject({ streamType: "metrics", match: "keyword", streamName: "redis" });
+    expect(card.detect).toMatchObject({
+      streamType: "metrics",
+      match: "keyword",
+      streamName: "redis",
+    });
     // Redis needs no monitoring user, so there is no prepare step.
     expect(card.steps.map((s) => s.id)).toEqual(["install", "configure", "run", "verify"]);
   });
@@ -53,7 +76,9 @@ describe("redisCard builder", () => {
 
 describe("Redis.vue", () => {
   let wrapper: VueWrapper<any>;
-  afterEach(() => { if (wrapper) wrapper.unmount(); });
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
   it("renders the shared card for the redis slug", () => {
     expect(getDataSourceCard("redis", SUBS)?.provider.name).toBe("Redis");
     wrapper = mount(Redis, { global: { plugins: [mockStore, mockI18n] } });

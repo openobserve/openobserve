@@ -13,19 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  formatUnitValue,
-  getUnitValue,
-} from "./convertDataIntoUnitValue";
-import {
-  applySeriesColorMappings,
-  getContrastColor,
-} from "./chartColorUtils";
-import {
-  calculateOptimalFontSize,
-  calculateDynamicNameGap,
-  calculateRotatedLabelBottomSpace,
-} from "./chartDimensionUtils";
+import { formatUnitValue, getUnitValue } from "./convertDataIntoUnitValue";
+import { applySeriesColorMappings, getContrastColor } from "./chartColorUtils";
 import { formatDate } from "./dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
 import { calculateGridPositions } from "./calculateGridForSubPlot";
@@ -37,14 +26,13 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
-import {
-  calculateBottomLegendHeight,
-  calculateRightLegendWidth,
-} from "./legendConfiguration";
+import { chartColor, chartNumber } from "@/utils/chartTheme";
+import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
-import { METRIC_COPY_BTN_RESERVE_PX } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
+import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
 
 let moment: any;
 let momentInitialized = false;
@@ -68,9 +56,13 @@ const getMarkLineData = (panelSchema: any) => {
         xAxis: markLine.type == "xAxis" ? markLine.value : null,
         yAxis: markLine.type == "yAxis" ? markLine.value : null,
         label: {
+          // The alert preview passes show_label:false — its lines are
+          // colour-coded, and a text label clips at the chart top.
+          show: markLine.show_label !== false,
           formatter: markLine.name ? "{b}:{c}" : "{c}",
           position: "insideEndTop",
         },
+        ...(markLine.color ? { lineStyle: { color: markLine.color } } : {}),
       };
     }) ?? []
   );
@@ -97,9 +89,7 @@ export const convertPromQLData = async (
 ) => {
   // Set gridlines visibility based on config.show_gridlines (default: true)
   const showGridlines =
-    panelSchema?.config?.show_gridlines !== undefined
-      ? panelSchema.config.show_gridlines
-      : true;
+    panelSchema?.config?.show_gridlines !== undefined ? panelSchema.config.show_gridlines : true;
   // Subtle dashed grid lines so they recede behind the data
   const gridLineStyle = getGridLineStyle(store.state.theme);
 
@@ -143,11 +133,7 @@ export const convertPromQLData = async (
 
       // Apply annotations if present (only for ECharts-based charts)
       if (annotations && annotations.length > 0 && panelSchema.type !== "table") {
-        const annotationResults = await getAnnotationsData(
-          annotations,
-          store,
-          panelSchema,
-        );
+        const annotationResults = getAnnotationsData(annotations, store.state.timezone);
         if (annotationResults && result.options) {
           result.options.annotations = annotationResults;
         }
@@ -177,18 +163,14 @@ export const convertPromQLData = async (
   });
 
   // For multiple queries (multi y-axis equivalent), divide the limit equally
-  const numberOfQueries = searchQueryData.filter(
-    (q: any) => q.result?.length > 0,
-  ).length;
-  const limitPerQuery =
-    numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
+  const numberOfQueries = searchQueryData.filter((q: any) => q.result?.length > 0).length;
+  const limitPerQuery = numberOfQueries > 1 ? Math.floor(maxSeries / numberOfQueries) : maxSeries;
 
   // Limit number of series to limitPerQuery per query
   const limitedSearchQueryData = searchQueryData.map((queryData: any) => {
     if (!queryData || !queryData.result) {
       return queryData;
     }
-    const originalCount = queryData.result.length;
     const remainingSeries = queryData.result.slice(0, limitPerQuery);
     return {
       ...queryData,
@@ -215,9 +197,7 @@ export const convertPromQLData = async (
   // flag to check if the data is time seriesc
   let isTimeSeriesFlag = true;
 
-  const legendPosition = getLegendPosition(
-    panelSchema?.config?.legends_position,
-  );
+  const legendPosition = getLegendPosition(panelSchema?.config?.legends_position);
 
   // get the x axis key which will be timestamp
   let xAxisData: any = new Set();
@@ -253,19 +233,14 @@ export const convertPromQLData = async (
       : (xAxisData[1] as number) - (xAxisData[0] as number);
 
     if (stepSeconds > 0) {
-      const queryStartSec =
-        parseInt(metadata.queries[0].startTime) / 1_000_000;
+      const queryStartSec = parseInt(metadata.queries[0].startTime) / 1_000_000;
       const queryEndSec = parseInt(metadata.queries[0].endTime) / 1_000_000;
 
       // Anchor to actual data grid — query range has fractional seconds
       // but PromQL data uses integer timestamps. Snap to the data's grid.
       const anchor = xAxisData[0] as number;
-      const gridStart =
-        anchor -
-        Math.ceil((anchor - queryStartSec) / stepSeconds) * stepSeconds;
-      const gridEnd =
-        anchor +
-        Math.ceil((queryEndSec - anchor) / stepSeconds) * stepSeconds;
+      const gridStart = anchor - Math.ceil((anchor - queryStartSec) / stepSeconds) * stepSeconds;
+      const gridEnd = anchor + Math.ceil((queryEndSec - anchor) / stepSeconds) * stepSeconds;
 
       const existingTimestamps = new Set(xAxisData);
       for (let t = gridStart; t <= gridEnd; t += stepSeconds) {
@@ -333,10 +308,7 @@ export const convertPromQLData = async (
     legendConfig.top = "bottom"; // Apply bottom positioning
   }
 
-  const { markLines, markAreas } = getAnnotationsData(
-    annotations,
-    store.state.timezone,
-  );
+  const { markLines, markAreas } = getAnnotationsData(annotations, store.state.timezone);
 
   const getSeriesMarkArea = () => {
     return {
@@ -357,9 +329,7 @@ export const convertPromQLData = async (
     if (configValue === null || configValue === undefined) {
       return undefined;
     }
-    return isMin
-      ? Math.min(configValue, dataValue)
-      : Math.max(configValue, dataValue);
+    return isMin ? Math.min(configValue, dataValue) : Math.max(configValue, dataValue);
   };
 
   // For PromQL, xAxis type is always "time" (time-series data)
@@ -381,7 +351,7 @@ export const convertPromQLData = async (
       //based on config width set grid
       left: panelSchema.config?.axis_width ?? 5,
       right: 20,
-      top: "15",
+      top: 16,
       bottom: (() => {
         // Reserve space below the plot for: tick labels, the axis name (when present)
         // and — for a horizontal bottom legend — the legend row. Without the axis name
@@ -405,14 +375,12 @@ export const convertPromQLData = async (
       appendToBody: true,
       className: "o2-echarts-tooltip",
       textStyle: {
-        color: store.state.theme === "dark" ? "#fff" : "#000",
+        color: chartColor("--color-tooltip-text"),
         fontSize: 12,
       },
       enterable: true,
-      backgroundColor:
-        store.state.theme === "dark" ? "rgba(22,23,25,0.97)" : "rgba(255,255,255,0.97)",
-      borderColor:
-        store.state.theme === "dark" ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.08)",
+      backgroundColor: chartColor("--color-tooltip-bg"),
+      borderColor: chartColor("--color-tooltip-border"),
       borderWidth: 1,
       padding: [8, 12],
       extraCssText:
@@ -439,8 +407,7 @@ export const convertPromQLData = async (
         if (hoveredSeriesState?.value?.hoveredSeriesName) {
           // get the current series index from name
           const currentSeriesIndex = name.findIndex(
-            (it: any) =>
-              it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
+            (it: any) => it.seriesName == hoveredSeriesState?.value?.hoveredSeriesName,
           );
 
           // if hovered series index is not -1 then take it to very first position
@@ -495,7 +462,7 @@ export const convertPromQLData = async (
           fontSize: 12,
           precision: panelSchema.config?.decimals,
           show: true,
-          backgroundColor: store.state.theme === "dark" ? "#333" : "",
+          backgroundColor: chartColor("--color-chart-crosshair-bg"),
           formatter: function (name: any) {
             if (name.axisDimension == "y")
               return formatUnitValue(
@@ -545,6 +512,9 @@ export const convertPromQLData = async (
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
       axisLabel: {
+        // hide colliding tick labels instead of drawing them on top of each
+        // other (short panels fit fewer labels than ECharts offers)
+        hideOverlap: true,
         formatter: function (name: any) {
           return formatUnitValue(
             getUnitValue(
@@ -591,7 +561,8 @@ export const convertPromQLData = async (
   // can auto-range with its natural padding (avoids bar clipping at
   // the y-axis edge where gap-filled data can extend beyond the query
   // start).
-  if (loading && metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
+  const pinXAxis = loading || panelSchema?.config?.pin_x_axis_to_range === true;
+  if (pinXAxis && metadata?.queries?.[0]?.startTime && metadata?.queries?.[0]?.endTime) {
     const queryStartMs = metadata.queries[0].startTime / 1000; // µs to ms
     const queryEndMs = metadata.queries[0].endTime / 1000;
 
@@ -622,7 +593,7 @@ export const convertPromQLData = async (
   // Ensure gridlines visibility is set for all xAxis and yAxis (handles both array and object cases)
   if (options.xAxis) {
     (Array.isArray(options.xAxis) ? options.xAxis : [options.xAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -631,7 +602,7 @@ export const convertPromQLData = async (
   }
   if (options.yAxis) {
     (Array.isArray(options.yAxis) ? options.yAxis : [options.yAxis]).forEach(
-      (axis) => {
+      (axis: { splitLine: { show: boolean; lineStyle: unknown } }) => {
         // if (!axis.splitLine) axis.splitLine = {};
         axis.splitLine.show = showGridlines;
         axis.splitLine.lineStyle = gridLineStyle;
@@ -658,19 +629,13 @@ export const convertPromQLData = async (
     options.grid = gridDataForGauge.gridArray;
   }
 
-  const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(
-    panelSchema.type,
-  );
+  const seriesPropsBasedOnChartType = getPropsByChartTypeForSeries(panelSchema.type);
 
   // if color type is shades, continuous then required to calculate min and max for chart.
   let chartMin: any = Infinity;
   let chartMax: any = -Infinity;
 
-  if (
-    !Object.values(ColorModeWithoutMinMax).includes(
-      panelSchema.config?.color?.mode,
-    )
-  ) {
+  if (!Object.values(ColorModeWithoutMinMax).includes(panelSchema.config?.color?.mode)) {
     [chartMin, chartMax] = getMetricMinMaxValue(limitedSearchQueryData);
   }
 
@@ -721,8 +686,7 @@ export const convertPromQLData = async (
                 name: seriesName,
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
-                  position:
-                    panelSchema.config?.label_option?.position || "None",
+                  position: panelSchema.config?.label_option?.position || "None",
                   rotate: panelSchema.config?.label_option?.rotate || 0,
                 },
                 smooth:
@@ -763,9 +727,10 @@ export const convertPromQLData = async (
                     color: "#8B5A2B",
                     type: [8, 4],
                     width: 2,
-                    shadowColor: store.state.theme === "light"
-                      ? "rgba(255, 255, 255, 0.7)"
-                      : "rgba(0, 0, 0, 0.7)",
+                    shadowColor:
+                      store.state.theme === "light"
+                        ? "rgba(255, 255, 255, 0.7)"
+                        : "rgba(0, 0, 0, 0.7)",
                     shadowBlur: 2,
                   },
                 },
@@ -805,8 +770,7 @@ export const convertPromQLData = async (
                 name: seriesName,
                 label: {
                   show: panelSchema.config?.label_option?.position != null,
-                  position:
-                    panelSchema.config?.label_option?.position || "None",
+                  position: panelSchema.config?.label_option?.position || "None",
                   rotate: panelSchema.config?.label_option?.rotate || 0,
                 },
                 smooth:
@@ -843,9 +807,10 @@ export const convertPromQLData = async (
                     color: "#8B5A2B",
                     type: [8, 4],
                     width: 2,
-                    shadowColor: store.state.theme === "light"
-                      ? "rgba(255, 255, 255, 0.7)"
-                      : "rgba(0, 0, 0, 0.7)",
+                    shadowColor:
+                      store.state.theme === "light"
+                        ? "rgba(255, 255, 255, 0.7)"
+                        : "rgba(0, 0, 0, 0.7)",
                     shadowBlur: 2,
                   },
                 },
@@ -856,6 +821,7 @@ export const convertPromQLData = async (
           }
         }
       }
+      // falls through — unknown resultType has no series to build
       case "gauge": {
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
@@ -943,7 +909,7 @@ export const convertPromQLData = async (
           show: true,
           trigger: "item",
           textStyle: {
-            color: store.state.theme === "dark" ? "#fff" : "#000",
+            color: chartColor("--color-tooltip-text"),
             fontSize: 12,
           },
           valueFormatter: (value: any) => {
@@ -957,14 +923,8 @@ export const convertPromQLData = async (
             );
           },
           enterable: true,
-          backgroundColor:
-            store.state.theme === "dark"
-              ? "rgba(22,23,25,0.97)"
-              : "rgba(255,255,255,0.97)",
-          borderColor:
-            store.state.theme === "dark"
-              ? "rgba(255,255,255,0.1)"
-              : "rgba(0,0,0,0.08)",
+          backgroundColor: chartColor("--color-tooltip-bg"),
+          borderColor: chartColor("--color-tooltip-border"),
           borderWidth: 1,
           padding: [8, 12],
           extraCssText:
@@ -1000,8 +960,7 @@ export const convertPromQLData = async (
               panelSchema.config?.unit_custom,
               panelSchema.config?.decimals,
             );
-            options.backgroundColor =
-              panelSchema.config?.background?.value?.color ?? "";
+            options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
             const metricText = formatUnitValue(unitValue);
             const series: any[] = [
               {
@@ -1010,23 +969,26 @@ export const convertPromQLData = async (
                 coordinateSystem: "polar",
                 _metricText: metricText,
                 renderItem: function (params: any) {
-                  const backgroundColor =
-                    panelSchema.config?.background?.value?.color;
-                  const isDarkTheme = store.state.theme === "dark";
+                  const backgroundColor = panelSchema?.config?.background?.value?.color;
                   return {
                     type: "text",
                     style: {
                       text: metricText,
-                      fontSize: calculateOptimalFontSize(
+                      fontSize: calculateMetricFontSize(
                         metricText,
-                        params.coordSys.cx * 2 - METRIC_COPY_BTN_RESERVE_PX,
+                        params?.coordSys?.cx * 2,
+                        params?.coordSys?.cy * 2,
                       ), //coordSys is relative. so that we can use it to calculate the dynamic size
                       fontWeight: 500,
                       align: "center",
                       verticalAlign: "middle",
-                      x: params.coordSys.cx,
-                      y: params.coordSys.cy,
-                      fill: getContrastColor(backgroundColor, isDarkTheme),
+                      x: params?.coordSys?.cx,
+                      y: params?.coordSys?.cy,
+                      fill: getContrastColor(
+                        backgroundColor,
+                        chartColor("--color-chart-metric-text"),
+                        chartNumber("--chart-metric-contrast-threshold", 0.5),
+                      ),
                     },
                   };
                 },
@@ -1036,8 +998,8 @@ export const convertPromQLData = async (
             // Rect for the per-value copy icon overlay (single metric fills the area).
             const panelEl = chartPanelRef?.value;
             if (panelEl) {
-              const w = panelEl.offsetWidth;
-              const h = panelEl.offsetHeight;
+              const w = panelEl?.offsetWidth;
+              const h = panelEl?.offsetHeight;
               series[0]._metricLayout = {
                 left: 0,
                 top: 0,
@@ -1045,10 +1007,7 @@ export const convertPromQLData = async (
                 height: h,
                 cx: w / 2,
                 cy: h / 2,
-                fontSize: calculateOptimalFontSize(
-                  metricText,
-                  w - METRIC_COPY_BTN_RESERVE_PX,
-                ),
+                fontSize: calculateMetricFontSize(metricText, w, h),
               };
             }
 
@@ -1071,7 +1030,6 @@ export const convertPromQLData = async (
 
           case "vector": {
             const traces = it?.result?.map((metric: any) => {
-              const values = [metric.value];
               return {
                 name: JSON.stringify(metric.metric),
                 value: metric?.value?.length > 1 ? metric.value[1] : "",
@@ -1096,16 +1054,9 @@ export const convertPromQLData = async (
   // mark line and mark area will be added only for time series chart
   // with specific chart type
   if (
-    [
-      "area",
-      "area-stacked",
-      "bar",
-      "h-bar",
-      "line",
-      "scatter",
-      "stacked",
-      "h-stacked",
-    ].includes(panelSchema.type) &&
+    ["area", "area-stacked", "bar", "h-bar", "line", "scatter", "stacked", "h-stacked"].includes(
+      panelSchema.type,
+    ) &&
     isTimeSeriesFlag &&
     !panelSchema.config.trellis?.layout
   ) {
@@ -1160,8 +1111,7 @@ export const convertPromQLData = async (
     ) {
       legendWidth =
         panelSchema.config.legend_width.unit === "%"
-          ? (chartPanelRef.value?.offsetWidth || 0) *
-            (panelSchema.config.legend_width.value / 100)
+          ? (chartPanelRef.value?.offsetWidth || 0) * (panelSchema.config.legend_width.value / 100)
           : panelSchema.config.legend_width.value;
     } else {
       // Dynamically compute width to ensure legends do not overlap the chart
@@ -1170,8 +1120,7 @@ export const convertPromQLData = async (
         chartPanelRef.value?.offsetWidth || 800,
         chartPanelRef.value?.offsetHeight || 400,
         options.series || [],
-        panelSchema?.config?.legends_type === "scroll" ||
-          panelSchema?.config?.legends_type == null,
+        panelSchema?.config?.legends_type === "scroll" || panelSchema?.config?.legends_type == null,
       );
     }
 
@@ -1233,12 +1182,12 @@ export const convertPromQLData = async (
         panelSchema.config.legend_height.unit === "%"
           ? chartHeight * (panelSchema.config.legend_height.value / 100)
           : panelSchema.config.legend_height.value;
-      
+
       // Apply the configured height using the same approach as calculateBottomLegendHeight
       if (options.grid) {
         options.grid.bottom = legendHeight;
       }
-      
+
       const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
       options.legend.top = legendTopPosition;
       options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1259,8 +1208,7 @@ export const convertPromQLData = async (
   // Apply legend height for scroll/auto legends at bottom position
   if (
     panelSchema?.config?.show_legends &&
-    (panelSchema?.config?.legends_type === "scroll" ||
-      panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
+    (panelSchema?.config?.legends_type === "scroll" || panelSchema?.config?.legends_type == null) && // null means auto, which can be scroll
     (panelSchema?.config?.legends_position === "bottom" ||
       panelSchema?.config?.legends_position === null) &&
     panelSchema.config.legend_height &&
@@ -1274,12 +1222,12 @@ export const convertPromQLData = async (
       panelSchema.config.legend_height.unit === "%"
         ? chartHeight * (panelSchema.config.legend_height.value / 100)
         : panelSchema.config.legend_height.value;
-    
+
     // Apply the configured height using the same approach as calculateBottomLegendHeight
     if (options.grid) {
       options.grid.bottom = legendHeight;
     }
-    
+
     const legendTopPosition = chartHeight - legendHeight + 10; // 10px padding from bottom
     options.legend.top = legendTopPosition;
     options.legend.height = legendHeight - 20; // Constrain height within allocated space
@@ -1287,6 +1235,8 @@ export const convertPromQLData = async (
 
   // promql query will be always timeseries except gauge and metric text chart.
   // console.timeEnd("convertPromQLData");
+  // Reserve measured left space so wide y-axis labels don't clip.
+  applyMeasuredYAxisLeftInset(options);
   return {
     options,
     extras: {
@@ -1296,5 +1246,3 @@ export const convertPromQLData = async (
     },
   };
 };
-
-

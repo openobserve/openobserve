@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   formatDate,
   isTimeSeries,
@@ -21,24 +21,6 @@ import {
   convertOffsetToSeconds,
   getUTCTimestampFromZonedTimestamp,
 } from "@/utils/dashboard/dateTimeUtils";
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    date: {
-      subtractFromDate: vi.fn((dateInput: any, subtractObj: any) => {
-        const result = new Date(dateInput);
-        if (subtractObj.seconds) result.setSeconds(result.getSeconds() - subtractObj.seconds);
-        if (subtractObj.minutes) result.setMinutes(result.getMinutes() - subtractObj.minutes);
-        if (subtractObj.hours) result.setHours(result.getHours() - subtractObj.hours);
-        if (subtractObj.days) result.setDate(result.getDate() - subtractObj.days);
-        if (subtractObj.months) result.setMonth(result.getMonth() - subtractObj.months);
-        return result;
-      }),
-    },
-  };
-});
 
 describe("dateTimeUtils", () => {
   describe("formatDate", () => {
@@ -106,11 +88,7 @@ describe("dateTimeUtils", () => {
     });
 
     it("returns true for array with all valid ISO timestamps", () => {
-      const sample = [
-        "2024-01-15T10:30:45",
-        "2024-02-20T15:45:00",
-        "2024-12-31T23:59:59",
-      ];
+      const sample = ["2024-01-15T10:30:45", "2024-02-20T15:45:00", "2024-12-31T23:59:59"];
       expect(isTimeSeries(sample)).toBe(true);
     });
   });

@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type SwitchSize = "sm" | "md" | "lg" | "xl";
 export type SwitchValue = boolean | string | number;
 /**
@@ -14,14 +16,14 @@ export interface SwitchProps {
   /** Current on/off state */
   modelValue?: SwitchValue;
   /** Accessible label rendered beside the switch */
-  label?: string;
+  label?: I18nText;
   /** Whether the label appears before (left) or after (right) the switch */
   labelPosition?: "left" | "right";
   /** Control size */
   size?: SwitchSize;
-  /** Value to emit when checked — replaces q-toggle `true-value` */
+  /** Value to emit when checked — replaces the legacy toggle's `true-value` */
   checkedValue?: SwitchCustomValue;
-  /** Value to emit when unchecked — replaces q-toggle `false-value` */
+  /** Value to emit when unchecked — replaces the legacy toggle's `false-value` */
   uncheckedValue?: SwitchCustomValue;
   /** Prevents interaction */
   disabled?: boolean;

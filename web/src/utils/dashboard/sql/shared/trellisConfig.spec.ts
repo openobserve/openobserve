@@ -14,9 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import {
-  createTrellisHelpers,
-} from "@/utils/dashboard/sql/shared/trellisConfig";
+import { createTrellisHelpers } from "@/utils/dashboard/sql/shared/trellisConfig";
 import { getTrellisGrid } from "@/utils/dashboard/calculateGridForSubPlot";
 
 vi.mock("@/utils/dashboard/chartDimensionUtils", () => ({
@@ -155,9 +153,7 @@ describe("createTrellisHelpers", () => {
   });
 
   it("updateTrellisConfig sets options.grid to gridArray from getTrellisGrid", () => {
-    const expectedGridArray = [
-      { left: "5%", top: "5%", width: "90%", height: "40%" },
-    ];
+    const expectedGridArray = [{ left: "5%", top: "5%", width: "90%", height: "40%" }];
     vi.mocked(getTrellisGrid).mockReturnValue({
       gridArray: expectedGridArray,
       gridWidth: 800,

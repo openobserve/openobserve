@@ -15,30 +15,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full">
-    <div class="tw:border-b tw:border-separator tw:pb-3 tw:mb-3">
-      <div class="tw:text-xl tw:font-semibold">
+  <div class="w-full">
+    <div class="mb-4">
+      <div class="text-text-heading text-sm leading-tight font-semibold">
         {{ t("settings.correlation.semanticFieldGroupsTitle") }}
       </div>
-      <div class="tw:text-xs tw:text-gray-400">
+      <div class="text-text-secondary mt-1 text-xs">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
     </div>
 
     <!-- Category Filter -->
-    <div class="tw:flex tw:gap-3 tw:mb-3">
-      <div class="tw:w-full col-md-4">
+    <div class="mb-3 flex gap-3">
+      <div class="col-md-4 w-full">
         <OSelect
           data-test="semantic-group-category-select"
           v-model="selectedCategory"
           :options="categoryOptions"
           :label="t('correlation.category')"
           :hint="t('correlation.categoryHint')"
-          class="showLabelOnTop"
-          style="max-width: 100%"
+          class="showLabelOnTop max-w-full"
         />
       </div>
-      <div class="tw:w-full col-md-8 tw:flex tw:items-center tw:justify-end tw:gap-2">
+      <div class="col-md-8 flex w-full items-center justify-end gap-2">
         <OButton
           data-test="correlation-semanticfieldgroup-export-json-btn"
           variant="outline"
@@ -66,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="tw:w-full tw:overflow-x-hidden tw:mb-3">
+    <div v-if="filteredGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
       <SemanticGroupItem
         v-for="(group, index) in filteredGroups"
         :key="`${group.id}-${index}`"
@@ -76,8 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="tw:text-center tw:p-4 tw:text-gray-400">
-      <OIcon name="info" size="md" class="tw:mb-2" />
+    <div v-else class="text-text-muted p-4 text-center">
+      <OIcon name="info" size="md" class="mb-2" />
       <div>
         {{
           t("correlation.noSemanticGroupsInCategory", {
@@ -88,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="tw:text-xs tw:text-gray-400 tw:mt-2">
+    <div v-if="localGroups.length > 0" class="text-text-secondary mt-2 text-xs">
       {{
         t("correlation.showingGroups", {
           filterGroupLength: filteredGroups.length,
@@ -100,31 +99,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
       v-if="localGroups.length > 0 && showFingerprintFields"
-      class="tw:border-t tw:border-separator tw:pt-4 tw:mt-4"
+      class="border-separator mt-4 border-t pt-4"
     >
-      <div class="tw:text-base tw:font-medium tw:mb-2">
+      <div class="mb-2 text-base font-medium">
         {{ t("correlation.deduplicateFields") }} *
         <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="tw:text-xs tw:text-gray-400 tw:mb-3">
+      <div class="text-text-secondary mb-3 text-xs">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
-      <div class="tw:flex tw:flex-wrap tw:gap-3">
+      <div class="flex flex-wrap gap-3">
         <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
           :key="group.id"
           v-model="localFingerprintFields"
           :value="group.id"
-          :label="group.display"
-          class="tw:min-w-50"
+          :label="raw(group.display)"
+          class="min-w-50"
           @update:model-value="emitUpdate"
         />
       </div>
-      <div
-        v-if="localFingerprintFields.length === 0"
-        class="tw:text-red-500 tw:text-xs tw:mt-2"
-      >
+      <div v-if="localFingerprintFields.length === 0" class="text-status-error-text mt-2 text-xs">
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
     </div>
@@ -143,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
@@ -154,9 +150,9 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-interface SemanticGroup {
+export interface SemanticGroup {
   id: string;
   display: string;
   group?: string;
@@ -252,7 +248,7 @@ const categoryOptions = computed(() => {
   return Array.from(groupsMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([category, count]) => ({
-      label: category,
+      label: raw(category),
       value: category,
       count: count,
     }));
@@ -264,17 +260,8 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) =>
-      normalizeCategoryName(group.group || "Other") === selectedCategory.value,
+    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
-});
-
-// Group ID options for fingerprint selection
-const groupIdOptions = computed(() => {
-  return localGroups.value.map((group) => ({
-    label: group.display,
-    value: group.id,
-  }));
 });
 
 // Generate a short unique ID for new groups using first 8 chars of UUID
@@ -295,10 +282,7 @@ const addGroup = () => {
 };
 
 // Update group by filtered index - find actual index in localGroups
-const updateGroupByFilter = (
-  filteredIndex: number,
-  updatedGroup: SemanticGroup,
-) => {
+const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
   const group = filteredGroups.value[filteredIndex];
   const actualIndex = localGroups.value.findIndex(
     (g) => g.id === group.id && g.display === group.display,
@@ -320,9 +304,7 @@ const removeGroupByFilter = (filteredIndex: number) => {
     localGroups.value.splice(actualIndex, 1);
 
     // Remove from fingerprint fields if present
-    localFingerprintFields.value = localFingerprintFields.value.filter(
-      (id) => id !== removedId,
-    );
+    localFingerprintFields.value = localFingerprintFields.value.filter((id) => id !== removedId);
 
     emitUpdate();
   }
@@ -370,9 +352,7 @@ onMounted(async () => {
 
   if (props.scrollToGroupId) {
     // Find and switch to the category that contains the requested group
-    const targetGroup = localGroups.value.find(
-      (g) => g.id === props.scrollToGroupId,
-    );
+    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
     if (targetGroup) {
       selectedCategory.value = targetGroup.group || "Other";
       await nextTick(); // wait for filteredGroups to re-render
@@ -389,17 +369,11 @@ onMounted(async () => {
     if (el) {
       // Scroll within the nearest scrollable parent to avoid pushing
       // ancestor containers (main page layout) out of view
-      const scrollParent = el.closest(
-        ".tw\\:overflow-y-auto",
-      ) as HTMLElement | null;
+      const scrollParent = el.closest(".overflow-y-auto") as HTMLElement | null;
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
         const elRect = el.getBoundingClientRect();
-        const offset =
-          elRect.top -
-          parentRect.top -
-          parentRect.height / 2 +
-          elRect.height / 2;
+        const offset = elRect.top - parentRect.top - parentRect.height / 2 + elRect.height / 2;
         scrollParent.scrollBy({ top: offset, behavior: "smooth" });
       } else {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -412,8 +386,8 @@ onMounted(async () => {
 });
 </script>
 
-<style>
-/* Applied via JS to the target group item */
+<style scoped>
+/* keep(keyframes): @keyframes can't be expressed as a utility; applied via JS classList */
 .group-highlight {
   animation: group-border-blink 0.4s ease-in-out 3;
 }
@@ -421,11 +395,11 @@ onMounted(async () => {
 @keyframes group-border-blink {
   0%,
   100% {
-    outline: 2px solid transparent;
+    outline: 0.125rem solid transparent;
   }
   50% {
-    outline: 2px solid var(--q-primary);
-    border-radius: 4px;
+    outline: 0.125rem solid var(--color-theme-accent);
+    border-radius: 0.25rem;
   }
 }
 </style>

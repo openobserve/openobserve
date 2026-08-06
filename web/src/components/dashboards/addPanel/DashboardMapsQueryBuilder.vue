@@ -17,18 +17,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'maps'">
     <!-- name container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-20 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.mapname") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
-          <OTooltip :content="Hint" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OTooltip :content="Hint" />
       </div>
-      <span class="tw:flex tw:items-center tw:ml-[2px] tw:mr-[2px]">:</span>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div
-        class="axis-container tw:flex-1 tw:w-full tw:flex tw:flex-wrap droppable tw:border-transparent tw:border-dashed tw:border-2 scroll"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:[border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
             dashboardPanelData.meta.dragAndDrop.currentDragArea == 'name',
         }"
@@ -39,78 +44,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-name-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
+          :divided="true"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.name
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.name
           "
-          :draggable="true"
+          :draggable="isDragArmed()"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.name,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.name,
               'name',
             )
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 !cursor-grab"
+            @mousedown="armDrag()"
             :data-test="`dashboard-name-item-${nameLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-name-item-${nameLabel}`"
               >
-                {{ nameLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <AxisFieldChipLabel :label="nameLabel" />
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-name-item-${nameLabel}-menu`"
             >
               <div
-                style="padding: 3px 16px 16px 16px"
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.name.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.name.isDerived
                       ? 'auto'
                       : '771px',
                 }"
               >
                 <div>
-                  <div class="tw:mr-1 tw:mb-2">
+                  <div class="mr-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.name
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.name
                       "
                       :allowAggregation="false"
                       :customQuery="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery
                       "
                       :chartType="dashboardPanelData.data.type"
                     />
@@ -120,43 +120,47 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="!w-4"
             :data-test="`dashboard-name-item-${nameLabel}-remove`"
             @click="removeMapName()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.name == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .name == null
           "
         >
-          <div class="tw:mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
     <OSeparator />
     <!-- value for maps container -->
-    <div style="display: flex; flex-direction: row" class="tw:pl-3">
-      <div class="tw:whitespace-nowrap tw:min-w-[130px] tw:flex tw:items-center">
+    <div class="flex flex-row pl-3">
+      <div class="flex min-w-20 items-center whitespace-nowrap">
+        <span
+          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          aria-hidden="true"
+        ></span>
         {{ t("panel.mapvalue") }}
-        <OIcon name="info-outline" size="sm" class="tw:ml-1" />
-          <OTooltip :content="Hint" />
+        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OTooltip :content="Hint" />
       </div>
-      <span class="tw:flex tw:items-center tw:ml-[2px] tw:mr-[2px]">:</span>
+      <span class="mr-0.5 ml-0.5 flex items-center">:</span>
       <div
-        class="axis-container tw:flex-1 tw:w-full tw:flex tw:flex-wrap droppable tw:border-transparent tw:border-dashed tw:border-2 scroll"
+        class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
-          'tw:bg-[rgba(0,0,0,0.042)] tw:border-white tw:[border-style:dotted]': dashboardPanelData.meta.dragAndDrop.dragging,
-          'tw:transition-all tw:duration-200 tw:bg-[var(--color-field-list-row-hover-bg)]':
+          '[border-style:dotted] border-white bg-[rgba(0,0,0,0.042)]':
+            dashboardPanelData.meta.dragAndDrop.dragging,
+          'bg-field-list-row-hover-bg transition-colors duration-200':
             dashboardPanelData.meta.dragAndDrop.dragging &&
-            dashboardPanelData.meta.dragAndDrop.currentDragArea ==
-              'value_for_maps',
+            dashboardPanelData.meta.dragAndDrop.currentDragArea == 'value_for_maps',
         }"
         @dragend="onDragEnd()"
         @dragover="onDragOver($event, 'value_for_maps')"
@@ -165,78 +169,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value_for_maps-layout"
       >
         <OButtonGroup
-          class="axis-field tw:overflow-hidden tw:mr-2 tw:my-1"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
+          :divided="true"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.value_for_maps
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.value_for_maps
           "
-          :draggable="true"
+          :draggable="isDragArmed()"
           @dragstart="
             onFieldDragStart(
               $event,
-              dashboardPanelData.data.queries[
-                dashboardPanelData.layout.currentQueryIndex
-              ].fields?.value_for_maps,
+              dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+                ?.value_for_maps,
               'value_for_maps',
             )
           "
         >
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
-            class="cursor-grab"
+            class="!w-4 !cursor-grab"
+            @mousedown="armDrag()"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-drag`"
           >
             <template #icon-left>
-              <OIcon name="drag-indicator" size="xs" />
+              <OIcon name="drag-indicator" size="xs" class="text-text-secondary" />
             </template>
           </OButton>
           <ODropdown>
             <template #trigger>
               <OButton
-                variant="primary"
+                variant="ghost"
                 size="chip-12"
+                class="!ps-1 !pe-1"
                 :data-test="`dashboard-value_for_maps-item-${valueLabel}`"
               >
-                {{ valueLabel }}
-                <template #icon-right
-                  ><OIcon name="arrow-drop-down" size="sm"
-                /></template>
+                <AxisFieldChipLabel :label="valueLabel" />
+                <template #icon-right><OIcon name="arrow-drop-down" size="sm" /></template>
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-maps-query-builder-dropdown tw:w-[771px]! tw:h-[323px] tw:shadow-[0px_4px_4px_0px_rgba(0,0,0,0.05)] tw:p-4 tw:shadow-[0px_3px_15px_rgba(0,0,0,0.1)] tw:translate-y-2 tw:rounded-none"
+              class="field-function-menu-popup dashboard-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
               :data-test="`dashboard-value_for_maps-item-${valueLabel}-menu`"
             >
               <div
-                style="padding: 3px 16px 16px 16px"
+                class="pt-0.75 pr-4 pb-4 pl-4"
                 :style="{
                   width:
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].customQuery ||
-                    dashboardPanelData.data.queries[
-                      dashboardPanelData.layout.currentQueryIndex
-                    ].fields.value_for_maps.isDerived
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery ||
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .fields.value_for_maps.isDerived
                       ? 'auto'
                       : '771px',
                 }"
               >
                 <div>
-                  <div class="tw:mr-1 tw:mb-2">
+                  <div class="mr-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].fields.value_for_maps
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .fields.value_for_maps
                       "
                       :allowAggregation="true"
                       :customQuery="
-                        dashboardPanelData.data.queries[
-                          dashboardPanelData.layout.currentQueryIndex
-                        ].customQuery
+                        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                          .customQuery
                       "
                       :chartType="dashboardPanelData.data.type"
                     />
@@ -246,51 +245,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </ODropdown>
           <OButton
-            variant="outline"
+            variant="ghost"
             size="icon-chip"
+            class="!w-4"
             :data-test="`dashboard-value_for_maps-item-${valueLabel}-remove`"
             @click="removeMapValue()"
-            icon-left="close"
           >
+            <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
           </OButton>
         </OButtonGroup>
         <div
-          class="tw:text-xs text-weight-bold tw:text-center tw:py-1"
+          class="flex min-w-0 flex-1 items-center justify-center text-center text-xs whitespace-nowrap"
           v-if="
-            dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields.value_for_maps == null
+            dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              .value_for_maps == null
           "
         >
-          <div class="tw:mt-1">{{ Hint }}</div>
+          <div>{{ Hint }}</div>
         </div>
       </div>
     </div>
-    <OSeparator />
-    <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
-    <OSeparator />
-    <!-- filters container -->
-    <DashboardFiltersOption
-      :dashboardData="dashboardData"
-    ></DashboardFiltersOption>
+    <template v-if="showJoinsAndFilters">
+      <OSeparator />
+      <DashboardJoinsOption :dashboardData="dashboardData"></DashboardJoinsOption>
+      <OSeparator />
+      <!-- filters container -->
+      <DashboardFiltersOption :dashboardData="dashboardData"></DashboardFiltersOption>
+    </template>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  reactive,
-  watch,
-  computed,
-  inject,
-  nextTick,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
-import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
 import { buildSQLQueryFromInput } from "@/utils/dashboard/dashboardAutoQueryBuilder";
@@ -303,16 +293,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import AxisFieldChipLabel from "@/components/dashboards/addPanel/AxisFieldChipLabel.vue";
 
 export default defineComponent({
   name: "DashboardMapsQueryBuilder",
   components: {
+    AxisFieldChipLabel,
     OSeparator,
     OButtonGroup,
     OButton,
     ODropdown,
-    SortByBtnGrp,
-    SanitizedHtmlRenderer,
     DashboardFiltersOption,
     DynamicFunctionPopUp,
     DashboardJoinsOption,
@@ -320,8 +310,8 @@ export default defineComponent({
     OTooltip,
   },
   props: ["dashboardData"],
-  setup(props) {
-    const { t } = useI18n();
+  setup() {
+    const { t } = useI18nTyped();
     const { showErrorNotification } = useNotifications();
 
     const expansionItems = reactive({
@@ -330,10 +320,7 @@ export default defineComponent({
       filter: false,
     });
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
     const {
       dashboardPanelData,
@@ -344,7 +331,7 @@ export default defineComponent({
       removeMapValue,
       promqlMode,
       cleanupDraggingFields,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const triggerOperators = [
       { label: t("dashboard.count"), value: "count" },
@@ -409,18 +396,18 @@ export default defineComponent({
         const dragElement = dashboardPanelData.meta.dragAndDrop.dragElement;
 
         const currentQueryField =
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields;
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields;
         if (targetAxis !== "f") {
           if (
             (targetAxis === "name" && currentQueryField.name) ||
-            (targetAxis === "value_for_maps" &&
-              currentQueryField.value_for_maps)
+            (targetAxis === "value_for_maps" && currentQueryField.value_for_maps)
           ) {
             const maxAllowedAxisFields = 1;
 
-            const errorMessage = `Max ${maxAllowedAxisFields} field in ${targetAxis.toUpperCase()} is allowed.`;
+            const errorMessage = t("dashboard.dashboardMapsQueryBuilder.maxFieldAllowed", {
+              count: maxAllowedAxisFields,
+              axis: targetAxis.toUpperCase(),
+            });
 
             showErrorNotification(errorMessage);
             cleanupDraggingFields();
@@ -445,7 +432,7 @@ export default defineComponent({
         )?.value;
 
         if (!firstFieldTypeArg) {
-          showErrorNotification("Without field, not able to drag");
+          showErrorNotification(t("dashboard.dashboardMapsQueryBuilder.withoutFieldNotDrag"));
           cleanupDraggingFields();
           return;
         }
@@ -466,26 +453,21 @@ export default defineComponent({
       cleanupDraggingFields();
     };
 
-    const onDragStart = (e: any, item: any) => {
+    const onDragStart = (e: any) => {
       e.preventDefault();
     };
 
-    const onDragOver = (e: any, area: string) => {
+    const onDragOver = (e: any, _columnData?: string) => {
       e.preventDefault();
     };
 
     const onDragEnter = (e: any, area: string, index: any) => {
-      if (
-        dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" &&
-        area === "f"
-      ) {
+      if (dashboardPanelData.meta.dragAndDrop.dragSource != "fieldList" && area === "f") {
         e.preventDefault();
         return;
       }
       dashboardPanelData.meta.dragAndDrop.targetDragIndex =
-        index != null && index >= 0
-          ? index
-          : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
+        index != null && index >= 0 ? index : dashboardPanelData.meta.dragAndDrop.targetDragIndex;
       dashboardPanelData.meta.dragAndDrop.currentDragArea = area;
       e.preventDefault();
     };
@@ -499,7 +481,10 @@ export default defineComponent({
     const onDragEnd = () => {
       cleanupDraggingFields();
     };
-    const Hint = computed((e: any) => {
+
+    // Handle-gated drag: chips drag only from the grip, not the label.
+    const { arm: armDrag, isArmed: isDragArmed } = useDragHandle();
+    const Hint = computed(() => {
       switch (dashboardPanelData.data.type) {
         case "maps":
           return t("dashboard.oneFieldMessage");
@@ -510,20 +495,15 @@ export default defineComponent({
 
     const commonBtnLabel = (field: any) => {
       if (
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].customQuery
       ) {
         return field?.alias;
       }
       const label = buildSQLQueryFromInput(
         field,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.joins?.length
-          ? dashboardPanelData.data.queries[
-              dashboardPanelData.layout.currentQueryIndex
-            ].fields?.stream
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins?.length
+          ? dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+              ?.stream
           : "",
       );
 
@@ -534,23 +514,30 @@ export default defineComponent({
 
     const nameLabel = computed(() => {
       const nameField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.name;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.name;
       return commonBtnLabel(nameField);
     });
 
     const valueLabel = computed(() => {
       const valueField =
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.value_for_maps;
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+          .value_for_maps;
       return commonBtnLabel(valueField);
+    });
+
+    // Joins and Filters hide themselves in custom-SQL mode; the separators
+    // around them must follow the same condition or they stack into a
+    // double border.
+    const showJoinsAndFilters = computed(() => {
+      const currentQuery =
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
+      return !(currentQuery?.customQuery && dashboardPanelData.data.queryType === "sql");
     });
 
     return {
       t,
       dashboardPanelData,
+      showJoinsAndFilters,
       removeMapName,
       removeMapValue,
       nameLabel,
@@ -567,6 +554,8 @@ export default defineComponent({
       onDragEnd,
       onDragOver,
       onDragEnter,
+      armDrag,
+      isDragArmed,
       expansionItems,
       Hint,
       promqlMode,

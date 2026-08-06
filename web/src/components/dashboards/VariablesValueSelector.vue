@@ -14,75 +14,70 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div
-    v-if="variablesData.values?.length > 0"
-    class="tw:flex tw:flex-wrap tw:mt-1 tw:ml-1"
-  >
+  <div v-if="variablesData.values?.length > 0" class="mt-1 flex flex-wrap">
     <div
       v-for="(item, index) in variablesData.values"
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-if="item.type == 'query_values'" class="max-w-[40rem] min-w-37.5">
         <VariableQueryValueSelector
-          class="tw:mr-4 tw:mt-1"
+          class="mt-1 mr-4"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
-          @search="onVariableSearch(index, $event)"
+          @search="onVariableSearch(Number(index), $event)"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'constant'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="tw:mr-4 tw:mt-1"
-          style="max-width: 150px !important"
+          class="mt-1 mr-4 max-w-37.5!"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
           readonly
           :data-test="`variable-selector-${item.name}`"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
-      <div v-else-if="item.type == 'textbox'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-else-if="item.type == 'textbox'" class="max-w-[40rem] min-w-37.5">
         <OInput
           v-show="!item.hideOnDashboard"
-          class="tw:mr-4 tw:mt-1"
-          style="max-width: 150px !important"
+          class="mt-1 mr-4 max-w-37.5!"
           :debounce="1000"
           v-model="item.value"
           :label="item.label || item.name"
           label-position="inside"
           :data-test="`variable-selector-${item.name}`"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
         />
       </div>
-      <div v-else-if="item.type == 'custom'" class="tw:max-w-[40rem] tw:min-w-37.5">
+      <div v-else-if="item.type == 'custom'" class="max-w-[40rem] min-w-37.5">
         <VariableCustomValueSelector
           v-show="!item.hideOnDashboard"
-          class="tw:mr-4 tw:mt-1"
+          class="mt-1 mr-4"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
-      <div v-else-if="item.type == 'dynamic_filters'" class="tw:max-w-max">
+      <div v-else-if="item.type == 'dynamic_filters'" class="max-w-max">
         <VariableAdHocValueSelector
-          class="tw:mr-4 tw:mt-1"
+          class="mt-1 mr-4"
           v-model="item.value"
           :variableItem="item"
-          @update:model-value="onVariablesValueUpdated(index)"
+          @update:model-value="onVariablesValueUpdated(Number(index))"
           :data-test="`variable-selector-${item.name}`"
         />
       </div>
     </div>
     <!-- Add Variable Button -->
-    <div v-if="showAddVariableButton" class="tw:ml-1 tw:mt-1">
+    <div v-if="showAddVariableButton" class="mt-1 ml-1">
       <OButton
         variant="outline"
         size="sm"
@@ -90,26 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-add-variable-btn"
         icon-left="add"
       >
-        Add Variable
+        {{ t("dashboard.newVariable") }}
       </OButton>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  getCurrentInstance,
-  onMounted,
-  onUnmounted,
-  ref,
-  watch,
-  PropType,
-  inject,
-  computed,
-  nextTick,
-} from "vue";
+import { onMounted, onUnmounted, ref, watch, PropType, inject, computed, nextTick } from "vue";
 import { defineComponent, reactive } from "vue";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
 import VariableQueryValueSelector from "./settings/VariableQueryValueSelector.vue";
 import VariableCustomValueSelector from "./settings/VariableCustomValueSelector.vue";
 import VariableAdHocValueSelector from "./settings/VariableAdHocValueSelector.vue";
@@ -117,20 +103,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
-import {
-  b64EncodeUnicode,
-  escapeSingleQuotes,
-  generateTraceContext,
-} from "@/utils/zincutils";
+import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
-import {
-  useVariablesWatcher,
-  variableLog,
-} from "@/composables/dashboard/useVariableDebugger";
+import { useVariablesWatcher, variableLog } from "@/composables/dashboard/useVariableDebugger";
 
 export default defineComponent({
   name: "VariablesValueSelector",
@@ -151,7 +130,7 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
-    // New props for scoped variables
+    // Props for scoped variables
     scope: {
       type: String as PropType<"global" | "tabs" | "panels">,
       default: "global",
@@ -188,8 +167,9 @@ export default defineComponent({
   },
   setup(props: any, { emit }) {
     const store = useStore();
-    // Try to inject variablesManager from parent (for backward compatibility)
-
+    const { t } = useI18nTyped();
+    // Alias preserves the same prop reference for in-place mutation.
+    const initialVariableValuesModel = computed(() => props.initialVariableValues);
     // Try to inject variablesManager from parent (for backward compatibility)
     const injectedManager = inject<any>("variablesManager", undefined);
     const manager = props.variablesManager || injectedManager;
@@ -206,8 +186,7 @@ export default defineComponent({
       // If showAllVisible is true, return all visible variables for this context
       // This includes global + tab + panel variables
       if (props.showAllVisible) {
-        variables =
-          manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
+        variables = manager.getAllVisibleVariables(props.tabId, props.panelId) || [];
       } else {
         // Otherwise, return only variables from the specified scope
         const scopeKey = props.scope;
@@ -222,12 +201,8 @@ export default defineComponent({
       }
 
       // Sort: dynamic filters should always appear at the end
-      const dynamicFilters = variables.filter(
-        (v) => v.type === "dynamic_filters",
-      );
-      const otherVariables = variables.filter(
-        (v) => v.type !== "dynamic_filters",
-      );
+      const dynamicFilters = variables.filter((v) => v.type === "dynamic_filters");
+      const otherVariables = variables.filter((v) => v.type !== "dynamic_filters");
 
       return [...otherVariables, ...dynamicFilters];
     });
@@ -283,8 +258,7 @@ export default defineComponent({
     const variableFirstResponseProcessed = ref<{ [key: string]: boolean }>({});
 
     // ------------- Start HTTP2/Streaming Implementation -------------
-    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-      useHttpStreaming();
+    const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
     // Utility functions
     const addTraceId = (field: string, traceId: string) => {
@@ -296,9 +270,7 @@ export default defineComponent({
 
     const removeTraceId = (field: string, traceId: string) => {
       if (traceIdMapper.value[field]) {
-        traceIdMapper.value[field] = traceIdMapper.value[field].filter(
-          (id) => id !== traceId,
-        );
+        traceIdMapper.value[field] = traceIdMapper.value[field].filter((id) => id !== traceId);
       }
     };
 
@@ -331,11 +303,7 @@ export default defineComponent({
       });
     });
 
-    const handleSearchClose = (
-      payload: any,
-      response: any,
-      variableObject: any,
-    ) => {
+    const handleSearchClose = (payload: any, response: any, variableObject: any) => {
       variableObject.isLoading = false;
       variableObject.isVariableLoadingPending = false;
 
@@ -389,18 +357,11 @@ export default defineComponent({
         variableObject.isLoading = true;
         variableFirstResponseProcessed.value[variableObject.name] = false;
 
-        fetchFieldValuesWithWebsocket(
-          variableObject,
-          data.queryReq.query_context,
-        );
+        fetchFieldValuesWithWebsocket(variableObject, data.queryReq.query_context);
       }
     };
 
-    const handleSearchResponse = (
-      payload: any,
-      response: any,
-      variableObject: any,
-    ) => {
+    const handleSearchResponse = (payload: any, response: any, variableObject: any) => {
       variableLog(variableObject.name, `Received response...`);
 
       if (!variableObject) {
@@ -420,8 +381,7 @@ export default defineComponent({
 
       // Handle completion
       if (
-        (response.type === "event_progress" &&
-          response.content.percent === 100) ||
+        (response.type === "event_progress" && response.content.percent === 100) ||
         response.type === "end"
       ) {
         // Mark as partially loaded
@@ -459,21 +419,16 @@ export default defineComponent({
       try {
         if (
           response.content?.results?.hits &&
-          (response.type === "search_response" ||
-            response.type === "search_response_hits")
+          (response.type === "search_response" || response.type === "search_response_hits")
         ) {
           // variableObject.isVariablePartialLoaded = true;
 
           const hits = response.content.results.hits;
 
           // Resolve field name for searching in response
-          const resolvedFieldName = resolveVariableValue(
-            variableObject.query_data.field,
-          );
+          const resolvedFieldName = resolveVariableValue(variableObject.query_data.field);
 
-          const fieldHit = hits.find(
-            (field: any) => field.field === resolvedFieldName,
-          );
+          const fieldHit = hits.find((field: any) => field.field === resolvedFieldName);
 
           variableLog(
             variableObject.name,
@@ -485,8 +440,7 @@ export default defineComponent({
               variableObject.options = [];
             }
 
-            const isFirstResponse =
-              variableObject.isVariablePartialLoaded === false;
+            const isFirstResponse = variableObject.isVariablePartialLoaded === false;
 
             variableLog(
               variableObject.name,
@@ -498,19 +452,13 @@ export default defineComponent({
             const newOptions = fieldHit.values
               .filter((value: any) => value.zo_sql_key !== undefined)
               .map((value: any) => ({
-                label:
-                  value.zo_sql_key !== ""
-                    ? value.zo_sql_key.toString()
-                    : "<blank>",
+                label: value.zo_sql_key !== "" ? value.zo_sql_key.toString() : "<blank>",
                 value: value.zo_sql_key.toString(),
               }));
             // For first response or subsequent responses, merge with existing options and keep selected values
             if (isFirstResponse) {
               // Add missing selected values to newOptions
-              if (
-                variableObject.multiSelect &&
-                Array.isArray(variableObject.value)
-              ) {
+              if (variableObject.multiSelect && Array.isArray(variableObject.value)) {
                 variableObject.value.forEach((val: string) => {
                   if (
                     !newOptions.some((opt: any) => opt.value === val) &&
@@ -522,14 +470,9 @@ export default defineComponent({
                     });
                   }
                 });
-              } else if (
-                !variableObject.multiSelect &&
-                variableObject.value !== null
-              ) {
+              } else if (!variableObject.multiSelect && variableObject.value !== null) {
                 if (
-                  !newOptions.some(
-                    (opt: any) => opt.value === variableObject.value,
-                  ) &&
+                  !newOptions.some((opt: any) => opt.value === variableObject.value) &&
                   variableObject.value !== SELECT_ALL_VALUE
                 ) {
                   newOptions.push({
@@ -541,10 +484,7 @@ export default defineComponent({
               variableObject.options = newOptions;
             } else {
               // For subsequent responses, merge with existing options
-              variableObject.options = [
-                ...newOptions,
-                ...variableObject.options,
-              ];
+              variableObject.options = [...newOptions, ...variableObject.options];
             }
             // Remove duplicates
             variableObject.options = variableObject.options.filter(
@@ -552,18 +492,14 @@ export default defineComponent({
                 index === self.findIndex((o) => o.value === option.value),
             );
             // Sort options
-            variableObject.options.sort((a: any, b: any) =>
-              a.label.localeCompare(b.label),
-            );
+            variableObject.options.sort((a: any, b: any) => a.label.localeCompare(b.label));
 
             variableLog(
               variableObject.name,
               `Received options being set: ${JSON.stringify(variableObject.options)}`,
             );
 
-            const originalValue = JSON.parse(
-              JSON.stringify(variableObject.value),
-            );
+            const originalValue = JSON.parse(JSON.stringify(variableObject.value));
 
             if (isFirstResponse) {
               // Update options and handle first response
@@ -573,9 +509,7 @@ export default defineComponent({
                   `Old values before processing: ${JSON.stringify(oldVariablesData[variableObject.name])}`,
                 );
 
-                const oldValues = Array.isArray(
-                  oldVariablesData[variableObject.name],
-                )
+                const oldValues = Array.isArray(oldVariablesData[variableObject.name])
                   ? oldVariablesData[variableObject.name]
                   : [oldVariablesData[variableObject.name]];
 
@@ -592,8 +526,7 @@ export default defineComponent({
                 if (
                   variableObject.value === null ||
                   variableObject.value === undefined ||
-                  (Array.isArray(variableObject.value) &&
-                    variableObject.value.length === 0)
+                  (Array.isArray(variableObject.value) && variableObject.value.length === 0)
                 ) {
                   // Don't auto-select a blank option as default. Find the first non-blank option.
                   if (variableObject.options.length) {
@@ -609,31 +542,18 @@ export default defineComponent({
                         : firstNonBlankOption.value;
                     } else {
                       // All options are blank - keep value unset
-                      variableObject.value = variableObject.multiSelect
-                        ? []
-                        : null;
+                      variableObject.value = variableObject.multiSelect ? [] : null;
                     }
                   } else {
-                    variableObject.value = variableObject.multiSelect
-                      ? []
-                      : null;
+                    variableObject.value = variableObject.multiSelect ? [] : null;
                   }
                 }
               }
 
               const hasValueChanged =
-                Array.isArray(originalValue) &&
-                Array.isArray(variableObject.value)
-                  ? JSON.stringify(originalValue) !==
-                    JSON.stringify(variableObject.value)
+                Array.isArray(originalValue) && Array.isArray(variableObject.value)
+                  ? JSON.stringify(originalValue) !== JSON.stringify(variableObject.value)
                   : originalValue !== variableObject.value;
-
-              // Check if variable now has a valid value (not null/undefined/empty)
-              const hasValidValue =
-                variableObject.value !== null &&
-                variableObject.value !== undefined &&
-                (!Array.isArray(variableObject.value) ||
-                  variableObject.value.length > 0);
 
               // Mark as partially loaded
               variableObject.isVariablePartialLoaded = true;
@@ -680,10 +600,7 @@ export default defineComponent({
       emitVariablesData();
     };
 
-    const initializeStreamingConnection = (
-      payload: any,
-      variableObject: any,
-    ): any => {
+    const initializeStreamingConnection = (payload: any, variableObject: any): any => {
       // Use HTTP2/streaming for all dashboard variable values
 
       fetchQueryDataWithHttpStream(payload, {
@@ -706,8 +623,7 @@ export default defineComponent({
       return value.replace(
         /(?:\$\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\})|(?:\$([a-zA-Z0-9_-]+))|(?:\{\{\s*([a-zA-Z0-9_-]+)\s*(?::\s*[a-zA-Z]+\s*)?\}\})/g,
         (fullMatch, dollarBraceVarName, dollarVarName, mustacheVarName) => {
-          const varName =
-            dollarBraceVarName || dollarVarName || mustacheVarName;
+          const varName = dollarBraceVarName || dollarVarName || mustacheVarName;
           if (varName in varLookup) {
             let varValue = varLookup[varName];
 
@@ -726,10 +642,7 @@ export default defineComponent({
       );
     };
 
-    const fetchFieldValuesWithWebsocket = (
-      variableObject: any,
-      queryContext: string,
-    ) => {
+    const fetchFieldValuesWithWebsocket = (variableObject: any, queryContext: string) => {
       if (!variableObject?.query_data?.field) {
         return;
       }
@@ -755,12 +668,8 @@ export default defineComponent({
       variableFirstResponseProcessed.value[variableObject.name] = false;
 
       // Resolve variable references in stream and field
-      const resolvedStream = resolveVariableValue(
-        variableObject.query_data.stream,
-      );
-      const resolvedField = resolveVariableValue(
-        variableObject.query_data.field,
-      );
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
 
       const payload = {
         fields: [resolvedField],
@@ -857,8 +766,7 @@ export default defineComponent({
           item.type === "query_values" &&
           item.selectAllValueForMultiSelect === "custom" &&
           item.customMultiSelectValue?.length > 0 &&
-          ((Array.isArray(initialValue) && initialValue.length === 0) ||
-            !initialValue) // Only set custom value if no URL value exists
+          ((Array.isArray(initialValue) && initialValue.length === 0) || !initialValue) // Only set custom value if no URL value exists
         ) {
           variableData.value = item.multiSelect
             ? item.customMultiSelectValue
@@ -866,12 +774,9 @@ export default defineComponent({
         } else if (
           item.type === "query_values" &&
           item.selectAllValueForMultiSelect === "all" &&
-          ((Array.isArray(initialValue) && initialValue.length === 0) ||
-            !initialValue)
+          ((Array.isArray(initialValue) && initialValue.length === 0) || !initialValue)
         ) {
-          variableData.value = item.multiSelect
-            ? [SELECT_ALL_VALUE]
-            : SELECT_ALL_VALUE;
+          variableData.value = item.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE;
         } else if (item.type === "custom") {
           // For custom type variables, honor the per-option default (the "Default"
           // checkbox in variable settings, stored as `option.selected`) if no initial value
@@ -962,9 +867,7 @@ export default defineComponent({
       }
 
       // need to build variables dependency graph on variables config list change
-      variablesDependencyGraph = buildVariablesDependencyGraph(
-        variablesData.values,
-      );
+      variablesDependencyGraph = buildVariablesDependencyGraph(variablesData.values);
     };
 
     const rejectAllPromises = () => {
@@ -993,9 +896,7 @@ export default defineComponent({
 
       // REBUILD dependency graph from updated variables
       // This is needed for the logic below (isChildVariable) and other component functions
-      variablesDependencyGraph = buildVariablesDependencyGraph(
-        variablesData.values,
-      );
+      variablesDependencyGraph = buildVariablesDependencyGraph(variablesData.values);
 
       // Synchronize oldVariablesData with current manager state
       // This is critical for child variables that get reset by the manager
@@ -1007,16 +908,14 @@ export default defineComponent({
 
         // Check if variable has custom or "all" default selection configured
         const hasCustomOrAllDefault =
-          v.selectAllValueForMultiSelect === "custom" ||
-          v.selectAllValueForMultiSelect === "all";
+          v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
         // CRITICAL FIX: If manager has reset a variable's value to null/empty array,
         // we MUST clear oldVariablesData immediately, otherwise the old value will be
         // restored when API response arrives
         // HOWEVER: If variable has custom/all default, set it to that value instead
         const managerHasResetValue =
-          (currentValue === null ||
-            (Array.isArray(currentValue) && currentValue.length === 0)) &&
+          (currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0)) &&
           oldValue !== undefined &&
           oldValue !== null &&
           (!Array.isArray(oldValue) || oldValue.length > 0);
@@ -1041,18 +940,11 @@ export default defineComponent({
 
               // Notify manager that this variable is loaded so it can trigger children
               if (useManager && manager) {
-                const variableKey = getVariableKey(
-                  v.name,
-                  v.scope || "global",
-                  v.tabId,
-                  v.panelId,
-                );
+                const variableKey = getVariableKey(v.name, v.scope || "global", v.tabId, v.panelId);
                 manager.onVariablePartiallyLoaded(variableKey);
               }
             } else if (v.selectAllValueForMultiSelect === "all") {
-              const allValue = v.multiSelect
-                ? [SELECT_ALL_VALUE]
-                : SELECT_ALL_VALUE;
+              const allValue = v.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE;
               oldVariablesData[v.name] = allValue;
               v.value = allValue;
               // Mark as partially loaded so child variables know this variable is ready
@@ -1062,12 +954,7 @@ export default defineComponent({
 
               // Notify manager that this variable is loaded so it can trigger children
               if (useManager && manager) {
-                const variableKey = getVariableKey(
-                  v.name,
-                  v.scope || "global",
-                  v.tabId,
-                  v.panelId,
-                );
+                const variableKey = getVariableKey(v.name, v.scope || "global", v.tabId, v.panelId);
                 manager.onVariablePartiallyLoaded(variableKey);
               }
             }
@@ -1080,8 +967,7 @@ export default defineComponent({
 
         // Check if variable is in reset state (null or empty array)
         const isCurrentlyReset =
-          currentValue === null ||
-          (Array.isArray(currentValue) && currentValue.length === 0);
+          currentValue === null || (Array.isArray(currentValue) && currentValue.length === 0);
 
         // Check if variable has a valid value (was set from URL or user selection)
         const hasValidValue =
@@ -1090,8 +976,7 @@ export default defineComponent({
           (!Array.isArray(currentValue) || currentValue.length > 0);
 
         // Check if this is a child variable
-        const isChildVariable =
-          variablesDependencyGraph[v.name]?.parentVariables?.length > 0;
+        const isChildVariable = variablesDependencyGraph[v.name]?.parentVariables?.length > 0;
 
         // If currently reset AND variable is marked as pending (about to load)
         // OR if options are empty (was reset), then clear oldVariablesData
@@ -1099,10 +984,7 @@ export default defineComponent({
         // UNLESS the variable has a valid value (from URL or user), in which case preserve it
         // IMPORTANT: For child variables, ALWAYS clear oldVariablesData when reset, even if custom/all is configured
         // This ensures child variables update based on parent changes, not initial custom/all values
-        if (
-          isCurrentlyReset &&
-          (v.isVariableLoadingPending || (v?.options?.length === 0))
-        ) {
+        if (isCurrentlyReset && (v.isVariableLoadingPending || v?.options?.length === 0)) {
           // For child variables, always clear oldVariablesData on reset regardless of custom/all config
           // For parent variables, only clear if not custom/all default
           if (isChildVariable || !hasCustomOrAllDefault) {
@@ -1121,17 +1003,12 @@ export default defineComponent({
           // If variable has custom or "all" default configured but oldVariablesData is undefined,
           // set it to the configured default value so it gets applied when API response arrives
           // BUT only for parent variables (non-child), not for child variables
-          if (
-            v.selectAllValueForMultiSelect === "custom" &&
-            v.customMultiSelectValue?.length > 0
-          ) {
+          if (v.selectAllValueForMultiSelect === "custom" && v.customMultiSelectValue?.length > 0) {
             oldVariablesData[v.name] = v.multiSelect
               ? v.customMultiSelectValue
               : v.customMultiSelectValue[0];
           } else if (v.selectAllValueForMultiSelect === "all") {
-            oldVariablesData[v.name] = v.multiSelect
-              ? [SELECT_ALL_VALUE]
-              : SELECT_ALL_VALUE;
+            oldVariablesData[v.name] = v.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE;
           }
         }
       });
@@ -1264,10 +1141,7 @@ export default defineComponent({
     };
 
     // it is used to change/update initial variables values from outside the component
-    // NOTE: right now, it is not used after variables in variables feature
-    const changeInitialVariableValues = async (
-      newInitialVariableValues: any,
-    ) => {
+    const changeInitialVariableValues = async (newInitialVariableValues: any) => {
       // reject all promises
       rejectAllPromises();
 
@@ -1275,7 +1149,7 @@ export default defineComponent({
       resetVariablesData();
 
       // set initial variables values
-      props.initialVariableValues.value = newInitialVariableValues;
+      initialVariableValuesModel.value.value = newInitialVariableValues;
 
       // make list of variables using variables config list
       initializeVariablesData();
@@ -1290,22 +1164,15 @@ export default defineComponent({
      * @param {array} oldVariableSelectedValues - old selected values of the variable
      * @returns {void}
      */
-    const handleQueryValuesLogic = (
-      currentVariable: any,
-      oldVariableSelectedValues: any[],
-    ) => {
+    const handleQueryValuesLogic = (currentVariable: any, oldVariableSelectedValues: any[]) => {
       // Check if this is a child variable (declare at the beginning to avoid scoping issues)
       const isChildVariable =
-        variablesDependencyGraph[currentVariable.name]?.parentVariables
-          ?.length > 0;
+        variablesDependencyGraph[currentVariable.name]?.parentVariables?.length > 0;
 
       // For multiSelect, preserve existing values even if they're not in current options
       if (currentVariable.multiSelect) {
         // If we have existing values and they're not empty, keep them
-        if (
-          Array.isArray(currentVariable.value) &&
-          currentVariable.value.length > 0
-        ) {
+        if (Array.isArray(currentVariable.value) && currentVariable.value.length > 0) {
           // Don't add missing values to options, just keep the existing values
           return;
         }
@@ -1313,9 +1180,7 @@ export default defineComponent({
         // Check if old values should be preserved based on selectAllValueForMultiSelect setting
         // Filter out undefined values - when oldVariablesData is cleared, it becomes [undefined]
         const validOldValues = Array.isArray(oldVariableSelectedValues)
-          ? oldVariableSelectedValues.filter(
-              (v) => v !== undefined && v !== null,
-            )
+          ? oldVariableSelectedValues.filter((v) => v !== undefined && v !== null)
           : [];
         const hasOldValues = validOldValues.length > 0;
 
@@ -1347,8 +1212,7 @@ export default defineComponent({
           }
         }
 
-        const optionsValues =
-          currentVariable.options.map((option: any) => option.value) ?? [];
+        const optionsValues = currentVariable.options.map((option: any) => option.value) ?? [];
         // If we have no values, handle default selection
         switch (currentVariable?.selectAllValueForMultiSelect) {
           case "custom":
@@ -1363,16 +1227,12 @@ export default defineComponent({
             break;
           default:
             // Default to first option if nothing else is set
-            currentVariable.value =
-              optionsValues.length > 0 ? [optionsValues[0]] : [];
+            currentVariable.value = optionsValues.length > 0 ? [optionsValues[0]] : [];
         }
         return;
       } else {
         // For single select, we need to ensure the value is valid
-        if (
-          currentVariable.value !== null &&
-          currentVariable.value !== undefined
-        ) {
+        if (currentVariable.value !== null && currentVariable.value !== undefined) {
           return;
         }
       }
@@ -1418,16 +1278,10 @@ export default defineComponent({
         oldVariablesData[currentVariable.name] === undefined &&
         currentVariable?.selectAllValueForMultiSelect === "all"
       ) {
-        currentVariable.value = currentVariable.multiSelect
-          ? [SELECT_ALL_VALUE]
-          : SELECT_ALL_VALUE;
+        currentVariable.value = currentVariable.multiSelect ? [SELECT_ALL_VALUE] : SELECT_ALL_VALUE;
         currentVariable.isVariableLoadingPending = true;
         return;
       }
-
-      // Pre-calculate the options values array
-      const optionsValues =
-        currentVariable.options.map((option: any) => option.value) ?? [];
 
       // For single select, handle old value selection
       if (!currentVariable.multiSelect) {
@@ -1435,8 +1289,7 @@ export default defineComponent({
         if (
           currentVariable.selectAllValueForMultiSelect === "custom" &&
           currentVariable.customMultiSelectValue?.length > 0 &&
-          oldVariableSelectedValues[0] ===
-            currentVariable.customMultiSelectValue[0]
+          oldVariableSelectedValues[0] === currentVariable.customMultiSelectValue[0]
         ) {
           // Preserve the custom value even if it's not in the API options
           currentVariable.value = currentVariable.customMultiSelectValue[0];
@@ -1466,8 +1319,7 @@ export default defineComponent({
           if (currentVariable.selectAllValueForMultiSelect === "custom") {
             const customValue = currentVariable.options.find(
               (variableOption: any) =>
-                variableOption.value ===
-                currentVariable.customMultiSelectValue?.[0],
+                variableOption.value === currentVariable.customMultiSelectValue?.[0],
             );
 
             // customValue can be undefined or default value
@@ -1493,10 +1345,7 @@ export default defineComponent({
      * @param {array} oldVariableSelectedValues - old selected values of the variable
      * @returns {void}
      */
-    const handleCustomVariablesLogic = (
-      currentVariable: any,
-      oldVariableSelectedValues: any[],
-    ) => {
+    const handleCustomVariablesLogic = (currentVariable: any, oldVariableSelectedValues: any[]) => {
       // Pre-calculate the selected options values array
       const selectedOptionsValues =
         currentVariable.options
@@ -1522,9 +1371,7 @@ export default defineComponent({
                 currentVariable.value = currentVariable.customMultiSelectValue;
               } else {
                 currentVariable.value =
-                  currentVariable.options.length > 0
-                    ? [currentVariable.options[0].value]
-                    : [];
+                  currentVariable.options.length > 0 ? [currentVariable.options[0].value] : [];
               }
               break;
             case "all":
@@ -1534,18 +1381,13 @@ export default defineComponent({
             default:
               // Default to first option
               currentVariable.value =
-                currentVariable.options.length > 0
-                  ? [currentVariable.options[0].value]
-                  : [];
+                currentVariable.options.length > 0 ? [currentVariable.options[0].value] : [];
           }
         }
       } else {
         // here, multi select is false
         // Keep old value if it exists, regardless of whether it's in current options
-        if (
-          oldVariableSelectedValues[0] !== undefined &&
-          oldVariableSelectedValues[0] !== null
-        ) {
+        if (oldVariableSelectedValues[0] !== undefined && oldVariableSelectedValues[0] !== null) {
           currentVariable.value = oldVariableSelectedValues[0];
         } else if (currentVariable.options.length > 0) {
           // here, multi select is false and old value not exist
@@ -1607,104 +1449,93 @@ export default defineComponent({
       isInitialLoad: boolean = false,
       searchText?: string,
     ) => {
-      return new Promise(async (resolve, reject) => {
-        const { name } = variableObject;
+      return new Promise((resolve, reject) => {
+        // Async body hoisted into an IIFE so the executor stays synchronous
+        void (async () => {
+          const { name } = variableObject;
 
-        if (!name || !variableObject) {
-          // console.error("Invalid variable object", variableObject);
-          resolve(false);
-          return;
-        }
-
-        // For search operations, use comprehensive cancellation
-        if (searchText) {
-          cancelAllVariableOperations(name);
-        } else {
-          // If the variable is already being processed, cancel the previous request
-          if (currentlyExecutingPromises[name]) {
-            variableLog(name, "Canceling previous request");
-            currentlyExecutingPromises[name](false);
-          }
-        }
-
-        currentlyExecutingPromises[name] = reject;
-
-        // Check if this variable has any dependencies
-        const hasParentVariables =
-          variablesDependencyGraph[name]?.parentVariables;
-        const areDatesValid =
-          !isInvalidDate(props.selectedTimeDate?.start_time) &&
-          !isInvalidDate(props.selectedTimeDate?.end_time); // Check dates for all query_values type
-        if (variableObject.type === "query_values") {
-          if (!areDatesValid) {
-            variableObject.isLoading = false;
-            variableObject.isVariableLoadingPending = false;
-            variableLog(
-              variableObject.name,
-              `Invalid date range for variable ${name}, skipping load`,
-            );
+          if (!name || !variableObject) {
+            // console.error("Invalid variable object", variableObject);
             resolve(false);
             return;
           }
-        }
 
-        // For variables with dependencies, check if they are ready
-        // SKIP dependency check if using manager - manager already handled this
-        if (hasParentVariables && !useManager) {
-          variableLog(
-            variableObject.name,
-            `Checking parent variables readiness (legacy mode)`,
-          );
+          // For search operations, use comprehensive cancellation
+          if (searchText) {
+            cancelAllVariableOperations(name);
+          } else {
+            // If the variable is already being processed, cancel the previous request
+            if (currentlyExecutingPromises[name]) {
+              variableLog(name, "Canceling previous request");
+              currentlyExecutingPromises[name](false);
+            }
+          }
 
-          const parentVariables =
-            variablesDependencyGraph[name].parentVariables;
+          currentlyExecutingPromises[name] = reject;
 
-          // Check if any parent has no data (empty options)
-          const hasParentWithNoData = parentVariables.some(
-            (parentName: string) => {
-              const parentVariable = variablesData.values.find(
-                (v: any) => v.name === parentName,
+          // Check if this variable has any dependencies
+          const hasParentVariables = variablesDependencyGraph[name]?.parentVariables;
+          const areDatesValid =
+            !isInvalidDate(props.selectedTimeDate?.start_time) &&
+            !isInvalidDate(props.selectedTimeDate?.end_time); // Check dates for all query_values type
+          if (variableObject.type === "query_values") {
+            if (!areDatesValid) {
+              variableObject.isLoading = false;
+              variableObject.isVariableLoadingPending = false;
+              variableLog(
+                variableObject.name,
+                `Invalid date range for variable ${name}, skipping load`,
               );
+              resolve(false);
+              return;
+            }
+          }
+
+          // For variables with dependencies, check if they are ready
+          // SKIP dependency check if using manager - manager already handled this
+          if (hasParentVariables && !useManager) {
+            variableLog(variableObject.name, `Checking parent variables readiness (legacy mode)`);
+
+            const parentVariables = variablesDependencyGraph[name].parentVariables;
+
+            // Check if any parent has no data (empty options)
+            const hasParentWithNoData = parentVariables.some((parentName: string) => {
+              const parentVariable = variablesData.values.find((v: any) => v.name === parentName);
 
               return (
                 parentVariable &&
                 (parentVariable.value === null ||
                   parentVariable.value === undefined ||
-                  (Array.isArray(parentVariable.value) &&
-                    parentVariable.value.length === 0))
+                  (Array.isArray(parentVariable.value) && parentVariable.value.length === 0))
               );
-            },
-          );
+            });
 
-          // If any parent has no data, skip API and set child value to null
-          if (hasParentWithNoData) {
-            variableLog(
-              variableObject.name,
-              `Parent variable has no data, skipping API call and resetting child value`,
-            );
-
-            // Reset the child variable value
-            resetVariableState(variableObject);
-            const nullValue = variableObject.multiSelect ? [] : null;
-            variableObject.value = nullValue;
-            variableObject.options = [];
-            variableObject.isLoading = false;
-            variableObject.isVariablePartialLoaded = true;
-            variableObject.isVariableLoadingPending = false;
-
-            // Update old variables data to reflect the reset
-            oldVariablesData[variableObject.name] = variableObject.value;
-
-            emitVariablesData();
-            resolve(true);
-            return;
-          }
-
-          const areParentsReady = parentVariables.every(
-            (parentName: string) => {
-              const parentVariable = variablesData.values.find(
-                (v: any) => v.name === parentName,
+            // If any parent has no data, skip API and set child value to null
+            if (hasParentWithNoData) {
+              variableLog(
+                variableObject.name,
+                `Parent variable has no data, skipping API call and resetting child value`,
               );
+
+              // Reset the child variable value
+              resetVariableState(variableObject);
+              const nullValue = variableObject.multiSelect ? [] : null;
+              variableObject.value = nullValue;
+              variableObject.options = [];
+              variableObject.isLoading = false;
+              variableObject.isVariablePartialLoaded = true;
+              variableObject.isVariableLoadingPending = false;
+
+              // Update old variables data to reflect the reset
+              oldVariablesData[variableObject.name] = variableObject.value;
+
+              emitVariablesData();
+              resolve(true);
+              return;
+            }
+
+            const areParentsReady = parentVariables.every((parentName: string) => {
+              const parentVariable = variablesData.values.find((v: any) => v.name === parentName);
 
               variableLog(
                 variableObject.name,
@@ -1716,8 +1547,7 @@ export default defineComponent({
                 parentVariable.isVariablePartialLoaded &&
                 parentVariable.value !== null &&
                 parentVariable.value !== undefined &&
-                (!Array.isArray(parentVariable.value) ||
-                  parentVariable.value.length > 0);
+                (!Array.isArray(parentVariable.value) || parentVariable.value.length > 0);
 
               if (!isReady && parentVariable) {
                 // Reset this variable since parent is not ready
@@ -1727,64 +1557,56 @@ export default defineComponent({
                 variableObject.isLoading = false;
               }
               return isReady;
-            },
-          );
+            });
 
-          variableLog(
-            variableObject.name,
-            `Parent variables readiness: ${areParentsReady}`,
-          );
+            variableLog(variableObject.name, `Parent variables readiness: ${areParentsReady}`);
 
-          if (!areParentsReady) {
-            variableLog(
-              variableObject.name,
-              `Parent variables are not ready, skipping variable load`,
-            );
-            // Just update loading states but don't reset value if already set
-            variableObject.isLoading = false;
-            variableObject.isVariablePartialLoaded = false;
-            variableObject.isVariableLoadingPending = true;
+            if (!areParentsReady) {
+              variableLog(
+                variableObject.name,
+                `Parent variables are not ready, skipping variable load`,
+              );
+              // Just update loading states but don't reset value if already set
+              variableObject.isLoading = false;
+              variableObject.isVariablePartialLoaded = false;
+              variableObject.isVariableLoadingPending = true;
+              resolve(false);
+              return;
+            }
+          }
+
+          // Set loading state
+          variableObject.isLoading = true;
+          variableObject.isVariablePartialLoaded = false;
+
+          // Update oldVariablesData to reflect the current (possibly reset) value
+          // This ensures handleQueryValuesLogic uses the correct baseline
+          // IMPORTANT: Don't overwrite if it's undefined (signals first-time load)
+          // syncManagerVariablesToLocal sets it to undefined to indicate variables should auto-select first option
+          // ALSO: Don't overwrite to null/empty - keep it undefined so first option gets selected
+          if (oldVariablesData[name] !== undefined) {
+            // Only update if the value is not null/empty (i.e., was explicitly set by user)
+            const hasValue =
+              variableObject.value !== null &&
+              variableObject.value !== undefined &&
+              (!Array.isArray(variableObject.value) || variableObject.value.length > 0);
+            if (hasValue) {
+              oldVariablesData[name] = variableObject.value;
+            }
+          }
+
+          emitVariablesData();
+
+          try {
+            const success = await handleVariableType(variableObject, isInitialLoad, searchText);
+            // await finalizeVariableLoading(variableObject, success);
+            resolve(success);
+          } catch (error) {
+            // console.error(`Error loading variable ${name}:`, error);
+            await finalizeVariableLoading(variableObject, false);
             resolve(false);
-            return;
           }
-        }
-
-        // Set loading state
-        variableObject.isLoading = true;
-        variableObject.isVariablePartialLoaded = false;
-
-        // Update oldVariablesData to reflect the current (possibly reset) value
-        // This ensures handleQueryValuesLogic uses the correct baseline
-        // IMPORTANT: Don't overwrite if it's undefined (signals first-time load)
-        // syncManagerVariablesToLocal sets it to undefined to indicate variables should auto-select first option
-        // ALSO: Don't overwrite to null/empty - keep it undefined so first option gets selected
-        if (oldVariablesData[name] !== undefined) {
-          // Only update if the value is not null/empty (i.e., was explicitly set by user)
-          const hasValue =
-            variableObject.value !== null &&
-            variableObject.value !== undefined &&
-            (!Array.isArray(variableObject.value) ||
-              variableObject.value.length > 0);
-          if (hasValue) {
-            oldVariablesData[name] = variableObject.value;
-          }
-        }
-
-        emitVariablesData();
-
-        try {
-          const success = await handleVariableType(
-            variableObject,
-            isInitialLoad,
-            searchText,
-          );
-          // await finalizeVariableLoading(variableObject, success);
-          resolve(success);
-        } catch (error) {
-          // console.error(`Error loading variable ${name}:`, error);
-          await finalizeVariableLoading(variableObject, false);
-          resolve(false);
-        }
+        })();
       });
     };
 
@@ -1817,8 +1639,7 @@ export default defineComponent({
             const currentValueIsEmpty =
               variableObject.value === null ||
               variableObject.value === undefined ||
-              (Array.isArray(variableObject.value) &&
-                variableObject.value.length === 0);
+              (Array.isArray(variableObject.value) && variableObject.value.length === 0);
 
             if (currentValueIsEmpty) {
               variableLog(
@@ -1834,9 +1655,7 @@ export default defineComponent({
                 variableObject.value = variableObject.multiSelect
                   ? variableObject.customMultiSelectValue
                   : variableObject.customMultiSelectValue[0];
-              } else if (
-                variableObject.selectAllValueForMultiSelect === "all"
-              ) {
+              } else if (variableObject.selectAllValueForMultiSelect === "all") {
                 variableObject.value = variableObject.multiSelect
                   ? [SELECT_ALL_VALUE]
                   : SELECT_ALL_VALUE;
@@ -1874,9 +1693,7 @@ export default defineComponent({
                 variableObject.value = variableObject.multiSelect
                   ? variableObject.customMultiSelectValue
                   : variableObject.customMultiSelectValue[0];
-              } else if (
-                variableObject.selectAllValueForMultiSelect === "all"
-              ) {
+              } else if (variableObject.selectAllValueForMultiSelect === "all") {
                 // Set "all" value for both multiSelect and single-select
                 variableObject.value = variableObject.multiSelect
                   ? [SELECT_ALL_VALUE]
@@ -1887,11 +1704,7 @@ export default defineComponent({
               oldVariablesData[variableObject.name] = variableObject.value;
 
               // Mark as loaded without making API call
-              finalizePartialVariableLoading(
-                variableObject,
-                true,
-                isInitialLoad,
-              );
+              finalizePartialVariableLoading(variableObject, true, isInitialLoad);
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -1903,8 +1716,7 @@ export default defineComponent({
             const hasValue =
               variableObject.value !== null &&
               variableObject.value !== undefined &&
-              (!Array.isArray(variableObject.value) ||
-                variableObject.value.length > 0);
+              (!Array.isArray(variableObject.value) || variableObject.value.length > 0);
 
             const hasOptions =
               variableObject.options &&
@@ -1913,11 +1725,7 @@ export default defineComponent({
 
             if (hasValue && hasOptions) {
               // Has both value and options - no need to reload
-              finalizePartialVariableLoading(
-                variableObject,
-                true,
-                isInitialLoad,
-              );
+              finalizePartialVariableLoading(variableObject, true, isInitialLoad);
               finalizeVariableLoading(variableObject, true);
               emitVariablesData();
               return true;
@@ -1926,10 +1734,7 @@ export default defineComponent({
           }
 
           try {
-            const queryContext: any = await buildQueryContext(
-              variableObject,
-              searchText,
-            );
+            const queryContext: any = await buildQueryContext(variableObject, searchText);
 
             // Use HTTP2/streaming for all dashboard variable values
             // We don't need to wait for the response here as it will be handled by the streaming handlers
@@ -2009,25 +1814,17 @@ export default defineComponent({
      * @param variableObject The variable object containing the query data.
      * @returns The query context as a string.
      */
-    const buildQueryContext = async (
-      variableObject: any,
-      searchText?: string,
-    ) => {
+    const buildQueryContext = async (variableObject: any, searchText?: string) => {
       variableLog(
         variableObject.name,
         `Building query context for variable: ${variableObject.name}${searchText ? ` with search: ${searchText}` : ""}`,
       );
 
-      const timestamp_column =
-        store.state.zoConfig.timestamp_column || "_timestamp";
+      const timestamp_column = store.state.zoConfig.timestamp_column || "_timestamp";
 
       // Resolve variable references in stream and field names for SQL query
-      const resolvedStream = resolveVariableValue(
-        variableObject.query_data.stream,
-      );
-      const resolvedField = resolveVariableValue(
-        variableObject.query_data.field,
-      );
+      const resolvedStream = resolveVariableValue(variableObject.query_data.stream);
+      const resolvedField = resolveVariableValue(variableObject.query_data.field);
 
       let dummyQuery: string;
 
@@ -2038,13 +1835,11 @@ export default defineComponent({
       }
 
       // Construct the filter from the query data
-      const constructedFilter = (variableObject.query_data?.filter || []).map(
-        (condition: any) => ({
-          name: condition.name,
-          operator: condition.operator,
-          value: condition.value,
-        }),
-      );
+      const constructedFilter = (variableObject.query_data?.filter || []).map((condition: any) => ({
+        name: condition.name,
+        operator: condition.operator,
+        value: condition.value,
+      }));
 
       // Add labels to the dummy query
       let queryContext = constructedFilter.length
@@ -2059,8 +1854,7 @@ export default defineComponent({
         // Get all visible variables for this scope
         // This includes global, tab-scoped (if in a tab), and panel-scoped (if in a panel)
         variablesToResolve =
-          manager.getAllVisibleVariables(props.tabId, props.panelId) ||
-          variablesData.values;
+          manager.getAllVisibleVariables(props.tabId, props.panelId) || variablesData.values;
       }
 
       // Normalize spaces inside variable syntax before replacement
@@ -2073,10 +1867,7 @@ export default defineComponent({
 
         if (variable.isVariablePartialLoaded) {
           // Escape special regex characters in variable name
-          const escapedVarName = variable.name.replace(
-            /[.*+?^${}()|[\]\\]/g,
-            "\\$&",
-          );
+          const escapedVarName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
           // Replace array values
           if (Array.isArray(variable.value)) {
@@ -2085,18 +1876,12 @@ export default defineComponent({
               .join(", ");
 
             // Mustache patterns: {{variable}} and {{variable:format}}
-            const mustachePattern = new RegExp(
-              `\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`,
-              "g",
-            );
+            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, "g");
             queryContext = queryContext.replace(mustachePattern, arrayValues);
 
             // Dollar-sign patterns (existing)
             // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
-            const unquotedPattern = new RegExp(
-              `\\$${escapedVarName}(?!')`,
-              "g",
-            );
+            const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, "g");
             // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
             const quotedPattern = new RegExp(`'\\$${escapedVarName}'`, "g");
 
@@ -2109,10 +1894,7 @@ export default defineComponent({
             const replacedValue = escapeSingleQuotes(variable.value);
 
             // Mustache pattern
-            const mustachePattern = new RegExp(
-              `\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`,
-              "g",
-            );
+            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, "g");
             queryContext = queryContext.replace(mustachePattern, replacedValue);
 
             // Dollar-sign pattern (existing)
@@ -2131,10 +1913,7 @@ export default defineComponent({
      * @param {object} variableObject - The variable object containing query data.
      * @param {boolean} success - Whether the variable load was successful or not.
      */
-    const finalizeVariableLoading = async (
-      variableObject: any,
-      success: boolean,
-    ) => {
+    const finalizeVariableLoading = async (variableObject: any, success: boolean) => {
       const { name } = variableObject;
 
       // Clear the currently executing promise
@@ -2198,8 +1977,7 @@ export default defineComponent({
         variableObject.isVariablePartialLoaded = success;
 
         // Update old variables data and determine whether to load children
-        const childVariables =
-          variablesDependencyGraph[name]?.childVariables || [];
+        const childVariables = variablesDependencyGraph[name]?.childVariables || [];
 
         variableLog(
           variableObject.name,
@@ -2220,18 +1998,15 @@ export default defineComponent({
         );
 
         if (childVariables.length > 0 && (isInitialLoad || valueChanged)) {
-          const childVariableObjects = variablesData.values.filter(
-            (variable: any) => childVariables.includes(variable.name),
+          const childVariableObjects = variablesData.values.filter((variable: any) =>
+            childVariables.includes(variable.name),
           );
 
           for (const childVariable of childVariableObjects) {
             await loadSingleVariableDataByName(childVariable, false);
           }
         } else {
-          variableLog(
-            variableObject.name,
-            "Skipping child load: no change and not initial load",
-          );
+          variableLog(variableObject.name, "Skipping child load: no change and not initial load");
         }
 
         // Finally, update the old variable value snapshot
@@ -2254,10 +2029,11 @@ export default defineComponent({
 
       try {
         await loadSingleVariableDataByName(variableObject);
-      } catch (error) {
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
         variableLog(
           variableObject.name,
-          `Error loading variable options for ${variableObject.name}: ${error.message}`,
+          `Error loading variable options for ${variableObject.name}: ${message}`,
         );
       }
     };
@@ -2308,8 +2084,7 @@ export default defineComponent({
 
       // Find all independent variables (variables with no dependencies)
       const independentVariables = variablesData.values.filter(
-        (variable: any) =>
-          !variablesDependencyGraph[variable.name]?.parentVariables?.length,
+        (variable: any) => !variablesDependencyGraph[variable.name]?.parentVariables?.length,
       );
 
       // console.groupCollapsed("Loading independent variables:");
@@ -2325,9 +2100,7 @@ export default defineComponent({
         );
       } catch (error) {
         await Promise.all(
-          independentVariables.map((variable: any) =>
-            finalizeVariableLoading(variable, false),
-          ),
+          independentVariables.map((variable: any) => finalizeVariableLoading(variable, false)),
         );
       }
 
@@ -2359,6 +2132,7 @@ export default defineComponent({
       // If using manager, delegate to manager's updateVariableValue
       if (useManager && manager) {
         try {
+          oldVariablesData[currentVariable.name] = currentVariable.value;
           await manager.updateVariableValue(
             currentVariable.name,
             currentVariable.scope || "global",
@@ -2389,9 +2163,7 @@ export default defineComponent({
           return;
         }
 
-        const optionValues = currentVariable.options.map(
-          (opt: any) => opt.value,
-        );
+        const optionValues = currentVariable.options.map((opt: any) => opt.value);
 
         const customTypedValues = currentVariable.value.filter(
           (val: any) => !optionValues.includes(val) && val !== SELECT_ALL_VALUE,
@@ -2403,7 +2175,7 @@ export default defineComponent({
 
         const merged = [
           ...filtered,
-          ...customTypedValues.filter((v) => !filtered.includes(v)),
+          ...customTypedValues.filter((v: unknown) => !filtered.includes(v)),
         ];
 
         if (merged.length !== currentVariable.value.length) {
@@ -2420,15 +2192,11 @@ export default defineComponent({
       oldVariablesData[currentVariable.name] = currentVariable.value;
 
       // Get all affected variables recursively
-      const getAllAffectedVariables = (
-        varName: string,
-        visited = new Set<string>(),
-      ): string[] => {
+      const getAllAffectedVariables = (varName: string, visited = new Set<string>()): string[] => {
         if (visited.has(varName)) return []; // Prevent circular dependencies
         visited.add(varName);
 
-        const immediateChildren =
-          variablesDependencyGraph[varName]?.childVariables || [];
+        const immediateChildren = variablesDependencyGraph[varName]?.childVariables || [];
         const allChildren: string[] = [...immediateChildren];
 
         for (const childName of immediateChildren) {
@@ -2465,9 +2233,7 @@ export default defineComponent({
 
       // Load variables in dependency order, even if parent value is empty
       for (const varName of affectedVariables) {
-        const variable = variablesData.values.find(
-          (v: any) => v.name === varName,
-        );
+        const variable = variablesData.values.find((v: any) => v.name === varName);
         if (variable) {
           await loadSingleVariableDataByName(variable);
         }
@@ -2490,9 +2256,7 @@ export default defineComponent({
       cancelTraceId(variableName);
 
       // 3. Reset loading states for the variable only if not in search mode
-      const variableObject = variablesData.values.find(
-        (v: any) => v.name === variableName,
-      );
+      const variableObject = variablesData.values.find((v: any) => v.name === variableName);
 
       if (variableObject) {
         variableObject.isLoading = false;
@@ -2500,15 +2264,8 @@ export default defineComponent({
       }
     };
 
-    const onVariableSearch = async (
-      index: number,
-      { variableItem, filterText }: any,
-    ) => {
-      if (
-        typeof index !== "number" ||
-        !variableItem ||
-        variableItem.type !== "query_values"
-      )
+    const onVariableSearch = async (index: number, { variableItem, filterText }: any) => {
+      if (typeof index !== "number" || !variableItem || variableItem.type !== "query_values")
         return;
 
       const variableName = variableItem.name;
@@ -2531,6 +2288,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       props,
       variablesData,
       changeInitialVariableValues,

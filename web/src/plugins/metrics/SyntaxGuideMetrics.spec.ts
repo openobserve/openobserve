@@ -19,19 +19,15 @@ import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
+import enLocale from "@/locales/languages/en-US.json";
 
-// Create i18n instance
+// The REAL locale file, not a hand-written stub: the guide's copy now comes from
+// `t()`, so a stub with a couple of keys would leave every other string
+// resolving to its raw key and the assertions testing nothing.
 const i18n = createI18n({
   locale: "en",
-  messages: {
-    en: {
-      search: {
-        syntaxGuideLabel: "Syntax Guide"
-      }
-    }
-  }
+  messages: { en: enLocale },
 });
-
 
 describe("SyntaxGuideMetrics.vue", () => {
   let wrapper: any;
@@ -39,7 +35,7 @@ describe("SyntaxGuideMetrics.vue", () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Setup default store state
     store.state.theme = "dark";
   });
@@ -54,12 +50,9 @@ describe("SyntaxGuideMetrics.vue", () => {
   const createWrapper = (propsData = {}) => {
     return mount(SyntaxGuideMetrics, {
       global: {
-        plugins: [
-          i18n,
-          store
-        ]
+        plugins: [i18n, store],
       },
-      props: propsData
+      props: propsData,
     });
   };
 
@@ -108,12 +101,12 @@ describe("SyntaxGuideMetrics.vue", () => {
   describe("Props Validation", () => {
     it("should accept boolean true for sqlmode prop", () => {
       wrapper = createWrapper({ sqlmode: true });
-      expect(wrapper.props('sqlmode')).toBe(true);
+      expect(wrapper.props("sqlmode")).toBe(true);
     });
 
     it("should accept boolean false for sqlmode prop", () => {
       wrapper = createWrapper({ sqlmode: false });
-      expect(wrapper.props('sqlmode')).toBe(false);
+      expect(wrapper.props("sqlmode")).toBe(false);
     });
 
     it("should use default value false when sqlmode prop is not provided", () => {
@@ -124,7 +117,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle sqlmode prop reactivity", async () => {
       wrapper = createWrapper({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
     });
@@ -153,8 +146,8 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have both t and store available in setup return", () => {
       wrapper = createWrapper();
       const setupReturn = wrapper.vm;
-      expect(setupReturn).toHaveProperty('t');
-      expect(setupReturn).toHaveProperty('store');
+      expect(setupReturn).toHaveProperty("t");
+      expect(setupReturn).toHaveProperty("store");
     });
 
     it("should maintain setup function structure", () => {
@@ -174,10 +167,10 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should react to store theme changes", async () => {
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
-      
+
       store.state.theme = "light";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -291,7 +284,7 @@ describe("SyntaxGuideMetrics.vue", () => {
 
     it("should handle SQL mode prop correctly", () => {
       wrapper = createWrapper({ sqlmode: true });
-      expect(wrapper.props('sqlmode')).toBe(true);
+      expect(wrapper.props("sqlmode")).toBe(true);
       expect(wrapper.vm.sqlmode).toBe(true);
     });
 
@@ -325,10 +318,10 @@ describe("SyntaxGuideMetrics.vue", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
-      
+
       store.state.theme = "light";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -357,7 +350,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have proper button attributes", () => {
       wrapper = createWrapper();
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.attributes('type')).toBe('button');
+      expect(button.attributes("type")).toBe("button");
       // OButton does not set tabindex="0" explicitly; native browser behavior handles focus
     });
 
@@ -374,7 +367,7 @@ describe("SyntaxGuideMetrics.vue", () => {
 
     it("should contain data-cy attribute for testing", () => {
       wrapper = createWrapper();
-      expect(wrapper.html()).toContain("data-cy=\"syntax-guide-button\"");
+      expect(wrapper.html()).toContain('data-cy="syntax-guide-button"');
     });
   });
 
@@ -382,7 +375,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle props changes correctly", async () => {
       wrapper = createWrapper({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
     });
@@ -391,19 +384,19 @@ describe("SyntaxGuideMetrics.vue", () => {
       wrapper = createWrapper({ sqlmode: false });
       const initialStore = wrapper.vm.store;
       const initialT = wrapper.vm.t;
-      
+
       await wrapper.setProps({ sqlmode: true });
-      
+
       expect(wrapper.vm.store).toBe(initialStore);
       expect(wrapper.vm.t).toBe(initialT);
     });
 
     it("should handle multiple prop updates", async () => {
       wrapper = createWrapper({ sqlmode: false });
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
-      
+
       await wrapper.setProps({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
     });
@@ -429,10 +422,10 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle store state mutations without breaking", () => {
       wrapper = createWrapper();
       const originalTheme = store.state.theme;
-      
+
       store.state.theme = "custom-theme";
       expect(wrapper.vm.store.state.theme).toBe("custom-theme");
-      
+
       store.state.theme = originalTheme; // Reset
     });
 
@@ -512,7 +505,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
@@ -530,7 +523,6 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    document.querySelectorAll(".q-menu").forEach((m) => m.remove());
     vi.clearAllTimers();
   });
 
@@ -590,7 +582,7 @@ describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
   });
 });
 
@@ -600,7 +592,7 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
@@ -618,7 +610,6 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    document.querySelectorAll(".q-menu").forEach((m) => m.remove());
     vi.clearAllTimers();
   });
 
@@ -695,17 +686,17 @@ describe("SyntaxGuideMetrics — SQL mode guide content", () => {
     await button.trigger("click");
     await flushPromises();
     expect(document.querySelector(".answers ul")).toBeTruthy();
-    expect(document.querySelector(".answers .bg-highlight")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
   });
 });
 
-describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
+describe("SyntaxGuideMetrics — dropdown theme class binding", () => {
   let wrapper: any;
 
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       global: {
@@ -724,14 +715,14 @@ describe("SyntaxGuideMetrics — q-menu theme class binding", () => {
     vi.clearAllTimers();
   });
 
-  it("q-menu has theme-dark class when store theme is 'dark'", () => {
+  it("resolves the dark theme binding when store theme is 'dark'", () => {
     store.state.theme = "dark";
     wrapper = createWrapper();
-    // Quasar renders q-menu as a portal; verify via vm that the binding resolves correctly
+    // The dropdown content renders as a portal; verify via vm that the binding resolves correctly
     expect(wrapper.vm.store.state.theme).toBe("dark");
   });
 
-  it("q-menu has theme-light class when store theme is 'light'", () => {
+  it("resolves the light theme binding when store theme is 'light'", () => {
     store.state.theme = "light";
     wrapper = createWrapper();
     expect(wrapper.vm.store.state.theme).toBe("light");
@@ -754,7 +745,7 @@ describe("SyntaxGuideMetrics — mode switching content swap", () => {
   const createWrapper = (propsData = {}) => {
     const i18nLocal = createI18n({
       locale: "en",
-      messages: { en: { search: { syntaxGuideLabel: "Syntax Guide" } } },
+      messages: { en: enLocale },
     });
     return mount(SyntaxGuideMetrics, {
       attachTo: document.body,
@@ -772,7 +763,6 @@ describe("SyntaxGuideMetrics — mode switching content swap", () => {
 
   afterEach(() => {
     if (wrapper) wrapper.unmount();
-    document.querySelectorAll(".q-menu").forEach((m) => m.remove());
     vi.clearAllTimers();
   });
 

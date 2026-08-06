@@ -17,41 +17,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <ODialog data-test="tabs-delete-popup-dialog"
+  <ODialog
+    data-test="tabs-delete-popup-dialog"
     v-model:open="open"
     size="md"
-    :title="`Delete ${dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name}`"
+    :title="
+      t('dashboard.tabsDeletePopUp.deleteTitle', {
+        name: dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name,
+      })
+    "
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('confirmDialog.ok')"
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-
     <div data-test="dialog-box">
       <p class="para" data-test="dashboard-tab-delete-tab-para">
-        This action cannot be undone. Are you sure you want to delete this
-        tab?
+        {{ t("dashboard.tabsDeletePopUp.confirmMessage") }}
       </p>
 
       <!-- only show if there are panels in the tab -->
       <div
-        v-if="
-          dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.panels
-            ?.length
-        "
-        class="tw:mt-4"
+        v-if="dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.panels?.length"
+        class="mt-4"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
-        <div class="tw:flex tw:flex-col" data-test="dashboard-tab-delete-radio-group">
-          <ORadioGroup v-model="action" orientation="vertical" class="tw:gap-4">
-            <div style="display: flex; flex-direction: row">
+        <div class="flex flex-col" data-test="dashboard-tab-delete-radio-group">
+          <ORadioGroup v-model="action" orientation="vertical" class="gap-4">
+            <div class="flex flex-row">
               <ORadio
                 val="move"
                 :disabled="moveTabOptions.length === 0"
                 data-test="dashboard-tab-delete-tab-panels-move"
-                label="Move panels to another tab"
+                :label="t('dashboard.tabsDeletePopUp.movePanels')"
               />
-              <div v-if="action === 'move'" class="tw:ml-5 tw:min-w-50 tw:max-w-75 tw:mb-2.5">
+              <div v-if="action === 'move'" class="mb-2.5 ml-5 max-w-75 min-w-50">
                 <OSelect
                   v-model="selectedTabToMovePanels"
                   :options="moveTabOptions"
@@ -62,20 +62,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ORadio
               val="delete"
               data-test="dashboard-tab-delete-tab-panels-delete"
-              label="Delete all the panels of this tab"
+              :label="t('dashboard.tabsDeletePopUp.deleteAllPanels')"
             />
           </ORadioGroup>
         </div>
       </div>
     </div>
-
   </ODialog>
 </template>
 
 <script lang="ts">
 import { onMounted } from "vue";
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
 import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
@@ -91,7 +90,7 @@ export default defineComponent({
     modelValue: { type: Boolean, default: false },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const action = ref("move");
     const selectedTabToMovePanels = ref<string | undefined>(undefined);
     const moveTabOptions = ref([]);

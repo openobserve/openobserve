@@ -13,6 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{
+    sync::LazyLock,
+    time::{Duration, Instant},
+};
+
+use config::RwHashMap;
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Set, entity::prelude::*, sea_query::OnConflict,
@@ -29,6 +35,67 @@ use crate::{
 };
 
 pub const ORG_INGESTION_TOKEN_PREFIX: &str = "o2oi_";
+
+/// `org_id` → its default enabled ingest token, with the time it was loaded.
+///
+/// Backs [`find_default_enabled`]. Synthetics needs this on every dispatch, on
+/// every job resolve and in the reaper's dead-letter path, i.e. once per job —
+/// all for a value that changes only when an operator adds, rotates or disables
+/// a token.
+///
+/// Note this is a *different lookup direction* from the existing
+/// `ORG_INGESTION_TOKENS` cache in the `db` crate, which is keyed
+/// `{org}/{token} → name` and answers "is this token valid". That one cannot
+/// serve "what is this org's token", which is why this exists rather than
+/// reusing it.
+///
+/// `None` is cached too, so an org with no enabled token does not re-query on
+/// every job.
+static DEFAULT_TOKEN_CACHE: LazyLock<
+    RwHashMap<String, (Option<OrgIngestionTokenRecord>, Instant)>,
+> = LazyLock::new(Default::default);
+
+/// Backstop only. Cross-node invalidation arrives through the existing
+/// `/org_ingestion_tokens/` coordinator watch (see `db::org_ingestion_tokens::watch`),
+/// so this TTL just bounds a dropped event.
+const DEFAULT_TOKEN_CACHE_TTL: Duration = Duration::from_secs(60);
+
+/// Drops one org's cached default token.
+///
+/// Called by every write path in this module, and by the coordinator watcher so
+/// a rotate or disable performed on another node lands here too.
+pub fn invalidate_default_cache(org_id: &str) {
+    DEFAULT_TOKEN_CACHE.remove(org_id);
+}
+
+/// The org's default enabled ingest token, served from cache when fresh.
+///
+/// Equivalent to the `list_by_org(org).find(|t| t.enabled)` that callers used to
+/// write by hand — `is_default` first, then newest — but as one row instead of
+/// fetching every token for the org and discarding most of them.
+pub async fn find_default_enabled(
+    org_id: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
+    if let Some(entry) = DEFAULT_TOKEN_CACHE.get(org_id)
+        && entry.1.elapsed() < DEFAULT_TOKEN_CACHE_TTL
+    {
+        return Ok(entry.0.clone());
+    }
+
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(Column::Enabled.eq(true))
+        .order_by(Column::IsDefault, Order::Desc)
+        .order_by(Column::CreatedAt, Order::Desc)
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .map(OrgIngestionTokenRecord::from);
+
+    DEFAULT_TOKEN_CACHE.insert(org_id.to_string(), (record.clone(), Instant::now()));
+    Ok(record)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrgIngestionTokenRecord {
@@ -78,6 +145,21 @@ pub fn generate_token() -> String {
     format!("{}{}", ORG_INGESTION_TOKEN_PREFIX, random_part)
 }
 
+/// Find an org ingestion token by value only (global — no org_id filter).
+/// Used for paths that have no org_id in the URL (e.g. synthetics job API).
+pub async fn find_enabled_token_global(
+    token: &str,
+) -> Result<Option<OrgIngestionTokenRecord>, errors::Error> {
+    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let record = Entity::find()
+        .filter(Column::Token.eq(token))
+        .filter(Column::Enabled.eq(true))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    Ok(record.map(OrgIngestionTokenRecord::from))
+}
+
 /// Insert a new org ingestion token row.
 pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> {
     let _lock = get_lock().await;
@@ -97,7 +179,11 @@ pub async fn add(record: &OrgIngestionTokenRecord) -> Result<(), errors::Error> 
 
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
     match Entity::insert(model).exec(client).await {
-        Ok(_) => Ok(()),
+        Ok(_) => {
+            // A new token can be the org default, so the cached pick is stale.
+            invalidate_default_cache(&record.org_id);
+            Ok(())
+        }
         Err(e) => match e.sql_err() {
             Some(SqlErr::UniqueConstraintViolation(_)) => {
                 Err(Error::DbError(DbError::SeaORMError(format!(
@@ -148,6 +234,7 @@ pub async fn upsert(record: &OrgIngestionTokenRecord) -> Result<(), errors::Erro
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    invalidate_default_cache(&record.org_id);
     Ok(())
 }
 
@@ -222,6 +309,7 @@ pub async fn rotate_token(org_id: &str, name: &str) -> Result<String, errors::Er
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    invalidate_default_cache(org_id);
     Ok(new_token)
 }
 
@@ -236,6 +324,7 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    invalidate_default_cache(org_id);
     Ok(())
 }
 
@@ -254,6 +343,7 @@ pub async fn remove_by_token(org_id: &str, token: &str) -> Result<(), errors::Er
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    invalidate_default_cache(org_id);
     Ok(())
 }
 
@@ -284,6 +374,7 @@ pub async fn set_enabled(org_id: &str, name: &str, enabled: bool) -> Result<(), 
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    invalidate_default_cache(org_id);
     Ok(())
 }
 

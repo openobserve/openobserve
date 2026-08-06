@@ -6,17 +6,17 @@
     :class="[
       'o-splitter',
       horizontal ? 'o-splitter--horizontal' : 'o-splitter--vertical',
-      'tw:flex tw:relative',
-      horizontal ? 'tw:flex-col' : 'tw:flex-row'
+      'relative flex',
+      horizontal ? 'flex-col' : 'flex-row',
     ]"
   >
     <!-- Before slot -->
     <div
       :class="[
         'o-splitter__before',
-        'tw:overflow-hidden tw:shrink-0 tw:relative',
-        horizontal ? 'tw:w-full' : 'tw:h-full',
-        beforeClass
+        'relative shrink-0 overflow-hidden',
+        horizontal ? 'w-full' : 'h-full',
+        beforeClass,
       ]"
       :style="beforeStyle"
     >
@@ -28,15 +28,13 @@
       v-if="separator !== false"
       :class="[
         horizontal ? 'o-splitter__separator--horizontal' : 'o-splitter__separator--vertical',
-        'tw:select-none',
-        'tw:transition-colors',
-        'hover:tw:bg-[var(--o2-border-input)]',
-        'tw:relative',
-        'tw:z-10',
-        'tw:focus:outline-2 tw:focus:outline-(--o2-primary-color) tw:focus:-outline-offset-2',
-        disable ? 'tw:cursor-default! tw:opacity-50' : '',
-        horizontal ? 'tw:h-px tw:w-full tw:cursor-row-resize' : 'tw:h-full tw:cursor-col-resize',
-        separatorClass
+        'select-none',
+        'relative',
+        'z-10',
+        'focus:outline-accent focus:outline-2 focus:-outline-offset-2',
+        disable ? 'pointer-events-none cursor-default! opacity-50' : '',
+        horizontal ? 'h-px w-full cursor-row-resize' : 'h-full cursor-col-resize',
+        separatorClass,
       ]"
       :style="[separatorStyle]"
       :tabindex="disable ? -1 : 0"
@@ -44,7 +42,11 @@
       @keydown="!disable && handleKeyDown($event)"
       role="separator"
       :aria-orientation="horizontal ? 'horizontal' : 'vertical'"
-      :aria-label="`${horizontal ? 'Horizontal' : 'Vertical'} splitter`"
+      :aria-label="
+        t('common.splitterLabel', {
+          orientation: horizontal ? t('common.horizontal') : t('common.vertical'),
+        })
+      "
       :aria-valuenow="modelValue"
       :aria-valuemin="limits?.[0] || 0"
       :aria-valuemax="limits?.[1] || 100"
@@ -56,8 +58,8 @@
     <div
       :class="[
         'o-splitter__after',
-        'tw:overflow-hidden tw:flex-1 tw:relative tw:z-0 tw:shrink-0',
-        horizontal ? 'tw:w-full' : 'tw:h-full'
+        'relative z-0 flex-1 shrink-0 overflow-hidden',
+        horizontal ? 'w-full' : 'h-full',
       ]"
     >
       <slot name="after" />
@@ -66,32 +68,32 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick } from 'vue'
-import useResizer from '@/composables/useResizer'
-import type { OSplitterProps, OSplitterEmits } from './OSplitter.types'
+import { computed, ref, nextTick } from "vue";
+import useResizer from "@/composables/useResizer";
+import type { OSplitterProps, OSplitterEmits } from "./OSplitter.types";
 
 const props = withDefaults(defineProps<OSplitterProps>(), {
   horizontal: false,
   limits: () => [0, 0],
-  unit: '%',
+  unit: "%",
   disable: false,
   separator: true,
-  separatorClass: '',
+  separatorClass: "",
   separatorStyle: () => ({}),
-  beforeClass: '',
-})
+  beforeClass: "",
+});
 
-const emit = defineEmits<OSplitterEmits>()
+const emit = defineEmits<OSplitterEmits>();
 
-const containerRef = ref<HTMLElement | null>(null)
+const containerRef = ref<HTMLElement | null>(null);
 
 // Determine min/max values from limits prop
-const minValue = computed(() => props.limits?.[0] ||  (props.unit ==='%' ? 0 : 0))
-const maxValue = computed(() => props.limits?.[1] || (props.unit ==='%' ? 100 : 1000))
+const minValue = computed(() => props.limits?.[0] || (props.unit === "%" ? 0 : 0));
+const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 : 1000));
 
 // Setup resizer composable with faster throttling for smoother movement
-const { value: currentValue, isResizing, onMouseDown } = useResizer({
-  direction: !props.horizontal ? 'horizontal' : 'vertical',
+const { value: currentValue, onMouseDown } = useResizer({
+  direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
   minValue: minValue.value,
   maxValue: maxValue.value,
@@ -100,72 +102,84 @@ const { value: currentValue, isResizing, onMouseDown } = useResizer({
   throttleMs: 16, // 60fps for smooth movement
   invert: false, // For horizontal splitters, invert the direction
   onResize: (newValue: number) => {
-    emit('update:modelValue', newValue)
-  }
-})
+    emit("update:modelValue", newValue);
+  },
+});
 
 // Computed styles for before/after sections
 const beforeStyle = computed(() => {
-  const size = `${currentValue.value}${props.unit}`
-  return props.horizontal
-    ? { height: size }
-    : { width: size }
-})
-
-const afterStyle = computed(() => {
-  const remainingSize = props.unit === '%'
-    ? `${100 - currentValue.value}%`
-    : `calc(100% - ${currentValue.value}px)`
-
-  return props.horizontal
-    ? { height: remainingSize }
-    : { width: remainingSize }
-})
-
-// Separator absolute positioning
-const separatorPosition = computed(() => {
-  const position = `${currentValue.value}${props.unit}`
-  return props.horizontal
-    ? { top: position, left: '0' }
-    : { left: position, top: '0' }
-})
+  const size = `${currentValue.value}${props.unit}`;
+  return props.horizontal ? { height: size } : { width: size };
+});
 
 // Keyboard navigation support
 const handleKeyDown = (event: KeyboardEvent) => {
-  if (props.disable) return
+  if (props.disable) return;
 
-  const step = props.unit === '%' ? 5 : 20 // 5% or 20px steps
-  let newValue = currentValue.value
+  const step = props.unit === "%" ? 5 : 20; // 5% or 20px steps
+  let newValue = currentValue.value;
 
   switch (event.key) {
-    case 'ArrowUp':
-    case 'ArrowLeft':
-      newValue = Math.max(minValue.value, currentValue.value - step)
-      break
-    case 'ArrowDown':
-    case 'ArrowRight':
-      newValue = Math.min(maxValue.value, currentValue.value + step)
-      break
-    case 'Home':
-      newValue = minValue.value
-      break
-    case 'End':
-      newValue = maxValue.value
-      break
+    case "ArrowUp":
+    case "ArrowLeft":
+      newValue = Math.max(minValue.value, currentValue.value - step);
+      break;
+    case "ArrowDown":
+    case "ArrowRight":
+      newValue = Math.min(maxValue.value, currentValue.value + step);
+      break;
+    case "Home":
+      newValue = minValue.value;
+      break;
+    case "End":
+      newValue = maxValue.value;
+      break;
     default:
-      return
+      return;
   }
 
-  event.preventDefault()
-  emit('update:modelValue', newValue)
+  event.preventDefault();
+  emit("update:modelValue", newValue);
   nextTick(() => {
-    currentValue.value = newValue
-  })
-}
+    currentValue.value = newValue;
+  });
+};
 
 // Watch for external prop changes
-import { watch } from 'vue'
-watch(() => props.modelValue, (newValue) => {
-  currentValue.value = newValue
-}, { immediate: true })
+import { watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+watch(
+  () => props.modelValue,
+  (newValue) => {
+    currentValue.value = newValue;
+  },
+  { immediate: true },
+);
+
+const { t } = useI18nTyped();
 </script>
+
+<style scoped>
+/* keep(complex-state): `.field-list-separator` is a public modifier on
+   this component's separator element — it can ONLY arrive through the
+   `separatorClass` prop (plugins/logs/Index.vue and
+   dashboards/PanelEditor/PanelEditor.vue x2 pass it), so no consumer's scope can
+   reach the element and the hover affordance has to be declared here. The ::after
+   pseudo-element has no markup of its own to carry utilities. Migrated from
+   styles/utilities.css (W2.b). */
+.field-list-separator::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0.125rem;
+  background-color: transparent;
+  transition: background-color 0.3s;
+}
+
+.field-list-separator:hover::after {
+  background-color: var(--color-accent);
+}
+</style>

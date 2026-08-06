@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, vi, type MockedFunction } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ref } from "vue";
 import { usePanelPromQLExecutor } from "./usePanelPromQLExecutor";
+import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 
 // ─── module mocks ─────────────────────────────────────────────────────────────
 
@@ -283,7 +284,9 @@ describe("usePanelPromQLExecutor", () => {
     it("handles errors gracefully: resets loading state", async () => {
       const { ctx } = makeCtx();
       // Force an error by making replaceQueryValue throw
-      ctx.replaceQueryValue = vi.fn(() => { throw new Error("substitution error"); });
+      ctx.replaceQueryValue = vi.fn(() => {
+        throw new Error("substitution error");
+      });
       ctx.state.loading = true;
 
       const { executePromQL } = usePanelPromQLExecutor(ctx);
@@ -325,17 +328,15 @@ describe("usePanelPromQLExecutor", () => {
       const { executePromQL } = usePanelPromQLExecutor(ctx);
       await executePromQL(0, 300_000_000, null);
 
-      capturedHandlers.error(
-        {},
-        { content: { message: "query failed", code: 400 } },
-      );
+      capturedHandlers.error({}, { content: { message: "query failed", code: 400 } });
 
       expect(state.errorDetail.message).toBe("query failed");
       expect(removeTraceId).toHaveBeenCalledWith("mock-trace-id");
     });
 
     it("complete handler resets loading and calls saveCurrentStateToCache", async () => {
-      const { ctx, fetchQueryDataWithHttpStream, state, saveCurrentStateToCache, removeTraceId } = makeCtx();
+      const { ctx, fetchQueryDataWithHttpStream, state, saveCurrentStateToCache, removeTraceId } =
+        makeCtx();
       let capturedHandlers: any;
 
       fetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
@@ -370,5 +371,121 @@ describe("usePanelPromQLExecutor", () => {
       expect(state.loadingProgressPercentage).toBe(42);
       expect(state.isPartialData).toBe(true);
     });
+  });
+});
+
+describe("the heatmap column cap", () => {
+  /**
+   * The start/end `usePanelDataLoader` passes here are MICROSECONDS, not ms. They
+   * come from `meta.dateTime`, whose Dates are built straight off
+   * `getConsumableDateTime()` — which is in µs — with no conversion
+   * (`plugins/metrics/Index.vue:419-428`, `views/Dashboards/ViewDashboard.vue`).
+   * `usePanelVariableSubstitution` reads the same pair and divides by 1e6.
+   *
+   * A previous revision of the cap divided by 1000, so every range looked 1000x
+   * LONGER: a 15m heatmap asked for a 7500s step over a 900s window, Prometheus
+   * returned a single sample per series, and the chart collapsed to one full-width
+   * column per bucket. This spec asserted the same wrong unit, so it stayed green
+   * while the product was broken — hence the explicit magnitude checks below.
+   */
+  const US = {
+    "15m": 900_000_000,
+    "1h": 3_600_000_000,
+    "6h": 21_600_000_000,
+    "24h": 86_400_000_000,
+    "7d": 604_800_000_000,
+  };
+
+  const stepFor = async (rangeUs: number) => {
+    const panelSchema = makePanelSchema();
+    panelSchema.value.type = "heatmap";
+    const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    // Exactly what the loader passes: getTime() on a Date built from µs.
+    await executePromQL(1_700_000_000_000_000, 1_700_000_000_000_000 + rangeUs, null);
+    const step = fetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.step;
+    return Number(String(step).replace(/s$/, ""));
+  };
+
+  for (const [label, rangeUs] of Object.entries(US)) {
+    it(`keeps a ${label} heatmap within ${HEATMAP_MAX_COLUMNS} columns`, async () => {
+      const stepSeconds = await stepFor(rangeUs);
+      const columns = rangeUs / 1_000_000 / stepSeconds;
+
+      expect(stepSeconds).toBeGreaterThan(0);
+      expect(columns).toBeLessThanOrEqual(HEATMAP_MAX_COLUMNS);
+    });
+  }
+
+  it("still returns enough columns to be a heatmap (the reported bug)", async () => {
+    // The 1000x-too-large step yielded ONE column. Every range must stay plural,
+    // and a 15m window must match what the metrics-explorer card already renders.
+    for (const [label, rangeUs] of Object.entries(US)) {
+      const columns = rangeUs / 1_000_000 / (await stepFor(rangeUs));
+      expect(columns, `${label} collapsed to ${columns} column(s)`).toBeGreaterThan(10);
+    }
+    expect(await stepFor(US["15m"])).toBeLessThanOrEqual(30);
+  });
+
+  it("does not collapse to the 15s floor at long ranges", async () => {
+    expect(await stepFor(US["24h"])).toBeGreaterThan(15);
+    expect(await stepFor(US["7d"])).toBeGreaterThan(await stepFor(US["6h"]));
+  });
+
+  it("leaves a non-heatmap panel on the server default", async () => {
+    const panelSchema = makePanelSchema(); // type: line
+    const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(1_700_000_000_000_000, 1_700_000_000_000_000 + US["24h"], null);
+    expect(fetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.step).toBe("0");
+  });
+
+  it("an explicit step_value still wins", async () => {
+    const panelSchema = makePanelSchema();
+    panelSchema.value.type = "heatmap";
+    panelSchema.value.queries[0].config = { step_value: "300" };
+    const { ctx, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(1_700_000_000_000_000, 1_700_000_000_000_000 + US["24h"], null);
+    expect(fetchQueryDataWithHttpStream.mock.calls[0][0].queryReq.step).toBe("300");
+  });
+});
+
+describe("streaming PromQL errors reach the user as sentences", () => {
+  /**
+   * The backend returns its internal envelope rather than a sentence. The axios
+   * path unwraps it (`usePanelDataLoader.processApiError`) — but a dashboard PromQL
+   * panel goes through the STREAMING path, which has its own error handler and was
+   * reading `content.message` raw. So the fix landed on a path users rarely take
+   * while the envelope stayed on the one they always take.
+   */
+  const ENVELOPE =
+    'Error during planning: ErrorCode# {"code":20010,"message":"Search query timed out","inner":"[PromQL] grpc search load data task timeout"}';
+
+  const errorFrom = async (payload: any) => {
+    const panelSchema = makePanelSchema();
+    const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx({ panelSchema });
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_req: any, handlers: any) =>
+      handlers.error({}, payload),
+    );
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(1_700_000_000_000, 1_700_000_000_100, null);
+    return state.errorDetail;
+  };
+
+  it("unwraps the ErrorCode envelope into the sentence inside it", async () => {
+    const detail = await errorFrom({ content: { message: ENVELOPE } });
+
+    expect(detail.message).toBe("Search query timed out");
+    expect(detail.message).not.toContain("ErrorCode#");
+    expect(detail.code).toBe(20010);
+  });
+
+  it("passes a plain message through untouched", async () => {
+    const detail = await errorFrom({
+      content: { message: "stream not found", code: 404 },
+    });
+    expect(detail.message).toBe("stream not found");
+    expect(detail.code).toBe(404);
   });
 });

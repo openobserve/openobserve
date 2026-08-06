@@ -16,63 +16,74 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph tw:min-h-[400px] tw:flex tw:flex-col tw:m-3 tw:p-5 tw:rounded-xl tw:overflow-hidden tw:transition-all tw:duration-200 tw:bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] tw:border tw:border-[#e5e7eb] tw:shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] tw:hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)]"
-    style="height: calc(100vh - 202px); position: relative;"
+    class="incident-service-graph rounded-default border-border-default relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04),inset_0_0_0_1px_rgba(255,255,255,0.5)] transition-all duration-200 hover:shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-1px_rgba(0,0,0,0.06),inset_0_0_0_1px_rgba(255,255,255,0.5)] dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)] dark:shadow-[0_1px_3px_0_color-mix(in_srgb,var(--color-black)_30%,transparent),0_1px_2px_0_color-mix(in_srgb,var(--color-black)_20%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)] dark:hover:shadow-[0_4px_6px_-1px_color-mix(in_srgb,var(--color-black)_40%,transparent),0_2px_4px_-1px_color-mix(in_srgb,var(--color-black)_30%,transparent),inset_0_0_0_1px_color-mix(in_srgb,var(--color-grey-700)_30%,transparent)]"
   >
-    <!-- Info Icon → Graph Legend popover (hover to show, like the previous behavior) -->
+    <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      class="info-icon-btn tw:absolute tw:top-4 tw:right-4 tw:z-10"
+      class="info-icon-btn group absolute top-4 right-4 z-10"
     >
       <OButton variant="ghost" size="icon-circle-sm">
         <OIcon name="info-outline" size="sm" />
       </OButton>
       <div
-        class="graph-legend tw:absolute tw:top-[calc(100%+8px)] tw:right-0 tw:min-w-[240px] tw:py-[14px] tw:px-4 tw:text-[13px] tw:leading-normal tw:text-[#1f2937] tw:bg-white tw:border tw:border-(--o2-border) tw:rounded-lg tw:shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] tw:opacity-0 tw:invisible tw:-translate-y-1 tw:transition-all tw:duration-150 tw:pointer-events-none tw:whitespace-nowrap"
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+8px)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-[0_10px_20px_rgba(0,0,0,0.12),0_3px_6px_rgba(0,0,0,0.06)] transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-[color-mix(in_srgb,var(--color-white)_12%,transparent)] dark:shadow-[0_10px_20px_color-mix(in_srgb,var(--color-black)_60%,transparent),0_3px_6px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
         role="tooltip"
       >
-        <div class="tw:font-semibold tw:text-sm tw:mb-2.5">Graph Legend</div>
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #ef4444;">●</span>
-          Red = Potential Root Cause
+        <div class="mb-2.5 text-sm font-semibold">{{ t("alerts.serviceGraphLegendTitle") }}</div>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-status-negative w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
+          {{ t("alerts.serviceGraphRootCause") }}
         </div>
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #f97316;">●</span>
-          Orange = High Frequency
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-status-warning-text w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
+          {{ t("alerts.serviceGraphHighFrequency") }}
         </div>
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #3b82f6;">●</span>
-          Blue = Normal
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-text-link w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
+          {{ t("alerts.serviceGraphNormal") }}
         </div>
-        <div class="graph-legend__divider tw:h-px tw:bg-(--o2-border) tw:my-2" />
-        <div class="graph-legend__row tw:flex tw:items-center tw:gap-2 tw:py-1">
-          <span class="graph-legend__dot tw:text-[14px] tw:leading-none tw:w-[14px] tw:text-center tw:shrink-0" style="color: #a78bfa;">→</span>
-          Purple arrows show temporal flow
+        <div
+          class="graph-legend__divider bg-border-default my-2 h-px dark:bg-[color-mix(in_srgb,var(--color-white)_15%,transparent)]"
+        />
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
+            >→</span
+          >
+          {{ t("alerts.serviceGraphTemporalFlow") }}
         </div>
       </div>
     </span>
 
     <!-- Loading State -->
-    <div
-      v-if="loading"
-      class="tw:flex tw:items-center tw:justify-center tw:h-full"
-      :class="isDarkMode ? 'tw:bg-gray-900/50' : 'tw:bg-white/50'"
-    >
+    <div v-if="loading" class="bg-surface-base/50 flex h-full items-center justify-center">
       <OSpinner size="md" />
     </div>
 
     <!-- Empty State -->
     <div
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-3 tw:h-full"
+      class="flex h-full flex-col items-center justify-center gap-3"
     >
-      <OIcon name="hub" :class="isDarkMode ? 'tw:text-gray-600' : 'tw:text-gray-300'" style="width: 48px; height: 48px;" />
-      <div class="tw:text-center">
-        <div class="tw:text-sm tw:font-medium" :class="isDarkMode ? 'tw:text-gray-400' : 'tw:text-gray-600'">
-          Service Graph Unavailable
+      <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
+           is required because OIcon's own `size-6` default sits in the same layer. -->
+      <OIcon name="hub" class="text-text-muted size-12!" />
+      <div class="text-center">
+        <div class="text-text-secondary text-sm font-medium">
+          {{ t("alerts.serviceGraphUnavailable") }}
         </div>
-        <div class="tw:text-xs tw:mt-1" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'">
-          No topology data available for this incident.
+        <div class="text-text-secondary mt-1 text-xs">
+          {{ t("alerts.serviceGraphNoTopologyData") }}
         </div>
       </div>
     </div>
@@ -80,13 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      style="width: 100%; height: 100%;"
+      class="h-full w-full"
     >
-      <ChartRenderer
-        ref="chartRendererRef"
-        :data="chartData"
-        :key="chartKey"
-      />
+      <ChartRenderer ref="chartRendererRef" :data="chartData" :key="chartKey" />
     </div>
   </div>
 </template>
@@ -94,10 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
 import { useStore } from "vuex";
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
+import { useI18nTyped } from "@/types/i18n";
+import { useTheme } from "@/composables/useTheme";
+import {
+  forceSimulation,
+  forceManyBody,
+  forceLink,
+  forceCenter,
+  forceCollide,
+  forceX,
+  forceY,
+} from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
-import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -106,11 +122,10 @@ export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
     ChartRenderer,
-    DropzoneBackground,
     OButton,
     OSpinner,
     OIcon,
-},
+  },
   props: {
     topologyContext: {
       type: Object as () => { nodes: AlertNode[]; edges: any[] } | null,
@@ -120,21 +135,22 @@ export default defineComponent({
   },
   setup(props) {
     const store = useStore();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const chartRendererRef = ref<any>(null);
     const chartKey = ref(0);
     const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
 
-    const isDarkMode = computed(() => store.state.theme === "dark");
+    const { isDark: isDarkMode } = useTheme();
 
     // Use topology_context directly from props
     const graphData = computed(() => props.topologyContext);
 
     // D3-Force simulation to compute stable node positions with left-to-right layout
     const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
-      const nodesCopy = nodes.map(n => ({ ...n }));
-      const edgesCopy = edges.map(e => ({
+      const nodesCopy = nodes.map((n) => ({ ...n }));
+      const edgesCopy = edges.map((e) => ({
         source: e.source,
         target: e.target,
         ...e,
@@ -142,18 +158,20 @@ export default defineComponent({
 
       // Calculate depth/level for each node (for left-to-right positioning)
       const nodeDepth = new Map<string, number>();
-      nodesCopy.forEach(n => nodeDepth.set(n.id, 0));
+      nodesCopy.forEach((n) => nodeDepth.set(n.id, 0));
 
       // Build adjacency list from temporal edges to determine hierarchy
-      const temporalEdges = edgesCopy.filter(e => e.originalEdge?.edge_type === 'temporal');
+      const temporalEdges = edgesCopy.filter((e) => e.originalEdge?.edge_type === "temporal");
       const visited = new Set<string>();
 
       // BFS to calculate depth
       const queue: Array<{ id: string; depth: number }> = [];
 
       // Find root nodes (nodes with no incoming temporal edges)
-      const hasIncoming = new Set(temporalEdges.map(e => typeof e.target === 'string' ? e.target : e.target.id));
-      nodesCopy.forEach(n => {
+      const hasIncoming = new Set(
+        temporalEdges.map((e) => (typeof e.target === "string" ? e.target : e.target.id)),
+      );
+      nodesCopy.forEach((n) => {
         if (!hasIncoming.has(n.id)) {
           queue.push({ id: n.id, depth: 0 });
         }
@@ -166,9 +184,9 @@ export default defineComponent({
         nodeDepth.set(id, depth);
 
         // Find outgoing temporal edges
-        temporalEdges.forEach(edge => {
-          const sourceId = typeof edge.source === 'string' ? edge.source : edge.source.id;
-          const targetId = typeof edge.target === 'string' ? edge.target : edge.target.id;
+        temporalEdges.forEach((edge) => {
+          const sourceId = typeof edge.source === "string" ? edge.source : edge.source.id;
+          const targetId = typeof edge.target === "string" ? edge.target : edge.target.id;
           if (sourceId === id) {
             queue.push({ id: targetId, depth: depth + 1 });
           }
@@ -176,34 +194,44 @@ export default defineComponent({
       }
 
       const simulation = forceSimulation(nodesCopy)
-        .force('charge', forceManyBody().strength(-400).distanceMax(1200))
-        .force('link', forceLink(edgesCopy)
-          .id((d: any) => d.id)
-          .distance(180)
-          .strength(0.5)
-          .iterations(2)
+        .force("charge", forceManyBody().strength(-400).distanceMax(1200))
+        .force(
+          "link",
+          forceLink(edgesCopy)
+            .id((d: any) => d.id)
+            .distance(180)
+            .strength(0.5)
+            .iterations(2),
         )
-        .force('x', forceX((d: any) => {
-          // Position nodes left-to-right based on their temporal-edge depth.
-          const depth = nodeDepth.get(d.id) || 0;
-          const maxDepth = Math.max(...Array.from(nodeDepth.values()));
-          const leftMargin = 80; // Left margin to prevent nodes from touching the edge
-          const rightMargin = 80; // Right margin
-          const availableWidth = width - leftMargin - rightMargin;
-          const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
-          return leftMargin + spacing * depth;
-        }).strength(1.5)) // Strong horizontal positioning
-        .force('y', forceY(() => {
-          return height / 2;
-        }).strength((d: any) => {
-          // Stronger centering for root nodes (depth 0).
-          const depth = nodeDepth.get(d.id) || 0;
-          return depth === 0 ? 0.8 : 0.1;
-        }))
-        .force('collision', forceCollide()
-          .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
-          .strength(1.0)
-          .iterations(3)
+        .force(
+          "x",
+          forceX((d: any) => {
+            // Position nodes left-to-right based on their temporal-edge depth.
+            const depth = nodeDepth.get(d.id) || 0;
+            const maxDepth = Math.max(...Array.from(nodeDepth.values()));
+            const leftMargin = 80; // Left margin to prevent nodes from touching the edge
+            const rightMargin = 80; // Right margin
+            const availableWidth = width - leftMargin - rightMargin;
+            const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
+            return leftMargin + spacing * depth;
+          }).strength(1.5),
+        ) // Strong horizontal positioning
+        .force(
+          "y",
+          forceY(() => {
+            return height / 2;
+          }).strength((d: any) => {
+            // Stronger centering for root nodes (depth 0).
+            const depth = nodeDepth.get(d.id) || 0;
+            return depth === 0 ? 0.8 : 0.1;
+          }),
+        )
+        .force(
+          "collision",
+          forceCollide()
+            .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
+            .strength(1.0)
+            .iterations(3),
         )
         .velocityDecay(0.4)
         .stop();
@@ -213,10 +241,10 @@ export default defineComponent({
         simulation.tick();
       }
 
-      return simulation.nodes().map(n => ({ ...n }));
+      return simulation.nodes().map((n) => ({ ...n }));
     };
 
-    // No longer need to load graph via API - data comes from props
+    // Data comes from props.
     const loadGraph = () => {
       // Increment chartKey to force re-render if topology_context changes
       chartKey.value++;
@@ -236,30 +264,26 @@ export default defineComponent({
     const getNodeSize = (node: AlertNode, nodes: AlertNode[], maxSize = 120): number => {
       // Scale node size based on alert_count relative to the max count in the dataset
       const minSize = 30;
-      const maxCount = Math.max(...nodes.map(n => n.alert_count || 0), 1);
+      const maxCount = Math.max(...nodes.map((n) => n.alert_count || 0), 1);
       if (maxCount === 0) return minSize;
       const ratio = (node.alert_count || 0) / maxCount;
       return Math.round(minSize + ratio * (maxSize - minSize));
     };
 
     // Above this raw-node count the graph is bucketed by time to stay legible;
-    // at or below it every firing is shown 1:1 (preserving the clean timeline).
-    // Kept low because the backend already caps nodes well below the alert count
-    // (e.g. 434 alerts -> 42 nodes), and the force layout blobs past ~15 nodes.
+    // at or below it every firing is shown 1:1. The force layout blobs past ~15 nodes.
     const NODE_CAP = 15;
     // Pick the smallest time unit that yields no more than this many windows.
-    // Kept low so dense incidents collapse into a coarse, readable timeline
-    // rather than dozens of overlapping nodes.
     const BUCKET_TARGET_MAX = 24;
     // Bucket-unit ladder in microseconds (backend timestamps are microseconds).
     const US = 1000; // microseconds per millisecond
     const BUCKET_UNITS_US = [
-      60 * US * 1000,            // 1 minute
-      5 * 60 * US * 1000,        // 5 minutes
-      15 * 60 * US * 1000,       // 15 minutes
-      60 * 60 * US * 1000,       // 1 hour
-      6 * 60 * 60 * US * 1000,   // 6 hours
-      24 * 60 * 60 * US * 1000,  // 1 day
+      60 * US * 1000, // 1 minute
+      5 * 60 * US * 1000, // 5 minutes
+      15 * 60 * US * 1000, // 15 minutes
+      60 * 60 * US * 1000, // 1 hour
+      6 * 60 * 60 * US * 1000, // 6 hours
+      24 * 60 * 60 * US * 1000, // 1 day
       7 * 24 * 60 * 60 * US * 1000, // 7 days
     ];
 
@@ -297,16 +321,19 @@ export default defineComponent({
         BUCKET_UNITS_US.find((u) => Math.ceil(span / u) <= BUCKET_TARGET_MAX) ??
         Math.ceil(span / BUCKET_TARGET_MAX);
 
-      const buckets = new Map<string, {
-        alert_id: string;
-        alert_name: string;
-        service_name: string;
-        alert_count: number;
-        first_fired_at: number;
-        last_fired_at: number;
-        windowStart: number;
-        serviceCounts: Map<string, number>;
-      }>();
+      const buckets = new Map<
+        string,
+        {
+          alert_id: string;
+          alert_name: string;
+          service_name: string;
+          alert_count: number;
+          first_fired_at: number;
+          last_fired_at: number;
+          windowStart: number;
+          serviceCounts: Map<string, number>;
+        }
+      >();
 
       // Track which bucket key each raw node index falls into, for edge rebuild.
       const rawIdxToKey = new Map<number, string>();
@@ -438,11 +465,11 @@ export default defineComponent({
       // Compute force-directed layout positions using D3 with left-to-right layout
       // Only compute if we don't have cached positions for these nodes
       let positionedNodes;
-      const hasAllPositions = preparedNodes.every(n => nodePositions.value.has(n.id));
+      const hasAllPositions = preparedNodes.every((n) => nodePositions.value.has(n.id));
 
       if (hasAllPositions) {
         // Use cached positions
-        positionedNodes = preparedNodes.map(n => ({
+        positionedNodes = preparedNodes.map((n) => ({
           ...n,
           x: nodePositions.value.get(n.id)!.x,
           y: nodePositions.value.get(n.id)!.y,
@@ -485,7 +512,9 @@ export default defineComponent({
             fontWeight: 500,
             color: isDarkMode.value ? "#e5e7eb" : "#374151",
             formatter: `{b}`,
-            backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.85)" : "rgba(255, 255, 255, 0.9)",
+            backgroundColor: isDarkMode.value
+              ? "rgba(31, 41, 55, 0.85)"
+              : "rgba(255, 255, 255, 0.9)",
             borderRadius: 4,
             padding: [3, 7],
             borderColor: isDarkMode.value ? "#4b5563" : "#e5e7eb",
@@ -500,7 +529,9 @@ export default defineComponent({
               fontWeight: 600,
               color: isDarkMode.value ? "#e5e7eb" : "#374151",
               formatter: `{b}`,
-              backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.95)" : "rgba(255, 255, 255, 1)",
+              backgroundColor: isDarkMode.value
+                ? "rgba(31, 41, 55, 0.95)"
+                : "rgba(255, 255, 255, 1)",
               borderRadius: 4,
               padding: [3, 7],
               borderColor: isDarkMode.value ? "#6b7280" : "#d1d5db",
@@ -510,10 +541,13 @@ export default defineComponent({
           tooltip: {
             formatter: () => {
               const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
-              const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
+              const lastTime =
+                originalNode.alert_count > 1
+                  ? new Date(originalNode.last_fired_at / 1000).toLocaleString()
+                  : null;
 
-              let html = `<div style="padding: 8px; font-size: 12px;">`;
-              html += `<strong style="font-size: 14px;">${originalNode.alert_name}</strong><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
+              html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
               html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
               html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
               html += `First Fired: ${firstTime}<br/>`;
@@ -521,7 +555,7 @@ export default defineComponent({
                 html += `Last Fired: ${lastTime}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">⚠ First Alert (Potential Root Cause)</span>`;
               }
               html += `</div>`;
               return html;
@@ -538,9 +572,14 @@ export default defineComponent({
           source: edge.from_node_index.toString(),
           target: edge.to_node_index.toString(),
           lineStyle: {
-            color: edge.edge_type === "temporal"
-              ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
-              : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
+            color:
+              edge.edge_type === "temporal"
+                ? isDarkMode.value
+                  ? "#a78bfa"
+                  : "#8b5cf6" // purple for temporal
+                : isDarkMode.value
+                  ? "#6b7280"
+                  : "#9ca3af", // gray for service dependency
             width: edge.edge_type === "temporal" ? 3 : 2,
             curveness: 0.2,
             type: "solid",
@@ -552,8 +591,8 @@ export default defineComponent({
           },
           tooltip: {
             formatter: () => {
-              let html = `<div style="padding: 8px; font-size: 12px; text-align: center;">`;
-              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: #a78bfa;">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs); text-align: center;">`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {
                 const sourceTime = new Date(sourceNode.first_fired_at / 1000);
@@ -572,12 +611,12 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: #a78bfa;">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
                 html += `From: ${sourceTime.toLocaleString()}<br/>`;
                 html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: #a78bfa;">Temporal correlation</span>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">Temporal correlation</span>`;
               } else {
-                html += `<span style="color: #9ca3af;">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">Service dependency</span>`;
               }
 
               html += `</div>`;
@@ -634,10 +673,11 @@ export default defineComponent({
         nodePositions.value.clear();
         loadGraph();
       },
-      { deep: true }
+      { deep: true },
     );
 
     return {
+      t,
       loading,
       graphData,
       chartRendererRef,
@@ -649,53 +689,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-/* Graph Legend popover — appears on hover of the info-icon-btn wrapper.
-   Background/text use explicit colors per theme because `--o2-popover-background`
-   and `--o2-text-primary` both resolve to `#F0F1F2` in dark mode, which gave
-   us a white card with invisible (same-color) text. */
-
-/* Dark-mode overrides — using both signals so it works regardless of which
-   class is currently toggled (theme.ts toggles both `body.body--dark` and
-   `html.dark`). Vue scoped CSS scopes only the rightmost selector. */
-html.dark .graph-legend,
-body.body--dark .graph-legend {
-  color: #e5e7eb;
-  background-color: #1f2937;
-  border-color: rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 10px 20px rgba(0, 0, 0, 0.6),
-    0 3px 6px rgba(0, 0, 0, 0.4);
-}
-
-html.dark .graph-legend__divider,
-body.body--dark .graph-legend__divider {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-
-.info-icon-btn:hover .graph-legend,
-.info-icon-btn:focus-within .graph-legend {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-/* Dark mode for incident-service-graph container */
-.body--dark .incident-service-graph {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  border: 1px solid #374151;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.3),
-    0 1px 2px 0 rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-
-.body--dark .incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.4),
-    0 2px 4px -1px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-</style>

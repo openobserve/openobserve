@@ -18,7 +18,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 const ODrawerStub = {
   name: "ODrawer",
   props: [
@@ -80,12 +79,15 @@ const mockDiffData = vi.hoisted(() => ({
   modifications: [
     {
       current: { id: "mod-1", display: "Existing Group", fields: ["host"], normalize: false },
-      proposed: { id: "mod-1", display: "Updated Group", fields: ["host", "region"], normalize: false },
+      proposed: {
+        id: "mod-1",
+        display: "Updated Group",
+        fields: ["host", "region"],
+        normalize: false,
+      },
     },
   ],
-  unchanged: [
-    { id: "unch-1", display: "Stable Group", fields: ["level"], normalize: false },
-  ],
+  unchanged: [{ id: "unch-1", display: "Stable Group", fields: ["level"], normalize: false }],
 }));
 
 vi.mock("@/services/alerts", () => ({

@@ -30,7 +30,7 @@ vi.stubGlobal(
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-  }))
+  })),
 );
 
 class ResizeObserver {
@@ -41,7 +41,7 @@ class ResizeObserver {
     this.callback = callback;
   }
 
-  observe(element: Element, _options?: ResizeObserverOptions) {
+  observe(element: Element) {
     this.elements.add(element);
     const rect = element.getBoundingClientRect();
     this.callback(
@@ -51,9 +51,7 @@ class ResizeObserver {
           contentRect: rect,
           borderBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
           contentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
-          devicePixelContentBoxSize: [
-            { inlineSize: rect.width, blockSize: rect.height },
-          ],
+          devicePixelContentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
         },
       ] as any,
       this,

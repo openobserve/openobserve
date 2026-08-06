@@ -1,26 +1,23 @@
 /**
  * Visual emphasis variants — map to dot background colours.
  *
- * | Variant       | Token                          | Maps from Quasar         |
- * |---------------|--------------------------------|--------------------------|
- * | primary       | --color-timeline-dot-primary   | color="primary" (default)|
- * | success       | --color-timeline-dot-success   | color="positive"         |
- * | destructive   | --color-timeline-dot-destructive| color="negative"        |
- * | info          | --color-timeline-dot-info      | color="blue"             |
- * | muted         | --color-timeline-dot-muted     | color="grey"             |
+ * | Variant       | Token                            |
+ * |---------------|----------------------------------|
+ * | primary       | --color-timeline-dot-primary     |
+ * | success       | --color-timeline-dot-success     |
+ * | destructive   | --color-timeline-dot-destructive |
+ * | info          | --color-timeline-dot-info        |
+ * | muted         | --color-timeline-dot-muted       |
  */
-export type TimelineItemVariant =
-  | "primary"
-  | "success"
-  | "destructive"
-  | "info"
-  | "muted";
+import type { I18nText } from "@/types/i18n";
+
+export type TimelineItemVariant = "primary" | "success" | "destructive" | "info" | "muted";
 
 export interface TimelineItemProps {
   /** Header text rendered in bold above the subtitle. */
-  title?: string;
+  title?: I18nText;
   /** Secondary line rendered below the title in muted text. */
-  subtitle?: string;
+  subtitle?: I18nText;
   /**
    * Material icon name rendered inside the dot.
    * Uses the `material-icons` font — pass the icon ligature string

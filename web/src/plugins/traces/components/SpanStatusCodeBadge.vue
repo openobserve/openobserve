@@ -20,13 +20,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
   - HTTP coloring: 2xx=success, 3xx=info, 4xx=warning, 5xx=error
   - gRPC coloring: 0=success (OK), non-zero=error (any error)
   - Renders "—" when neither value is present.
-  - Colors from --o2-status-* tokens defined in _variables.scss.
+  - Colors from the --color-status-* design tokens.
 -->
 <template>
   <span
     v-if="!displayValue"
     data-test="span-status-code-badge-empty"
-    class="tw:text-[var(--o2-status-neutral-text)]"
+    class="text-status-neutral-text"
   >
     —
   </span>
@@ -35,13 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
     data-test="span-status-code-badge"
     :type="badgeType"
     :value="badgeValue"
-    :label="displayValue"
+    :label="raw(displayValue)"
     :dot="false"
-    class="tw:font-mono tw:tabular-nums"
+    class="font-mono tabular-nums"
   />
 </template>
 
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 import { computed } from "vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { httpStatusBucket, grpcStatusKey } from "@/lib/core/Badge/badgeGroups";
@@ -80,9 +81,7 @@ const displayValue = computed(() => {
   return null;
 });
 
-const badgeType = computed(() =>
-  source.value === "grpc" ? "spanStatus" : "httpStatus",
-);
+const badgeType = computed(() => (source.value === "grpc" ? "spanStatus" : "httpStatus"));
 
 const badgeValue = computed(() => {
   if (source.value === "http") return httpStatusBucket(props.code);

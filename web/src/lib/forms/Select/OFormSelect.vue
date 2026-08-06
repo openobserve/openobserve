@@ -5,10 +5,15 @@ import { inject } from "vue";
 import OSelect from "./OSelect.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw, type I18nText } from "@/types/i18n";
 import type { FormSelectProps } from "./OFormSelect.types";
-import type { SelectModelValue } from "./OSelect.types";
 
 defineOptions({ inheritAttrs: false });
+
+const errorText = (errors: readonly unknown[] | undefined): I18nText | undefined => {
+  const message = firstFieldError(errors);
+  return message ? raw(message) : undefined;
+};
 
 // OSelect defaults `searchable` to true. Because OFormSelect re-declares it as a
 // boolean prop, an OMITTED `searchable` would be cast to `false` (Vue's
@@ -27,40 +32,24 @@ if (import.meta.env.DEV && !form) {
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
+      <!--
+        Forward the whole typed props object rather than a hand-written prop
+        list. FormSelectProps re-declares every OSelect prop (except
+        modelValue/error/errorMessage), so a declared-but-unforwarded prop like
+        `loading`, `optionTooltip`, `labelPosition`, etc. would be stripped from
+        `$attrs` AND missing from the manual list — silently dropped. Binding
+        `props` keeps the wrapper transparent as new OSelect props are added.
+        The field-driven bindings (model-value/error/error-message) come last so
+        they win, and are the exact three keys FormSelectProps omits.
+      -->
       <OSelect
-        v-bind="$attrs"
-        :label="props.label"
-        :placeholder="props.placeholder"
-        :options="props.options"
-        :multiple="props.multiple"
-        :searchable="props.searchable"
-        :search-debounce="props.searchDebounce"
-        :hide-selected="props.hideSelected"
-        :select-all="props.selectAll"
-        :creatable="props.creatable"
-        :label-key="props.labelKey"
-        :value-key="props.valueKey"
-        :clearable="props.clearable"
-        :disabled="props.disabled"
-        :required="props.required"
-        :size="props.size"
-        :width="props.width"
-        :name="props.name"
-        :id="props.id"
+        v-bind="{ ...$attrs, ...props }"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
-            : undefined
+          field.state.meta.errors.length > 0 ? errorText(field.state.meta.errors) : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"

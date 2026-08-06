@@ -40,7 +40,6 @@ vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   })),
 }));
 
-
 describe("MarkLineConfig", () => {
   let wrapper: any;
 
@@ -87,35 +86,27 @@ describe("MarkLineConfig", () => {
       wrapper = createWrapper();
 
       // Info tooltip button was removed from this component in config redesign (PR #10917).
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-info"]')
-          .exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-markline-info"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render add mark line button", () => {
       wrapper = createWrapper();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-add-btn"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]').exists(),
       ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-add-btn"]')
-          .text(),
-      ).toBe("+ Add");
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]').text()).toBe(
+        "+ Add",
+      );
     });
 
     it("should not render mark line items when list is empty", () => {
       mockDashboardPanelData.data.config.mark_line = [];
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-markline-type-0"]').exists(),
-      ).toBe(false);
+      expect(wrapper.find('[data-test="dashboard-config-markline-type-0"]').exists()).toBe(false);
     });
   });
 
@@ -156,9 +147,7 @@ describe("MarkLineConfig", () => {
 
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(0);
 
-      const addBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-markline-add-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]');
       await addBtn.trigger("click");
 
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(1);
@@ -167,9 +156,7 @@ describe("MarkLineConfig", () => {
     it("should add mark line with default values", async () => {
       wrapper = createWrapper();
 
-      const addBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-markline-add-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]');
       await addBtn.trigger("click");
 
       const addedMarkLine = mockDashboardPanelData.data.config.mark_line[0];
@@ -181,9 +168,7 @@ describe("MarkLineConfig", () => {
     it("should add multiple mark lines", async () => {
       wrapper = createWrapper();
 
-      const addBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-markline-add-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]');
 
       await addBtn.trigger("click");
       await addBtn.trigger("click");
@@ -216,12 +201,8 @@ describe("MarkLineConfig", () => {
 
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper.find('[data-test="dashboard-config-markline-type-0"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-config-markline-name-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-markline-type-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-markline-name-0"]').exists()).toBe(true);
     });
 
     it("should render remove button for each mark line", async () => {
@@ -233,9 +214,7 @@ describe("MarkLineConfig", () => {
       await wrapper.vm.$nextTick();
 
       expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-remove-0"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-markline-remove-0"]').exists(),
       ).toBe(true);
     });
 
@@ -248,21 +227,13 @@ describe("MarkLineConfig", () => {
 
       await wrapper.vm.$nextTick();
 
+      expect(wrapper.find('[data-test="dashboard-config-markline-type-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-config-markline-type-1"]').exists()).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-config-markline-type-0"]').exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-markline-remove-0"]').exists(),
       ).toBe(true);
       expect(
-        wrapper.find('[data-test="dashboard-config-markline-type-1"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-remove-0"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-remove-1"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-markline-remove-1"]').exists(),
       ).toBe(true);
     });
   });
@@ -278,9 +249,7 @@ describe("MarkLineConfig", () => {
 
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(1);
 
-      const removeBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-markline-remove-0"]',
-      );
+      const removeBtn = wrapper.find('[data-test="dashboard-addpanel-config-markline-remove-0"]');
       await removeBtn.trigger("click");
 
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(0);
@@ -297,18 +266,12 @@ describe("MarkLineConfig", () => {
       await wrapper.vm.$nextTick();
 
       // Remove middle item (index 1)
-      const removeBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-markline-remove-1"]',
-      );
+      const removeBtn = wrapper.find('[data-test="dashboard-addpanel-config-markline-remove-1"]');
       await removeBtn.trigger("click");
 
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(2);
-      expect(mockDashboardPanelData.data.config.mark_line[0].name).toBe(
-        "Line 1",
-      );
-      expect(mockDashboardPanelData.data.config.mark_line[1].name).toBe(
-        "Line 3",
-      );
+      expect(mockDashboardPanelData.data.config.mark_line[0].name).toBe("Line 1");
+      expect(mockDashboardPanelData.data.config.mark_line[1].name).toBe("Line 3");
     });
 
     it("should have removeMarkLineByIndex method", () => {
@@ -327,9 +290,7 @@ describe("MarkLineConfig", () => {
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(2);
       wrapper.vm.removeMarkLineByIndex(0);
       expect(mockDashboardPanelData.data.config.mark_line.length).toBe(1);
-      expect(mockDashboardPanelData.data.config.mark_line[0].name).toBe(
-        "Line 2",
-      );
+      expect(mockDashboardPanelData.data.config.mark_line[0].name).toBe("Line 2");
     });
   });
 
@@ -343,8 +304,7 @@ describe("MarkLineConfig", () => {
       await wrapper.vm.$nextTick();
 
       // Value input should be present for xAxis type
-      const valueInputs = wrapper
-        .findAll('[data-test*="dashboard-config-markline-value"]');
+      const valueInputs = wrapper.findAll('[data-test*="dashboard-config-markline-value"]');
       expect(valueInputs.length).toBeGreaterThanOrEqual(0);
     });
 
@@ -364,9 +324,7 @@ describe("MarkLineConfig", () => {
       const statisticalTypes = ["average", "median", "min", "max"];
 
       for (const type of statisticalTypes) {
-        mockDashboardPanelData.data.config.mark_line = [
-          { name: `${type} Line`, type, value: "" },
-        ];
+        mockDashboardPanelData.data.config.mark_line = [{ name: `${type} Line`, type, value: "" }];
 
         const localWrapper = createWrapper();
         await localWrapper.vm.$nextTick();
@@ -398,16 +356,12 @@ describe("MarkLineConfig", () => {
     });
 
     it("should not override existing mark_line array", () => {
-      const existingMarkLines = [
-        { name: "Existing", type: "yAxis", value: "50" },
-      ];
+      const existingMarkLines = [{ name: "Existing", type: "yAxis", value: "50" }];
       mockDashboardPanelData.data.config.mark_line = existingMarkLines;
 
       wrapper = createWrapper();
 
-      expect(mockDashboardPanelData.data.config.mark_line).toEqual(
-        existingMarkLines,
-      );
+      expect(mockDashboardPanelData.data.config.mark_line).toEqual(existingMarkLines);
     });
   });
 
@@ -442,9 +396,7 @@ describe("MarkLineConfig", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(
-        wrapper
-          .find('[data-test="dashboard-addpanel-config-markline-add-btn"]')
-          .exists(),
+        wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]').exists(),
       ).toBe(true);
     });
 
@@ -519,9 +471,7 @@ describe("MarkLineConfig", () => {
     it("should handle adding and removing multiple mark lines", async () => {
       wrapper = createWrapper();
 
-      const addBtn = wrapper.find(
-        '[data-test="dashboard-addpanel-config-markline-add-btn"]',
-      );
+      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-markline-add-btn"]');
 
       // Add 3 mark lines
       await addBtn.trigger("click");
@@ -551,12 +501,8 @@ describe("MarkLineConfig", () => {
       mockDashboardPanelData.data.config.mark_line[0].type = "average";
       mockDashboardPanelData.data.config.mark_line[0].value = "200";
 
-      expect(mockDashboardPanelData.data.config.mark_line[0].name).toBe(
-        "Modified",
-      );
-      expect(mockDashboardPanelData.data.config.mark_line[0].type).toBe(
-        "average",
-      );
+      expect(mockDashboardPanelData.data.config.mark_line[0].name).toBe("Modified");
+      expect(mockDashboardPanelData.data.config.mark_line[0].type).toBe("average");
       expect(mockDashboardPanelData.data.config.mark_line[0].value).toBe("200");
     });
   });

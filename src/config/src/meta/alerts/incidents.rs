@@ -248,6 +248,21 @@ impl DimensionRelationship {
     }
 }
 
+/// A superseded RCA report, retained so users can read earlier analyses.
+///
+/// Archived by [`IncidentTopology::record_rca_result`] when a newer report replaces it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ArchivedRcaReport {
+    /// The full markdown report as it was generated
+    pub content: String,
+    /// Microseconds since epoch, stamped when the report was archived
+    pub archived_at: i64,
+}
+
+/// Default number of superseded RCA reports to retain per incident.
+/// Overridden by `O2_INCIDENTS_RCA_HISTORY_LIMIT`.
+pub const DEFAULT_RCA_HISTORY_LIMIT: usize = 25;
+
 /// Alert flow graph showing how alerts cascaded across services over time
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct IncidentTopology {
@@ -257,8 +272,41 @@ pub struct IncidentTopology {
     pub edges: Vec<AlertEdge>,
     /// Related incident IDs (for cross-incident correlation)
     pub related_incident_ids: Vec<String>,
-    /// AI-generated root cause analysis (markdown)
+    /// AI-generated root cause analysis (markdown) — the current report
     pub suggested_root_cause: Option<String>,
+    /// Superseded reports, newest first. Bounded by the configured history limit so
+    /// this JSON column cannot grow without limit across a long-lived incident.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub previous_analyses: Vec<ArchivedRcaReport>,
+}
+
+impl IncidentTopology {
+    /// Install `content` as the current report, archiving whatever it replaces.
+    ///
+    /// The outgoing report is pushed to the front of `previous_analyses` (newest first)
+    /// and the list is truncated to `history_limit`. A `history_limit` of 0 disables
+    /// history entirely and clears any previously retained reports.
+    pub fn record_rca_result(&mut self, content: impl Into<String>, history_limit: usize) {
+        let content = content.into();
+
+        if history_limit == 0 {
+            self.previous_analyses.clear();
+        } else if let Some(prev) = self.suggested_root_cause.take() {
+            // Identical re-runs would otherwise fill the history with duplicates.
+            if !prev.is_empty() && prev != content {
+                self.previous_analyses.insert(
+                    0,
+                    ArchivedRcaReport {
+                        content: prev,
+                        archived_at: chrono::Utc::now().timestamp_micros(),
+                    },
+                );
+                self.previous_analyses.truncate(history_limit);
+            }
+        }
+
+        self.suggested_root_cause = Some(content);
+    }
 }
 
 /// Node in the alert flow graph
@@ -340,9 +388,17 @@ pub struct IncidentAlert {
     pub incident_id: String,
     pub alert_id: String,
     pub alert_name: String,
+    #[serde(default)]
+    pub alert_kind: AlertKind,
     pub alert_fired_at: i64,
     pub correlation_reason: CorrelationReason,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub labels: Option<std::collections::HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detected_source: Option<String>,
 }
 
 /// Incident with its alerts (for detail view)
@@ -449,6 +505,13 @@ pub enum IncidentCorrelationOutcome {
         incident_id: String,
         service_name: String,
     },
+    /// The alert re-fired at a HIGHER severity than the incident currently
+    /// carries (Warning→Critical, T-8). The incident's severity was upgraded
+    /// and a notification must be sent — an escalation is never a repeat.
+    SeverityEscalated {
+        incident_id: String,
+        service_name: String,
+    },
 }
 
 impl IncidentCorrelationOutcome {
@@ -456,7 +519,8 @@ impl IncidentCorrelationOutcome {
         match self {
             Self::NewIncidentCreated { incident_id, .. }
             | Self::NewAlertTypeJoined { incident_id, .. }
-            | Self::ExistingAlertRepeated { incident_id, .. } => incident_id,
+            | Self::ExistingAlertRepeated { incident_id, .. }
+            | Self::SeverityEscalated { incident_id, .. } => incident_id,
         }
     }
 
@@ -464,7 +528,8 @@ impl IncidentCorrelationOutcome {
         match self {
             Self::NewIncidentCreated { service_name, .. }
             | Self::NewAlertTypeJoined { service_name, .. }
-            | Self::ExistingAlertRepeated { service_name, .. } => service_name,
+            | Self::ExistingAlertRepeated { service_name, .. }
+            | Self::SeverityEscalated { service_name, .. } => service_name,
         }
     }
 }
@@ -483,6 +548,72 @@ fn default_upgrade_window() -> u64 {
 
 fn default_true() -> bool {
     true
+}
+
+/// Whether an incident's member alert is an OpenObserve alert or an
+/// externally-ingested one (External Alert Sources feature).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AlertKind {
+    #[default]
+    Internal,
+    External,
+}
+
+impl AlertKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            AlertKind::Internal => "internal",
+            AlertKind::External => "external",
+        }
+    }
+
+    pub fn from_stored(s: &str) -> Self {
+        match s {
+            "external" => AlertKind::External,
+            _ => AlertKind::Internal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum ExternalAlertStatus {
+    #[default]
+    Firing,
+    Resolved,
+}
+
+/// One normalized alert event from an external source (Grafana, Alertmanager,
+/// generic JSON). Produced by the normalizers, consumed by persistence +
+/// correlation. Self-contained: `raw` keeps the per-alert slice of the
+/// original payload.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ExternalAlertEvent {
+    pub status: ExternalAlertStatus,
+    pub dedup_key: String,
+    pub title: String,
+    pub severity: IncidentSeverity,
+    pub labels: HashMap<String, String>,
+    /// Source event time (startsAt/endsAt) in epoch micros — NOT receipt time.
+    pub event_ts: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_url: Option<String>,
+    #[serde(default)]
+    pub raw: serde_json::Value,
+}
+
+/// Built-in default severity mapping (spec §4.9: "no JSON for humans").
+/// critical→P1, error/major→P2, warning/minor→P3, info→P4, P1..P4 passthrough,
+/// anything else → P3.
+pub fn map_external_severity(s: &str) -> IncidentSeverity {
+    match s.to_ascii_lowercase().as_str() {
+        "critical" | "crit" | "fatal" | "p1" => IncidentSeverity::P1,
+        "error" | "major" | "high" | "p2" => IncidentSeverity::P2,
+        "warning" | "warn" | "minor" | "p3" => IncidentSeverity::P3,
+        "info" | "low" | "ok" | "p4" => IncidentSeverity::P4,
+        _ => IncidentSeverity::P3,
+    }
 }
 
 /// Statistics for incidents dashboard
@@ -515,6 +646,17 @@ pub enum AnalysisTriggerType {
     Manual,
     /// Triggered automatically when incident is reopened
     AutomaticReopened,
+}
+
+impl std::fmt::Display for AnalysisTriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AutomaticNewIncident => write!(f, "automatic_new_incident"),
+            Self::AutomaticReanalysis => write!(f, "automatic_reanalysis"),
+            Self::Manual => write!(f, "manual"),
+            Self::AutomaticReopened => write!(f, "automatic_reopened"),
+        }
+    }
 }
 
 /// A single event in an incident's lifecycle timeline
@@ -618,6 +760,69 @@ pub enum IncidentEventType {
         /// Optional error details for debugging
         error_details: Option<String>,
     },
+
+    /// AI/RCA analysis cancelled by a user.
+    /// Terminal, like Complete/Failed: clears the in-flight guard immediately so a
+    /// retry can start without waiting for the stale threshold.
+    #[serde(rename = "ai_analysis_cancelled")]
+    AIAnalysisCancelled {
+        /// User who cancelled the run. `None` when cancelled by the system.
+        user_id: Option<String>,
+    },
+
+    /// Forward-compatibility catch-all for event types this binary does not know.
+    ///
+    /// During a rolling deploy an old node reads rows written by a newer node. Without
+    /// this variant a single unrecognized `type` tag fails the whole `Vec<IncidentEvent>`
+    /// parse; combined with `unwrap_or_default()` on the read path that silently yields an
+    /// empty timeline, which the next `append` then writes back — destroying every prior
+    /// event. Capturing unknown events verbatim keeps them intact across the round-trip.
+    ///
+    /// CAUTION: this variant absorbs MORE than genuinely-unknown event types. Because
+    /// serde falls back to it whenever the tagged variants fail, a *known* tag carrying a
+    /// malformed payload (e.g. `{"type":"Comment","data":{"user_id":5}}` — `user_id` must
+    /// be a string) also lands here rather than raising a decode error. Preserving the row
+    /// is still the right trade, but it means an unknown-variant count is NOT a schema-drift
+    /// alarm on its own. Use [`IncidentEventType::is_known_tag`] to tell the two apart.
+    ///
+    /// Must stay LAST: `#[serde(untagged)]` variants are only tried after all tagged ones.
+    #[serde(untagged)]
+    Unknown(serde_json::Value),
+}
+
+impl IncidentEventType {
+    /// Every `type` tag this binary can decode, in serialized form.
+    ///
+    /// Kept next to the enum so a new variant that omits its tag here is easy to spot in
+    /// review; `test_known_tags_matches_variants` fails if the two drift apart.
+    pub const KNOWN_TAGS: &'static [&'static str] = &[
+        "Created",
+        "Alert",
+        "SeverityUpgrade",
+        "SeverityOverride",
+        "Acknowledged",
+        "Resolved",
+        "Reopened",
+        "DimensionsUpgraded",
+        "TitleChanged",
+        "AssignmentChanged",
+        "Comment",
+        "ai_analysis_begin",
+        "ai_analysis_complete",
+        "ai_analysis_failed",
+        "ai_analysis_cancelled",
+    ];
+
+    /// True when `raw` carries a `type` tag this binary recognizes.
+    ///
+    /// Distinguishes the two populations that both decode to [`Self::Unknown`]:
+    /// a tag from a newer node (benign, expected during a rolling deploy) versus a known
+    /// tag whose payload failed to parse (a real schema bug worth alerting on).
+    pub fn is_known_tag(raw: &serde_json::Value) -> bool {
+        raw.get("type")
+            .and_then(|t| t.as_str())
+            .is_some_and(|tag| Self::KNOWN_TAGS.contains(&tag))
+    }
 }
 
 impl IncidentEvent {
@@ -733,6 +938,10 @@ impl IncidentEvent {
         })
     }
 
+    pub fn ai_analysis_cancelled(user_id: Option<String>) -> Self {
+        Self::now(IncidentEventType::AIAnalysisCancelled { user_id })
+    }
+
     /// Increment alert count if this is an Alert event for the given alert_id.
     /// No-op if not an Alert or different alert_id.
     pub fn increment_alert(&mut self, alert_id: &str, triggered_at: i64) -> bool {
@@ -770,6 +979,166 @@ impl IncidentEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A node that predates an event type must still recover the whole timeline.
+    ///
+    /// Without the `Unknown` catch-all the array parse fails on the first unrecognized
+    /// tag, and callers that decode-then-write persist the truncated result — silently
+    /// destroying every prior event during a rolling deploy.
+    #[test]
+    fn test_unknown_event_type_preserves_timeline() {
+        let stored = serde_json::json!([
+            {"timestamp": 1, "type": "Created"},
+            {"timestamp": 2, "type": "some_future_event", "data": {"foo": "bar"}},
+            {"timestamp": 3, "type": "ai_analysis_complete"},
+        ]);
+
+        let events: Vec<IncidentEvent> = serde_json::from_value(stored.clone()).unwrap();
+        assert_eq!(events.len(), 3, "unknown tag must not discard other events");
+        assert!(matches!(
+            events[1].event_type,
+            IncidentEventType::Unknown(_)
+        ));
+
+        // The unknown event must survive a read/write cycle byte-for-byte, otherwise an
+        // old node rewriting the row would strip data a newer node depends on.
+        let rewritten = serde_json::to_value(&events).unwrap();
+        assert_eq!(rewritten, stored, "unknown events must round-trip verbatim");
+    }
+
+    /// A known tag with a malformed payload is absorbed by `Unknown` rather than erroring.
+    ///
+    /// This is the wide net documented on the variant: it preserves the row, but it means
+    /// an `Unknown` count alone cannot be read as "events from a newer node". `is_known_tag`
+    /// is what separates the two, and the read path logs them at different levels.
+    #[test]
+    fn test_malformed_known_event_is_absorbed_but_detectable() {
+        // `user_id` must be a string; a number makes the tagged variant fail to decode.
+        let raw = serde_json::json!({
+            "timestamp": 9,
+            "type": "Comment",
+            "data": {"user_id": 5, "comment": "hi"},
+        });
+
+        let event: IncidentEvent = serde_json::from_value(raw).unwrap();
+        let IncidentEventType::Unknown(inner) = &event.event_type else {
+            panic!("malformed known event should fall through to Unknown");
+        };
+
+        // The distinguishing signal: the tag is one we own, so this is schema drift, not
+        // a forward-compatible event from a newer binary.
+        assert!(
+            IncidentEventType::is_known_tag(inner),
+            "known tag must be detectable inside Unknown"
+        );
+
+        // A genuinely unknown type must NOT be flagged as drift.
+        let future = serde_json::json!({"timestamp": 1, "type": "some_future_event"});
+        let future_event: IncidentEvent = serde_json::from_value(future).unwrap();
+        let IncidentEventType::Unknown(future_inner) = &future_event.event_type else {
+            panic!("unknown type should decode to Unknown");
+        };
+        assert!(!IncidentEventType::is_known_tag(future_inner));
+    }
+
+    /// `KNOWN_TAGS` must list exactly the tags the enum actually serializes.
+    ///
+    /// Guards the hand-maintained list: a new variant whose tag is not added here would
+    /// make its malformed payloads look like benign forward-compat events.
+    #[test]
+    fn test_known_tags_matches_variants() {
+        // One representative value per variant; the payloads are irrelevant, only the tag.
+        let variants = vec![
+            IncidentEventType::Created,
+            IncidentEventType::Alert {
+                alert_id: "a".into(),
+                alert_name: "n".into(),
+                count: 1,
+                first_at: 1,
+                last_at: 1,
+            },
+            IncidentEventType::SeverityUpgrade {
+                from: IncidentSeverity::P3,
+                to: IncidentSeverity::P1,
+                reason: "r".into(),
+            },
+            IncidentEventType::SeverityOverride {
+                from: IncidentSeverity::P3,
+                to: IncidentSeverity::P1,
+                user_id: "u".into(),
+            },
+            IncidentEventType::Acknowledged {
+                user_id: "u".into(),
+            },
+            IncidentEventType::Resolved { user_id: None },
+            IncidentEventType::Reopened {
+                user_id: "u".into(),
+                reason: "r".into(),
+            },
+            IncidentEventType::DimensionsUpgraded {
+                from_key: "a".into(),
+                to_key: "b".into(),
+            },
+            IncidentEventType::TitleChanged {
+                from: "a".into(),
+                to: "b".into(),
+                user_id: "u".into(),
+            },
+            IncidentEventType::AssignmentChanged {
+                from: None,
+                to: None,
+            },
+            IncidentEventType::Comment {
+                user_id: "u".into(),
+                comment: "c".into(),
+            },
+            IncidentEventType::AIAnalysisBegin,
+            IncidentEventType::AIAnalysisComplete,
+            IncidentEventType::AIAnalysisFailed {
+                reason: "r".into(),
+                trigger_type: AnalysisTriggerType::Manual,
+                error_details: None,
+            },
+            IncidentEventType::AIAnalysisCancelled { user_id: None },
+        ];
+
+        let mut actual: Vec<String> = variants
+            .iter()
+            .map(|v| {
+                serde_json::to_value(v).unwrap()["type"]
+                    .as_str()
+                    .expect("every known variant serializes a string tag")
+                    .to_string()
+            })
+            .collect();
+        let mut expected: Vec<String> = IncidentEventType::KNOWN_TAGS
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        actual.sort();
+        expected.sort();
+        assert_eq!(
+            actual, expected,
+            "KNOWN_TAGS is out of sync with the enum variants"
+        );
+    }
+
+    /// Known variants must still win over the untagged catch-all.
+    #[test]
+    fn test_known_event_types_not_captured_as_unknown() {
+        let event = IncidentEvent {
+            timestamp: 5,
+            event_type: IncidentEventType::AIAnalysisCancelled {
+                user_id: Some("bob".into()),
+            },
+        };
+        let json = serde_json::to_value(&event).unwrap();
+        let roundtrip: IncidentEvent = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            roundtrip.event_type,
+            IncidentEventType::AIAnalysisCancelled { .. }
+        ));
+    }
 
     #[test]
     fn test_incident_event_serde_created() {
@@ -1049,6 +1418,7 @@ mod tests {
             edges: vec![edge],
             related_incident_ids: vec!["incident-1".to_string()],
             suggested_root_cause: Some("High memory usage".to_string()),
+            previous_analyses: vec![],
         };
 
         assert_eq!(topology.nodes.len(), 2);
@@ -1738,6 +2108,86 @@ mod tests {
     }
 
     #[test]
+    fn test_record_rca_result_archives_previous() {
+        let mut t = IncidentTopology::default();
+
+        t.record_rca_result("first", 25);
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("first"));
+        // Nothing was superseded on the very first run.
+        assert!(t.previous_analyses.is_empty());
+
+        t.record_rca_result("second", 25);
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("second"));
+        assert_eq!(t.previous_analyses.len(), 1);
+        assert_eq!(t.previous_analyses[0].content, "first");
+        assert!(t.previous_analyses[0].archived_at > 0);
+    }
+
+    #[test]
+    fn test_record_rca_result_orders_newest_first() {
+        let mut t = IncidentTopology::default();
+        for r in ["r1", "r2", "r3", "r4"] {
+            t.record_rca_result(r, 25);
+        }
+
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("r4"));
+        let archived: Vec<_> = t
+            .previous_analyses
+            .iter()
+            .map(|a| a.content.as_str())
+            .collect();
+        assert_eq!(archived, vec!["r3", "r2", "r1"]);
+    }
+
+    #[test]
+    fn test_record_rca_result_respects_history_limit() {
+        let mut t = IncidentTopology::default();
+        for i in 0..10 {
+            t.record_rca_result(format!("report-{i}"), 3);
+        }
+
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("report-9"));
+        // Only the three most recent superseded reports survive.
+        assert_eq!(t.previous_analyses.len(), 3);
+        assert_eq!(t.previous_analyses[0].content, "report-8");
+        assert_eq!(t.previous_analyses[2].content, "report-6");
+    }
+
+    #[test]
+    fn test_record_rca_result_zero_limit_disables_history() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_result("first", 25);
+        t.record_rca_result("second", 25);
+        assert_eq!(t.previous_analyses.len(), 1);
+
+        // Dropping the limit to 0 clears retained reports and stops archiving.
+        t.record_rca_result("third", 0);
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("third"));
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
+    fn test_record_rca_result_skips_identical_report() {
+        let mut t = IncidentTopology::default();
+        t.record_rca_result("same", 25);
+        t.record_rca_result("same", 25);
+
+        // An unchanged re-run should not fill history with duplicates.
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("same"));
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
+    fn test_topology_previous_analyses_backward_compatible() {
+        // Topology JSON written before history existed must still deserialize.
+        let json = r#"{"nodes":[],"edges":[],"related_incident_ids":[],
+            "suggested_root_cause":"legacy report"}"#;
+        let t: IncidentTopology = serde_json::from_str(json).unwrap();
+        assert_eq!(t.suggested_root_cause.as_deref(), Some("legacy report"));
+        assert!(t.previous_analyses.is_empty());
+    }
+
+    #[test]
     fn test_incident_event_factory_ai_analysis_begin() {
         let event = IncidentEvent::ai_analysis_begin();
         assert!(event.timestamp > 0);
@@ -1755,5 +2205,112 @@ mod tests {
             event.event_type,
             IncidentEventType::AIAnalysisComplete
         ));
+    }
+
+    #[test]
+    fn test_alert_kind_serde_and_stored() {
+        assert_eq!(
+            serde_json::to_string(&AlertKind::External).unwrap(),
+            "\"external\""
+        );
+        assert_eq!(AlertKind::from_stored("external"), AlertKind::External);
+        assert_eq!(AlertKind::from_stored("internal"), AlertKind::Internal);
+        assert_eq!(AlertKind::from_stored("garbage"), AlertKind::Internal); // safe default
+        assert_eq!(AlertKind::External.as_str(), "external");
+    }
+
+    #[test]
+    fn test_incident_alert_external_fields_serde() {
+        let alert = IncidentAlert {
+            incident_id: "inc1".to_string(),
+            alert_id: "ext1".to_string(),
+            alert_name: "External Alert".to_string(),
+            alert_kind: AlertKind::External,
+            alert_fired_at: 1000,
+            correlation_reason: CorrelationReason::AlertId,
+            created_at: 1000,
+            source_url: Some("https://example.com/alert/1".to_string()),
+            labels: Some(std::collections::HashMap::from([(
+                "service".to_string(),
+                "checkout".to_string(),
+            )])),
+            detected_source: Some("pagerduty".to_string()),
+        };
+
+        let json = serde_json::to_value(&alert).unwrap();
+        assert_eq!(json["alert_kind"], "external");
+        assert_eq!(json["source_url"], "https://example.com/alert/1");
+        assert_eq!(json["detected_source"], "pagerduty");
+
+        let round_tripped: IncidentAlert = serde_json::from_value(json).unwrap();
+        assert_eq!(round_tripped.alert_kind, AlertKind::External);
+        assert_eq!(
+            round_tripped.source_url,
+            Some("https://example.com/alert/1".to_string())
+        );
+    }
+
+    #[test]
+    fn test_incident_alert_legacy_json_defaults_to_internal() {
+        // Legacy stored/older payloads have no alert_kind or external fields at all.
+        let legacy_json = serde_json::json!({
+            "incident_id": "inc1",
+            "alert_id": "alert1",
+            "alert_name": "My Alert",
+            "alert_fired_at": 1000,
+            "correlation_reason": "alert_id",
+            "created_at": 1000,
+        });
+
+        let alert: IncidentAlert = serde_json::from_value(legacy_json).unwrap();
+        assert_eq!(alert.alert_kind, AlertKind::Internal);
+        assert_eq!(alert.source_url, None);
+        assert_eq!(alert.labels, None);
+        assert_eq!(alert.detected_source, None);
+    }
+
+    #[test]
+    fn test_external_alert_status_serde() {
+        assert_eq!(
+            serde_json::to_string(&ExternalAlertStatus::Firing).unwrap(),
+            "\"firing\""
+        );
+        let s: ExternalAlertStatus = serde_json::from_str("\"resolved\"").unwrap();
+        assert_eq!(s, ExternalAlertStatus::Resolved);
+    }
+
+    #[test]
+    fn test_map_external_severity() {
+        assert_eq!(map_external_severity("critical"), IncidentSeverity::P1);
+        assert_eq!(map_external_severity("CRITICAL"), IncidentSeverity::P1);
+        assert_eq!(map_external_severity("error"), IncidentSeverity::P2);
+        assert_eq!(map_external_severity("warning"), IncidentSeverity::P3);
+        assert_eq!(map_external_severity("info"), IncidentSeverity::P4);
+        assert_eq!(map_external_severity("p2"), IncidentSeverity::P2);
+        assert_eq!(
+            map_external_severity("unknown-things"),
+            IncidentSeverity::P3
+        ); // default
+    }
+
+    #[test]
+    fn test_external_alert_event_serde_roundtrip() {
+        let ev = ExternalAlertEvent {
+            status: ExternalAlertStatus::Firing,
+            dedup_key: "abc123".into(),
+            title: "High CPU".into(),
+            severity: IncidentSeverity::P1,
+            labels: std::collections::HashMap::from([(
+                "namespace".to_string(),
+                "prod".to_string(),
+            )]),
+            event_ts: 1_722_300_000_000_000,
+            source_url: Some("https://grafana.example/alerting/x".into()),
+            raw: serde_json::json!({"k": "v"}),
+        };
+        let json = serde_json::to_string(&ev).unwrap();
+        let back: ExternalAlertEvent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.dedup_key, "abc123");
+        assert_eq!(back.severity, IncidentSeverity::P1);
     }
 }

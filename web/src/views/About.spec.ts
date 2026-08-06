@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mount, flushPromises } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import About from "./About.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-
 
 // Mock getImageURL
 vi.mock("@/utils/zincutils", () => ({
@@ -326,7 +325,7 @@ describe("About", () => {
     });
 
     // The root element is a div; the second div inside has overflow-auto
-    const scrollContainer = wrapper.find(".tw\\:overflow-auto");
+    const scrollContainer = wrapper.find(".overflow-auto");
     expect(scrollContainer.exists()).toBe(true);
   });
 

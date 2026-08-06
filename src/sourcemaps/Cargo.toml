@@ -1,0 +1,33 @@
+[package]
+name = "openobserve-sourcemaps"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise", "dep:proto", "dep:tonic"]
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+config.workspace = true
+db.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+log.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+proto = { workspace = true, optional = true }
+serde.workspace = true
+sourcemap.workspace = true
+tokio.workspace = true
+tonic = { workspace = true, optional = true }
+zip.workspace = true
+
+[dev-dependencies]
+sea-orm.workspace = true

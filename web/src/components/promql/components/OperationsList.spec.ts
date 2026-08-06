@@ -18,8 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import OperationsList from "./OperationsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { PromOperationId } from "@/components/promql/types";
-
+import { PromqlStepId } from "@/components/promql/types";
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -63,8 +62,8 @@ describe("OperationsList", () => {
   let wrapper: any;
 
   const mockOperations = [
-    { id: PromOperationId.Rate, params: ["5m"] },
-    { id: PromOperationId.Sum, params: [["method", "status"]] },
+    { id: PromqlStepId.Rate, params: ["5m"] },
+    { id: PromqlStepId.Sum, params: [["method", "status"]] },
   ];
 
   const mockDashboardData = {
@@ -116,22 +115,18 @@ describe("OperationsList", () => {
   describe("Component Rendering", () => {
     it("should render operations list container", () => {
       wrapper = createWrapper();
-      // Outer tw:py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
-      expect(wrapper.find(".tw\\:pl-2").exists()).toBe(true);
+      // Outer py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
+      expect(wrapper.find(".pl-2").exists()).toBe(true);
     });
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="promql-operations-list-label"]').text(),
-      ).toBe("Operations");
+      expect(wrapper.find('[data-test="promql-operations-list-label"]').text()).toBe("Operations");
     });
 
     it("should render operation items", () => {
       wrapper = createWrapper();
-      const operations = wrapper.findAll(
-        '[data-test="promql-operations-item"]',
-      );
+      const operations = wrapper.findAll('[data-test="promql-operations-item"]');
       expect(operations.length).toBe(mockOperations.length);
     });
 
@@ -174,7 +169,7 @@ describe("OperationsList", () => {
     });
 
     it("should display operation name only when no params", () => {
-      const opsWithNoParams = [{ id: PromOperationId.Abs, params: [] }];
+      const opsWithNoParams = [{ id: PromqlStepId.Abs, params: [] }];
       wrapper = createWrapper({ operations: opsWithNoParams });
 
       const label = wrapper.vm.computedLabel(opsWithNoParams[0]);
@@ -197,16 +192,14 @@ describe("OperationsList", () => {
       const operations = [...mockOperations];
       wrapper = createWrapper({ operations });
 
-      const removeButton = wrapper.find(
-        '[data-test="promql-operation-remove-0"]',
-      );
+      const removeButton = wrapper.find('[data-test="promql-operation-remove-0"]');
       await removeButton.trigger("click");
 
       // Check that update:operations event was emitted with removed operation
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
       expect(emitted![0][0]).toHaveLength(1);
-      expect(emitted![0][0][0].id).toBe(PromOperationId.Sum);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Sum);
     });
 
     it("should add operation with default params", () => {
@@ -214,11 +207,11 @@ describe("OperationsList", () => {
       wrapper = createWrapper({ operations });
 
       const opDef = {
-        id: PromOperationId.Rate,
+        id: PromqlStepId.Rate,
         name: "Rate",
         params: [{ name: "Range", type: "string" as const }],
         defaultParams: ["5m"],
-        category: "Range Functions",
+        group: "Rate & range",
       };
 
       wrapper.vm.addOperation(opDef);
@@ -227,7 +220,7 @@ describe("OperationsList", () => {
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
       expect(emitted![0][0]).toHaveLength(1);
-      expect(emitted![0][0][0].id).toBe(PromOperationId.Rate);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Rate);
       expect(emitted![0][0][0].params).toEqual(["5m"]);
     });
   });
@@ -243,8 +236,8 @@ describe("OperationsList", () => {
       // Check that update:operations event was emitted with reordered operations
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
-      expect(emitted![0][0][0].id).toBe(PromOperationId.Sum);
-      expect(emitted![0][0][1].id).toBe(PromOperationId.Rate);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Sum);
+      expect(emitted![0][0][1].id).toBe(PromqlStepId.Rate);
     });
 
     it("should emit update event on drag", () => {
@@ -334,11 +327,11 @@ describe("OperationsList", () => {
       wrapper.vm.showOperationSelector = true;
 
       const opDef = {
-        id: PromOperationId.Rate,
+        id: PromqlStepId.Rate,
         name: "Rate",
         params: [],
         defaultParams: ["5m"],
-        category: "Range Functions",
+        group: "Rate & range",
       };
 
       wrapper.vm.addOperation(opDef);
@@ -353,11 +346,11 @@ describe("OperationsList", () => {
       wrapper.vm.searchQuery = "rate";
 
       const opDef = {
-        id: PromOperationId.Rate,
+        id: PromqlStepId.Rate,
         name: "Rate",
         params: [],
         defaultParams: ["5m"],
-        category: "Range Functions",
+        group: "Rate & range",
       };
 
       wrapper.vm.addOperation(opDef);
@@ -370,12 +363,8 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "rate";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
-      expect(filtered.some((op: any) => op.id === PromOperationId.Rate)).toBe(
-        true,
-      );
+      const filtered = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
+      expect(filtered.some((op: any) => op.id === PromqlStepId.Rate)).toBe(true);
     });
 
     it("should show all operations when search is empty", () => {
@@ -383,35 +372,33 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const filtered = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
       expect(filtered.length).toBeGreaterThan(0);
     });
   });
 
   describe("Operation Parameters", () => {
     it("should handle number parameter type", () => {
-      const ops = [{ id: PromOperationId.TopK, params: [10, []] }];
+      const ops = [{ id: PromqlStepId.TopK, params: [10, []] }];
       wrapper = createWrapper({ operations: ops });
 
-      const opDef = wrapper.vm.getOperationDef(PromOperationId.TopK);
+      const opDef = wrapper.vm.getStepSpec(PromqlStepId.TopK);
       expect(opDef?.params[0].type).toBe("number");
     });
 
     it("should handle string parameter type", () => {
-      const ops = [{ id: PromOperationId.Rate, params: ["5m"] }];
+      const ops = [{ id: PromqlStepId.Rate, params: ["5m"] }];
       wrapper = createWrapper({ operations: ops });
 
-      const opDef = wrapper.vm.getOperationDef(PromOperationId.Rate);
+      const opDef = wrapper.vm.getStepSpec(PromqlStepId.Rate);
       expect(opDef?.params[0].type).toBe("string");
     });
 
     it("should handle select parameter type with multi-select", () => {
-      const ops = [{ id: PromOperationId.Sum, params: [["method"]] }];
+      const ops = [{ id: PromqlStepId.Sum, params: [["method"]] }];
       wrapper = createWrapper({ operations: ops });
 
-      const opDef = wrapper.vm.getOperationDef(PromOperationId.Sum);
+      const opDef = wrapper.vm.getStepSpec(PromqlStepId.Sum);
       expect(opDef?.params[0].type).toBe("select");
     });
 
@@ -428,17 +415,15 @@ describe("OperationsList", () => {
       wrapper = createWrapper();
 
       const categories = wrapper.vm.categories;
-      expect(categories).toContain("Range Functions");
-      expect(categories).toContain("Aggregations");
-      expect(categories).toContain("Functions");
+      expect(categories).toContain("Rate & range");
+      expect(categories).toContain("Aggregation");
+      expect(categories).toContain("Math");
     });
 
     it("should get operations for specific category", () => {
       wrapper = createWrapper();
 
-      const rangeOps = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const rangeOps = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
       expect(rangeOps.length).toBeGreaterThan(0);
     });
   });
@@ -447,12 +432,7 @@ describe("OperationsList", () => {
     it("should access available labels from dashboard data", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.availableLabels).toEqual([
-        "method",
-        "status",
-        "path",
-        "host",
-      ]);
+      expect(wrapper.vm.availableLabels).toEqual(["method", "status", "path", "host"]);
     });
 
     it("should handle empty available labels", () => {
@@ -479,7 +459,7 @@ describe("OperationsList", () => {
 
   describe("Edge Cases", () => {
     it("should handle operation with empty params", () => {
-      const ops = [{ id: PromOperationId.Abs, params: [] }];
+      const ops = [{ id: PromqlStepId.Abs, params: [] }];
       wrapper = createWrapper({ operations: ops });
 
       const label = wrapper.vm.computedLabel(ops[0]);
@@ -487,7 +467,7 @@ describe("OperationsList", () => {
     });
 
     it("should handle operation with null params", () => {
-      const ops = [{ id: PromOperationId.Abs, params: [null] }];
+      const ops = [{ id: PromqlStepId.Abs, params: [null] }];
       wrapper = createWrapper({ operations: ops });
 
       const label = wrapper.vm.computedLabel(ops[0]);
@@ -495,7 +475,7 @@ describe("OperationsList", () => {
     });
 
     it("should handle operation with undefined params", () => {
-      const ops = [{ id: PromOperationId.Abs, params: [undefined] }];
+      const ops = [{ id: PromqlStepId.Abs, params: [undefined] }];
       wrapper = createWrapper({ operations: ops });
 
       const label = wrapper.vm.computedLabel(ops[0]);
@@ -515,22 +495,15 @@ describe("OperationsList", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-add-operation"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-0"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-remove-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-add-operation"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-operation-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-operation-remove-0"]').exists()).toBe(true);
     });
 
     it("should have tooltips", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
-      // QTooltip was replaced by OTooltip in the migration.
       expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
@@ -538,10 +511,7 @@ describe("OperationsList", () => {
       wrapper = createWrapper();
 
       const dragHandle = wrapper.find(".drag-handle");
-      // QTooltip was replaced by OTooltip in the migration.
-      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(
-        true,
-      );
+      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });
 });

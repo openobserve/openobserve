@@ -19,7 +19,6 @@ import i18n from "@/locales";
 
 import TraceStatusCell from "./TraceStatusCell.vue";
 
-
 describe("TraceStatusCell", () => {
   let wrapper: VueWrapper;
 
@@ -55,13 +54,13 @@ describe("TraceStatusCell", () => {
     it("applies the success CSS class on the pill", () => {
       wrapper = mount_({ errors: 0 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.classes()).toContain("tw:bg-badge-success-soft-bg");
+      expect(pill.classes()).toContain("bg-badge-success-soft-bg");
     });
 
     it("does not apply the error CSS class on the pill", () => {
       wrapper = mount_({ errors: 0 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.classes()).not.toContain("tw:bg-badge-error-soft-bg");
+      expect(pill.classes()).not.toContain("bg-badge-error-soft-bg");
     });
   });
 
@@ -83,13 +82,13 @@ describe("TraceStatusCell", () => {
     it("applies the error CSS class on the pill", () => {
       wrapper = mount_({ errors: 2 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.classes()).toContain("tw:bg-badge-error-soft-bg");
+      expect(pill.classes()).toContain("bg-badge-error-soft-bg");
     });
 
     it("does not apply the success CSS class on the pill", () => {
       wrapper = mount_({ errors: 2 });
       const pill = wrapper.find('[data-test="trace-row-status-pill"]');
-      expect(pill.classes()).not.toContain("tw:bg-badge-success-soft-bg");
+      expect(pill.classes()).not.toContain("bg-badge-success-soft-bg");
     });
   });
 

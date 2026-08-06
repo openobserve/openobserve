@@ -17,36 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     data-test="dashboard-custom-chart-editor-container"
-    class="card-container"
-    style="
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    "
+    class="bg-card-glass-bg flex h-full w-full flex-col overflow-hidden"
   >
-    <div
-      data-test="dashboard-custom-chart-editor-inner"
-      style="width: 100%; height: 100%; display: flex; flex-direction: column"
-    >
-      <div
-        data-test="dashboard-custom-chart-editor-flex-col"
-        class="tw:flex tw:flex-col"
-        style="height: 100%; display: flex; flex-direction: column"
-      >
+    <div class="flex h-full w-full flex-col" data-test="dashboard-custom-chart-editor-inner">
+      <div data-test="dashboard-custom-chart-editor-flex-col" class="flex h-full flex-col">
         <QueryEditor
           v-model:query="javascriptCodeContent"
           :debounceTime="500"
           @update:query="onEditorValueChange"
           data-test="dashboard-markdown-editor-query-editor"
           language="javascript"
-          class="javascript-query-editor"
-          style="padding-left: 20px; height: 100%; flex: 1"
-          :style="{
-            backgroundColor:
-              store.state.theme == 'dark' ? '#1e1e1e' : '#fafafa',
-          }"
+          class="javascript-query-editor bg-code-block-bg h-full flex-1 pl-5"
         />
       </div>
     </div>
@@ -56,9 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
 import { defineAsyncComponent } from "vue";
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
@@ -70,7 +50,7 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
+      default: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
   `,
     },
   },
@@ -79,7 +59,8 @@ export default defineComponent({
     const splitterModel = ref(50);
     const dataToBeRendered = ref({});
     const store = useStore();
-    const { dashboardPanelData } = useDashboardPanelData("dashboard");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
     // Watch for prop changes and update the editor content
     watch(
@@ -116,9 +97,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-</style>

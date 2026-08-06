@@ -1,16 +1,14 @@
 <template>
-  <div class="tw:mb-4">
-    <div class="tw:flex tw:flex-col tw:gap-0.5 tw:mb-2">
-      <span class="tw:text-xs tw:font-semibold tw:text-text-primary">{{ t("onlineEvals.job.scorerPicker.title") }}</span>
-      <span class="tw:text-[11.5px] tw:text-text-secondary">{{ t("onlineEvals.job.scorerPicker.hint") }}</span>
-    </div>
+  <div class="mb-4">
     <OSelect
       :model-value="modelValue"
+      :label="t('onlineEvals.job.scorerPicker.title')"
       :options="options"
       multiple
       searchable
       :placeholder="t('onlineEvals.job.scorerPicker.placeholder')"
       :search-placeholder="t('onlineEvals.job.scorerPicker.searchPlaceholder')"
+      :help-text="t(`onlineEvals.job.scorerPicker.hint.${targetScope}`)"
       size="md"
       :disabled="!scorers.length"
       data-test="job-form-scorer-select"
@@ -18,7 +16,7 @@
     />
     <div
       v-if="!scorers.length"
-      class="tw:mt-2 tw:py-3 tw:px-3.5 tw:border tw:border-dashed tw:border-dialog-header-border tw:rounded-[6px] tw:text-center tw:text-text-secondary tw:text-xs"
+      class="border-dialog-header-border rounded-default text-text-secondary mt-2 border border-dashed px-3.5 py-3 text-center text-xs"
     >
       {{ t("onlineEvals.job.scorerPicker.empty") }}
     </div>
@@ -27,12 +25,13 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import type { Scorer } from "@/services/online-evals.service";
+import type { EvalTargetScope, Scorer } from "@/services/online-evals.service";
 import { entityId, scorerTypeOf } from "../../utils/evalEntity";
 
 const props = defineProps<{
+  targetScope: EvalTargetScope;
   scorers: Scorer[];
   modelValue: string[];
 }>();
@@ -41,11 +40,11 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string[]): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const options = computed(() =>
   props.scorers.map((scorer) => ({
-    label: scorer.name,
+    label: raw(scorer.name),
     value: entityId(scorer),
     badge: `${scorerTypeOf(scorer).replace("_", " ")} · v${scorer.version}`,
   })),
@@ -53,7 +52,10 @@ const options = computed(() =>
 
 function onChange(value: unknown) {
   if (Array.isArray(value)) {
-    emit("update:modelValue", value.map((v) => String(v)));
+    emit(
+      "update:modelValue",
+      value.map((v) => String(v)),
+    );
   }
 }
 </script>

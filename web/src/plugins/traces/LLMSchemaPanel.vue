@@ -25,29 +25,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   renderers look identical side by side during the incremental migration.
 -->
 <template>
-  <div
-    class="card-container llm-trend-panel tw:rounded-lg tw:p-[1rem] tw:flex tw:flex-col"
-  >
-    <div class="tw:flex tw:items-baseline tw:justify-between tw:mb-[0.25rem]">
+  <div class="bg-card-glass-bg rounded-default border-border-default flex flex-col border">
+    <div class="p-page-edge mb-1 flex items-baseline justify-between">
       <div>
-        <div
-          class="tw:text-[0.85rem] tw:font-semibold tw:text-[var(--o2-text-primary)]"
-        >
+        <div class="text-text-heading text-sm font-semibold">
           {{ displayTitle }}
         </div>
-        <div
-          v-if="displaySubtitle"
-          class="tw:text-[0.7rem] tw:leading-normal tw:mt-[0.1rem]"
-        >
+        <div v-if="displaySubtitle" class="text-2xs mt-[0.1rem] leading-normal">
           {{ displaySubtitle }}
         </div>
       </div>
     </div>
 
-    <div class="llm-schema-panel__body tw:w-full">
+    <!-- h-55 matches LLMTrendPanel's chart height (13.75rem) so the converted
+         panel lines up with the legacy ones in the same grid row. The renderer
+         needs an explicit full size to fill the box — without it the echarts
+         canvas collapses to a sliver. -->
+    <div class="llm-schema-panel__body relative h-55 w-full">
       <PanelSchemaRenderer
         v-if="chartData"
-        class="llm-schema-panel__renderer"
+        class="llm-schema-panel__renderer h-full w-full"
         :panelSchema="chartData"
         :selectedTimeObj="selectedTimeObj"
         :variablesData="{}"
@@ -64,13 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import {
-  type LLMPanelDef,
-  renderPanelSql,
-  panelI18nKey,
-} from "./config/llmInsightsPanels";
+import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
 
 interface Props {
@@ -93,13 +86,11 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-// Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
-const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() =>
-  t(`${panelI18nKey(props.panel.id)}.subtitle`),
-);
+// Panel defs are a plain config module with no i18n context, so they carry keys.
+const displayTitle = computed(() => t(props.panel.titleKey));
+const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 
 // Fully-rendered SQL: stream substituted, agent predicate spliced. We swap the
 // templated `histogram(_timestamp, '{{interval}}')` for the auto-bucketing
@@ -150,23 +141,3 @@ const selectedTimeObj = computed(() => ({
   end_time: new Date(props.endTime),
 }));
 </script>
-
-<style lang="scss" scoped>
-.llm-trend-panel {
-  border: 1px solid var(--o2-border-color);
-}
-
-/* Match LLMTrendPanel's chart height (.llm-trend-chart = 220px) so the
-   converted panel lines up with the legacy ones in the same grid row.
-   PanelSchemaRenderer needs an explicit 100% size to fill the box — without
-   it the echarts canvas collapses to a sliver. */
-.llm-schema-panel__body {
-  height: 220px;
-  position: relative;
-}
-
-.llm-schema-panel__renderer {
-  height: 100%;
-  width: 100%;
-}
-</style>

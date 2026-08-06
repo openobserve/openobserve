@@ -15,29 +15,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:px-4 tw:pt-3" style="min-height: inherit; overflow: auto">
-    <div v-if="!isChildOrg" class="tw:flex tw:justify-between tw:items-center">
-      <div>
-        <h1 class="tw:text-2xl tw:font-bold tw:leading-9 tw:text-(--o2-text-heading) tw:mt-0 tw:mr-0 tw:mb-2 tw:ml-0 tw:block">{{ t("billing.title") }}</h1>
-        <p class="tw:text-base tw:font-semibold tw:leading-[1.375rem] tw:text-(--o2-text-secondary) tw:m-0 tw:block">{{ t("billing.subtitle") }}</p>
-      </div>
-    </div>
+  <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
+    <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
     <!-- Managed billing empty state for child orgs -->
     <div
       v-if="isChildOrg"
-      class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:text-center tw:min-h-[calc(100vh-var(--navbar-height)-200px)] tw:py-12 tw:px-6"
+      class="flex min-h-[calc(100vh-var(--navbar-height)-200px)] flex-col items-center justify-center px-6 py-12 text-center"
       data-test="plans-managed-billing-panel"
     >
-      <div class="tw:w-[100px] tw:h-[100px] tw:rounded-full tw:border tw:border-dashed tw:border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)] tw:flex tw:items-center tw:justify-center tw:mb-7">
-        <div class="tw:w-[68px] tw:h-[68px] tw:rounded-full tw:bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] tw:border-[1.5px] tw:border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] tw:border-solid tw:flex tw:items-center tw:justify-center">
-          <OIcon name="account-balance" size="lg" class="tw:text-(--color-primary-600) tw:opacity-85" />
+      <div
+        class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
+      >
+        <div
+          class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+        >
+          <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
         </div>
       </div>
 
-      <div class="tw:text-[1.2rem] tw:font-bold tw:tracking-[-0.2px] tw:mb-[10px]">
+      <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
         {{ t("billing.billingGroup.plansManagedTitle") }}
       </div>
-      <div class="tw:text-[0.88rem] tw:leading-[1.65] tw:opacity-65 tw:max-w-[440px] tw:mb-6">
+      <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
         {{
           t("billing.billingGroup.plansManagedDescription", {
             name: membership?.payer_org_name,
@@ -46,16 +45,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </div>
 
-      <div class="tw:flex tw:items-center tw:gap-2 tw:flex-wrap tw:justify-center tw:mb-8">
-        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
+      <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
+        <span
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
           <OIcon name="receipt-long" size="xs" />
           {{ t("billing.billingGroup.chipConsolidatedBill") }}
         </span>
-        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
+        <span
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
           <OIcon name="lock" size="xs" />
           {{ t("billing.billingGroup.chipPlanManaged") }}
         </span>
-        <span class="tw:inline-flex tw:items-center tw:gap-[5px] tw:text-xs tw:font-medium tw:opacity-85 tw:bg-[color-mix(in_srgb,currentColor_6%,transparent)] tw:border tw:border-(--o2-border-color,rgba(0,0,0,0.1)) tw:rounded-[20px] tw:py-1 tw:px-3">
+        <span
+          class="inline-flex items-center gap-1.25 rounded-full border border-(--color-card-glass-border,rgba(0,0,0,0.1)) bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
           <OIcon name="description" size="xs" />
           {{ t("billing.billingGroup.chipNoInvoices") }}
         </span>
@@ -63,96 +68,115 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OButton
         variant="primary"
-        class="tw:h-10 tw:py-0 tw:px-6 tw:font-semibold"
+        class="h-10 px-6 py-0 font-semibold"
         data-test="plans-view-org-group-btn"
         @click="goToOrgGroup"
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
         <template #icon-right>
-          <OIcon name="arrow-forward" size="sm" class="tw:ml-1" />
+          <OIcon name="arrow-forward" size="sm" class="ml-1" />
         </template>
       </OButton>
     </div>
     <template v-else>
-    <trial-period class="tw:mb-3" currentPage="billing"></trial-period>
-    <!-- AI Credits card -->
-    <div v-if="aiUsage" class="tw:grid tw:grid-cols-1 tw:gap-4 tw:w-full tw:mb-4">
-      <div class="tw:bg-(--o2-card-bg) tw:border tw:border-(--o2-border-color) tw:rounded-lg tw:p-4 tw:shadow-none tw:transition-shadow tw:duration-200 tw:hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)] tw:dark:bg-[var(--o2-card-background)] tw:dark:border-[var(--o2-border)]">
-        <div class="tw:min-h-full tw:rounded-lg tw:transition-all tw:duration-300 tw:ease-[cubic-bezier(0.4,0,0.2,1)] tw:text-center tw:flex tw:flex-col tw:justify-between">
-          <div class="tw:flex tw:flex-col tw:justify-between">
-            <div class="tw:flex tw:justify-between tw:items-center">
-              <div class="tw:text-base tw:font-medium tw:leading-5 tw:text-(--o2-text-heading) tw:text-left">{{ t("billing.aiCredits") }}</div>
-              <div style="opacity: 0.8;">
-                <img :src="aiIcon" />
+      <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
+      <!-- AI Credits card -->
+      <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
+        <div
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)]"
+        >
+          <div
+            class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          >
+            <div class="flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <div class="text-text-heading text-left text-base leading-5 font-medium">
+                  {{ t("billing.aiCredits") }}
+                </div>
+                <div class="opacity-80">
+                  <img :src="aiIcon" />
+                </div>
               </div>
+              <OTag type="aiMode" :value="aiUsage.mode" class="mt-2" style="width: fit-content" />
             </div>
-            <OTag
-              type="aiMode"
-              :value="aiUsage.mode"
-              class="tw:mt-2"
-              style="width: fit-content;"
-            />
-          </div>
-          <div class="tw:mt-3 tw:mb-2">
-            <OProgressBar
-              :value="aiUsageRatio"
-              size="sm"
-              :variant="aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'"
-            />
-          </div>
-          <div class="tw:text-2xl tw:font-semibold tw:leading-7 tw:text-(--o2-text-heading) tw:text-left tw:flex tw:items-end">
-            {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
-          </div>
-          <div v-if="aiUsage.mode === 'exhausted'" class="tw:text-red-500 tw:mt-2" style="font-size: 13px;">
-            {{ t("billing.aiExhaustedMessage") }}
-          </div>
-          <div v-else-if="aiUsage.mode === 'pay_as_you_go'" class="text-info tw:mt-2" style="font-size: 13px;">
-            {{ t("billing.aiPaygMessage") }}
+            <div class="mt-3 mb-2">
+              <OProgressBar
+                :value="aiUsageRatio"
+                size="sm"
+                :variant="
+                  aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'
+                "
+              />
+            </div>
+            <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
+              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+              {{ t("billing.creditsUsedLabel") }}
+            </div>
+            <div
+              v-if="aiUsage.mode === 'exhausted'"
+              class="text-status-error-text mt-2"
+              style="font-size: var(--text-compact)"
+            >
+              {{
+                t(
+                  aiUsage.requires_additional_credits
+                    ? "billing.aiContractExhaustedMessage"
+                    : "billing.aiExhaustedMessage",
+                )
+              }}
+            </div>
+            <div
+              v-else-if="aiUsage.mode === 'pay_as_you_go'"
+              class="text-info mt-2"
+              style="font-size: var(--text-compact)"
+            >
+              {{ t("billing.aiPaygMessage") }}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-    <div
-      v-if="
-        store.state.selectedOrganization.hasOwnProperty('note') &&
-        store.state.selectedOrganization.note
-      "
-      class="tw:flex tw:justify-start tw:items-center tw:gap-2 tw:text-red-500 tw:text-xl tw:font-semibold tw:pl-6 tw:pb-4"
-    >
-      <OIcon name="warning" size="sm" class="tw:pt-2" />
-      >{{ store.state.selectedOrganization.note }}
-    </div>
-    <div v-if="loading" class="tw:text-xl tw:font-semibold text-weight-medium tw:text-center">
-      <OSpinner size="md" class="tw:mx-auto tw:block tw:text-center tw:mt-3" />
-    </div>
-    <div v-else class="tw:grid tw:grid-cols-2 tw:gap-3 tw:mt-3">
-      <pro-plan
-        :planType="planType"
-        :billingProvider="billingProvider"
-        :subscriptionType="subscriptionType"
-        :features="proPlanFeatures"
-        :pricingError="pricingError"
-        @update:proSubscription="onLoadSubscription(config.paidPlan)"
-        @update:cancelSubscription="onUnsubscribe"
-      ></pro-plan>
-      <enterprise-plan
-        :features="enterprisePlanFeatures"
-        :pricingError="pricingError"
-      ></enterprise-plan>
-    </div>
+      <div
+        v-if="
+          store.state.selectedOrganization.hasOwnProperty('note') &&
+          store.state.selectedOrganization.note
+        "
+        class="text-status-error-text flex items-center justify-start gap-2 pb-4 pl-6 text-xl font-semibold"
+      >
+        <OIcon name="warning" size="sm" class="pt-2" />
+        >{{ store.state.selectedOrganization.note }}
+      </div>
+      <div v-if="loading" class="text-center text-xl font-medium font-semibold">
+        <OSpinner size="md" class="mx-auto mt-3 block text-center" />
+      </div>
+      <div v-else class="mt-3 grid grid-cols-2 gap-3">
+        <ProPlan
+          :planType="planType"
+          :billingProvider="billingProvider"
+          :subscriptionType="subscriptionType"
+          :features="proPlanFeatures"
+          :pricingError="pricingError"
+          @update:proSubscription="onLoadSubscription(config.paidPlan)"
+          @update:cancelSubscription="onUnsubscribe"
+        ></ProPlan>
+        <EnterprisePlan
+          :features="enterprisePlanFeatures"
+          :pricingError="pricingError"
+        ></EnterprisePlan>
+      </div>
     </template>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
+import useTheme from "@/composables/useTheme";
 import { useLocalOrganization, convertToTitleCase, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
@@ -193,9 +217,7 @@ export default defineComponent({
     },
     fetchMembership() {
       if (config.isCloud !== "true") return;
-      BillingService.get_billing_group_membership(
-        this.store.state.selectedOrganization.identifier
-      )
+      BillingService.get_billing_group_membership(this.store.state.selectedOrganization.identifier)
         .then((res: any) => {
           this.membership = res.data?.membership ?? null;
         })
@@ -204,9 +226,7 @@ export default defineComponent({
         });
     },
     fetchAiUsage() {
-      BillingService.get_ai_usage(
-        this.store.state.selectedOrganization.identifier
-      )
+      BillingService.get_ai_usage(this.store.state.selectedOrganization.identifier)
         .then((res: any) => {
           this.aiUsage = res.data;
         })
@@ -226,20 +246,14 @@ export default defineComponent({
             is_parent: !f.isSubItem,
           }));
         const payAsYouGo =
-          cloudPlans.find((p: any) =>
-            p.title?.toLowerCase().includes("pay as you go"),
-          ) ?? cloudPlans[0];
+          cloudPlans.find((p: any) => p.title?.toLowerCase().includes("pay as you go")) ??
+          cloudPlans[0];
         const enterprise =
-          cloudPlans.find((p: any) =>
-            p.title?.toLowerCase().includes("enterprise"),
-          ) ?? cloudPlans[1];
+          cloudPlans.find((p: any) => p.title?.toLowerCase().includes("enterprise")) ??
+          cloudPlans[1];
 
-        const proFeatures = payAsYouGo?.features
-          ? mapFeatures(payAsYouGo.features)
-          : [];
-        const entFeatures = enterprise?.features
-          ? mapFeatures(enterprise.features)
-          : [];
+        const proFeatures = payAsYouGo?.features ? mapFeatures(payAsYouGo.features) : [];
+        const entFeatures = enterprise?.features ? mapFeatures(enterprise.features) : [];
 
         const diff = proFeatures.length - entFeatures.length + 3;
         const paddedEntFeatures =
@@ -263,11 +277,9 @@ export default defineComponent({
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
-        BillingService.resume_subscription(
-          this.store.state.selectedOrganization.identifier,
-        )
-          .then(async (res) => {
-            await this.loadSubscription(true);
+        BillingService.resume_subscription(this.store.state.selectedOrganization.identifier)
+          .then(async () => {
+            await this.loadSubscription();
           })
           .catch((e) => {
             this.proLoading = false;
@@ -278,10 +290,7 @@ export default defineComponent({
             });
           });
       } else {
-        BillingService.get_hosted_url(
-          this.store.state.selectedOrganization.identifier,
-          planType,
-        )
+        BillingService.get_hosted_url(this.store.state.selectedOrganization.identifier, planType)
           .then((res) => {
             window.location.href = res.data.url;
           })
@@ -298,10 +307,7 @@ export default defineComponent({
       this.onChangePaymentDetail(this.currentPlanDetail.customer_id);
     },
     onChangePaymentDetail(customer_id: string) {
-      BillingService.get_session_url(
-        this.store.state.selectedOrganization.identifier,
-        customer_id,
-      )
+      BillingService.get_session_url(this.store.state.selectedOrganization.identifier, customer_id)
         .then((res) => {
           // this.updatePaymentResponse = res.data.data.url;
           // setInterval(this.retrieveHostedPage, 5000);
@@ -317,7 +323,7 @@ export default defineComponent({
           });
         });
     },
-    async loadSubscription(fromPro = false) {
+    async loadSubscription() {
       try {
         const res = await BillingService.list_subscription(
           this.store.state.selectedOrganization.identifier,
@@ -340,14 +346,11 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (
-          this.billingProvider === "" ||
-          this.billingProvider === "stripe"
-        ) {
+        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
           // Only show subscribe prompt for Stripe orgs without subscription
           toast({
             variant: "warning",
-            message: "Please subscribe to one of the plan.",
+            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
             timeout: 5000,
           });
 
@@ -375,8 +378,9 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
+    const { isDark } = useTheme();
     const frmPayment = ref();
     const planType = ref("");
     const isActiveSubscription = ref(false);
@@ -391,9 +395,9 @@ export default defineComponent({
     const subscriptionType = ref("");
     const aiUsage = ref<any>(null);
     const aiIcon = computed(() =>
-      store.state.theme === "dark"
+      isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon_gradient.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg"),
     );
     const aiUsageRatio = computed(() => {
       if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;

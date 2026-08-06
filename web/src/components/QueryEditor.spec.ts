@@ -48,17 +48,8 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("quasar", async (importOriginal) => {
-  const actual = (await importOriginal()) as any;
-  return {
-    ...actual,
-    useQuasar: () => ({ notify: vi.fn(), dialog: vi.fn() }),
-  };
-});
-
 // Component import must come after all vi.mock() declarations.
 import QueryEditor from "./QueryEditor.vue";
-
 
 // ── CodeQueryEditor stub ─────────────────────────────────────────────────────
 
@@ -126,9 +117,7 @@ describe("QueryEditor", () => {
 
     it("should render the CodeQueryEditor stub", () => {
       wrapper = mountQueryEditor();
-      expect(
-        wrapper.find('[data-test="code-query-editor"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="code-query-editor"]').exists()).toBe(true);
     });
 
     it("should hide the AI input bar when not in AI mode", () => {
@@ -192,8 +181,10 @@ describe("QueryEditor", () => {
 
       const sendBtn = wrapper.find('[data-test="query-editor-ai-send-btn"]');
       expect(sendBtn.exists()).toBe(true);
-      // Quasar q-btn renders disable attribute when disabled
-      expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(true);
+      // button renders the disable attribute when disabled
+      expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(
+        true,
+      );
     });
 
     it("should disable send button when disableAi prop is true", async () => {
@@ -203,7 +194,9 @@ describe("QueryEditor", () => {
 
       const sendBtn = wrapper.find('[data-test="query-editor-ai-send-btn"]');
       expect(sendBtn.exists()).toBe(true);
-      expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(true);
+      expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(
+        true,
+      );
     });
   });
 
@@ -292,11 +285,7 @@ describe("QueryEditor", () => {
     });
 
     it("should return false for a regular natural language query", () => {
-      expect(
-        (wrapper.vm as any).isExecutionIntent(
-          "show me errors in the last hour",
-        ),
-      ).toBe(false);
+      expect((wrapper.vm as any).isExecutionIntent("show me errors in the last hour")).toBe(false);
     });
 
     it("should return false for an empty string", () => {
@@ -493,9 +482,7 @@ describe("QueryEditor", () => {
       (wrapper.vm as any).editorRef = null;
 
       // Act & Assert — must not throw
-      await expect(
-        wrapper.setProps({ query: null as any }),
-      ).resolves.not.toThrow();
+      await expect(wrapper.setProps({ query: null as any })).resolves.not.toThrow();
     });
 
     it("calls editorRef.setValue with the new non-null query when prop changes normally", async () => {

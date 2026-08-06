@@ -22,9 +22,7 @@ defineSlots<CheckboxGroupSlots>();
 
 function toggle(value: CheckboxPrimitive) {
   const current: CheckboxGroupValue = props.modelValue ?? [];
-  const next = current.includes(value)
-    ? current.filter((v) => v !== value)
-    : [...current, value];
+  const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
   emit("update:modelValue", next);
 }
 
@@ -45,7 +43,7 @@ provide(CHECKBOX_GROUP_KEY, {
 </script>
 
 <template>
-  <div role="group" class="tw:flex tw:flex-col tw:gap-2">
+  <div role="group" class="flex flex-col gap-2">
     <slot />
   </div>
 </template>

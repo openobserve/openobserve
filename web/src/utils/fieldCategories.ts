@@ -153,9 +153,15 @@ export function discoverPrefixes(
 function dataTypeBucket(dataType: string): string {
   const t = (dataType || "").toLowerCase();
   if (
-    t === "int64" || t === "float64" || t === "int32" || t === "float32" ||
-    t === "double" || t === "long" || t === "integer"
-  ) return CATEGORY.TYPE_NUMBER;
+    t === "int64" ||
+    t === "float64" ||
+    t === "int32" ||
+    t === "float32" ||
+    t === "double" ||
+    t === "long" ||
+    t === "integer"
+  )
+    return CATEGORY.TYPE_NUMBER;
   if (t === "bool" || t === "boolean") return CATEGORY.TYPE_BOOLEAN;
   return CATEGORY.TYPE_STRING;
 }
@@ -198,7 +204,8 @@ export function resolveFieldGroup(
   }
 
   // 2c. Field name is itself a known group key (e.g. "body" matching the "body" prefix group)
-  if (dynamicPrefixes?.has(canonicalise(lower, index?.grouping))) return canonicalise(lower, index?.grouping);
+  if (dynamicPrefixes?.has(canonicalise(lower, index?.grouping)))
+    return canonicalise(lower, index?.grouping);
 
   // 3. Data-type bucket
   return dataTypeBucket(dataType);
@@ -355,7 +362,7 @@ export function shouldApplyFieldGrouping(opts: {
  *
  * Rules:
  * - Label (header) rows are always kept.
- * - When `filterTerm` is non-empty, bypass collapse entirely so the q-table
+ * - When `filterTerm` is non-empty, bypass collapse entirely so the table
  *   filter-method can match fields inside collapsed groups.
  * - When a field's group is not tracked in `expandGroupRows`, it is visible
  *   (flat / ungrouped list behaviour).

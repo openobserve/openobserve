@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
@@ -67,9 +68,14 @@ vi.mock("@/utils/metrics/metricGrouping", async (importOriginal) => {
       return {
         byGroup: { infra: infraStreams, network: [], others: [] },
         groups: [
-          { id: "infra", label: "Infrastructure", icon: "computer", streams: infraStreams },
-          { id: "network", label: "Network", icon: "network_check", streams: [] },
-          { id: "others", label: "Others", icon: "category", streams: [] },
+          {
+            id: "infra",
+            labelKey: "metrics.groups.compute",
+            icon: "computer",
+            streams: infraStreams,
+          },
+          { id: "network", labelKey: "metrics.groups.network", icon: "network_check", streams: [] },
+          { id: "others", labelKey: "metrics.groups.others", icon: "category", streams: [] },
         ],
       };
     }),
@@ -78,20 +84,14 @@ vi.mock("@/utils/metrics/metricGrouping", async (importOriginal) => {
 
 vi.mock("@/services/stream", () => ({
   default: {
-    nameList: vi.fn(() =>
-      Promise.resolve({ data: { list: [] } })
-    ),
+    nameList: vi.fn(() => Promise.resolve({ data: { list: [] } })),
   },
 }));
 
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn(() =>
-      Promise.resolve({ data: { hits: [], total: 0, took: 0 } })
-    ),
-    get_traces: vi.fn(() =>
-      Promise.resolve({ data: { hits: [], total: 0 } })
-    ),
+    search: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0, took: 0 } })),
+    get_traces: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0 } })),
   },
 }));
 
@@ -127,6 +127,8 @@ vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
 }));
 
 const mockTranslations = {
+  "correlation.correlatedStreamsFor": "Correlated Streams - {service}",
+  "correlation.noMetricStreamsFor": "No metric streams found for this {kind}",
   "correlation.filters": "Filters",
   "correlation.all": "All",
   "correlation.loadingLogs": "Loading logs...",
@@ -165,7 +167,7 @@ const i18n = createI18n({
 });
 
 // ---------------------------------------------------------------------------
-// ODrawer stub — replaces the migrated dialog-mode overlay (q-dialog -> ODrawer).
+// ODrawer stub — the dialog-mode overlay.
 // Renders header/default/footer slots and exposes migrated props/emits so we
 // can assert wiring without going through the real Reka portal/teleport.
 // ---------------------------------------------------------------------------
@@ -214,7 +216,7 @@ const ODrawerStub = {
 };
 
 // ---------------------------------------------------------------------------
-// ODialog stub — replaces the metric selector dialog (q-dialog -> ODialog).
+// ODialog stub — the metric selector dialog.
 // ---------------------------------------------------------------------------
 const ODialogStub = {
   name: "ODialog",
@@ -264,7 +266,6 @@ const mockMetricStreams = [
   { stream_name: "disk_io", stream_type: "metrics", filters: { service: "api" } },
 ];
 
-
 describe("TelemetryCorrelationDashboard.vue", () => {
   let wrapper: any;
 
@@ -290,10 +291,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
         ...props,
       },
       global: {
-        plugins: [
-          i18n,
-          store,
-        ],
+        plugins: [i18n, store],
         stubs: {
           TraceDetails: true,
           TracesSearchResultList: true,
@@ -513,12 +511,13 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper = createWrapper({ metricStreams: [] });
       const stream = { stream_name: "new_metric", stream_type: "metrics", filters: {} };
 
-      const initialCount = wrapper.vm.selectedMetricStreams.length;
       wrapper.vm.selectedMetricStreams = [];
       wrapper.vm.toggleMetricStream(stream);
       await nextTick();
 
-      expect(wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === "new_metric")).toBe(true);
+      expect(
+        wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === "new_metric"),
+      ).toBe(true);
     });
 
     it("should remove stream when already selected", async () => {
@@ -530,7 +529,48 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       wrapper.vm.toggleMetricStream(mockMetricStreams[0]);
       await nextTick();
 
-      expect(wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === streamName)).toBe(false);
+      expect(wrapper.vm.selectedMetricStreams.some((s: any) => s.stream_name === streamName)).toBe(
+        false,
+      );
+    });
+  });
+
+  describe("clearing the metric selection", () => {
+    // Regression (o2-enterprise#2188): deselecting the last checked metric left
+    // its chart on screen. Both reload paths were gated on a non-empty
+    // selection, so nothing ever tore the rendered dashboard down.
+    it("should drop the rendered charts when the last metric is deselected", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = createWrapper();
+
+        // Stand in for a loaded dashboard with one metric charted.
+        wrapper.vm.initialLoadCompleted = true;
+        wrapper.vm.selectedMetricStreams = [...mockMetricStreams.slice(0, 1)];
+        await nextTick();
+        wrapper.vm.dashboardData = {
+          tabs: [{ panels: [{ id: `${mockMetricStreams[0].stream_name}_1` }] }],
+        };
+        wrapper.vm.groupedDashboardData = {
+          compute: { tabs: [{ panels: [{ id: "p1" }] }] },
+        };
+        await nextTick();
+
+        // Uncheck it — the selection is now empty.
+        wrapper.vm.toggleMetricStream(mockMetricStreams[0]);
+        await nextTick();
+        expect(wrapper.vm.selectedMetricStreams.length).toBe(0);
+
+        // The stream watcher debounces before acting.
+        vi.advanceTimersByTime(500);
+        await flushPromises();
+
+        expect(wrapper.vm.dashboardData).toBeNull();
+        expect(wrapper.vm.groupedDashboardData).toEqual({});
+        expect(wrapper.vm.activeDashboardForGroup).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -685,7 +725,9 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       });
 
       wrapper = createWrapper({
-        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: { service: "api" } }],
+        traceStreams: [
+          { stream_name: "traces", stream_type: "traces", filters: { service: "api" } },
+        ],
       });
 
       await wrapper.vm.fetchTracesByDimensions();
@@ -704,14 +746,42 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       });
 
       wrapper = createWrapper({
-        traceStreams: [{ stream_name: "traces", stream_type: "traces", filters: { service: "api", env: "prod" } }],
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service: "api", env: "prod" },
+          },
+        ],
       });
 
       await wrapper.vm.fetchTracesByDimensions();
 
       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
-      expect(callArg.queryReq.filter).toContain("service='api'");
-      expect(callArg.queryReq.filter).toContain("env='prod'");
+      // Identifiers and values are escaped via buildSqlCondition (F2/F38)
+      expect(callArg.queryReq.filter).toContain("\"service\" = 'api'");
+      expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
+    });
+
+    it("should escape single quotes in trace filter values", async () => {
+      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
+        handlers.complete();
+      });
+
+      wrapper = createWrapper({
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            filters: { service: "a' OR 1=1 --" },
+          },
+        ],
+      });
+
+      await wrapper.vm.fetchTracesByDimensions();
+
+      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+      expect(callArg.queryReq.filter).toBe("\"service\" = 'a'' OR 1=1 --'");
     });
 
     it("should accumulate and return hits from streaming data callback", async () => {
@@ -754,7 +824,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Dialog-mode ODrawer wiring (replaces previous q-dialog)
+  // Dialog-mode ODrawer wiring
   // -------------------------------------------------------------------------
   describe("ODrawer wiring (dialog mode)", () => {
     it("should render an ODrawer when mode is dialog", () => {
@@ -832,7 +902,7 @@ describe("TelemetryCorrelationDashboard.vue", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Metric selector ODialog wiring (replaces previous q-dialog)
+  // Metric selector ODialog wiring
   // -------------------------------------------------------------------------
   describe("ODialog wiring (metric selector)", () => {
     it("should render an ODialog stub for the metric selector", () => {

@@ -1,6 +1,6 @@
-import { mount, flushPromises  } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach  } from "vitest";
-import { createRouter, createMemoryHistory  } from 'vue-router';
+import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createRouter, createMemoryHistory } from "vue-router";
 import i18n from "@/locales";
 import ListOrganizations from "./ListOrganizations.vue";
 import organizationsService from "@/services/organizations";
@@ -11,6 +11,11 @@ import OTable from "@/lib/core/Table/OTable.vue";
 vi.mock("@/services/organizations", () => ({
   default: {
     list: vi.fn(),
+    // getOrganizations() sources the list from the _meta admin endpoint (so it can
+    // surface status / deleted_at); resurrect_org + delete_org are used by row actions.
+    get_admin_org: vi.fn(),
+    resurrect_org: vi.fn(),
+    delete_org: vi.fn(),
   },
 }));
 
@@ -28,7 +33,7 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-// Mock toast (component uses toast() from @/lib/feedback/Toast/useToast instead of $q.notify)
+// Mock toast (component uses toast() from @/lib/feedback/Toast/useToast)
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
@@ -50,8 +55,8 @@ describe("ListOrganizations", () => {
       history: createMemoryHistory(),
       routes: [
         {
-          path: '/organizations',
-          name: 'organizations',
+          path: "/organizations",
+          name: "organizations",
           component: ListOrganizations,
         },
       ],
@@ -62,6 +67,12 @@ describe("ListOrganizations", () => {
       state: {
         selectedOrganization: {
           identifier: "test-org",
+        },
+        // useIsMetaOrg compares selectedOrganization.identifier to zoConfig.meta_org.
+        // "test-org" !== "_meta" → isMetaOrg is false → getOrganizations() uses the
+        // regular list() endpoint (the non-admin path these tests exercise).
+        zoConfig: {
+          meta_org: "_meta",
         },
         userInfo: {
           email: "test@example.com",
@@ -93,6 +104,14 @@ describe("ListOrganizations", () => {
 
     // Mock the organizations service list method
     organizationsService.list.mockResolvedValue(mockOrganizations);
+    // getOrganizations() now reads from the _meta admin endpoint. Delegate it to
+    // whatever `list` is currently mocked to return (incl. per-test mockResolvedValueOnce),
+    // so existing test data setups keep driving the component unchanged.
+    organizationsService.get_admin_org.mockImplementation((...args) =>
+      organizationsService.list(...args),
+    );
+    organizationsService.resurrect_org.mockResolvedValue({});
+    organizationsService.delete_org.mockResolvedValue({});
 
     wrapper = mount(ListOrganizations, {
       global: {
@@ -102,10 +121,10 @@ describe("ListOrganizations", () => {
         },
         stubs: {
           AddUpdateOrganization: {
-            name: 'AddUpdateOrganization',
+            name: "AddUpdateOrganization",
             template: '<div class="add-update-organization-stub" v-if="open" />',
-            props: ['open', 'modelValue'],
-            emits: ['update:open', 'updated'],
+            props: ["open", "modelValue"],
+            emits: ["update:open", "updated"],
           },
           NoData: true,
         },
@@ -157,10 +176,12 @@ describe("ListOrganizations", () => {
 
     it("should setup columns correctly for non-cloud mode", () => {
       const columns = wrapper.vm.columns;
-      // #, name, identifier, type, actions = 5 columns when isCloud is false
-      expect(columns).toHaveLength(5);
-      expect(columns.map(c => c.id)).toContain("name");
-      expect(columns.map(c => c.id)).toContain("identifier");
+      // The row index is rendered by OTable's `show-index` prop, so there is no
+      // "#" column in the definition. Non-cloud columns are:
+      // name, identifier, type, status, actions = 5
+      expect(columns.map((c) => c.id)).toEqual(["name", "identifier", "type", "status", "actions"]);
+      expect(columns.map((c) => c.id)).not.toContain("plan");
+      expect(columns[columns.length - 1].isAction).toBe(true);
     });
 
     it("should add plan column when isCloud is true", async () => {
@@ -187,8 +208,16 @@ describe("ListOrganizations", () => {
       });
 
       await flushPromises();
-      // #, name, identifier, type, plan, actions = 6 columns when isCloud is true
-      expect(wrapperWithCloud.vm.columns).toHaveLength(6);
+      // When isCloud is true a "plan" column is inserted before "actions":
+      // name, identifier, type, status, plan, actions = 6
+      expect(wrapperWithCloud.vm.columns.map((c) => c.id)).toEqual([
+        "name",
+        "identifier",
+        "type",
+        "status",
+        "plan",
+        "actions",
+      ]);
       wrapperWithCloud.unmount();
 
       config.isCloud = "false";
@@ -196,9 +225,66 @@ describe("ListOrganizations", () => {
   });
 
   describe("Data Loading", () => {
-    it("should load organizations on mount", async () => {
+    it("should load organizations on mount via the regular list endpoint (non-_meta context)", async () => {
+      await flushPromises();
+      // selectedOrganization is "test-org" (not _meta) → isMetaOrg is false →
+      // getOrganizations() uses the regular list() endpoint, not the admin one.
+      expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+    });
+
+    it("should use the _meta admin endpoint when the selected org is _meta on cloud", async () => {
+      config.isCloud = "true";
+      organizationsService.list.mockClear();
+      organizationsService.get_admin_org.mockClear();
+      organizationsService.get_admin_org.mockResolvedValue(mockOrganizations);
+      const metaWrapper = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: {
+              ...mockStore,
+              state: {
+                ...mockStore.state,
+                // Selecting the _meta org flips isMetaOrg true → admin endpoint on cloud.
+                selectedOrganization: { identifier: "_meta" },
+              },
+            },
+          },
+          stubs: { OTable: true },
+        },
+      });
+      await flushPromises();
+      expect(organizationsService.get_admin_org).toHaveBeenCalledWith("_meta");
+      expect(organizationsService.list).not.toHaveBeenCalled();
+      metaWrapper.unmount();
+      config.isCloud = "false";
+    });
+
+    it("should fall back to the regular list for _meta off-cloud", async () => {
+      config.isCloud = "false";
+      organizationsService.list.mockClear();
+      organizationsService.get_admin_org.mockClear();
+      organizationsService.list.mockResolvedValue(mockOrganizations);
+      const metaWrapper = mount(ListOrganizations, {
+        global: {
+          plugins: [i18n, router],
+          provide: {
+            store: {
+              ...mockStore,
+              state: {
+                ...mockStore.state,
+                selectedOrganization: { identifier: "_meta" },
+              },
+            },
+          },
+          stubs: { OTable: true },
+        },
+      });
       await flushPromises();
       expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+      metaWrapper.unmount();
     });
 
     it("should transform organization data correctly", async () => {
@@ -207,9 +293,15 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.organizations[1].type).toBe("Team");
     });
 
-    it("should update store with organizations", async () => {
+    it("should load organizations into the local list", async () => {
       await flushPromises();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizations", mockOrganizations.data.data);
+      // getOrganizations() populates the component's own list and deliberately does
+      // NOT dispatch setOrganizations (the navbar switcher keeps its own filtered
+      // list of non-deleting orgs).
+      expect(wrapper.vm.organizations).toHaveLength(mockOrganizations.data.data.length);
+      expect(wrapper.vm.organizations[0].identifier).toBe(
+        mockOrganizations.data.data[0].identifier,
+      );
     });
 
     it("should handle loading state correctly", async () => {
@@ -272,7 +364,7 @@ describe("ListOrganizations", () => {
   describe("Route Action Handling", () => {
     it("opens dialog with populated data when route action is update via watcher", async () => {
       await router.push({
-        path: '/organizations',
+        path: "/organizations",
         query: {
           action: "update",
           to_be_updated_org_id: "org-update-1",
@@ -289,7 +381,7 @@ describe("ListOrganizations", () => {
 
     it.skip("opens dialog on mount when route has action=add", async () => {
       // Push the route before mounting so onMounted sees it
-      await router.push({ path: '/organizations', query: { action: "add" } });
+      await router.push({ path: "/organizations", query: { action: "add" } });
       await router.isReady();
 
       const freshWrapper = mount(ListOrganizations, {
@@ -309,7 +401,7 @@ describe("ListOrganizations", () => {
     it("opens dialog with populated data on mount when route has action=update", async () => {
       // Push the route before mounting so onMounted sees it
       await router.push({
-        path: '/organizations',
+        path: "/organizations",
         query: {
           action: "update",
           to_be_updated_org_id: "mount-org-id",
@@ -336,7 +428,7 @@ describe("ListOrganizations", () => {
 
   describe("Add Organization Dialog", () => {
     it("should open add organization dialog", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
 
       await wrapper.vm.addOrganization();
@@ -349,7 +441,7 @@ describe("ListOrganizations", () => {
     });
 
     it("should track add organization button click", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
 
       const mockEvent = {
@@ -365,8 +457,8 @@ describe("ListOrganizations", () => {
 
     it("should hide add organization dialog", async () => {
       await router.push({
-        path: '/organizations',
-        query: { action: 'add', org_identifier: 'test-org' }
+        path: "/organizations",
+        query: { action: "add", org_identifier: "test-org" },
       });
       await flushPromises();
 
@@ -380,8 +472,8 @@ describe("ListOrganizations", () => {
 
     it("should handle dialog state on route change", async () => {
       await router.push({
-        path: '/organizations',
-        query: { action: "add" }
+        path: "/organizations",
+        query: { action: "add" },
       });
       await flushPromises();
       await wrapper.vm.$nextTick();
@@ -394,22 +486,22 @@ describe("ListOrganizations", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      const addUpdate = wrapper.findComponent({ name: "AddUpdateOrganization" });
       expect(addUpdate.exists()).toBe(true);
-      expect(addUpdate.props('open')).toBe(true);
+      expect(addUpdate.props("open")).toBe(true);
     });
 
     it("should close dialog when AddUpdateOrganization emits update:open false", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
       wrapper.vm.showAddOrganizationDialog = true;
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      const addUpdate = wrapper.findComponent({ name: "AddUpdateOrganization" });
       expect(addUpdate.exists()).toBe(true);
 
-      await addUpdate.vm.$emit('update:open', false);
+      await addUpdate.vm.$emit("update:open", false);
       await flushPromises();
       await wrapper.vm.$nextTick();
 
@@ -421,11 +513,11 @@ describe("ListOrganizations", () => {
       await flushPromises();
       await wrapper.vm.$nextTick();
 
-      const addUpdate = wrapper.findComponent({ name: 'AddUpdateOrganization' });
+      const addUpdate = wrapper.findComponent({ name: "AddUpdateOrganization" });
       expect(addUpdate.exists()).toBe(true);
 
       organizationsService.list.mockClear();
-      await addUpdate.vm.$emit('updated');
+      await addUpdate.vm.$emit("updated");
       await flushPromises();
 
       expect(organizationsService.list).toHaveBeenCalled();
@@ -444,7 +536,7 @@ describe("ListOrganizations", () => {
 
   describe("Organization Updates", () => {
     it("should handle successful organization addition", async () => {
-      await router.push('/organizations');
+      await router.push("/organizations");
       await flushPromises();
 
       await wrapper.vm.updateOrganizationList();
@@ -467,10 +559,12 @@ describe("ListOrganizations", () => {
       await wrapper.vm.updateOrganizationList();
 
       // updateOrganizationList calls toast() for success notification
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: "success",
-        message: "Organization added successfully.",
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Organization added successfully.",
+        }),
+      );
     });
 
     it("should show updated message when isUpdated is true", async () => {
@@ -480,10 +574,12 @@ describe("ListOrganizations", () => {
 
       await wrapper.vm.updateOrganizationList();
 
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: "success",
-        message: "Organization updated successfully.",
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Organization updated successfully.",
+        }),
+      );
     });
   });
 
@@ -512,11 +608,13 @@ describe("ListOrganizations", () => {
       wrapper.vm.joinOrganization();
 
       expect(wrapper.vm.showJoinOrganizationDialog).toBe(false);
-      expect(toast).toHaveBeenCalledWith(expect.objectContaining({
-        variant: "success",
-        message: "Request completed successfully.",
-        timeout: 5000,
-      }));
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: "Request completed successfully.",
+          timeout: 5000,
+        }),
+      );
     });
 
     it("should copy API key to clipboard when copyAPIKey is called", async () => {
@@ -530,7 +628,6 @@ describe("ListOrganizations", () => {
   });
 
   describe("Error Handling", () => {
-
     it("should handle empty organization list", async () => {
       organizationsService.list.mockResolvedValueOnce({ data: { data: [] } });
       await wrapper.vm.getOrganizations();
@@ -538,8 +635,10 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.organizations).toHaveLength(0);
     });
 
-    it("should format counter for double-digit rows", async () => {
-      // Generate 12 orgs to trigger the counter > 9 branch
+    it("should transform the 10th org row correctly in a large list", async () => {
+      // Generate 12 orgs; the row index is now rendered by OTable's `show-index`
+      // prop, so the transformed data no longer carries a "#" field. Assert the
+      // mapped fields for the 10th item instead.
       const largeOrgs = Array.from({ length: 12 }, (_, i) => ({
         name: `Org ${i + 1}`,
         identifier: `org-${i + 1}`,
@@ -555,15 +654,22 @@ describe("ListOrganizations", () => {
       await flushPromises();
 
       expect(wrapper.vm.organizations).toHaveLength(12);
-      // Counter should be 10 (without leading zero) for the 10th item
-      expect(wrapper.vm.organizations[9]["#"]).toBe(10);
+      // The transformation maps type via convertToTitleCase and plan "0" → "Free".
+      expect(wrapper.vm.organizations[9]).toMatchObject({
+        name: "Org 10",
+        identifier: "org-10",
+        type: "Team",
+        plan: "Free",
+      });
+      // No "#" field is added by the component anymore.
+      expect(wrapper.vm.organizations[9]["#"]).toBeUndefined();
     });
   });
 
   describe("Edge Cases", () => {
     it("falls back to empty string when update route lacks to_be_updated_org_name", async () => {
       await router.push({
-        path: '/organizations',
+        path: "/organizations",
         query: { action: "update" }, // no to_be_updated_org_id or to_be_updated_org_name
       });
       await flushPromises();

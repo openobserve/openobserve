@@ -28,24 +28,6 @@ const DURATION_UNIT_MULTIPLIERS: Record<string, number> = {
   m: 60 * 1_000_000,
 };
 
-/**
- * Converts duration comparisons in a WHERE clause that carry human-readable
- * unit suffixes (produced by `formatTimeWithSuffix`) back to raw microseconds.
- *
- * Accepts a WHERE clause and the already-loaded SQL parser instance.  Wraps
- * the clause in a full `SELECT * FROM "stream" WHERE …` query, uses the parser
- * to produce an AST, walks the tree to locate duration binary expressions whose
- * right-hand side is a quoted string value (e.g. `'1.50ms'`), converts the
- * value, and applies the replacement back on the original WHERE string.
- *
- * Falls back to the original string if the parser throws (malformed input).
- *
- * Examples:
- *   `duration >= '100.00us'`  →  `duration >= 100`
- *   `duration >= '1.50ms'`    →  `duration >= 1500`
- *   `duration >= '2.50s'`     →  `duration >= 2500000`
- *   `duration >= '1.50m'`     →  `duration >= 90000000`
- */
 /** Maps every accepted unit spelling to a canonical key in DURATION_UNIT_MULTIPLIERS. */
 const UNIT_ALIASES: Record<string, string> = {
   // Microseconds
@@ -117,10 +99,8 @@ export const parseDurationWhereClause = (
       if (!node || node.type !== "binary_expr" || unknownUnit) return;
 
       if (
-        (node.left?.column === "duration" ||
-          node.left?.column?.expr?.value === "duration") &&
-        (node.right?.type === "single_quote_string" ||
-          node.right?.type === "string")
+        (node.left?.column === "duration" || node.left?.column?.expr?.value === "duration") &&
+        (node.right?.type === "single_quote_string" || node.right?.type === "string")
       ) {
         const strVal = String(node.right.value).trim();
         // Allow optional whitespace between number and unit; unit may be multi-char.
@@ -133,9 +113,7 @@ export const parseDurationWhereClause = (
             return;
           }
           const num = parseFloat(match[1]);
-          const us = Math.round(
-            num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1),
-          );
+          const us = Math.round(num * (DURATION_UNIT_MULTIPLIERS[canonicalUnit] ?? 1));
           // Mutate the AST node in place — replace quoted string with a numeric literal.
           node.right = { type: "number", value: us };
         }
@@ -168,8 +146,7 @@ export const parseDurationWhereClause = (
  * stored in the stream. Formatting for display is the caller's responsibility.
  */
 const useDurationPercentiles = () => {
-  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } =
-    useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const percentiles = ref<DurationPercentiles>({
     p25: null,
@@ -209,9 +186,7 @@ const useDurationPercentiles = () => {
     const { traceId } = generateTraceContext();
     currentTraceId = traceId;
 
-    const where = payload.whereClause?.trim()
-      ? ` WHERE ${payload.whereClause.trim()}`
-      : "";
+    const where = payload.whereClause?.trim() ? ` WHERE ${payload.whereClause.trim()}` : "";
     const sql =
       `SELECT approx_percentile_cont(duration, 0.25) as p25,` +
       ` approx_percentile_cont(duration, 0.50) as p50,` +
@@ -260,16 +235,16 @@ const useDurationPercentiles = () => {
             }
           }
         },
-        error: (_p: any, _r: any) => {
+        error: () => {
           errMsg.value = "Failed to load percentiles";
           isLoading.value = false;
           currentTraceId = null;
         },
-        complete: (_p: any, _r: any) => {
+        complete: () => {
           isLoading.value = false;
           currentTraceId = null;
         },
-        reset: (_p: any, _r: any) => {
+        reset: () => {
           // no-op — percentile fetches are not retriable via reset
         },
       },

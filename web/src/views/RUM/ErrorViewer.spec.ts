@@ -15,7 +15,7 @@
 
 /**
  * Unit tests for ErrorViewer.vue component
- * 
+ *
  * This test suite covers:
  * 1. Component mounting and basic rendering
  * 2. Loading states and UI feedback
@@ -150,27 +150,6 @@ describe("ErrorViewer.vue", () => {
     message: "Test error message",
   };
 
-  const mockEventsData = [
-    {
-      error_id: "test-error-id-123",
-      type: "error",
-      error_type: "TypeError",
-      timestamp: 1640995200000000,
-    },
-    {
-      error_id: "test-error-id-123",
-      type: "action",
-      action_type: "click",
-      timestamp: 1640995199000000,
-    },
-    {
-      error_id: "test-error-id-123",
-      type: "view",
-      view_loading_type: "route_change",
-      timestamp: 1640995198000000,
-    },
-  ];
-
   beforeEach(() => {
     vi.clearAllMocks();
     store = createMockStore();
@@ -205,9 +184,6 @@ describe("ErrorViewer.vue", () => {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          QSeparator: {
-            template: "<hr data-test='separator' />",
-          },
           OSeparator: {
             template: "<hr data-test='separator' />",
           },
@@ -230,9 +206,7 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      expect(
-        wrapper.find('[data-test="error-viewer-container"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="error-viewer-container"]').exists()).toBe(true);
     });
 
     it("should have correct styles applied", () => {
@@ -243,7 +217,7 @@ describe("ErrorViewer.vue", () => {
       const container = wrapper.find('[data-test="error-viewer-container"]');
       expect(container.exists()).toBe(true);
       // Check that the container has the expected layout class
-      expect(container.classes()).toContain("card-container");
+      expect(container.classes()).toContain("bg-card-glass-bg");
     });
   });
 
@@ -299,6 +273,59 @@ describe("ErrorViewer.vue", () => {
     });
   });
 
+  describe("Linked backend trace", () => {
+    beforeEach(() => {
+      mockSearchService.search.mockResolvedValue({ data: { hits: [] } });
+    });
+
+    // errorDetails is only populated inside onActivated (keep-alive), which
+    // never fires in a plain mount — seed the exposed ref directly.
+    const seedErrorDetails = async (details: Record<string, any>) => {
+      wrapper = mountComponent();
+      wrapper.vm.errorDetails = details;
+      await nextTick();
+    };
+
+    it("shows the trace correlation card when the error carries _oo_trace_id", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _oo_trace_id: "trace-abc",
+        session_id: "session-1",
+        _timestamp: 1640995200000000,
+      });
+
+      const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
+      expect(card.exists()).toBe(true);
+      expect(card.props("traceId")).toBe("trace-abc");
+      expect(card.props("timestamp")).toBe(1640995200000000);
+    });
+
+    it("shows the card when a captured xhr event carries _oo_trace_id", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _timestamp: 1640995200000000,
+        events: [
+          { type: "action", action_type: "click" },
+          { type: "resource", resource_type: "xhr", _oo_trace_id: "trace-xhr" },
+        ],
+      });
+
+      const card = wrapper.findComponent({ name: "TraceCorrelationCard" });
+      expect(card.exists()).toBe(true);
+      expect(card.props("traceId")).toBe("trace-xhr");
+    });
+
+    it("hides the card when neither the error nor its events carry a trace id", async () => {
+      await seedErrorDetails({
+        error_id: "err-1",
+        _timestamp: 1640995200000000,
+        events: [{ type: "action", action_type: "click" }],
+      });
+
+      expect(wrapper.findComponent({ name: "TraceCorrelationCard" }).exists()).toBe(false);
+    });
+  });
+
   describe("Event Category Processing Method", () => {
     beforeEach(() => {
       mockSearchService.search.mockResolvedValue({
@@ -309,11 +336,17 @@ describe("ErrorViewer.vue", () => {
 
     it("should categorize error events correctly", () => {
       const component = wrapper.vm;
-      
-      expect(component.getErrorCategory({ type: "error", error_type: "TypeError" })).toBe("TypeError");
+
+      expect(component.getErrorCategory({ type: "error", error_type: "TypeError" })).toBe(
+        "TypeError",
+      );
       expect(component.getErrorCategory({ type: "resource", resource_type: "xhr" })).toBe("xhr");
-      expect(component.getErrorCategory({ type: "view", view_loading_type: "route_change" })).toBe("Navigation");
-      expect(component.getErrorCategory({ type: "view", view_loading_type: "initial_load" })).toBe("Reload");
+      expect(component.getErrorCategory({ type: "view", view_loading_type: "route_change" })).toBe(
+        "Navigation",
+      );
+      expect(component.getErrorCategory({ type: "view", view_loading_type: "initial_load" })).toBe(
+        "Reload",
+      );
       expect(component.getErrorCategory({ type: "action", action_type: "click" })).toBe("click");
       expect(component.getErrorCategory({ type: "unknown" })).toBe("unknown");
     });
@@ -334,7 +367,7 @@ describe("ErrorViewer.vue", () => {
     it("should render loading spinner when isLoading has elements", async () => {
       // Mock search to add to loading array
       wrapper = mountComponent();
-      
+
       // Manually add to isLoading array to simulate loading state
       wrapper.vm.isLoading.push(true);
       await nextTick();
@@ -345,7 +378,7 @@ describe("ErrorViewer.vue", () => {
 
     it("should not render main content when loading", async () => {
       wrapper = mountComponent();
-      
+
       // Manually add to isLoading array to simulate loading state
       wrapper.vm.isLoading.push(true);
       await nextTick();
@@ -359,7 +392,7 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      
+
       // Ensure isLoading is empty
       wrapper.vm.isLoading = [];
       await nextTick();
@@ -376,7 +409,7 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      
+
       // Ensure isLoading is empty
       wrapper.vm.isLoading = [];
       await nextTick();
@@ -391,7 +424,7 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      
+
       // Set up error details manually for testing
       wrapper.vm.errorDetails = mockErrorData;
       wrapper.vm.errorDetails.error_stack = ["Error: Test", "  at test.js:1:1"];
@@ -412,7 +445,9 @@ describe("ErrorViewer.vue", () => {
     it("should pass correct props to ErrorStackTrace", () => {
       const errorStackTrace = wrapper.findComponent({ name: "ErrorStackTrace" });
       expect(errorStackTrace.props("error")).toEqual(wrapper.vm.errorDetails);
-      expect(errorStackTrace.props("error_stack")).toEqual(wrapper.vm.errorDetails.error_stack || []);
+      expect(errorStackTrace.props("error_stack")).toEqual(
+        wrapper.vm.errorDetails.error_stack || [],
+      );
     });
 
     it("should pass correct props to ErrorSessionReplay", () => {
@@ -436,7 +471,7 @@ describe("ErrorViewer.vue", () => {
 
       // Component should still mount and not crash
       expect(wrapper.exists()).toBe(true);
-      
+
       consoleErrorSpy.mockRestore();
     });
 
@@ -445,7 +480,7 @@ describe("ErrorViewer.vue", () => {
         data: { hits: [mockErrorData] },
       });
       wrapper = mountComponent();
-      
+
       expect(() => wrapper.unmount()).not.toThrow();
     });
   });
@@ -453,53 +488,47 @@ describe("ErrorViewer.vue", () => {
   describe("Manual Error Details Processing", () => {
     it("should process error_handling_stack when available", async () => {
       wrapper = mountComponent();
-      
+
       // Manually set error details with handling stack
       const testErrorData = {
         ...mockErrorData,
         error_handling_stack: "Error: Handling stack\n    at handler.js:1:1",
         error_stack: "Error: Regular stack\n    at main.js:1:1",
       };
-      
+
       // Simulate the error stack processing logic
       const errorStack = testErrorData.error_handling_stack || testErrorData.error_stack;
       const processedStack = errorStack.split("\n");
-      
-      expect(processedStack).toEqual([
-        "Error: Handling stack",
-        "    at handler.js:1:1",
-      ]);
+
+      expect(processedStack).toEqual(["Error: Handling stack", "    at handler.js:1:1"]);
     });
 
     it("should fallback to error_stack when error_handling_stack is not available", async () => {
       wrapper = mountComponent();
-      
+
       // Manually set error details without handling stack
       const testErrorData = {
         ...mockErrorData,
         error_stack: "Error: Regular stack\n    at main.js:1:1",
       };
       delete testErrorData.error_handling_stack;
-      
+
       // Simulate the error stack processing logic
       const errorStack = testErrorData.error_handling_stack || testErrorData.error_stack;
       const processedStack = errorStack.split("\n");
-      
-      expect(processedStack).toEqual([
-        "Error: Regular stack",
-        "    at main.js:1:1",
-      ]);
+
+      expect(processedStack).toEqual(["Error: Regular stack", "    at main.js:1:1"]);
     });
   });
 
   describe("Component State Management", () => {
     it("should manage loading state correctly", async () => {
       wrapper = mountComponent();
-      
+
       // Test adding to loading state
       wrapper.vm.isLoading.push(true);
       expect(wrapper.vm.isLoading.length).toBe(1);
-      
+
       // Test removing from loading state
       wrapper.vm.isLoading.pop();
       expect(wrapper.vm.isLoading.length).toBe(0);
@@ -507,7 +536,7 @@ describe("ErrorViewer.vue", () => {
 
     it("should maintain errorDetails state", async () => {
       wrapper = mountComponent();
-      
+
       // Test setting error details
       wrapper.vm.errorDetails = mockErrorData;
       expect(wrapper.vm.errorDetails.error_id).toBe("test-error-id-123");
@@ -528,11 +557,14 @@ describe("ErrorViewer.vue", () => {
       });
 
       // Manually call the search service to test integration
-      const result = await mockSearchService.search({
-        org_identifier: "test-org",
-        query: { sql: "SELECT * FROM test" },
-        page_type: "logs",
-      }, "RUM");
+      const result = await mockSearchService.search(
+        {
+          org_identifier: "test-org",
+          query: { sql: "SELECT * FROM test" },
+          page_type: "logs",
+        },
+        "RUM",
+      );
 
       expect(result.data.hits).toEqual([mockErrorData]);
       expect(mockSearchService.search).toHaveBeenCalledWith(
@@ -541,7 +573,7 @@ describe("ErrorViewer.vue", () => {
           query: { sql: "SELECT * FROM test" },
           page_type: "logs",
         },
-        "RUM"
+        "RUM",
       );
     });
   });

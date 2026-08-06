@@ -15,26 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <OSplitter
-    v-model="categorySplitterModel"
-    unit="px"
-    class="tw:h-full"
-  >
+  <OSplitter v-model="categorySplitterModel" unit="px" class="h-full">
     <template v-slot:before>
-      <div class="tw:w-full tw:h-full">
-        <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
-          <div class="tw:overflow-y-auto tw:h-full tw:pt-1.5">
-            <OTabs
-              v-model="selectedCategory"
-              orientation="vertical"
-              dense
-              class="tw:px-1"
-            >
+      <div class="h-full w-full">
+        <div class="bg-surface-panel border-border-default h-full border-r">
+          <div class="h-full overflow-y-auto pt-1.5">
+            <OTabs v-model="selectedCategory" orientation="vertical" dense class="px-1">
               <OTab
                 v-for="cat in aiCategories"
                 :key="cat.slug"
                 :name="cat.slug"
-                :label="cat.name"
+                :label="raw(cat.name)"
                 :data-test="`ai-integrations-category-${cat.slug}`"
               />
             </OTabs>
@@ -44,52 +35,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <template v-slot:after>
-      <OSplitter
-        v-model="integrationSplitterModel"
-        unit="px"
-        class="tw:h-full"
-      >
+      <OSplitter v-model="integrationSplitterModel" unit="px" class="h-full">
         <template v-slot:before>
-          <div class="tw:w-full tw:h-full">
-            <div class="tw:h-full tw:bg-surface-panel tw:border-r tw:border-border-default">
-              <div class="tw:flex tw:flex-col tw:h-full">
-                <div class="tw:pt-2 tw:pl-2 tw:pr-4">
+          <div class="h-full w-full">
+            <div class="bg-surface-panel border-border-default h-full border-r">
+              <div class="flex h-full flex-col">
+                <div class="pt-2 pr-4 pl-2">
                   <OSearchInput
                     data-test="ai-integrations-search-input"
                     v-model="integrationFilter"
                     clearable
-                    class="tw:w-full indexlist-search-input"
+                    class="indexlist-search-input w-full"
                     :placeholder="t('common.search')"
                   />
                 </div>
-                <div class="tw:overflow-y-auto tw:flex-1 tw:min-h-0">
+                <div class="min-h-0 flex-1 overflow-y-auto">
                   <OTabs
                     v-model="selectedIntegration"
                     orientation="vertical"
                     dense
-                    class="tw:px-1"
+                    class="px-1"
                     @update:model-value="navigateToIntegration"
                   >
                     <OTab
                       v-for="integration in filteredIntegrations"
                       :key="integration.slug"
                       :name="integration.routeName"
-                      :label="integration.name"
+                      :label="raw(integration.name)"
                       :data-test="`ai-integrations-item-${integration.slug}`"
                     >
                       <template #icon>
                         <img
-                          v-if="(integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)"
-                          :src="(store.state.theme === 'dark' && integration.logoDark) || integration.logo"
-                          :alt="`${integration.name} logo`"
-                          class="ai-menu-logo"
+                          v-if="
+                            (integration.logo || integration.logoDark) &&
+                            !failedLogos.has(integration.slug)
+                          "
+                          :src="(isDark && integration.logoDark) || integration.logo"
+                          :alt="t('common.itemLogo', { name: integration.name })"
+                          class="rounded-default h-4.5 w-4.5 flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
                           @error="onLogoError(integration.slug)"
                         />
-                        <span v-else class="ai-menu-mono" aria-hidden="true">{{
-                          integration.name.charAt(0)
-                        }}</span>
+                        <span
+                          v-else
+                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                          aria-hidden="true"
+                          >{{ integration.name.charAt(0) }}</span
+                        >
                       </template>
                     </OTab>
                   </OTabs>
@@ -100,9 +93,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template v-slot:after>
-          <div class="tw:w-full tw:h-full">
-            <div class="card-container tw:h-full" data-test="ai-integrations-detail-pane">
-              <div class="tw:overflow-auto tw:h-full tw:pt-0.5">
+          <div class="h-full w-full">
+            <div class="bg-card-glass-bg h-full" data-test="ai-integrations-detail-pane">
+              <div class="h-full overflow-auto pt-0.5">
                 <router-view />
               </div>
             </div>
@@ -115,21 +108,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
 import { aiCategories } from "./ai/data";
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue';
-import OTab from '@/lib/navigation/Tabs/OTab.vue';
-import OSearchInput from '@/lib/forms/SearchInput/OSearchInput.vue';
-import OSplitter from '@/lib/core/Splitter/OSplitter.vue';
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "AIIntegrationsPage",
   components: { OTabs, OTab, OSearchInput, OSplitter },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const route = useRoute();
 
@@ -153,13 +148,12 @@ export default defineComponent({
         return currentIntegrations.value;
       }
       return currentIntegrations.value.filter((integration) =>
-        integration.name
-          .toLowerCase()
-          .includes(integrationFilter.value.toLowerCase()),
+        integration.name.toLowerCase().includes(integrationFilter.value.toLowerCase()),
       );
     });
 
-    const navigateToIntegration = (routeName: string) => {
+    const navigateToIntegration = (value: string | number) => {
+      const routeName = value as string;
       router.replace({
         name: routeName,
         query: {
@@ -197,9 +191,7 @@ export default defineComponent({
       } else {
         // Sync selectedCategory and selectedIntegration from current route
         for (const cat of aiCategories) {
-          const matchingIntegration = cat.integrations.find(
-            (i) => i.routeName === routeName,
-          );
+          const matchingIntegration = cat.integrations.find((i) => i.routeName === routeName);
           if (matchingIntegration) {
             selectedCategory.value = cat.slug;
             selectedIntegration.value = matchingIntegration.routeName;
@@ -213,15 +205,20 @@ export default defineComponent({
     // route. The route config redirect ("" → first integration) resolves to the
     // same route the user is already on, so Vue Router cancels it as a duplicate
     // navigation and the <router-view> can go blank.
-    watch(() => route.name, (newName) => {
-      if (newName === "ai-integrations") {
-        navigateToFirstIntegration(selectedCategory.value);
-      }
-    });
+    watch(
+      () => route.name,
+      (newName) => {
+        if (newName === "ai-integrations") {
+          navigateToFirstIntegration(selectedCategory.value);
+        }
+      },
+    );
 
     return {
+      raw,
       t,
       store,
+      isDark,
       aiCategories,
       selectedCategory,
       selectedIntegration,
@@ -236,27 +233,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-/* Sidebar provider logo / monogram — every item gets a marker (logo URL from the
-   manifest, else a lettered tile in the app theme color, matching the card hero). */
-.ai-menu-logo,
-.ai-menu-mono {
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  flex: none;
-}
-.ai-menu-logo {
-  object-fit: contain;
-}
-.ai-menu-mono {
-  display: grid;
-  place-items: center;
-  background: var(--q-primary, #3f7994);
-  color: #fff;
-  font-size: 10.5px;
-  font-weight: 700;
-  line-height: 1;
-}
-</style>

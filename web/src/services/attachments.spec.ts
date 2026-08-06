@@ -62,7 +62,7 @@ describe("attachments service", () => {
       await attachments.list(page_num, page_size, sort_by, desc, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/tickets?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`
+        `/api/tickets?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
       );
     });
 
@@ -78,7 +78,7 @@ describe("attachments service", () => {
       await attachments.list(page_num, page_size, sort_by, desc, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/tickets?page_num=2&page_size=50&sort_by=created_at&desc=true&name=report`
+        `/api/tickets?page_num=2&page_size=50&sort_by=created_at&desc=true&name=report`,
       );
     });
 
@@ -94,7 +94,7 @@ describe("attachments service", () => {
       await attachments.list(page_num, page_size, sort_by, desc, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/tickets?page_num=1&page_size=10&sort_by=name&desc=false&name=`
+        `/api/tickets?page_num=1&page_size=10&sort_by=name&desc=false&name=`,
       );
     });
 
@@ -110,7 +110,7 @@ describe("attachments service", () => {
       await attachments.list(page_num, page_size, sort_by, desc, name);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/tickets?page_num=1&page_size=100&sort_by=size&desc=true&name=log`
+        `/api/tickets?page_num=1&page_size=100&sort_by=size&desc=true&name=log`,
       );
     });
   });
@@ -127,7 +127,7 @@ describe("attachments service", () => {
       await attachments.getPresignedUrl(objectkey, fileType);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/attachements/${objectkey}?fileType=${fileType}`
+        `/api/attachements/${objectkey}?fileType=${fileType}`,
       );
     });
 
@@ -142,7 +142,7 @@ describe("attachments service", () => {
       await attachments.getPresignedUrl(objectkey, fileType);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/attachements/${objectkey}?fileType=${fileType}`
+        `/api/attachements/${objectkey}?fileType=${fileType}`,
       );
     });
 
@@ -155,7 +155,7 @@ describe("attachments service", () => {
       await attachments.getPresignedUrl(objectkey, fileType);
 
       expect(mockHttpInstance.get).toHaveBeenCalledWith(
-        `/api/attachements/image.jpg?fileType=image/jpeg`
+        `/api/attachements/image.jpg?fileType=image/jpeg`,
       );
     });
   });
@@ -257,18 +257,16 @@ describe("attachments service", () => {
       const error = new Error("Unauthorized");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        attachments.list(1, 20, "name", false, "test")
-      ).rejects.toThrow("Unauthorized");
+      await expect(attachments.list(1, 20, "name", false, "test")).rejects.toThrow("Unauthorized");
     });
 
     it("should propagate errors from getPresignedUrl", async () => {
       const error = new Error("Forbidden");
       mockHttpInstance.get.mockRejectedValue(error);
 
-      await expect(
-        attachments.getPresignedUrl("my-file.png", "image/png")
-      ).rejects.toThrow("Forbidden");
+      await expect(attachments.getPresignedUrl("my-file.png", "image/png")).rejects.toThrow(
+        "Forbidden",
+      );
     });
 
     it("should propagate errors from upload (axios)", async () => {
@@ -276,7 +274,10 @@ describe("attachments service", () => {
       (axios.put as any).mockRejectedValue(error);
 
       await expect(
-        attachments.upload("https://s3.amazonaws.com/url", new Blob(["data"], { type: "text/plain" }))
+        attachments.upload(
+          "https://s3.amazonaws.com/url",
+          new Blob(["data"], { type: "text/plain" }),
+        ),
       ).rejects.toThrow("S3 upload failed");
     });
 
@@ -284,18 +285,16 @@ describe("attachments service", () => {
       const error = new Error("Validation error");
       mockHttpInstance.post.mockRejectedValue(error);
 
-      await expect(
-        attachments.create({ title: "failing ticket" })
-      ).rejects.toThrow("Validation error");
+      await expect(attachments.create({ title: "failing ticket" })).rejects.toThrow(
+        "Validation error",
+      );
     });
 
     it("should propagate errors from delete", async () => {
       const error = new Error("Not found");
       mockHttpInstance.delete.mockRejectedValue(error);
 
-      await expect(
-        attachments.delete("non-existent-ticket")
-      ).rejects.toThrow("Not found");
+      await expect(attachments.delete("non-existent-ticket")).rejects.toThrow("Not found");
     });
   });
 });

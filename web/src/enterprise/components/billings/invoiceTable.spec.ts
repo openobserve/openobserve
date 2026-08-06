@@ -124,11 +124,6 @@ describe("InvoiceTable Component", () => {
           store: store,
         },
         plugins: [i18n, router],
-        mocks: {
-          $q: {
-            notify: vi.fn(),
-          },
-        },
       },
     });
   }
@@ -169,7 +164,7 @@ describe("InvoiceTable Component", () => {
     it("calls BillingService.list_invoice_history on mount", () => {
       wrapper = mountInvoiceTable();
       expect(BillingService.list_invoice_history).toHaveBeenCalledWith(
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       );
     });
 
@@ -182,7 +177,6 @@ describe("InvoiceTable Component", () => {
         global: {
           provide: { store },
           plugins: [i18n, router],
-          mocks: { $q: { notify: vi.fn() } },
         },
       });
 

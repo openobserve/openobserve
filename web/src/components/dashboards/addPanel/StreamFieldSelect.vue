@@ -1,10 +1,10 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <template>
-  <div class="tw:min-w-0">
+  <div class="min-w-0">
     <OSelect
       :model-value="selectValue"
       :options="flatOptions"
-      label="Select Field"
+      :label="t('dashboard.streamFieldSelect.selectField')"
       label-position="inside"
       searchable
       data-test="stream-field-select"
@@ -16,9 +16,11 @@
 
 <script lang="ts">
 import { defineComponent, ref, watch, computed, inject } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import useStreams from "@/composables/useStreams";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 
 // Composite key separator — unlikely to appear in stream/field names
 const SEP = "\x00";
@@ -42,20 +44,15 @@ export default defineComponent({
   components: { OSelect },
 
   setup(props, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
+    const { t } = useI18nTyped();
 
-    const { getStream } = useStreams();
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+
+    const { getStream } = useStreams(t);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Raw loaded groups: { label, streamRef, children: [{name, ...}] }
-    const groups = ref<{ label: string; streamRef: any; children: any[] }[]>(
-      [],
-    );
+    const groups = ref<{ label: string; streamRef: any; children: any[] }[]>([]);
 
     // valueMap: composite key -> { field, streamAlias }
     const valueMap = new Map<string, { field: string; streamAlias?: string }>();
@@ -80,7 +77,7 @@ export default defineComponent({
 
     // Derive the currently selected string key from the modelValue object.
     // Computed from `groups` (reactive ref) so it re-runs after fields load.
-    const selectValue = computed<string | null>(() => {
+    const selectValue = computed<string | null | undefined>(() => {
       const mv = props.modelValue;
 
       if (!mv?.field) return undefined;
@@ -108,9 +105,8 @@ export default defineComponent({
       try {
         return await getStream(
           streamName,
-          dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].fields.stream_type ?? "logs",
+          dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields
+            .stream_type ?? "logs",
           true,
         );
       } catch {
@@ -151,8 +147,8 @@ export default defineComponent({
       );
     }
 
-    function onSelect(key: string | null) {
-      if (!key) return;
+    function onSelect(key: SelectModelValue) {
+      if (!key || typeof key !== "string") return;
       const mapped = valueMap.get(key);
       if (mapped) {
         emit("update:modelValue", { ...mapped });
@@ -169,6 +165,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       flatOptions,
       selectValue,
       onSelect,

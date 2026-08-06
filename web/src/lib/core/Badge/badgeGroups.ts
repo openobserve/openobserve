@@ -25,6 +25,8 @@
 // to the same entry.
 // ─────────────────────────────────────────────────────────────────────────
 
+import { raw, type I18nKey, I18nText } from "@/types/i18n";
+
 import type { BadgeVariant, BadgeSize, BadgeShape } from "./OBadge.types";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 
@@ -37,14 +39,14 @@ export interface BadgeValueConfig {
   /** OIcon name — shown when the effective mode is "icon". */
   icon?: string;
   /** Display text. Defaults to the humanised value. */
-  label?: string;
+  label?: I18nText;
   /**
    * i18n key for the label. Resolved by `OTag` via `t(labelKey)` (the registry
    * is a plain module with no i18n context). Use this instead of `label` when
    * the text must be translated. A literal `label` (or a per-call `label` prop)
    * still wins over `labelKey`.
    */
-  labelKey?: string;
+  labelKey?: I18nKey;
   /** Force the leading dot on/off regardless of group mode. */
   dot?: boolean;
   /** Per-value size override (wins over the group `size`). For groups whose
@@ -97,8 +99,16 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       scheduled: { variant: "teal-soft", icon: "schedule" },
-      realtime: { variant: "blue-soft", icon: "bolt", label: "Real-time" },
-      anomalydetection: { variant: "purple-soft", icon: "query-stats", label: "Anomaly Detection" },
+      realtime: {
+        variant: "blue-soft",
+        icon: "bolt",
+        labelKey: "components.badge.alertType.realtime",
+      },
+      anomalydetection: {
+        variant: "purple-soft",
+        icon: "query-stats",
+        labelKey: "components.badge.alertType.anomalydetection",
+      },
     },
   },
 
@@ -115,6 +125,49 @@ export const BADGE_GROUPS = {
       disabled: { variant: "default-soft" },
       paused: { variant: "warning-soft" },
     },
+  },
+
+  // Alert PRIORITY (Feature 2, PT-3) — how much humans care about this alert,
+  // set at configuration time.
+  //
+  // A THIRD axis, distinct from both neighbours below: `alertState` is the run
+  // outcome ("did it fire?"), `alertLevel` is the evaluated severity right now
+  // ("how bad?"), and this is neither — a P1 alert sitting at level Ok is
+  // perfectly normal, so these must never share a group.
+  //
+  // Palette follows the existing `severity` hot→cold ramp so P1–P4 read the
+  // same as they do on incidents, extended with a neutral P5 (that scale stops
+  // at P4).
+  alertPriority: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      p1: { variant: "error-soft", label: raw("P1") },
+      p2: { variant: "orange-soft", label: raw("P2") },
+      p3: { variant: "amber-soft", label: raw("P3") },
+      p4: { variant: "blue-soft", label: raw("P4") },
+      p5: { variant: "default-soft", label: raw("P5") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Alert severity LEVEL (alerts_2.md Feature 1) — dot, PILL.
+  //
+  // A separate axis from `alertState` above, which renders the run OUTCOME
+  // ("did it fire?"). This renders "how bad?". An alert can be `firing` at
+  // `warning`, so the two badges can and do appear side by side.
+  alertLevel: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      critical: { variant: "error-soft" },
+      warning: { variant: "warning-soft" },
+      ok: { variant: "success-soft", labelKey: "components.badge.alertLevel.ok" },
+      // Reserved: the policy that produces it ships in Phase 2. Neutral rather
+      // than warning-coloured — "we don't know" is not "we know it's bad".
+      nodata: { variant: "default-soft", labelKey: "components.badge.alertLevel.nodata" },
+    },
+    fallback: { variant: "default-soft" },
   },
 
   // Incident lifecycle. Labels are i18n keys (resolved by OTag).
@@ -141,10 +194,10 @@ export const BADGE_GROUPS = {
       medium: { variant: "amber-soft" },
       low: { variant: "blue-soft" },
       info: { variant: "default-soft" },
-      p1: { variant: "error-soft", label: "P1" },
-      p2: { variant: "orange-soft", label: "P2" },
-      p3: { variant: "amber-soft", label: "P3" },
-      p4: { variant: "blue-soft", label: "P4" },
+      p1: { variant: "error-soft", label: raw("P1") },
+      p2: { variant: "orange-soft", label: raw("P2") },
+      p3: { variant: "amber-soft", label: raw("P3") },
+      p4: { variant: "blue-soft", label: raw("P4") },
     },
   },
 
@@ -156,8 +209,8 @@ export const BADGE_GROUPS = {
       trace: { variant: "default-soft" },
       debug: { variant: "default-soft" },
       info: { variant: "blue-soft" },
-      warn: { variant: "amber-soft", label: "WARN" },
-      warning: { variant: "amber-soft", label: "WARN" },
+      warn: { variant: "amber-soft", label: raw("WARN") },
+      warning: { variant: "amber-soft", label: raw("WARN") },
       error: { variant: "error-soft" },
       fatal: { variant: "purple-soft" },
     },
@@ -168,7 +221,11 @@ export const BADGE_GROUPS = {
     mode: "icon",
     shape: "pill",
     values: {
-      realtime: { variant: "blue-soft", icon: "bolt", label: "Real-time" },
+      realtime: {
+        variant: "blue-soft",
+        icon: "bolt",
+        labelKey: "components.badge.pipelineType.realtime",
+      },
       scheduled: { variant: "teal-soft", icon: "schedule" },
     },
   },
@@ -179,10 +236,22 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       logs: { variant: "blue-soft", icon: "search", labelKey: "settings.correlation.logs" },
-      metrics: { variant: "purple-soft", icon: "bar-chart", labelKey: "settings.correlation.metrics" },
-      traces: { variant: "teal-soft", icon: "account-tree", labelKey: "settings.correlation.traces" },
+      metrics: {
+        variant: "purple-soft",
+        icon: "bar-chart",
+        labelKey: "settings.correlation.metrics",
+      },
+      traces: {
+        variant: "teal-soft",
+        icon: "account-tree",
+        labelKey: "settings.correlation.traces",
+      },
       metadata: { variant: "default-soft", icon: "info" },
-      enrichmenttables: { variant: "amber-soft", icon: "database", label: "Enrichment" },
+      enrichmenttables: {
+        variant: "amber-soft",
+        icon: "database",
+        labelKey: "components.badge.streamType.enrichment",
+      },
       index: { variant: "cyan-soft", icon: "database" },
     },
   },
@@ -232,18 +301,72 @@ export const BADGE_GROUPS = {
     },
   },
 
+  // Pipeline execution outcome — dot.
+  //
+  // `RunOutcome` replaced the legacy trigger status vocabulary for every
+  // scheduler-backed module. Pipeline history must accept both generations
+  // while old rows remain in the triggers stream.
+  pipelineRunOutcome: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      // Current RunOutcome vocabulary.
+      firing: { variant: "success-soft" },
+      normal: { variant: "success-soft" },
+      succeeded: { variant: "success-soft" },
+      error: { variant: "error-soft" },
+      notifyfailed: { variant: "error-soft" },
+      skipped: { variant: "warning-soft" },
+      // Legacy trigger status vocabulary and older UI aliases.
+      completed: { variant: "success-soft" },
+      conditionnotsatisfied: { variant: "success-soft" },
+      failed: { variant: "error-soft" },
+      success: { variant: "success-soft" },
+      ok: { variant: "success-soft" },
+      warning: { variant: "warning-soft" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
   // Service / node health — dot.
   serviceStatus: {
     mode: "dot",
     shape: "pill",
     values: {
+      up: { variant: "success-soft" },
+      passed: { variant: "success-soft" },
       healthy: { variant: "success-soft" },
       online: { variant: "success-soft" },
       degraded: { variant: "warning-soft" },
       warning: { variant: "amber-soft" },
+      // A cluster node that is starting up but not yet serving.
+      prepare: { variant: "warning-soft" },
       critical: { variant: "error-soft" },
       offline: { variant: "error-soft" },
+      failed: { variant: "error-soft" },
       down: { variant: "error-soft" },
+      unknown: { variant: "default-soft" },
+    },
+  },
+
+  // Cluster node roles — plain (a role is a category, not a severity), one stable
+  // colour per role so the same node type reads the same everywhere.
+  nodeRole: {
+    mode: "plain",
+    shape: "pill",
+    values: {
+      all: { variant: "primary-soft", labelKey: "components.badge.nodeRole.all" },
+      ingester: { variant: "teal-soft" },
+      querier: { variant: "blue-soft" },
+      compactor: { variant: "purple-soft" },
+      flattencompactor: {
+        variant: "purple-soft",
+        labelKey: "components.badge.nodeRole.flattencompactor",
+      },
+      router: { variant: "orange-soft" },
+      alertmanager: { variant: "amber-soft", labelKey: "components.badge.nodeRole.alertmanager" },
+      actionserver: { variant: "lime-soft", labelKey: "components.badge.nodeRole.actionserver" },
+      script: { variant: "default-soft" },
     },
   },
 
@@ -258,7 +381,10 @@ export const BADGE_GROUPS = {
       member: { variant: "blue-soft" },
       viewer: { variant: "default-soft" },
       user: { variant: "default-soft" },
-      serviceaccount: { variant: "teal-soft", label: "Service Account" },
+      serviceaccount: {
+        variant: "teal-soft",
+        labelKey: "components.badge.userRole.serviceaccount",
+      },
     },
   },
 
@@ -267,9 +393,9 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      sso: { variant: "blue-soft", label: "SSO" },
+      sso: { variant: "blue-soft", label: raw("SSO") },
       native: { variant: "default-soft" },
-      ldap: { variant: "purple-soft", label: "LDAP" },
+      ldap: { variant: "purple-soft", label: raw("LDAP") },
     },
   },
 
@@ -278,11 +404,11 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      get: { variant: "blue-soft", label: "GET" },
-      post: { variant: "success-soft", label: "POST" },
-      put: { variant: "warning-soft", label: "PUT" },
-      patch: { variant: "purple-soft", label: "PATCH" },
-      delete: { variant: "error-soft", label: "DELETE" },
+      get: { variant: "blue-soft", label: raw("GET") },
+      post: { variant: "success-soft", label: raw("POST") },
+      put: { variant: "warning-soft", label: raw("PUT") },
+      patch: { variant: "purple-soft", label: raw("PATCH") },
+      delete: { variant: "error-soft", label: raw("DELETE") },
     },
   },
 
@@ -291,14 +417,14 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "rounded",
     values: {
-      utf8: { variant: "blue-soft", label: "String" },
+      utf8: { variant: "blue-soft", label: raw("String") },
       string: { variant: "blue-soft" },
-      int64: { variant: "purple-soft", label: "Int" },
-      integer: { variant: "purple-soft", label: "Int" },
-      float64: { variant: "cyan-soft", label: "Float" },
+      int64: { variant: "purple-soft", label: raw("Int") },
+      integer: { variant: "purple-soft", label: raw("Int") },
+      float64: { variant: "cyan-soft", label: raw("Float") },
       float: { variant: "cyan-soft" },
-      boolean: { variant: "teal-soft", label: "Bool" },
-      bool: { variant: "teal-soft", label: "Bool" },
+      boolean: { variant: "teal-soft", label: raw("Bool") },
+      bool: { variant: "teal-soft", label: raw("Bool") },
       object: { variant: "default-soft" },
       array: { variant: "default-soft" },
     },
@@ -312,19 +438,20 @@ export const BADGE_GROUPS = {
       email: { variant: "blue-soft", icon: "mail" },
       webhook: { variant: "teal-soft", icon: "webhook" },
       slack: { variant: "purple-soft", icon: "webhook" },
-      http: { variant: "teal-soft", icon: "webhook", label: "HTTP" },
-      sns: { variant: "orange-soft", icon: "cloud", label: "SNS" },
-      remotepipeline: { variant: "cyan-soft", icon: "hub", label: "Remote Pipeline" },
+      http: { variant: "teal-soft", icon: "webhook", label: raw("HTTP") },
+      sns: { variant: "orange-soft", icon: "cloud", label: raw("SNS") },
+      remotepipeline: {
+        variant: "cyan-soft",
+        icon: "hub",
+        labelKey: "components.badge.destinationType.remotepipeline",
+      },
     },
   },
 
-  // CLI command presets (AddAiToolset) — every preset shares ONE colour, so this
-  // is a "named-colour" group: a fallback-only entry centralises the chip colour
-  // in the registry (R5) without enumerating each preset (the list is data-driven
-  // via CLI_PRESETS). The `value` is passed for semantics but always resolves to
-  // the fallback. shape:pill + size:md keep it pixel-identical to the old manual
-  // `variant="primary-soft"` chip. (If presets ever need per-preset colours, add
-  // them under `values`.)
+  // CLI command presets (AddAiToolset) — every preset shares ONE colour via a
+  // fallback-only entry (the list is data-driven via CLI_PRESETS). The `value` is
+  // passed for semantics but always resolves to the fallback. Add per-preset
+  // colours under `values` if ever needed.
   cliPreset: {
     mode: "plain",
     shape: "pill",
@@ -334,9 +461,8 @@ export const BADGE_GROUPS = {
   },
 
   // Count chip — numeric count/total badges, keyed by colour INTENT (the number
-  // itself is the slot). Centralises count-badge styling per the type-drives-
-  // styling rule. pill + sm; the leading `dot` (where present) stays a per-call
-  // decorative prop. Reusable across count badges.
+  // itself is the slot). pill + sm; the leading `dot` (where present) stays a
+  // per-call decorative prop.
   countChip: {
     mode: "plain",
     shape: "pill",
@@ -380,7 +506,11 @@ export const BADGE_GROUPS = {
     values: {
       runtime: { variant: "default-outline", icon: "code" },
       setuptime: { variant: "primary-soft", icon: "schedule" },
-      cost: { variant: "default-outline", icon: "attach-money", label: "Cost & Tokens Captured" },
+      cost: {
+        variant: "default-outline",
+        icon: "attach-money",
+        labelKey: "components.badge.setupCardMeta.cost",
+      },
       meta: { variant: "default-outline" },
     },
     fallback: { variant: "default-outline" },
@@ -404,7 +534,7 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     size: "md",
-    class: "tw:px-2 tw:py-3",
+    class: "px-2 py-3",
     values: {
       discount: { variant: "primary-soft", labelKey: "billing.discountTag" },
       subscribed: { variant: "primary-soft", labelKey: "billing.subscribed" },
@@ -439,7 +569,7 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      invited: { variant: "warning-soft", label: "Invited" },
+      invited: { variant: "warning-soft", labelKey: "components.badge.userStatus.invited" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -458,7 +588,7 @@ export const BADGE_GROUPS = {
   featureStatus: {
     mode: "plain",
     shape: "pill",
-    size: "md",
+    size: "sm",
     values: {
       enabled: { variant: "success" },
       disabled: { variant: "error" },
@@ -496,6 +626,25 @@ export const BADGE_GROUPS = {
     fallback: { variant: "primary" },
   },
 
+  // Prometheus metric TYPE — the classifying badge on the Metrics Explorer's
+  // cards, the ⚙ function dialog and anywhere else a metric's kind is shown.
+  // One hue per kind, matching the explorer's palette (metricPalette.ts):
+  // Counter blue, Gauge green, Histogram purple, Summary orange, Other grey.
+  metricType: {
+    mode: "plain",
+    shape: "rounded",
+    // xs: this badge lives in dense card footers and dialog headers.
+    size: "xs",
+    values: {
+      counter: { variant: "blue-soft", label: raw("Counter") },
+      gauge: { variant: "success-soft", label: raw("Gauge") },
+      histogram: { variant: "purple-soft", label: raw("Histogram") },
+      summary: { variant: "orange-soft", label: raw("Summary") },
+      other: { variant: "default-soft", label: raw("Other") },
+    },
+    fallback: { variant: "default-soft", label: raw("Other") },
+  },
+
   // Metric/info chip — trace & thread toolbar chips (Service/Duration/Cost/Steps…)
   // that carry icon + label + value in the slot and get their accent from scoped
   // CSS (.toolbar-chip/.thread-chip/.llm-chip). Uniform neutral base; pill + sm.
@@ -522,8 +671,7 @@ export const BADGE_GROUPS = {
 
   // Neutral field/value tag — plain chips that just display a field or value name
   // (CrossLinkManager fields, PipelinesDestinationList type/format, …). `soft` =
-  // the lighter default-soft variant; bare (fallback) = solid default. pill + md =
-  // matches a bare <OTag> (the manual default these replaced). Reusable.
+  // the lighter default-soft variant; bare (fallback) = solid default. pill + md.
   fieldTag: {
     mode: "plain",
     shape: "pill",
@@ -548,20 +696,18 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      p50: { variant: "default-soft", label: "P50" },
-      p95: { variant: "default-soft", label: "P95" },
-      p99: { variant: "default-soft", label: "P99" },
+      p50: { variant: "default-soft", label: raw("P50") },
+      p95: { variant: "default-soft", label: raw("P95") },
+      p99: { variant: "default-soft", label: raw("P99") },
     },
     fallback: { variant: "default-soft" },
   },
 
-  // Report-row markers (ReportList) — report format + preview flag.
-  // png→primary-outline, preview→default-outline. pill + md; label is the slot.
   // Alert template origin — prebuilt vs custom. i18n labels via labelKey so the
-  // component needs no slot (was dimensionKey/fieldTag + hardcoded t() slots).
+  // component needs no slot.
   templateOrigin: {
     mode: "plain",
-    shape: "rounded",
+    shape: "pill",
     size: "sm",
     values: {
       prebuilt: { variant: "blue-soft", labelKey: "alert_templates.prebuiltBadge" },
@@ -575,8 +721,8 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "md",
     values: {
-      png: { variant: "primary-outline", label: "PNG" },
-      preview: { variant: "default-outline", label: "Preview" },
+      png: { variant: "primary-outline", label: raw("PNG") },
+      preview: { variant: "default-outline", labelKey: "components.badge.reportTag.preview" },
     },
     fallback: { variant: "default-outline" },
   },
@@ -607,21 +753,24 @@ export const BADGE_GROUPS = {
   },
 
   // Service-account kind (ServiceAccountsList) — system vs system-managed.
-  // system→primary-outline (sm), managed→default-outline (md) — per-value size
-  // preserves the two badges' original sizes. pill.
+  // system→primary-outline (sm), managed→default-outline (md). pill.
   serviceAccountKind: {
     mode: "plain",
     shape: "pill",
     values: {
-      system: { variant: "primary-outline", size: "sm", label: "system" },
-      managed: { variant: "default-outline", size: "md", labelKey: "serviceAccounts.row.managedBy" },
+      system: { variant: "primary-outline", size: "sm", label: raw("system") },
+      managed: {
+        variant: "default-outline",
+        size: "md",
+        labelKey: "serviceAccounts.row.managedBy",
+      },
     },
     fallback: { variant: "default-outline" },
   },
 
   // Dashboard variable SCOPE (VariableSettings) — global vs tabs vs panels.
-  // global→primary-soft, tabs/panels→primary-outline. pill + md to match the old
-  // manual chips; the count/label is the slot (e.g. "3 Tabs").
+  // global→primary-soft, tabs/panels→primary-outline. pill; the count/label is
+  // the slot (e.g. "3 Tabs").
   variableScope: {
     mode: "plain",
     shape: "pill",
@@ -659,9 +808,7 @@ export const BADGE_GROUPS = {
 
   // Field-name chips (ImportSemanticGroups dialogs) — decorative chips listing
   // field names. `highlight` = a group's member fields (primary), `muted` = the
-  // "current/old" side of a compare (light grey). Replaces dead Quasar
-  // `color="primary"/text-color/color="grey-4"` props that OTag silently ignored
-  // (so these had been rendering default). pill + sm.
+  // "current/old" side of a compare (light grey). pill + sm.
   fieldNameChip: {
     mode: "plain",
     shape: "pill",
@@ -674,23 +821,21 @@ export const BADGE_GROUPS = {
   },
 
   // Normalize state (ImportSemanticGroups) — boolean → colour + label.
-  // true → primary "Normalized", false → default "Not Normalized". SOLID + pill +
-  // md to match the old manual v-if/v-else chips (zero change).
+  // true → primary "Normalized", false → default "Not Normalized". SOLID + pill + md.
   normalizeState: {
     mode: "plain",
     shape: "pill",
     size: "md",
     values: {
-      true: { variant: "primary", label: "Normalized" },
-      false: { variant: "default", label: "Not Normalized" },
+      true: { variant: "primary", labelKey: "components.badge.normalizeState.true" },
+      false: { variant: "default", labelKey: "components.badge.normalizeState.false" },
     },
-    fallback: { variant: "default", label: "Not Normalized" },
+    fallback: { variant: "default", labelKey: "components.badge.normalizeState.fallback" },
   },
 
   // Field diff status (ImportSemanticGroups modification compare) — a proposed
   // field is either NEW (success) or already EXISTING (default). Plain colour
-  // only; the leading field name + trailing "add" icon stay as slots. SOLID +
-  // pill + sm = 1:1 with the old manual chips.
+  // only; the leading field name + trailing "add" icon stay as slots. SOLID + pill + sm.
   fieldDiffStatus: {
     mode: "plain",
     shape: "pill",
@@ -704,9 +849,8 @@ export const BADGE_GROUPS = {
 
   // Import diff summary categories (ImportSemanticGroups + …Drawer) — the diff
   // CATEGORY drives the colour (new→green, modified→amber, unchanged→grey); the
-  // count + label are the slot. A real value→colour family (not a pure count), so
-  // it's typed per R5/R2. SOLID + pill + md = 1:1 with the old manual chips; the
-  // count text sizing stays per-call (`.summary-chip` font-size on the list page).
+  // count + label are the slot. SOLID + pill + md; the count text sizing stays
+  // per-call (`.summary-chip` font-size on the list page).
   diffCategory: {
     mode: "plain",
     shape: "pill",
@@ -720,9 +864,7 @@ export const BADGE_GROUPS = {
   },
 
   // "Default" template marker (AlertsDestinationList) — fixed neutral flag.
-  // Named-colour group (R5). SOLID `default` + pill + md to match the old manual
-  // chip (no size prop → md; its `tw:text-xs` class was redundant since md is
-  // already text-xs). Label stays an i18n slot at the call site.
+  // SOLID `default` + pill + md. Label stays an i18n slot at the call site.
   templateDefaultFlag: {
     mode: "plain",
     shape: "pill",
@@ -735,7 +877,7 @@ export const BADGE_GROUPS = {
 
   // "Active version" marker in scorer / score-config version lists — dot +
   // success. i18n label lives in the registry (labelKey) so the component needs
-  // no slot or per-instance :label. Was booleanState value="enabled" + t() slot.
+  // no slot or per-instance :label.
   activeVersionFlag: {
     mode: "dot",
     shape: "pill",
@@ -749,7 +891,7 @@ export const BADGE_GROUPS = {
   },
 
   // Default LLM-provider marker (LlmProvidersSettings) — dot + success, i18n
-  // label via labelKey. Was booleanState value="yes" + :label="t()".
+  // label via labelKey.
   providerDefaultFlag: {
     mode: "dot",
     shape: "pill",
@@ -759,10 +901,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "success-soft" },
   },
 
-  // Readonly marker (AddDestination) — single fixed neutral flag. Named-colour
-  // group (R5): centralises the colour so the badge isn't a manual `variant`.
-  // SOLID `default` + pill + sm to match the old manual chip exactly. Label stays
-  // an i18n slot at the call site. Reusable for any "readonly" marker.
+  // Readonly marker (AddDestination) — single fixed neutral flag. SOLID `default`
+  // + pill + sm. Label stays an i18n slot at the call site.
   readonlyFlag: {
     mode: "plain",
     shape: "pill",
@@ -775,12 +915,11 @@ export const BADGE_GROUPS = {
 
   // Destination ORIGIN — prebuilt vs custom (AlertsDestinationList). Colour is the
   // prebuilt/custom distinction (NOT the specific type — that's `destinationType`);
-  // the type NAME is passed as the slot label. SOLID variants + pill to match main
-  // exactly (the OBadge default these replaced was solid `primary`/`default`, pill).
+  // the type NAME is passed as the slot label. SOLID variants + pill.
   destinationKind: {
     mode: "plain",
     shape: "pill",
-    class: "tw:text-xs",
+    class: "text-xs",
     values: {
       prebuilt: { variant: "primary" },
       custom: { variant: "default" },
@@ -841,28 +980,28 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      true: { variant: "success-soft", label: "Yes" },
+      true: { variant: "success-soft", labelKey: "components.badge.booleanState.yes" },
       yes: { variant: "success-soft" },
       enabled: { variant: "success-soft" },
-      on: { variant: "success-soft", label: "On" },
-      false: { variant: "default-soft", label: "No" },
+      on: { variant: "success-soft", labelKey: "components.badge.booleanState.on" },
+      false: { variant: "default-soft", labelKey: "components.badge.booleanState.no" },
       no: { variant: "default-soft" },
       disabled: { variant: "default-soft" },
-      off: { variant: "default-soft", label: "Off" },
+      off: { variant: "default-soft", labelKey: "components.badge.booleanState.off" },
     },
   },
 
   // ── Tracing ───────────────────────────────────────────────────────────────
 
-  // Span / trace status — dot. Mirrors SpanStatusPill / TraceStatusCell.
+  // Span / trace status — dot.
   spanStatus: {
     mode: "dot",
-    shape: "rounded",
+    shape: "pill",
     values: {
-      ok: { variant: "success-soft", label: "OK" },
+      ok: { variant: "success-soft", label: raw("OK") },
       success: { variant: "success-soft" },
-      error: { variant: "error-soft", label: "Error" },
-      unset: { variant: "default-soft", label: "Unset" },
+      error: { variant: "error-soft", label: raw("Error") },
+      unset: { variant: "default-soft", label: raw("Unset") },
     },
   },
 
@@ -873,11 +1012,11 @@ export const BADGE_GROUPS = {
     shape: "rounded",
     size: "xs",
     values: {
-      client: { variant: "blue-soft", label: "Client" },
-      server: { variant: "purple-soft", label: "Server" },
-      producer: { variant: "teal-soft", label: "Producer" },
-      consumer: { variant: "amber-soft", label: "Consumer" },
-      internal: { variant: "default-soft", label: "Internal" },
+      client: { variant: "blue-soft", label: raw("Client") },
+      server: { variant: "purple-soft", label: raw("Server") },
+      producer: { variant: "teal-soft", label: raw("Producer") },
+      consumer: { variant: "amber-soft", label: raw("Consumer") },
+      internal: { variant: "default-soft", label: raw("Internal") },
     },
   },
 
@@ -899,7 +1038,7 @@ export const BADGE_GROUPS = {
 
   // ── Online evals ────────────────────────────────────────────────────────
 
-  // Scorer type — plain. Mirrors scorerTypeBadgeVariant().
+  // Scorer type — plain.
   scorerType: {
     mode: "plain",
     shape: "pill",
@@ -907,12 +1046,12 @@ export const BADGE_GROUPS = {
     values: {
       remote: { variant: "teal-soft" },
       code: { variant: "purple-soft" },
-      llmjudge: { variant: "blue-soft", label: "LLM Judge" },
-      llm: { variant: "blue-soft", label: "LLM Judge" },
+      llmjudge: { variant: "blue-soft", labelKey: "components.badge.scorerType.llmjudge" },
+      llm: { variant: "blue-soft", labelKey: "components.badge.scorerType.llm" },
     },
   },
 
-  // Eval data type — plain. Mirrors dataTypeBadgeVariant().
+  // Eval data type — plain.
   evalDataType: {
     mode: "plain",
     shape: "pill",
@@ -924,24 +1063,24 @@ export const BADGE_GROUPS = {
   },
 
   // Threshold-declaration flag (Score Config detail → Healthy threshold section).
-  // Muted, extra-small, rounded — its own group so the xs/rounded sizing stays
-  // scoped here and never leaks into the shared `fieldTag` chips.
+  // Muted, its own group so the label mapping stays scoped and never leaks into
+  // the shared `fieldTag` chips.
   thresholdFlag: {
     mode: "plain",
-    shape: "rounded",
-    size: "xs",
+    shape: "pill",
     values: {
-      notdeclared: { variant: "default-soft", labelKey: "onlineEvals.scoreConfig.detail.noThreshold" },
+      notdeclared: {
+        variant: "default-soft",
+        labelKey: "onlineEvals.scoreConfig.detail.noThreshold",
+      },
     },
     fallback: { variant: "default-soft" },
   },
 
-  // LLM observation type — plain, PILL. Mirrors the in-component map that used
-  // to live in TraceDetailsSidebar (getObservationTypeColor → getObservationTypeVariant):
-  // many distinct semantic colours collapse to SOLID success/primary/warning/error/
-  // default. Kept 1:1 (solid variants, pill shape) so colour & shape match `main`.
-  // Keys are normalised (no underscores). `getObservationTypeColor` still drives
-  // TraceDAG graph-node fills — that is not a badge and is intentionally untouched.
+  // LLM observation type — plain, PILL. Many distinct semantic colours collapse
+  // to SOLID success/primary/warning/error/default. Keys are normalised (no
+  // underscores). NOTE: `getObservationTypeColor` still drives TraceDAG graph-node
+  // fills — that is not a badge and is intentionally untouched.
   observationType: {
     mode: "plain",
     shape: "pill",
@@ -966,8 +1105,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
-  // Enrichment URL-job status — dot, SOLID variants. Mirrors the inline map in
-  // EnrichmentTableList (completed→success, failed→error, processing→primary).
+  // Enrichment URL-job status — dot, SOLID variants (completed→success,
+  // failed→error, processing→primary).
   enrichmentJobStatus: {
     mode: "dot",
     shape: "pill",
@@ -979,9 +1118,8 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
-  // Backfill job status — plain (no dot), SOLID variants. Mirrors getStatusColor()
-  // in BackfillJobDetails. `deletionfailed` is the deletion-overlay state the
-  // caller passes when deletion_status.failed is set.
+  // Backfill job status — plain (no dot), SOLID variants. `deletionfailed` is the
+  // deletion-overlay state the caller passes when deletion_status.failed is set.
   backfillJobStatus: {
     mode: "plain",
     shape: "pill",
@@ -997,7 +1135,7 @@ export const BADGE_GROUPS = {
   },
 
   // Model source (TestModelMatchDialog) — plain. org → primary, meta_org →
-  // default-outline, anything else (built-in) → default. Mirrors sourceColor().
+  // default-outline, anything else (built-in) → default.
   modelSource: {
     mode: "plain",
     shape: "pill",
@@ -1008,22 +1146,25 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default" },
   },
 
-  // Evaluation verdict — icon. Mirrors TraceEvaluationsView verdict styling.
+  // Evaluation verdict — icon.
   evaluationVerdict: {
     mode: "icon",
     shape: "pill",
     values: {
-      pass: { variant: "success-soft", icon: "check-circle", label: "PASS" },
-      fail: { variant: "error-soft", icon: "cancel", label: "FAIL" },
-      unknown: { variant: "default-soft", icon: "help-outline", label: "Unknown" },
+      pass: { variant: "success-soft", icon: "check-circle", label: raw("PASS") },
+      fail: { variant: "error-soft", icon: "cancel", label: raw("FAIL") },
+      unknown: {
+        variant: "default-soft",
+        icon: "help-outline",
+        labelKey: "components.badge.evaluationVerdict.unknown",
+      },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },
   },
 
   // ── Anomaly detection ─────────────────────────────────────────────────────
 
-  // Anomaly-detection job status — dot. Mirrors statusColor() in
-  // AnomalyDetectionList (softened from solid for table density).
+  // Anomaly-detection job status — dot (soft variants for table density).
   anomalyStatus: {
     mode: "dot",
     shape: "pill",
@@ -1039,13 +1180,13 @@ export const BADGE_GROUPS = {
 
   // ── Misc lifecycle ────────────────────────────────────────────────────────
 
-  // Backfill / async deletion job status — dot. Mirrors getDeletionStatusColor().
+  // Backfill / async deletion job status — dot.
   deletionStatus: {
     mode: "dot",
     shape: "pill",
     values: {
       completed: { variant: "success-soft" },
-      inprogress: { variant: "blue-soft", label: "In Progress" },
+      inprogress: { variant: "blue-soft", labelKey: "components.badge.deletionStatus.inprogress" },
       pending: { variant: "warning-soft" },
       failed: { variant: "error-soft" },
     },
@@ -1063,18 +1204,33 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // RUM frustration EVENT type — plain. Mirrors FrustrationEventBadge config.
+  // RUM frustration EVENT type — plain.
   // (Frustration SEVERITY is count-derived → bucket the count yourself, then
   //  use the `severity` group; it can't be a value→variant entry.)
   frustrationEventType: {
     mode: "plain",
     shape: "pill",
     values: {
-      rageclick: { variant: "warning-soft", label: "Rage Click" },
-      deadclick: { variant: "default-soft", label: "Dead Click" },
-      errorclick: { variant: "error-soft", label: "Error Click" },
-      ragetap: { variant: "warning-soft", label: "Rage Tap" },
-      errortap: { variant: "error-soft", label: "Error Tap" },
+      rageclick: {
+        variant: "warning-soft",
+        labelKey: "components.badge.frustrationEventType.rageclick",
+      },
+      deadclick: {
+        variant: "default-soft",
+        labelKey: "components.badge.frustrationEventType.deadclick",
+      },
+      errorclick: {
+        variant: "error-soft",
+        labelKey: "components.badge.frustrationEventType.errorclick",
+      },
+      ragetap: {
+        variant: "warning-soft",
+        labelKey: "components.badge.frustrationEventType.ragetap",
+      },
+      errortap: {
+        variant: "error-soft",
+        labelKey: "components.badge.frustrationEventType.errortap",
+      },
     },
   },
 
@@ -1091,38 +1247,76 @@ export const BADGE_GROUPS = {
     },
   },
 
-  // Alert run state (alert history) — icon, PILL (status badge). Icons mirror
-  // the original status chip (✓ ok, ⊘ skipped, ✕ failed, ⏲ pending, 🔔 completed).
+  // Alert run state (alert history) — icon, PILL (status badge).
+  //
+  // The backend vocabulary is `firing | normal | succeeded | error |
+  // notify_failed | skipped` (RunOutcome). The legacy values below
+  // (`completed`, `condition_not_satisfied`, `failed`, `ok`, `success`) are kept
+  // so history rows written before the rename still render, and can be dropped
+  // once those rows age out of the triggers stream's retention window.
   alertState: {
     mode: "icon",
     shape: "pill",
     values: {
+      // ── firing states ──
       firing: { variant: "error-soft", icon: "error-outline" },
-      error: { variant: "error-soft", icon: "error-outline" },
       anomaly: { variant: "error-soft", icon: "error-outline" },
-      // `completed` = a finished/OK run → GREEN (matches the pre-migration
-      // AlertHistory badge + AlertHistorySummary.getStateColorClass). It is NOT
-      // a firing state for the badge (the timeline aggregates it under firing
-      // separately, but the per-row badge reads as Ok).
-      completed: { variant: "success-soft", icon: "check-circle-outline" },
-      ok: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
+      // Condition matched but delivery failed — still a firing state, flagged
+      // distinctly so a broken destination is visible.
+      notifyfailed: {
+        variant: "error-soft",
+        icon: "sync-problem",
+        labelKey: "components.badge.alertState.notifyfailed",
+      },
+      // LEGACY: `completed` meant "the alert fired" for condition-bearing
+      // modules. It is a firing state — the previous green rendering
+      // contradicted both the backend and the timeline aggregation.
+      completed: {
+        variant: "error-soft",
+        icon: "error-outline",
+        labelKey: "components.badge.alertState.firing",
+      },
+
+      // ── non-firing states ──
+      // Explicit key, not the humanised (English-only) fallback: `conditionnotsatisfied`
+      // below is the same state and must resolve the same key in every locale.
+      normal: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.normal",
+      },
+      succeeded: { variant: "success-soft", icon: "check-circle-outline" },
+      // LEGACY aliases for `normal`.
+      ok: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.ok",
+      },
       success: { variant: "success-soft", icon: "check-circle-outline" },
-      normal: { variant: "success-soft", icon: "check-circle-outline" },
-      // A non-firing/passed evaluation. The histogram counts these as "Ok", so
-      // the badge shows "Ok" too (matches the alert-history summary).
-      // Key MUST be normalised (no separators) so "condition_not_satisfied",
-      // "Condition Not Satisfied", etc. all resolve here.
-      conditionnotsatisfied: { variant: "success-soft", icon: "check-circle-outline", label: "Ok" },
-      skipped: { variant: "warning-soft", icon: "block" },
-      flapping: { variant: "warning-soft", icon: "bolt", label: "Flapping" },
+      conditionnotsatisfied: {
+        variant: "success-soft",
+        icon: "check-circle-outline",
+        labelKey: "components.badge.alertState.normal",
+      },
+
+      // ── evaluation problems ──
+      error: { variant: "error-soft", icon: "cancel" },
       failed: { variant: "error-soft", icon: "cancel" },
+
+      // ── neither ──
+      skipped: { variant: "warning-soft", icon: "block" },
+      flapping: {
+        variant: "warning-soft",
+        icon: "bolt",
+        labelKey: "components.badge.alertState.flapping",
+      },
       pending: { variant: "blue-soft", icon: "schedule" },
     },
     fallback: { variant: "default-soft", icon: "help-outline" },
   },
 
   // Recent-event result (overview) — plain. Failed/Firing run hot (red), Error
-  // is the milder amber, matching the original overview event badges.
+  // is the milder amber.
   eventStatus: {
     mode: "plain",
     shape: "pill",
@@ -1139,9 +1333,18 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      servicediscovery: { variant: "primary-soft", labelKey: "alerts.incidents.correlationServiceDiscovery" },
-      primarymatch: { variant: "primary-soft", labelKey: "alerts.incidents.correlationPrimaryMatch" },
-      secondarymatch: { variant: "warning-soft", labelKey: "alerts.incidents.correlationSecondaryMatch" },
+      servicediscovery: {
+        variant: "primary-soft",
+        labelKey: "alerts.incidents.correlationServiceDiscovery",
+      },
+      primarymatch: {
+        variant: "primary-soft",
+        labelKey: "alerts.incidents.correlationPrimaryMatch",
+      },
+      secondarymatch: {
+        variant: "warning-soft",
+        labelKey: "alerts.incidents.correlationSecondaryMatch",
+      },
       alertid: { variant: "default-soft", labelKey: "alerts.incidents.correlationAlertId" },
     },
     fallback: { variant: "default-soft" },
@@ -1152,8 +1355,8 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      mcp: { variant: "primary-soft", label: "MCP" },
-      cli: { variant: "success-soft", label: "CLI" },
+      mcp: { variant: "primary-soft", label: raw("MCP") },
+      cli: { variant: "success-soft", label: raw("CLI") },
       skill: { variant: "warning-soft" },
       generic: { variant: "default-soft" },
     },
@@ -1165,11 +1368,11 @@ export const BADGE_GROUPS = {
     mode: "dot",
     shape: "pill",
     values: {
-      verylow: { variant: "success-soft", label: "Very Low" },
+      verylow: { variant: "success-soft", labelKey: "components.badge.cardinalityClass.verylow" },
       low: { variant: "success-soft" },
       medium: { variant: "warning-soft" },
       high: { variant: "error-soft" },
-      veryhigh: { variant: "error-soft", label: "Very High" },
+      veryhigh: { variant: "error-soft", labelKey: "components.badge.cardinalityClass.veryhigh" },
       unknown: { variant: "default-soft" },
     },
     fallback: { variant: "default-soft" },
@@ -1189,13 +1392,13 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // Online-eval RUN status (per-record) — dot, PILL. 999px in source.
+  // Online-eval RUN status (per-record) — dot, PILL.
   evalRunStatus: {
     mode: "dot",
     shape: "pill",
     values: {
       success: { variant: "success-soft" },
-      ok: { variant: "success-soft", label: "OK" },
+      ok: { variant: "success-soft", label: raw("OK") },
       error: { variant: "error-soft" },
       timeout: { variant: "warning-soft" },
       skipped: { variant: "default-soft" },
@@ -1205,15 +1408,13 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // Quality-config health — dot.
-  // LLM session outcome (derived from error_count) — dot + soft colour, mirrors
-  // the old manual statusBadgeClass/statusDotClass in SessionsList.
+  // LLM session outcome (derived from error_count) — dot + soft colour.
   sessionStatus: {
     mode: "dot",
     shape: "pill",
     values: {
-      ok: { variant: "success-soft", label: "Ok" },
-      error: { variant: "error-soft", label: "Error" },
+      ok: { variant: "success-soft", labelKey: "components.badge.sessionStatus.ok" },
+      error: { variant: "error-soft", labelKey: "components.badge.sessionStatus.error" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1221,13 +1422,16 @@ export const BADGE_GROUPS = {
   qualityStatus: {
     mode: "dot",
     shape: "pill",
-    class: "tw:!bg-transparent tw:!p-0 tw:!ring-0",
+    class: "!bg-transparent !p-0 !ring-0",
     values: {
       healthy: { variant: "success-soft" },
       warn: { variant: "warning-soft" },
       unhealthy: { variant: "error-soft" },
-      nothreshold: { variant: "default-soft", label: "No Threshold" },
-      nodata: { variant: "default-soft", label: "No Data" },
+      nothreshold: {
+        variant: "default-soft",
+        labelKey: "components.badge.qualityStatus.nothreshold",
+      },
+      nodata: { variant: "default-soft", labelKey: "components.badge.qualityStatus.nodata" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1249,7 +1453,7 @@ export const BADGE_GROUPS = {
     fallback: { variant: "default-soft" },
   },
 
-  // RUM event type — plain. Mirrors EventTypeBadge getEventTypeClass.
+  // RUM event type — plain.
   rumEventType: {
     mode: "plain",
     shape: "rounded",
@@ -1258,7 +1462,7 @@ export const BADGE_GROUPS = {
       action: { variant: "purple-soft" },
       error: { variant: "error-soft" },
       resource: { variant: "teal-soft" },
-      longtask: { variant: "warning-soft", label: "Long Task" },
+      longtask: { variant: "warning-soft", labelKey: "components.badge.rumEventType.longtask" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1268,8 +1472,8 @@ export const BADGE_GROUPS = {
     mode: "plain",
     shape: "pill",
     values: {
-      stream: { variant: "primary-soft", label: "Stream" },
-      global: { variant: "default-soft", label: "Global" },
+      stream: { variant: "primary-soft", labelKey: "components.badge.crossLinkSource.stream" },
+      global: { variant: "default-soft", labelKey: "components.badge.crossLinkSource.global" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1280,10 +1484,28 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       free: { variant: "default-soft" },
-      payasyougo: { variant: "blue-soft", label: "Pay as you go" },
+      payasyougo: {
+        variant: "blue-soft",
+        labelKey: "components.badge.subscriptionPlan.payasyougo",
+      },
       enterprise: { variant: "purple-soft" },
     },
     fallback: { variant: "default-soft" },
+  },
+
+  // Synthetic monitor type — plain, PILL.
+  syntheticType: {
+    mode: "plain",
+    shape: "pill",
+    size: "sm",
+    values: {
+      http: { variant: "blue-soft", label: raw("HTTP") },
+      browser: { variant: "purple-soft", label: raw("Browser") },
+      api: { variant: "success-soft", label: raw("API") },
+      tcp: { variant: "orange-soft", label: raw("TCP") },
+      ping: { variant: "default-soft", label: raw("Ping") },
+      dns: { variant: "amber-soft", label: raw("DNS") },
+    },
   },
 
   // Billing AI usage mode — PILL. i18n labels.
@@ -1313,12 +1535,15 @@ export const BADGE_GROUPS = {
   billingManagement: {
     mode: "plain",
     shape: "pill",
-    class: "tw:px-3 tw:py-2",
+    class: "px-3 py-2",
     values: {
-      aws: { variant: "success-soft", label: "AWS Marketplace" },
-      azure: { variant: "success-soft", label: "Azure Marketplace" },
-      stripe: { variant: "default-soft", label: "Stripe" },
-      contract: { variant: "default-soft", label: "Contract" },
+      aws: { variant: "success-soft", labelKey: "components.badge.billingManagement.aws" },
+      azure: { variant: "success-soft", labelKey: "components.badge.billingManagement.azure" },
+      stripe: { variant: "default-soft", label: raw("Stripe") },
+      contract: {
+        variant: "default-soft",
+        labelKey: "components.badge.billingManagement.contract",
+      },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1329,9 +1554,17 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "sm",
     values: {
-      applied: { variant: "success-soft", icon: "check-circle", label: "Applied" },
+      applied: {
+        variant: "success-soft",
+        icon: "check-circle",
+        labelKey: "components.badge.themeApplied.applied",
+      },
     },
-    fallback: { variant: "success-soft", icon: "check-circle", label: "Applied" },
+    fallback: {
+      variant: "success-soft",
+      icon: "check-circle",
+      labelKey: "components.badge.themeApplied.fallback",
+    },
   },
 
   // Feature flags — PILL, extra-small (compact BETA / HA / Coming Soon chips).
@@ -1340,9 +1573,9 @@ export const BADGE_GROUPS = {
     shape: "pill",
     size: "xs",
     values: {
-      beta: { variant: "primary-soft", label: "BETA" },
-      ha: { variant: "primary-soft", label: "HA" },
-      comingsoon: { variant: "default-soft", label: "Coming Soon" },
+      beta: { variant: "primary-soft", label: raw("BETA") },
+      ha: { variant: "primary-soft", label: raw("HA") },
+      comingsoon: { variant: "default-soft", labelKey: "components.badge.featureFlag.comingsoon" },
     },
     fallback: { variant: "default-soft" },
   },
@@ -1352,10 +1585,10 @@ export type BadgeGroupName = keyof typeof BADGE_GROUPS;
 
 export interface ResolvedBadge {
   variant: BadgeVariant;
-  label: string;
+  label: I18nText;
   /** i18n key for the label, if the matched value declared one. `OTag`
    *  translates this when no explicit `label` is supplied. */
-  labelKey?: string;
+  labelKey?: I18nKey;
   icon?: string;
   dot: boolean;
   mode: BadgeRenderMode;
@@ -1381,7 +1614,8 @@ export function resolveBadge(
   group: BadgeGroupName | string | undefined,
   value: unknown,
 ): ResolvedBadge {
-  const raw = String(value ?? "").trim();
+  // `raw` is the imported i18n opt-out, so the local value keeps a distinct name.
+  const rawValue = String(value ?? "").trim();
   const key = normalizeKey(value);
   const cfg = group ? (BADGE_GROUPS as Record<string, BadgeGroupConfig>)[group] : undefined;
 
@@ -1390,7 +1624,7 @@ export function resolveBadge(
     const generic = statusVariant(value);
     return {
       variant: generic.variant,
-      label: raw ? humanize(raw) : "—",
+      label: raw(rawValue ? humanize(rawValue) : "—"),
       dot: true,
       mode: "dot",
     };
@@ -1401,7 +1635,7 @@ export function resolveBadge(
 
   return {
     variant: entry.variant,
-    label: entry.label ?? (raw ? humanize(raw) : "—"),
+    label: entry.label ?? raw(rawValue ? humanize(rawValue) : "—"),
     labelKey: entry.labelKey,
     icon: mode === "icon" ? entry.icon : undefined,
     dot: entry.dot ?? mode === "dot",
@@ -1420,7 +1654,12 @@ function genericEntry(value: unknown): BadgeValueConfig {
 
 /** Soft fallback palette for dimension keys not present in the registry. */
 const DIMENSION_FALLBACK_VARIANTS: BadgeVariant[] = [
-  "default-soft", "amber-soft", "purple-soft", "blue-soft", "teal-soft", "indigo-soft",
+  "default-soft",
+  "amber-soft",
+  "purple-soft",
+  "blue-soft",
+  "teal-soft",
+  "indigo-soft",
 ];
 
 /**
@@ -1440,7 +1679,7 @@ export function dimensionVariant(key: string): BadgeVariant {
   }
   let hash = 0;
   for (let i = 0; i < key.length; i++) {
-    hash = ((hash << 5) - hash) + key.charCodeAt(i);
+    hash = (hash << 5) - hash + key.charCodeAt(i);
     hash = hash & hash;
   }
   return DIMENSION_FALLBACK_VARIANTS[Math.abs(hash) % DIMENSION_FALLBACK_VARIANTS.length];

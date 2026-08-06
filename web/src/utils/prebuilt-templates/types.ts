@@ -12,24 +12,58 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component } from 'vue';
-
+import type { I18nKey, I18nText } from "@/types/i18n";
 /**
  * Prebuilt destination types
  */
-export type PrebuiltTypeId = 'slack' | 'discord' | 'msteams' | 'pagerduty' | 'servicenow' | 'email' | 'opsgenie';
+export type PrebuiltTypeId =
+  | "slack"
+  | "discord"
+  | "msteams"
+  | "pagerduty"
+  | "servicenow"
+  | "email"
+  | "opsgenie";
+
+/**
+ * A user-facing validation message, expressed as an i18n KEY (+ optional
+ * interpolation params) rather than English copy.
+ *
+ * These config modules are plain, Vue-less objects: they have no `useI18n()` and
+ * therefore cannot translate anything themselves. So they describe WHAT is wrong
+ * and let the two consumers — both of which do have a `t` — render it:
+ *   • `PrebuiltDestinationForm.schema.ts` (`makePrebuiltDestinationSchema`)
+ *   • `usePrebuiltDestinations.ts` (`validateCredentials`)
+ */
+export interface ValidationMessage {
+  key: string;
+  params?: Record<string, unknown>;
+}
+
+/** `true` when valid; otherwise the i18n message describing the failure. */
+export type CredentialValidatorResult = true | ValidationMessage;
 
 /**
  * Credential field configuration
+ *
+ * `labelKey` is an i18n KEY (not English): it is interpolated into
+ * `alerts.validation.credentialFieldRequired` ("{field} is required") by the
+ * consumers above, so it must be resolved with `t()` before display.
  */
 export interface CredentialField {
   key: string;
-  label: string;
-  type: 'text' | 'password' | 'email' | 'select' | 'toggle';
+  labelKey: I18nKey;
+  type: "text" | "password" | "email" | "select" | "toggle";
   required: boolean;
-  hint?: string;
+  /**
+   * Helper text that reads identically in every language — a URL or an example
+   * value. Translatable copy belongs in {@link hintKey} instead.
+   */
+  hint?: I18nText;
+  /** Wins over {@link hint} when both are set. */
+  hintKey?: I18nKey;
   options?: Array<{ label: string; value: string; description?: string }>;
-  validator?: (value: string) => boolean | string;
+  validator?: (value: string) => CredentialValidatorResult;
 }
 
 /**
@@ -39,7 +73,7 @@ export interface PrebuiltConfig {
   templateName: string;
   templateBody: string;
   headers: Record<string, string>;
-  method: 'get' | 'post' | 'put';
+  method: "get" | "post" | "put";
   urlValidator: (url: string) => boolean;
   credentialFields: CredentialField[];
 }
@@ -50,11 +84,16 @@ export interface PrebuiltConfig {
 export interface PrebuiltType {
   id: PrebuiltTypeId;
   name: string;
-  description: string;
+  /**
+   * i18n KEY, not resolved text. These objects are module-scope literals, so a
+   * resolved string would freeze at the boot locale; the selector calls `t()` on
+   * this at render time instead.
+   */
+  descriptionKey: I18nKey;
   icon: string; // Icon name or component reference
   image?: string; // Image URL for logo
   popular?: boolean;
-  category: 'messaging' | 'incident' | 'email' | 'custom';
+  category: "messaging" | "incident" | "email" | "custom";
 }
 
 /**
@@ -91,7 +130,7 @@ export interface TestResult {
 export interface PrebuiltTemplate {
   name: string;
   body: string;
-  type: 'http' | 'email';
+  type: "http" | "email";
   isDefault: boolean;
 }
 

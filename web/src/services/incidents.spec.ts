@@ -42,7 +42,7 @@ describe("incidents service", () => {
 
       expect(http).toHaveBeenCalled();
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=50&offset=0"
+        "/api/v2/test-org/alerts/incidents?limit=50&offset=0",
       );
     });
 
@@ -52,7 +52,7 @@ describe("incidents service", () => {
       incidents.list("test-org", "open");
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=50&offset=0&status=open"
+        "/api/v2/test-org/alerts/incidents?limit=50&offset=0&status=open",
       );
     });
 
@@ -62,7 +62,7 @@ describe("incidents service", () => {
       incidents.list("test-org", undefined, 20, 10);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=20&offset=10"
+        "/api/v2/test-org/alerts/incidents?limit=20&offset=10",
       );
     });
 
@@ -72,7 +72,7 @@ describe("incidents service", () => {
       incidents.list("test-org", "resolved", 100, 50);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=100&offset=50&status=resolved"
+        "/api/v2/test-org/alerts/incidents?limit=100&offset=50&status=resolved",
       );
     });
   });
@@ -89,9 +89,7 @@ describe("incidents service", () => {
       incidents.get("test-org", "incident-123");
 
       expect(http).toHaveBeenCalled();
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123"
-      );
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/alerts/incidents/incident-123");
     });
   });
 
@@ -104,7 +102,7 @@ describe("incidents service", () => {
       expect(http).toHaveBeenCalled();
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/update",
-        { status: "acknowledged" }
+        { status: "acknowledged" },
       );
     });
 
@@ -115,7 +113,7 @@ describe("incidents service", () => {
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/update",
-        { status: "open" }
+        { status: "open" },
       );
     });
 
@@ -126,7 +124,7 @@ describe("incidents service", () => {
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/update",
-        { status: "resolved" }
+        { status: "resolved" },
       );
     });
   });
@@ -145,9 +143,7 @@ describe("incidents service", () => {
       incidents.getStats("test-org");
 
       expect(http).toHaveBeenCalled();
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/stats"
-      );
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/alerts/incidents/stats");
     });
   });
 
@@ -163,7 +159,7 @@ describe("incidents service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/rca",
         null,
-        { params: {} }
+        { params: {} },
       );
     });
   });
@@ -265,5 +261,4 @@ describe("incidents service", () => {
       });
     });
   });
-
 });

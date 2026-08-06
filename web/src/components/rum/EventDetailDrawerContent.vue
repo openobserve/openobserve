@@ -15,101 +15,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <ODrawer data-test="event-detail-drawer"
+  <ODrawer
+    data-test="event-detail-drawer"
+    bleed
     :open="open"
     size="xl"
     @update:open="emit('update:open', $event)"
   >
     <template #header>
-      <div class="tw:px-1 tw:py-[0.625rem] tw:w-full">
-        <div class="tw:flex tw:items-center tw:flex-nowrap tw:w-full">
-        <div class="tw:flex tw:flex-col tw:w-full">
-          <!-- Event Header -->
-          <div class="tw:flex tw:items-center tw:justify-between tw:mb-[0.625rem]">
-              <div
-                class="tw:flex tw:items-center tw:w-full"
-              >
+      <div class="w-full px-1 py-2.5">
+        <div class="flex w-full flex-nowrap items-center">
+          <div class="flex w-full flex-col">
+            <!-- Event Header -->
+            <div class="mb-2.5 flex items-center justify-between">
+              <div class="flex w-full items-center">
                 <div
-                  class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
+                  class="rounded-default text-3xs mr-1.5 px-1.5 py-0.5 font-semibold uppercase"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
                 </div>
 
-                <template
-                  v-if="
-                    event.frustration_types &&
-                    event.frustration_types.length > 0
-                  "
-                >
+                <template v-if="event.frustration_types && event.frustration_types.length > 0">
                   <FrustrationEventBadge
                     :frustration-types="event.frustration_types"
-                    class="tw:mr-1 tw:inline"
+                    class="mr-1 inline"
                   />
                 </template>
                 <div
-                  class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap flex-1"
+                  class="semi-bold flex-1 overflow-hidden text-sm leading-tight text-ellipsis whitespace-nowrap"
                   :title="event.name"
                 >
                   {{ event.name }}
                 </div>
               </div>
-          </div>
-          <div
+            </div>
+            <div
               data-test="event-session-meta-data"
-              class="tw:flex tw:items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
+              class="event-metadata flex flex-wrap items-center gap-x-3 gap-y-1"
             >
-              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="language" size="sm" class="tw:pr-1" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="language" size="sm" class="pr-1" />
                 {{ sessionDetails.ip }}
               </div>
-              <div class="tw:text-xs tw:flex tw:items-center">
-                <OIcon name="code" size="sm" class="tw:pr-1" />
-                {{ rawEvent.service || "Unknown User" }}
+              <div class="flex items-center text-xs">
+                <OIcon name="code" size="sm" class="pr-1" />
+                {{ rawEvent.service || t("common.unknownUser") }}
               </div>
-              <div class="tw:text-xs tw:flex tw:items-center">
-                V {{ rawEvent.version || "Unknown User" }}
+              <div class="flex items-center text-xs">
+                {{ t("common.versionAbbreviation") }}
+                {{ rawEvent.version || t("common.unknownUser") }}
               </div>
-              <div class="tw:text-xs tw:flex tw:items-center">
-                <OIcon name="mail" size="sm" class="tw:pr-1" />
-                {{ sessionDetails.user_email || "Unknown User" }}
+              <div class="flex items-center text-xs">
+                <OIcon name="mail" size="sm" class="pr-1" />
+                {{ sessionDetails.user_email || t("common.unknownUser") }}
               </div>
-              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="settings" size="sm" class="tw:pr-1" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="settings" size="sm" class="pr-1" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
-              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="location-on" size="sm" class="tw:pr-1" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="location-on" size="sm" class="pr-1" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
-              <div class="tw:text-xs tw:truncate tw:flex tw:items-center">
-                <OIcon name="schedule" size="sm" class="tw:pr-1" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="schedule" size="sm" class="pr-1" />
                 {{ sessionDetails.date }}
               </div>
+            </div>
           </div>
         </div>
-      </div>
       </div>
     </template>
 
     <!-- Tabs Navigation -->
-    <div class="tw:flex tw:pt-2 tw:px-2">
-      <div class="tw:w-full">
+    <div class="px-page-edge flex pt-2">
+      <div class="w-full">
         <OTabs v-model="activeTab" align="left" dense>
           <OTab
             data-test="event-detail-overview-tab"
             name="overview"
-            label="Overview"
+            :label="t('common.overview')"
           />
-          <OTab
-            data-test="event-detail-network-tab"
-            name="network"
-            label="Network"
-          />
+          <OTab data-test="event-detail-network-tab" name="network" :label="t('common.network')" />
           <OTab
             data-test="event-detail-attributes-tab"
             name="attributes"
-            label="Attributes"
+            :label="t('common.attributes')"
           />
         </OTabs>
       </div>
@@ -128,74 +120,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTabPanel name="overview" padding="sm" data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
-          <div
-            v-if="event.type === 'error'"
-            class="tw:mb-3"
-            data-test="error-details"
-          >
-            <div class="tw:font-bold tw:mb-1 tw:text-sm">Error Details</div>
+          <div v-if="event.type === 'error'" class="mb-3" data-test="error-details">
+            <div class="mb-1 text-sm font-bold">{{ t("common.errorDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.error_type"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Error Type:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.errorTypeLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
+                <div class="flex-1 break-words">
                   {{ rawEvent.error_type }}
                 </div>
               </div>
               <div
                 v-if="rawEvent?.error_message"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Message:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.messageLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
+                <div class="flex-1 break-words">
                   {{ rawEvent.error_message }}
                 </div>
               </div>
               <div
                 v-if="rawEvent?.error_handling"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Handling:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.handlingLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
+                <div class="flex-1 break-words">
                   <span
-                    class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px]"
+                    class="rounded-default text-3xs px-1 py-0.5"
                     :class="
                       rawEvent.error_handling === 'unhandled'
-                        ? 'text-red-6 tw:border tw:border-solid tw:border-red-6'
-                        : 'tw:text-gray-500'
+                        ? 'text-status-error-text border-status-negative border border-solid'
+                        : 'text-text-secondary'
                     "
                   >
                     {{ rawEvent.error_handling }}
                   </span>
                 </div>
               </div>
-              <div
-                v-if="rawEvent?.error_id"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
-              >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Error ID:
+              <div v-if="rawEvent?.error_id" class="flex px-1.5 py-1 text-xs">
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.errorIdLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
-                  <code
-                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-(--color-surface-accent) tw:rounded"
-                  >
+                <div class="flex-1 break-words">
+                  <code class="text-3xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
                     {{ formatId(rawEvent.error_id) }}
                   </code>
                 </div>
@@ -204,55 +179,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- View Details -->
-          <div
-            v-if="event.type === 'view'"
-            class="tw:mb-3"
-            data-test="view-details"
-          >
-            <div class="tw:font-bold tw:mb-1 tw:text-sm">View Details</div>
+          <div v-if="event.type === 'view'" class="mb-3" data-test="view-details">
+            <div class="mb-1 text-sm font-bold">{{ t("common.viewDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Loading Type:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.loadingTypeLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:capitalize tw:break-words">
+                <div class="flex-1 break-words capitalize">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
                 </div>
               </div>
               <div
                 v-if="rawEvent?.view_url"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  URL:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.urlLabel") }}
                 </div>
                 <div
-                  class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+                  class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
                   :title="rawEvent.view_url"
                 >
                   {{ rawEvent.view_url }}
                 </div>
               </div>
-              <div
-                v-if="rawEvent?.view_id"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
-              >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  View ID:
+              <div v-if="rawEvent?.view_id" class="flex px-1.5 py-1 text-xs">
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.viewIdLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
-                  <code
-                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-(--color-surface-accent) tw:rounded"
-                  >
+                <div class="flex-1 break-words">
+                  <code class="text-3xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
                     {{ formatId(rawEvent.view_id) }}
                   </code>
                 </div>
@@ -263,38 +223,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Action Details -->
           <EventDetailsSection
             v-if="event.type === 'action'"
-            title="Action Details"
+            :title="t('common.actionDetails')"
             :fields="actionFields"
             data-test="action-details"
-            class="tw:mb-3"
+            class="mb-3"
           />
 
           <!-- Related Events for Actions -->
-          <div v-if="event.type === 'action'" class="tw:mb-3">
+          <div v-if="event.type === 'action'" class="mb-3">
             <template v-if="isLoadingRelatedResources">
-              <div class="tw:mt-2 tw:p-2 tw:text-center">
+              <div class="mt-2 p-2 text-center">
                 <OSpinner size="xs" />
-                <div class="tw:mt-1 tw:text-gray-400 tw:text-xs">
-                  Loading related events...
+                <div class="text-text-secondary mt-1 text-xs">
+                  {{ t("common.loadingRelatedEvents") }}
                 </div>
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
-              <div class="tw:font-bold tw:mb-1 tw:text-sm">
-                Related Events ({{ relatedResources.length }})
+              <div class="mb-1 text-sm font-bold">
+                {{ t("common.relatedEvents") }} ({{ relatedResources.length }})
               </div>
               <div>
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="tw:p-1.5 tw:mb-1 tw:bg-(--color-surface-accent) tw:rounded tw:cursor-pointer tw:hover:bg-[#e0e0e0] tw:transition-colors"
+                  class="bg-surface-accent rounded-default hover:bg-interactive-hover-bg mb-1 cursor-pointer p-1.5 transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
-                  <div class="tw:flex tw:items-center tw:mb-0.5">
+                  <div class="mb-0.5 flex items-center">
                     <div
-                      class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
+                      class="rounded-default text-3xs mr-1.5 px-1 py-0.5 font-semibold uppercase"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -302,75 +262,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span
-                        class="tw:mr-1 tw:font-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
-                      >
+                      <span class="text-3xs text-button-primary mr-1 font-bold">
                         {{ item.resource_method || "GET" }}
                       </span>
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
                         {{ item.resource_url }}
                       </span>
                     </template>
 
                     <!-- Error -->
                     <template v-else-if="item.type === 'error'">
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
                         {{ item.error_message || item.error_type }}
                       </span>
                     </template>
 
                     <!-- View -->
                     <template v-else-if="item.type === 'view'">
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
                         {{ item.view_url }}
                       </span>
                     </template>
 
                     <!-- Action -->
                     <template v-else-if="item.type === 'action'">
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
-                        {{ item.action_type }} on {{ item.action_target_name }}
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                        {{ item.action_type }} {{ t("common.on") }} {{ item.action_target_name }}
                       </span>
                     </template>
 
                     <!-- Other -->
                     <template v-else>
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
-                        {{ item.type }} event
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                        {{ item.type }} {{ t("common.event") }}
                       </span>
                     </template>
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="tw:flex tw:items-center tw:text-gray-400 tw:text-[10px]">
-                    <OIcon name="schedule" size="xs" class="tw:mr-1" />
-                    <span class="tw:mr-2">{{
-                      formatTimestamp(item.date)
-                    }}</span>
+                  <div class="text-text-secondary text-3xs flex items-center">
+                    <OIcon name="schedule" size="xs" class="mr-1" />
+                    <span class="mr-2">{{ formatTimestamp(item.date) }}</span>
 
                     <!-- Resource-specific details -->
                     <template v-if="item.type === 'resource'">
-                      <OIcon
-                        name="access-time"
-                        size="xs"
-                        class="tw:mr-0.5"
-                      />
-                      <span class="tw:mr-2">{{
+                      <OIcon name="access-time" size="xs" class="mr-0.5" />
+                      <span class="mr-2">{{
                         formatDuration(item.resource_duration / 1000000)
                       }}</span>
                       <OIcon
                         :name="getStatusIcon(item.resource_status_code)"
-                        :class="['tw:mr-0.5', getStatusColorClass(item.resource_status_code)]"
+                        :class="['mr-0.5', getStatusColorClass(item.resource_status_code)]"
                         size="xs"
                       />
                       <span>{{ item.resource_status_code }}</span>
@@ -378,16 +320,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Clickable Trace Button -->
                     <OButton
-                      v-if="item._oo_trace_id"
+                      v-if="rumField(item, 'trace_id')"
                       variant="outline"
                       size="xs"
-                      title="View trace details"
+                      :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
-                      class="tw:ml-2 tw:h-5! tw:px-1.5"
-                      @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
+                      class="ml-2 h-5! px-1.5"
+                      @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
                       <OIcon name="account-tree" size="xs" />
-                      <span v-if="item._oo_trace_id">View Trace</span>
+                      <span v-if="rumField(item, 'trace_id')">{{ t("common.viewTrace") }}</span>
                     </OButton>
                   </div>
                 </div>
@@ -400,43 +342,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Network Tab -->
       <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
-          <div class="tw:font-bold tw:mb-2 tw:text-sm">
-            Network Requests ({{ networkResources.length }})
+          <div class="mb-2 text-sm font-bold">
+            {{ t("common.networkRequests") }} ({{ networkResources.length }})
           </div>
           <div>
             <div
               v-for="resource in networkResources"
               :key="resource.resource_id"
-              class="tw:p-2 tw:mb-2 tw:bg-(--color-surface-accent) tw:rounded"
+              class="bg-surface-accent rounded-default mb-2 p-2"
               data-test="network-resource-item"
             >
-              <div class="tw:flex tw:items-center tw:mb-1">
+              <div class="mb-1 flex items-center">
                 <span
-                  class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-bold tw:mr-2 tw:bg-blue-100 tw:text-blue-700"
+                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text mr-2 px-1.5 py-0.5 font-bold"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
-                <span class="tw:text-xs tw:break-all">
+                <span class="text-xs break-all">
                   {{ resource.resource_url }}
                 </span>
               </div>
-              <div
-                class="tw:flex tw:items-center tw:gap-x-3 tw:text-[10px] tw:text-gray-400"
-              >
-                <div class="tw:flex tw:items-center">
-                  <OIcon name="access-time" size="xs" class="tw:mr-1" />
+              <div class="text-3xs text-text-secondary flex items-center gap-x-3">
+                <div class="flex items-center">
+                  <OIcon name="access-time" size="xs" class="mr-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
                 </div>
-                <div class="tw:flex tw:items-center">
+                <div class="flex items-center">
                   <OIcon
                     :name="getStatusIcon(resource.resource_status_code)"
-                    :class="['tw:mr-1', getStatusColorClass(resource.resource_status_code)]"
+                    :class="['mr-1', getStatusColorClass(resource.resource_status_code)]"
                     size="xs"
                   />
                   {{ resource.resource_status_code }}
                 </div>
-                <div class="tw:flex tw:items-center">
-                  <OIcon name="schedule" size="xs" class="tw:mr-1" />
+                <div class="flex items-center">
+                  <OIcon name="schedule" size="xs" class="mr-1" />
                   {{ formatTimestamp(resource.date) }}
                 </div>
               </div>
@@ -445,34 +385,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div
           v-else
-          class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm"
+          class="text-text-muted py-8 text-center text-sm"
           data-test="network-empty-state"
         >
-          No network requests found for this event
+          {{ t("common.noNetworkRequestsFound") }}
         </div>
       </OTabPanel>
 
       <!-- Console Tab -->
       <OTabPanel name="console" padding="sm" data-test="console-tab">
-        <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
-          Console logs coming soon
+        <div class="text-text-muted py-8 text-center text-sm">
+          {{ t("common.consoleLogsComingSoon") }}
         </div>
       </OTabPanel>
 
       <!-- Performance Tab -->
-      <OTabPanel
-        name="performance"
-        padding="sm"
-        data-test="performance-tab"
-      >
-        <div class="tw:text-center tw:py-8 tw:text-gray-400 tw:text-sm">
-          Performance metrics coming soon
+      <OTabPanel name="performance" padding="sm" data-test="performance-tab">
+        <div class="text-text-muted py-8 text-center text-sm">
+          {{ t("common.performanceMetricsComingSoon") }}
         </div>
       </OTabPanel>
 
       <!-- Attributes Tab -->
       <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
-        <div class="tw:flex tw:justify-start">
+        <div class="flex justify-start">
           <OButton
             icon-left="content-copy"
             variant="outline"
@@ -480,21 +416,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="attributes-copy-btn"
             @click="copyAttributesToClipboard"
           >
-            {{ t('common.copyToClipboard') }}
+            {{ t("common.copyToClipboard") }}
           </OButton>
         </div>
         <div
-          class="tw:p-2 tw:rounded tw:overflow-x-auto tw:font-mono tw:text-[10px]"
+          class="rounded-default text-3xs overflow-x-auto p-2 font-mono"
           data-test="raw-event-json"
         >
           <div>
             {
-            <div
-              v-for="(key, index) in Object.keys(rawEvent)"
-              :key="key"
-              class="tw:ml-4"
-            >
-              <span :class="store.state.theme === 'dark' ? 'dark' : ''">
+            <div v-for="(key, index) in Object.keys(rawEvent)" :key="key" class="ml-4">
+              <span>
                 <LogsHighLighting
                   :data="{ [key]: rawEvent[key] }"
                   :show-braces="false"
@@ -511,24 +443,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import OTabs from '@/lib/navigation/Tabs/OTabs.vue'
-import OTab from '@/lib/navigation/Tabs/OTab.vue'
-import OTabPanels from '@/lib/navigation/Tabs/OTabPanels.vue'
-import OTabPanel from '@/lib/navigation/Tabs/OTabPanel.vue'
+import { rumField } from "@/utils/rum/fields";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
-import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODrawer from '@/lib/overlay/Drawer/ODrawer.vue';
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
@@ -567,25 +499,19 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
 const activeTab = ref("overview");
 
-const {
-  formatTimestamp,
-  formatId,
-  getStatusIcon,
-  getStatusColorClass,
-  formatResourceDuration,
-  getEventTypeClass,
-} = useEventFormatters();
+const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventTypeClass } =
+  useEventFormatters();
 
 const copyAttributesToClipboard = () => {
-  copyToClipboard(JSON.stringify(props.rawEvent, null, 2), {
+  copyToClipboard(JSON.stringify(props.rawEvent, null, 2), t, {
     successMessage: t("common.copyToClipboard") + " - " + t("common.success"),
-    errorMessage: "Error while copying content.",
+    errorMessage: t("common.copyContentError"),
     timeout: 1500,
   });
 };
@@ -594,67 +520,21 @@ const networkResources = computed(() => {
   return relatedResources.value.filter((item) => item.type === "resource");
 });
 
-// Computed fields for different event types
-const errorFields = computed(() => [
-  {
-    key: "error_type",
-    label: "Error Type",
-    value: props.rawEvent?.error_type,
-  },
-  {
-    key: "error_message",
-    label: "Message",
-    value: props.rawEvent?.error_message,
-  },
-  {
-    key: "error_handling",
-    label: "Handling",
-    value: props.rawEvent?.error_handling,
-    slot: true,
-  },
-  {
-    key: "error_id",
-    label: "Error ID",
-    value: props.rawEvent?.error_id,
-    slot: true,
-  },
-]);
-
-const viewFields = computed(() => [
-  {
-    key: "view_loading_type",
-    label: "Loading Type",
-    value: props.rawEvent?.view_loading_type?.replace("_", " "),
-    valueClass: "tw:capitalize",
-  },
-  {
-    key: "view_url",
-    label: "URL",
-    value: props.rawEvent?.view_url,
-  },
-  {
-    key: "view_id",
-    label: "View ID",
-    value: props.rawEvent?.view_id,
-    slot: true,
-  },
-]);
-
 const actionFields = computed(() => [
   {
     key: "action_type",
-    label: "Action Type",
-    value: props.rawEvent?.action_type || "N/A",
-    valueClass: "tw:capitalize",
+    label: t("common.actionType"),
+    value: props.rawEvent?.action_type || t("common.notAvailable"),
+    valueClass: "capitalize",
   },
   {
     key: "action_target_name",
-    label: "Target",
-    value: props.rawEvent?.action_target_name || "N/A",
+    label: t("common.actionTarget"),
+    value: props.rawEvent?.action_target_name || t("common.notAvailable"),
   },
   {
     key: "action_id",
-    label: "Action ID",
+    label: t("common.actionId"),
     value: props.rawEvent?.action_id,
     slot: true,
   },
@@ -693,9 +573,7 @@ const fetchRelatedResources = async () => {
     relatedResources.value = res.data.hits || [];
 
     // Auto-select first resource with trace_id for trace correlation
-    const resourceWithTrace = relatedResources.value.find(
-      (r: any) => r._oo_trace_id,
-    );
+    const resourceWithTrace = relatedResources.value.find((r: any) => rumField(r, "trace_id"));
     if (resourceWithTrace) {
       selectedResourceWithTrace.value = resourceWithTrace;
     }
@@ -718,7 +596,7 @@ watch(
 
 const viewResourceDetails = (resource: any) => {
   // Update selected resource for trace correlation
-  if (resource._oo_trace_id) {
+  if (rumField(resource, "trace_id")) {
     selectedResourceWithTrace.value = resource;
   }
 
@@ -735,9 +613,7 @@ const navigateToSpecificTrace = (traceId: string) => {
   if (!traceId) return;
 
   // Find the resource with this trace_id to get timing information
-  const resource = relatedResources.value.find(
-    (r: any) => r._oo_trace_id === traceId,
-  );
+  const resource = relatedResources.value.find((r: any) => rumField(r, "trace_id") === traceId);
 
   // Use resource timing if available, otherwise use event timing
   const startTime = resource?.date
@@ -767,7 +643,3 @@ defineExpose({
   outlinedAccountTree: "account-tree",
 });
 </script>
-
-<style>
-@import "@/assets/styles/log-highlighting.css";
-</style>

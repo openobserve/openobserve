@@ -24,6 +24,7 @@ use crate::{
 
 pub mod action_scripts;
 pub mod alert_incidents;
+pub mod alert_states;
 pub mod alerts;
 pub mod anomaly_detection;
 pub mod backfill_jobs;
@@ -35,14 +36,18 @@ pub mod distinct_values;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
+pub mod evaluation_watermarks;
+pub mod external_alerts;
 pub mod folders;
 pub mod gen_ai_agents;
 pub mod incident_events;
+pub mod incident_integrations;
 pub mod kv_store;
 mod migration;
 pub mod model_pricing;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
+pub mod org_cleanup_tasks;
 pub mod org_ingestion_tokens;
 pub mod org_storage_providers;
 pub mod org_users;
@@ -59,14 +64,26 @@ pub mod search_queue;
 pub mod service_streams;
 pub mod sessions;
 pub mod short_urls;
+pub mod slo;
+pub mod slo_backfill_jobs;
+pub mod slo_budget;
+pub mod slos;
 pub mod source_maps;
+pub mod synthetics_agents;
+pub mod synthetics_checks;
+pub mod synthetics_jobs;
+pub mod synthetics_locations;
+pub mod synthetics_probe_tokens;
+pub mod synthetics_runs;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+#[cfg(feature = "cloud")]
 pub mod trial_quota_usage;
 pub mod users;
+pub mod workflows;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;

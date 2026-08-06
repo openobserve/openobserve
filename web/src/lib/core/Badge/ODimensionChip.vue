@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // ODimensionChip — the standard key|value dimension chip (k8s-cluster=prod,
@@ -27,7 +28,7 @@ withDefaults(
     value: string | number;
     /** Optional display override for the key segment (e.g. a shortened key). */
     keyLabel?: string;
-    /** Show a `key=value` hover tooltip. Default false (main had none). */
+    /** Show a `key=value` hover tooltip. Default false. */
     tooltip?: boolean;
   }>(),
   { tooltip: false },
@@ -35,21 +36,15 @@ withDefaults(
 </script>
 
 <template>
-  <span class="tw:inline-flex tw:min-w-0 tw:max-w-full">
-    <OTag
-      :variant="dimensionVariant(dimKey)"
-      shape="rounded"
-      class="tw:min-w-0 tw:!p-0 tw:overflow-hidden"
-    >
-      <span class="tw:inline-flex tw:items-stretch tw:min-w-0">
-        <span
-          class="tw:ps-2.5 tw:pe-1 tw:py-1.5 tw:shrink-0 tw:whitespace-nowrap tw:bg-current/8 tw:opacity-90"
-        >{{ keyLabel ?? dimKey }}</span>
-        <span
-          class="tw:ps-1 tw:pe-2.5 tw:py-1.5 tw:truncate tw:min-w-0 tw:font-semibold"
-        >{{ value }}</span>
+  <span class="inline-flex max-w-full min-w-0">
+    <OTag :variant="dimensionVariant(dimKey)" shape="rounded" class="min-w-0 overflow-hidden !p-0">
+      <span class="inline-flex min-w-0 items-stretch">
+        <span class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90">{{
+          keyLabel ?? dimKey
+        }}</span>
+        <span class="min-w-0 truncate py-1.5 ps-1 pe-2.5 font-semibold">{{ value }}</span>
       </span>
     </OTag>
-    <OTooltip v-if="tooltip" :delay="300" :content="`${dimKey}=${value}`" />
+    <OTooltip v-if="tooltip" :delay="300" :content="raw(`${dimKey}=${value}`)" />
   </span>
 </template>

@@ -63,9 +63,7 @@ describe("OPopover", () => {
     });
     await wrapper.setProps({ open: false });
     // Reka keeps the content mounted until its exit animation settles.
-    await vi.waitFor(() =>
-      expect(wrapper.find('[data-testid="content"]').exists()).toBe(false),
-    );
+    await vi.waitFor(() => expect(wrapper.find('[data-testid="content"]').exists()).toBe(false));
   });
 
   it("closes on a scroll outside its content", async () => {
@@ -105,10 +103,7 @@ describe("OPopover", () => {
     let registry: DropdownNestedRegistry | null = null;
     const Probe = defineComponent({
       setup() {
-        registry = inject<DropdownNestedRegistry | null>(
-          O_DROPDOWN_NESTED_KEY,
-          null,
-        );
+        registry = inject<DropdownNestedRegistry | null>(O_DROPDOWN_NESTED_KEY, null);
         return () => h("div");
       },
     });

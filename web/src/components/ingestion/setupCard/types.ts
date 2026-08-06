@@ -20,6 +20,16 @@
 // via markdown frontmatter (ai/content/richCard/buildFromMarkdown), and in-repo
 // data sources via typed builders (setupCard/content/*, setupCard/registry).
 
+import type { I18nKey, I18nText } from "@/types/i18n";
+
+import type { FieldWidth } from "@/lib/forms/Input/OInput.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+
+// Card copy comes in pairs: `title` (resolved I18nText, for raw() tokens and
+// markdown-authored content) and `titleKey` (an I18nKey the renderer translates).
+// Set one; `*Key` wins if both. The builders in content/* are plain modules, so
+// calling t() there would freeze the copy at the boot locale.
+
 /**
  * Per-org values substituted into a card's code blocks. `token` is the
  * OpenObserve ingestion token: base64 of `email:<org ingestion passcode>`,
@@ -35,12 +45,20 @@ export interface CardSubstitutions {
 /** Context of a step → drives both the title chip and the code-block chrome. */
 export type StepChipKind = "terminal" | "editor" | "run" | "traces";
 
-/** How a step is marked complete: the user copies its code, or a span lands. */
-export type StepCompleteOn = "copy" | "detect";
+/**
+ * How a step is marked complete: the user copies its code, a span lands, or the
+ * user triggers the step's action button (see RichCardStepAction — used by the
+ * cloud-provider cards, whose steps launch a console wizard rather than
+ * producing a command to copy).
+ */
+export type StepCompleteOn = "copy" | "detect" | "action";
 
 export interface RichCardChip {
   kind: StepChipKind;
-  label: string;
+  /** Already-resolved chip text. Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n KEY for the chip text, translated by the renderer. */
+  labelKey?: I18nKey;
 }
 
 export interface RichCardCode {
@@ -64,8 +82,10 @@ export interface RichCardCode {
 export interface RichCardStepVariant {
   /** Stable id (also the toggle's data-test suffix). */
   id: string;
-  /** Toggle label, e.g. "Linux (x86_64)". */
-  label: string;
+  /** Toggle label, e.g. "Linux (x86_64)". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the toggle label, translated by the renderer. */
+  labelKey?: I18nKey;
   /** Optional resolved icon URL shown before the label (e.g. an OS logo). */
   icon?: string;
   /**
@@ -78,12 +98,35 @@ export interface RichCardStepVariant {
   note?: string;
 }
 
+/**
+ * A button that performs the step instead of handing over a command — e.g.
+ * "Launch CloudFormation Stack", which opens the AWS console. The renderer is
+ * presentational, so it only emits `step-action` with this id; the hosting page
+ * owns the behaviour.
+ */
+export interface RichCardStepAction {
+  /** Emitted with the `step-action` event so the page can dispatch. */
+  id: string;
+  label: I18nText;
+  /** OIcon registry name rendered before the label. */
+  icon?: IconName;
+  /** Renders as a secondary button (default is primary). */
+  variant?: "primary" | "secondary";
+  /** Greys the button out — e.g. nothing selected yet. */
+  disabled?: boolean;
+}
+
 export interface RichCardStep {
   /** Stable id (also used as the scroll target for the next-step auto-advance). */
   id: string;
-  title: string;
+  /** Step heading. Omit when `titleKey` is set. */
+  title?: I18nText;
+  /** i18n key for the step heading, translated by the renderer. */
+  titleKey?: I18nKey;
   /** Inline markdown: supports **bold** and `code` only (rendered safely). */
-  description: string;
+  description?: I18nText;
+  /** i18n key for the description, translated by the renderer. */
+  descriptionKey?: I18nKey;
   chip?: RichCardChip;
   code?: RichCardCode;
   /**
@@ -112,7 +155,12 @@ export interface RichCardStep {
   /** Small muted note rendered under the code (e.g. the load_dotenv caveat). */
   note?: string;
   /** Monospace pills rendered after the description (e.g. captured attributes). */
-  pills?: string[];
+  pills?: I18nText[];
+  /**
+   * Button that performs this step (cloud-console flows). Rendered after the
+   * step's own content and any `#step-<id>` slot.
+   */
+  action?: RichCardStepAction;
   completeOn: StepCompleteOn;
   /** Marks the step as required (renders a "Required" emphasis on its chip). */
   required?: boolean;
@@ -157,12 +205,47 @@ export interface RichCardExtras {
   fixBody?: string;
   /** Highlight language for the fix snippet (e.g. "bash"). Default "python". */
   fixLang?: string;
+  /**
+   * An alternative, manual path to the same result — e.g. the raw Helm sequence
+   * behind Kubernetes' one-line installer. Rendered as a collapsed section below
+   * the steps, so the primary path stays the obvious default. Its code goes
+   * through the same live substitution as the steps ({stream} and step inputs).
+   */
+  advanced?: {
+    /** Accordion label, e.g. "Advanced Installation (Manual Steps)".
+     *  Omit when `labelKey` is set. */
+    label?: I18nText;
+    /** i18n KEY for the accordion label, translated by the renderer. */
+    labelKey?: I18nKey;
+    /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
+    description?: I18nText;
+    /** i18n KEY for that paragraph, translated by the renderer. */
+    descriptionKey?: I18nKey;
+    code: RichCardCode;
+  };
+  /**
+   * How to remove what the install step added. Rendered as the last collapsed
+   * section, below troubleshooting — it is a rare, destructive action, so it stays
+   * out of the way of the setup flow while remaining discoverable on the page that
+   * installed the thing.
+   */
+  uninstall?: {
+    /** Accordion label, e.g. "Uninstall the Agent". Omit when `labelKey` is set. */
+    label?: I18nText;
+    /** i18n KEY for the accordion label, translated by the renderer. */
+    labelKey?: I18nKey;
+    /** Optional paragraph above the code (inline markdown: **bold**, `code`). */
+    description?: I18nText;
+    /** i18n KEY for that paragraph, translated by the renderer. */
+    descriptionKey?: I18nKey;
+    code: RichCardCode;
+  };
   troubleshooting?: { q: string; a: string }[];
 }
 
 export interface RichCardProvider {
   name: string;
-  tagline: string;
+  tagline: I18nText;
   /** Resolved logo asset URL for light mode (rendered on a neutral tile). */
   logo: string;
   /** Optional resolved logo URL used only in dark mode; falls back to `logo`. */
@@ -177,7 +260,7 @@ export interface RichCardProvider {
    * (possibly empty) to override it — e.g. non-AI data sources pass `[]` for none
    * or `["Metrics", "Logs"]` for what they capture.
    */
-  metaBadges?: string[];
+  metaBadges?: I18nText[];
 }
 
 /**
@@ -187,14 +270,22 @@ export interface RichCardProvider {
  * to and the stream the card listens on in lockstep.
  */
 export interface RichCardStreamInput {
-  /** Field label, e.g. "Traces Stream Name". */
-  label: string;
+  /** Field label, e.g. "Traces Stream Name". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the field label, translated by the renderer. */
+  labelKey?: I18nKey;
   /** Stream used when the field is left blank (e.g. "default"). */
   default: string;
   /** Placeholder (falls back to `default`). */
-  placeholder?: string;
-  /** Helper text under the field. */
-  help?: string;
+  placeholder?: I18nText;
+  /**
+   * Literal helper text. Only for AI-authored markdown cards, whose prose is
+   * written in the source file and has no locale key — hand-written content
+   * uses `helpKey`.
+   */
+  help?: I18nText;
+  /** i18n key for the helper text under the field, translated by the renderer. */
+  helpKey?: I18nKey;
 }
 
 /**
@@ -205,16 +296,18 @@ export interface RichCardStreamInput {
 export interface RichCardInput {
   /** Placeholder key — `{id}` in any code block is replaced with this value. */
   id: string;
-  /** Field label, e.g. "SQL Server Host". */
-  label: string;
+  /** Field label, e.g. "SQL Server Host". Omit when `labelKey` is set. */
+  label?: I18nText;
+  /** i18n key for the field label, translated by the renderer. */
+  labelKey?: I18nKey;
   /** Value used (and shown in code) before the user edits the field. */
   default: string;
   /** Placeholder text (falls back to `default`). */
-  placeholder?: string;
-  /** Helper text under the field. */
-  help?: string;
+  placeholder?: I18nText;
+  /** i18n key for the helper text under the field, translated by the renderer. */
+  helpKey?: I18nKey;
   /** Width hint passed to OInput (e.g. "sm" | "md"). Defaults to "md". */
-  width?: string;
+  width?: FieldWidth;
 }
 
 export interface RichCardContent {
@@ -224,7 +317,15 @@ export interface RichCardContent {
   /** When set, the card shows a stream-name input (see RichCardStreamInput). */
   streamInput?: RichCardStreamInput;
   extras?: RichCardExtras;
+  /** Primary "Full integration docs" link in the footer. */
   docUrl?: string;
+  /**
+   * Additional reference links rendered as real anchors beside `docUrl` — for
+   * sources that legitimately have more than one guide (e.g. GCP's Pub/Sub and
+   * Google Workspace pages). Without this they end up as unclickable text
+   * inside a collapsed accordion, which is how they get lost.
+   */
+  docLinks?: { label: string; url: string }[];
   slackUrl?: string;
 }
 

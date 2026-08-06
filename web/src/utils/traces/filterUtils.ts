@@ -31,19 +31,13 @@ export const replaceExistingFieldCondition = (
   const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
 
   // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
-  const multiRegex = new RegExp(
-    `\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`,
-    "gi",
-  );
+  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
   if (multiRegex.test(queryStr)) {
     return queryStr.replace(multiRegex, newExpression);
   }
 
   // Try range condition: field >= val AND field <= val (e.g. duration filters)
-  const rangeRegex = new RegExp(
-    `${condPat}\\s+(?:and|AND)\\s+${condPat}`,
-    "gi",
-  );
+  const rangeRegex = new RegExp(`${condPat}\\s+(?:and|AND)\\s+${condPat}`, "gi");
   if (rangeRegex.test(queryStr)) {
     return queryStr.replace(rangeRegex, newExpression);
   }
@@ -62,10 +56,7 @@ export const replaceExistingFieldCondition = (
  * Handles pipe-separated queries (`SELECT ... | WHERE conditions`) by operating
  * only on the WHERE part. Cleans up dangling AND connectors after removal.
  */
-export const removeFieldCondition = (
-  queryStr: string,
-  fieldName: string,
-): string => {
+export const removeFieldCondition = (queryStr: string, fieldName: string): string => {
   const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Operators: comparison (= != > < >= <=) or `IS` (covers IS NULL / IS NOT
   // NULL produced for null-value filters). Without `is`, null conditions were
@@ -97,10 +88,7 @@ export const removeFieldCondition = (
  * Applies a single filter term to a base editor value using replace-or-append logic.
  * Returns the new editor value.
  */
-export const applyFilterTerm = (
-  filterTerm: string,
-  baseValue: string,
-): string => {
+export const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
   let filter = filterTerm;
 
   const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
@@ -132,9 +120,7 @@ export const applyFilterTerm = (
 
     if (replaced !== null) return replaced;
 
-    return (parts[0] as string) !== ""
-      ? (parts[0] as string) + " and " + filter
-      : filter;
+    return (parts[0] as string) !== "" ? (parts[0] as string) + " and " + filter : filter;
   }
 };
 

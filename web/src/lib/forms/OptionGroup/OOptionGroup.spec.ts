@@ -84,9 +84,7 @@ describe("OOptionGroup — checkbox", () => {
         modelValue: [],
       },
     });
-    const layoutDiv = wrapper.findAll("div").find((d) =>
-      d.classes().includes("tw:flex-row"),
-    );
+    const layoutDiv = wrapper.findAll("div").find((d) => d.classes().includes("flex-row"));
     expect(layoutDiv).toBeDefined();
   });
 

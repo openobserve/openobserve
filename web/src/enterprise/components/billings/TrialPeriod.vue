@@ -18,16 +18,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="showTrialPeriodMsg"
     data-test="trial-period-container"
-    class="tw:flex tw:items-center tw:gap-3 tw:px-4 tw:py-2 tw:rounded-md tw:w-full tw:bg-(--o2-status-warning-bg) tw:border tw:border-(--o2-status-warning-text) tw:text-(--o2-status-warning-text)"
+    class="rounded-default bg-status-warning-bg border-status-warning-text text-status-warning-text flex w-full items-center gap-3 border px-4 py-2"
   >
     <!-- Warning icon -->
-    <OIcon name="warning" size="sm" class="tw:shrink-0 tw:text-(--o2-status-warning-text)" />
+    <OIcon name="warning" size="sm" class="text-status-warning-text shrink-0" />
 
     <!-- Message + subtitle on one line -->
-    <p class="tw:flex-1 tw:min-w-0 tw:m-0 tw:text-sm tw:truncate">
-      <strong class="tw:font-semibold">{{ getTrialPeriodMessage() }}</strong>
-      <span class="tw:mx-1 tw:opacity-60">·</span>
-      <span>Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
+    <p class="m-0 min-w-0 flex-1 truncate text-sm">
+      <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
+      <span class="mx-1 opacity-60">·</span>
+      <span>{{ t("billing.upgradeToPlanMessage") }}</span>
     </p>
 
     <!-- CTA button -->
@@ -35,23 +35,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="currentPage != 'billing'"
       variant="warning"
       size="xs"
-      class="tw:shrink-0"
+      class="shrink-0"
       @click="redirectBilling"
-    >{{ t("billing.upgradeNow") }}</OButton>
-    <OButton
-      v-else
-      variant="warning"
-      size="xs"
-      class="tw:shrink-0"
-      @click="redirectContactSupport"
-    >{{ t("billing.contactSupport") }}</OButton>
+      >{{ t("billing.upgradeNow") }}</OButton
+    >
+    <OButton v-else variant="warning" size="xs" class="shrink-0" @click="redirectContactSupport">{{
+      t("billing.contactSupport")
+    }}</OButton>
   </div>
 </template>
 
 <script lang="ts">
 // @ts-ignore
 import { defineComponent, ref, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -67,10 +64,19 @@ export default defineComponent({
   props: ["currentPage"],
   methods: {
     getTrialPeriodMessage() {
-      if(Object.hasOwn(this.store.state.organizationData.organizationSettings, "free_trial_expiry") && this.store.state.organizationData.organizationSettings.free_trial_expiry != "" && this.store.state.organizationData.organizationSettings.free_trial_expiry != null) {
-        let dueDays = this.getDueDays(this.store.state.organizationData.organizationSettings.free_trial_expiry);
-        if(dueDays >= 0) {
-          if(dueDays > 1) {
+      if (
+        Object.hasOwn(
+          this.store.state.organizationData.organizationSettings,
+          "free_trial_expiry",
+        ) &&
+        this.store.state.organizationData.organizationSettings.free_trial_expiry != "" &&
+        this.store.state.organizationData.organizationSettings.free_trial_expiry != null
+      ) {
+        let dueDays = this.getDueDays(
+          this.store.state.organizationData.organizationSettings.free_trial_expiry,
+        );
+        if (dueDays >= 0) {
+          if (dueDays > 1) {
             return `${dueDays} Days remaining in your trial account`;
           } else {
             return `${dueDays} Day remaining in your trial account`;
@@ -79,16 +85,18 @@ export default defineComponent({
           return "Your trial period has expired.";
         }
       }
+      return undefined;
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
 
-    const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")
-      && store.state.organizationData.organizationSettings.free_trial_expiry != ""
-      && store.state.organizationData.organizationSettings.free_trial_expiry != null;
+    const hasTrialExpiry =
+      Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") &&
+      store.state.organizationData.organizationSettings.free_trial_expiry != "" &&
+      store.state.organizationData.organizationSettings.free_trial_expiry != null;
 
     const showTrialPeriodMsg = ref(hasTrialExpiry);
 
@@ -97,7 +105,7 @@ export default defineComponent({
       try {
         if (config.isCloud === "true") {
           const res = await BillingService.list_subscription(
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           );
           if (res.data?.provider === "aws") {
             // AWS billing - don't show trial period message
@@ -111,12 +119,12 @@ export default defineComponent({
     });
 
     const redirectBilling = () => {
-      router.push('/billings/plans/')
+      router.push("/billings/plans/");
     };
 
     const redirectContactSupport = () => {
       window.open(siteURL.contactSupport, "_blank");
-    }
+    };
 
     return {
       t,

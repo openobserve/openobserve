@@ -3,7 +3,7 @@
 // Anomaly Detection domain — form validation E2E tests
 //
 // Covers:
-//   1. Add Anomaly wizard — Next button disabled until stream is selected
+//   1. Add Anomaly wizard — blank name blocks save and highlights the field
 //   2. Query mode toggle — switching between filter and custom SQL modes
 //   3. Detection window error — save button disabled or window error shown for invalid window
 
@@ -12,7 +12,7 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
 test.describe('Anomaly Detection form validation', { tag: ['@anomaly-form-validation', '@P0', '@smoke'] }, () => {
-    test.describe.configure({ mode: 'serial' });
+    test.describe.configure({ mode: 'parallel' });
     let pm;
 
     test.beforeEach(async ({ page }, testInfo) => {
@@ -26,31 +26,35 @@ test.describe('Anomaly Detection form validation', { tag: ['@anomaly-form-valida
         testLogger.info('Navigated to Anomaly Detection tab');
     });
 
-    // ── TC001: Next button disabled when stream type is not selected ──────────
+    // ── TC001: blank name blocks save and highlights the name field ───────────
+    //
+    // The wizard does NOT gate save by disabling the button: OForm keeps submit
+    // enabled and validates on click, so the offending field gets painted rather
+    // than the user being left guessing why a gray button won't respond. The
+    // blank-name rule lives in AddAlert.schema.ts's anomaly branch.
 
-    test('should disable Next button when stream is not selected in step 1', {
+    test('should block save and highlight the name when it is blank', {
         tag: ['@anomaly-form-validation', '@P0', '@smoke']
     }, async ({ page }) => {
-        testLogger.info('TC001: Verify Next button disabled when no stream selected');
+        testLogger.info('TC001: Verify blank anomaly name blocks save and paints the field');
 
         await pm.anomalyFormValidation.openAddAnomalyWizard();
 
-        // Stream type and name selects are visible; nothing is selected yet
+        // Wizard is open on step 1; name is blank and nothing is selected yet
         await expect(pm.anomalyFormValidation.getStreamTypeSelectLocator()).toBeVisible();
 
-        // Next button should be disabled until a valid stream is selected
-        const nextBtn = pm.anomalyFormValidation.getNextBtnLocator();
-        const nextVisible = await nextBtn.isVisible().catch(() => false);
+        // Save stays enabled — validation runs on submit, not via a disabled button
+        const saveBtn = pm.anomalyFormValidation.getSaveBtnLocator();
+        await expect(saveBtn).toBeEnabled();
 
-        if (nextVisible) {
-            await expect(nextBtn).toBeDisabled();
-            testLogger.info('Next button correctly disabled when no stream selected');
-        } else {
-            // Some environments render a single-step form — check save is disabled
-            const saveBtn = pm.anomalyFormValidation.getSaveBtnLocator();
-            await expect(saveBtn).toBeDisabled();
-            testLogger.info('Save button correctly disabled when no stream selected');
-        }
+        await pm.anomalyFormValidation.clickSave();
+
+        // Blank name must paint the topbar field and toast, and must not save
+        await expect(pm.anomalyFormValidation.getAnomalyNameErrorLocator())
+            .toHaveText('Anomaly name is required.');
+        await expect(pm.anomalyFormValidation.getToastMessageLocator(/fix the highlighted fields/i))
+            .toBeVisible();
+        testLogger.info('Blank name correctly blocked save and highlighted the field');
 
         await pm.anomalyFormValidation.clickCancel();
     });

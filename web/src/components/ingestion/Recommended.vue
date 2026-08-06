@@ -20,12 +20,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model="ingestTabType"
     :tabs="recommendedTabs"
     :splitter-width="270"
+    searchable
+    search-data-test="recommended-list-search-input"
     panel-data-test="data-sources-recommended-tabs"
     tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-full">
-        <div class="tw:overflow-auto tw:h-full tw:pt-1.5">
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full">
+        <div class="h-full overflow-auto pt-1.5">
           <router-view
             :title="tabs"
             :currOrgIdentifier="currOrgIdentifier"
@@ -39,15 +41,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import DataSourceSidebarLayout from '@/components/ingestion/DataSourceSidebarLayout.vue'
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import { resolveTab } from "@/utils/routeTabMaps";
 
@@ -61,15 +61,15 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
 
-    const ingestTabType = ref(resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"));
+    const ingestTabType = ref(
+      resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"),
+    );
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {
@@ -130,6 +130,18 @@ export default defineComponent({
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
         label: t("ingestion.linux"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromMacOS",
+        to: {
+          name: "ingestFromMacOS",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/macos.png"),
+        label: t("ingestion.macos"),
         contentClass: "tab_content",
       },
       {
@@ -194,6 +206,26 @@ export default defineComponent({
       },
     ];
 
+    // MCP is an AI feature (endpoint requires O2_AI_ENABLED); available on
+    // enterprise and cloud, and only when ai_enabled is on at runtime.
+    if (
+      (config.isEnterprise == "true" || config.isCloud == "true") &&
+      store.state.zoConfig.ai_enabled
+    ) {
+      recommendedTabs.push({
+        name: "recommendedMcp",
+        to: {
+          name: "recommendedMcp",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "mcp",
+        label: t("ingestion.mcp.shortName"),
+        contentClass: "tab_content",
+      });
+    }
+
     return {
       t,
       store,
@@ -210,4 +242,3 @@ export default defineComponent({
   },
 });
 </script>
-

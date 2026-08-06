@@ -1,3 +1,12 @@
+import { canvasFont } from "@/utils/fonts";
+
+// Cached 2D context for text measurement — canvas measureText is the same
+// browser API ECharts measures its labels with, and it avoids the
+// DOM-append + forced-reflow cost of measuring with a <span>, which adds up
+// because this runs for every axis label of every panel on every render.
+// `undefined` = not attempted yet, `null` = unavailable (headless).
+let measureTextCtx: CanvasRenderingContext2D | null | undefined;
+
 /**
  * Calculates the width of a given text.
  * Useful to calculate nameGap for the left axis
@@ -6,38 +15,84 @@
  * @param {string} fontSize - The font size of the text.
  * @return {number} The width of the text in pixels.
  */
-export const calculateWidthText = (
-  text: string,
-  fontSize: string = "12px",
-): number => {
+export const calculateWidthText = (text: string, fontSize: string = "12px"): number => {
   if (!text) return 0;
 
-  const span = document.createElement("span");
-  document.body.appendChild(span);
+  if (measureTextCtx === undefined) {
+    try {
+      const canvas = document.createElement("canvas");
+      measureTextCtx = typeof canvas.getContext === "function" ? canvas.getContext("2d") : null;
+    } catch {
+      measureTextCtx = null;
+    }
+  }
+  if (measureTextCtx) {
+    // Must match the family ECharts renders axis labels with (set globally by
+    // registerO2EChartsTheme), otherwise nameGap/width come out wrong.
+    measureTextCtx.font = canvasFont(fontSize || "12px", "sans");
+    return Math.ceil(measureTextCtx.measureText(String(text)).width);
+  }
 
-  span.style.font = "sans-serif";
-  span.style.fontSize = fontSize || "12px";
-  span.style.height = "auto";
-  span.style.width = "auto";
-  span.style.top = "0px";
-  span.style.position = "absolute";
-  span.style.whiteSpace = "no-wrap";
-  span.innerHTML = text;
-
-  const width = Math.ceil(span.clientWidth);
-  span.remove();
-  return width;
+  // no 2D context (e.g. jsdom) — deterministic estimate, avg glyph ≈ 0.6em
+  const px = parseFloat(fontSize) || 12;
+  return Math.ceil(String(text).length * px * 0.6);
 };
 
 /**
- * Calculates the optimal font size for a given text that fits the canvas width.
+ * Tick values a value axis will render for the given extent, mirroring
+ * ECharts' nice-interval algorithm (interval = "nice" of span/splitNumber,
+ * where nice rounds to 1/2/3/5×10^n, and the extent is widened to interval
+ * multiples). Kept local instead of importing ECharts' internal IntervalScale
+ * so upgrades cannot break us; verified to produce identical ticks.
+ *
+ * @param lo - axis extent minimum
+ * @param hi - axis extent maximum
+ * @param splitNumber - desired number of intervals (ECharts default: 5)
+ * @return {number[]} the tick values, lowest first
+ */
+export const calculateNiceTickValues = (
+  lo: number,
+  hi: number,
+  splitNumber: number = 5,
+): number[] => {
+  const span = hi - lo;
+  if (!(span > 0) || !Number.isFinite(span)) return [lo];
+
+  const step = span / splitNumber;
+  const exp10 = 10 ** Math.floor(Math.log10(step));
+  const f = step / exp10;
+  const nf = f < 1.5 ? 1 : f < 2.5 ? 2 : f < 4 ? 3 : f < 7 ? 5 : 10;
+  const interval = nf * exp10;
+
+  const ticks: number[] = [];
+  for (let k = Math.floor(lo / interval); k <= Math.ceil(hi / interval); k++) {
+    // toPrecision strips float noise like 0.30000000000000004
+    ticks.push(parseFloat((k * interval).toPrecision(12)));
+  }
+  return ticks;
+};
+
+/**
+ * Calculates the optimal font size for a given text that fits the canvas width
+ * and, when provided, the canvas height.
  * @param text - The text to calculate the font size for.
  * @param canvasWidth - canvas width in pixels
+ * @param canvasHeight - optional canvas height in pixels; caps the font size so
+ * the rendered line (~1.2em tall) also fits vertically
  * @returns {number} - The optimal font size in pixels.
  */
-export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
+export const calculateOptimalFontSize = (
+  text: string,
+  canvasWidth: number,
+  canvasHeight?: number,
+) => {
   let minFontSize = 1; // Start with the smallest font size
   let maxFontSize = 90; // Set a maximum possible font size
+
+  if (canvasHeight !== undefined && canvasHeight > 0) {
+    maxFontSize = Math.max(minFontSize, Math.min(maxFontSize, Math.floor(canvasHeight / 1.2)));
+  }
+
   let optimalFontSize = minFontSize;
 
   while (minFontSize <= maxFontSize) {
@@ -53,6 +108,50 @@ export const calculateOptimalFontSize = (text: string, canvasWidth: number) => {
   }
 
   return optimalFontSize; // Return the largest font size that fits
+};
+
+// x-axis tick-label band below the plot edge (12px font + 8px axisLabel margin)
+export const X_AXIS_TICK_LABEL_BAND = 20;
+
+/**
+ * Widens the ECharts grid's left inset to the measured pixel width of the
+ * widest formatted y-axis label. ECharts' containLabel under-measures rendered
+ * label width, so wide labels clip at the left edge; we measure with the same
+ * canvas API ECharts renders with and reserve exactly that much, disabling
+ * containLabel so the two reservations don't stack.
+ *
+ * @param options - the ECharts options object (mutated in place).
+ */
+export const applyMeasuredYAxisLeftInset = (options: any): void => {
+  const grid = options?.grid;
+  const yAxis = options?.yAxis;
+
+  // Arrays are gauge/trellis layouts that manage their own left spacing.
+  const isPlainObject = (v: any) => v && typeof v === "object" && !Array.isArray(v);
+  if (!isPlainObject(grid) || !isPlainObject(yAxis)) return;
+  if (yAxis.type !== "value") return;
+
+  const formatter = yAxis.axisLabel?.formatter;
+  if (typeof formatter !== "function") return;
+
+  let widest = 0;
+  const series = Array.isArray(options?.series) ? options.series : [];
+  for (const s of series) {
+    const data = Array.isArray(s?.data) ? s.data : [];
+    for (const point of data) {
+      const y = Array.isArray(point) ? point[1] : point;
+      const width = calculateWidthText(String(formatter(y)));
+      if (width > widest) widest = width;
+    }
+  }
+
+  if (widest > 0) {
+    options.grid.left = widest;
+    if (grid.containLabel === true && typeof grid.bottom === "number") {
+      grid.bottom += X_AXIS_TICK_LABEL_BAND;
+    }
+    options.grid.containLabel = false;
+  }
 };
 
 /**
@@ -85,8 +184,7 @@ export const calculateDynamicNameGap = (
   // When a label of width W is rotated by angle ╬╕:
   // - The vertical height = W * sin(╬╕) + fontSize * cos(╬╕)
   const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
+    labelWidth * Math.sin(rotationInRadians) + fontSize * Math.cos(rotationInRadians);
 
   // Calculate nameGap: vertical height + axis label margin + small buffer (8px)
   // The buffer ensures there's slight spacing between longest label tip and axis name
@@ -124,8 +222,7 @@ export const calculateRotatedLabelBottomSpace = (
 
   // Calculate the vertical height occupied by rotated label
   const verticalHeight =
-    labelWidth * Math.sin(rotationInRadians) +
-    fontSize * Math.cos(rotationInRadians);
+    labelWidth * Math.sin(rotationInRadians) + fontSize * Math.cos(rotationInRadians);
 
   if (hasAxisName) {
     // If there's an axis name, nameGap already covers the label height.
@@ -138,11 +235,8 @@ export const calculateRotatedLabelBottomSpace = (
     // Only add if totalNeeded exceeds a reasonable base (e.g., 40px)
     return Math.max(0, Math.ceil(totalNeededSpace - 40));
   } else {
-    // Without axis name, containLabel: true in grid config handles the space automatically
-    // for rotated labels. No additional bottom spacing is needed because:
-    // 1. containLabel: true makes ECharts automatically expand grid to fit labels
-    // 2. The grid.bottom value already provides base spacing
-    // 3. Adding extra space here causes unnecessary whitespace
+    // Without an axis name, grid's containLabel: true expands the grid to fit
+    // rotated labels, so no extra bottom spacing is needed.
     return 10; // Let ECharts handle it with containLabel
   }
 };

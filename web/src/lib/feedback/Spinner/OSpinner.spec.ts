@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { mount } from "@vue/test-utils";
-import { h } from "vue";
 import OSpinner from "./OSpinner.vue";
 
 describe("OSpinner", () => {
@@ -8,12 +7,12 @@ describe("OSpinner", () => {
     it("renders an svg with animate-spin class", () => {
       const wrapper = mount(OSpinner);
       expect(wrapper.find("svg").exists()).toBe(true);
-      expect(wrapper.find("svg").classes()).toContain("tw:animate-spin");
+      expect(wrapper.find("svg").classes()).toContain("animate-spin");
     });
 
     it("does not render dots", () => {
       const wrapper = mount(OSpinner, { props: { variant: "ring" } });
-      expect(wrapper.findAll("span.tw\\:rounded-full").length).toBe(0);
+      expect(wrapper.findAll("span.rounded-full").length).toBe(0);
     });
   });
 
@@ -41,19 +40,17 @@ describe("OSpinner", () => {
   describe("sizes", () => {
     const sizes = ["xs", "sm", "md", "lg", "xl"] as const;
     const expectedClasses = {
-      xs: "tw:size-4",
-      sm: "tw:size-5",
-      md: "tw:size-8",
-      lg: "tw:size-12",
-      xl: "tw:size-16",
+      xs: "size-4",
+      sm: "size-5",
+      md: "size-8",
+      lg: "size-12",
+      xl: "size-16",
     };
 
     sizes.forEach((size) => {
       it(`applies ${expectedClasses[size]} for size="${size}"`, () => {
         const wrapper = mount(OSpinner, { props: { size } });
-        expect(wrapper.find("span[role='status']").classes()).toContain(
-          expectedClasses[size]
-        );
+        expect(wrapper.find("span[role='status']").classes()).toContain(expectedClasses[size]);
       });
     });
   });
@@ -66,9 +63,7 @@ describe("OSpinner", () => {
 
     it("has aria-label=Loading", () => {
       const wrapper = mount(OSpinner);
-      expect(wrapper.find("[role='status']").attributes("aria-label")).toBe(
-        "Loading"
-      );
+      expect(wrapper.find("[role='status']").attributes("aria-label")).toBe("Loading");
     });
 
     it("svg has aria-hidden=true", () => {

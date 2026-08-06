@@ -1,14 +1,39 @@
-import { describe, it, expect, beforeEach, vi, Mock } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { ref } from "vue";
 import DashboardJsonEditor from "./DashboardJsonEditor.vue";
 
 // Mock dependencies
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: (key: string) => key,
-  }),
-}));
+// The component was migrated to i18n and now renders its validation/save
+// messages via t("dashboard.dashboardJsonEditor.*"). Resolve those keys against
+// the REAL en locale (with {param} interpolation for failedDuringJsonSave) so
+// the English-text assertions pass, while preserving the original
+// key-passthrough behavior every other test relies on (e.g. the ODrawer
+// title/label assertions that check the raw keys).
+vi.mock("vue-i18n", async () => {
+  const enLocale = (await import("@/locales/languages/en-US.json")).default as Record<string, any>;
+  const resolve = (key: string): unknown =>
+    key.split(".").reduce<any>((obj, part) => (obj == null ? undefined : obj[part]), enLocale);
+
+  return {
+    useI18n: () => ({
+      t: (key: string, params?: Record<string, unknown>) => {
+        if (key.startsWith("dashboard.dashboardJsonEditor.")) {
+          const value = resolve(key);
+          if (typeof value === "string") {
+            return params
+              ? value.replace(/\{(\w+)\}/g, (_match, name) =>
+                  params[name] != null ? String(params[name]) : "",
+                )
+              : value;
+          }
+        }
+        // Preserve key-passthrough for all other keys.
+        return key;
+      },
+    }),
+  };
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path: string) => `mocked-${path}`),
@@ -23,16 +48,17 @@ vi.mock("@/components/CodeQueryEditor.vue", async () => {
   const { defineComponent } = await import("vue");
   const component = defineComponent({
     name: "QueryEditor",
-    template: '<div data-test="dashboard-json-editor" class="mocked-query-editor"><textarea v-model="query" @input="onInput"></textarea></div>',
+    template:
+      '<div data-test="dashboard-json-editor" class="mocked-query-editor"><textarea v-model="queryModel" @input="onInput"></textarea></div>',
     props: ["debounceTime", "language", "editorId", "query"],
     emits: ["update:query"],
     setup(props: any, { emit }: any) {
-      const query = ref(props.query || "");
+      const queryModel = ref(props.query || "");
       const onInput = (event: Event) => {
         const target = event.target as HTMLTextAreaElement;
         emit("update:query", target.value);
       };
-      return { query, onInput };
+      return { queryModel, onInput };
     },
   });
 
@@ -68,12 +94,7 @@ vi.mock("@/lib/overlay/Drawer/ODrawer.vue", async () => {
       "secondaryButtonLoading",
       "neutralButtonLoading",
     ],
-    emits: [
-      "update:open",
-      "click:primary",
-      "click:secondary",
-      "click:neutral",
-    ],
+    emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
     template: `
       <div data-test="o-drawer-stub" class="o-drawer-stub">
         <header data-test="o-drawer-header">
@@ -129,7 +150,7 @@ describe("DashboardJsonEditor", () => {
       global: {
         stubs: {
           // Stub QueryEditor with proper data-test attribute
-          "QueryEditor": {
+          QueryEditor: {
             name: "QueryEditor",
             template: '<div data-test="dashboard-json-editor" class="query-editor"><slot /></div>',
             props: ["debounceTime", "language", "editorId", "query"],
@@ -273,7 +294,7 @@ describe("DashboardJsonEditor", () => {
     wrapper = createWrapper();
     const modifiedJson = JSON.stringify({
       ...mockDashboardData,
-      dashboardId: "different-id"
+      dashboardId: "different-id",
     });
 
     wrapper.vm.handleEditorChange(modifiedJson);
@@ -286,7 +307,7 @@ describe("DashboardJsonEditor", () => {
     wrapper = createWrapper();
     const modifiedJson = JSON.stringify({
       ...mockDashboardData,
-      owner: "different-owner"
+      owner: "different-owner",
     });
 
     wrapper.vm.handleEditorChange(modifiedJson);
@@ -299,7 +320,7 @@ describe("DashboardJsonEditor", () => {
     wrapper = createWrapper();
     const modifiedJson = JSON.stringify({
       ...mockDashboardData,
-      created: "2024-01-01T00:00:00Z"
+      created: "2024-01-01T00:00:00Z",
     });
 
     wrapper.vm.handleEditorChange(modifiedJson);
@@ -366,7 +387,7 @@ describe("DashboardJsonEditor", () => {
     mockSaveJsonDashboard.execute.mockRejectedValue(saveError);
 
     // Mock console.error to suppress stderr output
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     wrapper = createWrapper();
     wrapper.vm.isValidJson = true;
@@ -388,7 +409,7 @@ describe("DashboardJsonEditor", () => {
     mockSaveJsonDashboard.execute.mockRejectedValue("String error");
 
     // Mock console.error to suppress stderr output
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     wrapper = createWrapper();
     wrapper.vm.isValidJson = true;
@@ -405,7 +426,7 @@ describe("DashboardJsonEditor", () => {
   // Test 18: saveChanges should handle JSON parsing errors during save
   it("should handle JSON parsing errors during save", async () => {
     // Mock console.error to suppress stderr output
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     wrapper = createWrapper();
     wrapper.vm.isValidJson = true;
@@ -425,7 +446,7 @@ describe("DashboardJsonEditor", () => {
 
     const newDashboardData = {
       ...mockDashboardData,
-      title: "Updated Dashboard Title"
+      title: "Updated Dashboard Title",
     };
 
     await wrapper.setProps({ dashboardData: newDashboardData });
@@ -515,7 +536,7 @@ describe("DashboardJsonEditor", () => {
       ...mockDashboardData,
       dashboardId: "different-id",
       owner: "different-owner",
-      created: "2024-01-01T00:00:00Z"
+      created: "2024-01-01T00:00:00Z",
     });
 
     wrapper.vm.handleEditorChange(modifiedJson);
@@ -536,7 +557,7 @@ describe("DashboardJsonEditor", () => {
     const jsonWithoutRestrictedFields = JSON.stringify({
       title: "Some Title",
       version: "v3",
-      tabs: []
+      tabs: [],
       // Note: no dashboardId, owner, or created fields
     });
 
@@ -553,8 +574,8 @@ describe("DashboardJsonEditor", () => {
     const validJson = JSON.stringify({ test: "value from editor" });
 
     // Simulate the editor update event
-    const queryEditor = wrapper.findComponent({ name: 'QueryEditor' });
-    queryEditor.vm.$emit('update:query', validJson);
+    const queryEditor = wrapper.findComponent({ name: "QueryEditor" });
+    queryEditor.vm.$emit("update:query", validJson);
 
     expect(wrapper.vm.isValidJson).toBe(true);
   });
@@ -593,14 +614,14 @@ describe("DashboardJsonEditor", () => {
     expect(wrapper.vm.jsonContent).toBe(expectedJson);
 
     // Check that the editor is rendered
-    const queryEditor = wrapper.findComponent({ name: 'QueryEditor' });
+    const queryEditor = wrapper.findComponent({ name: "QueryEditor" });
     expect(queryEditor.exists()).toBe(true);
   });
 
   // Test 32: Component handles empty or null dashboard data
   it("should handle empty or null dashboard data gracefully", () => {
     // Mock console.warn to suppress Vue prop validation warnings
-    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     wrapper = createWrapper({ dashboardData: null });
 
@@ -629,7 +650,7 @@ describe("DashboardJsonEditor", () => {
     wrapper = createWrapper();
     const modifiedJson = JSON.stringify({
       ...mockDashboardData,
-      dashboardId: "different-id" // This should trigger custom validation
+      dashboardId: "different-id", // This should trigger custom validation
     });
 
     wrapper.vm.handleEditorChange(modifiedJson);
@@ -649,9 +670,9 @@ describe("DashboardJsonEditor", () => {
         {
           tabId: "new-tab",
           name: "New Tab",
-          panels: [{ id: "panel1", title: "Panel 1" }]
-        }
-      ]
+          panels: [{ id: "panel1", title: "Panel 1" }],
+        },
+      ],
     };
 
     await wrapper.setProps({ dashboardData: newDashboardData });

@@ -19,7 +19,12 @@ const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
 const path = require('path');
 
-test.describe.configure({ mode: "serial" });
+// Parallel-safe: each test uses a unique per-test source stream
+// (generateUniqueMetricsStreamName) and its own destination stream, has no
+// order dependency, and the beforeAll/beforeEach hooks are idempotent and
+// non-destructive. Running in parallel lets these tests use idle workers instead
+// of monopolising a single worker serially (the file was the slowest pole at ~6m).
+test.describe.configure({ mode: "parallel" });
 
 // Use stored authentication state from global setup instead of logging in each test
 const authFile = path.join(__dirname, '../utils/auth/user.json');

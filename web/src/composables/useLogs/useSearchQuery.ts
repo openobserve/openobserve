@@ -20,10 +20,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
 import { SearchRequestPayload } from "@/ts/interfaces/query";
-import {
-  convertDateToTimestamp,
-  getConsumableRelativeTime,
-} from "@/utils/date";
+import { getConsumableRelativeTime } from "@/utils/date";
 import config from "@/aws-exports";
 import { b64EncodeUnicode, addSpacesToOperators } from "@/utils/zincutils";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
@@ -31,13 +28,11 @@ import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
 import { Parser as SqlParser } from "@openobserve/node-sql-parser/build/datafusionsql";
 import { buildContextualSqlMessage, isParserLimitation } from "@/utils/query/sqlDiagnostics";
+import { raw } from "@/types/i18n";
 
 // Walk the WHERE clause AST and replace column references whose name matches
 // a key in the fieldMapping (original field → stream-specific field).
-const replaceColumnRefsInWhere = (
-  node: any,
-  fieldMapping: Record<string, string>,
-): void => {
+const replaceColumnRefsInWhere = (node: any, fieldMapping: Record<string, string>): void => {
   if (!node) return;
 
   if (node.type === "column_ref") {
@@ -75,15 +70,13 @@ export const useSearchQuery = () => {
     isDistinctQuery,
     isWithQuery,
     isLimitQuery,
-    extractTimestamps,
     addTransformToQuery,
     updateUrlQueryParams,
     fnUnparsedSQL,
     checkTimestampAlias,
   } = logsUtils();
 
-  const { searchObj, notificationMsg, initialQueryPayload, searchAggData } =
-    searchState();
+  const { searchObj, notificationMsg, initialQueryPayload, searchAggData } = searchState();
 
   const { semanticGroups } = useServiceCorrelation();
 
@@ -119,12 +112,11 @@ export const useSearchQuery = () => {
     if (Number.isNaN(searchObj.data.datetime.startTime))
       searchObj.data.datetime.startTime = "Invalid Date";
 
-    const queryReq: SearchRequestPayload = buildSearch();
+    const queryReq: SearchRequestPayload | null = buildSearch();
 
     // Update highlight query on run-query
     if (searchObj.meta.sqlMode) {
-      searchObj.data.highlightQuery =
-        searchObj.data.query.toLowerCase().split("where")?.[1] || "";
+      searchObj.data.highlightQuery = searchObj.data.query.toLowerCase().split("where")?.[1] || "";
     } else {
       searchObj.data.highlightQuery = searchObj.data.query.toLowerCase();
     }
@@ -142,8 +134,7 @@ export const useSearchQuery = () => {
     if (!queryReq) {
       searchObj.loading = false;
       throw new Error(
-        notificationMsg.value ||
-          "Something went wrong while creating Search Request.",
+        notificationMsg.value || "Something went wrong while creating Search Request.",
       );
     }
 
@@ -161,12 +152,10 @@ export const useSearchQuery = () => {
         if (
           searchObj.meta.refreshInterval == 0 &&
           router.currentRoute.value.name == "logs" &&
-          searchObj.data.queryResults.hasOwnProperty("hits")
+          Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "hits")
         ) {
-          const start_time: number =
-            initialQueryPayload.value?.query?.start_time || 0;
-          const end_time: number =
-            initialQueryPayload.value?.query?.end_time || 0;
+          const start_time: number = initialQueryPayload.value?.query?.start_time || 0;
+          const end_time: number = initialQueryPayload.value?.query?.end_time || 0;
           queryReq.query.start_time = start_time;
           queryReq.query.end_time = end_time;
         }
@@ -189,13 +178,10 @@ export const useSearchQuery = () => {
     if (searchObj.data.histogramQuery.query.action_id)
       delete searchObj.data.histogramQuery.query.action_id;
 
-    searchObj.data.customDownloadQueryObj = JSON.parse(
-      JSON.stringify(queryReq),
-    );
+    searchObj.data.customDownloadQueryObj = JSON.parse(JSON.stringify(queryReq));
 
     queryReq.query.from =
-      (searchObj.data.resultGrid.currentPage - 1) *
-      searchObj.meta.resultGrid.rowsPerPage;
+      (searchObj.data.resultGrid.currentPage - 1) * searchObj.meta.resultGrid.rowsPerPage;
 
     // Use configurable scan size when patterns mode is enabled to get data for pattern extraction
     queryReq.query.size =
@@ -209,7 +195,6 @@ export const useSearchQuery = () => {
 
     if (searchObj.meta.sqlMode == true) {
       // if query has aggregation or groupby then we need to set size to -1 to get all records
-      // issue #5432
       // BUT: Don't override size when patterns mode is enabled - we need the configured scan size for pattern extraction
       if (
         (hasAggregation(parsedSQL?.columns) || parsedSQL.groupby != null) &&
@@ -219,10 +204,7 @@ export const useSearchQuery = () => {
       }
 
       // Don't apply LIMIT from SQL when patterns mode is enabled - we need the configured scan size for pattern extraction
-      if (
-        isLimitQuery(parsedSQL) &&
-        searchObj.meta.logsVisualizeToggle !== "patterns"
-      ) {
+      if (isLimitQuery(parsedSQL) && searchObj.meta.logsVisualizeToggle !== "patterns") {
         queryReq.query.size = parsedSQL.limit.value[0].value;
         searchObj.meta.resultGrid.showPagination = false;
 
@@ -267,7 +249,7 @@ export const useSearchQuery = () => {
   const buildSearch = (
     readOnly: boolean = false,
     ignoreQuickMode: boolean = false,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     try {
       let query = searchObj.data.query.trim();
 
@@ -298,7 +280,8 @@ export const useSearchQuery = () => {
             const msg = buildContextualSqlMessage(query, syntaxErr);
             searchObj.data.errorMsg = `SQL syntax error at line ${line}, column ${col}: ${msg}`;
             searchObj.data.sqlSyntaxErrorRanges = [
-              { startLine: line, endLine: line, column: col, error: msg },
+              // msg is string|null; `!` is compile-time only (null passes through unchanged).
+              { startLine: line, endLine: line, column: col, error: msg! },
             ];
           }
         }
@@ -312,40 +295,32 @@ export const useSearchQuery = () => {
           start_time: (new Date().getTime() - 900000) * 1000,
           end_time: new Date().getTime() * 1000,
           from:
-            searchObj.meta.resultGrid.rowsPerPage *
-              (searchObj.data.resultGrid.currentPage - 1) || 0,
+            searchObj.meta.resultGrid.rowsPerPage * (searchObj.data.resultGrid.currentPage - 1) ||
+            0,
           size: searchObj.meta.resultGrid.rowsPerPage,
           quick_mode: searchObj.meta.quickMode && !ignoreQuickMode,
         },
       };
 
-      if (
-        config.isEnterprise == "true" &&
-        store.state.zoConfig.super_cluster_enabled
-      ) {
+      if (config.isEnterprise == "true" && store.state.zoConfig.super_cluster_enabled) {
         req["regions"] = searchObj.meta.regions;
         req["clusters"] = searchObj.meta.clusters;
       }
 
-      const streamFieldNames: any =
-        searchObj.data.stream.selectedStreamFields.map(
-          (item: any) => item.name,
-        );
+      const streamFieldNames: any = searchObj.data.stream.selectedStreamFields.map(
+        (item: any) => item.name,
+      );
 
       // In read-only mode, create a filtered copy; in normal mode, mutate in place
       let interestingFields: string[];
       if (readOnly) {
         // Read-only: Create a filtered copy without mutating
-        interestingFields = searchObj.data.stream.interestingFieldList.filter(
-          (fieldName: string) => streamFieldNames.includes(fieldName),
+        interestingFields = searchObj.data.stream.interestingFieldList.filter((fieldName: string) =>
+          streamFieldNames.includes(fieldName),
         );
       } else {
         // Normal mode: Mutate the array in place
-        for (
-          let i = searchObj.data.stream.interestingFieldList.length - 1;
-          i >= 0;
-          i--
-        ) {
+        for (let i = searchObj.data.stream.interestingFieldList.length - 1; i >= 0; i--) {
           const fieldName = searchObj.data.stream.interestingFieldList[i];
           if (!streamFieldNames.includes(fieldName)) {
             searchObj.data.stream.interestingFieldList.splice(i, 1);
@@ -355,17 +330,11 @@ export const useSearchQuery = () => {
       }
 
       // Replace field list placeholder with appropriate values
-      if (
-        interestingFields.length > 0 &&
-        searchObj.meta.quickMode &&
-        !ignoreQuickMode
-      ) {
+      if (interestingFields.length > 0 && searchObj.meta.quickMode && !ignoreQuickMode) {
         if (searchObj.data.stream.selectedStream.length == 1) {
           req.query.sql = req.query.sql.replace(
             "[FIELD_LIST]",
-            interestingFields
-              .map((field: string) => quoteSqlIdentifierIfNeeded(field))
-              .join(","),
+            interestingFields.map((field: string) => quoteSqlIdentifierIfNeeded(field)).join(","),
           );
         }
       } else {
@@ -374,9 +343,7 @@ export const useSearchQuery = () => {
 
       const timestamps: any =
         searchObj.data.datetime.type === "relative"
-          ? getConsumableRelativeTime(
-              searchObj.data.datetime.relativeTimePeriod,
-            )
+          ? getConsumableRelativeTime(searchObj.data.datetime.relativeTimePeriod)
           : cloneDeep(searchObj.data.datetime);
 
       // Only mutate datetime timestamps in normal mode.
@@ -395,10 +362,7 @@ export const useSearchQuery = () => {
         });
       }
 
-      if (
-        timestamps.startTime != "Invalid Date" &&
-        timestamps.endTime != "Invalid Date"
-      ) {
+      if (timestamps.startTime != "Invalid Date" && timestamps.endTime != "Invalid Date") {
         if (timestamps.startTime > timestamps.endTime) {
           notificationMsg.value = "Start time cannot be greater than end time";
           return null;
@@ -421,8 +385,7 @@ export const useSearchQuery = () => {
           notificationMsg.value =
             "The selected start time is  invalid. Please choose a valid time.";
         } else if (timestamps.endTime == "Invalid Date") {
-          notificationMsg.value =
-            "The selected end time is  invalid. Please choose a valid time.";
+          notificationMsg.value = "The selected end time is  invalid. Please choose a valid time.";
         } else {
           notificationMsg.value = "Invalid date format.";
         }
@@ -435,8 +398,7 @@ export const useSearchQuery = () => {
         return handleNonSqlMode(query, req);
       }
     } catch (e: any) {
-      notificationMsg.value =
-        "An error occurred while constructing the search query.";
+      notificationMsg.value = "An error occurred while constructing the search query.";
       return null;
     }
   };
@@ -476,7 +438,7 @@ export const useSearchQuery = () => {
     query: string,
     req: any,
     readOnly: boolean = false,
-  ): SearchRequestPayload => {
+  ): SearchRequestPayload | null => {
     // Only mutate query in normal mode
     if (!readOnly) {
       searchObj.data.query = query;
@@ -531,11 +493,11 @@ export const useSearchQuery = () => {
    * Convenience wrapper for read-only mode
    * Use this when you need the query payload without mutating searchObj
    */
-  const getSearchQueryPayload = (): SearchRequestPayload => {
+  const getSearchQueryPayload = (): SearchRequestPayload | null => {
     return buildSearch(true);
   };
 
-  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload => {
+  const handleNonSqlMode = (query: string, req: any): SearchRequestPayload | null => {
     const parseQuery = [query];
     let queryFunctions = "";
     let whereClause = "";
@@ -556,9 +518,7 @@ export const useSearchQuery = () => {
       whereClause = addSpacesToOperators(whereClause);
       const parsedSQL = whereClause.split(" ");
       const streamFieldNames = new Set(
-        searchObj.data.stream.selectedStreamFields.map(
-          (field: any) => field.name,
-        ),
+        searchObj.data.stream.selectedStreamFields.map((field: any) => field.name),
       );
 
       for (const [index, token] of parsedSQL.entries()) {
@@ -569,17 +529,12 @@ export const useSearchQuery = () => {
       }
 
       whereClause = parsedSQL.join(" ");
-      req.query.sql = req.query.sql
-        .split("[WHERE_CLAUSE]")
-        .join(" WHERE " + whereClause);
+      req.query.sql = req.query.sql.split("[WHERE_CLAUSE]").join(" WHERE " + whereClause);
     } else {
       req.query.sql = req.query.sql.replace("[WHERE_CLAUSE]", "");
     }
 
-    req.query.sql = req.query.sql.replace(
-      "[QUERY_FUNCTIONS]",
-      queryFunctions.trim(),
-    );
+    req.query.sql = req.query.sql.replace("[QUERY_FUNCTIONS]", queryFunctions.trim());
 
     if (searchObj.data.stream.selectedStream.length > 1) {
       return handleMultiStream(req, whereClause);
@@ -593,10 +548,7 @@ export const useSearchQuery = () => {
     return finalizeRequest(req);
   };
 
-  const handleMultiStream = (
-    req: any,
-    whereClause: string,
-  ): SearchRequestPayload => {
+  const handleMultiStream = (req: any, whereClause: string): SearchRequestPayload | null => {
     let streams: any = searchObj.data.stream.selectedStream;
 
     if (whereClause.trim() != "") {
@@ -607,17 +559,13 @@ export const useSearchQuery = () => {
 
       if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
         streams = searchObj.data.stream.selectedStream.filter(
-          (streams: any) =>
-            !searchObj.data.stream.missingStreamMultiStreamFilter.includes(
-              streams,
-            ),
+          (streams: any) => !searchObj.data.stream.missingStreamMultiStreamFilter.includes(streams),
         );
       }
     }
 
     const preSQLQuery = req.query.sql;
     req.query.sql = [];
-
 
     streams
       .join(",")
@@ -631,13 +579,9 @@ export const useSearchQuery = () => {
           const mapping = multiStreamFieldMapping.get(item)!;
 
           // Build a parsable SQL by temporarily replacing template placeholders
-          const hasFieldListPlaceholder =
-            finalQuery.includes("[FIELD_LIST]");
+          const hasFieldListPlaceholder = finalQuery.includes("[FIELD_LIST]");
           if (hasFieldListPlaceholder) {
-            finalQuery = finalQuery.replace(
-              "[FIELD_LIST]",
-              "__field_list_placeholder__",
-            );
+            finalQuery = finalQuery.replace("[FIELD_LIST]", "__field_list_placeholder__");
           }
 
           const parsed = fnParsedSQL(finalQuery);
@@ -646,7 +590,7 @@ export const useSearchQuery = () => {
             finalQuery = fnUnparsedSQL(parsed);
 
             finalQuery = finalQuery.replace(/`/g, '"');
-            
+
             if (hasFieldListPlaceholder) {
               finalQuery = finalQuery
                 .replace(/"__field_list_placeholder__"/g, "[FIELD_LIST]")
@@ -687,10 +631,7 @@ export const useSearchQuery = () => {
   };
 
   const finalizeRequest = (req: any): SearchRequestPayload => {
-    if (
-      searchObj.data.resultGrid.currentPage > 1 ||
-      searchObj.meta.showHistogram === false
-    ) {
+    if (searchObj.data.resultGrid.currentPage > 1 || searchObj.meta.showHistogram === false) {
       if (searchObj.meta.showHistogram === false) {
         searchObj.data.histogram = {
           xData: [],
@@ -698,7 +639,8 @@ export const useSearchQuery = () => {
           breakdownField: null,
           breakdownSeries: null,
           chartParams: {
-            title: "",
+            title: raw(""),
+            titleParts: null,
             unparsed_x_data: [],
             timezone: "",
           },
@@ -723,12 +665,8 @@ export const useSearchQuery = () => {
 
   const validateFilterForMultiStream = (): boolean => {
     const filterCondition = searchObj.data.query;
-    const parsedSQL: any = fnParsedSQL(
-      "select * from stream where " + filterCondition,
-    );
-    searchObj.data.stream.filteredField = extractFilterColumns(
-      parsedSQL?.where,
-    );
+    const parsedSQL: any = fnParsedSQL("select * from stream where " + filterCondition);
+    searchObj.data.stream.filteredField = extractFilterColumns(parsedSQL?.where);
 
     searchObj.data.filterErrMsg = "";
     searchObj.data.missingStreamMessage = "";
@@ -741,10 +679,9 @@ export const useSearchQuery = () => {
 
     for (const fieldObj of searchObj.data.stream.filteredField) {
       const fieldName = fieldObj.expr.value;
-      const filteredFields: any =
-        searchObj.data.stream.selectedStreamFields.filter(
-          (field: any) => field.name === fieldName,
-        );
+      const filteredFields: any = searchObj.data.stream.selectedStreamFields.filter(
+        (field: any) => field.name === fieldName,
+      );
 
       if (filteredFields.length > 0) {
         const streamsCount = filteredFields[0].streams.length;
@@ -761,10 +698,9 @@ export const useSearchQuery = () => {
         .map((field: any) => field.streams)
         .flat();
 
-      let missingStreamsForField =
-        searchObj.data.stream.selectedStream.filter(
-          (stream: any) => !fieldStreams.includes(stream),
-        );
+      let missingStreamsForField = searchObj.data.stream.selectedStream.filter(
+        (stream: any) => !fieldStreams.includes(stream),
+      );
 
       // Try reverse mapping: for streams missing this field, check if they
       // have an equivalent field from the same semantic group.
@@ -775,11 +711,10 @@ export const useSearchQuery = () => {
           const resolvedStreams: string[] = [];
 
           for (const missingStream of missingStreamsForField) {
-            const equivalentField =
-              searchObj.data.stream.selectedStreamFields.find((sf: any) => {
-                if (!sf.streams?.includes(missingStream)) return false;
-                return fieldToGroupId.get(sf.name.toLowerCase()) === fieldGroupId;
-              });
+            const equivalentField = searchObj.data.stream.selectedStreamFields.find((sf: any) => {
+              if (!sf.streams?.includes(missingStream)) return false;
+              return fieldToGroupId.get(sf.name.toLowerCase()) === fieldGroupId;
+            });
 
             if (equivalentField) {
               if (!multiStreamFieldMapping) {
@@ -788,8 +723,7 @@ export const useSearchQuery = () => {
               if (!multiStreamFieldMapping.has(missingStream)) {
                 multiStreamFieldMapping.set(missingStream, {});
               }
-              multiStreamFieldMapping.get(missingStream)![fieldName] =
-                equivalentField.name;
+              multiStreamFieldMapping.get(missingStream)![fieldName] = equivalentField.name;
               resolvedStreams.push(missingStream);
             }
           }
@@ -801,13 +735,15 @@ export const useSearchQuery = () => {
         }
 
         // Only show error if field doesn't exist in ANY stream (not even via equivalent)
-        if (filteredFields.length === 0 && missingStreamsForField.length === searchObj.data.stream.selectedStream.length) {
+        if (
+          filteredFields.length === 0 &&
+          missingStreamsForField.length === searchObj.data.stream.selectedStream.length
+        ) {
           searchObj.data.filterErrMsg += `Field '${fieldName}' does not exist in the one or more stream.\n`;
         }
       }
 
-      searchObj.data.stream.missingStreamMultiStreamFilter =
-        missingStreamsForField;
+      searchObj.data.stream.missingStreamMultiStreamFilter = missingStreamsForField;
 
       if (searchObj.data.stream.missingStreamMultiStreamFilter.length > 0) {
         searchObj.data.missingStreamMessage = `One or more filter fields do not exist in "${searchObj.data.stream.missingStreamMultiStreamFilter.join(

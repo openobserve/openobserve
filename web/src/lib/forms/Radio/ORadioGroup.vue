@@ -1,14 +1,9 @@
 <script setup lang="ts">
 // Copyright 2026 OpenObserve Inc.
 
-import type {
-  RadioGroupProps,
-  RadioGroupEmits,
-  RadioGroupSlots,
-  RadioValue,
-} from "./ORadio.types";
+import type { RadioGroupProps, RadioGroupEmits, RadioGroupSlots, RadioValue } from "./ORadio.types";
 import { RADIO_VALUE_MAP_KEY } from "./ORadio.types";
-import { RadioGroupRoot } from "reka-ui";
+import { RadioGroupRoot, type AcceptableValue } from "reka-ui";
 import { provide } from "vue";
 
 withDefaults(defineProps<RadioGroupProps>(), {
@@ -23,8 +18,10 @@ defineSlots<RadioGroupSlots>();
 const valueMap = new Map<string, RadioValue>();
 provide(RADIO_VALUE_MAP_KEY, valueMap);
 
-function handleUpdate(value: string) {
-  emit("update:modelValue", valueMap.get(value) ?? value);
+function handleUpdate(value: AcceptableValue) {
+  // RadioGroupRoot binds string model values, so recover the original via the map.
+  const key = String(value);
+  emit("update:modelValue", valueMap.get(key) ?? key);
 }
 </script>
 
@@ -35,10 +32,7 @@ function handleUpdate(value: string) {
     :orientation="orientation"
     :name="name"
     :aria-label="label"
-    :class="[
-      'tw:flex tw:gap-2',
-      orientation === 'horizontal' ? 'tw:flex-row tw:flex-wrap' : 'tw:flex-col',
-    ]"
+    :class="['flex gap-2', orientation === 'horizontal' ? 'flex-row flex-wrap' : 'flex-col']"
     @update:model-value="handleUpdate"
   >
     <slot />

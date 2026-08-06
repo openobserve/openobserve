@@ -15,7 +15,7 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
-import { ref, reactive } from "vue";
+import { reactive } from "vue";
 
 // Create reactive mock data that mimics the real composable structure
 const createMockDashboardPanelData = () =>
@@ -58,7 +58,6 @@ vi.mock("vue-i18n", () => ({
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
 
 describe("BackGroundColorConfig", () => {
   let wrapper: any;
@@ -292,9 +291,7 @@ describe("BackGroundColorConfig", () => {
       mockDashboardPanelData.data.config.background.value.color = "";
       wrapper.vm.backgroundColor = "#00ff00";
 
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
-        "#00ff00",
-      );
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#00ff00");
     });
 
     it("should handle setting color when value object doesn't exist", () => {
@@ -307,9 +304,7 @@ describe("BackGroundColorConfig", () => {
       wrapper.vm.backgroundColor = "#ff0000";
 
       expect(mockDashboardPanelData.data.config.background.value).toBeDefined();
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
-        "#ff0000",
-      );
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#ff0000");
     });
   });
 
@@ -390,10 +385,12 @@ describe("BackGroundColorConfig", () => {
   describe("Template Rendering and UI", () => {
     it("should render main container with correct styling", () => {
       wrapper = createWrapper();
-      const container = wrapper.find("div[style*='display: flex']");
+      // The root container's inline flex/align/width style is now utilities.
+      const container = wrapper.find("div");
       expect(container.exists()).toBeTruthy();
-      expect(container.attributes("style")).toContain("align-items: center");
-      expect(container.attributes("style")).toContain("width: 100%");
+      expect(container.classes()).toContain("flex");
+      expect(container.classes()).toContain("items-center");
+      expect(container.classes()).toContain("w-full");
     });
 
     it("should render OSelect with correct props", () => {
@@ -439,8 +436,9 @@ describe("BackGroundColorConfig", () => {
       const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
 
       expect(colorWrapper.exists()).toBeTruthy();
-      expect(colorWrapper.attributes("style")).toContain("margin-top: 36px");
-      expect(colorWrapper.attributes("style")).toContain("margin-left: 5px");
+      // Inline `margin-top: 36px; margin-left: 5px` -> mt-9 (2.25rem) / ml-1.25 (0.3125rem).
+      expect(colorWrapper.classes()).toContain("mt-9");
+      expect(colorWrapper.classes()).toContain("ml-1.25");
     });
 
     it("should bind color input value correctly", () => {
@@ -476,9 +474,7 @@ describe("BackGroundColorConfig", () => {
       const colorInput = wrapper.find('[data-test="dashboard-config-color-input"]');
       await colorInput.setValue("#00ff00");
 
-      expect(mockDashboardPanelData.data.config.background.value.color).toBe(
-        "#00ff00",
-      );
+      expect(mockDashboardPanelData.data.config.background.value.color).toBe("#00ff00");
     });
 
     it("should handle form interactions correctly", async () => {
@@ -648,8 +644,8 @@ describe("BackGroundColorConfig", () => {
 
       const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
       expect(colorWrapper.exists()).toBeTruthy();
-      expect(colorWrapper.classes()).toContain("tw:rounded-full");
-      expect(colorWrapper.classes()).toContain("tw:overflow-hidden");
+      expect(colorWrapper.classes()).toContain("rounded-full");
+      expect(colorWrapper.classes()).toContain("overflow-hidden");
     });
 
     it("should have color input styles applied", () => {

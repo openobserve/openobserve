@@ -34,6 +34,7 @@ vi.mock("@/utils/zincutils", () => ({
 import rumCard, { RUM_SDK_VERSION } from "./rum";
 import type { RumCardSubs } from "./rum";
 import type { RichCardContent } from "../types";
+import enLocale from "@/locales/languages/en-US.json";
 
 // ── shared substitutions ──────────────────────────────────────────────────────
 
@@ -60,7 +61,6 @@ function buildCard(subs: RumCardSubs = BASE_SUBS): RichCardContent {
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe("rumCard builder", () => {
-
   // ── provider metadata ────────────────────────────────────────────────────────
 
   describe("provider", () => {
@@ -108,13 +108,13 @@ describe("rumCard builder", () => {
     it("install step has chip with label 'Install'", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
-      expect(install.chip?.label).toBe("Install");
+      expect(install.chip?.labelKey).toBe("ingestion.setupCard.chipInstall");
     });
 
     it("init step has chip with label 'Editor'", () => {
       const card = buildCard();
       const init = card.steps.find((s) => s.id === "init")!;
-      expect(init.chip?.label).toBe("Editor");
+      expect(init.chip?.labelKey).toBe("ingestion.setupCard.chipEditor");
     });
 
     it("verify step has chip with label 'RUM'", () => {
@@ -196,9 +196,7 @@ describe("rumCard builder", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const npm = install.variants!.find((v) => v.id === "npm")!;
-      expect(npm.code.raw).toBe(
-        "npm i @openobserve/browser-rum @openobserve/browser-logs",
-      );
+      expect(npm.code.raw).toBe("npm i @openobserve/browser-rum @openobserve/browser-logs");
     });
 
     it("npm install code.lang is 'bash'", () => {
@@ -231,36 +229,28 @@ describe("rumCard builder", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain(
-        'rel="preconnect" href="https://browsersdk.openobserve.ai"',
-      );
+      expect(cdn.code.raw).toContain('rel="preconnect" href="https://browsersdk.openobserve.ai"');
     });
 
     it("cdn install code contains dns-prefetch for browsersdk.openobserve.ai", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain(
-        'rel="dns-prefetch" href="https://browsersdk.openobserve.ai"',
-      );
+      expect(cdn.code.raw).toContain('rel="dns-prefetch" href="https://browsersdk.openobserve.ai"');
     });
 
     it("cdn install code contains preconnect for the passed endpoint", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain(
-        `href="${BASE_SUBS.endpoint}"`,
-      );
+      expect(cdn.code.raw).toContain(`href="${BASE_SUBS.endpoint}"`);
     });
 
     it("cdn install code contains dns-prefetch for the passed endpoint", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain(
-        `rel="dns-prefetch" href="${BASE_SUBS.endpoint}"`,
-      );
+      expect(cdn.code.raw).toContain(`rel="dns-prefetch" href="${BASE_SUBS.endpoint}"`);
     });
 
     it("cdn install code contains the pinned-version RUM bundle URL", () => {
@@ -545,14 +535,14 @@ describe("rumCard builder", () => {
 
       const init = card.steps.find((s) => s.id === "init")!;
       const ts = card.extras!.troubleshooting as any[];
-      const exposureEntry = ts.find((e: any) =>
-        e.q.toLowerCase().includes("visible"),
-      );
+      const exposureEntry = ts.find((e: any) => e.q.toLowerCase().includes("visible"));
 
       // The init step (both NPM and CDN tabs) states the token ships to
-      // visitors' browsers and can be rotated.
-      expect(init.description).toContain("ships to visitors' browsers");
-      expect(init.description).toContain("rotate");
+      // visitors' browsers and can be rotated. That copy now sits behind an i18n
+      // key, so assert on the en-US text the key resolves to.
+      expect(init.descriptionKey).toBe("ingestion.setupCard.rumInitDesc");
+      expect(enLocale.ingestion.setupCard.rumInitDesc).toContain("ships to visitors' browsers");
+      expect(enLocale.ingestion.setupCard.rumInitDesc).toContain("rotate");
       // The troubleshooting entry explains it is write-only and rotatable.
       expect(exposureEntry).toBeDefined();
       expect(exposureEntry.a).toContain("write");
@@ -562,9 +552,7 @@ describe("rumCard builder", () => {
     it("insecureHTTP value appears in the troubleshooting answer about HTTP", () => {
       const card = rumCard(HTTP_SUBS); // insecureHTTP: true
       const ts = card.extras!.troubleshooting as any[];
-      const httpEntry = ts.find((e: any) =>
-        e.q.toLowerCase().includes("http"),
-      );
+      const httpEntry = ts.find((e: any) => e.q.toLowerCase().includes("http"));
       expect(httpEntry).toBeDefined();
       expect(httpEntry.a).toContain("true");
     });
@@ -592,8 +580,10 @@ describe("rumCard builder", () => {
     it("different rumToken values produce different raw init codes", () => {
       const card1 = rumCard({ ...BASE_SUBS, rumToken: "token-a", rumTokenMasked: "tok-a" });
       const card2 = rumCard({ ...BASE_SUBS, rumToken: "token-b", rumTokenMasked: "tok-b" });
-      const raw1 = card1.steps.find((s) => s.id === "init")!.variants!.find((v) => v.id === "npm")!.code.raw;
-      const raw2 = card2.steps.find((s) => s.id === "init")!.variants!.find((v) => v.id === "npm")!.code.raw;
+      const raw1 = card1.steps.find((s) => s.id === "init")!.variants!.find((v) => v.id === "npm")!
+        .code.raw;
+      const raw2 = card2.steps.find((s) => s.id === "init")!.variants!.find((v) => v.id === "npm")!
+        .code.raw;
       expect(raw1).not.toBe(raw2);
     });
   });
@@ -610,9 +600,7 @@ describe("rumCard builder", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
       const cdn = install.variants!.find((v) => v.id === "cdn")!;
-      expect(cdn.code.raw).toContain(
-        `https://browsersdk.openobserve.ai/${RUM_SDK_VERSION}/`,
-      );
+      expect(cdn.code.raw).toContain(`https://browsersdk.openobserve.ai/${RUM_SDK_VERSION}/`);
     });
   });
 });

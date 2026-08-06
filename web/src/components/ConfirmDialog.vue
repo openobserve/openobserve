@@ -26,9 +26,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="onCancel"
     @click:primary="onConfirm"
   >
-    <div data-test="dialog-box" class="tw:text-left">
+    <div data-test="dialog-box" class="text-left">
       <div class="para">{{ message }}</div>
-      <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4 tw:text-left">
+      <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
         <OBanner variant="warning" icon="warning" :content="warningMessage" />
       </div>
     </div>
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
@@ -55,7 +55,7 @@ export default defineComponent({
     okColor: { type: String, default: "primary" },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const open = computed({
       get: () => props.modelValue ?? false,

@@ -17,555 +17,615 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div
-    data-test="alert-list-page"
-    class="tw:flex tw:flex-col tw:h-full"
-  >
-    <PageLayout
+  <div data-test="alert-list-page" class="flex h-full flex-col">
+    <OPageLayout
+      bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
-      :main-panel="false"
-      :header-class="'tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default'"
+      :title="t('alerts.header')"
+      :subtitle="t('alerts.subtitle')"
+      icon="shield-alert-outline"
     >
-      <!-- Row 1: standard header — title + actions only (Import/Add). The alert
-           type toggle, search and folder scope moved into the table toolbar. -->
-      <template #header>
-        <AppPageHeader :title="t('alerts.header')" :subtitle="t('alerts.subtitle')" icon="shield-alert-outline">
-          <template #actions>
-            <!-- Import button -->
-            <OButton
-              :class="isCompactToolbar ? 'tw:py-0! tw:px-2! tw:min-w-0!' : ''"
-              variant="outline"
-              size="sm"
-              @click="importAlert"
-              data-test="alert-import"
-              icon-left="upload-file"
-            >
-              <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-              <OTooltip v-if="isCompactToolbar" :content="t('dashboard.import')" side="bottom" shortcut-id="alertsImport" />
-            </OButton>
-            <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
-            <OButton
-              data-test="alert-list-add-alert-btn"
-              variant="primary"
-              size="sm"
-              :disabled="!destinations.length || !templates.length"
-              :title="!destinations.length ? t('alerts.noDestinations') : ''"
-              @click="
-                activeTab === 'anomalyDetection'
-                  ? router.push({
-                      name: 'addAnomalyDetection',
-                      query: {
-                        org_identifier:
-                          store.state.selectedOrganization.identifier,
-                        folder: activeFolderId,
-                        tab: activeTab,
-                      },
-                    })
-                  : showAddUpdateFn({})
-              "
-            >{{ t(`alerts.add`) }}</OButton>
-          </template>
-        </AppPageHeader>
+      <template #actions>
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
+          />
+        </OButton>
+        <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
+        <OButton
+          data-test="alert-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          :disabled="!destinations.length || !templates.length"
+          :title="!destinations.length ? t('alerts.noDestinations') : ''"
+          @click="
+            activeTab === 'anomalyDetection'
+              ? router.push({
+                  name: 'addAnomalyDetection',
+                  query: {
+                    org_identifier: store.state.selectedOrganization.identifier,
+                    folder: activeFolderId,
+                    tab: activeTab,
+                  },
+                })
+              : showAddUpdateFn({})
+          "
+          >{{ t(`alerts.add`) }}</OButton
+        >
       </template>
 
-    <div
-      data-test="alert-list-splitter"
-      class="tw:flex-1 tw:flex tw:min-h-0"
-    >
-      <!-- Left: FolderList -->
-      <div class="tw:shrink-0 tw:h-full" :style="{ width: 230 + 'px' }">
-        <div class="tw:h-full">
-          <FolderList
-            type="alerts"
-            @update:activeFolderId="updateActiveFolderId"
-          />
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
+        <!-- Left: FolderList -->
+        <div class="w-rail h-full shrink-0">
+          <div class="h-full">
+            <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
+          </div>
         </div>
-      </div>
-      <!-- Right: Table -->
-      <div class="tw:flex-1 tw:min-w-0 tw:h-full">
-        <div class="tw:h-full card-container">
-              <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
-              <OTable
-                :frame="false"
-                v-model:selected-ids="selectedAlertIds"
-                selection="multiple"
-                data-test="alert-list-table"
-                :data="filteredResults || []"
-                :columns="columns"
-                show-index
-                row-key="alert_id"
-                :loading="loading"
-                pagination="client"
-                :page-size="pageSize"
-                :page-size-options="pageSizeOptions"
-                width="100%"
-                :show-global-filter="false"
-                :default-columns="false"
-                :enable-column-resize="true"
-                :persist-columns="true"
-                table-id="alerts-alert-list"
-                @row-click="triggerExpand"
-              >
-                <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
-                <template #toolbar>
-                  <div class="tw:flex tw:items-center tw:gap-2 tw:w-full">
-                    <OToggleGroup
-                      :model-value="activeTab"
-                      @update:model-value="(v) => { activeTab = v; filterAlertsByTab(); }"
-                    >
-                      <OToggleGroupItem value="all" size="sm" data-test="tab-all">
-                        <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
-                        {{ t("alerts.all") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
-                        <template #icon-left><OIcon name="schedule" size="sm" /></template>
-                        {{ t("alerts.scheduled") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
-                        <template #icon-left><OIcon name="bolt" size="sm" /></template>
-                        {{ t("alerts.realTime") }}
-                      </OToggleGroupItem>
-                      <OToggleGroupItem v-if="isAnomalyDetectionEnabled" value="anomalyDetection" size="sm" data-test="tab-anomalyDetection">
-                        <template #icon-left><OIcon name="query-stats" size="sm" /></template>
-                        {{ t("alerts.anomalyDetection") }}
-                      </OToggleGroupItem>
-                    </OToggleGroup>
-                    <div class="tw:flex-1 tw:min-w-0">
-                      <OInput
-                        v-model="dynamicQueryModel"
-                        :placeholder="searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')"
-                        :clearable="searchAcrossFolders"
-                        @clear="clearSearchHistory"
-                        data-test="alert-list-search-input"
-                        class="tw:w-full"
-                      >
-                        <template #icon-left>
-                          <OIcon name="search" size="sm" />
-                        </template>
-                        <template #icon-right>
-                          <OToggleGroup
-                            :model-value="searchAcrossFolders ? 'all' : 'this'"
-                            type="single"
-                            class="tw:self-center tw:mr-1"
-                            @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
-                          >
-                            <OToggleGroupItem
-                              value="this"
-                              size="xs"
-                              icon-left="folder-outline"
-                              data-test="alert-list-search-scope-current"
-                              title="Search only this folder"
-                            >{{ t('alerts.searchThisFolder') }}</OToggleGroupItem>
-                            <OToggleGroupItem
-                              value="all"
-                              size="xs"
-                              icon-left="search"
-                              data-test="alert-list-search-across-folders-toggle"
-                              title="Search across all folders"
-                            >{{ t('alerts.searchAllFolders') }}</OToggleGroupItem>
-                          </OToggleGroup>
-                        </template>
-                      </OInput>
-                    </div>
-                  </div>
-                </template>
-                <template #toolbar-trailing>
-                  <OButton
-                    variant="outline"
-                    size="icon-sm"
-                    icon-left="refresh"
+        <!-- Right: Table -->
+        <div class="h-full min-w-0 flex-1">
+          <div class="bg-card-glass-bg h-full">
+            <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
+            <OTable
+              :frame="false"
+              v-model:selected-ids="selectedAlertIds"
+              selection="multiple"
+              data-test="alert-list-table"
+              :data="displayedAlerts"
+              :columns="columns"
+              show-index
+              row-key="alert_id"
+              :loading="loading"
+              pagination="client"
+              :page-size="pageSize"
+              :page-size-options="pageSizeOptions"
+              width="100%"
+              :show-global-filter="false"
+              :default-columns="false"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              table-id="alerts-alert-list"
+              :row-class="alertRowClass"
+              :get-row-style="alertRowStyle"
+              @row-click="triggerExpand"
+            >
+              <!-- Summary strip: at-a-glance operational counts for the folder.
+                     Rendered via OTable's #subheader slot so it sits BELOW the
+                     search/tabs and above the rows. Always rendered (skeleton
+                     while loading) so data arriving never shifts the layout. -->
+              <template #subheader>
+                <div
+                  class="px-page-edge border-table-row-divider border-b py-1.5"
+                  data-test="alert-list-summary"
+                >
+                  <OStatStrip
+                    :items="summaryStats"
                     :loading="loading"
-                    data-test="alert-list-refresh-btn"
-                    @click="refreshAlerts"
-                  >
-                    <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
-                  </OButton>
-                </template>
-
-
-                <template #cell-name="{ row }">
-                  <div class="tw:flex tw:items-center tw:gap-1.5 tw:min-w-0 tw:overflow-hidden">
-                    <OIcon
-                      v-if="row.is_real_time === 'anomaly'"
-                      name="query-stats"
-                      size="sm"
-                      class="tw:text-blue-600 tw:shrink-0"
-                    />
-                    <OIcon
-                      v-else-if="row.is_real_time"
-                      name="bolt"
-                      size="sm"
-                      class="tw:text-orange-500 tw:shrink-0"
-                    />
-                    <OIcon
-                      v-else
-                      name="schedule"
-                      size="sm"
-                      class="tw:text-gray-400 tw:shrink-0"
-                    />
-                    <span class="tw:truncate">{{ row.name || "--" }}</span>
-                  </div>
-                  <OTooltip
-                    v-if="row.name"
-                    :content="row.name"
-                    content-class="tw:max-w-[400px] tw:whitespace-normal tw:break-words tw:text-xs"
+                    selectable
+                    :selected-key="stateFilter"
+                    @select="onStatSelect"
                   />
-                </template>
+                </div>
+              </template>
 
-                <template #cell-owner="{ row }">
-                  <OUserCell :value="row.owner" />
-                </template>
-
-                <template #cell-last_triggered_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_triggered_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="Never"
-                  />
-                </template>
-
-                <template #cell-last_satisfied_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_satisfied_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="Never"
-                  />
-                </template>
-
-                <template #cell-last_trained_at="{ row }">
-                  <OTimeCell
-                    :value="row.last_trained_at"
-                    unit="iso"
-                    mode="absolute"
-                    :timezone="store.state.timezone"
-                    empty-label="—"
-                  />
-                </template>
-
-                <template #cell-status="{ row }">
-                  <span
-                    v-if="row.status && row.status !== '--'"
-                    class="tw:relative tw:inline-flex"
-                  >
-                    <OTag type="alertStatus" :value="row.status" />
-                    <OTooltip
-                      v-if="row.status === 'failed' && row.last_error"
-                      :max-width="'400px'"
-                      :content="row.last_error"
-                    />
-                  </span>
-                  <span v-else class="tw:text-text-primary">—</span>
-                </template>
-
-                <template #cell-period="{ row }">
-                  {{
-                    row.period
-                      ? row.period >= 60
-                        ? row.period % 60 === 0
-                          ? `${Math.floor(row.period / 60)} Hours`
-                          : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
-                        : `${row.period} Mins`
-                      : "--"
-                  }}
-                </template>
-
-                <template #cell-frequency="{ row }">
-                  {{
-                    row.frequency
-                      ? row.frequency +
-                        (row.frequency_type == "cron"
-                          ? ""
-                          : " Mins")
-                      : "--"
-                  }}
-                </template>
-
-                <template #cell-folder_name="{ row }">
-                  <div
-                    @click.stop="
-                      updateActiveFolderId(row.folder_name.id)
+              <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
+              <template #toolbar>
+                <div class="flex w-full items-center gap-2">
+                  <OToggleGroup
+                    :model-value="activeTab"
+                    @update:model-value="
+                      (v) => {
+                        activeTab = v as string;
+                        filterAlertsByTab();
+                      }
                     "
                   >
-                    {{ row.folder_name.name }}
-                  </div>
-                </template>
-
-                <template #cell-actions="{ row }">
-                  <div class="tw:flex tw:items-center actions-container">
-                    <div
-                      data-test="alert-list-loading-alert"
-                      v-if="alertStateLoadingMap[row.uuid]"
-                      style="
-                        display: inline-block;
-                        width: 33.14px;
-                        height: auto;
+                    <OToggleGroupItem value="all" size="sm" data-test="tab-all">
+                      <template #icon-left
+                        ><OIcon name="format-list-bulleted" size="sm"
+                      /></template>
+                      {{ t("alerts.all") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="scheduled" size="sm" data-test="tab-scheduled">
+                      <template #icon-left><OIcon name="schedule" size="sm" /></template>
+                      {{ t("alerts.scheduled") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem value="realTime" size="sm" data-test="tab-realTime">
+                      <template #icon-left><OIcon name="bolt" size="sm" /></template>
+                      {{ t("alerts.realTime") }}
+                    </OToggleGroupItem>
+                    <OToggleGroupItem
+                      v-if="isAnomalyDetectionEnabled"
+                      value="anomalyDetection"
+                      size="sm"
+                      data-test="tab-anomalyDetection"
+                    >
+                      <template #icon-left><OIcon name="query-stats" size="sm" /></template>
+                      {{ t("alerts.anomalyDetection") }}
+                    </OToggleGroupItem>
+                  </OToggleGroup>
+                  <div class="min-w-0 flex-1">
+                    <OInput
+                      v-model="dynamicQueryModel"
+                      :placeholder="
+                        searchAcrossFolders ? t('dashboard.searchAcross') : t('alerts.search')
                       "
-                      class="tw:flex tw:justify-center tw:items-center tw:ml-1"
-                      :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                      :clearable="searchAcrossFolders"
+                      @clear="clearSearchHistory"
+                      data-test="alert-list-search-input"
+                      class="w-full"
                     >
-                      <OSpinner size="xs" />
-                    </div>
-                    <OButton
-                      v-else
-                      :data-row-action="row.enabled ? 'pause' : 'resume'"
-                      :data-test="`alert-list-${row.name}-pause-start-alert`"
-                      class="tw:ml-1"
-                      :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
-                      size="icon-sm"
-                      :icon-left="row.enabled ? 'pause' : 'play-arrow'"
-                      @click.stop="toggleAlertState(row)"
-                    >
-                      <OTooltip
-                        side="bottom"
-                        :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
-                        :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
-                      />
-                    </OButton>
-                    <OButton
-                      data-row-action="edit"
-                      :data-test="`alert-list-${row.name}-update-alert`"
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="edit"
-                      @click.stop="editAlert(row)"
-                    >
-                      <OTooltip side="bottom" :content="t('alerts.edit')" shortcut-id="alertsRowEdit" />
-                    </OButton>
-                    <OButton
-                      data-row-action="duplicate"
-                      variant="ghost"
-                      size="icon-sm"
-                      icon-left="content-copy"
-                      @click.stop="duplicateAlert(row)"
-                      :data-test="`alert-list-${row.name}-clone-alert`"
-                    >
-                      <OTooltip side="bottom" :content="t('alerts.clone')" shortcut-id="alertsRowDuplicate" />
-                    </OButton>
-                    <!-- Hidden proxies so the row-hover shortcuts work for
+                      <template #icon-left>
+                        <OIcon name="search" size="sm" />
+                      </template>
+                      <template #icon-right>
+                        <OToggleGroup
+                          :model-value="searchAcrossFolders ? 'all' : 'this'"
+                          type="single"
+                          class="mr-1 self-center"
+                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+                        >
+                          <OToggleGroupItem
+                            value="this"
+                            size="xs"
+                            icon-left="folder-outline"
+                            data-test="alert-list-search-scope-current"
+                            :title="t('alerts.searchThisFolderTooltip')"
+                            >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
+                          >
+                          <OToggleGroupItem
+                            value="all"
+                            size="xs"
+                            icon-left="search"
+                            data-test="alert-list-search-across-folders-toggle"
+                            :title="t('alerts.searchAllFoldersTooltip')"
+                            >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
+                          >
+                        </OToggleGroup>
+                      </template>
+                    </OInput>
+                  </div>
+                </div>
+              </template>
+              <template #toolbar-trailing>
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="loading"
+                  data-test="alert-list-refresh-btn"
+                  @click="refreshAlerts"
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="t('alerts.reloadAlertsTooltip')"
+                    shortcut-id="alertsRefresh"
+                  />
+                </OButton>
+              </template>
+
+              <template #cell-name="{ row }">
+                <div class="flex min-w-0 items-center gap-2 overflow-hidden">
+                  <!-- Type chip: glyph + colour by alert type -->
+                  <span
+                    class="rounded-default bg-surface-subtle grid h-6 w-6 shrink-0 place-items-center"
+                  >
+                    <OIcon :name="typeIconName(row)" size="sm" :class="typeIconClass(row)" />
+                  </span>
+                  <span class="truncate">{{ row.name || "--" }}</span>
+                </div>
+                <OTooltip
+                  v-if="row.name"
+                  :content="row.name"
+                  content-class="max-w-100 whitespace-normal break-words text-xs"
+                />
+              </template>
+
+              <template #cell-owner="{ row }">
+                <OUserCell :value="row.owner" />
+              </template>
+
+              <template #cell-last_triggered_at="{ row }">
+                <span class="inline-flex min-w-0 items-center gap-1.5">
+                  <span
+                    v-if="['hot', 'warm'].includes(recencyLevel(row.last_triggered_at_raw))"
+                    class="h-1.5 w-1.5 shrink-0 rounded-full"
+                    :class="
+                      recencyLevel(row.last_triggered_at_raw) === 'hot'
+                        ? 'bg-warning-500 motion-safe:animate-pulse'
+                        : 'bg-text-muted'
+                    "
+                  />
+                  <OTimeCell
+                    :value="row.last_triggered_at_raw"
+                    unit="us"
+                    mode="relative"
+                    :timezone="store.state.timezone"
+                    :empty-label="t('alerts.anomaly.retrainNever')"
+                  />
+                </span>
+              </template>
+
+              <template #cell-last_satisfied_at="{ row }">
+                <OTimeCell
+                  :value="row.last_satisfied_at"
+                  unit="iso"
+                  mode="absolute"
+                  :timezone="store.state.timezone"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
+                />
+              </template>
+
+              <template #cell-status="{ row }">
+                <span v-if="row.status && row.status !== '--'" class="relative inline-flex">
+                  <OTag type="alertStatus" :value="row.status" />
+                  <OTooltip
+                    v-if="row.status === 'failed' && row.last_error"
+                    :max-width="'400px'"
+                    :content="row.last_error"
+                  />
+                </span>
+                <span v-else class="text-text-body">—</span>
+              </template>
+
+              <!-- Priority (PT-3). Unset renders an em dash, not a chip:
+                   most alerts have none and a wall of grey chips is noise. -->
+              <template #cell-priority="{ row }">
+                <OTag
+                  v-if="row.priority"
+                  type="alertPriority"
+                  :value="`p${row.priority}`"
+                  :data-test="`alert-list-${row.name}-priority`"
+                />
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <!-- Tags (PT-6). Three visible + overflow count, so an alert
+                   carrying 64 tags cannot blow out the row height. -->
+              <template #cell-tags="{ row }">
+                <div v-if="row.tags?.length" class="flex flex-wrap items-center gap-1">
+                  <OTag
+                    v-for="tag in row.tags.slice(0, 3)"
+                    :key="tag"
+                    type="exampleChip"
+                    value="dim"
+                    :label="tag"
+                    :data-test="`alert-list-${row.name}-tag`"
+                  />
+                  <OTooltip v-if="row.tags.length > 3" :content="row.tags.join(', ')">
+                    <span class="text-text-secondary text-2xs">+{{ row.tags.length - 3 }}</span>
+                  </OTooltip>
+                </div>
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <!--
+                Multi-alert fan-out summary (§5.4). Both counts come from the
+                rollup row and are PRE-cap, so they keep telling the truth when
+                the M-6 cap truncates what is actually tracked. Each is rendered
+                with a `≥` when its persisted lower-bound marker says the fetch
+                page could not prove exactness — under-reporting silently is the
+                failure M-6 forbids.
+              -->
+              <template #cell-groups="{ row }">
+                <div
+                  v-if="
+                    row.multi_alert &&
+                    row.groups_observed !== undefined &&
+                    row.groups_observed !== null
+                  "
+                  class="flex flex-wrap items-center gap-1"
+                  :data-test="`alert-list-${row.name}-groups`"
+                >
+                  <OTag
+                    v-if="row.groups_firing"
+                    type="alertLevel"
+                    value="critical"
+                    :label="
+                      t('alerts.groups.firingCount', {
+                        count: formatGroupCount(
+                          row.groups_firing,
+                          row.groups_firing_is_lower_bound,
+                        ),
+                      })
+                    "
+                    size="sm"
+                  />
+                  <span class="text-text-secondary text-2xs">
+                    {{
+                      t("alerts.groups.ofNGroups", {
+                        count: formatGroupCount(
+                          row.groups_observed,
+                          row.groups_observed_is_lower_bound,
+                        ),
+                      })
+                    }}
+                  </span>
+                </div>
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <template #cell-last_outcome="{ row }">
+                <!--
+                  Only rendered for enabled alerts: a disabled alert keeps
+                  whatever outcome it last recorded, so showing it would display
+                  "Firing" forever on something that is not running.
+                -->
+                <OTooltip v-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
+                  <OTag
+                    type="alertState"
+                    :value="row.last_outcome"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <span v-else class="text-text-body">—</span>
+              </template>
+
+              <template #cell-folder_name="{ row }">
+                <div @click.stop="updateActiveFolderId(row.folder_name.id)">
+                  {{ row.folder_name.name }}
+                </div>
+              </template>
+
+              <template #cell-actions="{ row }">
+                <div class="actions-container flex items-center">
+                  <div
+                    data-test="alert-list-loading-alert"
+                    v-if="alertStateLoadingMap[row.uuid]"
+                    style="display: inline-block; width: 33.14px; height: auto"
+                    class="ml-1 flex items-center justify-center"
+                    :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
+                  >
+                    <OSpinner size="xs" />
+                  </div>
+                  <OButton
+                    v-else
+                    :data-row-action="row.enabled ? 'pause' : 'resume'"
+                    :data-test="`alert-list-${row.name}-pause-start-alert`"
+                    class="ml-1"
+                    :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
+                    size="icon-sm"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    @click.stop="toggleAlertState(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      :content="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                      :shortcut-id="row.enabled ? 'alertsRowPause' : undefined"
+                    />
+                  </OButton>
+                  <OButton
+                    data-row-action="edit"
+                    :data-test="`alert-list-${row.name}-update-alert`"
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="edit"
+                    @click.stop="editAlert(row)"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      :content="t('alerts.edit')"
+                      shortcut-id="alertsRowEdit"
+                    />
+                  </OButton>
+                  <OButton
+                    data-row-action="duplicate"
+                    variant="ghost"
+                    size="icon-sm"
+                    icon-left="content-copy"
+                    @click.stop="duplicateAlert(row)"
+                    :data-test="`alert-list-${row.name}-clone-alert`"
+                  >
+                    <OTooltip
+                      side="bottom"
+                      :content="t('alerts.clone')"
+                      shortcut-id="alertsRowDuplicate"
+                    />
+                  </OButton>
+                  <!-- Hidden proxies so the row-hover shortcuts work for
                          actions that live in the more-menu dropdown (which is
                          teleported out of the row DOM): x = export, Del = delete. -->
-                    <button
-                      type="button"
-                      data-row-action="export"
-                      class="tw:hidden"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      @click.stop="exportAlert(row)"
-                    />
-                    <button
-                      type="button"
-                      data-row-action="delete"
-                      class="tw:hidden"
-                      tabindex="-1"
-                      aria-hidden="true"
-                      @click.stop="showDeleteDialogFn({ row })"
-                    />
-                    <ODropdown>
-                      <template #trigger>
-                        <OButton
-                          variant="ghost"
-                          size="icon-sm"
-                          icon-left="more-vert"
-                          @click.stop="openMenu($event, row)"
-                          :data-test="`alert-list-${row.name}-more-options`"
-                        />
+                  <button
+                    type="button"
+                    data-row-action="export"
+                    class="hidden"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    @click.stop="exportAlert(row)"
+                  />
+                  <button
+                    type="button"
+                    data-row-action="delete"
+                    class="hidden"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    @click.stop="showDeleteDialogFn({ row })"
+                  />
+                  <ODropdown>
+                    <template #trigger>
+                      <OButton
+                        variant="ghost"
+                        size="icon-sm"
+                        icon-left="more-vert"
+                        @click.stop="openMenu($event, row)"
+                        :data-test="`alert-list-${row.name}-more-options`"
+                      />
+                    </template>
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-move-alert`"
+                      @select="moveAlertToAnotherFolder(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="drive-file-move" size="sm" />
                       </template>
-                      <ODropdownItem
-                        :data-test="`alert-list-${row.name}-move-alert`"
-                        @select="moveAlertToAnotherFolder(row)"
-                      >
-                        <template #icon-left>
-                          <OIcon name="drive-file-move" size="sm" />
-                        </template>
-                        Move
-                      </ODropdownItem>
-                      <ODropdownSeparator />
-                      <ODropdownItem
-                        :data-test="`alert-list-${row.name}-delete-alert`"
-                        variant="destructive"
-                        shortcut-id="alertsRowDelete"
-                        @select="showDeleteDialogFn({ row })"
-                      >
-                        <template #icon-left>
-                          <OIcon name="delete" size="sm" />
-                        </template>
-                        {{ t("alerts.delete") }}
-                      </ODropdownItem>
-                      <ODropdownSeparator />
-                      <ODropdownItem
-                        :data-test="`alert-list-${row.name}-export-alert`"
-                        shortcut-id="alertsRowExport"
-                        @select="exportAlert(row)"
-                      >
-                        <template #icon-left>
-                          <OIcon size="sm" name="download" />
-                        </template>
-                        Export
-                      </ODropdownItem>
-                      <ODropdownSeparator />
-                      <!-- Anomaly Detection: Trigger Detection + Re-train -->
-                      <template v-if="row.type === 'anomaly'">
-                        <ODropdownItem
-                          :data-test="`alert-list-${row.name}-trigger-detection`"
-                          @select="triggerAlert(row)"
-                        >
-                          <template #icon-left>
-                            <OIcon size="sm" name="sound-sampler" />
-                          </template>
-                          Trigger Detection
-                        </ODropdownItem>
-                        <ODropdownItem
-                          :data-test="`alert-list-${row.name}-retrain-anomaly`"
-                          @select="retrainAnomaly(row)"
-                        >
-                          <template #icon-left>
-                            <OIcon size="sm" name="replay" />
-                          </template>
-                          Re-train
-                        </ODropdownItem>
+                      {{ t("common.move") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-delete-alert`"
+                      variant="destructive"
+                      shortcut-id="alertsRowDelete"
+                      @select="showDeleteDialogFn({ row })"
+                    >
+                      <template #icon-left>
+                        <OIcon name="delete" size="sm" />
                       </template>
-                      <!-- Regular alerts: existing Trigger Alert item -->
+                      {{ t("alerts.delete") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <ODropdownItem
+                      :data-test="`alert-list-${row.name}-export-alert`"
+                      shortcut-id="alertsRowExport"
+                      @select="exportAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon size="sm" name="download" />
+                      </template>
+                      {{ t("common.export") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator />
+                    <!-- Anomaly Detection: Trigger Detection + Re-train -->
+                    <template v-if="row.type === 'anomaly'">
                       <ODropdownItem
-                        v-else
-                        :data-test="`alert-list-${row.name}-trigger-alert`"
+                        :data-test="`alert-list-${row.name}-trigger-detection`"
                         @select="triggerAlert(row)"
                       >
                         <template #icon-left>
                           <OIcon size="sm" name="sound-sampler" />
                         </template>
-                        {{ t("alerts.triggerAlert") }}
+                        {{ t("alerts.triggerDetection") }}
                       </ODropdownItem>
-                    </ODropdown>
-                  </div>
-                </template>
+                      <ODropdownItem
+                        :data-test="`alert-list-${row.name}-retrain-anomaly`"
+                        @select="retrainAnomaly(row)"
+                      >
+                        <template #icon-left>
+                          <OIcon size="sm" name="replay" />
+                        </template>
+                        {{ t("alerts.retrain") }}
+                      </ODropdownItem>
+                    </template>
+                    <!-- Regular alerts: Trigger Alert item -->
+                    <ODropdownItem
+                      v-else
+                      :data-test="`alert-list-${row.name}-trigger-alert`"
+                      @select="triggerAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon size="sm" name="sound-sampler" />
+                      </template>
+                      {{ t("alerts.triggerAlert") }}
+                    </ODropdownItem>
+                  </ODropdown>
+                </div>
+              </template>
 
-                <template #empty>
-                  <div
-                    v-if="!templates.length || !destinations.length"
-                    class="tw:w-full tw:flex tw:flex-col tw:justify-center tw:items-center tw:text-center"
+              <template #empty>
+                <OEmptyState
+                  v-if="!templates.length"
+                  size="hero"
+                  preset="no-alert-templates"
+                  :description="t('alerts.noTemplatesMsg')"
+                  data-test="alert-list-create-template-text"
+                  @action="routeTo('alertTemplates')"
+                />
+                <OEmptyState
+                  v-else-if="!destinations.length"
+                  size="hero"
+                  preset="no-alert-destinations"
+                  :description="t('alerts.noDestinationsMsg')"
+                  data-test="alert-list-create-destination-text"
+                  @action="routeTo('alertDestinations')"
+                />
+                <OEmptyState
+                  v-else
+                  size="hero"
+                  preset="no-alerts"
+                  :filtered="!!(filterQuery || searchQuery || stateFilter)"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? ((filterQuery = ''), (searchQuery = ''), (stateFilter = null))
+                        : showAddUpdateFn({})
+                  "
+                />
+              </template>
+
+              <template #bottom>
+                <div class="flex h-12 w-full items-center justify-between gap-1">
+                  <div class="flex min-w-25 items-center text-xs font-normal">
+                    <template v-if="selectedAlerts.length > 0"
+                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
+                      {{ t("alerts.selectedLabel") }}</template
+                    >
+                    <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
+                  </div>
+
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-move-across-folders-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="drive-file-move"
+                    @click="moveMultipleAlerts"
+                    >{{ t("common.move") }}</OButton
                   >
-                    <div style="width: 600px" class="tw:mt-6">
-                      <template v-if="!templates.length">
-                        <div
-                          class="tw:text-sm"
-                          data-test="alert-list-create-template-text"
-                        >
-                          {{ t('alerts.noTemplatesMsg') }}
-                        </div>
-                        <OButton
-                          data-test="alert-list-create-template-btn"
-                          class="tw:mt-3"
-                          variant="primary"
-                          size="sm"
-                          @click="routeTo('alertTemplates')"
-                        >{{ t('alerts.createTemplateBtn') }}</OButton>
-                      </template>
-                      <template v-if="!destinations.length && templates.length">
-                        <div
-                          class="tw:text-sm"
-                          data-test="alert-list-create-destination-text"
-                        >
-                          {{ t('alerts.noDestinationsMsg') }}
-                        </div>
-                        <OButton
-                          data-test="alert-list-create-destination-btn"
-                          class="tw:mt-3"
-                          variant="primary"
-                          size="sm"
-                          @click="routeTo('alertDestinations')"
-                        >{{ t('alerts.createDestinationBtn') }}</OButton>
-                      </template>
-                    </div>
-                  </div>
-                  <template v-else>
-                    <OEmptyState
-                      size="hero"
-                      preset="no-alerts"
-                      :filtered="!!(filterQuery || searchQuery)"
-                      @action="
-                        (id) =>
-                          id === 'clear-filters'
-                            ? ((filterQuery = ''), (searchQuery = ''))
-                            : showAddUpdateFn({})
-                      "
-                    />
-                  </template>
-                </template>
-
-                <template #bottom>
-                  <div class="tw:flex tw:w-full tw:justify-between tw:items-center tw:h-[48px]">
-                    <div
-                      class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md"
-                    >
-                      {{ resultTotal }} {{ t("alerts.header") }}
-                    </div>
-
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-move-across-folders-btn"
-                      variant="outline"
-                      size="sm"
-                      class="tw:mr-2"
-                      @click="moveMultipleAlerts"
-                    >
-                      <OIcon name="drive-file-move" size="sm" />
-                      <span class="tw:ml-2">Move</span>
-                    </OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-export-alerts-btn"
-                      variant="outline"
-                      size="sm"
-                      class="tw:mr-2"
-                      @click="multipleExportAlert"
-                    >
-                      <OIcon name="download" size="sm" />
-                      <span class="tw:ml-2">Export</span>
-                    </OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-pause-alerts-btn"
-                      variant="outline"
-                      size="sm"
-                      class="tw:mr-2"
-                      @click="bulkToggleAlerts('pause')"
-                    >
-                      <OIcon name="pause" size="sm" class="tw:text-button-ghost-destructive-text" />
-                      <span class="tw:ml-2">Pause</span>
-                    </OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-unpause-alerts-btn"
-                      variant="outline"
-                      size="sm"
-                      class="tw:mr-2"
-                      @click="bulkToggleAlerts('resume')"
-                    >
-                      <OIcon name="play-arrow" size="sm" class="tw:text-button-ghost-success-text" />
-                      <span class="tw:ml-2">Resume</span>
-                    </OButton>
-                    <OButton
-                      v-if="selectedAlerts.length > 0"
-                      data-test="alert-list-delete-alerts-btn"
-                      variant="outline-destructive"
-                      size="sm"
-                      class="tw:mr-2"
-                      @click="openBulkDeleteDialog"
-                    >
-                      <OIcon name="delete" size="sm" />
-                      <span class="tw:ml-2">Delete</span>
-                    </OButton>
-                  </div>
-                </template>
-              </OTable>
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-export-alerts-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="download"
+                    @click="multipleExportAlert"
+                    >{{ t("common.export") }}</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-pause-alerts-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="pause"
+                    @click="bulkToggleAlerts('pause')"
+                    >{{ t("alerts.pause") }}</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-unpause-alerts-btn"
+                    variant="outline"
+                    size="sm"
+                    icon-left="play-arrow"
+                    @click="bulkToggleAlerts('resume')"
+                    >{{ t("alerts.resume") }}</OButton
+                  >
+                  <OButton
+                    v-if="selectedAlerts.length > 0"
+                    data-test="alert-list-delete-alerts-btn"
+                    variant="outline-destructive"
+                    size="sm"
+                    icon-left="delete"
+                    :loading="bulkDeleteLoading"
+                    @click="openBulkDeleteDialog"
+                    >{{ t("common.delete") }}</OButton
+                  >
+                </div>
+              </template>
+            </OTable>
+          </div>
         </div>
       </div>
-    </div>
-    </PageLayout>
+    </OPageLayout>
     <template v-else-if="showAddAlertDialog && !showImportAlertDialog">
       <AddAlert
         v-model="formData"
@@ -582,11 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ImportAlert
         :destinations="destinations"
         :templates="templates"
-        :alerts="
-          store?.state?.organizationData?.allAlertsListByFolderId[
-            activeFolderId
-          ]
-        "
+        :alerts="store?.state?.organizationData?.allAlertsListByFolderId[activeFolderId]"
         :folderId="activeFolderId"
         @update:alerts="refreshImportedAlerts"
         @update:destinations="refreshDestination"
@@ -595,23 +651,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete this alert?"
+      :title="t('alerts.deleteAlertTitle')"
+      :message="t('alerts.deleteAlertMessage')"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Alerts"
-      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      :title="t('alerts.deleteAlertsTitle')"
+      :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
 
     <template>
-      <ODialog data-test="alert-list-form-dialog"
+      <ODialog
+        data-test="alert-list-form-dialog"
         v-model:open="showForm"
         persistent
         size="sm"
@@ -626,27 +683,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
-            label="Alert Name"
+            :label="t('alerts.alertName')"
           />
           <OSelect
             data-test="to-be-clone-stream-type"
             v-model="toBeClonestreamType"
-            label="Stream Type"
+            :label="t('alerts.streamType')"
             :options="streamTypes"
             @update:model-value="updateStreams()"
-            class="tw:mt-1"
+            class="mt-1"
           />
           <OSelect
             data-test="to-be-clone-stream-name"
             v-model="toBeClonestreamName"
             :disabled="!toBeClonestreamType"
-            label="Stream Name"
+            :label="t('alerts.stream_name')"
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"
-            class="tw:mt-1 tw:mb-2"
+            class="mt-1 mb-2"
           />
-          <div class="tw:mb-4">
+          <div class="mb-4">
             <SelectFolderDropDown
               :type="'alerts'"
               @folder-selected="updateFolderIdToBeCloned"
@@ -664,45 +721,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @updated="updateAcrossFolders"
         data-test="dashboard-move-to-another-folder-dialog"
       />
-
-      <!-- Alert Details Dialog -->
-      <AlertHistoryDrawer
-        v-model:open="showAlertDetailsDrawer"
-        :alert-details="selectedAlertDetails"
-        :alert-id="selectedAlertDetails?.alert_id || ''"
-        :alert-type="selectedAlertDetails?.alert_type"
-        @edit="editAlertFromDrawer"
-        data-test="alert-details-dialog"
-      />
     </template>
   </div>
 </template>
 
 <script lang="ts">
-
 import {
   defineComponent,
   ref,
   onBeforeMount,
   onActivated,
-  onDeactivated,
   onBeforeUnmount,
-  onUnmounted,
   watch,
   defineAsyncComponent,
   onMounted,
   computed,
   reactive,
 } from "vue";
-import PageLayout from "@/components/common/PageLayout.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
-import { formatDate } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -712,44 +756,34 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 import ImportAlert from "@/components/alerts/ImportAlert.vue";
-import DedupSummaryCards from "@/components/alerts/DedupSummaryCards.vue";
-import {
-  getImageURL,
-  getUUID,
-  verifyOrganizationStatus,
-} from "@/utils/zincutils";
-import { getFoldersListByType } from "@/utils/commons";
+import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutils";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
-import type { Alert, AlertListItem } from "@/ts/interfaces/index";
+import type { Alert } from "@/ts/interfaces/index";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import { toRaw } from "vue";
 import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import anomalyDetectionService from "@/services/anomaly_detection";
-import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
-import OButton from '@/lib/core/Button/OButton.vue';
-import ODialog from '@/lib/overlay/Dialog/ODialog.vue';
-import ODropdown from '@/lib/overlay/Dropdown/ODropdown.vue';
-import ODropdownItem from '@/lib/overlay/Dropdown/ODropdownItem.vue';
-import ODropdownSeparator from '@/lib/overlay/Dropdown/ODropdownSeparator.vue';
-import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
-import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import OSeparator from '@/lib/core/Separator/OSeparator.vue';
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -760,16 +794,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 export default defineComponent({
   name: "AlertList",
   components: {
-    PageLayout,
-    AppPageHeader,
-    OSeparator,
-    AddAlert: defineAsyncComponent(
-      () => import("@/components/alerts/AddAlert.vue"),
-    ),
+    OPageLayout,
+    AddAlert: defineAsyncComponent(() => import("@/components/alerts/AddAlert.vue")),
     OEmptyState,
     ConfirmDialog,
     ImportAlert,
-    DedupSummaryCards,
     FolderList,
     MoveAcrossFolders,
     OToggleGroup,
@@ -777,8 +806,6 @@ export default defineComponent({
     OInput,
     OTooltip,
     SelectFolderDropDown,
-    AlertHistoryDrawer,
-    O2AIContextAddBtn,
     OButton,
     OIcon,
     ODialog,
@@ -791,14 +818,12 @@ export default defineComponent({
     OTimeCell,
     OUserCell,
     OTag,
+    OStatStrip,
   },
-  emits: [
-    "update:changeRecordPerPage",
-    "update:maxRecordToReturn",
-  ],
+  emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -815,6 +840,17 @@ export default defineComponent({
     const showAddAlertDialog: any = ref(false);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
+    /**
+     * Render a multi-alert group count, marking it as a lower bound when the
+     * evaluation could not prove exactness (§5.4).
+     *
+     * The `≥` is not decoration: past the M-6 cap, or when the whole fetch page
+     * was still firing, the stored number is the most the evaluation could see,
+     * not the real total. Printing it bare would understate an incident.
+     */
+    const formatGroupCount = (count: number, isLowerBound?: boolean) =>
+      isLowerBound ? `≥${count}` : String(count);
+
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(200);
     const showForm = ref(false);
@@ -836,13 +872,12 @@ export default defineComponent({
       () => store.state.isAiChatEnabled && windowWidth.value <= 1440,
     );
 
-
     const showImportAlertDialog = ref(false);
     const showHistoryDrawer = ref(false);
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
@@ -860,105 +895,24 @@ export default defineComponent({
         name: "folder2",
       },
     ]);
-    const activeFolderId = ref<any>(
-      router.currentRoute.value.query.folder ?? "default",
-    );
+    const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
-    const showAlertDetailsDrawer = ref(false);
-    const selectedAlertDetails: Ref<any> = ref(null);
-
+    // Clicking a row opens the alert's own status page. It replaced a side
+    // drawer: a multi-alert's per-group table, group history and cap banner
+    // do not fit a panel, and a routed page is linkable and back-navigable.
     const triggerExpand = (row: any) => {
-      // Open drawer instead of inline expansion
-      const alert = row;
-
-      // LAZY CONVERSION: Convert conditions on-demand only when expanding
-      // This improves performance by avoiding conversion of all alerts on list load
-      let displayConditions = "--";
-      if (alert.rawCondition && Object.keys(alert.rawCondition).length) {
-        if (alert.rawCondition.type == "custom") {
-          const conditionData = alert.rawCondition.conditions;
-
-          // Detect format by structure, not by version field (more reliable)
-          if (conditionData?.filterType === "group") {
-            // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-            displayConditions = transformV2ToExpression(conditionData);
-          } else if (
-            conditionData?.version === 2 &&
-            conditionData?.conditions
-          ) {
-            // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-            displayConditions = transformV2ToExpression(
-              conditionData.conditions,
-            );
-          } else if (conditionData?.or || conditionData?.and) {
-            // V1 format: {or: [...]} or {and: [...]}
-            displayConditions = transformToExpression(conditionData);
-          } else if (Array.isArray(conditionData) && conditionData.length > 0) {
-            // V0 format (legacy): flat array [{column, operator, value}, ...]
-            // V0 had implicit AND between all conditions (no groups)
-            const parts = conditionData.map((item: any) => {
-              const column = item.column || "field";
-              const operator = item.operator || "=";
-              const value =
-                typeof item.value === "string" ? `'${item.value}'` : item.value;
-              return `${column} ${operator} ${value}`;
-            });
-            displayConditions =
-              parts.length > 0 ? `(${parts.join(" AND ")})` : "--";
-          } else {
-            // Unknown format or empty
-            displayConditions =
-              typeof conditionData === "string" ? conditionData : "--";
-          }
-        } else if (alert.rawCondition.sql) {
-          displayConditions = alert.rawCondition.sql;
-        } else if (alert.rawCondition.promql) {
-          displayConditions = alert.rawCondition.promql;
-        }
-      }
-
-      // Set selectedAlertDetails with converted conditions
-      selectedAlertDetails.value = {
-        ...alert,
-        conditions: displayConditions,
-      };
-
-      showAlertDetailsDrawer.value = true;
-    };
-
-    // Handle ESC key and click outside to close drawer
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && showAlertDetailsDrawer.value) {
-        showAlertDetailsDrawer.value = false;
-      }
-    };
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!showAlertDetailsDrawer.value) return;
-
-      const target = event.target as HTMLElement;
-
-      // Check if clicked element is the backdrop or outside drawer content
-      if (
-        target.classList.contains("q-drawer__backdrop") ||
-        target.classList.contains("q-layout__shadow")
-      ) {
-        showAlertDetailsDrawer.value = false;
-        return;
-      }
-
-      // Check if the click is outside the drawer content
-      const drawerElement = document.querySelector(
-        ".alert-details-drawer .q-drawer__content",
-      );
-      if (drawerElement && !drawerElement.contains(target)) {
-        showAlertDetailsDrawer.value = false;
-      }
+      if (!row?.alert_id) return;
+      router.push({
+        name: "alertDetail",
+        params: { alert_id: row.alert_id },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+        },
+      });
     };
 
     onMounted(() => {
-      document.addEventListener("keydown", handleKeyDown);
-      document.addEventListener("click", handleClickOutside, true);
       window.addEventListener("resize", onWindowResize);
     });
 
@@ -982,17 +936,207 @@ export default defineComponent({
     // Prevent forcing anomalyDetection tab when the feature is not available.
     const rawTab = (router.currentRoute.value.query.tab as string) || "all";
     const activeTab = ref(
-      rawTab === "anomalyDetection" && !isAnomalyDetectionEnabled.value
-        ? "all"
-        : rawTab,
+      rawTab === "anomalyDetection" && !isAnomalyDetectionEnabled.value ? "all" : rawTab,
     );
 
     const filteredResults: Ref<any[]> = ref([]);
 
-    onBeforeUnmount(() => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("click", handleClickOutside, true);
+    // ── "Calm Signal" table helpers ─────────────────────────────────────────
+    // Recency of the last trigger, bucketed for the trigger-time dot + the
+    // recently-fired row highlight. Derived from the RAW microsecond timestamp
+    // (last_triggered_at_raw) so it stays correct regardless of display timezone.
+    const RECENT_TRIGGER_MS = 15 * 60 * 1000; // "hot" — fired in the last 15 min
+    const RECENT_TRIGGER_DAY_MS = 24 * 60 * 60 * 1000; // "warm" — within a day
+    const triggerAgeMs = (rawMicros: unknown): number | null => {
+      const n = Number(rawMicros);
+      if (!rawMicros || !Number.isFinite(n) || n <= 0) return null;
+      return Date.now() - n / 1000; // microseconds → milliseconds
+    };
+    const recencyLevel = (rawMicros: unknown): "hot" | "warm" | "cold" | "none" => {
+      const age = triggerAgeMs(rawMicros);
+      if (age === null) return "none";
+      if (age <= RECENT_TRIGGER_MS) return "hot";
+      if (age <= RECENT_TRIGGER_DAY_MS) return "warm";
+      return "cold";
+    };
+
+    // ── Alert operational state (single source of truth) ────────────────────
+    // failed  → an anomaly whose model training failed (needs attention)
+    // active  → enabled and running
+    // paused  → disabled
+    const alertState = (row: any): "active" | "paused" | "failed" => {
+      if (row?.is_real_time === "anomaly" && String(row?.status).toLowerCase() === "failed")
+        return "failed";
+      return row?.enabled ? "active" : "paused";
+    };
+
+    // ── Last run outcome (Part IV) ─────────────────────────────────────────
+    // A disabled alert freezes its last outcome, so the badge is suppressed
+    // unless the alert is actually running — otherwise a paused alert would
+    // advertise "Firing" indefinitely.
+    const showRunOutcome = (row: any): boolean =>
+      shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+
+    // Never present the outcome as live state: it is the result of the LAST
+    // evaluation, so it is always qualified with when that ran.
+    const runOutcomeTooltip = (row: any) => {
+      const at = row?.last_outcome_at ? convertUnixToDateFormat(row.last_outcome_at) : null;
+      // Pass every label: outcomeLabel's own defaults are English.
+      const label = outcomeLabel(
+        row?.last_outcome,
+        t("alerts.historyTimeline.firing"),
+        t("alerts.historyTimeline.ok"),
+        t("alerts.historyTimeline.error"),
+        t("alerts.historyTimeline.skipped"),
+        t("alerts.historyTimeline.unknown"),
+      );
+      return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
+    };
+
+    // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
+    // what's off, not what's fine: failed=light red, paused=muted grey, active
+    // stays clean (its state still reads from the green left rail).
+    const alertRowClass = (row: any): string => {
+      const s = alertState(row);
+      return s === "failed" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
+    };
+
+    // Extreme-left state rail — a full-height colour bar at the very start of the
+    // row (inset box-shadow so it paints regardless of border-collapse). rem width
+    // + token colour keep it theme-aware and hardcode-free.
+    const alertRowStyle = (row: any): Record<string, string> => {
+      const s = alertState(row);
+      const color =
+        s === "failed"
+          ? "var(--color-error-500)"
+          : s === "paused"
+            ? "var(--color-grey-400)"
+            : "var(--color-success-500)";
+      return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+    };
+
+    // Type chip (the "left chip"): glyph + colour by alert type.
+    const typeIconName = (row: any): IconName =>
+      row?.is_real_time === "anomaly" ? "query-stats" : row?.is_real_time ? "bolt" : "schedule";
+    const typeIconClass = (row: any): string =>
+      row?.is_real_time === "anomaly"
+        ? "text-status-info-text"
+        : row?.is_real_time
+          ? "text-status-warning-text"
+          : "text-text-secondary";
+
+    // At-a-glance operational counts for the summary strip. Counts over the rows
+    // currently shown (folder + tab + search) so it tracks what the user sees.
+    const stateCounts = computed(() => {
+      const rows = filteredResults.value || [];
+      let active = 0;
+      let paused = 0;
+      let failed = 0;
+      let recent = 0;
+      for (const r of rows) {
+        // active = unpaused (enabled); paused = disabled. These two partition the
+        // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
+        // active), so it is counted separately and may overlap with active/paused.
+        if (r.enabled) active += 1;
+        else paused += 1;
+        if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
+          failed += 1;
+        if (recencyLevel(r.last_triggered_at_raw) === "hot") recent += 1;
+      }
+      return { active, paused, failed, recent, total: rows.length };
     });
+
+    // Stat tiles for the summary strip. `tone` is the single source of colour so
+    // states stay consistent with the row-level State pills. When the folder is
+    // empty (no data at all) every tile shows a muted "—"; once there IS data,
+    // real counts show — including a legitimate "0". The `max` gives each state
+    // tile a proportion bar (its share of the total).
+    const summaryStats = computed<StatItem[]>(() => {
+      const c = stateCounts.value;
+      const hasData = c.total > 0;
+      const v = (n: number): string | number => (hasData ? n : "—");
+      const share = hasData ? c.total : undefined;
+      // Severity-descending so what needs attention sits on the left (matches the
+      // Incidents / Eval Jobs strips): failed (error) → recent (warning) → active
+      // (healthy) → paused (inert) → Total last.
+      return [
+        {
+          key: "failed",
+          label: t("alerts.summaryFailed"),
+          value: v(c.failed),
+          icon: "error-outline",
+          tone: "error",
+          max: share,
+          dataTest: "alert-summary-failed",
+        },
+        {
+          key: "recent",
+          label: t("alerts.summaryRecent"),
+          value: v(c.recent),
+          icon: "bolt",
+          tone: "warning",
+          max: share,
+          dataTest: "alert-summary-recent",
+        },
+        {
+          key: "active",
+          label: t("alerts.summaryActive"),
+          value: v(c.active),
+          icon: "check-circle",
+          tone: "success",
+          max: share,
+          dataTest: "alert-summary-active",
+        },
+        {
+          key: "paused",
+          label: t("alerts.summaryPaused"),
+          value: v(c.paused),
+          icon: "pause",
+          tone: "neutral",
+          max: share,
+          dataTest: "alert-summary-paused",
+        },
+        {
+          key: "total",
+          label: t("alerts.summaryTotal"),
+          value: v(c.total),
+          icon: "format-list-bulleted",
+          tone: "primary",
+          // Total is clickable (clears the filter) but never shows the ring — the
+          // selected key is only ever a real state, never "total". No bar (its
+          // share of itself is always 100%).
+          dataTest: "alert-summary-total",
+        },
+      ];
+    });
+
+    // ── Stat-tile quick filter ──────────────────────────────────────────────
+    // Clicking a summary tile filters the table to that state (toggle); the
+    // "total" tile clears it. Counts on the tiles stay full (from filteredResults)
+    // so you always see the folder totals; only the table rows are filtered.
+    const stateFilter = ref<"active" | "paused" | "failed" | "recent" | null>(null);
+    const displayedAlerts = computed(() => {
+      const rows = filteredResults.value || [];
+      const f = stateFilter.value;
+      if (!f) return rows;
+      if (f === "recent")
+        return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
+      if (f === "failed")
+        return rows.filter(
+          (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
+        );
+      // active = unpaused (enabled); paused = disabled — matching the summary
+      // counts. A failed anomaly is still active here (failed is an overlay).
+      return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
+    });
+    const onStatSelect = (key: string) => {
+      if (key === "total") {
+        stateFilter.value = null;
+        return;
+      }
+      stateFilter.value =
+        stateFilter.value === key ? null : (key as "active" | "paused" | "failed" | "recent");
+    };
 
     const activeFolderToMove = ref("default");
 
@@ -1041,6 +1185,63 @@ export default defineComponent({
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
+        // "last_outcome" — did the most recent evaluation fire? Distinct from
+        // "state" (is it running?) and from the anomaly-only "status" (is the
+        // model trained?). Backed by the alert_states rollup row.
+        {
+          id: "last_outcome",
+          accessorKey: "last_outcome",
+          header: t("alerts.lastOutcome"),
+          cell: " ",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          minSize: 130,
+          meta: { align: "left" },
+        },
+        // "priority" — how much humans care (Feature 2, PT-3). A different
+        // axis from "last_outcome" (did it fire): a P1 alert whose last run was
+        // normal is perfectly ordinary.
+        {
+          id: "priority",
+          accessorKey: "priority",
+          header: t("alerts.priority"),
+          cell: " ",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          meta: { align: "left" },
+        },
+        // "groups" — multi-alert fan-out summary (alerts_2.md §5.4). Blank for
+        // every alert that has not opted in to per-group evaluation. Not
+        // sortable: the value is a composite of two counts plus their
+        // exactness, so a single sort order would misrepresent it.
+        {
+          id: "groups",
+          accessorKey: "groups_observed",
+          header: t("alerts.groups.tab"),
+          cell: " ",
+          sortable: false,
+          resizable: true,
+          hideable: true,
+          size: 170,
+          meta: { align: "left" },
+        },
+        // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
+        // no meaningful order and sorting by it would imply one.
+        {
+          id: "tags",
+          accessorKey: "tags",
+          header: t("alerts.tags"),
+          cell: " ",
+          sortable: false,
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "left" },
+        },
         {
           id: "owner",
           accessorKey: "owner",
@@ -1052,38 +1253,6 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
-        // "period" (Look back window) — all tabs except realTime
-        ...(activeTab.value !== "realTime"
-          ? [
-              {
-                id: "period",
-                accessorKey: "period",
-                header: t("alerts.period"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: 150,
-                meta: { align: "left" },
-              } as OTableColumnDef,
-            ]
-          : []),
-        // "frequency" (Check every) — all tabs except realTime
-        ...(activeTab.value !== "realTime"
-          ? [
-              {
-                id: "frequency",
-                accessorKey: "frequency",
-                header: t("alerts.frequency"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: COL.frequency,
-                meta: { align: "left" },
-              } as OTableColumnDef,
-            ]
-          : []),
         {
           id: "last_triggered_at",
           accessorKey: "last_triggered_at",
@@ -1109,17 +1278,6 @@ export default defineComponent({
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
         ...(activeTab.value === "anomalyDetection" || activeTab.value === "all"
           ? [
-              {
-                id: "last_trained_at",
-                accessorKey: "last_trained_at",
-                header: t("alerts.lastTrainedAt"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: COL.dateAbsolute,
-                meta: { align: "left" },
-              } as OTableColumnDef,
               {
                 id: "status",
                 accessorKey: "status",
@@ -1148,7 +1306,7 @@ export default defineComponent({
         baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
-          header: "Folder",
+          header: t("alerts.folder"),
           cell: " ",
           sortable: true,
           resizable: true,
@@ -1166,9 +1324,7 @@ export default defineComponent({
     const selectedAlertIds = ref<string[]>([]);
     const selectedAlerts = computed({
       get: () =>
-        filteredResults.value.filter((row: any) =>
-          selectedAlertIds.value.includes(row.alert_id),
-        ),
+        filteredResults.value.filter((row: any) => selectedAlertIds.value.includes(row.alert_id)),
       set: (val) => {
         if (val.length === 0) {
           selectedAlertIds.value = [];
@@ -1180,24 +1336,17 @@ export default defineComponent({
 
     const searchQuery = ref<any>(savedAlertListFilters.searchQuery || "");
     const filterQuery = ref<any>(savedAlertListFilters.filterQuery || "");
-    const searchAcrossFolders = ref<any>(
-      savedAlertListFilters.searchAcrossFolders || false,
-    );
+    const searchAcrossFolders = ref<any>(savedAlertListFilters.searchAcrossFolders || false);
     const selectedAlertToMove: Ref<any[]> = ref([]);
     const selectedAnomalyConfigsToMove: Ref<any[]> = ref([]);
-    const folderIdToBeCloned = ref<any>(
-      router.currentRoute.value.query.folder ?? "default",
-    );
+    const folderIdToBeCloned = ref<any>(router.currentRoute.value.query.folder ?? "default");
     // ---------------------------------------------------------------------------
     // Anomaly detection scaffolding — TEMPORARY until backend returns anomaly
     // data as part of the alert list API. Remove this block when that happens.
     // ---------------------------------------------------------------------------
     // Normalizes an anomaly-detection item returned by the merged alerts list API
     // (alert_type === "anomaly_detection") into the standard alert row shape.
-    const normalizeAnomalyToAlertRow = (
-      anomaly: any,
-      counter: number,
-    ): any => ({
+    const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       name: anomaly.name,
@@ -1219,10 +1368,13 @@ export default defineComponent({
       frequency: anomaly.trigger_condition?.frequency ?? "",
       frequency_type: anomaly.trigger_condition?.frequency_type ?? "minutes",
       last_triggered_at: anomaly.last_triggered_at
-        ? convertUnixToQuasarFormat(anomaly.last_triggered_at)
+        ? convertUnixToDateFormat(anomaly.last_triggered_at)
         : "",
+      // Raw microsecond epoch — drives the relative-time cell, recency dot and
+      // recently-fired row highlight (timezone-independent).
+      last_triggered_at_raw: anomaly.last_triggered_at ?? null,
       last_satisfied_at: anomaly.last_satisfied_at
-        ? convertUnixToQuasarFormat(anomaly.last_satisfied_at)
+        ? convertUnixToDateFormat(anomaly.last_satisfied_at)
         : "",
       detection_window: (() => {
         const mins = anomaly.trigger_condition?.period_minutes;
@@ -1235,7 +1387,7 @@ export default defineComponent({
         return `${mins} mins`;
       })(),
       last_trained_at: anomaly.last_trained_at
-        ? convertUnixToQuasarFormat(anomaly.last_trained_at)
+        ? convertUnixToDateFormat(anomaly.last_trained_at)
         : "",
       total_evaluations: anomaly.total_evaluations ?? "--",
       firing_count: anomaly.firing_count ?? "--",
@@ -1254,31 +1406,21 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
 
     const getAlertsByFolderId = async (store: any, folderId: any) => {
-      try {
-        //this is the condition where we are fetching the alerts from the server
-        // assigning it to the allAlertsListByFolderId in the store
-        if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
-          await getAlertsFn(store, folderId);
-        } else {
-          //this is the condition where we are assigning the alerts to the filteredResults so whenever
-          // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-          allAlerts.value =
-            store.state.organizationData.allAlertsListByFolderId[folderId];
-          // Data is served synchronously from cache — clear the loading flag
-          // (it starts true to avoid the empty-state flash) so the table renders
-          // the cached rows instead of staying stuck on the skeleton.
-          loading.value = false;
-        }
-      } catch (error) {
-        throw error;
+      //this is the condition where we are fetching the alerts from the server
+      // assigning it to the allAlertsListByFolderId in the store
+      if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
+        await getAlertsFn(store, folderId);
+      } else {
+        //this is the condition where we are assigning the alerts to the filteredResults so whenever
+        // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
+        allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
+        // Data is served synchronously from cache — clear the loading flag
+        // (it starts true to avoid the empty-state flash) so the table renders
+        // the cached rows instead of staying stuck on the skeleton.
+        loading.value = false;
       }
     };
-    const getAlertsFn = async (
-      store: any,
-      folderId: any,
-      query = "",
-      refreshResults = true,
-    ) => {
+    const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
       //we forcing the destination and source folder to fetch the alerts again
@@ -1297,9 +1439,9 @@ export default defineComponent({
       }
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alerts...",
-              timeout: 0,
-});
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
+        timeout: 0,
+      });
       if (query) {
         folderId = "";
       }
@@ -1359,14 +1501,44 @@ export default defineComponent({
             period: data.is_real_time ? "" : data?.trigger_condition?.period,
             frequency: data.is_real_time ? "" : frequency,
             frequency_type: data?.trigger_condition?.frequency_type,
-            last_triggered_at: convertUnixToQuasarFormat(
-              data.last_triggered_at,
-            ),
-            last_satisfied_at: convertUnixToQuasarFormat(
-              data.last_satisfied_at,
-            ),
+            last_triggered_at: convertUnixToDateFormat(data.last_triggered_at),
+            // Raw microsecond epoch — drives the relative-time cell, recency dot
+            // and recently-fired row highlight (timezone-independent).
+            last_triggered_at_raw: data.last_triggered_at ?? null,
+            last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
+            // Durable run state from the alert_states rollup row (Part IV).
+            // This is the LAST RUN outcome, not a live firing flag — always
+            // paired with last_outcome_at so the UI can say "as of <time>".
+            last_outcome: data.last_outcome ?? null,
+            // Configured priority & tags (Feature 2). Must be carried
+            // explicitly: this mapping builds the row object field by field,
+            // so anything not listed here is invisible to the table no matter
+            // what the API returns.
+            priority: data.priority ?? null,
+            tags: data.tags ?? [],
+            // Severity axis (alerts_2.md Feature 1) — independent of outcome.
+            level: data.level ?? null,
+            level_since: data.level_since ?? null,
+            // Whether the alert CURRENTLY evaluates per group — either the
+            // aggregation opt-in or the PromQL per-series one. The counts
+            // below survive an opt-out (§5.3 leaves the rollup row alone), so
+            // without this flag a simple alert would keep advertising the
+            // group summary from back when it was a multi-alert.
+            multi_alert:
+              data.condition?.type === "promql"
+                ? !!data.condition?.promql_multi_alert
+                : !!data.condition?.aggregation?.multi_alert,
+            // Multi-alert fan-out counts (§5.4). `undefined` — not 0 — for an
+            // alert that never opted in, so the cell can render "—" rather
+            // than claiming it observed zero groups.
+            groups_observed: data.groups_observed,
+            groups_firing: data.groups_firing,
+            groups_observed_is_lower_bound: data.groups_observed_is_lower_bound,
+            groups_firing_is_lower_bound: data.groups_firing_is_lower_bound,
+            last_outcome_at: data.last_outcome_at ?? null,
+            last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
             type: data.condition.type,
             folder_name: {
@@ -1427,7 +1599,7 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "error",
-          message: "Error while pulling alerts.",
+          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
         });
       } finally {
         loading.value = false;
@@ -1436,9 +1608,9 @@ export default defineComponent({
     const getAlertById = async (id: string) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alert...",
-              timeout: 0,
-});
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlert"),
+        timeout: 0,
+      });
       try {
         const res = await alertsService.get_by_alert_id(
           store.state.selectedOrganization.identifier,
@@ -1468,14 +1640,10 @@ export default defineComponent({
       }
       if (activeTab.value === "scheduled") {
         // Scheduled: is_real_time is falsy (false / undefined / null) — anomaly rows ("anomaly") excluded
-        filteredResults.value = allAlerts.value.filter(
-          (alert: any) => !alert.is_real_time,
-        );
+        filteredResults.value = allAlerts.value.filter((alert: any) => !alert.is_real_time);
       } else if (activeTab.value === "realTime") {
         // Real-time: strictly boolean true — anomaly rows excluded
-        filteredResults.value = allAlerts.value.filter(
-          (alert: any) => alert.is_real_time === true,
-        );
+        filteredResults.value = allAlerts.value.filter((alert: any) => alert.is_real_time === true);
       } else if (activeTab.value === "anomalyDetection") {
         // Anomaly Detection: rows injected by normalizeAnomalyToAlertRow with is_real_time === "anomaly"
         filteredResults.value = allAlerts.value.filter(
@@ -1519,9 +1687,7 @@ export default defineComponent({
         if (!folders) return;
 
         const folderQuery = router.currentRoute.value.query.folder;
-        const matchingFolder = folders.find(
-          (it: any) => it.folderId === folderQuery,
-        );
+        const matchingFolder = folders.find((it: any) => it.folderId === folderQuery);
 
         activeFolderId.value = matchingFolder ? folderQuery : "default";
         filterAlertsByTab();
@@ -1650,7 +1816,7 @@ export default defineComponent({
             console.error("AlertList: Failed to load alert", error);
             toast({
               variant: "error",
-              message: "Failed to load alert for editing",
+              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
             });
           }
         }
@@ -1679,7 +1845,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching destinations.",
+            message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
           }),
         );
     };
@@ -1695,23 +1861,19 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching templates.",
+            message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
           }),
         );
     };
     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
     const resultTotal = computed(function () {
-      return filteredResults.value?.length;
+      return displayedAlerts.value?.length;
     });
 
-    function convertUnixToQuasarFormat(unixMicroseconds: any) {
-      if (!unixMicroseconds) return "";
-      const unixSeconds = unixMicroseconds / 1e6;
-      const dateToFormat = new Date(unixSeconds * 1000);
-      const formattedDate = dateToFormat.toISOString();
-      return formatDate(formattedDate, "YYYY-MM-DD HH:mm:ss");
-    }
+    // No timezone suffix in this table, unlike the other lists.
+    const convertUnixToDateFormat = (unixMicroseconds: any) =>
+      convertUnixToFormat(unixMicroseconds, "YYYY-MM-DD HH:mm:ss");
 
     const addAlert = () => {
       showAddAlertDialog.value = true;
@@ -1735,23 +1897,23 @@ export default defineComponent({
         if (!toBeClonestreamType.value) {
           toast({
             variant: "error",
-            message: "Please select stream type ",
+            message: t("toastMessages.alerts.pleaseSelectStreamType"),
           });
           return;
         }
         if (!toBeClonestreamName.value) {
           toast({
             variant: "error",
-            message: "Please select stream name",
+            message: t("toastMessages.alerts.pleaseSelectStreamName"),
           });
           return;
         }
         isSubmitting.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait...",
-                  timeout: 0,
-});
+          message: t("toastMessages.alerts.pleaseWait"),
+          timeout: 0,
+        });
         try {
           await alertsService.clone_by_id(
             store.state.selectedOrganization.identifier,
@@ -1767,7 +1929,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: "Anomaly detection cloned successfully",
+            message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
           await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1776,8 +1938,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "error",
-            message:
-              e?.response?.data?.message || "Failed to clone anomaly detection",
+            message: e?.response?.data?.message || "Failed to clone anomaly detection",
           });
         } finally {
           isSubmitting.value = false;
@@ -1788,30 +1949,30 @@ export default defineComponent({
       if (!toBeClonedAlert.value) {
         toast({
           variant: "error",
-          message: "Alert not found",
+          message: t("toastMessages.alerts.alertNotFound"),
         });
         return;
       }
       if (!toBeClonestreamType.value) {
         toast({
           variant: "error",
-          message: "Please select stream type ",
+          message: t("toastMessages.alerts.pleaseSelectStreamType"),
         });
         return;
       }
       if (!toBeClonestreamName.value) {
         toast({
           variant: "error",
-          message: "Please select stream name",
+          message: t("toastMessages.alerts.pleaseSelectStreamName"),
         });
         return;
       }
       isSubmitting.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
-              timeout: 0,
-});
+        message: t("toastMessages.alerts.pleaseWait"),
+        timeout: 0,
+      });
 
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
@@ -1838,7 +1999,7 @@ export default defineComponent({
             if (res.data.code == 200) {
               toast({
                 variant: "success",
-                message: "Alert Cloned Successfully",
+                message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
               await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1961,9 +2122,7 @@ export default defineComponent({
       }
       update(() => {
         const value = val.toLowerCase();
-        filteredOptions = options.filter(
-          (column: any) => column.toLowerCase().indexOf(value) > -1,
-        );
+        filteredOptions = options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
       });
       return filteredOptions;
     };
@@ -1974,11 +2133,9 @@ export default defineComponent({
       if (resetStream) toBeClonestreamName.value = "";
       if (streams.value[toBeClonestreamType.value]) {
         schemaList.value = streams.value[toBeClonestreamType.value];
-        indexOptions.value = streams.value[toBeClonestreamType.value].map(
-          (data: any) => {
-            return data.name;
-          },
-        );
+        indexOptions.value = streams.value[toBeClonestreamType.value].map((data: any) => {
+          return data.name;
+        });
         updateStreamName(toBeClonestreamName.value);
 
         return;
@@ -2022,8 +2179,8 @@ export default defineComponent({
           toast({
             variant: "success",
             message: isEnabled
-              ? "Alert Resumed Successfully"
-              : "Alert Paused Successfully",
+              ? t("toastMessages.alerts.alertResumedSuccessfully")
+              : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
         })
         .finally(() => {
@@ -2084,7 +2241,7 @@ export default defineComponent({
       );
       const alertToBeExported = res.data;
 
-      if (alertToBeExported.hasOwnProperty("id")) {
+      if (Object.prototype.hasOwnProperty.call(alertToBeExported, "id")) {
         delete alertToBeExported.id;
       }
 
@@ -2148,13 +2305,12 @@ export default defineComponent({
         row.status = "training";
         toast({
           variant: "success",
-          message: "Retraining triggered",
+          message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
         toast({
           variant: "error",
-          message:
-            error?.response?.data?.message || "Failed to trigger retraining",
+          message: error?.response?.data?.message || "Failed to trigger retraining",
         });
       }
     };
@@ -2238,16 +2394,6 @@ export default defineComponent({
       });
     };
 
-    const editAlertFromDrawer = async () => {
-      if (!selectedAlertDetails.value) return;
-
-      // Close the drawer first
-      showAlertDetailsDrawer.value = false;
-
-      // Reuse the same edit flow as the listing page
-      await editAlert(selectedAlertDetails.value);
-    };
-
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
       if (row.type === "anomaly") {
@@ -2260,10 +2406,7 @@ export default defineComponent({
       activeFolderToMove.value = activeFolderId.value;
     };
 
-    const updateAcrossFolders = async (
-      activeFolderId: any,
-      selectedFolderId: any,
-    ) => {
+    const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
       await getAlertsFn(store, selectedFolderId, "", false);
       await getAlertsFn(store, activeFolderId);
@@ -2288,9 +2431,7 @@ export default defineComponent({
 
     const dynamicQueryModel = computed({
       get() {
-        return searchAcrossFolders.value
-          ? searchQuery.value
-          : filterQuery.value;
+        return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
       },
       set(value) {
         if (searchAcrossFolders.value) {
@@ -2312,9 +2453,9 @@ export default defineComponent({
       if (!query) return;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while searching for dashboards...",
-              timeout: 0,
-});
+        message: t("toastMessages.alerts.pleaseWaitWhileSearchingForDashboards"),
+        timeout: 0,
+      });
       dismiss();
       await getAlertsFn(store, activeFolderId.value, query);
     }, 600);
@@ -2341,9 +2482,7 @@ export default defineComponent({
         //here we are restoring the current folder's alerts and re-filtering by the active tab
         //this ensures cross-folder results are cleared and only the current folder's data is shown
         const currentFolderAlerts =
-          store.state.organizationData.allAlertsListByFolderId[
-            activeFolderId.value
-          ] || [];
+          store.state.organizationData.allAlertsListByFolderId[activeFolderId.value] || [];
         allAlerts.value = currentFolderAlerts;
         filterQuery.value = null;
         searchQuery.value = null;
@@ -2377,7 +2516,7 @@ export default defineComponent({
       });
     });
 
-    const openMenu = (event: Event, row: any) => {
+    const openMenu = (event: Event, _row?: unknown) => {
       event.stopPropagation();
     };
 
@@ -2385,14 +2524,12 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Exporting alerts...",
+          message: t("toastMessages.alerts.exportingAlerts"),
           timeout: 0, // Set timeout to 0 to keep it showing until dismissed
         });
 
         const alertToBeExported = [];
-        const selectedAlertsToExport = selectedAlerts.value.map(
-          (alert: any) => alert.alert_id,
-        );
+        const selectedAlertsToExport = selectedAlerts.value.map((alert: any) => alert.alert_id);
 
         const alertsData = await Promise.all(
           selectedAlertsToExport.map(async (alertId: string) => {
@@ -2401,7 +2538,7 @@ export default defineComponent({
               alertId,
             );
             const data = res.data;
-            if (data.hasOwnProperty("id")) delete data.id;
+            if (Object.prototype.hasOwnProperty.call(data, "id")) delete data.id;
             return data;
           }),
         );
@@ -2421,7 +2558,9 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "success",
-          message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
+          message: t("toastMessages.alerts.successfullyExportedAlert", {
+            count: selectedAlertsToExport.length,
+          }),
         });
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -2429,7 +2568,7 @@ export default defineComponent({
         console.error("Error exporting alerts:", error);
         toast({
           variant: "error",
-          message: "Error exporting alerts. Please try again.",
+          message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
         });
       }
     };
@@ -2469,8 +2608,7 @@ export default defineComponent({
         } else {
           const column = item.column;
           const operator = item.operator;
-          const value =
-            typeof item.value === "string" ? `'${item.value}'` : item.value;
+          const value = typeof item.value === "string" ? `'${item.value}'` : item.value;
           return `${column} ${operator} ${value}`;
         }
       });
@@ -2479,18 +2617,6 @@ export default defineComponent({
       return wrap ? `(${joined})` : joined;
     }
 
-    // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-    // Uses shared buildConditionsString utility for consistency
-    function transformV2ToExpression(group: any, isRoot = true): string {
-      const result = buildConditionsString(group, {
-        sqlMode: false, // Display format (lowercase operators)
-        addWherePrefix: false,
-        formatValues: false, // Simple display without type-aware formatting
-      });
-
-      // Wrap in parentheses if it's the root level and has content
-      return isRoot && result ? `(${result})` : result;
-    }
     //this function is used to filter the alerts by the local search not the global search
     //this will be used when the user is searching for the alerts in the same folder
     const filterAlertsByQuery = (query: string) => {
@@ -2513,7 +2639,10 @@ export default defineComponent({
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = toast({
         variant: "loading",
-        message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+        message:
+          action === "resume"
+            ? t("toastMessages.alerts.resumingAlerts")
+            : t("toastMessages.alerts.pausingAlerts"),
         timeout: 0,
       });
       try {
@@ -2527,7 +2656,10 @@ export default defineComponent({
         if (alertsToToggle.length === 0) {
           toast({
             variant: "error",
-            message: `No alerts to ${action}`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.noAlertsToResume")
+                : t("toastMessages.alerts.noAlertsToPause"),
           });
           dismiss();
           return;
@@ -2550,7 +2682,10 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: `Alerts ${action}d successfully`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.alertsResumedSuccessfully")
+                : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
         // Refresh alerts
@@ -2564,21 +2699,26 @@ export default defineComponent({
         console.error(`Error ${action}ing alerts:`, error);
         toast({
           variant: "error",
-          message: `Error ${action}ing alerts. Please try again.`,
+          message:
+            action === "resume"
+              ? t("toastMessages.alerts.errorResumingAlerts")
+              : t("toastMessages.alerts.errorPausingAlerts"),
         });
       }
     };
 
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref<boolean>(false);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteAlerts = async () => {
+      bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting alerts...",
+        message: t("toastMessages.alerts.deletingAlerts"),
         timeout: 0,
       });
 
@@ -2586,7 +2726,7 @@ export default defineComponent({
         if (selectedAlerts.value.length === 0) {
           toast({
             variant: "error",
-            message: "No alerts selected for deletion",
+            message: t("toastMessages.alerts.noAlertsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -2615,27 +2755,32 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.alertsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} alert(s)`,
+              message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} alert(s) deleted successfully`,
+              message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+            message: t("toastMessages.alerts.alertsDeletedSuccessfully", {
+              count: selectedAlerts.value.length,
+            }),
           });
         }
 
@@ -2660,6 +2805,8 @@ export default defineComponent({
             message: errorMessage,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
@@ -2711,10 +2858,21 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       router,
       columns,
+      recencyLevel,
+      alertRowClass,
+      alertRowStyle,
+      typeIconName,
+      typeIconClass,
+      stateCounts,
+      summaryStats,
+      stateFilter,
+      displayedAlerts,
+      onStatSelect,
       formData,
       hideForm,
       confirmDelete,
@@ -2755,6 +2913,8 @@ export default defineComponent({
       folders,
       splitterModel,
       alertStateLoadingMap,
+      showRunOutcome,
+      runOutcomeTooltip,
       toggleAlertState,
       templates,
       routeTo,
@@ -2770,7 +2930,6 @@ export default defineComponent({
       updateActiveFolderId,
       activeFolderId,
       editAlert,
-      editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
       selectedAlertToMove,
@@ -2787,8 +2946,7 @@ export default defineComponent({
       clearSearchHistory,
       filteredResults,
       triggerExpand,
-      showAlertDetailsDrawer,
-      selectedAlertDetails,
+      formatGroupCount,
       allSelectedAlerts,
       copyToClipboard,
       openMenu,
@@ -2810,6 +2968,7 @@ export default defineComponent({
       openBulkDeleteDialog,
       bulkDeleteAlerts,
       confirmBulkDelete,
+      bulkDeleteLoading,
       config,
       isCompactToolbar,
       isAnomalyDetectionEnabled,
@@ -2818,14 +2977,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-@media (max-width: 1440px) {
-  .app-tabs-container .o2-tab {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-    min-width: auto !important;
-  }
-}
-
-</style>

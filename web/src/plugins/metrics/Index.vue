@@ -15,88 +15,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll tw:flex tw:flex-col tw:h-full" data-test="metrics-page">
-    <!-- Standard page header: title + icon + all query controls on ONE line
-         (syntax guide, legends, date range, refresh, Run). No extra toolbar row. -->
-    <AppPageHeader
-      :title="t('search.metrics')"
-      icon="bar-chart"
-      class="tw:shrink-0 tw:px-4 tw:border-b tw:border-border-default"
-    >
-      <template #actions>
-        <syntax-guide-metrics />
-        <MetricLegends />
-        <DateTimePickerDashboard
-          v-if="
-            !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
-            selectedDate
-          "
-          v-model="selectedDate"
-          ref="dateTimePickerRef"
-          :disable="disable"
-          class="tw:h-8"
-          data-test="metrics-date-picker"
-        />
-        <AutoRefreshInterval
-          v-if="
-            !['html', 'markdown', 'custom_chart'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
-          v-model="refreshInterval"
-          trigger
-          :min-refresh-interval="
-            store.state?.zoConfig?.min_auto_refresh_interval || 5
-          "
-          @trigger="runQuery"
-          class="tw:h-8"
-          data-test="metrics-auto-refresh"
-        />
-        <ShareButton
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          :url="metricsShareUrl"
-          variant="outline"
-          size="icon-toolbar"
-          data-test="metrics-share-btn"
-          class="tw:h-8"
-        />
-        <template
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+  <OPageLayout
+    data-test="metrics-page"
+    :title="t('search.metrics')"
+    icon="bar-chart"
+    :back="{
+      label: t('search.metrics'),
+      onClick: goBackToExplorer,
+      dataTest: 'metrics-editor-back-btn',
+    }"
+    bleed
+  >
+    <template #actions>
+      <SyntaxGuideMetrics />
+      <MetricLegends />
+      <DateTimePickerDashboard
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type) && selectedDate"
+        v-model="selectedDate"
+        ref="dateTimePickerRef"
+        :disable="disable"
+        class="h-8"
+        data-test="metrics-date-picker"
+      />
+      <AutoRefreshInterval
+        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+        v-model="refreshInterval"
+        trigger
+        :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        @trigger="runQuery"
+        class="h-8"
+        data-test="metrics-auto-refresh"
+      />
+      <ShareButton
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        :url="metricsShareUrl"
+        variant="outline"
+        size="icon-toolbar"
+        data-test="metrics-share-btn"
+        shortcut-id="metricsCopyUrl"
+        class="h-8"
+      />
+      <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+        <OButton
+          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+          variant="outline-destructive"
+          size="sm-toolbar"
+          data-test="metrics-cancel"
+          @click="cancelAddPanelQuery"
         >
-          <OButton
-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            variant="outline-destructive"
-            size="sm-toolbar"
-            data-test="metrics-cancel"
-            @click="cancelAddPanelQuery"
-          >
-            <span class="tw:relative tw:flex tw:items-center tw:justify-center">
-              <span class="tw:invisible">{{ t("metrics.runQuery") }}</span>
-              <span class="tw:absolute">{{ t("panel.cancel") }}</span>
-            </span>
-          </OButton>
-          <OButton
-            v-else
-            variant="primary"
-            size="sm-toolbar"
-            data-test="metrics-apply"
-            :loading="disable"
-            :disabled="disable"
-            @click="runQuery"
-          >
-            {{ t("metrics.runQuery") }}
-          </OButton>
-        </template>
+          <span class="relative flex items-center justify-center">
+            <span class="invisible">{{ t("metrics.runQuery") }}</span>
+            <span class="absolute">{{ t("panel.cancel") }}</span>
+          </span>
+        </OButton>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm-toolbar"
+          data-test="metrics-apply"
+          :loading="disable"
+          :disabled="disable"
+          @click="runQuery"
+        >
+          {{ t("metrics.runQuery") }}
+          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+        </OButton>
       </template>
-    </AppPageHeader>
-
+    </template>
     <!-- PanelEditor Content Area -->
     <PanelEditor
       ref="panelEditorRef"
       pageType="metrics"
       :editMode="false"
       :dashboardData="currentDashboardData.data"
-      :variablesData="{}"
+      :variablesData="{} as unknown as PanelEditorVariablesData"
       :selectedDateTime="dashboardPanelData.meta.dateTime"
       @addToDashboard="addToDashboard"
       @chartApiError="handleChartApiError"
@@ -104,12 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <!-- Add to Dashboard Dialog -->
-    <add-to-dashboard
+    <AddToDashboard
       v-model:open="showAddToDashboardDialog"
       :dashboardPanelData="dashboardPanelData"
       @save="addPanelToDashboard"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -120,18 +112,17 @@ import {
   nextTick,
   watch,
   reactive,
-  onUnmounted,
   onMounted,
   onBeforeMount,
   defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -139,7 +130,7 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import { PanelEditor } from "@/components/dashboards/PanelEditor";
+import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
 import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
 import { useRoute, useRouter } from "vue-router";
@@ -163,6 +154,7 @@ const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -171,7 +163,7 @@ export default defineComponent({
   props: ["metaData"],
 
   components: {
-    AppPageHeader,
+    OPageLayout,
     DateTimePickerDashboard,
     SyntaxGuideMetrics,
     MetricLegends,
@@ -179,9 +171,10 @@ export default defineComponent({
     AutoRefreshInterval,
     PanelEditor,
     OButton,
+    OTooltip,
     ShareButton,
   },
-  setup(props) {
+  setup() {
     provide("dashboardPanelDataPageKey", "metrics");
 
     // PanelEditor ref for accessing exposed methods/properties
@@ -190,18 +183,14 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
     const { showErrorNotification } = useNotifications();
-    const {
-      dashboardPanelData,
-      resetDashboardPanelData,
-      resetAggregationFunction,
-      validatePanel,
-    } = useDashboardPanelData("metrics");
-    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+    const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
+      useDashboardPanelData("metrics", t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics", t);
     const editMode = ref(false);
     const selectedDate: any = ref({
       valueType: "relative",
@@ -235,9 +224,7 @@ export default defineComponent({
       dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
 
       if (store.state.zoConfig?.auto_query_enabled) {
-        const persisted = restoreMetricsStream(
-          store.state.selectedOrganization.identifier,
-        );
+        const persisted = restoreMetricsStream(store.state.selectedOrganization.identifier);
         if (persisted) {
           dashboardPanelData.data.queries[0].fields.stream = persisted;
         }
@@ -259,9 +246,8 @@ export default defineComponent({
         metrics_data: encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
       };
       const changed =
-        Object.keys(query).some(
-          (k) => String(query[k]) !== String(route.query[k] ?? ""),
-        ) || Object.keys(route.query).some((k) => !(k in query));
+        Object.keys(query).some((k) => String(query[k]) !== String(route.query[k] ?? "")) ||
+        Object.keys(route.query).some((k) => !(k in query));
       if (changed) router.replace({ query }).catch(() => {});
     };
 
@@ -320,10 +306,7 @@ export default defineComponent({
       }
 
       sp.set("refresh", refreshIntervalToLabel(refreshInterval.value));
-      sp.set(
-        "metrics_data",
-        encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
-      );
+      sp.set("metrics_data", encodeMetricsConfig(getMetricsConfig(dashboardPanelData)));
       return url.href;
     });
 
@@ -339,7 +322,7 @@ export default defineComponent({
 
     onMounted(async () => {
       // DateTimePicker is now mounted; safe to read its value
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
@@ -350,7 +333,7 @@ export default defineComponent({
       // auto-run a restored blob / inbound deep-link, then normalize the URL
       if (pendingAutoRun) {
         pendingAutoRun = false;
-        updateDateTime(selectedDate.value);
+        updateDateTime();
         runQuery();
       }
     });
@@ -369,7 +352,7 @@ export default defineComponent({
     );
 
     watch(selectedDate, () => {
-      updateDateTime(selectedDate.value);
+      updateDateTime();
     });
 
     // resize the chart when config panel is opened and closed
@@ -384,10 +367,7 @@ export default defineComponent({
       () => dashboardPanelData.data.queries[0]?.fields?.stream,
       async (stream: string, oldStream: string) => {
         if (store.state.zoConfig?.auto_query_enabled && stream) {
-          saveMetricsStream(
-            store.state.selectedOrganization.identifier,
-            stream,
-          );
+          saveMetricsStream(store.state.selectedOrganization.identifier, stream);
         }
 
         // Seed the default query when a stream becomes available in builder mode
@@ -425,7 +405,7 @@ export default defineComponent({
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      updateDateTime(selectedDate.value);
+      updateDateTime();
 
       // Call PanelEditor's runQuery if available
       if (panelEditorRef.value) {
@@ -436,7 +416,7 @@ export default defineComponent({
       syncStateToUrl();
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         const date = dateTimePickerRef.value?.getConsumableDateTime();
 
@@ -459,12 +439,9 @@ export default defineComponent({
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
-    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+    const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
-        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
-          chartData.value,
-          newVal,
-        );
+        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(chartData.value, newVal);
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
@@ -485,11 +462,8 @@ export default defineComponent({
 
       // check if name of panel is there
       if (!onlyChart) {
-        if (
-          dashboardData.data.title == null ||
-          dashboardData.data.title.trim() == ""
-        ) {
-          errors.push("Name of Panel is required");
+        if (dashboardData.data.title == null || dashboardData.data.title.trim() == "") {
+          errors.push(t("metrics.index.namePanelRequired"));
         }
       }
 
@@ -497,9 +471,7 @@ export default defineComponent({
       validatePanel(errors, isFieldsValidationRequired);
 
       if (errors.length) {
-        showErrorNotification(
-          "There are some errors, please fix them and try again",
-        );
+        showErrorNotification(t("metrics.index.errorsFixTryAgain"));
       }
 
       if (errors.length) {
@@ -509,10 +481,7 @@ export default defineComponent({
       }
     };
 
-    const handleChartApiError = (errorMessage: {
-      message: string;
-      code: string;
-    }) => {
+    const handleChartApiError = (errorMessage: { message: string; code: string }) => {
       if (errorMessage?.message) {
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
@@ -549,10 +518,7 @@ export default defineComponent({
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
-    provide(
-      "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
-    );
+    provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
@@ -561,7 +527,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;
@@ -571,9 +537,7 @@ export default defineComponent({
     const disable = ref(false);
 
     watch(variablesAndPanelsDataLoadingState, () => {
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
-      );
+      const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
@@ -585,9 +549,7 @@ export default defineComponent({
       if (errors.length) {
         // set errors into errorData
         errorData.errors = errors;
-        showErrorNotification(
-          "There are some errors, please fix them and try again",
-        );
+        showErrorNotification(t("metrics.index.errorsFixTryAgain"));
         return;
       } else {
         showAddToDashboardDialog.value = true;
@@ -596,6 +558,24 @@ export default defineComponent({
 
     const addPanelToDashboard = () => {
       showAddToDashboardDialog.value = false;
+    };
+
+    const goBackToExplorer = () => {
+      const back = router.options?.history?.state?.back;
+      if (
+        typeof back === "string" &&
+        back.startsWith("/metrics") &&
+        !back.startsWith("/metrics/editor")
+      ) {
+        router.back();
+        return;
+      }
+      router.push({
+        name: "metrics",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+        },
+      });
     };
 
     // [END] cancel running queries
@@ -611,6 +591,30 @@ export default defineComponent({
         handler: () => {
           if (isInputFocused()) return;
           runQuery();
+        },
+      },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // The metrics PromQL editor is Monaco — focus its inner textarea.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          addToDashboard();
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document.querySelector<HTMLElement>('[data-test="metrics-share-btn"]')?.click();
         },
       },
     ]);
@@ -637,6 +641,7 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      goBackToExplorer,
       refreshInterval,
       panelEditorRef,
       metricsShareUrl,
@@ -644,5 +649,3 @@ export default defineComponent({
   },
 });
 </script>
-
-

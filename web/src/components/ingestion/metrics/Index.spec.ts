@@ -4,7 +4,6 @@ import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -24,7 +23,7 @@ vi.mock("../../../aws-exports", () => ({
   },
 }));
 
-// Mock clipboard utility — replaces the removed quasar copyToClipboard
+// Mock clipboard utility
 vi.mock("@/utils/clipboard", () => ({
   copyToClipboard: vi.fn().mockResolvedValue(true),
 }));
@@ -57,12 +56,11 @@ function buildMountOptions() {
         store,
       },
       stubs: {
-        "OSplitter": {
-          template:
-            '<div><slot name="before"></slot><slot name="after"></slot></div>',
+        OSplitter: {
+          template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
         },
-        "OTabs": true,
-        "ORouteTab": true,
+        OTabs: true,
+        ORouteTab: true,
         "router-view": true,
       },
     },
@@ -136,12 +134,11 @@ describe("IngestMetrics Component", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            "OSplitter": {
-              template:
-                '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
             },
-            "OTabs": true,
-            "ORouteTab": true,
+            OTabs: true,
+            ORouteTab: true,
             "router-view": true,
           },
         },
@@ -191,6 +188,42 @@ describe("IngestMetrics Component", () => {
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
+    });
+
+    it("should push with org_identifier query when route is 'vmagent'", () => {
+      mockRouter.currentRoute.value.name = "vmagent";
+      const tw = mount(IngestMetrics, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "vmagent",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'nightingale'", () => {
+      mockRouter.currentRoute.value.name = "nightingale";
+      const tw = mount(IngestMetrics, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "nightingale",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
+    });
+
+    it("should push with org_identifier query when route is 'categraf'", () => {
+      mockRouter.currentRoute.value.name = "categraf";
+      const tw = mount(IngestMetrics, buildMountOptions());
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        name: "categraf",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      });
+      tw.unmount();
     });
 
     it("should push with org_identifier query when route is 'otelCollector'", () => {
@@ -292,6 +325,7 @@ describe("IngestMetrics Component", () => {
 
       expect(copyToClipboard).toHaveBeenCalledWith(
         "prometheus config snippet",
+        expect.any(Function),
         {
           successMessage: "Content Copied Successfully!",
           errorMessage: "Error while copy content.",
@@ -305,7 +339,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({ innerText: "some text" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("some text", {
+      expect(copyToClipboard).toHaveBeenCalledWith("some text", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -317,8 +351,8 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({ innerText: "fail text" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("fail text", {
-        successMessage: expect.any(String),
+      expect(copyToClipboard).toHaveBeenCalledWith("fail text", expect.any(Function), {
+        successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
       });
@@ -371,7 +405,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({ innerText: "" });
 
-      expect(copyToClipboard).toHaveBeenCalledWith("", {
+      expect(copyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -383,7 +417,7 @@ describe("IngestMetrics Component", () => {
 
       wrapper.vm.copyToClipboardFn({});
 
-      expect(copyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(copyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -428,9 +462,7 @@ describe("IngestMetrics Component", () => {
 
     it("should expose store state.selectedOrganization", () => {
       expect(wrapper.vm.store.state.selectedOrganization).toBeDefined();
-      expect(
-        wrapper.vm.store.state.selectedOrganization.identifier,
-      ).toBeDefined();
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBeDefined();
     });
   });
 

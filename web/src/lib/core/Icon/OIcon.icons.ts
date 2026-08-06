@@ -48,6 +48,7 @@ import Cloud from "~icons/material-symbols/cloud-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
+import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
@@ -55,8 +56,11 @@ import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
 import ExpandMore from "~icons/material-symbols/expand-more";
+import Extension from "~icons/material-symbols/extension-outline";
 import UploadFile from "~icons/material-symbols/upload-file-outline";
 import FormatListBulleted from "~icons/material-symbols/format-list-bulleted";
+import FormatBold from "~icons/material-symbols/format-bold";
+import FormatItalic from "~icons/material-symbols/format-italic";
 import Fullscreen from "~icons/material-symbols/fullscreen";
 import GroupWork from "~icons/material-symbols/group-work-outline";
 import Groups from "~icons/material-symbols/groups-outline";
@@ -127,7 +131,7 @@ import Activity from "~icons/material-symbols/vital-signs";
 import AlignLeft from "~icons/material-symbols/format-align-left";
 import AllInclusive from "~icons/material-symbols/all-inclusive";
 import AssignmentTurnedIn from "~icons/material-symbols/assignment-turned-in-outline";
-import AutoAwesome from "~icons/material-symbols/wand-stars-outline";
+import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import BarChart from "~icons/material-symbols/bar-chart-4-bars";
 import Bookmark from "~icons/material-symbols/bookmark-outline";
 import Build from "~icons/material-symbols/build-outline";
@@ -155,6 +159,9 @@ import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
 import Speed from "~icons/material-symbols/speed-outline";
+import Target from "~icons/material-symbols/target";
+import TrackChanges from "~icons/material-symbols/track-changes";
+import LocalFireDepartment from "~icons/material-symbols/local-fire-department";
 import StopCircle from "~icons/material-symbols/stop-circle-outline";
 import Storage from "~icons/material-symbols/storage";
 import TableChart from "~icons/material-symbols/table-chart-outline";
@@ -168,7 +175,12 @@ import VerifiedUser from "~icons/material-symbols/verified-user-outline";
 import Webhook from "~icons/material-symbols/webhook";
 import MenuBook from "~icons/material-symbols/menu-book-outline";
 
-// Batch 2: Additional icons from full codebase audit (2026-05-16)
+import OpenInBrowser from "~icons/material-symbols/open-in-browser";
+import StackedLineChart from "~icons/material-symbols/stacked-line-chart";
+import Keyboard from "~icons/material-symbols/keyboard";
+import Checklist from "~icons/material-symbols/checklist";
+import PhotoCamera from "~icons/material-symbols/photo-camera-outline";
+
 import AddCircleIcon from "~icons/material-symbols/add-circle-outline";
 import AdsClickIcon from "~icons/material-symbols/ads-click";
 import AnalyticsIcon from "~icons/material-symbols/analytics-outline";
@@ -180,9 +192,8 @@ import AssessmentIcon from "~icons/material-symbols/analytics-outline";
 import AssignmentIcon from "~icons/material-symbols/assignment-outline";
 import AttachFileIcon from "~icons/material-symbols/attach-file";
 import AttachMoneyIcon from "~icons/material-symbols/attach-money";
-// Material Symbols replacements for `@quasar/extras/material-symbols-outlined`
-// (these specific icons don't ship an `-outline` variant in @iconify/material-symbols;
-// the base names render the outlined glyph by default)
+// These icons don't ship an `-outline` variant in @iconify/material-symbols;
+// the base names render the outlined glyph by default.
 import SoundSampler from "~icons/material-symbols/sound-sampler";
 import ClockLoader20 from "~icons/material-symbols/clock-loader-20";
 import DataInfoAlert from "~icons/material-symbols/data-info-alert";
@@ -257,6 +268,7 @@ import SavedSearchIcon from "~icons/material-symbols/saved-search";
 import SearchOffIcon from "~icons/material-symbols/search-off";
 import SecurityIcon from "~icons/material-symbols/shield-outline";
 import SentimentVeryDissatisfiedIcon from "~icons/material-symbols/mood-bad-outline";
+import AddReactionIcon from "~icons/material-symbols/add-reaction-outline";
 import StopIcon from "~icons/material-symbols/stop-outline";
 import SwapHorizIcon from "~icons/material-symbols/swap-horiz";
 import SwapVertIcon from "~icons/material-symbols/swap-vert";
@@ -299,17 +311,20 @@ import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
 import Widgets from "~icons/material-symbols/widgets-outline";
 import Lan from "~icons/material-symbols/lan-outline";
-import AutoAwesome from "~icons/material-symbols/auto-awesome-outline";
 import CheckCircleOutline from "~icons/material-symbols/check-circle-outline";
 import TrendingUpFilled from "~icons/material-symbols/trending-up";
-import ErrorOutlineFilled from "~icons/material-symbols/error-outline";
 import ViewInAr from "~icons/material-symbols/view-in-ar-outline";
 import Input from "~icons/material-symbols/input";
 import Transform from "~icons/material-symbols/transform";
 import Favorite from "~icons/material-symbols/favorite";
 import FavoriteBorder from "~icons/material-symbols/favorite-outline";
+import Star from "~icons/material-symbols/star";
+import StarOutline from "~icons/material-symbols/star-outline";
 import RadioButtonUnchecked from "~icons/material-symbols/radio-button-unchecked";
 import RadioButtonChecked from "~icons/material-symbols/radio-button-checked";
+import ComputerIcon from "~icons/material-symbols/computer-outline";
+import TabletIcon from "~icons/material-symbols/tablet-outline";
+import SmartphoneIcon from "~icons/material-symbols/smartphone-outline";
 import TouchApp from "~icons/material-symbols/touch-app";
 import NetworkCheck from "~icons/material-symbols/network-check";
 import CloudDownload from "~icons/material-symbols/cloud-download";
@@ -325,12 +340,19 @@ import Plagiarism from "~icons/material-symbols/plagiarism-outline";
 import Redo from "~icons/material-symbols/redo";
 import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
+import SmartDisplay from "~icons/material-symbols/smart-display-outline";
+import AndroidIcon from "~icons/material-symbols/android";
+import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
+
+// Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
+import McpLogo from "./McpLogo.vue";
 
 import type { Component } from "vue";
 
 export const iconRegistry = {
-  "alarm": Alarm,
-  "add": Add,
+  alarm: Alarm,
+  add: Add,
+  mcp: McpLogo,
   "arrow-back": ArrowBack,
   "arrow-back-ios-new": ArrowBackIosNew,
   "arrow-downward": ArrowDownward,
@@ -338,220 +360,229 @@ export const iconRegistry = {
   "arrow-drop-up": ArrowDropUp,
   "arrow-forward": ArrowForward,
   "arrow-upward": ArrowUpward,
-  "article": Article,
-  "attachment": Attachment,
-  "stars": Stars,
-  "favorite": Favorite,
+  article: Article,
+  attachment: Attachment,
+  stars: Stars,
+  favorite: Favorite,
   "favorite-border": FavoriteBorder,
-  "backpack": Backpack,
-  "block": Block,
-  "bolt": Bolt,
-  "cached": Cached,
+  star: Star,
+  "star-outline": StarOutline,
+  backpack: Backpack,
+  block: Block,
+  bolt: Bolt,
+  cached: Cached,
   "calendar-month": CalendarMonth,
-  "campaign": Campaign,
-  "cancel": Cancel,
-  "redeem": Redeem,
+  campaign: Campaign,
+  cancel: Cancel,
+  redeem: Redeem,
   "receipt-long": ReceiptLong,
-  "category": Category,
-  "check": Check,
+  category: Category,
+  check: Check,
   "check-circle": CheckCircle,
   "chevron-left": ChevronLeft,
-  "backup": Backup,
+  backup: Backup,
   "chevron-right": ChevronRight,
-  "close": Close,
-  "cloud": Cloud,
-  "code": Code,
+  close: Close,
+  cloud: Cloud,
+  code: Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,
-  "delete": Delete,
-  "download": Download,
-  "edit": Edit,
-  "error": Error,
+  "content-paste": ContentPaste,
+  delete: Delete,
+  download: Download,
+  edit: Edit,
+  error: Error,
   "error-outline": ErrorOutline,
-  "event": Event,
+  event: Event,
   "expand-more": ExpandMore,
+  extension: Extension,
   "upload-file": UploadFile,
   "format-list-bulleted": FormatListBulleted,
-  "fullscreen": Fullscreen,
+  "format-bold": FormatBold,
+  "format-italic": FormatItalic,
+  fullscreen: Fullscreen,
   "group-work": GroupWork,
   "group-add": GroupAdd,
-  "groups": Groups,
+  groups: Groups,
   "how-to-reg": HowToReg,
   "help-outline": HelpOutline,
-  "history": History,
-  "info": Info,
+  history: History,
+  info: Info,
   "info-filled": InfoFilled,
   "info-outline": InfoOutline,
   "account-balance": AccountBalance,
   "account-tree": AccountTree,
   "dark-mode": DarkMode,
-  "draft": Draft,
+  draft: Draft,
   "drive-file-move": DriveFileMove,
   "expand-less": ExpandLess,
   "inventory-2": Inventory2,
   "light-mode": LightMode,
-  "schema": Schema,
-  "wifi": Wifi,
-  "window": Window,
-  "javascript": Javascript,
-  "keep": Keep,
+  schema: Schema,
+  wifi: Wifi,
+  window: Window,
+  javascript: Javascript,
+  keep: Keep,
   "keep-outline": KeepOutline,
   "keyboard-arrow-down": KeyboardArrowDown,
   "keyboard-double-arrow-left": KeyboardDoubleArrowLeft,
   "keyboard-double-arrow-right": KeyboardDoubleArrowRight,
-  "language": Language,
-  "link": Link,
+  language: Language,
+  link: Link,
   "location-on": LocationOn,
   "more-vert": MoreVert,
-  "menu": MenuIcon,
+  menu: MenuIcon,
   "open-in-new": OpenInNew,
-  "organization": OrganizationIcon,
-  "pause": Pause,
+  organization: OrganizationIcon,
+  pause: Pause,
   "pause-circle-filled": PauseCircleFilled,
-  "person": Person,
+  person: Person,
   "person-add": PersonAdd,
   "play-arrow": PlayArrow,
-  "preview": Preview,
+  preview: Preview,
   "query-stats": QueryStats,
-  "refresh": Refresh,
-  "replay": Replay,
+  refresh: Refresh,
+  replay: Replay,
   "replay-10": Replay10,
   "forward-10": Forward10,
-  "schedule": Schedule,
-  "search": Search,
-  "send": Send,
-  "share": Share,
-  "settings": Settings,
-  "shield": Shield,
+  schedule: Schedule,
+  search: Search,
+  send: Send,
+  share: Share,
+  settings: Settings,
+  shield: Shield,
   "show-chart": ShowChart,
-  "timeline": Timeline,
-  "tune": Tune,
-  "visibility": Visibility,
+  timeline: Timeline,
+  tune: Tune,
+  visibility: Visibility,
   "visibility-off": VisibilityOff,
-  "warning": Warning,
-  "workspaces": Workspaces,
+  warning: Warning,
+  workspaces: Workspaces,
   "workspace-premium": WorkspacePremium,
   "unfold-less": UnfoldLess,
   "left-panel-close": LeftPanelClose,
   "left-panel-open": LeftPanelOpen,
-  "reorder": Reorder,
+  reorder: Reorder,
   "first-page": FirstPage,
   "last-page": LastPage,
-  "dashboard": Dashboard,
+  dashboard: Dashboard,
   "access-time": AccessTime,
-  "activity": Activity,
+  activity: Activity,
   "align-left": AlignLeft,
   "all-inclusive": AllInclusive,
   "assignment-turned-in": AssignmentTurnedIn,
   "auto-awesome": AutoAwesome,
   "bar-chart": BarChart,
-  "bookmark": Bookmark,
-  "build": Build,
-  "business": Business,
-  "chat": Chat,
+  bookmark: Bookmark,
+  build: Build,
+  business: Business,
+  chat: Chat,
   "check-box": CheckBoxIcon,
   "close-fullscreen": CloseFullscreen,
   "data-object": DataObject,
-  "database": Database,
-  "description": Description,
-  "dns": Dns,
+  database: Database,
+  description: Description,
+  dns: Dns,
   "fork-right": ForkRight,
   "git-branch": ForkRight,
   "graph-2": Graph2Icon,
-  "flame": Whatshot,
-  "whatshot": Whatshot,
+  flame: Whatshot,
+  whatshot: Whatshot,
   "brain-circuit": PsychologyIcon,
-  "key": Key,
+  key: Key,
   "admin-panel-settings": AdminPanelSettings,
   "fact-check": FactCheck,
   "alt-route": AltRoute,
-  "emergency": Emergency,
-  "compress": Compress,
-  "pattern": Pattern,
+  emergency: Emergency,
+  compress: Compress,
+  pattern: Pattern,
   "call-merge": CallMerge,
   "auto-graph": AutoGraph,
   "play-circle-filled": PlayCircleFilled,
-  "pets": Pets,
+  pets: Pets,
   "monitor-heart": MonitorHeart,
-  "dataset": Dataset,
+  dataset: Dataset,
   "folder-open": FolderOpen,
-  "folder": Folder,
+  folder: Folder,
   "folder-outline": FolderOutline,
-  "widgets": Widgets,
-  "lan": Lan,
+  widgets: Widgets,
+  lan: Lan,
   "trending-up-filled": TrendingUpFilled,
   "view-in-ar": ViewInAr,
-  "input": Input,
-  "transform": Transform,
-  "processing": Transform,
+  input: Input,
+  transform: Transform,
+  processing: Transform,
   "navigate-before": ChevronLeft,
   "navigate-next": ChevronRight,
   "fullscreen-exit": FullscreenExit,
-  "group": Group,
+  group: Group,
   "hourglass-empty": HourglassEmpty,
-  "label": Label,
-  "layers": Layers,
-  "mail": Mail,
+  label: Label,
+  layers: Layers,
+  mail: Mail,
   "manage-search": ManageSearch,
-  "merge": Merge,
+  merge: Merge,
   "more-horiz": MoreHoriz,
-  "navigation": NavigationIcon,
-  "notifications": Notifications,
+  navigation: NavigationIcon,
+  notifications: Notifications,
   "open-in-full": OpenInFull,
   "play-circle": PlayCircle,
   "smart-toy": SmartToy,
-  "speed": Speed,
+  speed: Speed,
+  target: Target,
+  "track-changes": TrackChanges,
+  "local-fire-department": LocalFireDepartment,
   "stop-circle": StopCircle,
-  "storage": Storage,
+  storage: Storage,
   "table-chart": TableChart,
-  "timer": TimerIcon,
-  "title": Title,
+  timer: TimerIcon,
+  title: Title,
   "trending-up": TrendingUp,
-  "undo": Undo,
+  undo: Undo,
   "unfold-more": UnfoldMore,
-  "upload": Upload,
+  upload: Upload,
   "verified-user": VerifiedUser,
-  "webhook": Webhook,
+  webhook: Webhook,
   "menu-book": MenuBook,
 
   // Batch 2: Additional icons (2026-05-16)
   "add-circle": AddCircleIcon,
   "add-circle-outline": AddCircleIcon,
   "ads-click": AdsClickIcon,
-  "analytics": AnalyticsIcon,
+  analytics: AnalyticsIcon,
   "arrow-back-ios": ArrowBackIosIcon,
   "arrow-forward-ios": ArrowForwardIosIcon,
   "arrow-right": ArrowRightIcon,
   "arrow-right-alt": ArrowRightAltIcon,
-  "assessment": AssessmentIcon,
-  "assignment": AssignmentIcon,
+  assessment: AssessmentIcon,
+  assignment: AssignmentIcon,
   "attach-file": AttachFileIcon,
   "attach-money": AttachMoneyIcon,
   "sound-sampler": SoundSampler,
   "clock-loader-20": ClockLoader20,
   "data-info-alert": DataInfoAlert,
-  "function": FunctionIcon,
-  "list": ListIcon,
+  function: FunctionIcon,
+  list: ListIcon,
   "123": NumbersIcon,
-  "paid": PaidIcon,
-  "autorenew": AutorenewIcon,
+  paid: PaidIcon,
+  autorenew: AutorenewIcon,
   "progress-activity": ProgressActivityIcon,
   "card-giftcard": CardGiftcardIcon,
   "check-circle-outline": CheckCircleOutline,
-  "circle": CircleIcon,
-  "clear": Close,
+  circle: CircleIcon,
+  clear: Close,
   "cloud-done": CloudDoneIcon,
   "cloud-upload": CloudUploadIcon,
   "code-off": CodeOffIcon,
   "color-lens": ColorLensIcon,
-  "colorize": ColorizeIcon,
-  "compare": CompareIcon,
+  colorize: ColorizeIcon,
+  compare: CompareIcon,
   "corporate-fare": CorporateFareIcon,
   "dashboard-customize": DashboardCustomizeIcon,
   "data-usage": DataUsageIcon,
   "delete-outline": Delete,
   "delete-sweep": DeleteSweepIcon,
-  "devices": DevicesIcon,
+  devices: DevicesIcon,
   "drag-indicator": DragIndicatorIcon,
   "event-note": EventNoteIcon,
   "exit-to-app": ExitToAppIcon,
@@ -564,54 +595,55 @@ export const iconRegistry = {
   "filter-alt": FilterAltIcon,
   "data-plus-line": DataPlusLineIcon,
   "filter-list": FilterListIcon,
-  "flag": FlagIcon,
+  flag: FlagIcon,
   "format-list-numbered": FormatListNumberedIcon,
-  "forum": ForumIcon,
-  "functions": FunctionsIcon,
+  forum: ForumIcon,
+  functions: FunctionsIcon,
   "grid-on": GridOnIcon,
-  "help": HelpIcon,
+  help: HelpIcon,
   "history-toggle-off": HistoryToggleOffIcon,
-  "home": HomeIcon,
-  "hub": HubIcon,
-  "image": ImageIcon,
-  "insights": InsightsIcon,
+  home: HomeIcon,
+  hub: HubIcon,
+  image: ImageIcon,
+  insights: InsightsIcon,
   "keyboard-arrow-right": KeyboardArrowRightIcon,
   "keyboard-arrow-up": KeyboardArrowUpIcon,
-  "lightbulb": LightbulbIcon,
+  lightbulb: LightbulbIcon,
   "lightbulb-outline": LightbulbIcon,
-  "lock": LockIcon,
-  "login": LoginIcon,
-  "logout": LogoutIcon,
+  lock: LockIcon,
+  login: LoginIcon,
+  logout: LogoutIcon,
   "manage-accounts": ManageAccountsIcon,
-  "memory": MemoryIcon,
+  memory: MemoryIcon,
   "monetization-on": MonetizationOnIcon,
   "note-add": NoteAddIcon,
   "notifications-active": NotificationsActiveIcon,
-  "palette": PaletteIcon,
-  "payments": PaymentsIcon,
-  "print": PrintIcon,
-  "psychology": PsychologyIcon,
-  "radar": RadarIcon,
-  "remove": RemoveIcon,
+  palette: PaletteIcon,
+  payments: PaymentsIcon,
+  print: PrintIcon,
+  psychology: PsychologyIcon,
+  radar: RadarIcon,
+  remove: RemoveIcon,
   "report-problem": ReportProblemIcon,
   "shield-alert-outline": ShieldAlertOutlineIcon,
   "restart-alt": RestartAltIcon,
   "rocket-launch": RocketLaunchIcon,
-  "rule": RuleIcon,
+  rule: RuleIcon,
   "running-with-errors": RunningWithErrorsIcon,
-  "save": SaveIcon,
+  save: SaveIcon,
   "saved-search": SavedSearchIcon,
   "search-off": SearchOffIcon,
-  "security": SecurityIcon,
+  security: SecurityIcon,
   "sentiment-very-dissatisfied": SentimentVeryDissatisfiedIcon,
-  "stop": StopIcon,
+  "add-reaction": AddReactionIcon,
+  stop: StopIcon,
   "swap-horiz": SwapHorizIcon,
   "swap-vert": SwapVertIcon,
-  "sync": SyncIcon,
+  sync: SyncIcon,
   "sync-disabled": SyncDisabledIcon,
   "sync-problem": SyncProblemIcon,
   "table-view": TableViewIcon,
-  "tag": TagIcon,
+  tag: TagIcon,
   "task-alt": TaskAltIcon,
   "text-fields": TextFieldsIcon,
   "thumb-down-off-alt": ThumbDownOffAltIcon,
@@ -621,9 +653,9 @@ export const iconRegistry = {
   // "group-work": GroupWorkIcon,
   "toggle-off": ToggleOffIcon,
   "trending-down": TrendingDownIcon,
-  "troubleshoot": TroubleshootIcon,
-  "update": UpdateIcon,
-  "verified": VerifiedIcon,
+  troubleshoot: TroubleshootIcon,
+  update: UpdateIcon,
+  verified: VerifiedIcon,
   "view-column": ViewColumnIcon,
   "volume-off": VolumeOffIcon,
   "volume-up": VolumeUpIcon,
@@ -631,22 +663,35 @@ export const iconRegistry = {
   "wrap-text": WrapTextIcon,
   "radio-button-unchecked": RadioButtonUnchecked,
   "radio-button-checked": RadioButtonChecked,
+  computer: ComputerIcon,
+  tablet: TabletIcon,
+  smartphone: SmartphoneIcon,
   "touch-app": TouchApp,
   "network-check": NetworkCheck,
   "cloud-download": CloudDownload,
   "call-made": CallMade,
   "call-received": CallReceived,
-  "inbox": Inbox,
+  inbox: Inbox,
   "star-rate": StarRate,
   "card-membership": CardMembership,
-  "domain": Domain,
+  domain: Domain,
   "data-array": DataArray,
-  "mouse": Mouse,
-  "plagiarism": Plagiarism,
-  "redo": Redo,
-  "tab": Tab,
-  "web": Web,
+  mouse: Mouse,
+  plagiarism: Plagiarism,
+  redo: Redo,
+  tab: Tab,
+  web: Web,
+  android: AndroidIcon,
+  "phone-iphone": PhoneIphoneIcon,
+
+  // Batch 3: Synthetics / browser-check icons (2026-06-22)
+  // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)
+  "open-in-browser": OpenInBrowser,
+  "stacked-line-chart": StackedLineChart,
+  keyboard: Keyboard,
+  checklist: Checklist,
+  "photo-camera": PhotoCamera,
+  "smart-display": SmartDisplay,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;
-

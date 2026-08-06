@@ -18,7 +18,6 @@ import { mount } from "@vue/test-utils";
 import DashboardSankeyChartBuilder from "@/components/dashboards/addPanel/DashboardSankeyChartBuilder.vue";
 import i18n from "@/locales";
 
-
 // Mock the composables
 const mockDashboardPanelData = {
   data: {
@@ -126,14 +125,7 @@ describe("DashboardSankeyChartBuilder", () => {
           DashboardFiltersOption: true,
           DashboardJoinsOption: true,
           DynamicFunctionPopUp: true,
-          "OIcon": true,
-          "q-tooltip": true,
-          "q-btn-group": true,
-          "q-btn": true,
-          "q-menu": true,
-          "q-input": true,
-          "q-select": true,
-          "q-separator": true,
+          OIcon: true,
         },
         mocks: {
           $t: (key: string) => key,
@@ -205,9 +197,7 @@ describe("DashboardSankeyChartBuilder", () => {
       mockUseDashboardPanelData.promqlMode = false;
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.$options.components.DashboardFiltersOption,
-      ).toBeDefined();
+      expect(wrapper.vm.$options.components.DashboardFiltersOption).toBeDefined();
     });
   });
 
@@ -299,8 +289,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const sourceField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
+      const sourceField = wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
       expect(sourceField).toBeDefined();
       expect(sourceField.column).toBe("source_field");
     });
@@ -311,8 +300,7 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.source = null;
       wrapper = createWrapper();
 
-      const sourceField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
+      const sourceField = wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
       expect(sourceField).toBe(null);
     });
 
@@ -336,9 +324,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.source.label,
-      ).toBe("Source");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.source.label).toBe("Source");
     });
 
     it("should have modifiable source field label", () => {
@@ -348,8 +334,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const sourceField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
+      const sourceField = wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
       expect(sourceField.label).toBe("Source");
 
       sourceField.label = "New Source";
@@ -367,8 +352,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const targetField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.target;
+      const targetField = wrapper.vm.dashboardPanelData.data.queries[0].fields.target;
       expect(targetField).toBeDefined();
       expect(targetField.column).toBe("target_field");
     });
@@ -379,8 +363,7 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.target = null;
       wrapper = createWrapper();
 
-      const targetField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.target;
+      const targetField = wrapper.vm.dashboardPanelData.data.queries[0].fields.target;
       expect(targetField).toBe(null);
     });
 
@@ -404,9 +387,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.target.label,
-      ).toBe("Target");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.target.label).toBe("Target");
     });
 
     it("should have modifiable target field label", () => {
@@ -416,8 +397,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const targetField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.target;
+      const targetField = wrapper.vm.dashboardPanelData.data.queries[0].fields.target;
       expect(targetField.label).toBe("Target");
 
       targetField.label = "New Target";
@@ -436,8 +416,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const valueField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value;
+      const valueField = wrapper.vm.dashboardPanelData.data.queries[0].fields.value;
       expect(valueField).toBeDefined();
       expect(valueField.column).toBe("value_field");
       expect(valueField.aggregationFunction).toBe("sum");
@@ -449,8 +428,7 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.data.queries[0].fields.value = null;
       wrapper = createWrapper();
 
-      const valueField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value;
+      const valueField = wrapper.vm.dashboardPanelData.data.queries[0].fields.value;
       expect(valueField).toBe(null);
     });
 
@@ -474,9 +452,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value.label,
-      ).toBe("Value");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value.label).toBe("Value");
     });
 
     it("should handle aggregation function for value field", () => {
@@ -487,10 +463,9 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value
-          .aggregationFunction,
-      ).toBe("count");
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value.aggregationFunction).toBe(
+        "count",
+      );
     });
 
     it("should have modifiable value field label", () => {
@@ -500,8 +475,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const valueField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.value;
+      const valueField = wrapper.vm.dashboardPanelData.data.queries[0].fields.value;
       expect(valueField.label).toBe("Value");
 
       valueField.label = "New Value";
@@ -531,9 +505,7 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.value = {
           type: "build",
           label: "Value",
-          args: [
-            { type: "field", value: { field: "value_field", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
         };
         wrapper = createWrapper();
 
@@ -546,9 +518,7 @@ describe("DashboardSankeyChartBuilder", () => {
           type: "build",
           label: "Value",
           functionName: "sum",
-          args: [
-            { type: "field", value: { field: "value_field", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "value_field", streamAlias: "" } }],
         };
         wrapper = createWrapper();
 
@@ -595,9 +565,7 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.value = {
           type: "build",
           functionName: "count",
-          args: [
-            { type: "field", value: { field: "test_col", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "test_col", streamAlias: "" } }],
         };
         const result = wrapper.vm.valueLabel;
 
@@ -612,9 +580,7 @@ describe("DashboardSankeyChartBuilder", () => {
 
         mockDashboardPanelData.data.queries[0].fields.value = {
           type: "build",
-          args: [
-            { type: "field", value: { field: "plain_col", streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: "plain_col", streamAlias: "" } }],
         };
         const result = wrapper.vm.valueLabel;
 
@@ -631,17 +597,10 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "source",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
 
-        expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add target from field list", () => {
@@ -650,17 +609,10 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "target",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "target");
 
-        expect(mockUseDashboardPanelData.addTarget).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addTarget).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add value from field list", () => {
@@ -669,17 +621,10 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "value",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "value");
 
-        expect(mockUseDashboardPanelData.addValue).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addValue).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should add filtered item from field list", () => {
@@ -688,17 +633,10 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "f",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "f");
 
-        expect(mockUseDashboardPanelData.addFilteredItem).toHaveBeenCalledWith(
-          mockField,
-        );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.addFilteredItem).toHaveBeenCalledWith(mockField);
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle drag element not found", () => {
@@ -706,10 +644,7 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.meta.dragAndDrop.dragElement = null;
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "source",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
 
         expect(mockUseDashboardPanelData.addSource).not.toHaveBeenCalled();
       });
@@ -720,21 +655,17 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.source = {
           column: "existing_field",
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: "existing_field" }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: "existing_field" },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "source",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
 
         expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith(
           "Max 1 field in SOURCE is allowed.",
         );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should show error when max fields exceeded for target", () => {
@@ -743,21 +674,17 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.target = {
           column: "existing_field",
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: "existing_field" }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: "existing_field" },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "target",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "target");
 
         expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith(
           "Max 1 field in TARGET is allowed.",
         );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should show error when max fields exceeded for value", () => {
@@ -766,156 +693,118 @@ describe("DashboardSankeyChartBuilder", () => {
         mockDashboardPanelData.data.queries[0].fields.value = {
           column: "existing_field",
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: "existing_field" }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: "existing_field" },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "value",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "value");
 
         expect(mockNotifications.showErrorNotification).toHaveBeenCalledWith(
           "Max 1 field in VALUE is allowed.",
         );
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should move field between axes from source to target", () => {
         const fieldName = "test_field";
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "source";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: fieldName }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: fieldName },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "target",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "target");
 
         expect(mockUseDashboardPanelData.removeSource).toHaveBeenCalled();
         expect(mockUseDashboardPanelData.addTarget).toHaveBeenCalledWith({
           name: fieldName,
           streamAlias: "",
         });
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should move field between axes from target to value", () => {
         const fieldName = "test_field";
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "target";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: fieldName }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: fieldName },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "value",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "value");
 
         expect(mockUseDashboardPanelData.removeTarget).toHaveBeenCalled();
         expect(mockUseDashboardPanelData.addValue).toHaveBeenCalledWith({
           name: fieldName,
           streamAlias: "",
         });
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should move field between axes from value to source", () => {
         const fieldName = "test_field";
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "value";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: fieldName }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: fieldName },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "source",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
 
         expect(mockUseDashboardPanelData.removeValue).toHaveBeenCalled();
         expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith({
           name: fieldName,
           streamAlias: "",
         });
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle custom drag name from custom query fields", () => {
         const fieldName = "custom_field";
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "source";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
-        mockDashboardPanelData.meta.stream.customQueryFields = [
-          { name: fieldName },
-        ];
+        mockDashboardPanelData.meta.stream.customQueryFields = [{ name: fieldName }];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "target",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "target");
 
         expect(mockUseDashboardPanelData.removeSource).toHaveBeenCalled();
         expect(mockUseDashboardPanelData.addTarget).toHaveBeenCalledWith({
           name: fieldName,
           streamAlias: "",
         });
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
 
       it("should handle filter drop and return early", () => {
         const fieldName = "filter_field";
         mockDashboardPanelData.meta.dragAndDrop.dragSource = "source";
         mockDashboardPanelData.meta.dragAndDrop.dragElement = {
-          args: [
-            { type: "field", value: { field: fieldName, streamAlias: "" } },
-          ],
+          args: [{ type: "field", value: { field: fieldName, streamAlias: "" } }],
         };
-        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value =
-          [{ name: fieldName }];
+        mockUseDashboardPanelData.selectedStreamFieldsBasedOnUserDefinedSchema.value = [
+          { name: fieldName },
+        ];
         wrapper = createWrapper();
 
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "f",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "f");
 
         // When dropping to "f" with non-fieldList source, it returns early and does not call cleanup
         // The component actually returns early without calling cleanupDraggingFields for filter drops
         expect(() =>
-          wrapper.vm.onDrop(
-            { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-            "f",
-          ),
+          wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "f"),
         ).not.toThrow();
       });
     });
@@ -928,12 +817,8 @@ describe("DashboardSankeyChartBuilder", () => {
         wrapper.vm.onFieldDragStart(mockEvent, "test_item", "source");
 
         expect(mockDashboardPanelData.meta.dragAndDrop.dragging).toBe(true);
-        expect(mockDashboardPanelData.meta.dragAndDrop.dragElement).toBe(
-          "test_item",
-        );
-        expect(mockDashboardPanelData.meta.dragAndDrop.dragSource).toBe(
-          "source",
-        );
+        expect(mockDashboardPanelData.meta.dragAndDrop.dragElement).toBe("test_item");
+        expect(mockDashboardPanelData.meta.dragAndDrop.dragSource).toBe("source");
       });
     });
 
@@ -944,9 +829,7 @@ describe("DashboardSankeyChartBuilder", () => {
         const mockEvent = { preventDefault: vi.fn() };
         wrapper.vm.onDragEnter(mockEvent, "target", 1);
 
-        expect(mockDashboardPanelData.meta.dragAndDrop.currentDragArea).toBe(
-          "target",
-        );
+        expect(mockDashboardPanelData.meta.dragAndDrop.currentDragArea).toBe("target");
         expect(mockDashboardPanelData.meta.dragAndDrop.targetDragIndex).toBe(1);
         expect(mockEvent.preventDefault).toHaveBeenCalled();
       });
@@ -1001,9 +884,7 @@ describe("DashboardSankeyChartBuilder", () => {
 
         wrapper.vm.onDragEnd();
 
-        expect(
-          mockUseDashboardPanelData.cleanupDraggingFields,
-        ).toHaveBeenCalled();
+        expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
       });
     });
   });
@@ -1061,10 +942,8 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.dragging = true;
       wrapper = createWrapper();
 
-      const sourceContainer = wrapper.find(
-        '[data-test="dashboard-source-layout"]',
-      );
-      expect(sourceContainer.classes()).toContain("tw:border-dotted");
+      const sourceContainer = wrapper.find('[data-test="dashboard-source-layout"]');
+      expect(sourceContainer.classes()).toContain("border-dotted");
     });
 
     it("should apply drop-entered class when drag area matches", () => {
@@ -1074,10 +953,8 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.currentDragArea = "source";
       wrapper = createWrapper();
 
-      const sourceContainer = wrapper.find(
-        '[data-test="dashboard-source-layout"]',
-      );
-      expect(sourceContainer.classes()).toContain("tw:transition-all");
+      const sourceContainer = wrapper.find('[data-test="dashboard-source-layout"]');
+      expect(sourceContainer.classes()).toContain("transition-colors");
     });
 
     it("should not apply drop-entered class when drag area doesn't match", () => {
@@ -1087,10 +964,8 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.currentDragArea = "target";
       wrapper = createWrapper();
 
-      const sourceContainer = wrapper.find(
-        '[data-test="dashboard-source-layout"]',
-      );
-      expect(sourceContainer.classes()).not.toContain("tw:transition-all");
+      const sourceContainer = wrapper.find('[data-test="dashboard-source-layout"]');
+      expect(sourceContainer.classes()).not.toContain("transition-colors");
     });
   });
 
@@ -1123,10 +998,7 @@ describe("DashboardSankeyChartBuilder", () => {
       wrapper = createWrapper();
 
       expect(() => {
-        wrapper.vm.onDrop(
-          { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-          "source",
-        );
+        wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
       }).not.toThrow();
     });
   });
@@ -1160,15 +1032,9 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.source).toBe(
-        null,
-      );
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.target).toBe(
-        null,
-      );
-      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value).toBe(
-        null,
-      );
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.source).toBe(null);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.target).toBe(null);
+      expect(wrapper.vm.dashboardPanelData.data.queries[0].fields.value).toBe(null);
     });
   });
 
@@ -1180,17 +1046,10 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
       mockDashboardPanelData.meta.dragAndDrop.dragElement = mockField;
 
-      wrapper.vm.onDrop(
-        { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-        "source",
-      );
+      wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
 
-      expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith(
-        mockField,
-      );
-      expect(
-        mockUseDashboardPanelData.cleanupDraggingFields,
-      ).toHaveBeenCalled();
+      expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith(mockField);
+      expect(mockUseDashboardPanelData.cleanupDraggingFields).toHaveBeenCalled();
 
       wrapper.vm.removeSource();
       expect(mockUseDashboardPanelData.removeSource).toHaveBeenCalled();
@@ -1206,31 +1065,16 @@ describe("DashboardSankeyChartBuilder", () => {
       mockDashboardPanelData.meta.dragAndDrop.dragSource = "fieldList";
 
       mockDashboardPanelData.meta.dragAndDrop.dragElement = sourceField;
-      wrapper.vm.onDrop(
-        { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-        "source",
-      );
-      expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith(
-        sourceField,
-      );
+      wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "source");
+      expect(mockUseDashboardPanelData.addSource).toHaveBeenCalledWith(sourceField);
 
       mockDashboardPanelData.meta.dragAndDrop.dragElement = targetField;
-      wrapper.vm.onDrop(
-        { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-        "target",
-      );
-      expect(mockUseDashboardPanelData.addTarget).toHaveBeenCalledWith(
-        targetField,
-      );
+      wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "target");
+      expect(mockUseDashboardPanelData.addTarget).toHaveBeenCalledWith(targetField);
 
       mockDashboardPanelData.meta.dragAndDrop.dragElement = valueField;
-      wrapper.vm.onDrop(
-        { stopPropagation: vi.fn(), preventDefault: vi.fn() },
-        "value",
-      );
-      expect(mockUseDashboardPanelData.addValue).toHaveBeenCalledWith(
-        valueField,
-      );
+      wrapper.vm.onDrop({ stopPropagation: vi.fn(), preventDefault: vi.fn() }, "value");
+      expect(mockUseDashboardPanelData.addValue).toHaveBeenCalledWith(valueField);
     });
   });
 
@@ -1269,8 +1113,7 @@ describe("DashboardSankeyChartBuilder", () => {
       };
       wrapper = createWrapper();
 
-      const sourceField =
-        wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
+      const sourceField = wrapper.vm.dashboardPanelData.data.queries[0].fields.source;
       sourceField.label = "Updated Label";
 
       expect(sourceField.label).toBe("Updated Label");

@@ -2,15 +2,16 @@
 import { computed, useAttrs } from "vue";
 import type { PaginationProps, PaginationEmits } from "./OPagination.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 defineOptions({ inheritAttrs: false });
 
 const $attrs = useAttrs();
 // Forward consumer's `data-test` so individual buttons can be addressed via
 // `${parent}-prev` / `${parent}-next` / `${parent}-page-{n}` selectors.
-const parentDataTest = computed(
-  () => $attrs["data-test"] as string | undefined,
-);
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
 
 const props = withDefaults(defineProps<PaginationProps>(), {
   disable: false,
@@ -20,8 +21,7 @@ const props = withDefaults(defineProps<PaginationProps>(), {
 const emit = defineEmits<PaginationEmits>();
 
 /** Clamp a value between min and max (inclusive). */
-const clamp = (val: number, min: number, max: number) =>
-  Math.min(Math.max(val, min), max);
+const clamp = (val: number, min: number, max: number) => Math.min(Math.max(val, min), max);
 
 /** Visible page-number window, centred around the current page. */
 const pages = computed<number[]>(() => {
@@ -58,21 +58,21 @@ const navigate = (page: number) => {
 <template>
   <div
     role="navigation"
-    class="tw:inline-flex tw:items-center tw:gap-0.5 tw:select-none"
-    aria-label="Pagination"
+    class="inline-flex items-center gap-0.5 select-none"
+    :aria-label="t('components.pagination.pagination')"
     v-bind="$attrs"
   >
     <!-- Previous page -->
     <button
       type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
         isFirst || disable
-          ? 'tw:text-pagination-nav-disabled-text tw:cursor-not-allowed tw:opacity-50'
-          : 'tw:text-pagination-nav-text tw:hover:bg-pagination-nav-hover-bg tw:cursor-pointer',
+          ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
+          : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
       :disabled="isFirst || disable"
-      aria-label="Previous page"
+      :aria-label="t('components.pagination.previousPage')"
       :data-test="parentDataTest ? `${parentDataTest}-prev` : undefined"
       @click="navigate(modelValue - 1)"
     >
@@ -84,16 +84,16 @@ const navigate = (page: number) => {
       v-for="page in pages"
       :key="page"
       type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:text-sm tw:font-medium tw:transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center text-sm font-medium transition-colors"
       :class="[
         page === modelValue
-          ? 'tw:bg-pagination-item-active-bg tw:text-pagination-item-active-text tw:cursor-default'
+          ? 'bg-pagination-item-active-bg text-pagination-item-active-text cursor-default'
           : disable
-            ? 'tw:text-pagination-item-disabled-text tw:cursor-not-allowed tw:opacity-50'
-            : 'tw:text-pagination-item-text tw:hover:bg-pagination-item-hover-bg tw:cursor-pointer',
+            ? 'text-pagination-item-disabled-text cursor-not-allowed opacity-50'
+            : 'text-pagination-item-text hover:bg-pagination-item-hover-bg cursor-pointer',
       ]"
       :disabled="disable && page !== modelValue"
-      :aria-label="`Page ${page}`"
+      :aria-label="t('common.pageNumber', { page })"
       :aria-current="page === modelValue ? 'page' : undefined"
       :data-test="parentDataTest ? `${parentDataTest}-page-${page}` : undefined"
       :data-test-value="page"
@@ -106,19 +106,18 @@ const navigate = (page: number) => {
     <!-- Next page -->
     <button
       type="button"
-      class="o-pagination__btn tw:flex tw:size-7 tw:items-center tw:justify-center tw:rounded tw:transition-colors"
+      class="o-pagination__btn rounded-default flex size-7 items-center justify-center transition-colors"
       :class="[
         isLast || disable
-          ? 'tw:text-pagination-nav-disabled-text tw:cursor-not-allowed tw:opacity-50'
-          : 'tw:text-pagination-nav-text tw:hover:bg-pagination-nav-hover-bg tw:cursor-pointer',
+          ? 'text-pagination-nav-disabled-text cursor-not-allowed opacity-50'
+          : 'text-pagination-nav-text hover:bg-pagination-nav-hover-bg cursor-pointer',
       ]"
       :disabled="isLast || disable"
-      aria-label="Next page"
+      :aria-label="t('components.pagination.nextPage')"
       :data-test="parentDataTest ? `${parentDataTest}-next` : undefined"
       @click="navigate(modelValue + 1)"
     >
       <OIcon name="fast-forward" size="sm" />
     </button>
-
   </div>
 </template>

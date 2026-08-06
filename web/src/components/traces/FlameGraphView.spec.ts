@@ -15,8 +15,10 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import FlameGraphView from "@/components/traces/FlameGraphView.vue";
 
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Stub ChartRenderer globally so defineAsyncComponent resolves synchronously
 const ChartRendererStub = {
@@ -335,7 +337,7 @@ describe("FlameGraphView", () => {
         },
       });
 
-      expect(wrapper.find(".tw\\:flex-1").exists()).toBe(true);
+      expect(wrapper.find(".flex-1").exists()).toBe(true);
     });
   });
 
@@ -764,9 +766,7 @@ describe("FlameGraphView", () => {
       await wrapper.vm.$nextTick();
 
       const { data } = wrapper.vm.flameGraphDataAndDepth;
-      const selectedItem = data.find(
-        (d: any) => d.spanData.span_id === "span-1",
-      );
+      const selectedItem = data.find((d: any) => d.spanData.span_id === "span-1");
       expect(selectedItem.itemStyle.borderColor).toBe("#2563EB");
       expect(selectedItem.itemStyle.borderWidth).toBe(3);
     });
@@ -1040,7 +1040,7 @@ describe("FlameGraphView", () => {
       });
 
       expect(result).toContain("⚠ Has errors");
-      expect(result).toContain("#f87171");
+      expect(result).toContain("var(--color-flame-tooltip-error)");
     });
 
     it("should not show error indicator for normal spans", async () => {
@@ -1104,8 +1104,7 @@ describe("FlameGraphView", () => {
 
       await wrapper.vm.$nextTick();
 
-      const { formatDuration } =
-        await import("@/composables/traces/useTraceProcessing");
+      const { formatDuration } = await import("@/composables/traces/useTraceProcessing");
 
       getFormatter(wrapper)({
         data: {
@@ -1145,10 +1144,10 @@ describe("FlameGraphView", () => {
 
       expect(result).toContain("<div");
       expect(result).toContain("font-weight: bold");
-      expect(result).toContain("font-size: 11px");
+      expect(result).toContain("font-size: var(--text-2xs)");
       expect(result).toContain("display: flex");
       expect(result).toContain("justify-content: space-between");
-      expect(result).toContain("color: #cbd5e1");
+      expect(result).toContain("color: var(--color-flame-tooltip-label)");
     });
 
     it("should handle very small percentages correctly", async () => {

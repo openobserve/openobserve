@@ -24,31 +24,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Slots: illustration | title | description | actions | extra
 -->
 <template>
-  <div class="tw:relative tw:w-full tw:h-full tw:overflow-hidden tw:[--empty-dot:var(--color-grey-300)] tw:dark:[--empty-dot:var(--color-grey-800)]">
-    <!-- decorative backdrop — subtle dot texture only (no color gradient) -->
+  <div
+    class="relative h-full w-full overflow-hidden [--empty-dot:var(--color-grey-300)] dark:[--empty-dot:var(--color-grey-800)]"
+  >
+    <!--
+      Decorative backdrop — subtle dot texture only (no color gradient).
+      The dot colour comes from `--empty-dot` (set theme-aware on the parent).
+      Sparse 1.875rem spacing keeps the texture subtle, and the ellipse mask
+      concentrates it behind the illustration/text, dissolving well before the
+      edges so it reads as a soft backdrop rather than an all-over grid.
+    -->
     <div
       aria-hidden="true"
-      class="tw:absolute tw:inset-0 tw:pointer-events-none"
-      :style="dotGridStyle"
+      class="pointer-events-none absolute inset-0 bg-[radial-gradient(var(--empty-dot)_1.25px,transparent_1.25px)] mask-[radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)] bg-size-[1.875rem_1.875rem] [-webkit-mask-image:radial-gradient(ellipse_60%_62%_at_50%_44%,var(--color-black)_0%,transparent_70%)]"
     />
 
     <!-- content -->
     <div
-      class="tw:relative tw:w-full tw:h-full tw:flex tw:flex-col tw:items-center tw:justify-center tw:gap-7 tw:px-6 tw:py-12 tw:text-center"
+      class="relative flex h-full w-full flex-col items-center justify-center gap-7 px-6 py-12 text-center"
     >
-      <div v-if="$slots.illustration" class="tw:shrink-0">
+      <div v-if="$slots.illustration" class="shrink-0">
         <slot name="illustration" />
       </div>
 
-      <div class="tw:flex tw:flex-col tw:gap-2.5 tw:max-w-xl">
-        <h2
-          class="tw:text-2xl! tw:font-semibold! tw:text-text-primary tw:tracking-[-0.01em]"
-        >
+      <div class="flex max-w-xl flex-col gap-2.5">
+        <h2 class="text-text-heading text-2xl! font-semibold! tracking-[-0.01em]">
           <slot name="title">{{ title }}</slot>
         </h2>
         <p
           v-if="description || $slots.description"
-          class="tw:text-base tw:text-text-secondary tw:leading-relaxed"
+          class="text-text-secondary text-base leading-relaxed"
         >
           <slot name="description">{{ description }}</slot>
         </p>
@@ -57,32 +62,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Actions presented as a distinct, labelled section so the empty state
            reads as multiple structured elements (hero + "quick start" group)
            rather than one sparse centered block. -->
-      <div
-        v-if="$slots.actions"
-        class="tw:w-full tw:max-w-3xl tw:flex tw:flex-col tw:items-center tw:gap-4"
-      >
-        <div
-          v-if="actionsLabel"
-          class="tw:flex tw:items-center tw:gap-3 tw:w-full tw:max-w-md"
-        >
-          <span class="tw:h-px tw:flex-1 tw:bg-border-default" />
-          <span
-            class="tw:text-[0.6875rem] tw:font-semibold tw:text-text-secondary tw:whitespace-nowrap"
-            >{{ actionsLabel }}</span
-          >
-          <span class="tw:h-px tw:flex-1 tw:bg-border-default" />
+      <div v-if="$slots.actions" class="flex w-full max-w-3xl flex-col items-center gap-4">
+        <div v-if="actionsLabel" class="flex w-full max-w-md items-center gap-3">
+          <span class="bg-border-default h-px flex-1" />
+          <span class="text-2xs text-text-secondary font-semibold whitespace-nowrap">{{
+            actionsLabel
+          }}</span>
+          <span class="bg-border-default h-px flex-1" />
         </div>
-        <div
-          class="tw:flex tw:flex-wrap tw:items-stretch tw:justify-center tw:gap-3"
-        >
+        <div class="flex flex-wrap items-stretch justify-center gap-3">
           <slot name="actions" />
         </div>
       </div>
 
-      <div
-        v-if="$slots.extra"
-        class="tw:w-full tw:flex tw:flex-col tw:items-center tw:gap-3 tw:pt-2"
-      >
+      <div v-if="$slots.extra" class="flex w-full flex-col items-center gap-3 pt-2">
         <slot name="extra" />
       </div>
     </div>
@@ -90,27 +83,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 withDefaults(
   defineProps<{
-    title?: string;
-    description?: string;
+    title?: I18nText;
+    description?: I18nText;
     /** Optional eyebrow label rendered above the actions (e.g. "Quick start"). */
     actionsLabel?: string;
   }>(),
-  { title: "", description: "", actionsLabel: "" },
+  { title: raw(""), description: raw(""), actionsLabel: "" },
 );
-
-// Faded dot-grid, masked to a soft ellipse so it concentrates behind the
-// content and dissolves toward the edges.
-const dotGridStyle =
-  // `--empty-dot` is theme-aware (see <style> below): grey-300 in light so the
-  // dots read clearly on white, ~grey-800 in dark.
-  "background-image: radial-gradient(var(--empty-dot) 1.25px, transparent 1.25px);" +
-  // sparse spacing so the texture stays subtle, not busy.
-  "background-size: 30px 30px;" +
-  // concentrated behind the illustration/text and faded to clean space well
-  // before the edges — a soft backdrop, not an all-over grid.
-  "-webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);" +
-  "mask-image: radial-gradient(ellipse 60% 62% at 50% 44%, #000 0%, transparent 70%);";
 </script>
-

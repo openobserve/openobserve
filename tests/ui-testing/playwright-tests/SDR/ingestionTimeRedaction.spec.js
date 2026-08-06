@@ -115,7 +115,7 @@ test.describe("Ingestion Time Redaction - Combined Test", { tag: '@enterprise' }
 
       // Verify the pattern actually exists in the list
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
+      const exists = await pm.sdrPatternsPage.waitForPatternCreated(patternConfig.name); // backend-consistent create gate (API source of truth)
       if (!exists) {
         testLogger.error(`Pattern ${patternConfig.name} was not created successfully!`);
         throw new Error(`Pattern ${patternConfig.name} creation failed - not found in list`);

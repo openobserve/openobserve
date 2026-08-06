@@ -53,11 +53,7 @@ function symbolizeToken(token: string): string {
 
 /** Symbolise a combo like "ctrl+shift+a" → "⌘⇧A" (joined into one keycap). */
 function symbolizeCombo(combo: string): string {
-  return combo
-    .split("+")
-    .map(symbolizeToken)
-    .filter(Boolean)
-    .join("");
+  return combo.split("+").map(symbolizeToken).filter(Boolean).join("");
 }
 
 /**
@@ -74,23 +70,20 @@ const caps = computed<string[]>(() => {
 });
 
 const sizeClasses: Record<NonNullable<ShortcutProps["size"]>, string> = {
-  sm: "tw:h-5 tw:min-w-5 tw:px-1.5 tw:text-[11px]",
-  md: "tw:h-6 tw:min-w-6 tw:px-1.5 tw:text-xs",
+  sm: "h-5 min-w-5 px-1.5 text-2xs",
+  md: "h-6 min-w-6 px-1.5 text-xs",
 };
 </script>
 
 <template>
-  <span
-    class="tw:inline-flex tw:items-center tw:gap-1"
-    data-test="o-shortcut"
-  >
+  <span class="inline-flex items-center gap-1" data-test="o-shortcut">
     <kbd
       v-for="(cap, i) in caps"
       :key="i"
       :class="[
-        'tw:inline-flex tw:items-center tw:justify-center',
-        'tw:rounded tw:border tw:border-kbd-border tw:bg-kbd-bg tw:text-kbd-text',
-        'tw:font-medium tw:leading-none tw:whitespace-nowrap tw:shadow-xs',
+        'inline-flex items-center justify-center',
+        'rounded-default border-kbd-border bg-kbd-bg text-kbd-text border',
+        'leading-none font-medium whitespace-nowrap shadow-md',
         sizeClasses[size],
       ]"
       >{{ cap }}</kbd

@@ -15,28 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:rounded-md tw:p-0"
+  <OPageLayout
+    :back="{
+      label: t('pipeline_destinations.header'),
+      onClick: () => emit('cancel'),
+    }"
+    bleed
   >
-    <AppPageHeader
-      :back="{
-        label: t('pipeline_destinations.header'),
-        onClick: () => emit('cancel'),
-      }"
-      class="tw:rounded-lg tw:px-3 tw:border-b tw:border-border-default"
-    >
-      <template #title>
-        <span data-test="pipeline-destination-editor-title">
-          <template v-if="destination"
-            >{{ t("alert_destinations.updateTitle") }} -
-            {{ destination.name }}</template
-          >
-          <template v-else>{{ t("alert_destinations.addTitle") }}</template>
-        </span>
-      </template>
-    </AppPageHeader>
+    <template #title>
+      <span data-test="pipeline-destination-editor-title">
+        <template v-if="destination"
+          >{{ t("alert_destinations.updateTitle") }} - {{ destination.name }}</template
+        >
+        <template v-else>{{ t("alert_destinations.addTitle") }}</template>
+      </span>
+    </template>
 
-    <div class="tw:rounded-lg tw:py-2 tw:px-3 tw:overflow-auto">
-      <div class="tw:w-full">
+    <div class="rounded-default overflow-auto px-3 py-2">
+      <div class="w-full">
         <CreateDestinationForm
           :destination="destination"
           @created="handleDestinationCreated"
@@ -45,19 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
-import { defineProps, defineEmits } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
-import AppPageHeader from "@/components/common/AppPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Props
-const props = defineProps<{
+defineProps<{
   destination?: any;
 }>();
 
@@ -79,4 +74,3 @@ const handleCancel = () => {
   emit("cancel");
 };
 </script>
-

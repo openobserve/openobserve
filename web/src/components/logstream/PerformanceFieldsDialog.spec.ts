@@ -18,8 +18,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import PerformanceFieldsDialog from "./PerformanceFieldsDialog.vue";
 import { createStore } from "vuex";
 
-// PerformanceFieldsDialog now wraps content in <ODialog> (migrated from
-// <q-dialog>). The dialog exposes:
+// PerformanceFieldsDialog now wraps content in <ODialog>. The dialog exposes:
 //   - prop  : open (v-model:open), persistent, size, title,
 //             primary-button-label, secondary-button-label
 //   - emits : update:open, click:primary, click:secondary
@@ -76,12 +75,7 @@ const ODialogStub = {
     "secondaryButtonLoading",
     "neutralButtonLoading",
   ],
-  emits: [
-    "update:open",
-    "click:primary",
-    "click:secondary",
-    "click:neutral",
-  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
 
 describe("PerformanceFieldsDialog", () => {
@@ -109,11 +103,7 @@ describe("PerformanceFieldsDialog", () => {
     }
   });
 
-  const mountDialog = (
-    missingFields: any[] = [],
-    modelValue = true,
-    customStore: any = store,
-  ) => {
+  const mountDialog = (missingFields: any[] = [], modelValue = true, customStore: any = store) => {
     wrapper = mount(PerformanceFieldsDialog, {
       props: { modelValue, missingFields },
       global: {
@@ -142,9 +132,7 @@ describe("PerformanceFieldsDialog", () => {
     it("should pass size='md' to ODialog", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      expect(
-        wrapper.find('[data-test-stub="o-dialog"]').attributes("data-size"),
-      ).toBe("md");
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-size")).toBe("md");
     });
 
     it("should render Skip as the secondary button label", async () => {
@@ -299,9 +287,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="o-dialog-secondary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-dialog-secondary"]').trigger("click");
 
       expect(wrapper.emitted("skip")).toBeTruthy();
       expect(wrapper.emitted("skip")!.length).toBe(1);
@@ -311,9 +297,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="o-dialog-primary"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-dialog-primary"]').trigger("click");
 
       expect(wrapper.emitted("add-fields")).toBeTruthy();
       expect(wrapper.emitted("add-fields")!.length).toBe(1);
@@ -323,9 +307,7 @@ describe("PerformanceFieldsDialog", () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
 
-      await wrapper
-        .find('[data-test="o-dialog-close"]')
-        .trigger("click");
+      await wrapper.find('[data-test="o-dialog-close"]').trigger("click");
 
       const events = wrapper.emitted("update:modelValue");
       expect(events).toBeTruthy();
@@ -345,9 +327,9 @@ describe("PerformanceFieldsDialog", () => {
     it("should render correctly in light theme", async () => {
       mountDialog([mockFtsFiled]);
       await flushPromises();
-      // light theme applies the light surface/border classes
-      expect(wrapper.html()).toContain("tw:bg-[#f5f5f5]");
-      expect(wrapper.html()).not.toContain("tw:bg-[#1e1e1e]");
+      // The hex dark/light surfaces collapsed to a single theme-aware token.
+      expect(wrapper.html()).toContain("bg-surface-subtle");
+      expect(wrapper.html()).toContain("border-border-default");
     });
 
     it("should render correctly in dark theme", async () => {
@@ -360,8 +342,9 @@ describe("PerformanceFieldsDialog", () => {
 
       mountDialog([mockFtsFiled], true, darkStore);
       await flushPromises();
-      expect(wrapper.html()).toContain("tw:bg-[#1e1e1e]");
-      expect(wrapper.html()).not.toContain("tw:bg-[#f5f5f5]");
+      // Same theme-aware token is rendered in dark mode; the token resolves the color.
+      expect(wrapper.html()).toContain("bg-surface-subtle");
+      expect(wrapper.html()).toContain("border-border-default");
     });
   });
 });

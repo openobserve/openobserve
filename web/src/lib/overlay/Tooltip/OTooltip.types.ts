@@ -2,6 +2,8 @@
  * OTooltip.types.ts ΓÇö public types for OTooltip.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { TooltipContentProps } from "reka-ui";
 
 export type TooltipSide = "top" | "right" | "bottom" | "left";
@@ -9,7 +11,7 @@ export type TooltipAlign = "start" | "center" | "end";
 
 export interface TooltipProps {
   /** Tooltip text ΓÇö shorthand for `#content` slot when content is plain text */
-  content?: string;
+  content?: I18nText;
   /** Which side of the trigger to render the tooltip on */
   side?: TooltipSide;
   /** Alignment along the chosen side */
@@ -24,6 +26,13 @@ export interface TooltipProps {
   maxWidth?: string;
   /** When true, the tooltip never opens */
   disabled?: boolean;
+  /**
+   * When true, the tooltip stays open while the pointer moves onto the bubble,
+   * so its content can be hovered/selected/copied (useful for long error text
+   * or paths). Default false keeps the standard non-interactive tooltip that
+   * closes as soon as the pointer leaves the trigger.
+   */
+  hoverable?: boolean;
   /** Controlled open state ΓÇö omit for uncontrolled */
   open?: boolean;
   /** Extra CSS class applied to the tooltip bubble element */

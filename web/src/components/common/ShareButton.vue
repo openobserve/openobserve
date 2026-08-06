@@ -25,9 +25,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click="handleShareClick"
     icon-left="share"
   >
-    <span v-if="showLabel" class="tw:ml-1">{{ t("search.shareLink") }}</span>
+    <span v-if="showLabel" class="ml-1">{{ t("search.shareLink") }}</span>
     <OTooltip v-if="isWebUrlNotConfigured">
-      <template #content><OIcon name="warning" size="sm" class="tw:mr-1" />{{ t("search.webUrlNotConfigured") }}</template>
+      <template #content
+        ><OIcon name="warning" size="sm" class="mr-1" />{{
+          t("search.webUrlNotConfigured")
+        }}</template
+      >
     </OTooltip>
     <OTooltip
       v-else-if="tooltip || !showLabel"
@@ -39,11 +43,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeUnmount, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onBeforeUnmount, computed, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonVariant, ButtonSize } from "@/lib/core/Button/OButton.types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
@@ -65,12 +70,12 @@ export default defineComponent({
     },
     // OButton variant
     variant: {
-      type: String,
+      type: String as PropType<ButtonVariant>,
       default: "outline",
     },
     // OButton size
     size: {
-      type: String,
+      type: String as PropType<ButtonSize>,
       default: "icon-xs",
     },
     // Show "Share" label text next to icon
@@ -80,8 +85,8 @@ export default defineComponent({
     },
     // Custom tooltip text
     tooltip: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     // Optional keyboard-shortcut hint shown in the tooltip (raw key, e.g. "ctrl+shift+c")
     shortcut: {
@@ -107,7 +112,7 @@ export default defineComponent({
   },
   emits: ["copy:success", "copy:error", "shorten:success", "shorten:error"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const isLoading = ref(false);
@@ -163,28 +168,27 @@ export default defineComponent({
           isPolling = false;
 
           // Short URL is ready! Copy it to clipboard
-          copyToClipboard(shortURL, {
+          copyToClipboard(shortURL, t, {
             successMessage: t("search.linkCopiedSuccessfully"),
             errorMessage: t("search.errorCopyingLink"),
             timeout: 5000,
-          }).then((success: boolean) => {
-            if (success) {
-              emit("copy:success", { url: shortURL, type: "short" });
-            } else {
-              console.error("Failed to copy short URL:", shortURL);
-              emit("copy:error", { error: new Error("Copy failed"), type: "short" });
-            }
           })
-          .finally(() => {
-            // Clean up: clear store
-            store.commit("clearPendingShortURL");
-            isLoading.value = false;
-          });
+            .then((success: boolean) => {
+              if (success) {
+                emit("copy:success", { url: shortURL, type: "short" });
+              } else {
+                console.error("Failed to copy short URL:", shortURL);
+                emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+              }
+            })
+            .finally(() => {
+              // Clean up: clear store
+              store.commit("clearPendingShortURL");
+              isLoading.value = false;
+            });
         } else if (attempts >= MAX_ATTEMPTS) {
           // Timeout: Stop polling after max attempts
-          console.warn(
-            "Polling timeout: Short URL not received within time limit",
-          );
+          console.warn("Polling timeout: Short URL not received within time limit");
           if (pollIntervalId) {
             clearInterval(pollIntervalId);
             pollIntervalId = null;
@@ -212,7 +216,7 @@ export default defineComponent({
       if (!props.url) {
         toast({
           variant: "warning",
-          message: "No URL to share",
+          message: t("toastMessages.common.noUrlToShare"),
         });
         return;
       }
@@ -237,21 +241,22 @@ export default defineComponent({
               store.commit("setPendingShortURL", shortUrl);
             } else {
               // Chrome/Firefox: Copy directly here
-              copyToClipboard(shortUrl, {
+              copyToClipboard(shortUrl, t, {
                 successMessage: t("search.linkCopiedSuccessfully"),
                 errorMessage: t("search.errorCopyingLink"),
                 timeout: 5000,
-              }).then((success: boolean) => {
-                if (success) {
-                  emit("copy:success", { url: shortUrl, type: "short" });
-                } else {
-                  console.error("Failed to copy short URL:", shortUrl);
-                  emit("copy:error", { error: new Error("Copy failed"), type: "short" });
-                }
               })
-              .finally(() => {
-                isLoading.value = false;
-              });
+                .then((success: boolean) => {
+                  if (success) {
+                    emit("copy:success", { url: shortUrl, type: "short" });
+                  } else {
+                    console.error("Failed to copy short URL:", shortUrl);
+                    emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+                  }
+                })
+                .finally(() => {
+                  isLoading.value = false;
+                });
             }
 
             emit("shorten:success", {
@@ -303,6 +308,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       isLoading,
       isWebUrlNotConfigured,
@@ -311,4 +317,3 @@ export default defineComponent({
   },
 });
 </script>
-

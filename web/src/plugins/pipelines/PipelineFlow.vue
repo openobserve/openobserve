@@ -16,39 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- src/components/PipelineFlow.vue -->
 <template>
-  <div data-test="pipeline-flow-container" class="tw:flex tw:items-center tw:justify-between">
-     <div data-test="pipeline-flow-unsaved-changes-warning-text" v-show="pipelineObj.dirtyFlag" class="tw:text-[#F5A623] tw:border tw:border-[#F5A623] tw:rounded-sm tw:flex tw:items-center tw:px-2 tw:mr-3">
-      <OIcon name="info" class="tw:mr-1 " size="sm" />
-     Unsaved changes detected. Click "Save" to preserve your updates.
-   </div>
+  <div data-test="pipeline-flow-container" class="flex items-center justify-between">
+    <div
+      data-test="pipeline-flow-unsaved-changes-warning-text"
+      v-show="pipelineObj.dirtyFlag"
+      class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      {{ t("pipeline.unsavedChangesDetected") }}
+    </div>
 
-   <!-- Edge deletion help notification -->
-   <div v-if="showEdgeHelpNotification" class="edge-help-notification tw:absolute tw:top-5 tw:left-1/2 tw:-translate-x-1/2 tw:z-[1000] tw:bg-white tw:text-[#374151] tw:py-[10px] tw:px-4 tw:rounded-lg tw:text-sm tw:shadow-[0_4px_20px_rgba(0,0,0,0.15)] tw:border tw:border-[#e5e7eb] tw:flex tw:items-center tw:dark:bg-(--o2-primary-background) tw:dark:text-[#f3f4f6] tw:dark:border-[#374151] tw:dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)] tw:[animation:slideDown_0.3s_ease-out]">
-     <OIcon name="info" class="tw:mr-1" size="sm" />
-     Press Backspace/Delete to remove the edge
-   </div>
+    <!-- Edge deletion help notification -->
+    <div
+      v-if="showEdgeHelpNotification"
+      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    >
+      <OIcon name="info" class="mr-1" size="sm" />
+      {{ t("pipeline.edgeDeleteHint") }}
+    </div>
+  </div>
 
- </div>
-
-    <VueFlow
+  <VueFlow
     @drop="onDrop"
     ref="vueFlowRef"
-      v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
-      v-model:edges="pipelineObj.currentSelectedPipeline.edges"
-      @node-change="onNodeChange"
-      @nodes-change="onNodesChange"
-      @edges-change="onEdgesChange"
-      @edge-click="onEdgeClick"
-      @connect="onConnect"
-      @dragover="onDragOver"
-      :default-viewport="{ zoom: 0.8 }"
-      :min-zoom="0.2"
-      :max-zoom="4"
-      @dragleave="onDragLeave"
-      class="basic-flow"
-
-    >
-
+    v-model:nodes="pipelineObj.currentSelectedPipeline.nodes"
+    v-model:edges="pipelineObj.currentSelectedPipeline.edges"
+    :connect-on-click="false"
+    @node-change="onNodeChange"
+    @nodes-change="onNodesChange"
+    @edges-change="onEdgesChange"
+    @edge-click="onEdgeClick"
+    @connect="onConnect"
+    @dragover="onDragOver"
+    :default-viewport="{ zoom: 0.8 }"
+    :min-zoom="0.2"
+    :max-zoom="4"
+    @dragleave="onDragLeave"
+    class="basic-flow"
+  >
     <!-- <template #edge-button="buttonEdgeProps">
       <EdgeWithButton
         :id="buttonEdgeProps.id"
@@ -63,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
     </template> -->
     <template #edge-custom="customEdgeProps">
-      <CustomEdge
+      <FlowEdge
         :id="customEdgeProps.id"
         :source-x="customEdgeProps.sourceX"
         :source-y="customEdgeProps.sourceY"
@@ -74,135 +79,224 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data="customEdgeProps.data"
         :marker-end="customEdgeProps.markerEnd"
         :style="customEdgeProps.style"
-        :is-in-view = false
+        :is-in-view="false"
       />
     </template>
-      <DropzoneBackground
-        :style="{
-          backgroundColor: isDragOver ? '#e7f3ff' : 'transparent',
-          transition: 'background-color 0.2s ease',
-        }"
-      >
-        <p v-if="isDragOver">Drop here</p>
-      </DropzoneBackground>
-      <template #node-input="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="input" />
+    <!-- Drag-over highlight: same role as OFile's drop target, so it shares
+           --color-file-drag-bg (theme-aware; the old raw blue had no dark step).
+           Stays a binding because the fill is driven by isDragOver at runtime. -->
+    <DropzoneBackground
+      :style="{
+        backgroundColor: isDragOver ? 'var(--color-file-drag-bg)' : 'transparent',
+        transition: 'background-color 0.2s ease',
+      }"
+    >
+      <p v-if="isDragOver">{{ t("pipeline.dropHere") }}</p>
+    </DropzoneBackground>
+    <template #node-input="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="input" />
+    </template>
+    <template #node-output="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="output" />
+    </template>
+    <template #node-default="{ id, data }">
+      <CustomNode :id="id" :data="data" io_type="default" />
+    </template>
+    <Controls :showInteractive="false" class="controls-grp" position="top-left">
+      <!-- Node-rail toggle. `#top` puts it ABOVE zoom-in / zoom-out / fit-view
+             (the default slot would append it below them). The glyph is a bare
+             32x32 currentColor <svg>, exactly like Vue Flow's own control icons
+             — an OIcon here rendered at a different weight and box, so it read
+             as a foreign control in the stack. `.vue-flow__controls-button svg`
+             does the sizing, so no width/height of our own. -->
+      <template #top>
+        <ControlButton
+          data-test="pipeline-node-sidebar-collapse-btn"
+          :title="
+            pipelineObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')
+          "
+          @click="pipelineObj.showNodePalette = !pipelineObj.showNodePalette"
+        >
+          <!-- » chevrons; mirrored in place to « once the rail is open. -->
+          <svg viewBox="0 0 32 32">
+            <path
+              :transform="pipelineObj.showNodePalette ? 'translate(32,0) scale(-1,1)' : undefined"
+              d="M2 5.5 5.5 2 19.5 16 5.5 30 2 26.5 12.5 16ZM14.5 5.5 18 2 32 16 18 30 14.5 26.5 25 16Z"
+            />
+          </svg>
+        </ControlButton>
       </template>
-      <template #node-output="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="output" />
-      </template>
-      <template #node-default="{ id, data }">
-        <CustomNode :id="id" :data="data" io_type="default" />
-      </template>
-      <Controls
-      :showInteractive=false
-
-      class="controls-grp"
-        position="top-left">
     </Controls>
-    </VueFlow>
-    <div v-if="isCanvasEmpty" data-test="pipeline-flow-empty-text" class="tw:absolute tw:top-1/2 tw:left-1/2 tw:-translate-x-1/2 tw:-translate-y-1/2 tw:text-[#888] tw:text-[1.5em] tw:text-center tw:pointer-events-none tw:z-10">
-      {{ t('pipeline.dragDropNodesHere') }}
+  </VueFlow>
+  <!-- Empty-canvas start node. It is an OVERLAY, not a Vue Flow node: a real
+         node would land in `currentSelectedPipeline.nodes` and show up in save,
+         validation and the dirty flag. It borrows `vue-flow__node-input` so it
+         is chrome-for-chrome the same card a Stream/Query source renders as —
+         picking a source swaps the icon and label, and the frame never moves.
+         Sits near the TOP, not the middle: the graph runs downwards, so the
+         first node belongs where a source lives, leaving the canvas below it
+         free for the steps that follow. -->
+
+  <div v-if="needsSource" class="absolute top-32 left-1/2 z-10 -translate-x-1/2">
+    <!-- Scaled by the LIVE viewport zoom. Real nodes are drawn inside
+           `.vue-flow__viewport`, which carries the canvas transform, so at the
+           default 0.8 zoom this overlay — a sibling of that transform, not a
+           child — rendered 1.25x larger than the node it stands in for.
+           Matching the zoom keeps it the size of the node it becomes.
+
+           `relative!` / `origin-top!` undo two things `.vue-flow__node` sets for
+           nodes VUE FLOW positions: `position:absolute` (which took this card
+           out of flow, collapsing the centring wrapper to zero width) and
+           `transform-origin:0 0` (which scaled it toward the top-left). This
+           card is positioned by us, so it needs neither. -->
+    <div
+      data-test="pipeline-flow-start-node"
+      class="vue-flow__node vue-flow__node-input relative! w-max origin-top! scale-[var(--ghost-zoom,1)] cursor-pointer! whitespace-nowrap"
+      :style="{ '--ghost-zoom': viewport.zoom }"
+      @click="openSourcePicker($event)"
+    >
+      <FlowNodeCard icon="add" io-type="input" :has-input="false" :has-output="false">
+        <template #body>{{ t("pipeline.chooseSource") }}</template>
+      </FlowNodeCard>
     </div>
-    <!-- Add UI elements or buttons to interact with the methods -->
+  </div>
+  <!-- Add UI elements or buttons to interact with the methods -->
 </template>
 
-<script>
-import { ref, onMounted, onActivated, watch, computed, nextTick } from "vue";
+<script lang="ts">
+import { ref, onMounted, watch, computed } from "vue";
+import type { Ref } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
-import { ControlButton, Controls } from '@vue-flow/controls'
+import type { VueFlowStore } from "@vue-flow/core";
+import { Controls, ControlButton } from "@vue-flow/controls";
 // import vueFlowConfig from "./vueFlowConfig";
+// Shared, token-driven canvas styling — the SAME file the workflow canvas
+// imports, so the two canvases cannot drift. It owns the vue-flow node chrome
+// and the input/default/output role colours (including their dark variants);
+// PipelineEditor.vue used to carry a private copy of those rules, which is why
+// the two editors' nodes rendered differently in dark mode.
+import "@/components/flow/flow-canvas.css";
 import CustomNode from "./CustomNode.vue";
-import CustomEdge from "./CustomEdge.vue";
+import FlowEdge from "@/components/flow/FlowEdge.vue";
+import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import DropzoneBackground from "./DropzoneBackground.vue";
 import useDragAndDrop from "./useDnD";
-import EdgeWithButton from "./EdgeWithButton.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 /* import the required styles */
 
 import { useStore } from "vuex";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
-const { onInit } = useVueFlow();
 
 export default {
-  components: { VueFlow, CustomNode, DropzoneBackground, Controls,ControlButton,EdgeWithButton,CustomEdge
-   },
+  components: {
+    VueFlow,
+    CustomNode,
+    OIcon,
+    DropzoneBackground,
+    Controls,
+    ControlButton,
+    FlowEdge,
+    FlowNodeCard,
+  },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const {
+      onDragStart,
       onDragOver,
       onDrop,
       onDragLeave,
-      isDragOver,
       onNodeChange,
       onNodesChange,
       onEdgesChange,
       onConnect,
       validateConnection,
+      openSourcePicker,
       pipelineObj,
-    } = useDragAndDrop();
+    } = useDragAndDrop(t);
     const store = useStore();
 
-    const vueFlowRef = ref(null);
+    // Mirror the hook's drag-over state (pipelineObj.isDragOver) into a local
+    // ref so the dropzone highlight and "Drop here" hint react to dragging.
+    const isDragOver = ref(pipelineObj.isDragOver);
+    watch(
+      () => pipelineObj.isDragOver,
+      (value) => {
+        isDragOver.value = value;
+      },
+    );
+    const vueFlowRef: Ref<VueFlowStore | null> = ref(null);
     const isCanvasEmpty = computed(() => pipelineObj.currentSelectedPipeline.nodes.length === 0);
+    // The start node ("Choose a Source") shows whenever the pipeline has NO
+    // SOURCE — not only when the canvas is empty. A pipeline needs exactly one
+    // source, and the palette is collapsed by default, so if the user deletes
+    // the source while other nodes remain they'd be stranded with no way to add
+    // one back. Keying off "no input node" (io_type/type "input", the same
+    // source test hasInputNodeFn uses) covers both the empty canvas and the
+    // source-deleted-mid-graph case.
+    const needsSource = computed(
+      () =>
+        !pipelineObj.currentSelectedPipeline.nodes.some(
+          (n: any) => n.io_type === "input" || n.type === "input",
+        ),
+    );
     const showEdgeHelpNotification = ref(false);
-    let notificationTimeout = null;
+    let notificationTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const { setViewport, getSelectedEdges, addSelectedEdges, removeSelectedEdges, removeEdges } = useVueFlow()
+    // `viewport` is the live canvas transform; the empty-canvas start node
+    // reads its zoom so it renders at the same scale as real nodes.
+    const { setViewport, viewport } = useVueFlow();
 
     // Handle edge click events
-    const onEdgeClick = (event) => {
-
+    const onEdgeClick = () => {
       // Clear any existing timeout
       if (notificationTimeout) {
-        clearTimeout(notificationTimeout)
-        notificationTimeout = null
+        clearTimeout(notificationTimeout);
+        notificationTimeout = null;
       }
 
       // Always show notification on edge click (even if already visible)
-      showEdgeHelpNotification.value = true
+      showEdgeHelpNotification.value = true;
 
       // Auto-hide notification after 3.5 seconds
       notificationTimeout = setTimeout(() => {
-        showEdgeHelpNotification.value = false
-        notificationTimeout = null
-      }, 3500)
-    }
+        showEdgeHelpNotification.value = false;
+        notificationTimeout = null;
+      }, 3500);
+    };
 
-
-
-
-    watch(() => pipelineObj.currentSelectedPipeline, (newVal, oldVal) => {
-          if(pipelineObj.dirtyFlag){
-            pipelineObj.dirtyFlag = false;
-          }
-        });
+    watch(
+      () => pipelineObj.currentSelectedPipeline,
+      () => {
+        if (pipelineObj.dirtyFlag) {
+          pipelineObj.dirtyFlag = false;
+        }
+      },
+    );
     onMounted(async () => {
-        setTimeout(() => {
-          if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
-            vueFlowRef.value.fitView({ padding: 0.1});
-          }
-          else if(vueFlowRef.value){
-            vueFlowRef.value.fitView({ padding: 1});
-          }
-        }, 100);
-      });
+      setTimeout(() => {
+        if (vueFlowRef.value && pipelineObj.currentSelectedPipeline.nodes.length > 4) {
+          vueFlowRef.value.fitView({ padding: 0.1 });
+        } else if (vueFlowRef.value) {
+          vueFlowRef.value.fitView({ padding: 1 });
+        }
+      }, 100);
+    });
 
-
-function resetTransform() {
-  setViewport({ x: 0, y: 0, zoom: 1 })
-}
+    function resetTransform() {
+      setViewport({ x: 0, y: 0, zoom: 1 });
+    }
     const zoomIn = () => {
-      vueFlowRef.value.zoomIn();
+      if (vueFlowRef.value) vueFlowRef.value.zoomIn();
     };
 
     const zoomOut = () => {
-      vueFlowRef.value.zoomOut();
+      if (vueFlowRef.value) vueFlowRef.value.zoomOut();
     };
 
     return {
       pipelineObj,
+      onDragStart,
       onDragOver,
       onDrop,
       onDragLeave,
@@ -219,6 +313,9 @@ function resetTransform() {
       vueFlowRef,
       resetTransform,
       isCanvasEmpty,
+      needsSource,
+      openSourcePicker,
+      viewport,
       store,
       setViewport,
       t,
@@ -227,11 +324,16 @@ function resetTransform() {
 };
 </script>
 
-<style>
-@keyframes slideDown {
+<style scoped>
+/* keep(keyframes): entry animation for the edge-deletion help toast; the animation reference must live in this scoped block (not a Tailwind utility) so Vue's scoped keyframe-name hashing resolves it */
+.edge-help-notification {
+  animation: pipeline-flow-slide-down 0.3s ease-out;
+}
+
+@keyframes pipeline-flow-slide-down {
   from {
     opacity: 0;
-    transform: translateX(-50%) translateY(-10px);
+    transform: translateX(-50%) translateY(-0.625rem);
   }
   to {
     opacity: 1;

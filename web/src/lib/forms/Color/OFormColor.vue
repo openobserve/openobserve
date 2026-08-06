@@ -5,6 +5,7 @@ import { inject } from "vue";
 import OColor from "./OColor.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
 import type { FormColorProps } from "./OFormColor.types";
 
 defineOptions({ inheritAttrs: false });
@@ -14,18 +15,12 @@ const props = defineProps<FormColorProps>();
 const form = inject(FORM_CONTEXT_KEY, null);
 
 if (import.meta.env.DEV && !form) {
-  console.warn(
-    "[OFormColor] must be rendered inside <OForm>. No form context found.",
-  );
+  console.warn("[OFormColor] must be rendered inside <OForm>. No form context found.");
 }
 </script>
 
 <template>
-  <component
-    v-if="form"
-    :is="form.Field"
-    :name="props.name"
-  >
+  <component v-if="form" :is="form.Field" :name="props.name">
     <template #default="{ field }">
       <OColor
         v-bind="$attrs"
@@ -40,12 +35,10 @@ if (import.meta.env.DEV && !form) {
         :id="props.id"
         :name="props.name"
         :model-value="field.state.value"
-        :error="
-          field.state.meta.errors.length > 0
-        "
+        :error="field.state.meta.errors.length > 0"
         :error-message="
           field.state.meta.errors.length > 0
-            ? firstFieldError(field.state.meta.errors)
+            ? raw(firstFieldError(field.state.meta.errors))
             : undefined
         "
         @update:model-value="field.handleChange"

@@ -17,7 +17,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import i18n from "@/locales";
 
-
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -51,12 +50,12 @@ describe("ConfigPanelSearch", () => {
   // -------------------------------------------------------------------------
 
   describe("rendering", () => {
-    it("renders a q-input element", () => {
+    it("renders a search input element", () => {
       expect(wrapper.find("#dashboard-config-panel-search-input").exists()).toBe(true);
     });
 
     it("renders a search icon", () => {
-      // Quasar renders the prepend slot — OIcon with name 'search'
+      // Renders the prepend slot — OIcon with name 'search'
       expect(wrapper.html()).toContain("search");
     });
   });
@@ -73,7 +72,6 @@ describe("ConfigPanelSearch", () => {
       expect((input.element as HTMLInputElement).value).toBe("hello");
       w.unmount();
     });
-
   });
 
   // -------------------------------------------------------------------------
@@ -88,6 +86,5 @@ describe("ConfigPanelSearch", () => {
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1]).toContain("axis");
     });
-
   });
 });

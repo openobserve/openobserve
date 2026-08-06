@@ -29,11 +29,6 @@ vi.mock("../router", () => ({
   default: {},
 }));
 
-// Mock Quasar
-vi.mock("quasar", () => ({
-  useQuasar: () => ({ notify: vi.fn() }),
-}));
-
 // Mock axios so we can control the interceptor chain
 vi.mock("axios", () => {
   const mockInterceptors = {
@@ -95,7 +90,7 @@ describe("httpsearch service", () => {
       httpsearch();
 
       expect(axios.create).toHaveBeenCalledWith(
-        expect.objectContaining({ baseURL: "http://localhost:5080" })
+        expect.objectContaining({ baseURL: "http://localhost:5080" }),
       );
     });
 

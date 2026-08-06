@@ -15,28 +15,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container tw:h-full tw:flex tw:flex-col tw:pb-[0.3rem]">
+  <div class="bg-card-glass-bg flex h-full flex-col pb-[0.3rem]">
     <!-- Current org section (if super org, not a member) -->
-    <div v-if="currentOrgToShow" class="tw:mb-3">
-      <div class="tw:rounded-[0.625rem] tw:bg-(--o2-card-bg) tw:dark:bg-[var(--o2-card-background)]">
-        <div class="tw:font-semibold tw:px-2 tw:py-2">
+    <div v-if="currentOrgToShow" class="mb-3">
+      <div class="rounded-default bg-card-glass-bg dark:bg-surface-base">
+        <div class="px-2 py-2 font-semibold">
           {{ t("billing.billingGroup.currentOrgTitle") }}
         </div>
-        <OSeparator class="tw:mb-1 tw:mt-[3px]" />
+        <OSeparator class="mt-0.75 mb-1" />
 
-        <OTabs
-          orientation="vertical"
-          v-model="activeMember"
-          data-test="usage-member-tab-current"
-        >
+        <OTabs orientation="vertical" v-model="activeMember" data-test="usage-member-tab-current">
           <OTab name="" :data-test="`usage-member-tab-current-item`">
-            <div class="member-item tw:flex tw:flex-col tw:items-start tw:w-full tw:min-w-0">
-              <div class="member-name tw:font-semibold tw:truncate tw:max-w-full tw:normal-case" :title="currentOrgToShow.title">
+            <div class="member-item flex w-full min-w-0 flex-col items-start">
+              <div
+                class="member-name max-w-full truncate font-semibold normal-case"
+                :title="currentOrgToShow.title"
+              >
                 {{ currentOrgToShow.primary }}
               </div>
               <div
                 v-if="currentOrgToShow.secondary"
-                class="member-id tw:text-[0.72rem] tw:opacity-60 tw:truncate tw:max-w-full tw:normal-case"
+                class="member-id max-w-full truncate text-xs normal-case opacity-60"
                 :title="currentOrgToShow.secondary"
               >
                 {{ currentOrgToShow.secondary }}
@@ -48,19 +47,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Member organizations section -->
-    <div class="tw:flex-1 tw:flex tw:flex-col tw:min-h-0">
-      <div class="tw:rounded-[0.625rem] tw:bg-(--o2-card-bg) tw:dark:bg-[var(--o2-card-background)]">
-        <div class="tw:font-semibold tw:px-2 tw:py-2">
+    <div class="flex min-h-0 flex-1 flex-col">
+      <div class="rounded-default bg-card-glass-bg dark:bg-surface-base">
+        <div class="px-2 py-2 font-semibold">
           {{ t("billing.billingGroup.memberOrgsTitle") }}
         </div>
-        <OSeparator class="tw:mb-1 tw:mt-[3px]" />
+        <OSeparator class="mt-0.75 mb-1" />
 
-        <div class="tw:flex tw:items-center tw:py-1 tw:w-full">
+        <div class="flex w-full items-center py-1">
           <OInput
             v-model="searchQuery"
             data-test="usage-member-search"
             :placeholder="t('billing.billingGroup.searchMemberOrg')"
-            class="tw:mx-2 tw:w-full"
+            class="mx-2 w-full"
           >
             <template #icon-left>
               <OIcon name="search" size="sm" />
@@ -69,23 +68,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <div class="members-tabs tw:flex-1 tw:overflow-y-auto">
-        <OTabs
-          orientation="vertical"
-          v-model="activeMember"
-          data-test="usage-member-tabs"
-        >
+      <div class="members-tabs flex-1 overflow-y-auto px-1.5">
+        <OTabs orientation="vertical" v-model="activeMember" data-test="usage-member-tabs">
           <OTab
             v-for="opt in filteredOptions"
             :key="opt.value"
             :name="opt.value"
             :data-test="`usage-member-tab-${opt.value}`"
           >
-            <div class="member-item tw:flex tw:flex-col tw:items-start tw:w-full tw:min-w-0">
-              <div class="member-name tw:font-semibold tw:truncate tw:max-w-full tw:normal-case" :title="opt.title">
+            <div class="member-item flex w-full min-w-0 flex-col items-start">
+              <div
+                class="member-name max-w-full truncate font-semibold normal-case"
+                :title="opt.title"
+              >
                 {{ opt.primary }}
               </div>
-              <div v-if="opt.secondary" class="member-id tw:text-[0.72rem] tw:opacity-60 tw:truncate tw:max-w-full tw:normal-case" :title="opt.secondary">
+              <div
+                v-if="opt.secondary"
+                class="member-id max-w-full truncate text-xs normal-case opacity-60"
+                :title="opt.secondary"
+              >
                 {{ opt.secondary }}
               </div>
             </div>
@@ -94,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div
           v-if="filteredOptions.length === 0"
-          class="o2-page-subtitle tw:text-center tw:py-4 tw:px-2"
+          class="o2-page-subtitle px-2 py-4 text-center"
           data-test="usage-member-no-results"
         >
           {{ t("billing.billingGroup.noMemberMatch") }}
@@ -107,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -135,7 +137,7 @@ export default defineComponent({
   emits: ["update:modelValue"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const searchQuery = ref("");
 
     const activeMember = computed({
@@ -178,9 +180,7 @@ export default defineComponent({
       const q = searchQuery.value?.toLowerCase().trim();
       if (!q) return options.value;
       return options.value.filter(
-        (o) =>
-          o.primary.toLowerCase().includes(q) ||
-          o.value.toLowerCase().includes(q)
+        (o) => o.primary.toLowerCase().includes(q) || o.value.toLowerCase().includes(q),
       );
     });
 
@@ -195,24 +195,29 @@ export default defineComponent({
 });
 </script>
 
-<style>
-.card-container .o-tabs--vertical {
-  margin: 5px;
+<style scoped>
+/* keep(lib-override:o2-tabs): OTabs/OTab internals (.o-tabs--vertical, .o-tab,
+   .o-tabs) are child-component DOM this component can only reach through :deep();
+   the active-tab → .member-id opacity is a descendant state chain. */
+.members-tabs :deep(.o-tabs--vertical) {
+  margin: 0.3125rem;
 }
 
-.card-container .o-tabs--vertical .o-tab {
+/* Vertical padding only — the horizontal inset comes from OTab's vertical
+   variant (--spacing-page-edge) so this rail aligns with the page header. */
+.members-tabs :deep(.o-tabs--vertical .o-tab) {
   justify-content: flex-start;
-  padding: 0.375rem 1rem 0.375rem 1.25rem;
+  padding-block: 0.375rem;
   border-radius: 0.5rem;
   min-height: 1.5rem;
   text-transform: none;
 }
 
-.card-container .o-tabs--vertical .o-tab[data-state="active"] .member-id {
+.members-tabs :deep(.o-tabs--vertical .o-tab[data-state="active"] .member-id) {
   opacity: 0.85;
 }
 
-.members-tabs .o-tabs {
+.members-tabs :deep(.o-tabs) {
   height: auto !important;
   max-height: none !important;
 }

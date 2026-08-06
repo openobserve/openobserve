@@ -16,9 +16,37 @@
 import config from "@/aws-exports";
 import ServiceAccountsList from "@/components/iam/serviceAccounts/ServiceAccountsList.vue";
 import { routeGuard } from "@/utils/zincutils";
+import store from "@/stores";
 
-const IdentityAccessManagement = () =>
-  import("@/views/IdentityAccessManagement.vue");
+// Synthetics routes are gated on the backend /config flag `synthetics_enabled`
+// (enterprise O2_SYNTHETICS_ENABLED). Direct URL access redirects home when off.
+const syntheticsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.synthetics_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+// Workflows routes are gated on the backend /config flag `workflows_enabled`
+// (enterprise O2_WORKFLOWS_ENABLED). The enterprise/cloud build check is already
+// implicit — this whole block only runs for those builds.
+//
+// Checks `=== false`, NOT `!== true`, and that is deliberate: /config is fetched
+// without await, so the flag is briefly undefined at startup. Redirecting on
+// "not yet known" would bounce a bookmarked /workflows to home on a cold load.
+// The sidebar entry takes the opposite stance (it requires `=== true`, so it
+// never flashes in) — the two are not meant to match. Same split as
+// syntheticsRouteGuard above.
+const workflowsRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.workflows_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
 const AppGroups = () => import("@/components/iam/groups/AppGroups.vue");
 
@@ -30,17 +58,21 @@ const EditGroup = () => import("@/components/iam/groups/EditGroup.vue");
 
 const Quota = () => import("@/components/iam/quota/Quota.vue");
 
-const Organizations = () =>
-  import("@/components/iam/organizations/AppOrganizations.vue");
+const Organizations = () => import("@/components/iam/organizations/AppOrganizations.vue");
 
-const ActionScripts = () =>
-  import("@/components/actionScripts/ActionScripts.vue");
+const ActionScripts = () => import("@/components/actionScripts/ActionScripts.vue");
 
 const Invitations = () => import("@/views/Invitations.vue");
 
 import Users from "@/views/User.vue";
 
 const IncidentList = () => import("@/components/alerts/IncidentList.vue");
+
+const WorkflowsList = () => import("@/components/workflows/WorkflowsList.vue");
+
+const WorkflowEditor = () => import("@/components/workflows/WorkflowEditor.vue");
+
+const WorkflowRuns = () => import("@/components/workflows/WorkflowRuns.vue");
 
 const useEnterpriseRoutes = () => {
   const routes: any = [
@@ -69,10 +101,20 @@ const useEnterpriseRoutes = () => {
           meta: {
             title: "Ingestion Tokens",
           },
-          component: () =>
-            import("@/components/iam/IngestionTokens.vue"),
+          component: () => import("@/components/iam/IngestionTokens.vue"),
           beforeEnter(to: any, from: any, next: any) {
             routeGuard(to, from, next);
+          },
+        },
+        {
+          path: "syntheticsTokens",
+          name: "syntheticsTokens",
+          meta: {
+            title: "Synthetics Tokens",
+          },
+          component: () => import("@/components/iam/SyntheticsTokens.vue"),
+          beforeEnter(to: any, from: any, next: any) {
+            syntheticsRouteGuard(to, from, next);
           },
         },
         {
@@ -115,6 +157,81 @@ const useEnterpriseRoutes = () => {
   //the above are the routes that we support for oss including both enterprise and cloud
 
   if (config.isCloud == "true" || config.isEnterprise == "true") {
+    // Inbound MCP server setup — lives under IAM as a credentialed-access
+    // surface, alongside Service Accounts / Ingestion Tokens. MCP is an AI
+    // feature, gated on ai_enabled like the rest of the app — but that gate is
+    // enforced by the sidebar item's reactive `visible` (isEnterprise &&
+    // ai_enabled), NOT here: `window.store` is unset at runtime, so a guard read
+    // is unreliable and must never fail-closed (it would bounce every click to
+    // Users). The route itself is already limited to the enterprise/cloud build.
+    routes[0].children.push({
+      path: "mcpServer",
+      name: "mcpServer",
+      meta: { title: "MCP Server" },
+      component: () => import("@/components/iam/McpServer.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+
+    routes.push({
+      path: "synthetics",
+      name: "synthetics",
+      component: () => import("@/views/SyntheticMonitoring.vue"),
+      meta: { title: "Synthetics" },
+      beforeEnter(to: any, from: any, next: any) {
+        syntheticsRouteGuard(to, from, next);
+      },
+    });
+
+    routes.push(
+      {
+        path: "synthetics/add",
+        name: "synthetics-add",
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "Add Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetics/edit/:id",
+        name: "synthetics-edit",
+        component: () => import("@/views/synthetics/CreateCheck.vue"),
+        meta: { title: "Edit Check" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetic/private-locations/:id",
+        name: "synthetic-private-location",
+        component: () => import("@/views/synthetics/PrivateLocationDetail.vue"),
+        meta: { title: "Private Location" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetics/:id/results",
+        name: "synthetic-monitor-results",
+        component: () => import("@/views/synthetics/MonitorResults.vue"),
+        meta: { title: "Monitor Results" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "synthetics/:id/results/run/:runId/:executionId",
+        name: "synthetics-run-detail",
+        component: () => import("@/views/synthetics/RunDetail.vue"),
+        meta: { title: "Run Detail" },
+        beforeEnter(to: any, from: any, next: any) {
+          syntheticsRouteGuard(to, from, next);
+        },
+      },
+    );
+
     routes.push(
       {
         path: "incidents",
@@ -147,6 +264,52 @@ const useEnterpriseRoutes = () => {
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
+    });
+
+    // Workflows — enterprise/cloud only (FD3). List is the parent; the editor
+    // renders in its <router-view> for add/edit.
+    routes.push({
+      path: "workflows",
+      name: "workflows",
+      component: WorkflowsList,
+      meta: {
+        title: "Workflows",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        workflowsRouteGuard(to, from, next);
+      },
+      children: [
+        {
+          path: "add",
+          name: "createWorkflow",
+          component: WorkflowEditor,
+          meta: { title: "New Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            workflowsRouteGuard(to, from, next);
+          },
+        },
+        {
+          path: "edit",
+          name: "workflowEditor",
+          component: WorkflowEditor,
+          meta: { title: "Edit Workflow" },
+          beforeEnter(to: any, from: any, next: any) {
+            workflowsRouteGuard(to, from, next);
+          },
+        },
+        {
+          // Dedicated READ-ONLY run-inspection surface (master-detail). Separate
+          // from the editor so viewing a past run never drops the user into the
+          // builder; deep-linkable by ?run_id.
+          path: "runs",
+          name: "workflowRuns",
+          component: WorkflowRuns,
+          meta: { title: "Workflow Runs" },
+          beforeEnter(to: any, from: any, next: any) {
+            workflowsRouteGuard(to, from, next);
+          },
+        },
+      ],
     });
     routes[0].children.push(
       ...[

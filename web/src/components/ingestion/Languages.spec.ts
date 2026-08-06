@@ -4,17 +4,16 @@ import Languages from "@/components/ingestion/Languages.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-
 // Mock services
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn((path) => `mock-image-url-${path}`),
-  verifyOrganizationStatus: vi.fn(() => true)
+  verifyOrganizationStatus: vi.fn(() => true),
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 // Mock router
@@ -22,10 +21,10 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "languages",
-      query: {}
-    }
+      query: {},
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -33,23 +32,9 @@ vi.mock("vue-router", () => ({
   useRoute: () => mockRouter.currentRoute.value,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    copyToClipboard: vi.fn()
-  };
-});
-
 const mountOptions = {
   props: {
-    currOrgIdentifier: "test-org"
+    currOrgIdentifier: "test-org",
   },
   global: {
     plugins: [i18n],
@@ -58,8 +43,8 @@ const mountOptions = {
     },
     stubs: {
       DataSourceSidebarLayout: true,
-      'router-view': true
-    }
+      "router-view": true,
+    },
   },
 };
 
@@ -107,7 +92,7 @@ describe("Languages Component", () => {
         global: mountOptions.global,
       });
 
-      expect(testWrapper.props('currOrgIdentifier')).toBe("");
+      expect(testWrapper.props("currOrgIdentifier")).toBe("");
       testWrapper.unmount();
     });
   });
@@ -213,7 +198,9 @@ describe("Languages Component", () => {
     });
 
     it("should have dotnettracing tab configuration", () => {
-      const dotnetTracingTab = wrapper.vm.languagesTabs.find((tab: any) => tab.name === "dotnettracing");
+      const dotnetTracingTab = wrapper.vm.languagesTabs.find(
+        (tab: any) => tab.name === "dotnettracing",
+      );
       expect(dotnetTracingTab).toBeDefined();
       expect(dotnetTracingTab.name).toBe("dotnettracing");
       expect(dotnetTracingTab.to).toEqual({
@@ -370,7 +357,7 @@ describe("Languages Component", () => {
         global: mountOptions.global,
       });
 
-      expect(testWrapper.props('currOrgIdentifier')).toBe("string-value");
+      expect(testWrapper.props("currOrgIdentifier")).toBe("string-value");
       testWrapper.unmount();
     });
   });
@@ -391,7 +378,7 @@ describe("Languages Component", () => {
     it("should not interfere with other route names", () => {
       const routeNames = ["python", "dotnettracing", "dotnetlogs", "nodejs", "go"];
 
-      routeNames.forEach(routeName => {
+      routeNames.forEach((routeName) => {
         mockRouter.currentRoute.value.name = routeName;
         mockRouter.push.mockClear();
 
@@ -408,8 +395,8 @@ describe("Languages Component", () => {
       const emptyStore = {
         state: {
           selectedOrganization: { identifier: "" },
-          userInfo: { email: "" }
-        }
+          userInfo: { email: "" },
+        },
       };
 
       const testWrapper = mount(Languages, {
@@ -419,8 +406,8 @@ describe("Languages Component", () => {
           provide: { store: emptyStore },
           stubs: {
             DataSourceSidebarLayout: true,
-            'router-view': true
-          }
+            "router-view": true,
+          },
         },
       });
 
@@ -450,10 +437,10 @@ describe("Languages Component", () => {
         "images/ingestion/python.svg",
         "images/ingestion/dotnet.svg",
         "images/ingestion/nodejs.svg",
-        "images/ingestion/golang.svg"
+        "images/ingestion/golang.svg",
       ];
 
-      paths.forEach(path => {
+      paths.forEach((path) => {
         const result = wrapper.vm.getImageURL(path);
         expect(result).toBe(`mock-image-url-${path}`);
       });

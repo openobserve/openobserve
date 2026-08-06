@@ -13,8 +13,79 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock;
+
+use regex::Regex;
+
 pub static EMPTY_STRING: String = String::new();
 pub static EMPTY_STR: &str = "";
+
+/// Canonical email-validation regex (RFC 5321/5322 dot-atom form).
+///
+/// Local part = one or more non-empty atoms separated by single dots (accepts single-char dotted
+/// segments like `first.x`, rejects leading/trailing/consecutive dots). Domain requires at least
+/// one dot-separated label and a TLD of 2-63 letters (RFC 1035 label max; covers long TLDs like
+/// `.software`). Anchored on both ends. Shared by the OSS auth layer and enterprise domain
+/// management so email validation stays identical across crates.
+pub static EMAIL_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(
+        r"^([a-zA-Z0-9_+\-]+(\.[a-zA-Z0-9_+\-]+)*)@([a-zA-Z0-9]+([\-\.][a-zA-Z0-9]+)*\.[a-zA-Z]{2,63})$",
+    )
+    .unwrap()
+});
+
+/// Returns true if `email` is syntactically valid per [`EMAIL_REGEX`].
+pub fn is_valid_email(email: &str) -> bool {
+    EMAIL_REGEX.is_match(email)
+}
+
+/// Characters an OpenFGA object id cannot represent. Detection
+/// ([`is_ofga_unsupported`]) and sanitization ([`into_ofga_supported_format`])
+/// share this pattern so they always agree on what is unsafe.
+pub static RE_OFGA_UNSUPPORTED_NAME: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"[:#?\s'"%&]+"#).unwrap());
+
+/// Matches an OpenFGA-unsupported character together with the whitespace around
+/// it, so [`into_ofga_supported_format`] can strip the padding before collapsing
+/// the run (e.g. `foo : bar` → `foo:bar` → `foo.bar`, not `foo...bar`).
+static RE_SPACE_AROUND: LazyLock<Regex> = LazyLock::new(|| {
+    let char_pattern = r#"[^a-zA-Z0-9:#?'"&%\s]"#;
+    let pattern = format!(r"(\s+{char_pattern}\s+)|(\s+{char_pattern})|({char_pattern}\s+)");
+    Regex::new(&pattern).unwrap()
+});
+
+/// Rewrite a resource name into an OpenFGA-safe object id.
+///
+/// OpenFGA-unsupported characters (`:#?\s'"%&`) are collapsed to `.`. We use `.`
+/// rather than `_` on purpose: the only real-world names carrying an unsupported
+/// character are Prometheus metric streams, whose grammar is `[a-zA-Z0-9_:]`.
+/// Mapping `:` to `_` would let a metric named `a:b` collide with a distinct
+/// metric named `a_b`; `.` can never appear in a metric name, so the mapping
+/// stays collision-free for the case that actually occurs. `.` is a valid
+/// OpenFGA object-id character.
+///
+/// This is the single source of truth: both the OSS auth layer
+/// (`openobserve_core::auth`, which re-exports it) and the enterprise
+/// route-permission checks (`o2_openfga`) call this, so a stream's object id is
+/// computed identically on every code path.
+pub fn into_ofga_supported_format(name: &str) -> String {
+    // remove spaces around special characters
+    let result = RE_SPACE_AROUND.replace_all(name, |caps: &regex::Captures| {
+        caps.iter()
+            .find_map(|m| m)
+            .map(|m| m.as_str().trim())
+            .unwrap_or("")
+            .to_string()
+    });
+    RE_OFGA_UNSUPPORTED_NAME
+        .replace_all(&result, ".")
+        .to_string()
+}
+
+/// True if `name` contains any character an OpenFGA object id cannot represent.
+pub fn is_ofga_unsupported(name: &str) -> bool {
+    RE_OFGA_UNSUPPORTED_NAME.is_match(name)
+}
 
 #[inline(always)]
 #[cfg(not(target_arch = "x86_64"))]
@@ -72,6 +143,87 @@ impl StringExt for String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_ofga_unsupported() {
+        assert!(is_ofga_unsupported("abc:123"));
+        assert!(is_ofga_unsupported("name with space"));
+        assert!(is_ofga_unsupported("foo&bar"));
+        assert!(!is_ofga_unsupported("valid_name"));
+        assert!(!is_ofga_unsupported("name_with_underscores"));
+
+        // Supported characters (should return false)
+        assert!(!is_ofga_unsupported("valid"));
+        assert!(!is_ofga_unsupported("valid123"));
+        assert!(!is_ofga_unsupported("CamelCase"));
+        assert!(!is_ofga_unsupported(""));
+
+        // Unsupported characters (should return true)
+        assert!(is_ofga_unsupported("has:colon"));
+        assert!(is_ofga_unsupported("has#hash"));
+        assert!(is_ofga_unsupported("has?question"));
+        assert!(is_ofga_unsupported("has space"));
+        assert!(is_ofga_unsupported("has'quote"));
+        assert!(is_ofga_unsupported("has\"doublequote"));
+        assert!(is_ofga_unsupported("has%percent"));
+        assert!(is_ofga_unsupported("has&ampersand"));
+        assert!(is_ofga_unsupported("valid:invalid"));
+        assert!(is_ofga_unsupported("valid invalid"));
+    }
+
+    #[test]
+    fn test_into_ofga_supported_format() {
+        // `:` and the other unsupported chars collapse to `.` (not `_`), so a
+        // metric `a:b` cannot collide with a distinct metric `a_b`.
+        assert_eq!(into_ofga_supported_format("foo:bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format("foo bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format("foo#bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format("foo : bar"), "foo.bar");
+        assert_eq!(into_ofga_supported_format(" a  & b "), ".a.b.");
+        assert_eq!(into_ofga_supported_format("a   b"), "a.b");
+        assert_eq!(into_ofga_supported_format("a:b#c?d e"), "a.b.c.d.e");
+        assert_eq!(into_ofga_supported_format("foo & bar % baz"), "foo.bar.baz");
+
+        // Names with no unsupported characters pass through untouched.
+        assert_eq!(into_ofga_supported_format("test"), "test");
+        assert_eq!(into_ofga_supported_format("test_name"), "test_name");
+        assert_eq!(into_ofga_supported_format("123"), "123");
+
+        // Runs of unsupported characters collapse to a single `.`.
+        assert_eq!(into_ofga_supported_format("  a  b  "), ".a.b.");
+        assert_eq!(
+            into_ofga_supported_format("test:name with spaces"),
+            "test.name.with.spaces"
+        );
+        assert_eq!(into_ofga_supported_format("a & b : c # d"), "a.b.c.d");
+        assert_eq!(into_ofga_supported_format(""), "");
+        assert_eq!(into_ofga_supported_format(":::"), ".");
+        assert_eq!(into_ofga_supported_format("   "), ".");
+    }
+
+    #[test]
+    fn test_ofga_regex_compilation() {
+        assert!(RE_OFGA_UNSUPPORTED_NAME.is_match("test:name"));
+        assert!(!RE_OFGA_UNSUPPORTED_NAME.is_match("valid_name"));
+        // `@` is not in the exclusion list, so RE_SPACE_AROUND matches it.
+        assert!(RE_SPACE_AROUND.is_match("a @ b"));
+    }
+
+    #[test]
+    fn test_is_valid_email() {
+        // Valid
+        assert!(is_valid_email("user@example.com"));
+        assert!(is_valid_email("john.doe+123@mail.co.in"));
+        assert!(is_valid_email("a_b-c.d+e@domain.org"));
+        assert!(is_valid_email("user@example.software"));
+        // Invalid
+        assert!(!is_valid_email("no-at-symbol.com"));
+        assert!(!is_valid_email("@missing-user.com"));
+        assert!(!is_valid_email("user@.com"));
+        assert!(!is_valid_email("user@com"));
+        assert!(!is_valid_email("user@domain..com"));
+        assert!(!is_valid_email(".leading@example.com"));
+    }
 
     #[test]
     fn test_find() {

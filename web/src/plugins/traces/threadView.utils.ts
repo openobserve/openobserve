@@ -28,25 +28,17 @@
 /**
  * Read the LLM operation kind from a span.
  * Uses the OTEL gen_ai.operation.name value directly.
- * @example getOp({ gen_ai_operation_name: "chat" })             // "chat"
- * @example getOp({})                                            // ""
  */
 export function getOp(span: any): string {
-  return String(
-    span?.gen_ai_operation_name || "",
-  );
+  return String(span?.gen_ai_operation_name || "");
 }
 
 /**
  * Read the model name. Prefers the response model (what actually served
  * the call) over the request model (what was asked for).
- * @example getModel({ gen_ai_response_model: "claude-sonnet-4-6" })
- *          // "claude-sonnet-4-6"
  */
 export function getModel(span: any): string {
-  return String(
-    span?.gen_ai_response_model || span?.gen_ai_request_model || "",
-  );
+  return String(span?.gen_ai_response_model || span?.gen_ai_request_model || "");
 }
 
 /**
@@ -70,22 +62,14 @@ export function getOutputRaw(span: any): unknown {
  * Returns 0 for missing / unparseable values (instead of NaN).
  */
 export function getCost(span: any): number {
-  return (
-    Number(span?.gen_ai_usage_cost) ||
-    Number(span?.llm_usage_cost_total) ||
-    0
-  );
+  return Number(span?.gen_ai_usage_cost) || Number(span?.llm_usage_cost_total) || 0;
 }
 
 /**
  * Read the total token count. Falls back to llm_usage_tokens_total.
  */
 export function getTokens(span: any): number {
-  return (
-    Number(span?.gen_ai_usage_total_tokens) ||
-    Number(span?.llm_usage_tokens_total) ||
-    0
-  );
+  return Number(span?.gen_ai_usage_total_tokens) || Number(span?.llm_usage_tokens_total) || 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,16 +84,14 @@ export type SpanKind = "llm_turn" | "tool_call" | "agent" | "root" | "other";
  * (Vertex/ADK tag `generate_content` with `gen_ai.operation.name=GENERATION`
  * even though it carries no `messages` array — the actual model call
  * is the inner span).
- *
- * @example hasLLMPayload({ gen_ai_input_messages: '[{"role":"user"}]' }) // true
- * @example hasLLMPayload({ gen_ai_input_messages: '{}' })                // false
- * @example hasLLMPayload({})                                             // false
  */
 export function hasLLMPayload(span: any): boolean {
-  const inp = getInputRaw(span);
-  if (typeof inp === "string") return inp.length > 2; // skip "{}" / "[]"
-  if (inp && typeof inp === "object") return Object.keys(inp).length > 0;
-  return false;
+  const input = decodeAnyValue(getInputRaw(span));
+  if (input == null) return false;
+  if (typeof input === "string") return input.trim().length > 0;
+  if (Array.isArray(input)) return input.length > 0;
+  if (typeof input === "object") return Object.keys(input).length > 0;
+  return true;
 }
 
 /**
@@ -121,11 +103,6 @@ export function hasLLMPayload(span: any): boolean {
  *   - {invoke_agent, create_agent}              → agent
  *   - server span with no parent                → root
  *   - everything else                           → other
- *
- * @example classify({ gen_ai_operation_name: "chat",
- *                     gen_ai_input_messages: "[{...}]" })     // "llm_turn"
- * @example classify({ gen_ai_operation_name: "execute_tool" }) // "tool_call"
- * @example classify({ span_kind: "2" })                       // "root"
  */
 export function classify(span: any): SpanKind {
   const obs = getOp(span);
@@ -134,10 +111,7 @@ export function classify(span: any): SpanKind {
   if (obs === "execute_tool") return "tool_call";
   const AGENT_OPS = new Set(["invoke_agent", "create_agent"]);
   if (AGENT_OPS.has(obs)) return "agent";
-  if (
-    String(span?.span_kind || "") === "2" &&
-    !span?.reference_parent_span_id
-  ) {
+  if (String(span?.span_kind || "") === "2" && !span?.reference_parent_span_id) {
     return "root";
   }
   return "other";
@@ -156,16 +130,17 @@ export interface Message {
   sig: string;
 }
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 /**
  * Try to parse a value as JSON; return it untouched if it's already an
  * object/array, or `null` for non-strings / parse failures.
- *
- * @example safeParseJSON('{"a":1}')   // { a: 1 }
- * @example safeParseJSON({ a: 1 })    // { a: 1 } (passthrough)
- * @example safeParseJSON("not json")  // null
- * @example safeParseJSON(null)        // null
  */
-export function safeParseJSON<T = any>(value: unknown): T | null {
+export function safeParseJSON<T = unknown>(value: unknown): T | null {
   if (value == null) return null;
   if (typeof value !== "string") return value as T;
   const trimmed = value.trim();
@@ -174,6 +149,22 @@ export function safeParseJSON<T = any>(value: unknown): T | null {
     return JSON.parse(trimmed) as T;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Decode JSON-encoded OTEL AnyValue payloads while preserving scalar strings.
+ */
+function decodeAnyValue(value: unknown): unknown {
+  if (value == null) return null;
+  if (typeof value !== "string") return value;
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return value;
   }
 }
 
@@ -214,20 +205,26 @@ export function extractContent(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) {
     return content
-      .map((part: any) => {
+      .map((part: unknown) => {
         if (typeof part === "string") return part;
-        if (part?.text) return String(part.text);
-        if (part?.type === "text") return String(part.content ?? "");
-        if (part?.function_response?.response?.content) {
-          return extractContent(part.function_response.response.content);
+        if (!isRecord(part)) return "";
+        if (part.text) return String(part.text);
+        if (part.type === "text") return String(part.content ?? "");
+
+        const functionResponse = part.function_response;
+        if (isRecord(functionResponse)) {
+          const response = functionResponse.response;
+          if (isRecord(response) && response.content) {
+            return extractContent(response.content);
+          }
         }
         return "";
       })
       .filter(Boolean)
       .join("\n");
   }
-  if (typeof content === "object") {
-    const obj = content as any;
+  if (isRecord(content)) {
+    const obj = content;
     if (typeof obj.text === "string") return obj.text;
     if (typeof obj.content === "string") return obj.content;
     if (Array.isArray(obj.parts)) return extractContent(obj.parts);
@@ -242,12 +239,40 @@ export function extractContent(content: unknown): string {
  *   2. Wrapped messages key  — {messages: [...]}
  *   3. Vertex/ADK request    — {model, config, contents: [...]}
  */
-export function resolveMessageArray(parsed: any): any[] {
+export function resolveMessageArray(parsed: unknown): unknown[] {
   if (!parsed) return [];
   if (Array.isArray(parsed)) return parsed;
+  if (!isRecord(parsed)) return [];
   if (Array.isArray(parsed.messages)) return parsed.messages;
   if (Array.isArray(parsed.contents)) return parsed.contents;
   return [];
+}
+
+function anyValueToText(value: unknown): string {
+  const content = extractContent(value);
+  if (content) return content;
+  if (value == null) return "";
+  if (typeof value !== "object") return String(value);
+  if (Array.isArray(value) && value.length === 0) return "";
+  if (isRecord(value) && Object.keys(value).length === 0) return "";
+
+  try {
+    return JSON.stringify(value) ?? "";
+  } catch {
+    return String(value);
+  }
+}
+
+function messageFromAnyValue(value: unknown, defaultRole: Role): Message | null {
+  const record = isRecord(value) ? value : null;
+  const role = normalizeRole(record?.role ?? defaultRole);
+  const hasMessageContent =
+    record !== null && ("content" in record || "text" in record || "parts" in record);
+  const rawContent = hasMessageContent ? (record.content ?? record.text ?? record.parts) : value;
+  const content = hasMessageContent ? extractContent(rawContent) : anyValueToText(rawContent);
+
+  if (!content.trim()) return null;
+  return { role, content, sig: `${role}::${content}` };
 }
 
 /**
@@ -259,27 +284,35 @@ export function resolveMessageArray(parsed: any): any[] {
  * prompt panel.
  */
 export function messagesFromInput(raw: unknown): Message[] {
-  const parsed = safeParseJSON(raw);
-  if (!parsed) return [];
+  const parsed = decodeAnyValue(raw);
+  if (parsed == null) return [];
 
   const arr = resolveMessageArray(parsed);
   const messages: Message[] = [];
-  const sysInstruction = (parsed as any)?.config?.system_instruction;
-  if (typeof sysInstruction === "string" && sysInstruction.trim()) {
+  const config = isRecord(parsed) && isRecord(parsed.config) ? parsed.config : null;
+  const sysInstruction = config?.system_instruction;
+  const systemContent = anyValueToText(sysInstruction);
+  if (systemContent.trim()) {
     messages.push({
       role: "system",
-      content: sysInstruction,
-      sig: `system::${sysInstruction}`,
+      content: systemContent,
+      sig: `system::${systemContent}`,
     });
   }
 
-  if (!arr.length) return messages;
-
-  for (const m of arr) {
-    const role = normalizeRole(m?.role);
-    const content = extractContent(m?.content ?? m?.text ?? m?.parts);
-    messages.push({ role, content, sig: `${role}::${content}` });
+  if (arr.length) {
+    for (const value of arr) {
+      const message = messageFromAnyValue(value, "user");
+      if (message) messages.push(message);
+    }
+    return messages;
   }
+
+  if (isRecord(parsed) && ("messages" in parsed || "contents" in parsed)) return messages;
+  if (config) return messages;
+
+  const message = messageFromAnyValue(parsed, "user");
+  if (message) messages.push(message);
   return messages;
 }
 
@@ -290,30 +323,25 @@ export function messagesFromInput(raw: unknown): Message[] {
  * an array — promote the inner `content` into a single message.
  */
 export function messagesFromOutput(raw: unknown): Message[] {
-  const parsed = safeParseJSON(raw);
-  if (!parsed) return [];
+  const parsed = decodeAnyValue(raw);
+  if (parsed == null) return [];
 
-  if (
-    !Array.isArray(parsed) &&
-    (parsed as any).content &&
-    typeof (parsed as any).content === "object"
-  ) {
-    const inner = (parsed as any).content;
-    const role = normalizeRole(inner?.role || "assistant");
-    const content = extractContent(inner?.parts ?? inner?.content ?? inner);
-    if (!content) return [];
-    return [{ role, content, sig: `${role}::${content}` }];
+  if (isRecord(parsed) && isRecord(parsed.content) && !("role" in parsed)) {
+    const message = messageFromAnyValue(parsed.content, "assistant");
+    return message ? [message] : [];
   }
 
-  const arr = Array.isArray(parsed) ? parsed : [parsed];
-  return arr
-    .map((m: any) => {
-      const role = normalizeRole(m?.role || "assistant");
-      const content = extractContent(m?.content ?? m?.text ?? m?.parts);
-      if (!content) return null;
-      return { role, content, sig: `${role}::${content}` };
-    })
-    .filter(Boolean) as Message[];
+  const arr = resolveMessageArray(parsed);
+  if (arr.length) {
+    return arr
+      .map((value) => messageFromAnyValue(value, "assistant"))
+      .filter((message): message is Message => message !== null);
+  }
+
+  if (isRecord(parsed) && ("messages" in parsed || "contents" in parsed)) return [];
+
+  const message = messageFromAnyValue(parsed, "assistant");
+  return message ? [message] : [];
 }
 
 /**
@@ -344,9 +372,9 @@ export function looksLikeAgentInjection(text: string): boolean {
     return true;
   }
 
-  if (/^for context\s*[:\-]/i.test(head)) return true;
+  if (/^for context\s*[:-]/i.test(head)) return true;
 
-  if (/^\[?[\w._-]+\]?\s+said[:\-]/i.test(head)) return true;
+  if (/^\[?[\w._-]+\]?\s+said[:-]/i.test(head)) return true;
 
   return false;
 }
@@ -417,9 +445,7 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
   const inp0 = messagesFromInput(getInputRaw(llmTurns[0]));
   const sys = inp0.find((m) => m.role === "system");
 
-  const rootSpan = spans.find(
-    (s) => s.span_kind === "2" && !s.reference_parent_span_id,
-  );
+  const rootSpan = spans.find((s) => s.span_kind === "2" && !s.reference_parent_span_id);
   const explicit = String(rootSpan?.user_query || "").trim();
   let derived = "";
   for (let j = inp0.length - 1; j >= 0; j--) {
@@ -447,9 +473,7 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
     if (attached.length === 0) {
       const start = Number(turnSpan.start_time);
       const end =
-        i + 1 < llmTurns.length
-          ? Number(llmTurns[i + 1].start_time)
-          : Number.POSITIVE_INFINITY;
+        i + 1 < llmTurns.length ? Number(llmTurns[i + 1].start_time) : Number.POSITIVE_INFINITY;
       attached = toolSpans.filter((t) => {
         const ts = Number(t.start_time);
         return ts >= start && ts < end;
@@ -469,21 +493,15 @@ export function buildTraceGroup(spans: any[]): TraceGroup | null {
 
     return {
       span: turnSpan,
-      toolCalls: attached.sort(
-        (a, b) => Number(a.start_time) - Number(b.start_time),
-      ),
+      toolCalls: attached.sort((a, b) => Number(a.start_time) - Number(b.start_time)),
       assistant: messagesFromOutput(getOutputRaw(turnSpan)),
       followupUsers,
     };
   });
 
   const totalCost = turns.reduce((s, t) => s + getCost(t.span), 0);
-  const startNs = Math.min(
-    ...spans.map((s) => Number(s.start_time)).filter(Number.isFinite),
-  );
-  const endNs = Math.max(
-    ...spans.map((s) => Number(s.end_time)).filter(Number.isFinite),
-  );
+  const startNs = Math.min(...spans.map((s) => Number(s.start_time)).filter(Number.isFinite));
+  const endNs = Math.max(...spans.map((s) => Number(s.end_time)).filter(Number.isFinite));
   const totalDurationNs = isFinite(endNs - startNs) ? endNs - startNs : 0;
   const errorCount = spans.filter((s) => s.span_status === "ERROR").length;
 

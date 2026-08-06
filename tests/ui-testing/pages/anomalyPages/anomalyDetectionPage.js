@@ -56,7 +56,7 @@ class AnomalyDetectionPage {
 
             // Alerting
             alertEnabled: '[data-test="anomaly-alert-enabled"]',
-            alertToggleLabel: '.q-toggle__label',
+            alertToggleLabel: '[role="switch"]',
             destination: '[data-test="anomaly-destination"]',
             destinationError: '[data-test="anomaly-destination-error"]',
             refreshDestinationsBtn: '[data-test="anomaly-refresh-destinations"]',
@@ -66,8 +66,8 @@ class AnomalyDetectionPage {
             saveButton: '[data-test="add-alert-submit-btn"]',
             cancelButton: '[data-test="add-alert-cancel-btn"]',
 
-            // Generic Quasar components
-            qToggle: '.q-toggle',
+            // Generic framework components
+            qToggle: '[role="switch"]',
             qMenuItem: '[data-test$="-popover"] [data-test$="-option"]',
             qMenu: '[data-test$="-popover"]',
             qDialog: '[data-test$="-dialog"]',
@@ -174,7 +174,7 @@ class AnomalyDetectionPage {
     async clickTab(tabName) {
         // Try multiple base selectors with filter pattern to avoid injection
         const baseSelectors = [
-            '[class*="tw:cursor-pointer"]',
+            '[class*="cursor-pointer"]',
             '[role="group"] button',
             'button',
             '[role="tab"]'
@@ -328,7 +328,7 @@ class AnomalyDetectionPage {
 
         // Try multiple ways to find and click the Alerting tab
         const tabSelectors = [
-            '[class*="tw:cursor-pointer"]:has-text("Alerting")',
+            '[class*="cursor-pointer"]:has-text("Alerting")',
             'text=Alerting',
             'button:has-text("Alerting")',
             '[role="group"] button:has-text("Alerting")'
@@ -357,7 +357,7 @@ class AnomalyDetectionPage {
         const toggleSelectors = [
             this.selectors.alertEnabled,
             '[data-test="anomaly-alert-enabled"]',
-            '.q-toggle'
+            '[role="switch"]'
         ];
 
         let toggle = null;
@@ -376,7 +376,7 @@ class AnomalyDetectionPage {
         }
 
         // Get toggle label to determine state
-        const toggleLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
+        const toggleLabel = await toggle.locator('[role="switch"]').textContent().catch(() => '');
         testLogger.info('Alert toggle state', { toggleLabel });
 
         if (toggleLabel.toLowerCase().includes('enabled')) {
@@ -385,7 +385,7 @@ class AnomalyDetectionPage {
             await this.page.waitForTimeout(1000);
 
             // Verify it was disabled
-            const newLabel = await toggle.locator('div.q-toggle__label').textContent().catch(() => '');
+            const newLabel = await toggle.locator('[role="switch"]').textContent().catch(() => '');
             testLogger.info('After clicking toggle', { toggleLabel: newLabel });
             testLogger.info('Disabled alerting');
         } else {
@@ -464,7 +464,7 @@ class AnomalyDetectionPage {
         const filterCount = await filterRows.count();
         const lastFilterRow = filterRows.nth(filterCount - 1);
 
-        // 1. Fill the field select (first q-select in the row)
+        // 1. Fill the field select (first select in the row)
         const fieldSelect = lastFilterRow.locator('.filter-field-select, .alert-v3-select').first();
         await expect(fieldSelect).toBeVisible({ timeout: 3000 });
         await fieldSelect.click();
@@ -484,7 +484,7 @@ class AnomalyDetectionPage {
         }
         await this.page.waitForTimeout(500);
 
-        // 2. Fill the operator select (second q-select in the row)
+        // 2. Fill the operator select (second select in the row)
         const operatorSelect = lastFilterRow.locator('.alert-v3-select').nth(1);
         if (await operatorSelect.isVisible({ timeout: 2000 }).catch(() => false)) {
             await operatorSelect.click();
@@ -499,7 +499,7 @@ class AnomalyDetectionPage {
             await this.page.waitForTimeout(500);
         }
 
-        // 3. Fill the value input (q-input in the row)
+        // 3. Fill the value input (input in the row)
         const valueInput = lastFilterRow.locator('.alert-v3-input input, input').first();
         if (await valueInput.isVisible({ timeout: 2000 }).catch(() => false)) {
             await valueInput.click();
@@ -728,7 +728,7 @@ class AnomalyDetectionPage {
     async expectEditModeOpen() {
         // Detection Config tab should be visible when in edit mode
         const tabSelectors = [
-            '[class*="tw:cursor-pointer"]:has-text("Detection Config")',
+            '[class*="cursor-pointer"]:has-text("Detection Config")',
             'text=Detection Config',
             'button:has-text("Detection Config")',
             '[role="group"] button:has-text("Detection Config")'
@@ -1533,7 +1533,7 @@ class AnomalyDetectionPage {
         await this.page.waitForTimeout(3000);
 
         // Search for anomaly alert in validation stream
-        let logTableCell = this.page.locator('[data-test="log-table-column-0-source"]');
+        let logTableCell = this.page.locator('[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]');
         let logCount = await logTableCell.count();
 
         if (logCount === 0) {
