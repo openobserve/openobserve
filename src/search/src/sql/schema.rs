@@ -114,7 +114,7 @@ pub fn generate_user_defined_schema(
     fields.insert(TIMESTAMP_COL_NAME.to_string());
     fields.insert(ID_COL_NAME.to_string());
 
-    if need_all_column || !cfg.common.feature_query_exclude_all {
+    if need_all_column || !cfg.search.feature_query_exclude_all {
         fields.insert(cfg.common.column_all.to_string());
     }
     let new_fields = fields
@@ -170,7 +170,7 @@ pub fn generate_quick_mode_fields(
         .collect::<HashSet<_>>();
 
     // check _all column
-    if cfg.common.feature_query_exclude_all {
+    if cfg.search.feature_query_exclude_all {
         if fields_name.contains(&cfg.common.column_all) {
             fields.retain(|field| field.name().ne(&cfg.common.column_all));
         }
