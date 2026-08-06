@@ -1,6 +1,9 @@
 # API Cache Inventory — what is cached, where it is stored, what is left
 
-**Companion to** [api-caching-audit.md](./api-caching-audit.md) (the design).
+**Companion to** [api-caching-audit.md](./api-caching-audit.md) (the design) and
+[api-cache-architecture.md](./api-cache-architecture.md) (the call flow — which
+file calls what, and where the payload goes).
+
 This document is the **register**: every read API, its module, its cache tier,
 and the physical storage its payload lands in.
 
@@ -33,8 +36,40 @@ anything carrying a secret (see §5).
 | IndexedDB `o2FieldValues` → `fieldValues` | `<org>\|<streamType>\|<stream>\|<field>` | log field autocomplete |
 | memory | — | T2/T3/T4 |
 
-Every key carries the org, so **org switch** is one `removeQueries` + a prefix
-scan per store, and **logout** clears all of it.
+### Lifecycle — what survives what
+
+Every key carries the org, which is what makes the two events below safe.
+
+| Event | Memory | localStorage / IndexedDB |
+|---|---|---|
+| **Org switch** | **kept** | **purged** for the org being left |
+| **Logout** | cleared | purged entirely (incl. `o2FieldValues`) |
+
+Memory is deliberately kept across an org switch: keys are rooted at
+`["org", id]`, so one org's data can never be served to another, and `gcTime`
+collects it anyway. The payoff is that switching back to a recent org inside its
+`staleTime` costs **no requests at all**.
+
+Disk is purged because it is a different budget: localStorage is ~5 MB shared
+with the whole app, so persisting every org visited would eventually hit quota —
+silently, since the storage wrapper swallows the error — and the previous
+tenant's stream, folder and function names would sit on a possibly shared
+machine.
+
+Measured on a two-org instance: switching to a never-visited org costs 3
+requests; switching **back** to the previous one costs **0**.
+
+Two consequences of splitting memory from disk this way:
+
+- Switching back is free **in-session only**. The org's disk entry was purged on
+  the way out and is not rewritten by a cache hit (nothing fetched), so after a
+  page reload that org fetches again. Expected — the disk copy is a first-paint
+  optimisation for the *current* org, not a per-org archive.
+- If a user's access to an org is revoked while they are elsewhere, switching
+  back renders cached rows until the refetch 403s. Inherent to any cache within
+  `staleTime`, not specific to this choice.
+
+Implemented in `purgeOrgQueries` / `purgeAllQueries` (`queryClient.ts`).
 
 ---
 
@@ -214,6 +249,58 @@ Each needs `useServerTable` (or the `fetch/refetch/prefetch` trio) for
 
 ---
 
+### 3h. Enterprise modules (`src/enterprise/`) — none migrated
+
+Nothing under `src/enterprise/` was touched by the migration. Note the
+distinction: enterprise-*gated* features that live outside that tree — cipher
+keys, AI toolsets, regex patterns, IAM groups and roles — **are** migrated;
+they sit in `src/components` and are gated at runtime by `config.isEnterprise`.
+It is the `src/enterprise/` tree itself that is untouched.
+
+**Online Evals** — `src/enterprise/components/onlineEvals` (35 files, 49 imports
+of `online-evals.service`). The cleanest area to migrate: four plain org-scoped
+lists behind one service.
+
+| # | Surface | API | Proposed | Storage |
+|---|---|---|---|---|
+| 55 | Providers | `GET /api/{org}/providers` | T1 | **localStorage** |
+| 56 | Score configs | `GET /api/{org}/score_configs` | T2 | memory |
+| 57 | Score config versions | `GET /api/{org}/score_configs/{id}/versions` | T3 | memory |
+| 58 | Scorers | `GET /api/{org}/scorers` | T2 | memory |
+| 59 | Eval jobs | `GET /api/{org}/eval_jobs` | T2 | memory |
+
+Writes (`create` / `update` / `delete` / `activate` / `pause` / `manual_eval`)
+become `useOrgMutation` with a prefix invalidate. `scorers/test` and
+`llm_judge/output_schema` are POST previews — never cache.
+
+**AI Observability** — `src/enterprise/{views,components}/AIObservability`
+(20 files).
+
+| # | Surface | API | Proposed | Storage |
+|---|---|---|---|---|
+| 60 | Agent signals | `GET /api/{org}/traces/agent_signals` | T2 | memory — reads a small derived stream, not raw traces |
+| 61 | GenAI agent mapping | `GET /api/{org}/settings/gen_ai/agent_mapping`, `/gen_ai/agents` | T1 | **localStorage** — same rows as §3a #15 |
+
+The rest of these pages run `search.search`, which stays **out of scope** (§4).
+
+**Billings** — `src/enterprise/components/billings` (12 files). This one needs
+triage, not bulk conversion: **most billing GETs are one-shot and must not be
+cached.**
+
+| # | Surface | API | Proposed | Storage |
+|---|---|---|---|---|
+| 62 | Invoice history | `GET /api/{org}/billings/invoices` | T2 | memory |
+| 63 | Subscription | `GET /api/{org}/billings/list_subscription` | T2 | memory |
+| 64 | Quota threshold | `GET /api/{org}/billings/quota_threshold` | T1 | memory |
+| 65 | AI usage | `GET /api/{org}/ai/usage` | T2 | memory |
+| 66 | Billing group members / invites / membership | `GET /api/{org}/billing_group/*` | T2 | memory |
+
+**Never cache in billings** — each returns a single-use URL, token or a
+state-changing result despite the GET verb:
+`hosted_subscription_url`, `billing_portal`, `hosted_page_status/{id}`,
+`change_payment_detail/{id}`, `list_paymentsource` (payment instrument data),
+`unsubscribe` and `resume_subscription` (both mutate through a GET).
+
 ## 4. Explicitly out of scope — do not cache
 
 Per audit §5.9. These are not "to be migrated"; they must stay uncached.
@@ -265,3 +352,48 @@ Then in the page: `thingQuery.fetchList(org)` for the mount path,
 Loaders take a `force` flag — mount stays cached, refresh and post-write reloads
 pass `true`. Never bind a loader straight to a template event
 (`@click="getX"`): the event object lands in `force`.
+
+---
+
+## 7. After the migration completes — update the skills and rules
+
+**Do this last**, once §3 is empty. The point of these files is that they
+describe what the codebase *is*, so writing them while half the app is still on
+the old pattern would document intent rather than reality.
+
+Two places, and the difference matters:
+
+| File | Why there |
+|---|---|
+| `.claude/rules/fe-data-fetching.md` *(new)* | Rules are auto-loaded into every session, so this is what actually enforces the convention on new code. |
+| `.claude/skills/ui-architect/SKILL.md` | Add a house rule cross-referencing the above, so anyone building a new page meets the data layer alongside the O2-component and design-token rules. |
+
+The rule file should carry:
+
+1. The layer table from [api-cache-architecture.md](./api-cache-architecture.md)
+   — which file owns which decision.
+2. The decision tree below.
+3. The `createOrgListQuery` template from §6.
+4. The `force` convention, and the `@click="getX"` trap (a bound event object
+   lands in `force`).
+5. "Invalidate by prefix, never re-call the loader."
+6. The never-cache list from §4 and the never-persist list from §5.
+
+### The decision tree — where a new endpoint goes
+
+```
+New endpoint
+├─ Not a GET, or streaming, or a single-use URL? ──────► no cache.
+│                                                        useOrgMutation for writes.
+└─ GET, reused across surfaces or across visits?
+   ├─ Immutable for the session (config, license, built-ins)? ──► T0  localStorage
+   ├─ Org configuration (streams, folders, functions)?         ──► T1  localStorage
+   ├─ A list of entities?                                      ──► T2  memory
+   ├─ One entity?                                              ──► T3  memory
+   ├─ Operational state you poll?                              ──► T4  memory
+   │                                                                 + refetchInterval
+   └─ Large result payload (panel, DAG, field values)?         ──► T5  IndexedDB
+        │
+        └─ then, regardless of tier:
+           does the payload carry a token, key or passcode? ──yes──► persist: "none"
+```
