@@ -53,7 +53,9 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 service_key
             );
             service_streams::delete_all(&org_id).await?;
-            infra::coordinator::service_streams::emit_delete_event(&org_id, &service_key).await?;
+            // Org-scope reload: the delete wiped the whole org's rows, so a per-service
+            // delete event would evict only one cache key on this cluster's nodes (F6).
+            infra::coordinator::service_streams::emit_reload_event(&org_id).await?;
         }
     }
     Ok(())

@@ -490,12 +490,30 @@ pub async fn reset_services(
         {
             return MetaHttpResponse::forbidden("Unauthorized Access");
         }
-        match infra::table::service_streams::delete_all(&org_id).await {
-            Ok(deleted_count) => MetaHttpResponse::json(serde_json::json!({
-                "deleted_count": deleted_count,
-                "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
-                "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
-            })),
+        // Go through the enterprise storage layer so the local cache is cleared and the
+        // reset is replicated to the super-cluster.
+        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(
+            &org_id,
+        )
+        .await
+        {
+            Ok(deleted_count) => {
+                // Org-scope reload: other nodes wholesale-replace their org cache from
+                // the now-empty DB. Without this the pre-reset rows are served forever
+                // (the cache has no TTL) (F6).
+                if let Err(e) =
+                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
+                {
+                    log::warn!(
+                        "[ServiceStreams] _reset: failed to emit reload event for org '{org_id}': {e}"
+                    );
+                }
+                MetaHttpResponse::json(serde_json::json!({
+                    "deleted_count": deleted_count,
+                    "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
+                    "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
+                }))
+            }
             Err(e) => MetaHttpResponse::internal_error(format!("Failed to reset services: {e}")),
         }
     }
