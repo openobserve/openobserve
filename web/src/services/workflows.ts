@@ -110,13 +110,17 @@ const workflows = {
     workflow,
     inputs,
     from_node,
+    draft = false,
   }: {
     org_identifier: string;
     workflow: any;
     inputs: any[];
     from_node?: string;
+    // `draft=true` when dry-running a draft / unsaved graph, so the backend skips
+    // the strict published-workflow validation for the test run.
+    draft?: boolean;
   }) => {
-    const url = `/api/${org_identifier}/workflows/test`;
+    const url = `/api/${org_identifier}/workflows/test${draft ? "?draft=true" : ""}`;
     return http().post(url, { workflow, inputs, from_node });
   },
 

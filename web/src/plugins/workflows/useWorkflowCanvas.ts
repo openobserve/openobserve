@@ -567,11 +567,15 @@ export const executeTestRun = async (opts: {
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
   try {
+    // Dry-run a DRAFT when the graph is a saved draft, has unsaved edits, or was
+    // never persisted — the backend then skips the strict published validation.
+    const draft = !!(wf.isDraft || workflowObj.dirtyFlag || !wf.id);
     const res = await workflowService.testWorkflow({
       org_identifier: opts.orgId,
       workflow: serializeWorkflow(),
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
+      draft,
     });
     const errors = res.data?.errors || {};
     // Per-node INPUT map: node_id -> the records that node received. A node's
