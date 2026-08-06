@@ -30,28 +30,80 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
   }
 
   /**
-   * Helper: Apply dashboard and set a wide time range for data availability.
+   * Helper: Click Apply and wait until the panel query has actually run.
+   *
+   * `waitForChartToRender()` only checks that the Apply button is enabled, and
+   * that is still true in the gap between the click and Vue flipping the
+   * button into its loading state — so on its own it can return before the
+   * query even starts. Wait for the loading state to appear first (best
+   * effort: a very fast query may finish before we can observe it), then let
+   * `waitForChartToRender()` wait for it to clear.
    */
-  async function applyWithTimeRange(page) {
+  async function applyAndWaitForQuery(page) {
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    await waitForDateTimeButtonToBeEnabled(page);
-    await pm.dashboardTimeRefresh.setRelative("4", "w");
-    await pm.dashboardPanelActions.applyDashboardBtn();
+    // Loading state: on enterprise the apply button is swapped for
+    // data-test="dashboard-cancel" (so the lookup below returns null), on
+    // non-enterprise it stays in place but is disabled.
+    await page
+      .waitForFunction(
+        () => {
+          const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
+          return !applyBtn || applyBtn.disabled;
+        },
+        { timeout: 5000 }
+      )
+      .catch(() => {});
     await pm.dashboardPanelActions.waitForChartToRender();
   }
 
   /**
-   * Helper: Assert metric chart renders with data (not "No Data").
+   * Helper: Apply dashboard and set a wide time range for data availability.
    */
-  async function assertMetricRenders(page) {
+  async function applyWithTimeRange(page) {
+    await applyAndWaitForQuery(page);
+
+    await waitForDateTimeButtonToBeEnabled(page);
+    await pm.dashboardTimeRefresh.setRelative("4", "w");
+    await applyAndWaitForQuery(page);
+  }
+
+  /**
+   * Helper: Assert metric chart renders with data (not "No Data").
+   *
+   * For metric panels `noData` is computed straight from the Y alias lookup
+   * (PanelSchemaRenderer.vue), so a hidden "no-data" empty state is exactly
+   * the signal these tests care about. Poll for it instead of reading it once:
+   * on the first query of a panel the empty state stays up for the whole load,
+   * and the just-ingested records can take a moment to become searchable, so
+   * re-apply and re-check before failing.
+   */
+  async function assertMetricRenders(page, attempts = 3) {
     const chartRenderer = page.locator('[data-test="chart-renderer"]');
     await expect(chartRenderer).toBeVisible({ timeout: 15000 });
 
     const noDataElement = page.locator('[data-test="no-data"]');
-    const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
-    expect(noDataText.trim()).not.toBe("No Data");
+
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      const rendered = await noDataElement
+        .waitFor({ state: "hidden", timeout: 15000 })
+        .then(() => true)
+        .catch(() => false);
+
+      if (rendered) {
+        testLogger.info("Metric panel rendered a value", { attempt });
+        return;
+      }
+
+      if (attempt < attempts) {
+        testLogger.info("Panel still shows No Data — re-running the query", {
+          attempt,
+        });
+        await applyAndWaitForQuery(page);
+      }
+    }
+
+    // Exhausted the retries — fail with the panel's actual state.
+    await expect(noDataElement).toBeHidden({ timeout: 10000 });
   }
 
   /**
@@ -164,28 +216,36 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
     testLogger.info("Custom SQL with non-existent filter entered");
 
     // Apply and set narrow time range
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
+    await applyAndWaitForQuery(page);
 
     await waitForDateTimeButtonToBeEnabled(page);
     await pm.dashboardTimeRefresh.setRelative("1", "m");
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    await pm.dashboardPanelActions.waitForChartToRender();
-
-    // Wait for rendering to stabilize
-    await page.waitForTimeout(3000);
+    await applyAndWaitForQuery(page);
 
     // For count(*) with a WHERE that matches nothing, the result may still be 0
     // which is a valid metric value. Assert the panel is in a valid state.
     const chartRenderer = page.locator('[data-test="chart-renderer"]');
     const noDataElement = page.locator('[data-test="no-data"]');
 
-    const chartVisible = await chartRenderer.isVisible().catch(() => false);
-    const noDataText = await noDataElement.textContent({ timeout: 5000 }).catch(() => "");
+    // Either chart renders (count returns 0) or "No Data" is shown - both are
+    // valid, so poll until the panel settles into one of them.
+    await expect
+      .poll(
+        async () => {
+          const chartVisible = await chartRenderer.isVisible().catch(() => false);
+          const noDataText = await noDataElement
+            .textContent({ timeout: 1000 })
+            .catch(() => "");
+          return chartVisible || noDataText.trim() === "No Data";
+        },
+        { timeout: 15000, intervals: [500, 1000, 1000, 2000, 2000] }
+      )
+      .toBe(true);
 
-    // Either chart renders (count returns 0) or "No Data" is shown - both are valid
-    const isValidState = chartVisible || noDataText.trim() === "No Data";
-    expect(isValidState).toBeTruthy();
+    const chartVisible = await chartRenderer.isVisible().catch(() => false);
+    const noDataText = await noDataElement
+      .textContent({ timeout: 1000 })
+      .catch(() => "");
 
     testLogger.info("Metric panel correctly handles empty/zero result", {
       chartVisible,
