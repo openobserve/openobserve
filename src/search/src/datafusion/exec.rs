@@ -66,14 +66,7 @@ use crate::{
 
 pub const DATAFUSION_MIN_MEM: usize = 1024 * 1024 * 256; // 256MB
 
-pub fn create_session_config(
-    sorted_by_time: bool,
-    target_partitions: usize,
-) -> Result<SessionConfig> {
-    create_session_config_for_stream(sorted_by_time, target_partitions, None)
-}
-
-fn create_session_config_for_stream(
+fn create_session_config(
     sorted_by_time: bool,
     target_partitions: usize,
     stream_type: Option<StreamType>,
@@ -280,11 +273,8 @@ impl<'a> DataFusionContextBuilder<'a> {
         )
         .await?;
 
-        let session_config = create_session_config_for_stream(
-            self.sorted_by_time,
-            target_partitions,
-            self.stream_type,
-        )?;
+        let session_config =
+            create_session_config(self.sorted_by_time, target_partitions, self.stream_type)?;
         let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
@@ -802,7 +792,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_session_config_default() -> Result<()> {
-        let config = create_session_config(false, 0)?;
+        let config = create_session_config(false, 0, None)?;
 
         // Test default configurations
         assert_eq!(
@@ -834,7 +824,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_session_config_for_metrics() -> Result<()> {
-        let config = create_session_config_for_stream(false, 0, Some(StreamType::Metrics))?;
+        let config = create_session_config(false, 0, Some(StreamType::Metrics))?;
 
         assert_eq!(
             config.options().execution.parquet.pushdown_filters,
@@ -847,7 +837,7 @@ mod tests {
     #[tokio::test]
     async fn test_create_session_config_with_partitions() -> Result<()> {
         let target_partitions = 8;
-        let config = create_session_config(true, target_partitions)?;
+        let config = create_session_config(true, target_partitions, None)?;
 
         let expected_partitions = std::cmp::max(
             get_config().limit.datafusion_min_partition_num,
@@ -865,7 +855,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_session_config_sorted_by_time() -> Result<()> {
-        let config = create_session_config(true, 4)?;
+        let config = create_session_config(true, 4, None)?;
         assert!(config.options().execution.split_file_groups_by_statistics);
         Ok(())
     }
@@ -1475,8 +1465,8 @@ mod tests {
         #[tokio::test]
         async fn test_session_config_bloom_filter_settings() -> Result<()> {
             // Test bloom filter configurations
-            let config1 = create_session_config(false, 4)?;
-            let config2 = create_session_config(true, 4)?;
+            let config1 = create_session_config(false, 4, None)?;
+            let config2 = create_session_config(true, 4, None)?;
 
             // Both should be valid configurations
             assert!(config1.options().execution.target_partitions > 0);
@@ -1488,7 +1478,7 @@ mod tests {
         #[tokio::test]
         async fn test_session_config_partition_bounds() -> Result<()> {
             // Test minimum partition enforcement
-            let config = create_session_config(false, 1)?; // Very small number
+            let config = create_session_config(false, 1, None)?; // Very small number
 
             let actual_partitions = config.options().execution.target_partitions;
             assert!(actual_partitions >= get_config().limit.datafusion_min_partition_num);

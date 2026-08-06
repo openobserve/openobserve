@@ -1124,13 +1124,13 @@ pub struct Search {
         default = true,
         help = "Use the heap implementation for eligible aggregate TopK plans"
     )]
-    pub use_agg_topk_heap: bool,
+    pub aggregation_topk_heap_enabled: bool,
     #[env_config(
         name = "ZO_AGGREGATION_TOPK_HEAP_MAX_LIMIT",
         default = 500,
         help = "Maximum aggregate TopK limit that uses the heap implementation"
     )]
-    pub agg_topk_heap_max_limit: u64,
+    pub aggregation_topk_heap_max_limit: u64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
