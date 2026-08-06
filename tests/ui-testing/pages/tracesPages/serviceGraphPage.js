@@ -9,14 +9,17 @@ export class ServiceGraphPage {
     this.page = page;
 
     // ===== NAVIGATION =====
-    this.serviceGraphToggle = '[data-test="traces-service-graph-toggle"]';
+    // Service Graph is its own route (/traces/service-graph), reached from the
+    // Traces rail tile's hover flyout — it is no longer a tab on the Traces page.
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-serviceGraph"]';
 
     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
     this.chartContainer = '[data-test="service-graph-chart"]';
 
-    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — button with .selected class) =====
+    // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
 
@@ -69,8 +72,9 @@ export class ServiceGraphPage {
   // ===== NAVIGATION =====
 
   async navigateToServiceGraph() {
-    await this.page.locator(this.serviceGraphToggle).click();
-    await this.page.waitForURL(/tab=service-graph/, { timeout: 10000 });
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.serviceGraphFlyoutItem).click();
+    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 });
   }
 
   /**
@@ -92,9 +96,9 @@ export class ServiceGraphPage {
     // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
     // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
     // the 15m default the just-ingested topology often falls outside the window and the chart
-    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The tab
+    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The route
     // honours the `period` URL param (verified: label shows "Past 6 Hours").
-    const url = `${baseUrl}/web/traces?tab=service-graph&period=${period}&org_identifier=${org}`;
+    const url = `${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=${period}`;
     await this.page.goto(url);
     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
   }
