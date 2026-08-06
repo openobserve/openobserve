@@ -161,23 +161,23 @@ the Free Software Foundation, either version 3 of the License, or
       <section
         class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
       >
-        <div
+        <OTabs
           v-if="!hideTabBar"
-          class="online-evals__tabs border-border-default flex shrink-0 items-center gap-2 border-b bg-transparent px-3.5 py-0"
+          :model-value="activeTab"
+          bordered
+          class="online-evals__tabs shrink-0 px-3.5"
+          data-test="online-evals-tabs"
+          @update:model-value="activeTab = $event as ActiveTab"
         >
-          <button
+          <OTab
             v-for="tab in tabs"
             :key="tab.value"
-            class="online-evals__tab text-text-muted text-compact inline-flex h-9.5 cursor-pointer items-center gap-1.75 border-0 border-b-2 border-b-transparent bg-transparent px-3.5 py-0 font-semibold"
-            :class="
-              activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
-            "
-            type="button"
-            @click="activeTab = tab.value"
+            :name="tab.value"
+            :data-test="`online-evals-tab-${tab.value}`"
           >
-            <span>{{ tab.label }}</span>
-          </button>
-        </div>
+            {{ tab.label }}
+          </OTab>
+        </OTabs>
 
         <div class="online-evals__body flex min-h-0 flex-1">
           <QualityPage
@@ -406,6 +406,8 @@ import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
 import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
 import ImportScorer from "./onlineEvals/ImportScorer.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";

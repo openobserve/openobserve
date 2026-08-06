@@ -267,7 +267,7 @@ export function buildSQLContext(
         }
         for (const k in sums) if (sums[k] > hi) hi = sums[k];
       }
-      const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
+      const lo = Number.isFinite(min) ? Math.min(0, min) : 0;
 
       const ticks = calculateNiceTickValues(lo, hi);
       if (!ticks?.length) throw new Error("no ticks");
@@ -667,12 +667,10 @@ export function buildSQLContext(
       nameLocation: "middle",
       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
-      // nameGap positions the name's centerline: clear the label column,
-      // its 8px margin and half the rotated name's own height.
       nameGap:
         (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
           ? calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys?.[0])))
-          : widestYAxisTickLabel) + 8,
+          : widestYAxisTickLabel) + 10,
       nameTextStyle: {
         fontWeight: "bold",
         fontSize: 14,

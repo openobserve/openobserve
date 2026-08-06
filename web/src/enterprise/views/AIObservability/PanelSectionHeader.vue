@@ -3,8 +3,8 @@
 // PanelSectionHeader — the one title (+ optional hint / icon) header for the AI
 // Observability card/panel/drawer sections. Every one of these panels wraps an
 // OTable, so the header insets to the SAME `px-page-edge` grid line the table
-// content uses — the hand-rolled `px-4` blocks these replaced sat 2px off the
-// columns, which read as "bad header spacing".
+// content uses — the hand-rolled `px-4` blocks these replaced sat a hair off
+// the columns, which read as "bad header spacing".
 //
 // Pass `icon` + `tone` to tie a section to its summary tile and its detail
 // drawer: the same glyph + colour on the tile, the table header, and the drawer

@@ -214,6 +214,7 @@ import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
@@ -376,27 +377,11 @@ watch(total, () => {
 const tableColumns = computed(() =>
   [
     {
-      id: "lastSeenNanos",
-      header: t("traces.sessionsList.columns.lastActivity"),
-      accessorKey: "lastSeenNanos",
-      size: 170,
-      sortable: false,
-      hideable: true,
-      meta: { align: "left" },
-    },
-    {
-      id: "sessionId",
-      header: t("traces.sessionsList.columns.sessionId"),
-      accessorKey: "sessionId",
-      size: 250,
-      sortable: false,
-      meta: { align: "left" },
-    },
-    {
       id: "userId",
       header: t("traces.sessionsList.columns.user"),
       accessorKey: "userId",
-      size: 110,
+      // Email-identity width preset; OUserCell truncates + tooltips beyond it.
+      size: COL.email,
       sortable: false,
       hideable: true,
       meta: { align: "left" },
@@ -460,6 +445,23 @@ const tableColumns = computed(() =>
       sortable: false,
       hideable: true,
       meta: { align: "left", disableCellAction: true },
+    },
+    {
+      id: "lastSeenNanos",
+      header: t("traces.sessionsList.columns.lastActivity"),
+      accessorKey: "lastSeenNanos",
+      size: COL.dateAbsolute,
+      sortable: false,
+      hideable: true,
+      meta: { align: "left" },
+    },
+    {
+      id: "sessionId",
+      header: t("traces.sessionsList.columns.sessionId"),
+      accessorKey: "sessionId",
+      size: 250,
+      sortable: false,
+      meta: { align: "left" },
     },
   ].map((c: any) => ({
     ...c,
