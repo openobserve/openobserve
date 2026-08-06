@@ -1,0 +1,148 @@
+===== COMPLETE LIST OF CHANGED FILES (2 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AddTemplate.spec.ts
+web/src/components/alerts/AddTemplate.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AddTemplate.spec.ts b/web/src/components/alerts/AddTemplate.spec.ts
+index cd46a3f1382..401e0ebd5c1 100644
+--- a/web/src/components/alerts/AddTemplate.spec.ts
++++ b/web/src/components/alerts/AddTemplate.spec.ts
+@@ -684,3 +684,72 @@ describe("AddTemplate - variable guide collapses when switching to content mode"
+     expect(w.html()).not.toContain('data-state="open"');
+   });
+ });
++
++// P0 regression (o2-enterprise#2364): on an EXISTING custom template, the two
++// mode tabs share the single form `body` field. Switching to the Template tab
++// overwrote it with the serialized EMPTY spec (Template tab blank), and
++// switching back left that empty-spec JSON in the editor (raw payload "reset")
++// — original payload destroyed, and Save would persist the empty spec.
++describe("AddTemplate - existing custom template survives a mode-tab round trip", () => {
++  beforeEach(() => vi.clearAllMocks());
++
++  const LEGACY_BODY = '{"text":"{alert_name} fired on {stream_name}"}';
++
++  async function mountExistingCustom() {
++    return mountComp({
++      template: {
++        name: "custom-template",
++        body: LEGACY_BODY,
++        type: "http",
++        title: "",
++        kind: "custom",
++      },
++    });
++  }
++
++  async function selectMode(wrapper: any, mode: "content" | "custom") {
++    const modeTabs = wrapper.findAllComponents({ name: "AppTabs" });
++    await modeTabs[0].vm.$emit("update:activeTab", mode);
++    await flushPromises();
++  }
++
++  it("restores the original raw payload when switching Template → Raw payload", async () => {
++    const w = await mountExistingCustom();
++
++    await selectMode(w, "content");
++    await selectMode(w, "custom");
++
++    expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
++  });
++
++  it("restores raw-mode EDITS (not just the saved body) across the round trip", async () => {
++    const w = await mountExistingCustom();
++    getForm(w).setFieldValue("body", '{"text":"edited draft"}');
++    await flushPromises();
++
++    await selectMode(w, "content");
++    await selectMode(w, "custom");
++
++    expect(getForm(w).state.values.body).toBe('{"text":"edited draft"}');
++  });
++
++  it("prefills the Template tab from detected {vars} instead of opening blank", async () => {
++    const w = await mountExistingCustom();
++
++    await selectMode(w, "content");
++
++    const spec = (w.vm as any).contentSpec;
++    expect(spec.body).toContain("{alert_name}");
++    expect(spec.body).toContain("{stream_name}");
++  });
++
++  it("'start a content version' then Raw payload restores the original body too", async () => {
++    const w = await mountExistingCustom();
++
++    await w.find('[data-test="add-template-start-content-version-btn"]').trigger("click");
++    await flushPromises();
++    await selectMode(w, "custom");
++
++    expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
++  });
++});
+diff --git a/web/src/components/alerts/AddTemplate.vue b/web/src/components/alerts/AddTemplate.vue
+index ced317dc9a2..13580595dff 100644
+--- a/web/src/components/alerts/AddTemplate.vue
++++ b/web/src/components/alerts/AddTemplate.vue
+@@ -398,10 +398,38 @@ const RAW_PAYLOAD_STARTER = JSON.stringify(
+   2,
+ );
+ 
++// The two modes share the single schema `body` field, and entering content
++// mode overwrites it with the serialized ContentSpec. Stash the raw payload
++// on the way out of custom mode so a round trip through the Template tab can
++// restore it — without this, an existing custom template's payload was
++// destroyed by one tab click, and Save then persisted an empty spec over it
++// (P0 o2-enterprise#2364).
++const customBodyStash = ref<string | null>(null);
++
+ const onModeChange = (value: unknown) => {
++  const rawBody = body.value;
++  const wasCustom = editorMode.value === "custom";
+   form.setFieldValue("kind", value as "content" | "custom");
+   if (value === "content") {
++    if (wasCustom) {
++      customBodyStash.value = rawBody;
++      // A still-empty spec means this custom template never had a content
++      // version (existing templates load with an empty spec). Prefill it from
++      // the payload's {vars} — same as startContentVersion — so the Template
++      // tab never opens blank.
++      if (serializeContentSpec(contentSpec.value) === serializeContentSpec(emptyContentSpec())) {
++        const spec = emptyContentSpec();
++        spec.body = detectBodyVars(rawBody)
++          .map((v) => `{${v}}`)
++          .join(" ");
++        contentSpec.value = spec;
++      }
++    }
+     form.setFieldValue("body", serializeContentSpec(contentSpec.value));
++  } else if (customBodyStash.value !== null) {
++    // Coming back to custom mode after a stash always restores the user's
++    // payload — including unsaved raw-mode edits, which the stash captured.
++    form.setFieldValue("body", customBodyStash.value);
+   } else if (
+     isSeededTemplate.value &&
+     serializeContentSpec(contentSpec.value) === serializeContentSpec(starterContentSpec())
+@@ -435,6 +463,10 @@ const detectBodyVars = (rawBody: string): string[] => {
+ };
+ 
+ const startContentVersion = () => {
++  // Same data-loss hazard as the mode tabs: the contentSpec watcher rewrites
++  // `body` the moment the spec below is assigned, so stash the payload first
++  // or switching back to Raw payload would show the serialized spec instead.
++  customBodyStash.value = body.value;
+   const vars = detectBodyVars(body.value);
+   const spec = emptyContentSpec();
+   spec.body = vars.map((v) => `{${v}}`).join(" ");
+@@ -513,6 +545,9 @@ const tabs = computed(() => [
+ const applyTemplateData = () => {
+   const params = router.currentRoute.value.query;
+   const next = addTemplateDefaults();
++  // A stash from a previously viewed template must never restore into this
++  // one (the component is kept alive — onActivated re-runs this).
++  customBodyStash.value = null;
+   if (props.template) {
+     // Clone mode pre-fills the form but stays in create mode so save
+     // produces a new template; edit mode would overwrite the original.

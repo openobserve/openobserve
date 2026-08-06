@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alertTemplateRoundtrip.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "Neither existing test covers mode tab switching or the Custom→Content→Custom roundtrip. alerts-content-templates.spec.js tests content template rendering but never toggles mode tabs. alerts-template-prebuilt-guard.spec.js tests list-level guards and basic edit/clone but never enters the mode-tab interaction path. This is a distinct feature area that warrants its own spec: alertTemplateRoundtrip.spec.js. Note: Playwright auto-discovers specs by directory (testDir: './playwright-tests'), so no manual registration needed."
+}

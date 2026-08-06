@@ -65,6 +65,18 @@ export class AlertTemplatesPage {
         this.monacoEditorLocator = '.monaco-editor';
         this.tableLocator = 'table';
         this.preLocator = 'pre';
+
+        // =========================================================================
+        // Mode-tab roundtrip locators (AddTemplate editor)
+        // =========================================================================
+        this.modeTabsContainer = '[data-test="add-template-mode-tabs"]';
+        this.contentForm = '[data-test="add-template-content-form"]';
+        this.templateBodyEditor = '[data-test="template-body-editor"]';
+        this.legacyBanner = '[data-test="add-template-legacy-banner"]';
+        this.startContentVersionBtn = '[data-test="add-template-start-content-version-btn"]';
+        this.emailTitleInput = '[data-test="add-template-email-title-input"]';
+        this.contentTemplateTitleInputField = '[data-test="content-template-form-title-input-field"]';
+        this.contentTemplateBodyEditor = '[data-test="content-template-form-body-editor"]';
     }
 
     async navigateToTemplates(retryCount = 0) {
@@ -1267,5 +1279,196 @@ export class AlertTemplatesPage {
         }
         await expect(this.page.locator(this.prebuiltBadge).first()).toBeVisible();
         return true;
+    }
+
+    // =========================================================================
+    // Mode Tab Roundtrip methods (AddTemplate editor)
+    // =========================================================================
+
+    /**
+     * Switch the AddTemplate editor to Content mode tab.
+     * Mode tabs use i18n key text ("Content" / "Custom") rendered inside
+     * the AppTabs container [data-test="add-template-mode-tabs"].
+     */
+    async switchToContentModeTab() {
+        const modeTabs = this.page.locator(this.modeTabsContainer);
+        const contentTab = modeTabs.getByRole('tab', { name: /content/i });
+        await contentTab.click();
+        // Wait for the content form to appear (async component mount)
+        await expect(this.page.locator(this.contentForm)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Switched to Content mode tab');
+    }
+
+    /**
+     * Switch the AddTemplate editor to Custom mode tab.
+     */
+    async switchToCustomModeTab() {
+        const modeTabs = this.page.locator(this.modeTabsContainer);
+        const customTab = modeTabs.getByRole('tab', { name: /custom/i });
+        await customTab.click();
+        // Wait for the Monaco editor to appear (CodeQueryEditor is defineAsyncComponent)
+        await expect(this.page.locator(this.templateBodyEditor)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Switched to Custom mode tab');
+    }
+
+    /**
+     * Read the raw text from the Custom-mode Monaco editor body.
+     * Uses the Monaco editor API via page.evaluate for reliable text extraction.
+     * Falls back to .view-lines textContent if the editor API is unavailable.
+     * @returns {Promise<string>} The raw body text from the Monaco editor.
+     */
+    async getCustomModeBodyText() {
+        // Wait for editor to be visible first
+        await expect(this.page.locator(this.templateBodyEditor)).toBeVisible({ timeout: 10000 });
+        // Use Monaco editor API via page.evaluate for reliable text extraction
+        const text = await this.page.evaluate(() => {
+            const editors = window.monaco?.editor?.getEditors?.() || [];
+            if (editors.length > 0) {
+                return editors[0].getValue() || '';
+            }
+            return null;
+        });
+        if (text !== null && text !== undefined) {
+            testLogger.info('Read custom mode body text via Monaco API', { length: text.length });
+            return text;
+        }
+        // Fallback: read from .view-lines textContent
+        const viewLines = this.page.locator('[data-test="template-body-editor"] .view-lines').first();
+        const fallbackText = (await viewLines.textContent()) || '';
+        testLogger.info('Read custom mode body text via view-lines fallback', { length: fallbackText.length });
+        return fallbackText;
+    }
+
+    /**
+     * Assert the Content mode form (ContentTemplateForm) is visible.
+     */
+    async expectContentFormVisible() {
+        await expect(this.page.locator(this.contentForm)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Content form is visible');
+    }
+
+    /**
+     * Assert the Content mode form is NOT visible.
+     */
+    async expectContentFormNotVisible() {
+        await expect(this.page.locator(this.contentForm)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Content form is not visible');
+    }
+
+    /**
+     * Assert the Custom mode Monaco editor is visible.
+     */
+    async expectCustomEditorVisible() {
+        await expect(this.page.locator(this.templateBodyEditor)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Custom editor (Monaco) is visible');
+    }
+
+    /**
+     * Assert the Custom mode Monaco editor is NOT visible.
+     */
+    async expectCustomEditorNotVisible() {
+        await expect(this.page.locator(this.templateBodyEditor)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Custom editor (Monaco) is not visible');
+    }
+
+    /**
+     * Assert the legacy migration banner is visible.
+     * Only shown for EXISTING custom-kind templates in custom mode.
+     */
+    async expectLegacyBannerVisible() {
+        await expect(this.page.locator(this.legacyBanner)).toBeVisible({ timeout: 5000 });
+        testLogger.info('Legacy banner is visible');
+    }
+
+    /**
+     * Assert the legacy migration banner is NOT visible.
+     */
+    async expectLegacyBannerNotVisible() {
+        await expect(this.page.locator(this.legacyBanner)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Legacy banner is not visible');
+    }
+
+    /**
+     * Click the "Start content version" button inside the legacy banner.
+     */
+    async clickStartContentVersionBtn() {
+        const btn = this.page.locator(this.startContentVersionBtn);
+        await expect(btn).toBeVisible({ timeout: 5000 });
+        await btn.click();
+        await this.page.waitForTimeout(1000);
+        testLogger.info('Clicked Start Content Version button');
+    }
+
+    /**
+     * Assert the email title input field is visible.
+     * Only shown when type = 'email' in custom mode.
+     */
+    async expectEmailTitleInputVisible() {
+        await expect(this.page.locator(this.emailTitleInput)).toBeVisible({ timeout: 5000 });
+        testLogger.info('Email title input is visible');
+    }
+
+    /**
+     * Assert the email title input field is NOT visible.
+     */
+    async expectEmailTitleInputNotVisible() {
+        await expect(this.page.locator(this.emailTitleInput)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('Email title input is not visible');
+    }
+
+    /**
+     * Switch the template type to "Email" in custom mode.
+     * Type tabs use label text — no dedicated data-test per tab (NEEDS SELECTOR).
+     */
+    async switchToEmailTypeTab() {
+        // Type tabs in custom mode — use getByRole tab with email label text
+        const emailTab = this.page.getByRole('tab', { name: /email/i });
+        await emailTab.click();
+        // Wait for email title input to confirm the switch took effect
+        await expect(this.page.locator(this.emailTitleInput)).toBeVisible({ timeout: 10000 });
+        testLogger.info('Switched to Email type tab');
+    }
+
+    /**
+     * Switch the template type to "HTTP" in custom mode.
+     * Type tabs use label text — no dedicated data-test per tab (NEEDS SELECTOR).
+     */
+    async switchToHttpTypeTab() {
+        // Type tabs in custom mode — use getByRole tab with HTTP label text
+        const httpTab = this.page.getByRole('tab', { name: /http/i });
+        await httpTab.click();
+        // Wait for email title input to disappear to confirm the switch took effect
+        await expect(this.page.locator(this.emailTitleInput)).not.toBeVisible({ timeout: 10000 });
+        testLogger.info('Switched to HTTP type tab');
+    }
+
+    /**
+     * Fill the Content-mode title input field.
+     * @param {string} text - Title text to fill
+     */
+    async fillContentTitleInput(text) {
+        const input = this.page.locator(this.contentTemplateTitleInputField);
+        await expect(input).toBeVisible({ timeout: 10000 });
+        await input.click();
+        await input.fill(text);
+        await expect(input).toHaveValue(text, { timeout: 5000 });
+        testLogger.info('Filled content title input', { text });
+    }
+
+    /**
+     * Fill the Content-mode body markdown editor with text.
+     * @param {string} text - Text to insert into the editor
+     */
+    async fillContentBodyEditor(text) {
+        const bodyEditorLines = this.page.locator('[data-test="content-template-form-body-editor"] .view-lines').first();
+        await expect(bodyEditorLines).toBeVisible({ timeout: 15000 });
+        await bodyEditorLines.click();
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(300);
+        await this.page.keyboard.insertText(text);
+        await this.page.waitForTimeout(500);
+        testLogger.info('Filled content body editor', { length: text.length });
     }
 } 
