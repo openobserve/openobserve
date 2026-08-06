@@ -167,7 +167,7 @@ impl ExecutionPlan for AggregateTopkExec {
         // increases the performance takes a hit. In such cases, giving up on memory and
         // prioritizing performance make more sense.
         let can_use_top_k_heap =
-            cfg.common.use_agg_topk_heap && self.limit <= cfg.common.agg_topk_heap_max_limit;
+            cfg.search.use_agg_topk_heap && self.limit <= cfg.search.agg_topk_heap_max_limit;
 
         let pinned_stream: SendableRecordBatchStream = if can_use_top_k_heap {
             // we use inflated limit here to calculate topK values on partial aggregation results

@@ -425,7 +425,7 @@ async fn search_tantivy_index(
         parquet_file.meta.min_ts >= start_time && parquet_file.meta.max_ts < end_time;
     let cfg = get_config();
     let mut cache_key = String::new();
-    if cfg.common.inverted_index_result_cache_enabled && file_in_range {
+    if cfg.search.inverted_index_result_cache_enabled && file_in_range {
         metrics::TANTIVY_RESULT_CACHE_REQUESTS_TOTAL
             .with_label_values::<&str>(&[])
             .inc();

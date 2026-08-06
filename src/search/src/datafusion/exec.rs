@@ -20,7 +20,7 @@ use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
         search::{Session as SearchSession, StorageType},
-        stream::FileKey,
+        stream::{FileKey, StreamType},
     },
     utils::schema_ext::SchemaExt,
 };
@@ -70,6 +70,14 @@ pub fn create_session_config(
     sorted_by_time: bool,
     target_partitions: usize,
 ) -> Result<SessionConfig> {
+    create_session_config_for_stream(sorted_by_time, target_partitions, None)
+}
+
+fn create_session_config_for_stream(
+    sorted_by_time: bool,
+    target_partitions: usize,
+    stream_type: Option<StreamType>,
+) -> Result<SessionConfig> {
     let cfg = get_config();
     let target_partitions = if target_partitions == 0 {
         cfg.limit.cpu_num
@@ -90,7 +98,11 @@ pub fn create_session_config(
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     config.options_mut().execution.parquet.pushdown_filters =
-        cfg.common.feature_pushdown_filter_enabled;
+        if matches!(stream_type, Some(StreamType::Metrics)) {
+            cfg.search.feature_metrics_pushdown_filter_enabled
+        } else {
+            cfg.search.feature_pushdown_filter_enabled
+        };
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
     if sorted_by_time {
@@ -185,6 +197,7 @@ pub async fn create_runtime_env(trace_id: &str, memory_limit: usize) -> Result<R
 pub struct DataFusionContextBuilder<'a> {
     trace_id: &'a str,
     work_group: Option<String>,
+    stream_type: Option<StreamType>,
     analyzer_rules: Vec<Arc<dyn AnalyzerRule + Send + Sync>>,
     optimizer_rules: Vec<Arc<dyn OptimizerRule + Send + Sync>>,
     physical_optimizer_rules: Vec<Arc<dyn PhysicalOptimizerRule + Send + Sync>>,
@@ -202,6 +215,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         Self {
             trace_id: "",
             work_group: None,
+            stream_type: None,
             analyzer_rules: vec![],
             optimizer_rules: vec![],
             physical_optimizer_rules: vec![],
@@ -216,6 +230,11 @@ impl<'a> DataFusionContextBuilder<'a> {
 
     pub fn work_group(mut self, work_group: Option<String>) -> Self {
         self.work_group = work_group;
+        self
+    }
+
+    pub fn stream_type(mut self, stream_type: StreamType) -> Self {
+        self.stream_type = Some(stream_type);
         self
     }
 
@@ -261,7 +280,11 @@ impl<'a> DataFusionContextBuilder<'a> {
         )
         .await?;
 
-        let session_config = create_session_config(self.sorted_by_time, target_partitions)?;
+        let session_config = create_session_config_for_stream(
+            self.sorted_by_time,
+            target_partitions,
+            self.stream_type,
+        )?;
         let runtime_env = Arc::new(create_runtime_env(self.trace_id, memory_size).await?);
         let mut builder = SessionStateBuilder::new()
             .with_config(session_config)
@@ -276,7 +299,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.common.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))
@@ -501,6 +524,7 @@ pub async fn register_metrics_table(
     let ctx = DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
+        .stream_type(StreamType::Metrics)
         .build(session.target_partitions)
         .await?;
 
@@ -792,6 +816,10 @@ mod tests {
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert_eq!(
+            config.options().execution.parquet.pushdown_filters,
+            get_config().search.feature_pushdown_filter_enabled
+        );
         // Join dynamic filter pushdown must stay disabled: its runtime filter can't cross our
         // distributed RemoteScan/Flight boundary and breaks our custom join rewrites.
         assert!(
@@ -799,6 +827,18 @@ mod tests {
                 .options()
                 .optimizer
                 .enable_join_dynamic_filter_pushdown
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_create_session_config_for_metrics() -> Result<()> {
+        let config = create_session_config_for_stream(false, 0, Some(StreamType::Metrics))?;
+
+        assert_eq!(
+            config.options().execution.parquet.pushdown_filters,
+            get_config().search.feature_metrics_pushdown_filter_enabled
         );
 
         Ok(())

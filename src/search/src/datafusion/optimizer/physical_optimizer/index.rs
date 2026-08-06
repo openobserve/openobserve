@@ -87,7 +87,7 @@ impl PhysicalOptimizerRule for IndexRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        if !config::get_config().common.inverted_index_enabled {
+        if !config::get_config().search.inverted_index_enabled {
             return Ok(plan);
         }
 
@@ -147,10 +147,10 @@ impl IndexOptimizer {
             can_optimize: false,
             has_filter: false,
             is_remove_filter: config::get_config()
-                .common
+                .search
                 .feature_query_remove_filter_with_index,
             optimizer_enabled: config::get_config()
-                .common
+                .search
                 .inverted_index_count_optimizer_enabled,
         }
     }

@@ -101,7 +101,7 @@ impl CacheBuf {
 
         // When partial_reduce is enabled each follower has already sent pre-merged data, so
         // phase-1 (parallel chunked aggregation) would double-aggregate already-reduced values.
-        let partial_reduce_enabled = config::get_config().common.feature_partial_reduce_enabled;
+        let partial_reduce_enabled = config::get_config().search.feature_partial_reduce_enabled;
 
         let mut merged_batches: Vec<RecordBatch> = if partial_reduce_enabled {
             // Phase 1 skipped — use follower results directly.

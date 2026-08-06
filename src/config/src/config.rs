@@ -615,6 +615,7 @@ pub struct Config {
     pub grpc: Grpc,
     pub route: Route,
     pub common: Common,
+    pub search: Search,
     pub limit: Limit,
     pub compact: Compact,
     pub cache_latest_files: CacheLatestFiles,
@@ -992,6 +993,116 @@ pub struct Route {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
+pub struct Search {
+    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
+    pub feature_query_exclude_all: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
+    pub feature_query_remove_filter_with_index: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
+    pub feature_query_streaming_aggs: bool,
+    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
+    pub feature_join_match_one_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
+    )]
+    pub feature_join_right_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
+        default = true,
+        help = "Enable broadcast join"
+    )]
+    pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
+        default = 0,
+        help = "Max rows for left side of broadcast join, default to 10_000 rows"
+    )]
+    pub feature_broadcast_join_left_side_max_rows: usize,
+    #[env_config(
+        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
+        default = 0,
+        help = "Max size for left side of broadcast join, default to 10 MB"
+    )]
+    pub feature_broadcast_join_left_side_max_size: usize, // MB
+    #[env_config(
+        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
+        default = true,
+        help = "Enable enrichment table broadcast join"
+    )]
+    pub feature_enrichment_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable pushdown filter"
+    )]
+    pub feature_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
+        default = false,
+        help = "Enable pushdown filter for metrics queries"
+    )]
+    pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable dynamic pushdown filter"
+    )]
+    pub feature_dynamic_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
+    #[env_config(
+        name = "ZO_ENABLE_INVERTED_INDEX",
+        default = true,
+        help = "Toggle inverted index generation."
+    )]
+    pub inverted_index_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
+        default = false,
+        help = "Toggle tantivy result cache."
+    )]
+    pub inverted_index_result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
+        default = false,
+        help = "Use old format for inverted index, it will generate same stream name for index."
+    )]
+    pub inverted_index_old_format: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
+    pub aggregation_topk_enabled: bool,
+    #[env_config(
+        name = "ZO_DF_USE_AGG_TOPK_HEAP",
+        default = true,
+        help = "Use the heap implementation for eligible aggregate TopK plans"
+    )]
+    pub use_agg_topk_heap: bool,
+    #[env_config(
+        name = "ZO_DF_TOPK_HEAP_MAX_LIMIT",
+        default = 500,
+        help = "Maximum aggregate TopK limit that uses the heap implementation"
+    )]
+    pub agg_topk_heap_max_limit: u64,
+}
+
+#[derive(Serialize, EnvConfig, Default)]
 pub struct Common {
     #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
     pub app_name: String,
@@ -1139,74 +1250,12 @@ pub struct Common {
         default = "file_num"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
-    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
-    pub feature_query_exclude_all: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
-    pub feature_query_remove_filter_with_index: bool,
-    #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
-    pub feature_query_streaming_aggs: bool,
-    #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
-    pub feature_join_match_one_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_JOIN_RIGHT_SIDE_MAX_ROWS",
-        default = 0,
-        help = "Default to 50_000 when ZO_FEATURE_JOIN_MATCH_ONE_ENABLED is true"
-    )]
-    pub feature_join_right_side_max_rows: usize,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_ENABLED",
-        default = true,
-        help = "Enable broadcast join"
-    )]
-    pub feature_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
-        default = 0,
-        help = "Max rows for left side of broadcast join, default to 10_000 rows"
-    )]
-    pub feature_broadcast_join_left_side_max_rows: usize,
-    #[env_config(
-        name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_SIZE",
-        default = 0,
-        help = "Max size for left side of broadcast join, default to 10 MB"
-    )]
-    pub feature_broadcast_join_left_side_max_size: usize, // MB
-    #[env_config(
-        name = "ZO_FEATURE_ENRICHMENT_BROADCAST_JOIN_ENABLED",
-        default = true,
-        help = "Enable enrichment table broadcast join"
-    )]
-    pub feature_enrichment_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable pushdown filter"
-    )]
-    pub feature_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable dynamic pushdown filter"
-    )]
-    pub feature_dynamic_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
-        default = true,
-        help = "Enable single node optimize(used for debug, not document)"
-    )]
-    pub feature_single_node_optimize_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_QUERY_SKIP_WAL",
         default = false,
         help = "Skip WAL for query"
     )]
     pub feature_query_skip_wal: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
-        default = true,
-        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
-    )]
-    pub feature_partial_reduce_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_SHARED_MEMTABLE_ENABLED",
         default = false,
@@ -1422,30 +1471,6 @@ pub struct Common {
     )]
     pub restricted_routes_on_empty_data: bool,
     #[env_config(
-        name = "ZO_ENABLE_INVERTED_INDEX",
-        default = true,
-        help = "Toggle inverted index generation."
-    )]
-    pub inverted_index_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
-        default = false,
-        help = "Toggle tantivy result cache."
-    )]
-    pub inverted_index_result_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
-        default = false,
-        help = "Use old format for inverted index, it will generate same stream name for index."
-    )]
-    pub inverted_index_old_format: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
-        default = true,
-        help = "Toggle inverted index count optimizer."
-    )]
-    pub inverted_index_count_optimizer_enabled: bool,
-    #[env_config(
         name = "ZO_QUERY_ON_STREAM_SELECTION",
         default = true,
         help = "Toggle search to be trigger based on button click event."
@@ -1581,20 +1606,6 @@ pub struct Common {
     pub use_stream_settings_for_partitions_enabled: bool,
     #[env_config(name = "ZO_DASHBOARD_PLACEHOLDER", default = "_o2_all_")]
     pub dashboard_placeholder: String,
-    #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
-    pub aggregation_topk_enabled: bool,
-    #[env_config(
-        name = "ZO_DF_USE_AGG_TOPK_HEAP",
-        default = true,
-        help = "Use the heap implementation for eligible aggregate TopK plans"
-    )]
-    pub use_agg_topk_heap: bool,
-    #[env_config(
-        name = "ZO_DF_TOPK_HEAP_MAX_LIMIT",
-        default = 500,
-        help = "Maximum aggregate TopK limit that uses the heap implementation"
-    )]
-    pub agg_topk_heap_max_limit: u64,
     #[env_config(name = "ZO_SEARCH_INSPECTOR_ENABLED", default = false)]
     pub search_inspector_enabled: bool,
     #[env_config(name = "ZO_UTF8_VIEW_ENABLED", default = true)]
@@ -3286,22 +3297,22 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
 
     // check for join match one
-    if cfg.common.feature_join_match_one_enabled && cfg.common.feature_join_right_side_max_rows == 0
+    if cfg.search.feature_join_match_one_enabled && cfg.search.feature_join_right_side_max_rows == 0
     {
-        cfg.common.feature_join_right_side_max_rows = 50_000;
+        cfg.search.feature_join_right_side_max_rows = 50_000;
     }
 
     // check for broadcast join left side max rows
-    if cfg.common.feature_broadcast_join_enabled
-        && cfg.common.feature_broadcast_join_left_side_max_rows == 0
+    if cfg.search.feature_broadcast_join_enabled
+        && cfg.search.feature_broadcast_join_left_side_max_rows == 0
     {
-        cfg.common.feature_broadcast_join_left_side_max_rows = 10_000;
+        cfg.search.feature_broadcast_join_left_side_max_rows = 10_000;
     }
 
-    if cfg.common.feature_broadcast_join_enabled
-        && cfg.common.feature_broadcast_join_left_side_max_size == 0
+    if cfg.search.feature_broadcast_join_enabled
+        && cfg.search.feature_broadcast_join_left_side_max_size == 0
     {
-        cfg.common.feature_broadcast_join_left_side_max_size = 10; // 10 MB
+        cfg.search.feature_broadcast_join_left_side_max_size = 10; // 10 MB
     }
 
     if cfg.common.default_hec_stream.is_empty() {
@@ -3601,7 +3612,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable disk cache for local disk storage
     if cfg.common.is_local_storage
         && !cfg.common.result_cache_enabled
-        && !cfg.common.feature_query_streaming_aggs
+        && !cfg.search.feature_query_streaming_aggs
     {
         cfg.disk_cache.enabled = false;
     }
@@ -3609,7 +3620,7 @@ fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // disable result cache if disk cache is disabled
     if !cfg.disk_cache.enabled {
         cfg.common.result_cache_enabled = false;
-        cfg.common.feature_query_streaming_aggs = false;
+        cfg.search.feature_query_streaming_aggs = false;
     }
 
     let disks = sysinfo::disk::get_disk_usage();
