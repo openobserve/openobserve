@@ -20,14 +20,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   progress), the content pane (the reviewed object), and the scoring pane (one
   control per bound Score Config). Per the Phase-2.5 spec: submit is N/N
   all-or-nothing, items are pending|reviewed only, and reviews are append-only
-  (a re-review appends; nothing is overwritten). Mock content until the trace
-  backend is wired.
+  (a re-review appends; nothing is overwritten).
 -->
 <template>
   <OPageLayout
     data-test="ai-queue-workbench-page"
     :title="queue?.name || t('aiObservability.queues.detail.fallbackTitle')"
-    :subtitle="t('aiObservability.queues.workbench.subtitle', { reviewed: reviewedCount, total: items.length })"
+    :subtitle="
+      t('aiObservability.queues.workbench.subtitle', {
+        reviewed: reviewedCount,
+        total: items.length,
+      })
+    "
     :back="backTarget"
     bleed
     :scroll="false"
@@ -65,14 +69,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <div class="flex h-full min-h-0" data-test="ai-queue-workbench-body">
       <!-- Item navigator (collapsible) -->
-      <aside v-if="!navCollapsed" class="border-border-default flex w-64 shrink-0 flex-col border-r">
+      <aside
+        v-if="!navCollapsed"
+        class="border-border-default flex w-64 shrink-0 flex-col border-r"
+      >
         <div class="border-table-row-divider flex flex-col gap-1.5 border-b px-3 py-2.5">
           <div class="flex items-center justify-between gap-2 text-xs tabular-nums">
             <span class="text-text-secondary">
-              {{ t("aiObservability.queues.reviewedCount", { reviewed: reviewedCount, total: items.length }) }}
+              {{
+                t("aiObservability.queues.reviewedCount", {
+                  reviewed: reviewedCount,
+                  total: items.length,
+                })
+              }}
             </span>
             <span
-              :class="cleared ? 'text-status-success-text font-semibold' : 'text-text-body font-semibold'"
+              :class="
+                cleared ? 'text-status-success-text font-semibold' : 'text-text-body font-semibold'
+              "
             >
               {{ percent }}%
             </span>
@@ -99,7 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :name="item.status === 'reviewed' ? 'check-circle' : 'fiber-manual-record'"
                 size="sm"
                 class="shrink-0"
-                :class="item.status === 'reviewed' ? 'text-status-success-text' : 'text-text-disabled'"
+                :class="
+                  item.status === 'reviewed' ? 'text-status-success-text' : 'text-text-disabled'
+                "
               />
               <span class="min-w-0 flex-1 truncate text-left font-mono">{{ item.refId }}</span>
             </div>
@@ -110,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Review pane -->
       <section class="flex min-w-0 flex-1 flex-col">
         <div
-          v-if="loading"
+          v-if="loading || detailLoading"
           class="flex flex-1 items-center justify-center"
           data-test="ai-queue-workbench-loading"
         >
@@ -151,7 +167,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @click="navCollapsed = !navCollapsed"
                   >
                     <OIcon
-                      :name="navCollapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'"
+                      :name="
+                        navCollapsed ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
+                      "
                       size="sm"
                     />
                     <OTooltip
@@ -174,16 +192,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="open-in-new"
                     class="shrink-0"
+                    :disabled="!currentDetail"
                     data-test="ai-queue-workbench-open-trace"
                     @click="openTrace"
                   >
                     {{ t("aiObservability.queues.workbench.openTrace") }}
                   </OButton>
                 </div>
-                <div class="text-text-secondary flex flex-wrap items-center gap-x-2 font-mono text-xs">
+                <div
+                  class="text-text-secondary flex flex-wrap items-center gap-x-2 font-mono text-xs"
+                >
                   <span class="truncate">{{ currentItem.refId }}</span>
-                  <span>·</span><span>{{ currentCase.workflow }}</span>
-                  <span>·</span><span>{{ currentCase.model }}</span>
+                  <span>·</span><span>{{ currentCase.workflow }}</span> <span>·</span
+                  ><span>{{ currentCase.model }}</span>
                 </div>
               </div>
 
@@ -212,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="ms.name"
                     class="border-border-default bg-surface-subtle rounded-default flex shrink-0 items-center gap-1.5 border px-2 py-1"
                   >
-                    <span class="text-text-secondary font-mono text-2xs">{{ ms.name }}</span>
+                    <span class="text-text-secondary text-2xs font-mono">{{ ms.name }}</span>
                     <span class="font-mono text-xs font-semibold">{{ ms.value }}</span>
                     <OTooltip side="bottom" :content="ms.source" />
                   </span>
@@ -277,7 +298,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ t("aiObservability.queues.workbench.scoreTitle") }}
                     </span>
                     <span class="text-text-secondary text-xs">
-                      {{ t("aiObservability.queues.workbench.dimensionsBound", { count: boundConfigs.length }) }}
+                      {{
+                        t("aiObservability.queues.workbench.dimensionsBound", {
+                          count: boundConfigs.length,
+                        })
+                      }}
                     </span>
                   </span>
                   <span class="text-text-secondary text-2xs">
@@ -310,13 +335,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div v-if="cfg.dataType === 'numeric'" class="flex flex-col gap-1">
                       <div class="flex items-center gap-3">
                         <OSlider
-                          :model-value="numericValue(cfg.scoreConfigId)"
-                          :min="0"
-                          :max="1"
-                          :step="0.05"
+                          :model-value="numericValue(cfg)"
+                          :min="cfg.min"
+                          :max="cfg.max"
+                          :step="cfg.step"
                           class="min-w-0 flex-1"
                           :data-test="`ai-queue-workbench-slider-${cfg.scoreConfigId}`"
-                          @update:model-value="(v: number) => (draft[cfg.scoreConfigId] = v)"
+                          @update:model-value="(v: number) => setDraftValue(cfg.scoreConfigId, v)"
                         />
                         <span
                           class="shrink-0 text-right tabular-nums"
@@ -334,8 +359,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                       </div>
                       <span class="text-text-secondary text-2xs">
-                        {{ t("aiObservability.queues.workbench.numericScale") }} ·
-                        {{ t("aiObservability.queues.workbench.healthyLabel", { threshold: NUMERIC_HEALTHY }) }}
+                        {{ cfg.min }} – {{ cfg.max }}
+                        <template v-if="cfg.healthyValue !== undefined">
+                          · {{ cfg.healthyDirection === "lte" ? "≤" : "≥" }}
+                          {{ cfg.healthyValue }}
+                        </template>
                       </span>
                     </div>
 
@@ -344,14 +372,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else-if="cfg.dataType === 'categorical'"
                       :model-value="(draft[cfg.scoreConfigId] as string) ?? ''"
                       orientation="horizontal"
-                      @update:model-value="(v: unknown) => (draft[cfg.scoreConfigId] = String(v))"
+                      @update:model-value="
+                        (v: unknown) => setDraftValue(cfg.scoreConfigId, String(v))
+                      "
                     >
-                      <ORadio
-                        v-for="c in cfg.categories || []"
-                        :key="c"
-                        :value="c"
-                        :label="c"
-                      />
+                      <ORadio v-for="c in cfg.categories || []" :key="c" :value="c" :label="c" />
                     </ORadioGroup>
 
                     <!-- boolean → radios -->
@@ -359,7 +384,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-else
                       :model-value="(draft[cfg.scoreConfigId] as string) ?? ''"
                       orientation="horizontal"
-                      @update:model-value="(v: unknown) => (draft[cfg.scoreConfigId] = String(v))"
+                      @update:model-value="
+                        (v: unknown) => setDraftValue(cfg.scoreConfigId, String(v))
+                      "
                     >
                       <ORadio value="true" :label="t('aiObservability.queues.workbench.true')" />
                       <ORadio value="false" :label="t('aiObservability.queues.workbench.false')" />
@@ -374,13 +401,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("aiObservability.queues.workbench.commentLabel") }}
                       </span>
-                      <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
+                      <span class="text-text-secondary text-2xs font-normal">{{
+                        t("common.optional")
+                      }}</span>
                     </span>
                     <OTextarea
                       v-model="comment"
                       :placeholder="t('aiObservability.queues.workbench.commentPlaceholder')"
                       :rows="3"
                       data-test="ai-queue-workbench-comment"
+                      @update:model-value="currentSubmissionId = null"
                     />
                   </div>
 
@@ -404,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         >({{ currentCase.priorAnnotations.length }})</span
                       >
                     </button>
-                    <span v-if="!priorExpanded" class="text-text-secondary pl-5 text-2xs">
+                    <span v-if="!priorExpanded" class="text-text-secondary text-2xs pl-5">
                       {{ t("aiObservability.queues.workbench.priorScoresHint") }}
                     </span>
 
@@ -421,14 +451,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ a.initials }}
                         </span>
                         <span class="text-sm font-medium">{{ a.reviewer }}</span>
-                        <span class="text-text-secondary ml-auto text-2xs">{{ a.time }}</span>
+                        <span class="text-text-secondary text-2xs ml-auto">{{ a.time }}</span>
                       </div>
                       <div class="flex flex-wrap items-center gap-1.5">
                         <OTag
                           v-for="s in a.scores"
                           :key="s.name"
                           variant="default-soft"
-                          class="font-mono text-2xs"
+                          class="text-2xs font-mono"
                         >
                           {{ s.name }} {{ s.value }}
                         </OTag>
@@ -442,8 +472,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 class="border-table-row-divider bg-surface-panel flex flex-col gap-2 border-t px-4 py-3"
               >
-                <span class="text-text-secondary text-2xs" data-test="ai-queue-workbench-scored-count">
-                  {{ t("aiObservability.queues.workbench.dimensionsScored", { scored: scoredCount, total: boundConfigs.length }) }}
+                <span
+                  class="text-text-secondary text-2xs"
+                  data-test="ai-queue-workbench-scored-count"
+                >
+                  {{
+                    t("aiObservability.queues.workbench.dimensionsScored", {
+                      scored: scoredCount,
+                      total: boundConfigs.length,
+                    })
+                  }}
                 </span>
                 <OProgressBar
                   :value="boundConfigs.length ? scoredCount / boundConfigs.length : 0"
@@ -465,7 +503,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-right="arrow-forward"
                     class="flex-1"
-                    :disabled="!canSubmit"
+                    :disabled="!canSubmit || submitting"
+                    :loading="submitting"
                     data-test="ai-queue-workbench-submit"
                     @click="submit"
                   >
@@ -482,10 +521,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { formatDistanceToNowStrict } from "date-fns";
 import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -504,6 +544,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, {
   type LlmQueue,
   type LlmQueueItem,
+  type LlmQueueItemDetail,
+  type LlmQueueReview,
   type LlmScoreConfigOption,
   type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
@@ -513,11 +555,11 @@ defineOptions({ name: "AIQueueWorkbenchPage" });
 const { t } = useI18n();
 const store = useStore();
 const route = useRoute();
+const router = useRouter();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const queueId = computed<string>(() => String(route.params.id ?? ""));
 
-// Standard detail-page back button (start of the header) — returns to the list.
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.queues"),
   to: { name: "aiQueues", query: { org_identifier: orgId.value } },
@@ -526,218 +568,327 @@ const backTarget = computed(() => ({
 const queue = ref<LlmQueue | null>(null);
 const items = ref<LlmQueueItem[]>([]);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
+const currentDetail = ref<LlmQueueItemDetail | null>(null);
+const currentReviews = ref<LlmQueueReview[]>([]);
 const loading = ref(false);
-const currentIndex = ref(0);
+const detailLoading = ref(false);
+const submitting = ref(false);
+const currentIndex = ref(-1);
 const navCollapsed = ref(false);
 const priorExpanded = ref(false);
 const contextExpanded = ref(false);
+const currentSubmissionId = ref<string | null>(null);
 
-// The current item's in-progress scores (one entry per bound dimension).
 type ScoreValue = number | string;
 const draft = reactive<Record<string, ScoreValue | undefined>>({});
 const comment = ref("");
 
 const currentItem = computed<LlmQueueItem | null>(() => items.value[currentIndex.value] ?? null);
-
-const reviewedCount = computed(() => items.value.filter((i) => i.status === "reviewed").length);
-const fraction = computed(() => (items.value.length ? reviewedCount.value / items.value.length : 0));
+const reviewedCount = computed(
+  () => items.value.filter((item) => item.status === "reviewed").length,
+);
+const fraction = computed(() =>
+  items.value.length ? reviewedCount.value / items.value.length : 0,
+);
 const percent = computed(() => Math.round(fraction.value * 100));
 const cleared = computed(() => items.value.length > 0 && reviewedCount.value >= items.value.length);
 
-// The queue's bindings joined with the Score Config catalog → the controls to
-// render (name + data type + categories) per bound dimension.
 interface BoundScoreConfig {
+  rowId: string;
   scoreConfigId: string;
   name: string;
   dataType: ScoreConfigDataType;
   categories?: string[];
+  min: number;
+  max: number;
+  step: number;
+  healthyDirection?: "gte" | "lte";
+  healthyValue?: number;
 }
+
 const boundConfigs = computed<BoundScoreConfig[]>(() =>
-  (queue.value?.scoreConfigs ?? []).map((b) => {
-    const cat = configOptions.value.find((o) => o.id === b.scoreConfigId);
+  (queue.value?.scoreConfigs ?? []).map((binding) => {
+    const option = configOptions.value.find((candidate) => candidate.id === binding.scoreConfigId);
+    const version = option?.versionDetails[binding.version];
+    const min = version?.numericRange?.min ?? 0;
+    const max = version?.numericRange?.max ?? 1;
+    const threshold = version?.healthyThreshold;
+    const healthyDirection =
+      threshold?.direction === "gte" || threshold?.direction === "lte"
+        ? threshold.direction
+        : undefined;
+    const healthyValue = Number(threshold?.value);
     return {
-      scoreConfigId: b.scoreConfigId,
-      name: b.name,
-      dataType: cat?.dataType ?? "numeric",
-      categories: cat?.categories,
+      rowId: binding.rowId,
+      scoreConfigId: binding.scoreConfigId,
+      name: binding.name,
+      dataType: binding.dataType ?? option?.dataType ?? "numeric",
+      categories: version?.categories ?? option?.categories,
+      min,
+      max,
+      step: (max - min) / 20,
+      healthyDirection,
+      healthyValue: Number.isFinite(healthyValue) ? healthyValue : undefined,
     };
   }),
 );
 
-// N/N all-or-nothing: every bound dimension must have a value to submit.
 const canSubmit = computed(
   () =>
+    Boolean(currentDetail.value?.sourceStream) &&
     boundConfigs.value.length > 0 &&
-    boundConfigs.value.every((c) => draft[c.scoreConfigId] !== undefined),
+    boundConfigs.value.every(
+      (config) => Boolean(config.rowId) && draft[config.scoreConfigId] !== undefined,
+    ),
 );
 
-const NUMERIC_HEALTHY = 0.7; // TODO(BE): comes from the Score Config's healthy_threshold.
-
-function numericValue(id: string): number {
-  const v = draft[id];
-  // Unscored → neutral middle (not the "healthy" 0.7, which read as already-set).
-  return typeof v === "number" ? v : 0.5;
-}
-
-// How many of the bound dimensions the reviewer has scored so far.
 const scoredCount = computed(
-  () => boundConfigs.value.filter((c) => draft[c.scoreConfigId] !== undefined).length,
+  () => boundConfigs.value.filter((config) => draft[config.scoreConfigId] !== undefined).length,
 );
 
-// Mock review content until the trace backend is wired. Mirrors the shape the
-// Workbench needs: the reviewed object + the machine's pre-judgment (for
-// reference) + prior append-only annotations.
-interface MachineScore {
-  name: string;
-  value: string;
-  source: string;
-}
-interface PriorAnnotation {
-  reviewer: string;
-  initials: string;
-  time: string;
-  scores: { name: string; value: string }[];
-  comment: string;
-}
-interface MockCase {
-  model: string;
-  workflow: string;
-  input: string;
-  output: string;
-  retrievedContext: string;
-  machineScores: MachineScore[];
-  priorAnnotations: PriorAnnotation[];
+function setDraftValue(id: string, value: ScoreValue) {
+  draft[id] = value;
+  currentSubmissionId.value = null;
 }
 
-const MOCK_CASES: MockCase[] = [
-  {
-    model: "claude-sonnet-4-5",
-    workflow: "agent.workflow.o2-ai",
-    input: "User asks whether a 35-day-old order qualifies for a refund under the standard policy.",
-    output:
-      "Yes, absolutely — you can return it any time, no questions asked. I've processed a full refund to your card.",
-    retrievedContext:
-      "Retrieved (policy_v3.md): standard refund window is 30 days; beyond that requires manual review and is not auto-approved.",
-    machineScores: [
-      { name: "faithfulness", value: "0.31", source: "LLM Judge" },
-      { name: "toxicity", value: "0.02", source: "Code" },
-      { name: "hallucination", value: "0.74", source: "LLM Judge" },
-      { name: "grounded", value: "false", source: "Code" },
-      { name: "relevance", value: "0.88", source: "LLM Judge" },
-      { name: "coherence", value: "0.91", source: "LLM Judge" },
-      { name: "pii_leak", value: "none", source: "Code" },
-      { name: "policy_violation", value: "0.12", source: "LLM Judge" },
-      { name: "answer_length", value: "142", source: "Code" },
-      { name: "sentiment", value: "0.05", source: "Code" },
-    ],
-    priorAnnotations: [
-      {
-        reviewer: "alice",
-        initials: "AL",
-        time: "1h ago",
-        scores: [
-          { name: "faithfulness", value: "0.3" },
-          { name: "halluc_severity", value: "major" },
-          { name: "grounded", value: "false" },
-        ],
-        comment: "Invents an auto-approval that contradicts the 30-day policy.",
-      },
-    ],
-  },
-  {
-    model: "claude-sonnet-4-5",
-    workflow: "agent.workflow.o2-ai",
-    input: "What's the warranty period for the X200 laptop?",
-    output: "The X200 laptop comes with a 2-year limited warranty covering manufacturing defects.",
-    retrievedContext: "Retrieved (warranty.md): X200 — 24-month limited warranty on manufacturing defects.",
-    machineScores: [
-      { name: "faithfulness", value: "0.94", source: "LLM Judge" },
-      { name: "toxicity", value: "0.00", source: "Code" },
-    ],
-    priorAnnotations: [],
-  },
-  {
-    model: "claude-sonnet-4-5",
-    workflow: "agent.workflow.o2-ai",
-    input: "Does the subscription auto-renew?",
-    output: "Yes — plans renew automatically each month unless cancelled before the renewal date.",
-    retrievedContext: "Retrieved (billing.md): monthly plans auto-renew; cancel any time before the cycle ends.",
-    machineScores: [
-      { name: "faithfulness", value: "0.88", source: "LLM Judge" },
-      { name: "toxicity", value: "0.01", source: "Code" },
-    ],
-    priorAnnotations: [],
-  },
-];
-const currentCase = computed<MockCase>(() => {
-  const item = currentItem.value;
-  if (!item) return MOCK_CASES[0];
-  const n = item.refId.split("").reduce((a, ch) => a + ch.charCodeAt(0), 0);
-  return MOCK_CASES[n % MOCK_CASES.length];
-});
+function numericValue(config: BoundScoreConfig): number {
+  const value = draft[config.scoreConfigId];
+  return typeof value === "number" ? value : config.min + (config.max - config.min) / 2;
+}
 
-// The queue item is only a pointer (refType/refId) — the backend gives us no
-// title, so we derive the heading from the reviewed input (fall back to the
-// operation name, then the ref id). Mirrors what we can actually show once the
-// trace-content fetch is wired.
+function formatContent(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function valueAt(row: Record<string, unknown>, path: string): unknown {
+  if (path in row) return row[path];
+  let current: unknown = row;
+  for (const part of path.split(".")) {
+    if (!current || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+  return current;
+}
+
+function firstTraceValue(paths: string[]): unknown {
+  for (const row of currentDetail.value?.content.trace ?? []) {
+    for (const path of paths) {
+      const value = valueAt(row, path);
+      if (value !== null && value !== undefined && String(value).trim()) return value;
+    }
+  }
+  return undefined;
+}
+
+function retrievedContext(): string {
+  const outputPaths = [
+    "gen_ai_output_messages",
+    "gen_ai.output.messages",
+    "llm.output",
+    "_o2_llm_output",
+    "llm_output",
+  ];
+  const retrievalRow = (currentDetail.value?.content.trace ?? []).find((row) => {
+    const operation =
+      valueAt(row, "gen_ai_operation_name") ??
+      valueAt(row, "gen_ai.operation.name") ??
+      valueAt(row, "operation_name");
+    return typeof operation === "string" && /retriev|search|rag/i.test(operation);
+  });
+  if (!retrievalRow) return "";
+  for (const path of outputPaths) {
+    const value = valueAt(retrievalRow, path);
+    if (value !== null && value !== undefined) return formatContent(value);
+  }
+  return "";
+}
+
+function displayScoreValue(value: number | string | boolean | null): string {
+  if (value === null) return "—";
+  return typeof value === "number" ? String(Number(value.toFixed(4))) : String(value);
+}
+
+function reviewerInitials(reviewer: string): string {
+  const name = reviewer.split("@")[0];
+  const parts = name.split(/[._\-\s]+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : name.slice(0, 2)).toUpperCase();
+}
+
+function relativeReviewTime(timestampMicros: number): string {
+  if (!timestampMicros) return "";
+  return formatDistanceToNowStrict(new Date(timestampMicros / 1_000), { addSuffix: true });
+}
+
+const currentCase = computed(() => ({
+  model: String(
+    firstTraceValue([
+      "gen_ai_request_model",
+      "gen_ai.request.model",
+      "gen_ai_response_model",
+      "gen_ai.response.model",
+    ]) ?? "",
+  ),
+  workflow: String(
+    firstTraceValue(["gen_ai_agent_name", "gen_ai.agent.name", "service_name", "operation_name"]) ??
+      "",
+  ),
+  input: formatContent(currentDetail.value?.content.input),
+  output: formatContent(currentDetail.value?.content.output),
+  retrievedContext: retrievedContext(),
+  machineScores: (currentDetail.value?.machineScores ?? []).map((score) => ({
+    name: score.name,
+    value: displayScoreValue(score.value),
+    source: score.sourceType.replaceAll("_", " "),
+  })),
+  priorAnnotations: currentReviews.value.map((review) => {
+    const reviewer = review.reviewer || "Unknown reviewer";
+    return {
+      reviewer,
+      initials: reviewerInitials(reviewer),
+      time: relativeReviewTime(review.submittedAt),
+      scores: review.scores.map((score) => ({
+        name: score.name,
+        value: displayScoreValue(score.value),
+      })),
+      comment: review.comments ?? "",
+    };
+  }),
+}));
+
 const itemTitle = computed(() => {
-  const preview = (currentCase.value.input || "").replace(/\s+/g, " ").trim();
+  const preview = currentCase.value.input.replace(/\s+/g, " ").trim();
   if (preview) return preview.length > 72 ? `${preview.slice(0, 72).trimEnd()}…` : preview;
   return currentCase.value.workflow || currentItem.value?.refId || "";
 });
 
-
 function resetDraft() {
-  for (const k of Object.keys(draft)) delete draft[k];
+  for (const key of Object.keys(draft)) delete draft[key];
   comment.value = "";
+  currentSubmissionId.value = null;
   priorExpanded.value = false;
   contextExpanded.value = false;
+}
+
+let detailRequest = 0;
+async function loadCurrentItem() {
+  const item = currentItem.value;
+  const request = ++detailRequest;
+  currentDetail.value = null;
+  currentReviews.value = [];
+  if (!item) return;
+
+  detailLoading.value = true;
+  const [detailResult, reviewsResult] = await Promise.allSettled([
+    llmQueuesService.getItemDetail(orgId.value, queueId.value, item.id),
+    llmQueuesService.listReviews(orgId.value, queueId.value, item.id),
+  ]);
+  if (request !== detailRequest) return;
+
+  if (detailResult.status === "fulfilled") {
+    currentDetail.value = detailResult.value;
+    currentReviews.value = reviewsResult.status === "fulfilled" ? reviewsResult.value : [];
+  } else {
+    toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
+  }
+  detailLoading.value = false;
 }
 
 function selectItem(index: number) {
   if (index < 0 || index >= items.value.length) return;
   currentIndex.value = index;
   resetDraft();
+  void loadCurrentItem();
 }
 
 function firstPendingIndex(): number {
-  const i = items.value.findIndex((it) => it.status === "pending");
-  return i === -1 ? 0 : i;
+  return items.value.findIndex((item) => item.status === "pending");
 }
 
 function advance() {
-  const next = items.value.findIndex((it, i) => i > currentIndex.value && it.status === "pending");
-  selectItem(next === -1 ? Math.min(currentIndex.value + 1, items.value.length - 1) : next);
+  const next = items.value.findIndex(
+    (item, index) => index > currentIndex.value && item.status === "pending",
+  );
+  const wrapped = next === -1 ? firstPendingIndex() : next;
+  if (wrapped === -1) {
+    currentIndex.value = -1;
+    currentDetail.value = null;
+    currentReviews.value = [];
+    resetDraft();
+    return;
+  }
+  selectItem(wrapped);
 }
 
 function skip() {
   advance();
 }
 
-// Append-only in production; here the mock flips the item to reviewed and moves on.
-function submit() {
+function generateSubmissionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+async function submit() {
   const item = currentItem.value;
-  if (!canSubmit.value || !item) return;
-  item.status = "reviewed";
-  item.reviewedAt = Date.now();
-  toast({ variant: "success", message: t("aiObservability.queues.workbench.submitted") });
-  advance();
+  const detail = currentDetail.value;
+  if (!canSubmit.value || !item || !detail || submitting.value) return;
+
+  const submissionId = currentSubmissionId.value ?? generateSubmissionId();
+  currentSubmissionId.value = submissionId;
+  submitting.value = true;
+  try {
+    await llmQueuesService.submitReview(orgId.value, queueId.value, item.id, {
+      submissionId,
+      sourceStream: detail.sourceStream,
+      scores: boundConfigs.value.map((config) => {
+        const value = draft[config.scoreConfigId];
+        return {
+          scoreConfigRowId: config.rowId,
+          value:
+            config.dataType === "boolean"
+              ? value === "true"
+              : config.dataType === "numeric"
+                ? Number(value)
+                : String(value),
+        };
+      }),
+      comments: comment.value.trim() || null,
+    });
+    item.status = "reviewed";
+    item.reviewedAt = Date.now();
+    currentSubmissionId.value = null;
+    toast({ variant: "success", message: t("aiObservability.queues.workbench.submitted") });
+    advance();
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.queues.workbench.submitError") });
+  } finally {
+    submitting.value = false;
+  }
 }
 
 async function refresh() {
   if (!orgId.value || !queueId.value) return;
   loading.value = true;
   try {
-    const [q, its, configs] = await Promise.all([
+    const [queueRow, queueItems, configs] = await Promise.all([
       llmQueuesService.get(orgId.value, queueId.value),
       llmQueuesService.listItems(orgId.value, queueId.value),
       llmQueuesService.listScoreConfigOptions(orgId.value),
     ]);
-    queue.value = q;
-    items.value = its;
+    queue.value = queueRow;
+    items.value = queueItems;
     configOptions.value = configs;
     currentIndex.value = firstPendingIndex();
     resetDraft();
+    await loadCurrentItem();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
   } finally {
@@ -745,24 +896,34 @@ async function refresh() {
   }
 }
 
-// TODO(BE): deep-link to the full trace detail once trace refs are wired.
 function openTrace() {
-  toast({ variant: "info", message: t("aiObservability.queues.workbench.openTraceSoon") });
+  const item = currentItem.value;
+  const detail = currentDetail.value;
+  if (!item || !detail) return;
+  const query = {
+    stream: detail.sourceStream,
+    from: item.refTraceStartTime,
+    to: Date.now() * 1_000,
+    org_identifier: orgId.value,
+  };
+  if (item.refType === "session") {
+    router.push({ name: "sessionDetails", query: { ...query, session_id: item.refId } });
+    return;
+  }
+  const traceId = item.refType === "span" ? item.refTraceId : item.refId;
+  if (traceId) router.push({ name: "traceDetails", query: { ...query, trace_id: traceId } });
 }
 
-// Keyboard: ←/→ move between items, Enter submits when complete.
-function onKeydown(e: KeyboardEvent) {
-  const el = e.target as HTMLElement | null;
-  if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
-  if (e.key === "ArrowLeft") selectItem(currentIndex.value - 1);
-  else if (e.key === "ArrowRight") selectItem(currentIndex.value + 1);
-  else if (e.key === "Enter" && canSubmit.value) submit();
+function onKeydown(event: KeyboardEvent) {
+  const element = event.target as HTMLElement | null;
+  if (element && /^(INPUT|TEXTAREA|SELECT)$/.test(element.tagName)) return;
+  if (event.key === "ArrowLeft") selectItem(currentIndex.value - 1);
+  else if (event.key === "ArrowRight") selectItem(currentIndex.value + 1);
+  else if (event.key === "Enter" && canSubmit.value) void submit();
 }
-
-watch(currentItem, () => resetDraft());
 
 onMounted(() => {
-  refresh();
+  void refresh();
   window.addEventListener("keydown", onKeydown);
 });
 
