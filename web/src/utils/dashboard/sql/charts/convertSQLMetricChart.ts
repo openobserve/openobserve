@@ -60,6 +60,19 @@ export const METRIC_SPARKLINE = {
   bottomBandTopPct: 60, // "bottom" layout: the trend starts this % down the cell
 };
 
+/**
+ * Persisted `config.sparkline` shape. Every field is optional/nullable — the
+ * UI leaves them null until the user interacts, and each is guarded at read.
+ */
+export interface SparklineConfig {
+  enabled?: boolean;
+  type?: string | null;
+  layout?: string | null;
+  color?: string | null;
+  fillOpacity?: number | null;
+  lineWidth?: number | null;
+}
+
 export interface MetricSparkline {
   grid: any;
   xAxis: any[];
@@ -80,8 +93,8 @@ export interface MetricSparkline {
  * series, or null when disabled or there is no trend to draw (< 2 points).
  */
 export const buildMetricSparkline = (
-  values: any[],
-  spark: any,
+  values: unknown[],
+  spark: SparklineConfig | null | undefined,
   fallbackColor: string,
 ): MetricSparkline | null => {
   if (!spark?.enabled || !Array.isArray(values) || values.length < 2) return null;
@@ -144,35 +157,6 @@ export const buildMetricSparkline = (
     data,
     resolved: { type, color, fillOpacity, lineWidth, layout },
   };
-};
-
-/**
- * Extract an ordered numeric series from `is_ui_histogram` hits (defensive about
- * the value/timestamp field names): oldest→newest, non-numeric points dropped.
- */
-export const extractSparklineValues = (hits: any): number[] => {
-  if (!Array.isArray(hits) || hits.length === 0) return [];
-  const tsKey = (h: any): number => {
-    const raw = h?.zo_sql_key ?? h?._timestamp ?? null;
-    if (raw == null) return 0;
-    const num = Number(raw);
-    if (!Number.isNaN(num)) return num;
-    const parsed = Date.parse(String(raw));
-    return Number.isNaN(parsed) ? 0 : parsed;
-  };
-  const valOf = (h: any): number => {
-    if (h?.zo_sql_num != null) return Number(h.zo_sql_num);
-    for (const [k, v] of Object.entries(h ?? {})) {
-      if (k === "zo_sql_key" || k === "zo_sql_breakdown" || k.includes("timestamp")) continue;
-      const n = Number(v);
-      if (!Number.isNaN(n)) return n;
-    }
-    return NaN;
-  };
-  return [...hits]
-    .sort((a, b) => tsKey(a) - tsKey(b))
-    .map(valOf)
-    .filter((n) => !Number.isNaN(n));
 };
 
 /** Normalize a histogram bucket key (UTC string, or sec/ms/µs number) to microseconds. */

@@ -17,7 +17,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   applyMetricChart,
   buildMetricSparkline,
-  extractSparklineValues,
   fillSparklineRange,
   calculateMetricFontSize,
   METRIC_COPY_BTN_SLOT_PX,
@@ -338,41 +337,6 @@ describe("applyMetricChart", () => {
       // ordered oldest→newest by zo_sql_key → [5, 9, 7] (not the y1 [100,200,300])
       expect(ctx.options.series[1].data).toEqual([5, 9, 7]);
     });
-  });
-});
-
-describe("extractSparklineValues", () => {
-  it("returns [] for empty / non-array input", () => {
-    expect(extractSparklineValues(undefined)).toEqual([]);
-    expect(extractSparklineValues([])).toEqual([]);
-  });
-
-  it("orders by zo_sql_key and maps zo_sql_num", () => {
-    expect(
-      extractSparklineValues([
-        { zo_sql_key: 30, zo_sql_num: 3 },
-        { zo_sql_key: 10, zo_sql_num: 1 },
-        { zo_sql_key: 20, zo_sql_num: 2 },
-      ]),
-    ).toEqual([1, 2, 3]);
-  });
-
-  it("falls back to an aliased value column when zo_sql_num is absent", () => {
-    expect(
-      extractSparklineValues([
-        { _timestamp: 1, y_axis_1: 11 },
-        { _timestamp: 2, y_axis_1: 22 },
-      ]),
-    ).toEqual([11, 22]);
-  });
-
-  it("drops non-numeric points", () => {
-    expect(
-      extractSparklineValues([
-        { zo_sql_key: 1, zo_sql_num: 5 },
-        { zo_sql_key: 2, zo_sql_num: "n/a" },
-      ]),
-    ).toEqual([5]);
   });
 });
 

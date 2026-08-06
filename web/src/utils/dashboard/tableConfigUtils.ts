@@ -88,7 +88,6 @@ export const buildValueMappingCache = (mappings: any): Map<any, any> | null => {
       // Range mapping – encoded key so direct + range share the same Map
       cache.set(`__range_${mapping.from}_${mapping.to}`, mapping);
     } else if (type === "gt" || type === "lt" || type === "gte" || type === "lte") {
-      // Threshold mapping – numeric comparison happens during lookup.
       cache.set(`__op_${type}_${mapping.value}`, mapping);
     } else if (mapping.value !== undefined && mapping.value !== null) {
       cache.set(mapping.value, mapping);
