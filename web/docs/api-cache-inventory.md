@@ -75,7 +75,7 @@ Implemented in `purgeOrgQueries` / `purgeAllQueries` (`queryClient.ts`).
 
 ## 2. Migrated — currently cached
 
-17 query modules live in `web/src/composables/query/queries/`, covering 26 reads,
+26 query modules live in `web/src/composables/query/queries/`, covering 55 reads,
 plus the two pre-existing IndexedDB caches now folded into the same purge path.
 
 ### App shell
@@ -137,6 +137,67 @@ plus the two pre-existing IndexedDB caches now folded into the same purge path.
 | `queries/settingsLists.ts` → model pricing | `GET /api/{org}/llm/models` | T1 | **localStorage** |
 | `queries/regexPatterns.ts` → built-in | `GET /api/{org}/re_patterns/built-in` | T0 | **localStorage** |
 
+### App settings & org metadata
+
+| Module | API | Tier | Storage |
+|---|---|---|---|
+| `queries/userSettings.ts` → favourites | `GET /api/{org}/settings/v2/favorite_dashboards` | T1 | **localStorage** (key includes the user id) |
+| `queries/userSettings.ts` → home dashboard | `GET /api/{org}/settings/v2/home_dashboard` | T1 | **localStorage** |
+| `queries/orgMeta.ts` → org settings | `GET /api/{org}/settings` | T1 | **localStorage** |
+| `queries/orgMeta.ts` → nodes | `GET /api/{org}/node/list` | T1 | memory — cluster state is more confusing stale than slow |
+| `queries/orgMeta.ts` → license | `GET /api/license` | T4 | memory — carries live usage counters (see below) |
+| `queries/actions.ts` | `GET /api/{org}/actions` | T1 | **localStorage** — read on every Logs entry |
+| `queries/savedViews.ts` | `GET /api/{org}/savedviews` | T2 | memory |
+
+### Credentials — cached, never persisted
+
+Every query in `queries/tokens.ts` pins `persist: "none"` explicitly, on the
+query, so the override survives anyone re-tiering these later.
+
+| Module | API | Tier | Storage |
+|---|---|---|---|
+| `queries/tokens.ts` → ingestion tokens | `GET /api/{org}/ingestion-tokens` | T2 | memory only |
+| `queries/tokens.ts` → org passcode | `GET /api/{org}/passcode` | T2 | memory only |
+| `queries/tokens.ts` → RUM tokens | `GET /api/{org}/rumtoken` | T2 | memory only |
+| `queries/tokens.ts` → agent tokens | `GET /api/{org}/synthetics/agent-tokens` | T2 | memory only |
+| `queries/settingsLists.ts` → cipher keys | (already listed above) | T1 | memory only |
+| `queries/config.ts` | (already listed above) | T0 | memory only |
+
+### IAM
+
+| Module | API | Tier | Storage |
+|---|---|---|---|
+| `queries/iam.ts` → groups | `GET /api/{org}/groups` | T2 | memory |
+| `queries/iam.ts` → roles | `GET /api/{org}/roles` | T2 | memory |
+| `queries/iam.ts` → resources | `GET /api/{org}/resources` | T1 | **localStorage** — enum-like |
+| `queries/iam.ts` → role permissions | `GET /api/{org}/roles/{name}/permissions` | T3 | memory |
+| `queries/iam.ts` → pending invites | `GET /api/invites` | T2 | memory |
+
+### Traces
+
+| Module | API | Tier | Storage |
+|---|---|---|---|
+| `queries/traces.ts` → trace DAG | `GET /api/{org}/{stream}/traces/{id}/dag` | T5, `staleTime: Infinity` | **IndexedDB** — a trace is immutable, so each time window is cacheable forever |
+
+### Enterprise
+
+| Module | API | Tier | Storage |
+|---|---|---|---|
+| `queries/onlineEvals.ts` → providers | `GET /api/{org}/providers` | T1 | **localStorage** |
+| `queries/onlineEvals.ts` → score configs | `GET /api/{org}/score_configs` | T2 | memory |
+| `queries/onlineEvals.ts` → scorers | `GET /api/{org}/scorers` | T2 | memory |
+| `queries/onlineEvals.ts` → eval jobs | `GET /api/{org}/eval_jobs` | T2 | memory |
+| `queries/billing.ts` → subscription | `GET /api/{org}/billings/list_subscription` | T2 | memory only |
+| `queries/billing.ts` → invoices | `GET /api/{org}/billings/invoices` | T2 | memory only |
+| `queries/billing.ts` → AI usage | `GET /api/{org}/ai/usage` | T2 | memory only |
+| `queries/billing.ts` → billing group members | `GET /api/{org}/billing_group/members` | T2 | memory only |
+
+### Server-paginated (all now share one cached page query per surface)
+
+| Module | API | Tier | Storage |
+|---|---|---|---|
+| `queries/alertHistory.ts` — also used by AlertHistoryDrawer and AlertEvaluationHistory | `GET /api/v2/{org}/alerts/history` | T2 | memory |
+
 ### Polling
 
 | Module | API | Tier | Storage |
@@ -157,22 +218,22 @@ Ordered by value. **Storage** is what the proposed tier implies.
 
 ### 3a. High value — shared, stable, cheap to cache
 
+> Two proposals in this section were wrong and were corrected while migrating:
+> **license** is T4/memory, not T0/localStorage — the payload carries live
+> ingestion-usage counters and the key is replaceable from the settings page, so
+> freezing it would show stale entitlement right after an update. **Nodes** is
+> memory, not persisted — stale cluster topology is more confusing than a second
+> of loading. Treat the tiers below as proposals to verify against the payload,
+> not as decisions already made.
+
 | # | Module / page | API | Proposed | Storage | Why |
 |---|---|---|---|---|---|
-| 1 | `useFavoriteDashboards` | `GET /api/{org}/settings/v2/favorite_dashboards` | T1 | **localStorage** | Fetched on every Dashboards mount; drives the favorites-first landing decision, so it blocks first paint. |
-| 2 | `useHomeDashboard` | `GET /api/{org}/settings/v2/home_dashboard` | T1 | **localStorage** | Same shape; read on MainLayout mount for the pinned-dashboard button. |
 | 3 | `settings.listSettings` | `GET /api/{org}/settings/v2` | T1 | **localStorage** | Backs both of the above; one query could serve all user settings. |
-| 4 | Org settings | `GET /api/{org}/settings` | T1 | **localStorage** | Refetched on every org switch by MainLayout. |
-| 5 | Org selector | `GET /api/organizations` (`os_list`) | T1 | **localStorage** | Header dropdown; re-requested on several routes. |
 | 6 | Stream schema drawer | `GET /api/{org}/streams/{name}/schema` | T1 | memory | Per-stream; a schema changes rarely but is re-fetched on every drawer open. |
 | 7 | Enrichment table status | `GET /api/{org}/enrichment_tables/status` | T2 | memory | Paired with the enrichment list on every mount. |
-| 8 | Nodes | `GET /api/{org}/node/list` | T1 | memory | Cluster topology; stable within a session. |
-| 9 | Saved views (Logs) | `GET /api/{org}/savedviews` | T2 | memory | Re-fetched on each Logs entry. |
-| 10 | Query functions | `GET /api/{org}/query_functions` | T1 | **localStorage** | Same class as `functions`. |
-| 11 | Action scripts | `GET /api/{org}/actions` | T2 | memory | Replaces the `organizationData.actions` Vuex map. |
+| 10 | Query functions | `GET /api/{org}/query_functions` | — | — | **Dead service** — no consumer in the app. Delete rather than cache. |
 | 12 | Domain management | `GET /api/{metaOrg}/domain_management` | T1 | memory | Settings page. |
 | 13 | Org storage settings | `GET /api/{org}/storage` | T1 | memory | Settings page. |
-| 14 | License | `GET /api/license` | T0 | **localStorage** | Immutable for the session. |
 | 15 | GenAI agent mapping | `GET /api/{org}/settings/gen_ai/agent_mapping`, `/gen_ai/agents` | T1 | **localStorage** | Settings page. |
 | 16 | Service streams | `GET /api/{org}/service_streams`, `/config/identity` | T1 | memory | Service catalog; stable. |
 
@@ -180,11 +241,6 @@ Ordered by value. **Storage** is what the proposed tier implies.
 
 | # | Page | API | Proposed | Storage |
 |---|---|---|---|---|
-| 17 | Groups | `GET /api/{org}/groups` (+ `/{name}`) | T2 / T3 | memory |
-| 18 | Roles | `GET /api/{org}/roles` (+ `/{id}`) | T2 / T3 | memory |
-| 19 | Role permissions | `GET /api/{org}/roles/{name}/permissions` | T3 | memory |
-| 20 | Resources | `GET /api/{org}/resources` | T1 | **localStorage** (enum-like) |
-| 21 | Invitations | `GET /api/invites`, `/api/{org}/invites` | T2 | memory |
 | 22 | User roles / groups | `GET /api/{org}/users/{email}/roles`, `/groups`, `/users/roles/all` | T2 | memory |
 
 ### 3c. Detail reads (open one entity)
@@ -207,8 +263,6 @@ Each needs `useServerTable` (or the `fetch/refetch/prefetch` trio) for
 
 | # | Table | API | Proposed | Storage |
 |---|---|---|---|---|
-| 31 | AlertHistoryDrawer | `GET /api/v2/{org}/alerts/history` | T2 | memory |
-| 32 | AlertEvaluationHistory | `GET /api/v2/{org}/alerts/{id}/groups/transitions` | T2 | memory |
 | 33 | PipelineHistory | `GET /api/{org}/pipelines/history` — called inline via `http()`, not through a service | T2 | memory |
 | 34 | Workflow runs | `GET /api/{org}/workflows/{id}/history` | T4 | memory (volatile) |
 | 35 | Synthetics runs | `GET /api/{org}/synthetics/{id}/runs` | T2 | memory |
@@ -218,7 +272,20 @@ Each needs `useServerTable` (or the `fetch/refetch/prefetch` trio) for
 | 39 | Query history | `POST /api/{org}/_search_history` — a POST-shaped read; cacheable, but the body must be the key | T2 | memory |
 | 40 | Tickets / attachments | `GET /api/tickets` | T2 | memory |
 
-### 3e. Polling → `refetchInterval` (still on `setInterval`)
+### 3e. Polling — mostly a false premise, verified
+
+Only `OrgCleanupTasksDialog` had the defect this section was written for (a
+timer that had to be started, stopped and torn down by hand). Checked against
+the source:
+
+- **Running queries** and **backfill jobs** have no `setInterval` at all. There
+  is nothing to convert, and no dedup to win — a single caller with
+  `staleTime: 0` gains nothing. Deliberately not migrated.
+- **Incident RCA** and **AWS marketplace activation** do poll, but both already
+  clear their own timer on every terminal state. Converting them means
+  rewriting a working state machine on flows that are hard to exercise, for no
+  behavioural gain. Deliberately not migrated.
+
 
 | # | Where | API | Proposed | Storage |
 |---|---|---|---|---|
@@ -242,7 +309,6 @@ Each needs `useServerTable` (or the `fetch/refetch/prefetch` trio) for
 
 | # | Surface | API | Proposed | Storage |
 |---|---|---|---|---|
-| 51 | Trace DAG | `GET /api/{org}/{stream}/traces/{traceId}/dag` | T5, `staleTime: Infinity` | **IndexedDB** — immutable once written |
 | 52 | Service graph topology | `/api/{org}/traces/service_graph/topology/current` | T5 | **IndexedDB** |
 | 53 | Dashboard variable values | `stream.fieldValues` / WS | T5 | **IndexedDB** (shares the field-value store) |
 | 54 | PromQL label discovery | `get_promql_series`, `/prometheus/api/v1/metadata` | T1 | memory |
@@ -263,11 +329,7 @@ lists behind one service.
 
 | # | Surface | API | Proposed | Storage |
 |---|---|---|---|---|
-| 55 | Providers | `GET /api/{org}/providers` | T1 | **localStorage** |
-| 56 | Score configs | `GET /api/{org}/score_configs` | T2 | memory |
 | 57 | Score config versions | `GET /api/{org}/score_configs/{id}/versions` | T3 | memory |
-| 58 | Scorers | `GET /api/{org}/scorers` | T2 | memory |
-| 59 | Eval jobs | `GET /api/{org}/eval_jobs` | T2 | memory |
 
 Writes (`create` / `update` / `delete` / `activate` / `pause` / `manual_eval`)
 become `useOrgMutation` with a prefix invalidate. `scorers/test` and
@@ -289,17 +351,26 @@ cached.**
 
 | # | Surface | API | Proposed | Storage |
 |---|---|---|---|---|
-| 62 | Invoice history | `GET /api/{org}/billings/invoices` | T2 | memory |
-| 63 | Subscription | `GET /api/{org}/billings/list_subscription` | T2 | memory |
 | 64 | Quota threshold | `GET /api/{org}/billings/quota_threshold` | T1 | memory |
-| 65 | AI usage | `GET /api/{org}/ai/usage` | T2 | memory |
-| 66 | Billing group members / invites / membership | `GET /api/{org}/billing_group/*` | T2 | memory |
 
 **Never cache in billings** — each returns a single-use URL, token or a
 state-changing result despite the GET verb:
 `hosted_subscription_url`, `billing_portal`, `hosted_page_status/{id}`,
 `change_payment_detail/{id}`, `list_paymentsource` (payment instrument data),
 `unsubscribe` and `resume_subscription` (both mutate through a GET).
+
+### 3i. Deliberately left uncached — decisions, not backlog
+
+Verified against the source while working through §3. These are **not** pending
+items; migrating them would be wrong or a net loss.
+
+| Surface | Why not |
+|---|---|
+| Single dashboard (`get_Dashboard`) | Read inside the save path, where its `hash` drives optimistic concurrency. A cached hash means a spurious save conflict. |
+| Running queries, backfill jobs | No `setInterval` to convert and a single caller, so `staleTime: 0` buys nothing. |
+| Incident RCA poll, AWS marketplace poll | Already self-limiting; the timers clear on every terminal state. |
+| `query_functions` | Dead service — no consumer anywhere in the app. Delete it instead. |
+| Billing single-use URLs and GET-mutations | Listed in `queries/billing.ts`; caching any of them is a correctness bug. |
 
 ## 4. Explicitly out of scope — do not cache
 
