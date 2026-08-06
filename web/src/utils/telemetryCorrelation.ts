@@ -112,6 +112,49 @@ export function buildFieldToGroupIdMap(semanticGroups: FieldAlias[]): Map<string
 }
 
 /**
+ * Overlay user filter edits onto ONE stream's base filters (F35).
+ *
+ * Chip keys are raw field names harvested from a single stream, but every
+ * correlated stream carries its own alias for the same semantic group (e.g.
+ * a log stream's `k8s_namespace_name` vs a trace stream's
+ * `service_k8s_namespace_name`). Requiring literal key identity silently drops
+ * the user's edit for every stream that spells the field differently, so the
+ * override is resolved through the semantic group when the exact key is absent.
+ *
+ * Precedence: an exact key match always wins; only then do we fall back to the
+ * group. Overrides that match neither are dropped — adding them would emit a
+ * WHERE condition on a column the stream does not have.
+ *
+ * @param baseFilters - the stream's own filters, keyed by its raw field names
+ * @param overrides - user-edited values, keyed by whichever stream's field names the chips came from
+ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function applyFilterOverlay(
+  baseFilters: Record<string, string>,
+  overrides: Record<string, string>,
+  fieldToGroupId: Map<string, string>,
+): Record<string, string> {
+  const effective: Record<string, string> = { ...baseFilters };
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (key in baseFilters) {
+      effective[key] = value;
+      continue;
+    }
+
+    const groupId = fieldToGroupId.get(key.toLowerCase());
+    if (!groupId) continue;
+
+    const target = Object.keys(baseFilters).find(
+      (baseKey) => fieldToGroupId.get(baseKey.toLowerCase()) === groupId,
+    );
+    if (target) effective[target] = value;
+  }
+
+  return effective;
+}
+
+/**
  * Filter dimensions to only include fields that are actually used for disambiguation
  *
  * This implements the same logic as the backend to determine which dimensions are relevant

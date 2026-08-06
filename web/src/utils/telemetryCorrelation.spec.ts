@@ -20,6 +20,7 @@ import {
   quoteSqlIdentifier,
   quoteSqlLiteral,
   buildSqlCondition,
+  applyFilterOverlay,
 } from "./telemetryCorrelation";
 import type { ServiceIdentityConfig, FieldAlias } from "@/services/service_streams";
 
@@ -326,6 +327,67 @@ describe("telemetryCorrelation", () => {
     it("coerces non-string inputs before escaping", () => {
       expect(quoteSqlLiteral(42 as unknown as string)).toBe("'42'");
       expect(quoteSqlIdentifier(7 as unknown as string)).toBe('"7"');
+    });
+  });
+
+  describe("applyFilterOverlay", () => {
+    const groups = new Map<string, string>([
+      ["k8s_namespace_name", "k8s-namespace"],
+      ["service_k8s_namespace_name", "k8s-namespace"],
+    ]);
+
+    it("applies exact-key overrides", () => {
+      expect(
+        applyFilterOverlay({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("resolves an override to the stream's own alias for the same group (F35)", () => {
+      // Chip key came from stream A ("k8s_namespace_name"); stream B uses the other alias.
+      expect(
+        applyFilterOverlay({ service_k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
+      ).toEqual({ service_k8s_namespace_name: "b" });
+    });
+
+    it("ignores overrides with no group and no matching base key", () => {
+      expect(applyFilterOverlay({ x: "1" }, { unrelated: "z" }, groups)).toEqual({ x: "1" });
+    });
+
+    it("ignores a grouped override when the stream has no field in that group", () => {
+      expect(applyFilterOverlay({ x: "1" }, { k8s_namespace_name: "b" }, groups)).toEqual({
+        x: "1",
+      });
+    });
+
+    it("resolves group aliases case-insensitively", () => {
+      expect(
+        applyFilterOverlay(
+          { SERVICE_K8S_NAMESPACE_NAME: "a" },
+          { K8S_NAMESPACE_NAME: "b" },
+          groups,
+        ),
+      ).toEqual({ SERVICE_K8S_NAMESPACE_NAME: "b" });
+    });
+
+    it("prefers the exact key when the base has both the exact key and a group sibling", () => {
+      expect(
+        applyFilterOverlay(
+          { k8s_namespace_name: "a", service_k8s_namespace_name: "a2" },
+          { k8s_namespace_name: "b" },
+          groups,
+        ),
+      ).toEqual({ k8s_namespace_name: "b", service_k8s_namespace_name: "a2" });
+    });
+
+    it("returns a copy and does not mutate the base filters", () => {
+      const base = { k8s_namespace_name: "a" };
+      const result = applyFilterOverlay(base, { k8s_namespace_name: "b" }, groups);
+      expect(base).toEqual({ k8s_namespace_name: "a" });
+      expect(result).not.toBe(base);
+    });
+
+    it("passes base filters through untouched with an empty group map", () => {
+      expect(applyFilterOverlay({ a: "1" }, { a: "2", b: "3" }, new Map())).toEqual({ a: "2" });
     });
   });
 });
