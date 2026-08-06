@@ -45,7 +45,7 @@
     "@openobserve/browser-rum": "0.4.1",
     "@openobserve/node-sql-parser": "^0.1.5",
     "@openobserve/rrweb-player": "^0.2.1",
-    "@rudderstack/analytics-js": "3.31.6",
+    "@rudderstack/analytics-js": "3.6.0",
     "@tanstack/vue-form": "^1.33.3",
     "@tanstack/vue-table": "^9.0.0",
     "@tanstack/vue-virtual": "^3.13.35",
