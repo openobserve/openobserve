@@ -1432,8 +1432,8 @@ export default defineComponent({
     async changeOrganizationIdentifier(_next: string, previous: string) {
       this.isLoading = false;
       this.resetStreams();
-      // Every query key is rooted at ["org", id], so the previous org's cached
-      // reads — in memory and persisted — go in one call.
+      // Drops the previous org's persisted entries; its in-memory ones stay, so
+      // switching back is free. Keys are org-rooted, so nothing can cross over.
       if (previous) purgeOrgQueries(previous);
       // Clear notifications from the previous org — they no longer apply.
       dismissAll();

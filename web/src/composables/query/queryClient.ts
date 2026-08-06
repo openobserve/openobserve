@@ -40,12 +40,21 @@ export const queryClient = new QueryClient({
 });
 
 /**
- * Drop everything cached for `org` — in memory and in persisted storage.
- * Called from the org-switch watcher.
+ * Called on org switch with the org being left. Drops that org's *persisted*
+ * entries only — the in-memory ones stay.
+ *
+ * Keeping memory is safe because every key is rooted at ["org", id], so one
+ * org's data can never be served to another, and gcTime collects it anyway.
+ * The payoff is that switching back to a recent org inside its staleTime costs
+ * no requests at all.
+ *
+ * Disk is different: localStorage is a ~5 MB budget shared with the whole app,
+ * so persisting every org visited would eventually hit quota (silently — the
+ * storage wrapper swallows it), and the previous tenant's stream, folder and
+ * function names would sit on a possibly shared machine.
  */
 export const purgeOrgQueries = (org: string): void => {
   if (!org) return;
-  queryClient.removeQueries({ queryKey: ["org", org] });
   void purgePersistedOrg(org);
 };
 
