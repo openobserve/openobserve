@@ -466,12 +466,23 @@ pub async fn update_workflows(
 )]
 pub async fn test_workflow(
     Path(org_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
     Json(inputs): Json<WorkflowTestInput>,
 ) -> Response {
     let mut workflow = inputs.workflow;
     workflow.org_id = org_id.clone();
     workflow.id = format!("test-{}", config::ider::uuid());
-    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node).await {
+
+    let is_draft = match query.get("draft") {
+        Some(v) => v.as_str(),
+        None => "false",
+    };
+
+    let is_draft: bool = is_draft.parse().unwrap_or(false);
+
+    match workflows::test_workflow(&org_id, workflow, inputs.inputs, inputs.from_node, is_draft)
+        .await
+    {
         Ok(v) => MetaHttpResponse::json(WorkflowTestResult {
             errors: v.errors,
             inputs: v.inputs,

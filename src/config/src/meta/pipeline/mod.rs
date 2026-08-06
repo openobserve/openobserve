@@ -97,8 +97,12 @@ impl MemorySize for Pipeline {
 
 // TODO YJDoc2: in a separate PR, use this fn in the pipeline validation below, so we have
 // same logic for pipelines and workflows as intended
-pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow::Error> {
-    if nodes.len() < 2 || edges.is_empty() {
+pub fn validate_nodes_edges(
+    nodes: &[Node],
+    edges: &[Edge],
+    is_draft: bool,
+) -> Result<(), anyhow::Error> {
+    if nodes.len() < 2 || (!is_draft && edges.is_empty()) {
         return Err(anyhow!(
             "there must be more than 1 node and at least 1 edge"
         ));
@@ -117,7 +121,7 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         }
     }
 
-    if edges.len() < nodes.len().saturating_sub(1) {
+    if !is_draft && edges.len() < nodes.len().saturating_sub(1) {
         return Err(anyhow!(
             "Insufficient number of edges to connect all nodes. Need at least {} for {} nodes, but got {}.",
             nodes.len().saturating_sub(1),
@@ -156,6 +160,7 @@ pub fn validate_nodes_edges(nodes: &[Node], edges: &[Edge]) -> Result<(), anyhow
         false,
         false,
         &mut visited,
+        is_draft,
     )?;
 
     Ok(())
@@ -297,6 +302,7 @@ impl Pipeline {
             false,
             self.is_evaluation(),
             &mut visited,
+            false, // pipelines are never drafted
         )?;
 
         Ok(())
@@ -521,6 +527,7 @@ fn dfs_traversal_check(
     mut flattened: bool,
     allow_evaluation_leaf: bool,
     visited: &mut HashSet<String>,
+    is_draft: bool,
 ) -> Result<()> {
     if visited.contains(current_id) {
         return Err(anyhow!("Cyclical pipeline detected."));
@@ -546,7 +553,7 @@ fn dfs_traversal_check(
         // Evaluation pipelines publish durable tasks instead of forwarding to a stream.
         let valid_leaf = current_node.is_a_leaf_node()
             || (allow_evaluation_leaf && matches!(current_node, NodeData::LlmEvaluation(_)));
-        if !valid_leaf {
+        if !valid_leaf && !is_draft {
             return Err(anyhow!(
                 "All terminal nodes must be stream nodes or destination nodes"
             ));
@@ -571,6 +578,7 @@ fn dfs_traversal_check(
             flattened,
             allow_evaluation_leaf,
             visited,
+            is_draft,
         )?;
     }
     visited.remove(current_id);

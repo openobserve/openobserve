@@ -438,7 +438,15 @@ impl ExecutablePipeline {
                 return Err(e);
             }
         };
-        let source_node_id = sorted_nodes[0].to_owned();
+        let source_node_id = sorted_nodes
+            .iter()
+            .filter(|id| {
+                let node = node_map.get(*id).unwrap();
+                matches!(node.node_data, NodeData::WorkflowTrigger)
+            })
+            .next()
+            .unwrap_or(&sorted_nodes[0])
+            .to_owned();
 
         Ok(Self {
             id: workflow.id.to_string(),
