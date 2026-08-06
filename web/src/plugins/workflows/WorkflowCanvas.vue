@@ -39,6 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @node-change="onNodeChange"
     @nodes-change="onNodesChange"
     @edges-change="onEdgesChange"
+    @node-drag-start="onNodeDragStart"
+    @node-drag-stop="onNodeDragStop"
     @edge-click="onEdgeClick"
     @connect="onConnect"
     @drop="onDrop"
@@ -96,6 +98,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </svg>
         </ControlButton>
+
+        <!-- Undo (T1) + Tidy up (T9) — editor-only affordances (hidden on the
+             read-only Runs canvas). Undo is the ONLY history button; redo is
+             keyboard-only (Ctrl/Cmd+Shift+Z). -->
+        <ControlButton
+          v-if="!readOnly"
+          data-test="workflows-canvas-undo"
+          :disabled="!canUndo"
+          :title="t('workflow.canvas.undo')"
+          @click="onUndo"
+        >
+          <OIcon name="restart-alt" size="sm" />
+        </ControlButton>
+        <ControlButton
+          v-if="!readOnly"
+          data-test="workflows-canvas-tidy"
+          :title="t('workflow.canvas.tidyUp')"
+          @click="onTidy"
+        >
+          <OIcon name="account-tree" size="sm" />
+        </ControlButton>
       </template>
     </Controls>
   </VueFlow>
@@ -106,10 +129,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="showEdgeHelpNotification"
     data-test="workflow-edge-delete-hint"
-    class="bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    class="bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center gap-2 border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
   >
-    <OIcon name="info" class="mr-1" size="sm" />
-    {{ t("workflow.edgeDeleteHint") }}
+    <OIcon name="info" size="sm" />
+    <span>{{ t("workflow.edgeDeleteHint") }}</span>
+    <!-- Insert a step onto the selected edge (T7): A→B becomes A→new→B, rewired
+         automatically. Kept as an action on the selected edge (rather than a
+         hover-`+` overlay) so it stays within the token/utility styling rules. -->
+    <OButton
+      variant="outline"
+      size="xs"
+      data-test="workflows-edge-insert"
+      icon-left="add-circle-outline"
+      @click="onInsertStep"
+    >
+      {{ t("workflow.canvas.insertStep") }}
+    </OButton>
   </div>
 
   <!-- Empty-canvas start node (replaces the old "add a trigger" hint text). An
@@ -153,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // workflow canvases cannot drift. Intentionally global: the selectors target
 // VueFlow's own markup, which never carries a scoped data-attribute.
 import "@/components/flow/flow-canvas.css";
-import { ref, computed, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls, ControlButton } from "@vue-flow/controls";
@@ -162,7 +197,14 @@ import WorkflowNode from "./WorkflowNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import useWorkflowCanvas from "./useWorkflowCanvas";
+import OButton from "@/lib/core/Button/OButton.vue";
+import useWorkflowCanvas, {
+  workflowHistory,
+  pushWorkflowHistory,
+  undoWorkflow,
+  redoWorkflow,
+  tidyWorkflowLayout,
+} from "./useWorkflowCanvas";
 
 import "@vue-flow/core/dist/style.css";
 import "@vue-flow/core/dist/theme-default.css";
@@ -174,10 +216,13 @@ const {
   onNodeChange,
   onNodesChange,
   onEdgesChange,
+  onNodeDragStart,
+  onNodeDragStop,
   onConnect,
   onDrop,
   onDragOver,
   openTriggerPicker,
+  openInsertPicker,
 } = useWorkflowCanvas();
 
 const {
@@ -188,7 +233,19 @@ const {
   findNode,
   getSelectedEdges,
   removeEdges,
+  fitView,
 } = useVueFlow();
+
+// Undo availability drives the button's disabled state (T1).
+const canUndo = computed(() => workflowHistory.past.length > 0);
+const onUndo = () => undoWorkflow();
+// Tidy re-lays-out the tree, then frames it (T9). Pass the measured node width so
+// cards centre on their column (not left-align); falls back to a default width for
+// any node VueFlow hasn't measured yet.
+const onTidy = () => {
+  const getWidth = (id: string) => findNode(id)?.dimensions?.width;
+  if (tidyWorkflowLayout(getWidth)) nextTick(() => fitView({ padding: 0.2 }));
+};
 
 const vueFlowRef = ref<any>(null);
 // Read-only inspection canvas (the Runs view) — disables node drag/connect and,
@@ -199,9 +256,12 @@ const readOnly = computed(() => workflowObj.readOnly);
 // hint that Backspace/Delete removes it (same affordance as the pipeline canvas).
 // Skipped on the read-only Runs canvas, where edges can't be removed.
 const showEdgeHelpNotification = ref(false);
+// The edge the hint refers to — the Insert Step action (T7) splices onto it.
+const selectedEdge = ref<any>(null);
 let edgeHintTimeout: ReturnType<typeof setTimeout> | null = null;
-const onEdgeClick = () => {
+const onEdgeClick = (payload: any) => {
   if (readOnly.value) return;
+  selectedEdge.value = payload?.edge ?? payload ?? null;
   if (edgeHintTimeout) clearTimeout(edgeHintTimeout);
   showEdgeHelpNotification.value = true;
   edgeHintTimeout = setTimeout(() => {
@@ -210,14 +270,53 @@ const onEdgeClick = () => {
   }, 3500);
 };
 
-// Backspace/Delete removes the selected edge (the action the hint advertises).
-// Scoped to EDGES only so node deletion keeps flowing through the confirm dialog.
+// Insert a step onto the selected edge (T7) — opens the step picker in "insert"
+// mode; picking a type splices A→new→B (see addNodeOnEdge / commitNode).
+const onInsertStep = () => {
+  if (!selectedEdge.value) return;
+  openInsertPicker(selectedEdge.value);
+  showEdgeHelpNotification.value = false;
+};
+
+// Is the user typing in a field / code editor? Undo/redo + edge-delete must not
+// hijack keystrokes meant for an input (a node config field, Monaco, etc.).
+const isTextInputTarget = (target: EventTarget | null): boolean => {
+  const el = target as HTMLElement | null;
+  if (!el) return false;
+  const tag = el.tagName;
+  return (
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    el.isContentEditable ||
+    !!el.closest?.(".monaco-editor")
+  );
+};
+
+// Keyboard handling on the canvas:
+//   • Backspace/Delete removes the selected edge (the action the hint advertises;
+//     scoped to EDGES only so node deletion keeps flowing through the confirm dialog).
+//   • Ctrl/Cmd+Z undoes the last structural change; Ctrl/Cmd+Shift+Z redoes it
+//     (redo is keyboard-only — no on-screen button, by product decision).
+// All of these are inert on the read-only Runs canvas and while a text input /
+// Monaco editor is focused.
 const onKeydown = (event: KeyboardEvent) => {
   if (readOnly.value) return;
+  if (isTextInputTarget(event.target)) return;
+
+  const mod = event.metaKey || event.ctrlKey;
+  if (mod && (event.key === "z" || event.key === "Z")) {
+    event.preventDefault();
+    if (event.shiftKey) redoWorkflow();
+    else undoWorkflow();
+    return;
+  }
+
   if (event.key !== "Delete" && event.key !== "Backspace") return;
   const selected = getSelectedEdges.value;
   if (!selected.length) return;
   event.preventDefault();
+  // Snapshot BEFORE removal so the edge-delete is a single undo step.
+  pushWorkflowHistory();
   removeEdges(selected.map((e) => e.id));
   showEdgeHelpNotification.value = false;
 };

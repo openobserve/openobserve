@@ -67,6 +67,14 @@
   box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-indigo-500) 22%, transparent);
 }
 
+/* Active result node — the step whose Input/Output is showing in the results dock
+   (WorkflowNode marks its card `wf-result-active`). A stronger indigo ring than
+   `.selected` so, with the step list hidden in the right dock, it's clear on the
+   canvas which node is being inspected. */
+.o2vf_node .vue-flow__node:has(.wf-result-active) {
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--color-indigo-500) 55%, transparent);
+}
+
 /* ── Per-type colour: input = blue, default = amber, output = green ──────── */
 .o2vf_node .vue-flow__node-input {
   border: 1px solid var(--color-blue-400);

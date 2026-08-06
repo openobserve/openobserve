@@ -2330,7 +2330,32 @@
       "destinationSelect": "Destination",
       "destinationCreateNew": "Create New Destination",
       "destinationRequired": "Please Select a Destination",
-      "destinationLoadError": "Unable To Load Destinations"
+      "destinationLoadError": "Unable To Load Destinations",
+      "namePlaceholder": "Name This Step",
+      "commentLabel": "Comment",
+      "commentPlaceholder": "Add A Note About This Step...",
+      "commentAdd": "Add Comment",
+      "disable": "Disable Step",
+      "enable": "Enable Step",
+      "disabledBadge": "Disabled"
+    },
+    "canvas": {
+      "undo": "Undo",
+      "tidyUp": "Tidy Up",
+      "insertStep": "Insert Step"
+    },
+    "unsaved": {
+      "title": "Unsaved Changes",
+      "message": "You have unsaved changes. Leaving now will discard them.",
+      "discard": "Discard Changes",
+      "stay": "Keep Editing"
+    },
+    "results": {
+      "title": "Step Results",
+      "collapse": "Collapse",
+      "expand": "Expand",
+      "nodesTitle": "Steps",
+      "empty": "Run A Test To See Step Results Here."
     }
   },
   "pipeline": {

@@ -55,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="workflow-editor-description"
             :placeholder="t('workflow.descriptionPlaceholder')"
             :aria-label="t('workflow.description')"
+            @update:model-value="markWorkflowDirty"
           />
         </span>
       </template>
@@ -70,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :readonly="workflowObj.isEditWorkflow"
             :error="workflowObj.nameError"
             :error-message="workflowObj.nameError ? t('workflow.nameRequired') : undefined"
-            @update:model-value="workflowObj.nameError = false"
+            @update:model-value="onNameChange"
           />
           <BetaBadge />
         </span>
@@ -167,7 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
       <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
-        <WorkflowCanvas />
+        <!-- The results dock (T4) wraps the canvas: once a Test run produces a
+             result it docks the shared results panel beside the canvas (bottom or
+             right, flippable) instead of overlaying it in a drawer. -->
+        <WorkflowResultsDock>
+          <WorkflowCanvas />
+        </WorkflowResultsDock>
       </div>
     </div>
 
@@ -191,12 +197,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Test input popup — collects the sample payload + run-from and dry-runs the
          current graph (sent whole, no save needed). Results render as ✓ / error
-         badges on the canvas nodes. -->
+         badges on the canvas nodes, and open in the results dock (T4) — clicking a
+         node badge selects that step in the dock rather than opening an overlay. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
-
-    <!-- Per-step Input/Output result drawer — opened by clicking a node's badge
-         after a run; also hosts the Replay-from-here button. -->
-    <WorkflowStepResultDrawer v-if="workflowObj.testRun.resultDrawer.show" />
 
     <!-- Link-to-alerts prompt — shown once, right after a workflow is created, so
          the user can attach it to existing alerts without leaving for the alert
@@ -219,13 +222,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:ok="deleteNode(workflowObj.deleteConfirm.nodeId)"
       @update:cancel="cancelDeleteNode"
     />
+
+    <!-- Unsaved-changes guard (T8) — blocks a leave with unsaved edits until the
+         user chooses Discard or Keep Editing. -->
+    <ConfirmDialog
+      v-model="unsavedDialog"
+      data-test="workflows-editor-unsaved-dialog"
+      :title="t('workflow.unsaved.title')"
+      :message="t('workflow.unsaved.message')"
+      :ok-label="t('workflow.unsaved.discard')"
+      @update:ok="onDiscardChanges"
+      @update:cancel="onKeepEditing"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import { useI18n } from "vue-i18n";
-import { useRouter } from "vue-router";
+import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -237,7 +252,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
-import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
+import WorkflowResultsDock from "./WorkflowResultsDock.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -252,6 +267,8 @@ import useWorkflowCanvas, {
   triggerTypeForKind,
   currentTriggerKind,
   serializeWorkflow,
+  markWorkflowDirty,
+  reachableFrom,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -272,6 +289,7 @@ const {
   deleteNode,
   cancelDeleteNode,
   addNodeAfter,
+  addNodeOnEdge,
   addTriggerNode,
   closeStepPicker,
   onDragStart,
@@ -348,11 +366,13 @@ const stepItems = computed(() => {
 });
 
 const onStepPick = (item: any) => {
-  const { source, handle, mode, position } = workflowObj.stepPicker;
+  const { source, handle, mode, position, edgeId } = workflowObj.stepPicker;
   closeStepPicker();
   // The trigger has nothing before it, so it is placed rather than appended.
   if (mode === "trigger")
     addTriggerNode(item.nodeType || "workflow_trigger", item.trigger_kind, position);
+  // Insert-between (T7): splice the picked type onto the selected edge.
+  else if (mode === "insert") addNodeOnEdge(edgeId, item.key);
   else addNodeAfter(source, handle, item.key);
 };
 
@@ -389,9 +409,55 @@ const loadWorkflow = async (id: string) => {
   }
 };
 
+// Cancel / back — just navigate. The unsaved-changes guard (onBeforeRouteLeave)
+// intercepts if there are unsaved edits and prompts before the route actually
+// changes; resetWorkflowData runs on unmount, so it must NOT run here (it would
+// clear dirtyFlag and slip the guard). A clean editor navigates straight out.
 const goBack = () => {
-  resetWorkflowData();
   router.push({ name: "workflows", query: { org_identifier: orgId() } });
+};
+
+// ── Unsaved-changes guard (T8) ──────────────────────────────────────────────
+// One prompt catches every exit path: Cancel/back and sidebar/programmatic nav
+// (route-leave) plus tab close / reload (beforeunload). The route-leave guard
+// blocks the pending navigation, opens the confirm dialog, and only proceeds once
+// the user chooses Discard — at which point dirtyFlag is cleared so the retried
+// navigation passes straight through.
+const unsavedDialog = ref(false);
+const pendingRoute = ref<RouteLocationRaw | null>(null);
+
+onBeforeRouteLeave((to) => {
+  if (!workflowObj.dirtyFlag) return true;
+  pendingRoute.value = to.fullPath;
+  unsavedDialog.value = true;
+  return false;
+});
+
+const onDiscardChanges = () => {
+  unsavedDialog.value = false;
+  // Discard: drop the dirty flag so the retried navigation is allowed through.
+  workflowObj.dirtyFlag = false;
+  const to = pendingRoute.value;
+  pendingRoute.value = null;
+  if (to) router.push(to);
+};
+const onKeepEditing = () => {
+  unsavedDialog.value = false;
+  pendingRoute.value = null;
+};
+
+// Native browser prompt for tab close / reload while there are unsaved edits.
+const beforeUnloadHandler = (e: BeforeUnloadEvent) => {
+  if (!workflowObj.dirtyFlag) return;
+  e.preventDefault();
+  e.returnValue = "";
+};
+
+// Name / description edits (create mode only — the fields are read-only on edit)
+// must mark the workflow dirty so the guard fires for a rename-only change.
+const onNameChange = () => {
+  workflowObj.nameError = false;
+  markWorkflowDirty();
 };
 
 const saving = ref(false);
@@ -403,7 +469,15 @@ const saving = ref(false);
 const validate = ({
   requireName = true,
   requireGraph = true,
-}: { requireName?: boolean; requireGraph?: boolean } = {}): boolean => {
+  allowOrphans = false,
+}: {
+  requireName?: boolean;
+  requireGraph?: boolean;
+  // Test only (T5): run the connected chain from the trigger; DON'T reject
+  // unwired/orphan steps — they're simply excluded from the run set. Save/Publish
+  // keep the strict check (allowOrphans stays false).
+  allowOrphans?: boolean;
+} = {}): boolean => {
   const wf = workflowObj.currentSelectedWorkflow;
   if (requireName) {
     const name = (wf.name || "").trim();
@@ -426,6 +500,18 @@ const validate = ({
     toast({ message: t("workflow.triggerRequired"), variant: "warning" });
     return false;
   }
+
+  // Test (allowOrphans): require only a trigger with at least one connected step;
+  // unwired steps stay on the canvas and are skipped on the run.
+  if (allowOrphans) {
+    const reachable = reachableFrom(wf.edges || [], [trigger.id]);
+    if (reachable.size < 2) {
+      toast({ message: t("workflow.addStepRequired"), variant: "warning" });
+      return false;
+    }
+    return true;
+  }
+
   if (nodes.length < 2) {
     toast({ message: t("workflow.addStepRequired"), variant: "warning" });
     return false;
@@ -646,8 +732,10 @@ const onPublish = async () => {
 // request, so there's no need to save first. It must still be a runnable graph
 // though: a trigger plus at least one connected step, no orphan nodes (the same
 // connectivity checks as Save, minus the name requirement).
+// Test dry-runs the current in-memory graph (T5): a trigger with at least one
+// connected step is enough — unwired/orphan steps are skipped, not blockers.
 const onTest = () => {
-  if (!validate({ requireName: false })) return;
+  if (!validate({ requireName: false, allowOrphans: true })) return;
   workflowObj.testRun.show = true;
 };
 
@@ -664,6 +752,7 @@ const openRuns = () => {
 };
 
 onMounted(async () => {
+  window.addEventListener("beforeunload", beforeUnloadHandler);
   const query = router.currentRoute.value.query;
   const id = query.id as string | undefined;
   if (id) {
@@ -675,5 +764,8 @@ onMounted(async () => {
   }
 });
 
-onBeforeUnmount(() => resetWorkflowData());
+onBeforeUnmount(() => {
+  window.removeEventListener("beforeunload", beforeUnloadHandler);
+  resetWorkflowData();
+});
 </script>
