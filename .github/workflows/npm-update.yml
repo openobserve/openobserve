@@ -13,8 +13,10 @@ permissions:
 jobs:
   update-dependencies:
     name: Update NPM Dependencies
-    runs-on:
-      labels: ubicloud-standard-8
+    # This job only bumps the manifest and opens the PR. Type check, unit tests
+    # and build all run as normal PR checks on the resulting pull request, so
+    # nothing here needs to install node_modules or compile anything.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Clone the current repo
@@ -38,13 +40,6 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Install current dependencies
-        run: |
-          cd web
-          # Install from the lockfile first so `npm outdated`/ncu report accurate
-          # "current" versions, and so the toolchain exists for the later checks.
-          npm ci
-
       - name: Check for available updates
         id: check_updates
         run: |
@@ -53,11 +48,7 @@ jobs:
           # Snapshot the pre-update manifest so the PR body can show old → new.
           cp package.json "$RUNNER_TEMP/package.json.before"
 
-          # IMPORTANT: --target minor keeps upgrades inside the current major.
-          # Unrestricted major bumps break the build toolchain (e.g. typescript
-          # 5.x -> 7.x drops the `./lib/tsc` export that vue-tsc still requires).
-          # Major upgrades stay a deliberate, manual decision.
-          npx --yes npm-check-updates --target minor --peer --jsonUpgraded \
+          npx --yes npm-check-updates --target latest --peer --jsonUpgraded \
             > "$RUNNER_TEMP/upgrades.json"
 
           if ! jq -e 'type == "object"' "$RUNNER_TEMP/upgrades.json" > /dev/null; then
@@ -72,13 +63,8 @@ jobs:
             jq '.' "$RUNNER_TEMP/upgrades.json"
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "No in-major updates available"
+            echo "No updates available"
           fi
-
-          # Informational only: majors deliberately held back, surfaced in the PR
-          # body so reviewers know what still needs a manual upgrade.
-          npx --yes npm-check-updates --target latest --jsonUpgraded \
-            > "$RUNNER_TEMP/majors.json" || echo '{}' > "$RUNNER_TEMP/majors.json"
 
       - name: Update dependencies
         if: steps.check_updates.outputs.has_updates == 'true'
@@ -86,36 +72,14 @@ jobs:
           cd web
           echo "Updating dependencies..."
 
-          # Apply the same in-major upgrades that were just reported.
-          npx --yes npm-check-updates -u --target minor --peer
+          # Apply the same upgrades that were just reported.
+          npx --yes npm-check-updates -u --target latest --peer
 
-          # Resolve the new ranges and regenerate package-lock.json
-          npm install
+          # Regenerate package-lock.json only — node_modules is never needed
+          # here, and skipping the install keeps this job to well under a minute.
+          npm install --package-lock-only
 
           echo "Dependencies updated successfully"
-
-      - name: Run type check
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          cd web
-          echo "Running type check..."
-          npm run type-check
-
-      - name: Run unit tests
-        if: steps.check_updates.outputs.has_updates == 'true'
-        run: |
-          cd web
-          echo "Running unit tests..."
-          npm run test:unit:coverage
-
-      - name: Build project
-        if: steps.check_updates.outputs.has_updates == 'true'
-        env:
-          NODE_OPTIONS: "--max-old-space-size=8192"
-        run: |
-          cd web
-          echo "Building project..."
-          npm run build
 
       - name: Generate update summary
         if: steps.check_updates.outputs.has_updates == 'true'
@@ -129,46 +93,22 @@ jobs:
             'to_entries[] | "- **\(.key)**: \($before[.key] // "n/a") → \(.value)"' \
             "$RUNNER_TEMP/upgrades.json")
 
-          # Drop entries whose "latest" is the same version the minor pass already
-          # applied — those are not held back.
-          HELD_BACK=$(jq -r --argjson before "$BEFORE" \
-            --slurpfile minor "$RUNNER_TEMP/upgrades.json" \
-            'to_entries[] | select($minor[0][.key] != .value)
-             | "- **\(.key)**: \($before[.key] // "n/a") → \(.value)"' \
-            "$RUNNER_TEMP/majors.json")
-          if [ -z "$HELD_BACK" ]; then
-            HELD_BACK="_None — every dependency is on its latest major._"
-          fi
-
           cat > "$RUNNER_TEMP/pr_body.md" <<EOF
           ## 📦 Weekly NPM Dependencies Update
 
-          This automated PR updates \`web/\` npm packages within their current major versions.
+          This automated PR updates \`web/\` npm packages to their latest versions
+          and regenerates \`package-lock.json\`.
 
           ### Updated Packages
 
           $UPDATED_PACKAGES
 
-          ### Testing Results
+          ### Validation
 
-          - ✅ Type check passed
-          - ✅ Unit tests passed
-          - ✅ Build successful
-
-          ### Major Upgrades Available (not applied)
-
-          Majors are intentionally excluded — they routinely break the build toolchain
-          (e.g. \`typescript\` 7.x drops the \`./lib/tsc\` export that \`vue-tsc\` requires).
-          Upgrade these deliberately in a dedicated PR:
-
-          $HELD_BACK
-
-          ### Notes
-
-          - \`package-lock.json\` has been regenerated
-          - All tests passed successfully
-
-          Please review the changes and merge if everything looks good.
+          This workflow does **not** run any checks — type check, unit tests and
+          build all run as normal PR checks below. Review the results there before
+          merging; a red check usually means one of the upgrades above needs to be
+          pinned back or accompanied by a code change.
 
           ---
 
@@ -180,7 +120,7 @@ jobs:
       - name: Commit changes
         if: steps.check_updates.outputs.has_updates == 'true'
         run: |
-          # Scope the check to the manifest files so stray build artifacts never
+          # Scope the check to the manifest files so stray artifacts never
           # trigger an empty dependency PR.
           if git diff --quiet -- web/package.json web/package-lock.json; then
             echo "No dependency changes to commit"
@@ -189,9 +129,8 @@ jobs:
             git add web/package.json web/package-lock.json
             git commit \
               -m "chore(deps): update web npm dependencies ($(date +%Y-%m-%d))" \
-              -m "- Updated packages to their latest in-major versions" \
+              -m "- Updated packages to their latest versions" \
               -m "- Regenerated package-lock.json" \
-              -m "- Type check, unit tests and build all passing" \
               -m "🤖 Automated update by GitHub Actions"
 
             git push origin "$BRANCH_NAME"
@@ -214,4 +153,4 @@ jobs:
       - name: No updates needed
         if: steps.check_updates.outputs.has_updates == 'false'
         run: |
-          echo "✅ All npm packages are up to date within their current majors. No PR needed."
+          echo "✅ All npm packages are up to date. No PR needed."
