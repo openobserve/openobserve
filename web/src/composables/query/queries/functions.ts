@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import TransformService from "@/services/jstransform";
+import queryFunctionsService from "@/services/query_functions";
 import { qk } from "../queryKeys";
 import { tierOptions } from "../tiers";
 import { queryClient } from "../queryClient";
@@ -48,3 +49,15 @@ export const useFunctionsList = () =>
     fetch: (org) => functionsQueryOptions(org).queryFn(),
     tier: "ORG_CONFIG",
   });
+
+// ── Server query functions (SQL editor autocomplete) ────────────────────────
+// Small, stable and needed before the first completion popup, so it persists.
+
+const queryFunctionsOptions = (org: string) => ({
+  queryKey: [...qk.functions.root(org), "queryFunctions"] as const,
+  queryFn: async (): Promise<any[]> => (await queryFunctionsService.list(org)).data?.list ?? [],
+  ...tierOptions("ORG_CONFIG"),
+});
+
+export const fetchQueryFunctions = (org: string): Promise<any[]> =>
+  queryClient.fetchQuery(queryFunctionsOptions(org));
