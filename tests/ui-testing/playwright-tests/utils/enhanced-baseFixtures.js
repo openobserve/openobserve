@@ -112,9 +112,13 @@ const expect = test.expect;
 async function verifyAuthentication(page) {
   try {
     // Increase timeout for authentication verification, especially important for first test in suite
-    await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
+    // Verify against the nav rail container rather than a specific item. The
+    // Home tile's `menu-link-/-item` no longer renders on the current rail
+    // (only Slack/Help still use that pattern), so keying auth off it made
+    // every suite fail setup even when login had succeeded.
+    await page.waitHelpers.waitForElementVisible('[data-test="navbar-main-nav"]', {
       timeout: 15000,
-      description: 'home menu link (auth verification)'
+      description: 'main nav rail (auth verification)'
     });
     return true;
   } catch (error) {
@@ -169,7 +173,7 @@ async function navigateToBase(page) {
     testLogger.error('User not authenticated - global setup might have failed (re-auth also failed or unavailable)');
     throw new Error('User not authenticated. Global setup might have failed.');
   }
-
+  
   testLogger.info('Successfully navigated to base URL with authentication');
 }
 
