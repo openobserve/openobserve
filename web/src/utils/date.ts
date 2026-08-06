@@ -273,11 +273,7 @@ export function formatTimestamp(us: number, format: string): string {
  * Mirrors formatTimestamp but renders in the given timezone instead of the
  * browser's local zone, so the displayed value matches a timezone label.
  */
-export function formatTimestampInTimezone(
-  us: number,
-  format: string,
-  timezone: string,
-): string {
+export function formatTimestampInTimezone(us: number, format: string, timezone: string): string {
   return formatInTimeZone(us / 1000, timezone, normalizeFormat(format));
 }
 
