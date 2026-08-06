@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { createRouter, createMemoryHistory } from "vue-router";
 import { useAlertCreation } from "./useAlertCreation";
 import {
   ALERT_PREFILL_KEY,
@@ -7,7 +8,9 @@ import {
 } from "@/utils/alerts/alertPrefillStorage";
 import { ALERT_PREFILL_VERSION, type AlertPrefill } from "@/ts/interfaces/alertPrefill";
 
-const mockRouterPush = vi.fn();
+// Resolves like the real push: it reports a NavigationFailure rather than
+// throwing, and openAlertCreation inspects that result.
+const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 vi.mock("vue-router", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
   return { ...actual, useRouter: () => ({ push: mockRouterPush }) };
@@ -74,5 +77,44 @@ describe("useAlertCreation", () => {
     expect(openAlertCreation(prefill({ streamName: "" }))).toBe(false);
     expect(mockRouterPush).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(ALERT_PREFILL_KEY)).toBeNull();
+  });
+
+  // A real router, not the mock: the behaviour under test is vue-router's own
+  // cancellation, which a stubbed push cannot express.
+  describe("when the launching page navigates at the same time", () => {
+    const Stub = { template: "<div />" };
+
+    // The alert form is `() => import(...)`, so the push stays in flight while
+    // the chunk loads. That window is what the competing navigation lands in.
+    const lazyStub = () =>
+      new Promise((resolve) => {
+        let ticks = 0;
+        const tick = () => (ticks++ < 3 ? Promise.resolve().then(tick) : resolve(Stub));
+        tick();
+      });
+
+    const makeRouter = () =>
+      createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: "/dashboards/view", name: "viewDashboard", component: Stub },
+          { path: "/alerts/add", name: "addAlert", component: lazyStub as any },
+        ],
+      });
+
+    it("still reaches the alert form when a query sync supersedes the push", async () => {
+      const router = makeRouter();
+      await router.push({ name: "viewDashboard", query: { dashboard: "d1" } });
+
+      const { openAlertCreation } = useAlertCreation({ router, store: mockStore });
+      openAlertCreation(prefill());
+
+      // The dashboard writing its own query params, mid-flight. Without the
+      // re-issue this wins outright and the user never leaves the dashboard.
+      await router.replace({ query: { dashboard: "d1", refresh: "0" } });
+
+      await vi.waitFor(() => expect(router.currentRoute.value.name).toBe("addAlert"));
+      expect(router.currentRoute.value.query.prefill).toBe("logs");
+    });
   });
 });

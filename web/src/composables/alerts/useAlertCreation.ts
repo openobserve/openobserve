@@ -23,7 +23,7 @@
  */
 
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, isNavigationFailure, NavigationFailureType } from "vue-router";
 import { useStore } from "vuex";
 import type { AlertBuildOptions, AlertPrefill } from "@/ts/interfaces/alertPrefill";
 import { isPrefillBlocked, normalizePrefill } from "@/utils/alerts/alertPrefill";
@@ -117,7 +117,7 @@ export const useAlertCreation = (deps: UseAlertCreationDeps = {}) => {
 
     writeAlertPrefill(normalized);
 
-    router.push({
+    const target = {
       name: "addAlert",
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
@@ -125,6 +125,23 @@ export const useAlertCreation = (deps: UseAlertCreationDeps = {}) => {
         // Small, shareable, inert on its own — the payload rides sessionStorage.
         prefill: normalized.source,
       },
+    };
+
+    // Re-issue once if the navigation is cancelled.
+    //
+    // The alert form is a lazy-loaded route, so this push stays in flight while
+    // its chunk downloads — and every surface that launches it (a dashboard, a
+    // logs search) syncs its own query params on a timer or on data arrival. A
+    // replace() that starts inside that window supersedes ours, vue-router
+    // reports `cancelled`, and the user is left staring at the page they
+    // clicked on with no error. The competing sync has landed by the time we
+    // hear about it, so the retry is uncontested. Bounded at one — a second
+    // cancellation means something is navigating in a loop, and ping-ponging
+    // with it would be worse than stopping.
+    router.push(target).then((failure: unknown) => {
+      if (isNavigationFailure(failure, NavigationFailureType.cancelled)) {
+        router.push(target);
+      }
     });
 
     return true;

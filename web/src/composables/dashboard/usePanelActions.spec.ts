@@ -75,7 +75,9 @@ describe("usePanelActions", () => {
         selectedTimeObj: { value: { start_time: 1, end_time: 2 } },
         contextMenuData: { value: null as any },
         store: { state: { selectedOrganization: { identifier: "org-1" } } },
-        router: { push: vi.fn() },
+        // Resolves like the real push, which reports navigation failures
+        // through the returned promise rather than throwing.
+        router: { push: vi.fn().mockResolvedValue(undefined) },
         emit: vi.fn(),
       };
     };
