@@ -221,15 +221,17 @@ pub async fn save(
         ref destination_type,
     } = destination.module
     {
-        // Check if this is a prebuilt destination (has destination_type metadata)
+        // Check if this is a prebuilt destination (has destination_type metadata).
+        // Templates are optional now (design §4.4 — org-default/compiled-in
+        // fallback covers the None case), so a missing template no longer
+        // implies "assume prebuilt" — only an EXPLICIT `prebuilt_*` reference
+        // triggers the auto-association below.
         let prebuilt_type = match destination_type {
             DestinationType::Http(endpoint) => endpoint.destination_type.as_deref(),
             DestinationType::Email(_) => {
-                // Check if template is prebuilt or not set (assume prebuilt email)
-                if template.is_none()
-                    || template
-                        .as_ref()
-                        .is_some_and(|t| t.starts_with("prebuilt_"))
+                if template
+                    .as_ref()
+                    .is_some_and(|t| t.starts_with("prebuilt_"))
                 {
                     Some("email")
                 } else {
@@ -258,14 +260,6 @@ pub async fn save(
                 }
             }
         }
-    }
-
-    // Validate that alert destinations have a template
-    // Templates are REQUIRED for alert destinations to format alert messages
-    if let Module::Alert { template, .. } = &destination.module
-        && (template.is_none() || template.as_ref().is_some_and(|t| t.is_empty()))
-    {
-        return Err(DestinationError::TemplateNotFound);
     }
 
     let saved = db::alerts::destinations::set(destination).await?;
@@ -318,6 +312,7 @@ pub async fn test_email(
     super::alert::send_email_notification(
         "OpenObserve - Test Email Destination",
         &email,
+        email_body.clone(),
         email_body,
     )
     .await
@@ -712,22 +707,24 @@ mod tests {
         let _ = db::alerts::destinations::delete(org_id, "custom_webhook").await;
     }
 
-    /// Test that alert destinations cannot be created without a template
+    /// Templates are optional at the destination level (design §4.4) — a
+    /// missing or empty template no longer fails save(); resolution falls
+    /// through to the org default / compiled-in fallback at send time
+    /// instead. Supersedes the old `test_alert_destination_requires_template`.
     #[tokio::test]
-    async fn test_alert_destination_requires_template() {
+    async fn test_alert_destination_template_is_optional() {
         let org_id = "test_org_no_template";
 
         // Clean up any leftover state
         let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
         let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
 
-        // Try to create an alert destination without a template
         let dest = Destination {
             id: None,
             org_id: org_id.to_string(),
             name: "test_no_template".to_string(),
             module: Module::Alert {
-                template: None, // No template!
+                template: None,
                 destination_type: DestinationType::Http(Endpoint {
                     url: "https://example.com/webhook".to_string(),
                     method: HTTPType::POST,
@@ -736,21 +733,27 @@ mod tests {
             },
         };
 
-        // Attempt to save should fail with TemplateNotFound error
         let result = save("test_no_template", dest, true).await;
-        assert!(result.is_err(), "Should fail when template is None");
         assert!(
-            matches!(result.unwrap_err(), DestinationError::TemplateNotFound),
-            "Should return TemplateNotFound error"
+            result.is_ok(),
+            "Should save when template is None: {result:?}"
         );
+        let saved = result.unwrap();
+        if let Module::Alert { template, .. } = &saved.module {
+            assert!(
+                template.is_none(),
+                "template stays None — no auto-association without an explicit prebuilt_* reference, got {template:?}"
+            );
+        } else {
+            panic!("expected Module::Alert");
+        }
 
-        // Try with empty string template
         let dest_empty = Destination {
             id: None,
             org_id: org_id.to_string(),
             name: "test_empty_template".to_string(),
             module: Module::Alert {
-                template: Some("".to_string()), // Empty template!
+                template: Some("".to_string()),
                 destination_type: DestinationType::Http(Endpoint {
                     url: "https://example.com/webhook".to_string(),
                     method: HTTPType::POST,
@@ -760,13 +763,13 @@ mod tests {
         };
 
         let result_empty = save("test_empty_template", dest_empty, true).await;
-        assert!(result_empty.is_err(), "Should fail when template is empty");
         assert!(
-            matches!(
-                result_empty.unwrap_err(),
-                DestinationError::TemplateNotFound
-            ),
-            "Should return TemplateNotFound error for empty template"
+            result_empty.is_ok(),
+            "Should save when template is an empty string: {result_empty:?}"
         );
+
+        // Clean up
+        let _ = db::alerts::destinations::delete(org_id, "test_no_template").await;
+        let _ = db::alerts::destinations::delete(org_id, "test_empty_template").await;
     }
 }
