@@ -259,6 +259,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 import config from "@/aws-exports";
+import { aiUsageQuery } from "@/composables/query/queries/billing";
 
 let currentDate = new Date();
 
@@ -421,7 +422,7 @@ export default defineComponent({
       if (config.isCloud !== "true") return;
       const orgId = store.state.selectedOrganization.identifier;
       try {
-        aiUsage.value = (await BillingService.get_ai_usage(orgId)).data;
+        aiUsage.value = await aiUsageQuery.fetch(orgId);
       } catch {
         aiUsage.value = null;
       }

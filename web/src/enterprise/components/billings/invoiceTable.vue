@@ -70,6 +70,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { invoiceHistoryQuery } from "@/composables/query/queries/billing";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -167,10 +168,11 @@ const getInvoiceHistory = () => {
     timeout: 0,
   });
 
-  BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
-    .then((res) => {
+  invoiceHistoryQuery
+    .fetch(store.state.selectedOrganization.identifier)
+    .then((res: any) => {
       dismiss();
-      const invoiceList = res.data.invoices;
+      const invoiceList = res.invoices;
       if (invoiceList.length > 0) {
         invoiceHistory.value = invoiceList.map((invoice: Invoice, index: number) => {
           return {

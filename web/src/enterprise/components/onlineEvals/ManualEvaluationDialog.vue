@@ -70,6 +70,7 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { evalJobsQuery } from "@/composables/query/queries/onlineEvals";
 import {
   makeManualEvaluationDialogSchema,
   type ManualEvaluationDialogForm,
@@ -137,7 +138,7 @@ async function loadJobs(): Promise<void> {
   loadedJobs.value = [];
   form.reset({ jobId: "" });
   try {
-    loadedJobs.value = await onlineEvalsService.jobs.list(props.orgId);
+    loadedJobs.value = await evalJobsQuery.fetch(props.orgId);
     if (compatibleJobs.value.length === 1) {
       form.setFieldValue("jobId", compatibleJobs.value[0].id);
     }

@@ -141,6 +141,7 @@ import {
 } from "@/services/online-evals-catalog.service";
 import { entityId } from "./utils/evalEntity";
 import { showError } from "./utils/evalFormat";
+import { scoreConfigsQuery } from "@/composables/query/queries/onlineEvals";
 
 const { t } = useI18nTyped();
 
@@ -315,7 +316,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
     );
   } catch (err: any) {
     if (err?.response?.status === 409) {
-      const refreshed = await onlineEvalsService.scoreConfigs.list(props.orgId);
+      const refreshed = await scoreConfigsQuery.refetch(props.orgId);
       const found = refreshed.find((row) => row.name === name);
       if (found) return found;
     }

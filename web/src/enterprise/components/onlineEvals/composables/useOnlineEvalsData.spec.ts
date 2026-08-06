@@ -138,6 +138,10 @@ describe("useOnlineEvalsData — loadAll", () => {
     const inFlight = data.loadAll("org-1");
     expect(data.isLoading.value).toBe(true);
 
+    // The query layer defers the fetch to a microtask, so the mock's promise
+    // (and `resolveProviders`) only exists after a tick.
+    await Promise.resolve();
+    await Promise.resolve();
     resolveProviders([]);
     await inFlight;
     expect(data.isLoading.value).toBe(false);

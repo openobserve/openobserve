@@ -8,6 +8,12 @@ import onlineEvalsService, {
 } from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
+import {
+  providersQuery,
+  scoreConfigsQuery,
+  scorersQuery,
+  evalJobsQuery,
+} from "@/composables/query/queries/onlineEvals";
 
 export function useOnlineEvalsData() {
   const { t } = useI18nTyped();
@@ -22,12 +28,14 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     isLoading.value = true;
     try {
+      // Cached per list: revisiting the page inside the tier's staleTime costs
+      // nothing, and the four requests still fan out in parallel on a miss.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          onlineEvalsService.providers.list(orgId),
-          onlineEvalsService.scoreConfigs.list(orgId),
-          onlineEvalsService.scorers.list(orgId),
-          onlineEvalsService.jobs.list(orgId),
+          providersQuery.fetch(orgId),
+          scoreConfigsQuery.fetch(orgId),
+          scorersQuery.fetch(orgId),
+          evalJobsQuery.fetch(orgId),
         ],
       );
 
@@ -65,7 +73,7 @@ export function useOnlineEvalsData() {
   async function loadProviders(orgId: string) {
     if (!orgId) return;
     try {
-      providers.value = await onlineEvalsService.providers.list(orgId);
+      providers.value = await providersQuery.refetch(orgId);
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));
     }
