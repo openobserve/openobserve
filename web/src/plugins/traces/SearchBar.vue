@@ -46,33 +46,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroupItem>
         </OToggleGroup>
 
-        <template>
-          <!-- Reset: icon+text at wide widths, icon-only when narrow -->
-          <OButton
-            data-test="traces-search-bar-reset-filters-btn"
-            variant="outline"
-            size="xs"
-            @click="resetFilters"
-          >
-            <template #icon-left>
-              <OIcon name="restart-alt" size="sm" class="shrink-0" />
-            </template>
-            <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
-          </OButton>
+        <!-- Reset: icon+text at wide widths, icon-only when narrow -->
+        <OButton
+          data-test="traces-search-bar-reset-filters-btn"
+          variant="outline"
+          size="xs"
+          @click="resetFilters"
+        >
+          <template #icon-left>
+            <OIcon name="restart-alt" size="sm" class="shrink-0" />
+          </template>
+          <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+        </OButton>
 
-          <div
-            class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
-          >
-            <OSwitch
-              data-test="traces-search-bar-show-metrics-toggle-btn"
-              v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs flex items-center justify-center pr-1"
-              size="lg"
-            />
-            <OIcon name="bar-chart" size="sm" class="shrink-0" />
-            <OTooltip :content="t('traces.RedMetrics')" />
-          </div>
-        </template>
+        <div
+          class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
+        >
+          <OSwitch
+            data-test="traces-search-bar-show-metrics-toggle-btn"
+            v-model="searchObj.meta.showHistogram"
+            class="o2-toggle-button-xs flex items-center justify-center pr-1"
+            size="lg"
+          />
+          <OIcon name="bar-chart" size="sm" class="shrink-0" />
+          <OTooltip :content="t('traces.RedMetrics')" />
+        </div>
 
         <!-- More menu: Syntax Guide — always last.
              Sessions + LLM Insights were removed from Traces; they now

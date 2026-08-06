@@ -156,14 +156,14 @@ const graphRef = ref<any>(null);
 const router = useRouter();
 const store = useStore();
 const { searchObj } = useTraces();
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 // Stream list is loaded here rather than read off the graph: `expose()` unwraps
 // refs, so `graphRef.value.availableStreams` is a snapshot the template would
 // never see update.
 const availableStreams = ref<string[]>([]);
 const selectedStream = ref("");
-const streamOptions = computed<{ label: string; value: string }[]>(() =>
+const streamOptions = computed(() =>
   availableStreams.value.map((s) => ({ label: raw(s), value: s })),
 );
 
@@ -244,8 +244,6 @@ function onDateChange(value: any) {
       ? value.relativeTimePeriod
       : searchObj.data.datetime.relativeTimePeriod,
     type: value.relativeTimePeriod ? "relative" : "absolute",
-    queryRangeRestrictionMsg: searchObj.data.datetime?.queryRangeRestrictionMsg || "",
-    queryRangeRestrictionInHour: searchObj.data.datetime?.queryRangeRestrictionInHour || 0,
   };
 }
 
@@ -274,6 +272,6 @@ function onJumpToStreamData(fromUs: number, toUs: number) {
   searchObj.data.datetime.startTime = fromUs;
   searchObj.data.datetime.endTime = toUs;
   searchObj.data.datetime.type = "absolute";
-  searchObj.data.datetime.relativeTimePeriod = null;
+  searchObj.data.datetime.relativeTimePeriod = "";
 }
 </script>
