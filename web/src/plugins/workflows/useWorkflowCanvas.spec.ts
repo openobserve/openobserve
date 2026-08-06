@@ -466,8 +466,16 @@ describe("serializeWorkflow — backend Workflow shape", () => {
     expect(wf.created_by).toBe("");
 
     const node = wf.nodes[0];
-    // persisted fields only — runtime state stripped
-    expect(Object.keys(node).sort()).toEqual(["data", "id", "io_type", "meta", "position"]);
+    // persisted fields only — runtime state stripped. is_disabled (T6) is always
+    // emitted at the node root.
+    expect(Object.keys(node).sort()).toEqual([
+      "data",
+      "id",
+      "io_type",
+      "is_disabled",
+      "meta",
+      "position",
+    ]);
     expect(node.io_type).toBe("input");
     // trigger kind carried in meta (NodeData::WorkflowTrigger is a unit variant)
     expect(node.meta.trigger_kind).toBe("alert_fired");

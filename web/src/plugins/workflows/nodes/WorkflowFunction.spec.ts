@@ -84,10 +84,11 @@ describe("WorkflowFunction", () => {
       expect(picker(wrapper).exists()).toBe(true);
     });
 
-    it("passes an empty initial-name and after-flatten=true by default", () => {
+    it("passes an empty initial-name and after-flatten=false by default", () => {
       const wrapper = createWrapper();
       expect(picker(wrapper).props("initialName")).toBe("");
-      expect(picker(wrapper).props("initialAfterFlatten")).toBe(true);
+      // Workflow function nodes default After-Flatten to false ([RBF]).
+      expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
     });
 
     it("seeds initial-name / after-flatten from the saved node data", () => {
@@ -100,13 +101,13 @@ describe("WorkflowFunction", () => {
       expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
     });
 
-    it("defaults after-flatten to true when only a name is saved", () => {
+    it("defaults after-flatten to false when only a name is saved", () => {
       workflowObj.currentSelectedNodeData = {
         id: "n1",
         data: { node_type: "function", name: "redact" },
       } as any;
       const wrapper = createWrapper();
-      expect(picker(wrapper).props("initialAfterFlatten")).toBe(true);
+      expect(picker(wrapper).props("initialAfterFlatten")).toBe(false);
     });
 
     it("seeds the inline editor with the fired-alert sample for an alert trigger", () => {

@@ -29,7 +29,12 @@ const { mockRouter, mockToast, uuidState } = vi.hoisted(() => ({
   uuidState: { n: 0 },
 }));
 
-vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
+vi.mock("vue-router", () => ({
+  useRouter: () => mockRouter,
+  // The editor registers an unsaved-changes route-leave guard (T8); the mock must
+  // provide the export or mounting throws before any assertion runs.
+  onBeforeRouteLeave: () => {},
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
@@ -70,7 +75,11 @@ const { stub } = vi.hoisted(() => ({
 vi.mock("@/plugins/workflows/WorkflowCanvas.vue", () => stub("WorkflowCanvas"));
 vi.mock("./WorkflowNodeDrawer.vue", () => stub("WorkflowNodeDrawer"));
 vi.mock("./WorkflowTestDialog.vue", () => stub("WorkflowTestDialog"));
-vi.mock("./WorkflowStepResultDrawer.vue", () => stub("WorkflowStepResultDrawer"));
+vi.mock("./WorkflowResultsDock.vue", () =>
+  stub("WorkflowResultsDock", {
+    template: `<div data-test="WorkflowResultsDock"><slot /></div>`,
+  }),
+);
 vi.mock("./WorkflowLinkAlertsDialog.vue", () =>
   stub("WorkflowLinkAlertsDialog", {
     props: ["workflowId", "workflowName"],
@@ -591,6 +600,9 @@ describe("WorkflowEditor", () => {
         show: false,
         source: "",
         handle: "out",
+        // `edgeId` carries the target edge in insert-on-edge mode (T7); reset with
+        // the rest of the picker state.
+        edgeId: "",
         mode: "next",
         position: null,
         anchor: null,
@@ -813,6 +825,8 @@ describe("WorkflowEditor", () => {
           trigger_kind: "alert_fired",
           alert_ids: [],
         },
+        // is_disabled (T6) is serialized at the node root, defaulting to false.
+        is_disabled: false,
         meta: { trigger_kind: "alert_fired" },
       });
       // runtime-only VueFlow fields are dropped
@@ -826,6 +840,7 @@ describe("WorkflowEditor", () => {
         io_type: "output",
         position: { x: 5, y: 6 },
         data: { label: "d1", node_type: "destination", destination_id: "sink" },
+        is_disabled: false,
         meta: { custom: "keep" },
         style: { width: "200px" },
       });
@@ -867,6 +882,7 @@ describe("WorkflowEditor", () => {
         io_type: "default",
         position: { x: 0, y: 0 },
         data: {},
+        is_disabled: false,
       });
       expect(bare).not.toHaveProperty("meta");
       expect(bare).not.toHaveProperty("style");
@@ -1275,19 +1291,23 @@ describe("WorkflowEditor", () => {
   // ── cancel / back ──────────────────────────────────────────────────────────
 
   describe("cancel", () => {
-    it("resets the shared state and returns to the list", async () => {
+    it("returns to the list and resets state on unmount", async () => {
       wrapper = mountEditor();
       await flushPromises();
       wf().name = "dirty";
 
       await wrapper.find('[data-test="workflow-editor-cancel"]').trigger("click");
 
-      expect(wf().name).toBe("");
-      expect(wf().nodes).toEqual([]);
+      // Cancel navigates immediately; the shared state is reset on UNMOUNT (not
+      // before push) so the unsaved-changes route guard can still read dirtyFlag.
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
         query: { org_identifier: "default" },
       });
+
+      wrapper.unmount();
+      expect(wf().name).toBe("");
+      expect(wf().nodes).toEqual([]);
     });
 
     it("returns to the list from the header back chevron", async () => {
@@ -1388,8 +1408,8 @@ describe("WorkflowEditor", () => {
       });
     });
 
-    it("blocks Test with a warning when a node is left unconnected (orphan)", async () => {
-      // trigger + a destination that has NO incoming edge -> orphan.
+    it("blocks Test when nothing is connected to the trigger", async () => {
+      // trigger + a destination but NO edges -> nothing runs from the trigger.
       wrapper = mountEditor();
       await flushPromises();
       hydrateWorkflow(savedGraph({ id: "", name: "", edges: [] }));
@@ -1397,11 +1417,44 @@ describe("WorkflowEditor", () => {
 
       await clickTest(wrapper);
 
+      // Relaxed Test validation (T5) needs a trigger + at least one connected step;
+      // with no edges it blocks with addStepRequired (not connectAllNodes).
       expect(workflowObj.testRun.show).toBe(false);
       expect(mockToast).toHaveBeenCalledWith({
-        message: t("workflow.connectAllNodes"),
+        message: t("workflow.addStepRequired"),
         variant: "warning",
       });
+    });
+
+    it("allows Test with an unwired orphan node when the chain is connected (T5)", async () => {
+      // trigger -> destination (connected) PLUS an extra orphan step with no edge.
+      wrapper = mountEditor();
+      await flushPromises();
+      const base = savedGraph({ id: "", name: "" });
+      hydrateWorkflow({
+        ...base,
+        nodes: [
+          ...base.nodes,
+          {
+            id: "orphan",
+            io_type: "default",
+            position: { x: 600, y: 240 },
+            data: { label: "orphan", node_type: "condition" },
+          },
+        ],
+      });
+      await nextTick();
+
+      await clickTest(wrapper);
+
+      // Orphans are excluded from the run, not blockers — Test proceeds.
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.connectAllNodes") }),
+      );
+      expect(mockToast).not.toHaveBeenCalledWith(
+        expect.objectContaining({ message: t("workflow.addStepRequired") }),
+      );
     });
 
     it("does not require a name to test a connected draft", async () => {
@@ -1419,15 +1472,12 @@ describe("WorkflowEditor", () => {
       );
     });
 
-    it("renders the per-step result drawer when a node's badge opens it", async () => {
+    it("mounts the results dock (which hosts the step Input/Output) instead of an overlay drawer", async () => {
       wrapper = mountEditor();
       await flushPromises();
-      expect(wrapper.find('[data-test="WorkflowStepResultDrawer"]').exists()).toBe(false);
-
-      workflowObj.testRun.resultDrawer = { show: true, nodeId: "n1" };
-      await nextTick();
-
-      expect(wrapper.find('[data-test="WorkflowStepResultDrawer"]').exists()).toBe(true);
+      // The editor docks results below the canvas via WorkflowResultsDock; a node
+      // badge selects a step inside the dock rather than opening an overlay drawer.
+      expect(wrapper.find('[data-test="WorkflowResultsDock"]').exists()).toBe(true);
     });
   });
 

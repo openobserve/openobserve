@@ -474,6 +474,8 @@ describe("WorkflowNode", () => {
         source: "c1",
         handle: "out",
         mode: "next",
+        // edgeId is only set in insert-on-edge mode (T7); empty here.
+        edgeId: "",
         position: null,
         anchor: { x: 120, y: 240 },
       });

@@ -16,10 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!--
   Per-step Test result CONTENT — the Input / Output panes, status, copy,
-  fullscreen, "Use as Test Input" and Replay for a single node. Extracted from
-  WorkflowStepResultDrawer so BOTH the overlay drawer (Runs view) and the docked
-  results panel (T4, editor) render identical content from one source. The node
-  is passed in via `nodeId`; everything else reads the shared testRun state.
+  fullscreen, "Use as Test Input" and Replay for a single node. Shared by the
+  results dock (WorkflowResultsPanel) in BOTH the editor and the read-only Runs
+  view, so they render identical content from one source. The node is passed in
+  via `nodeId`; everything else reads the shared testRun state (read-only when the
+  run is historical — see `isHistory`).
 
   Data: the test response carries a per-node `inputs` map. Input = the records
   THIS node received (nodeTestInput). Output = what it emitted, derived per
