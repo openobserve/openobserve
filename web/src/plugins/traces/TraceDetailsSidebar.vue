@@ -744,6 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"
@@ -1766,6 +1767,9 @@ export default defineComponent({
             sourceType: "traces",
             // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
             availableDimensions: { ...logFilters, ...context.fields },
+            // Lets filter edits resolve across streams that alias the same
+            // semantic group under different field names (F35).
+            semanticGroups: semanticGroups.value,
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,

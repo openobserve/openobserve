@@ -14,7 +14,16 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { filterDimensionsForCorrelation, buildFieldToGroupIdMap } from "./telemetryCorrelation";
+import {
+  filterDimensionsForCorrelation,
+  buildFieldToGroupIdMap,
+  quoteSqlIdentifier,
+  quoteSqlLiteral,
+  buildSqlCondition,
+  applyFilterOverlay,
+  applyDimensionEditsToFilters,
+  mergeSubjectOverrides,
+} from "./telemetryCorrelation";
 import type { ServiceIdentityConfig, FieldAlias } from "@/services/service_streams";
 
 describe("telemetryCorrelation", () => {
@@ -295,6 +304,236 @@ describe("telemetryCorrelation", () => {
         service: "my-service",
         "k8s-cluster": "prod-cluster",
       });
+    });
+  });
+
+  describe("sql escaping helpers", () => {
+    it("quotes identifiers and doubles embedded double quotes", () => {
+      expect(quoteSqlIdentifier("k8s_pod_name")).toBe('"k8s_pod_name"');
+      expect(quoteSqlIdentifier('bad"field')).toBe('"bad""field"');
+    });
+
+    it("quotes literals and doubles embedded single quotes", () => {
+      expect(quoteSqlLiteral("prod")).toBe("'prod'");
+      expect(quoteSqlLiteral("a' OR 1=1 --")).toBe("'a'' OR 1=1 --'");
+    });
+
+    it("builds a fully escaped condition", () => {
+      expect(buildSqlCondition("svc", "a'b")).toBe("\"svc\" = 'a''b'");
+    });
+
+    it("always quotes identifiers, including ones with special characters", () => {
+      expect(buildSqlCondition("k8s-pod.name", "web-1")).toBe("\"k8s-pod.name\" = 'web-1'");
+    });
+
+    it("coerces non-string inputs before escaping", () => {
+      expect(quoteSqlLiteral(42 as unknown as string)).toBe("'42'");
+      expect(quoteSqlIdentifier(7 as unknown as string)).toBe('"7"');
+    });
+  });
+
+  describe("applyFilterOverlay", () => {
+    const groups = new Map<string, string>([
+      ["k8s_namespace_name", "k8s-namespace"],
+      ["service_k8s_namespace_name", "k8s-namespace"],
+    ]);
+
+    it("applies exact-key overrides", () => {
+      expect(
+        applyFilterOverlay({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("resolves an override to the stream's own alias for the same group (F35)", () => {
+      // Chip key came from stream A ("k8s_namespace_name"); stream B uses the other alias.
+      expect(
+        applyFilterOverlay(
+          { service_k8s_namespace_name: "a" },
+          { k8s_namespace_name: "b" },
+          groups,
+        ),
+      ).toEqual({ service_k8s_namespace_name: "b" });
+    });
+
+    it("ignores overrides with no group and no matching base key", () => {
+      expect(applyFilterOverlay({ x: "1" }, { unrelated: "z" }, groups)).toEqual({ x: "1" });
+    });
+
+    it("ignores a grouped override when the stream has no field in that group", () => {
+      expect(applyFilterOverlay({ x: "1" }, { k8s_namespace_name: "b" }, groups)).toEqual({
+        x: "1",
+      });
+    });
+
+    it("resolves group aliases case-insensitively", () => {
+      expect(
+        applyFilterOverlay(
+          { SERVICE_K8S_NAMESPACE_NAME: "a" },
+          { K8S_NAMESPACE_NAME: "b" },
+          groups,
+        ),
+      ).toEqual({ SERVICE_K8S_NAMESPACE_NAME: "b" });
+    });
+
+    it("prefers the exact key when the base has both the exact key and a group sibling", () => {
+      expect(
+        applyFilterOverlay(
+          { k8s_namespace_name: "a", service_k8s_namespace_name: "a2" },
+          { k8s_namespace_name: "b" },
+          groups,
+        ),
+      ).toEqual({ k8s_namespace_name: "b", service_k8s_namespace_name: "a2" });
+    });
+
+    it("returns a copy and does not mutate the base filters", () => {
+      const base = { k8s_namespace_name: "a" };
+      const result = applyFilterOverlay(base, { k8s_namespace_name: "b" }, groups);
+      expect(base).toEqual({ k8s_namespace_name: "a" });
+      expect(result).not.toBe(base);
+    });
+
+    it("passes base filters through untouched with an empty group map", () => {
+      expect(applyFilterOverlay({ a: "1" }, { a: "2", b: "3" }, new Map())).toEqual({ a: "2" });
+    });
+  });
+
+  describe("applyDimensionEditsToFilters", () => {
+    const f2d = new Map<string, string>([
+      ["k8s_namespace_name", "k8s-namespace"],
+      ["service_k8s_namespace_name", "k8s-namespace"],
+    ]);
+
+    it("applies semantic-ID-keyed edits (IncidentDetailDrawer path)", () => {
+      expect(
+        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { "k8s-namespace": "b" }, f2d),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("applies raw-field-keyed edits (SearchResult dialog path — F36)", () => {
+      expect(
+        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, f2d),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("resolves a raw-field-keyed edit to the stream's own alias for the same group", () => {
+      // The dimension bar was seeded from a log stream's field name; the metric
+      // stream spells the same concept differently.
+      expect(
+        applyDimensionEditsToFilters(
+          { service_k8s_namespace_name: "a" },
+          { k8s_namespace_name: "b" },
+          f2d,
+        ),
+      ).toEqual({ service_k8s_namespace_name: "b" });
+    });
+
+    it("prefers the raw-field edit over the semantic-ID edit for the same filter", () => {
+      expect(
+        applyDimensionEditsToFilters(
+          { k8s_namespace_name: "a" },
+          { k8s_namespace_name: "raw", "k8s-namespace": "semantic" },
+          f2d,
+        ),
+      ).toEqual({ k8s_namespace_name: "raw" });
+    });
+
+    it("leaves filters without an edit untouched", () => {
+      expect(applyDimensionEditsToFilters({ x: "1" }, { "k8s-namespace": "b" }, f2d)).toEqual({
+        x: "1",
+      });
+    });
+
+    it("resolves filter keys case-insensitively", () => {
+      expect(
+        applyDimensionEditsToFilters({ K8S_NAMESPACE_NAME: "a" }, { "k8s-namespace": "b" }, f2d),
+      ).toEqual({ K8S_NAMESPACE_NAME: "b" });
+    });
+
+    it("keeps an empty-string edit (clearing a value is a real edit)", () => {
+      expect(
+        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { k8s_namespace_name: "" }, f2d),
+      ).toEqual({ k8s_namespace_name: "" });
+    });
+
+    it("never adds a filter key the stream does not already have", () => {
+      expect(
+        applyDimensionEditsToFilters({ x: "1" }, { k8s_namespace_name: "b", other: "c" }, f2d),
+      ).toEqual({ x: "1" });
+    });
+
+    it("returns a copy and does not mutate the input filters", () => {
+      const filters = { k8s_namespace_name: "a" };
+      const result = applyDimensionEditsToFilters(filters, { "k8s-namespace": "b" }, f2d);
+      expect(filters).toEqual({ k8s_namespace_name: "a" });
+      expect(result).not.toBe(filters);
+    });
+  });
+
+  describe("mergeSubjectOverrides", () => {
+    const groups = new Map<string, string>([
+      ["k8s_namespace_name", "k8s-namespace"],
+      ["service_k8s_namespace_name", "k8s-namespace"],
+      ["k8s_pod_name", "k8s-pod"],
+    ]);
+
+    it("replaces the same-group backend key instead of adding a duplicate (F31)", () => {
+      expect(
+        mergeSubjectOverrides(
+          { service_k8s_namespace_name: "prod" }, // backend-resolved key
+          { k8s_namespace_name: "staging" }, // schema-resolved override, different alias
+          groups,
+        ),
+      ).toEqual({ k8s_namespace_name: "staging" }); // ONE condition, not two
+    });
+
+    it("overwrites in place when keys match", () => {
+      expect(
+        mergeSubjectOverrides({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("adds an override whose group is not present in the filters", () => {
+      expect(
+        mergeSubjectOverrides({ k8s_pod_name: "p" }, { k8s_namespace_name: "n" }, groups),
+      ).toEqual({ k8s_pod_name: "p", k8s_namespace_name: "n" });
+    });
+
+    it("leaves filters of other groups untouched while replacing one group", () => {
+      expect(
+        mergeSubjectOverrides(
+          { service_k8s_namespace_name: "prod", k8s_pod_name: "p" },
+          { k8s_namespace_name: "staging" },
+          groups,
+        ),
+      ).toEqual({ k8s_pod_name: "p", k8s_namespace_name: "staging" });
+    });
+
+    it("matches the existing filter key case-insensitively", () => {
+      expect(
+        mergeSubjectOverrides(
+          { SERVICE_K8S_NAMESPACE_NAME: "prod" },
+          { k8s_namespace_name: "staging" },
+          groups,
+        ),
+      ).toEqual({ k8s_namespace_name: "staging" });
+    });
+
+    it("adds an ungrouped override without disturbing existing filters", () => {
+      expect(mergeSubjectOverrides({ a: "1" }, { unknown_field: "2" }, groups)).toEqual({
+        a: "1",
+        unknown_field: "2",
+      });
+    });
+
+    it("returns a copy and does not mutate the input filters", () => {
+      const filters = { service_k8s_namespace_name: "prod" };
+      const result = mergeSubjectOverrides(filters, { k8s_namespace_name: "staging" }, groups);
+      expect(filters).toEqual({ service_k8s_namespace_name: "prod" });
+      expect(result).not.toBe(filters);
+    });
+
+    it("passes filters through untouched with no overrides", () => {
+      expect(mergeSubjectOverrides({ a: "1" }, {}, groups)).toEqual({ a: "1" });
     });
   });
 });
