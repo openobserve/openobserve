@@ -75,7 +75,7 @@ Implemented in `purgeOrgQueries` / `purgeAllQueries` (`queryClient.ts`).
 
 ## 2. Migrated — currently cached
 
-26 query modules live in `web/src/composables/query/queries/`, covering 55 reads,
+26 query modules live in `web/src/composables/query/queries/`, covering 63 reads,
 plus the two pre-existing IndexedDB caches now folded into the same purge path.
 
 ### App shell
@@ -177,6 +177,14 @@ query, so the override survives anyone re-tiering these later.
 
 | Module | API | Tier | Storage |
 |---|---|---|---|
+| `queries/functions.ts` → query functions | `GET /api/{org}/query_functions` | T1 | **localStorage** — SQL-editor autocomplete catalogue |
+| `queries/alerts.ts` → alert detail | `GET /api/v2/{org}/alerts/{id}` | T3 | memory |
+| `queries/pipelines.ts` → pipeline detail | `GET /api/{org}/pipelines/{name}` | T3 | memory |
+| `queries/slos.ts` → SLO detail | `GET /api/{org}/slos/{id}` | T3 | memory |
+| `queries/synthetics.ts` → monitor detail | `GET /api/{org}/synthetics/{id}` | T3 | memory |
+| `queries/reports.ts` → report detail | `GET /api/v2/{org}/reports/{id}` | T3 | memory |
+| `queries/settingsLists.ts` → cipher key detail | `GET /api/{org}/cipher_keys/{name}` | T3 | memory |
+| `queries/dashboards.ts` → annotations | `GET /api/{org}/dashboards/{id}/annotations` | T3 | memory |
 | `queries/traces.ts` → trace DAG | `GET /api/{org}/{stream}/traces/{id}/dag` | T5, `staleTime: Infinity` | **IndexedDB** — a trace is immutable, so each time window is cacheable forever |
 
 ### Enterprise
@@ -231,7 +239,6 @@ Ordered by value. **Storage** is what the proposed tier implies.
 | 3 | `settings.listSettings` | `GET /api/{org}/settings/v2` | T1 | **localStorage** | Backs both of the above; one query could serve all user settings. |
 | 6 | Stream schema drawer | `GET /api/{org}/streams/{name}/schema` | T1 | memory | Per-stream; a schema changes rarely but is re-fetched on every drawer open. |
 | 7 | Enrichment table status | `GET /api/{org}/enrichment_tables/status` | T2 | memory | Paired with the enrichment list on every mount. |
-| 10 | Query functions | `GET /api/{org}/query_functions` | — | — | **Dead service** — no consumer in the app. Delete rather than cache. |
 | 12 | Domain management | `GET /api/{metaOrg}/domain_management` | T1 | memory | Settings page. |
 | 13 | Org storage settings | `GET /api/{org}/storage` | T1 | memory | Settings page. |
 | 15 | GenAI agent mapping | `GET /api/{org}/settings/gen_ai/agent_mapping`, `/gen_ai/agents` | T1 | **localStorage** | Settings page. |
@@ -369,7 +376,7 @@ items; migrating them would be wrong or a net loss.
 | Single dashboard (`get_Dashboard`) | Read inside the save path, where its `hash` drives optimistic concurrency. A cached hash means a spurious save conflict. |
 | Running queries, backfill jobs | No `setInterval` to convert and a single caller, so `staleTime: 0` buys nothing. |
 | Incident RCA poll, AWS marketplace poll | Already self-limiting; the timers clear on every terminal state. |
-| `query_functions` | Dead service — no consumer anywhere in the app. Delete it instead. |
+| Read-modify-write reads (`WorkflowLinkAlertsDialog`) | Reads an alert then immediately writes it back. A cached read would overwrite someone else's edit. |
 | Billing single-use URLs and GET-mutations | Listed in `queries/billing.ts`; caching any of them is a correctness bug. |
 
 ## 4. Explicitly out of scope — do not cache
