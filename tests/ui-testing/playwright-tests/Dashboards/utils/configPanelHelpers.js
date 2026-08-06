@@ -427,6 +427,39 @@ export async function describePanelRender(page) {
 }
 
 /**
+ * The text nodes the metric panel drew, with their resolved fill colours.
+ *
+ * The metric value is an ECharts `renderItem` text on the SVG renderer, so its
+ * colour can land either as a `fill` attribute or as inline style depending on
+ * the ECharts build — getComputedStyle normalises both to "rgb(r, g, b)".
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<Array<{text: string, fill: string}>>}
+ */
+export async function getMetricTextFills(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-test="chart-renderer"]');
+    if (!root) return [];
+    return Array.from(root.querySelectorAll("svg text")).map((el) => ({
+      text: (el.textContent ?? "").trim(),
+      fill: getComputedStyle(el).fill,
+    }));
+  });
+}
+
+/**
+ * "#b91c1c" → "rgb(185, 28, 28)" — the form getComputedStyle reports, so the
+ * swatch hex the test picked can be compared against what actually rendered.
+ * @param {string} hex
+ * @returns {string}
+ */
+export function hexToRgbString(hex) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}
+
+/**
  * Collects browser console errors/warnings for the rest of the test.
  *
  * ChartRenderer swallows a failing `setOption` with a bare `console.error`, so a

@@ -780,6 +780,28 @@ export default class DashboardPanelConfigs {
     if (text !== undefined) await field("text").fill(String(text));
   }
 
+  /**
+   * A swatch button inside a mapping row's ColorSwatchPicker.
+   * @param {import('@playwright/test').Locator} popup
+   * @param {number} index - mapping row index
+   * @param {"text-color"|"bg-color"} kind
+   * @param {number|"none"} swatch - palette index, or "none" for the clear button
+   */
+  valueMappingColorSwatch(popup, index, kind, swatch) {
+    const suffix = swatch === "none" ? "none" : `swatch-${swatch}`;
+    return popup.locator(
+      `[data-test="dashboard-addpanel-config-value-mapping-${kind}-${index}-${suffix}"]`
+    );
+  }
+
+  /** Click a mapping row's text/background colour swatch. Returns the swatch locator. */
+  async pickValueMappingColorSwatch(popup, index, kind, swatch) {
+    const target = this.valueMappingColorSwatch(popup, index, kind, swatch);
+    await target.waitFor({ state: "visible", timeout: 5000 });
+    await target.click();
+    return target;
+  }
+
   /** Toggle the sparkline enable switch. */
   async enableSparkline() {
     const enableSwitch = this.page.locator('[data-test="dashboard-config-sparkline-enable"]');
@@ -828,6 +850,16 @@ export default class DashboardPanelConfigs {
     await this.scrollSidebarToElement(input);
     await input.locator('[data-test$="-field"]').fill(String(width));
   }
+
+  /** Read the sparkline line width input's current value. */
+  async getSparklineLineWidth() {
+    const field = this.page.locator(
+      '[data-test="dashboard-config-sparkline-line-width"] [data-test$="-field"]'
+    );
+    await field.waitFor({ state: "visible", timeout: 10000 });
+    return field.inputValue();
+  }
+
 
   // Add and configure override with dynamic column and type
   // Click-hold on the sidebar and scroll down until the Override button is visible
