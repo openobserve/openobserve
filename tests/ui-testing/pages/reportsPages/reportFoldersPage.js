@@ -348,7 +348,18 @@ export class ReportFoldersPage {
   }
 
   async expectReportVisibleInTable(reportName) {
-    await expect(this.reportPauseStartBtn(reportName)).toBeVisible({ timeout: 10000 });
+    // Under parallel load the reports table is slow to pick up a just-created (via API) report:
+    // the list fetch + search debounce lag mean a single 10s wait times out (reportFolders
+    // :46/:79/:150). Poll: re-apply the search filter (which re-fetches the current folder's
+    // list) until the row's pause/start control renders. Non-masking — still fails if the
+    // report genuinely never appears.
+    const btn = this.reportPauseStartBtn(reportName);
+    await expect(async () => {
+      if (await btn.isVisible().catch(() => false)) return;
+      await this.reportSearchInput.fill(reportName, { force: true }).catch(() => {});
+      await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+      await expect(btn).toBeVisible({ timeout: 5000 });
+    }).toPass({ timeout: 45000 });
   }
 
   async expectReportNotVisibleInTable(reportName) {

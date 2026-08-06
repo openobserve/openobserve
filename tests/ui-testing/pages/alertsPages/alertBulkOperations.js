@@ -137,6 +137,11 @@ export class AlertBulkOperations {
         // Select all alerts using the header checkbox
         const headerCheckbox = this.page.locator(this.locators.headerCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for at least one alert ROW first — after navigating to the folder the OTable can
+        // still be loading, and clicking select-all over an empty table selects nothing so the
+        // (selection-gated) move-across-folders button never appears (alerts-e2e-flow:160 flake).
+        await this.page.locator('[data-test^="o2-table-row-"]').first()
+            .waitFor({ state: 'visible', timeout: 15000 });
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox');
 

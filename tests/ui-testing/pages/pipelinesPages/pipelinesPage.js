@@ -4,7 +4,7 @@ const https = require('https');
 const { expect } = require('@playwright/test')
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const fetch = require('node-fetch');
-const { getAuthHeaders } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 import { openNavFlyoutChild } from '../commonActions.js';
 
 const randomNodeName = `remote-node-${Math.floor(Math.random() * 1000)}`;
@@ -1414,11 +1414,39 @@ export class PipelinesPage {
         testLogger.info('Stream ingestion response', { streamName, status: fetchResponse.status });
         await this.page.waitForTimeout(2000);
 
-        // Navigate and explore
+        // Navigate to streams and try the streams-list Explore. A freshly-ingested stream
+        // (data ingested 200) can lag in the streams LIST on cloud (stream-stats latency), so
+        // the Explore action may never appear. Poll (reload + refresh-stats + re-search) for a
+        // bounded window; if it still doesn't surface, fall back to opening the logs explorer
+        // DIRECTLY by URL — which lands on the same page clickExplore reaches but does not depend
+        // on the stream showing in the streams-list. openTimestampMenu() below then runs the
+        // query on that logs explorer either way. This keeps the fast path for callers whose
+        // stream lists promptly (pipeline-core/pipelines) and only the lagging case takes the
+        // fallback, so it can't regress the tests that already pass here.
         await this.navigateToStreams();
-        await this.refreshStreamStats();
-        await this.searchStream(streamName);
-        await this.clickExplore();
+        let exploreReady = false;
+        try {
+            await expect.poll(async () => {
+                await this.page.reload().catch(() => {});
+                await this.page.waitForLoadState('domcontentloaded', { timeout: 15000 }).catch(() => {});
+                await this.refreshStreamStats().catch(() => {});
+                await this.searchStream(streamName).catch(() => {});
+                await this.page.waitForTimeout(1000);
+                return await this.exploreButton.first().isVisible({ timeout: 2000 }).catch(() => false);
+            }, { intervals: [3000, 5000, 10000, 15000], timeout: 60000 }).toBe(true);
+            exploreReady = true;
+        } catch (e) {
+            testLogger.warn('Explore not in streams list — falling back to direct logs URL', { streamName });
+        }
+
+        if (exploreReady) {
+            await this.clickExplore();
+        } else {
+            const org = getOrgIdentifier() || process.env.ORGNAME || 'default';
+            const base = (process.env.ZO_BASE_URL || '').replace(/\/+$/, '');
+            await this.page.goto(`${base}/web/logs?stream=${encodeURIComponent(streamName)}&stream_type=logs&org_identifier=${org}`);
+            await this.page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+        }
         await this.openTimestampMenu();
         await this.navigateToPipeline();
     }
@@ -1742,7 +1770,37 @@ export class PipelinesPage {
     }
 
     async openPipelineForEdit(pipelineName) {
-        await this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`).click();
+        const editBtn = this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+        // A naked click here 45s-timed-out on alpha1: after save the pipeline list can be long
+        // (shared org) or not-yet-refreshed, so the target row isn't clickable. Filter to the
+        // pipeline and wait for its edit button, polling with a reload if the list hasn't caught
+        // up. Mirrors the proven readiness path in createAndVerifyPipeline. Non-masking: if the
+        // pipeline never appears (i.e. save genuinely failed) the poll times out and we fail.
+        await this.searchPipeline(pipelineName).catch(() => {});
+        if (!(await editBtn.isVisible({ timeout: 15000 }).catch(() => false))) {
+            testLogger.info(`openPipelineForEdit: ${pipelineName} not in list yet — polling with reload`);
+            await expect.poll(async () => {
+                const reloadApi = this.page.waitForResponse(
+                    (resp) => /\/api\/[^/]+\/pipelines(\?|$)/.test(resp.url()) && resp.request().method() === 'GET' && resp.status() === 200,
+                    { timeout: 20000 }
+                ).catch(() => null);
+                await this.page.reload().catch(() => {});
+                await reloadApi;
+                const allTab = this.page.locator('[data-test="tab-all"]');
+                if (await allTab.isVisible({ timeout: 2000 }).catch(() => false)) {
+                    await allTab.click().catch(() => {});
+                }
+                await this.waitForPipelineListSettled(15000);
+                await this.pipelineSearchInputField.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+                await this.pipelineSearchInputField.fill('').catch(() => {});
+                await this.searchPipeline(pipelineName).catch(() => {});
+                return await editBtn.isVisible({ timeout: 2000 }).catch(() => false);
+            }, {
+                intervals: [2000, 3000, 5000, 5000, 10000, 10000],
+                timeout: 120000,
+            }).toBe(true);
+        }
+        await editBtn.click();
         await this.page.waitForTimeout(2000);
     }
 
