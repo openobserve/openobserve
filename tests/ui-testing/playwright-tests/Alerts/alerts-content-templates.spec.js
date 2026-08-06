@@ -161,6 +161,8 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     // Preview severity select: default is single_level — field with a
     // show_when:critical filter must NOT appear.
     await pm.alertTemplatesPage.clickPreviewVisualTab();
+    // Wait for preview panel to re-render after field/severity changes
+    await page.waitForTimeout(1000);
 
     if (severityFilterExists) {
       // At single_level, a critical-only field should be absent.
@@ -201,18 +203,15 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     testLogger.info('Step 2: Creating two destinations via API bound to the content template');
 
     const createDestination = async (name, path, destinationType) => {
-      const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations`, {
+      const resp = await page.request.post(`${baseUrl}/api/${org}/alerts/destinations?module=alert`, {
         data: {
           name,
-          module: 'alert',
           template: templateName,
-          destination_type: {
-            type: 'http',
-            url: `http://127.0.0.1:${receiverPort}${path}`,
-            method: 'post',
-            destination_type: destinationType,
-            metadata: {},
-          },
+          type: 'http',
+          url: `http://127.0.0.1:${receiverPort}${path}`,
+          method: 'post',
+          destination_type_name: destinationType,
+          metadata: {},
         },
       });
       if (!resp.ok()) {
@@ -248,7 +247,7 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
 
     // Bind the second (hook) destination via API so one alert fire reaches
     // both destination shapes in a single trigger.
-    const getAlertResp = await page.request.get(`${baseUrl}/api/${org}/alerts`);
+    const getAlertResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts`);
     expect(getAlertResp.ok()).toBeTruthy();
     const alertList = await getAlertResp.json();
     const alertsArr = Array.isArray(alertList) ? alertList : (alertList.list || []);
@@ -256,12 +255,12 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     expect(alertMeta).toBeTruthy();
     const alertId = alertMeta.alert_id || alertMeta.id;
 
-    const getAlertDetailResp = await page.request.get(`${baseUrl}/api/${org}/alerts/${alertId}`);
+    const getAlertDetailResp = await page.request.get(`${baseUrl}/api/v2/${org}/alerts/${alertId}`);
     expect(getAlertDetailResp.ok()).toBeTruthy();
     const alertDetail = await getAlertDetailResp.json();
     alertDetail.destinations = Array.from(new Set([...(alertDetail.destinations || []), hookDestName]));
 
-    const putAlertResp = await page.request.put(`${baseUrl}/api/${org}/alerts/${alertId}`, { data: alertDetail });
+    const putAlertResp = await page.request.put(`${baseUrl}/api/v2/${org}/alerts/${alertId}`, { data: alertDetail });
     expect(putAlertResp.ok()).toBeTruthy();
     testLogger.info('Bound second (hook/custom) destination to the alert', { alertId, destinations: alertDetail.destinations });
 
@@ -289,6 +288,7 @@ test.describe('Content Templates E2E - Multi-Channel Rendering', () => {
     }).toBeGreaterThan(0);
 
     const slackPayload = JSON.parse(received.slack[0].body);
+    testLogger.info('Received Slack payload', { keys: Object.keys(slackPayload), bodyPreview: received.slack[0].body.substring(0, 300) });
     expect(Array.isArray(slackPayload.blocks)).toBe(true);
     const slackHeaderText = JSON.stringify(slackPayload.blocks);
     expect(slackHeaderText).toContain(alertName);

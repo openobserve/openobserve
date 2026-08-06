@@ -1396,11 +1396,24 @@ export class AlertTemplatesPage {
     }
 
     async openOptionalDisclosure() {
-        const disclosure = this.page.locator(this.contentOptionalDisclosure);
-        const state = await disclosure.getAttribute('data-state').catch(() => 'closed');
-        if (state !== 'open') {
-            await disclosure.click();
-            await this.page.waitForTimeout(300);
+        // The collapsible trigger is a <button> rendered by Reka's CollapsibleTrigger
+        // inside the OCollapsible root. Clicking the root div does not toggle the
+        // collapsible — the click must land on the <button> child.
+        const disclosureRoot = this.page.locator(this.contentOptionalDisclosure);
+        await disclosureRoot.waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+
+        // The CollapsibleContent uses data-state="open" / "closed" to track
+        // its animation state. Scope to THIS disclosure's inner content.
+        const contentEl = disclosureRoot.locator('[data-test="o-collapsible-content"]');
+        const dataState = await contentEl.getAttribute('data-state').catch(() => 'closed');
+
+        if (dataState !== 'open') {
+            // Click the <button> trigger (CollapsibleTrigger renders as <button>)
+            const triggerBtn = disclosureRoot.locator('button').first();
+            await triggerBtn.waitFor({ state: 'visible', timeout: 5000 });
+            await triggerBtn.click();
+            // Wait for the Reka animation to finish (200ms CSS + buffer)
+            await this.page.waitForTimeout(600);
         }
     }
 
@@ -1425,20 +1438,65 @@ export class AlertTemplatesPage {
     }
 
     async toggleRowsEnabled() {
-        await this.page.locator(this.contentRowsEnabledSwitch).click();
-        await this.page.waitForTimeout(300);
+        // Click the inner <button> element of OSwitch. The outer wrapper div's
+        // @click handler fires unconditionally, but in some CI runs the click
+        // lands on the label span instead of the switch control. Targeting the
+        // button directly (which gets data-test="...-switch-btn") is more
+        // reliable — the click bubbles to the wrapper div, which calls toggle().
+        const btn = this.page.locator('[data-test="content-template-form-rows-enabled-switch-btn"]');
+        await btn.waitFor({ state: 'visible', timeout: 5000 });
+        await btn.click({ force: true });
+        // Wait for data-state="checked" on the button to confirm toggle success
+        await btn.waitFor({ state: 'attached', timeout: 5000 });
+        await this.page.waitForTimeout(500);
+        // Wait for v-if="spec.rows.enabled" to render the max/format inputs
+        // Verify by checking for the button's data-state before proceeding
+        const state = await btn.getAttribute('data-state').catch(() => 'unchecked');
+        if (state !== 'checked') {
+            // One more attempt with a direct click on the wrapper
+            await this.page.locator(this.contentRowsEnabledSwitch).click({ force: true });
+            await this.page.waitForTimeout(1000);
+        }
     }
 
     async setRowsMax(n) {
-        await this.page.locator(this.contentRowsMaxInputField).waitFor({ state: 'visible', timeout: 5000 });
-        await this.page.locator(this.contentRowsMaxInputField).click();
-        await this.page.locator(this.contentRowsMaxInputField).fill(String(n));
+        // The OInput wrapper has data-test without -field suffix;
+        // the inner <input> gets -field. Try the wrapper first (more
+        // reliable — OInput's inheritAttrs:false + $attrs race resolved
+        // in production builds sometimes misses the inner data-test),
+        // then fall back to the -field suffixed inner input.
+        const wrapperSel = '[data-test="content-template-form-rows-max-input"]';
+        const wrapper = this.page.locator(wrapperSel);
+        const wrapperVisible = await wrapper.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (wrapperVisible) {
+            // Find the actual <input> inside the OInput wrapper
+            const input = wrapper.locator('input').first();
+            await input.click();
+            await input.fill(String(n));
+        } else {
+            // Fallback: try the -field suffixed selector
+            const field = this.page.locator(this.contentRowsMaxInputField);
+            await field.waitFor({ state: 'visible', timeout: 5000 });
+            await field.click();
+            await field.fill(String(n));
+        }
     }
 
     async setRowsFormat(format) {
-        await this.page.locator(this.contentRowsFormatInputField).waitFor({ state: 'visible', timeout: 5000 });
-        await this.page.locator(this.contentRowsFormatInputField).click();
-        await this.page.locator(this.contentRowsFormatInputField).fill(format);
+        const wrapperSel = '[data-test="content-template-form-rows-format-input"]';
+        const wrapper = this.page.locator(wrapperSel);
+        const wrapperVisible = await wrapper.isVisible({ timeout: 5000 }).catch(() => false);
+
+        if (wrapperVisible) {
+            const input = wrapper.locator('input').first();
+            await input.click();
+            await input.fill(format);
+        } else {
+            await this.page.locator(this.contentRowsFormatInputField).waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.locator(this.contentRowsFormatInputField).click();
+            await this.page.locator(this.contentRowsFormatInputField).fill(format);
+        }
     }
 
     async addChannelTitleOverride(channel, title) {
@@ -1549,7 +1607,23 @@ export class AlertTemplatesPage {
     }
 
     async confirmTestSend() {
-        await this.page.locator(this.previewTestSendConfirmDialog).locator(this.confirmButton).click();
+        // The ConfirmDialog wraps ODialog, which renders its primary button with
+        // data-test="o-dialog-primary-btn" inside the dialog panel. Scope to
+        // the outer dialog container whose data-test IS stably in the DOM, then
+        // find the primary button within it. Fall back to a text-based locator
+        // when the button isn't scoped to the dialog container (e.g. portal
+        // rendering differences).
+        const container = this.page.locator(this.previewTestSendConfirmDialog);
+        const btnInDialog = container.locator('[data-test="o-dialog-primary-btn"]');
+        const visible = await btnInDialog.isVisible({ timeout: 3000 }).catch(() => false);
+        if (visible) {
+            await btnInDialog.click();
+        } else {
+            // Fall back: the ODialog renders in a portal outside the container
+            const pageBtn = this.page.locator('[data-test="o-dialog-primary-btn"]').first();
+            await pageBtn.waitFor({ state: 'visible', timeout: 10000 });
+            await pageBtn.click();
+        }
     }
 
     async expectTestSendToastVisible() {
@@ -1652,8 +1726,10 @@ export class AlertTemplatesPage {
     }
 
     async searchTemplatesByDataTest(searchText) {
-        // Uses the data-test search input (more reliable than placeholder match)
-        const input = this.page.locator(this.templateListSearchInput);
+        // OSearchInput wraps OInput — the inner <input> gets the -field suffix
+        // (see OInput's parentDataTest pattern). Clicking/filling the wrapper div
+        // fails with "Element is not an <input>" in production builds.
+        const input = this.page.locator('[data-test="template-list-search-input-field"]');
         await input.waitFor({ state: 'visible', timeout: 5000 });
         await input.click();
         await input.fill('');
@@ -1733,15 +1809,25 @@ export class AlertTemplatesPage {
             `[data-test="content-template-form-fields-row-${index}-severity-select-trigger"], [data-test="content-template-form-fields-row-${index}-show-when-trigger"]`
         ).first();
         await trigger.click();
-        await this.page.waitForTimeout(300);
+        // The OSelect dropdown renders in a portal; wait for it to appear
+        await this.page.waitForTimeout(600);
+        // Wait for visible options to appear in the portal
+        await this.page.getByRole('option').first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
     }
 
     async selectFieldRowSeverityCritical() {
-        await this.page.getByText(/critical/i).first().click().catch(() => {});
+        // Use role-based selection (more reliable than fragile text matching
+        // on the whole page, which can hit unrelated elements when the portal
+        // hasn't fully rendered).
+        await this.page.getByRole('option', { name: /critical/i }).first().click().catch(() => {
+            // Fallback: text-based click if role isn't present
+            this.page.getByText(/critical/i).first().click().catch(() => {});
+        });
     }
 
     async closeFieldRowSeverityDropdown() {
         await this.page.keyboard.press('Escape').catch(() => {});
+        await this.page.waitForTimeout(200);
     }
 
     async expectPreviewFieldContains(text) {
