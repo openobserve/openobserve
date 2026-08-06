@@ -156,6 +156,9 @@ import OpenInFull from "~icons/material-symbols/open-in-full";
 import PlayCircle from "~icons/material-symbols/play-circle-outline";
 import SmartToy from "~icons/material-symbols/smart-toy-outline";
 import Speed from "~icons/material-symbols/speed-outline";
+import Target from "~icons/material-symbols/target";
+import TrackChanges from "~icons/material-symbols/track-changes";
+import LocalFireDepartment from "~icons/material-symbols/local-fire-department";
 import StopCircle from "~icons/material-symbols/stop-circle-outline";
 import Storage from "~icons/material-symbols/storage";
 import TableChart from "~icons/material-symbols/table-chart-outline";
@@ -334,6 +337,8 @@ import Redo from "~icons/material-symbols/redo";
 import Tab from "~icons/material-symbols/tab-outline";
 import Web from "~icons/material-symbols/web";
 import SmartDisplay from "~icons/material-symbols/smart-display-outline";
+import AndroidIcon from "~icons/material-symbols/android";
+import PhoneIphoneIcon from "~icons/material-symbols/phone-iphone-outline";
 
 // Brand mark (not a Material Symbol) — a local inline SVG component. See McpLogo.vue.
 import McpLogo from "./McpLogo.vue";
@@ -517,6 +522,9 @@ export const iconRegistry = {
   "play-circle": PlayCircle,
   "smart-toy": SmartToy,
   speed: Speed,
+  target: Target,
+  "track-changes": TrackChanges,
+  "local-fire-department": LocalFireDepartment,
   "stop-circle": StopCircle,
   storage: Storage,
   "table-chart": TableChart,
@@ -665,6 +673,8 @@ export const iconRegistry = {
   redo: Redo,
   tab: Tab,
   web: Web,
+  android: AndroidIcon,
+  "phone-iphone": PhoneIphoneIcon,
 
   // Batch 3: Synthetics / browser-check icons (2026-06-22)
   // (duplicate "person-pin-circle" from batch 2 removed — keep the first entry at line 624)

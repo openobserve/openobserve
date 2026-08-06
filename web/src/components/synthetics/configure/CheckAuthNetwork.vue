@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -15,7 +30,7 @@ import { getUUID } from "@/utils/uuid";
 const props = defineProps<{ check: BrowserCheck }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── Header summary ─────────────────────────────────────────────────────────────
 
@@ -212,7 +227,7 @@ function removeCookie(index: number) {
                 :type="variable.secure ? 'password' : 'text'"
                 :placeholder="
                   variable.secure && !variable.value
-                    ? variable.example || t('synthetics.authNetwork.passwordPlaceholder')
+                    ? raw(variable.example) || t('synthetics.authNetwork.passwordPlaceholder')
                     : t('synthetics.authNetwork.variableValuePlaceholder')
                 "
                 :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
@@ -227,7 +242,7 @@ function removeCookie(index: number) {
                 class="gap-1.5"
                 @click="updateVariable(index, 'secure', !variable.secure)"
               >
-                <OSwitch v-model="variable.secure" size="md" />
+                <OSwitch :model-value="variable.secure" size="md" />
                 <OIcon name="lock" size="sm" />
                 <OTooltip
                   :content="

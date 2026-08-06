@@ -9,13 +9,15 @@
  * | info          | --color-timeline-dot-info        |
  * | muted         | --color-timeline-dot-muted       |
  */
+import type { I18nText } from "@/types/i18n";
+
 export type TimelineItemVariant = "primary" | "success" | "destructive" | "info" | "muted";
 
 export interface TimelineItemProps {
   /** Header text rendered in bold above the subtitle. */
-  title?: string;
+  title?: I18nText;
   /** Secondary line rendered below the title in muted text. */
-  subtitle?: string;
+  subtitle?: I18nText;
   /**
    * Material icon name rendered inside the dot.
    * Uses the `material-icons` font — pass the icon ligature string

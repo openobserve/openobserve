@@ -46,10 +46,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span :class="['text-xs font-semibold', 'text-text-body']">
             {{
               isAnomaly
-                ? "Anomaly Detection"
+                ? t("alerts.anomalyDetection")
                 : alertDetails.is_real_time
-                  ? "Real-time"
-                  : "Scheduled"
+                  ? t("common.realTime")
+                  : t("alerts.scheduled")
             }}
           </span>
         </div>
@@ -63,13 +63,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #icon-left>
               <OIcon name="history" size="sm" />
             </template>
-            History
+            {{ t("alert_list.alert_history") }}
           </OToggleGroupItem>
           <OToggleGroupItem value="condition" size="sm" data-test="alert-history-tab-condition">
             <template #icon-left>
               <OIcon name="code" size="sm" />
             </template>
-            Condition
+            {{ t("common.condition") }}
           </OToggleGroupItem>
         </OToggleGroup>
       </div>
@@ -161,7 +161,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @click="toggleFlappingGroup(row.timestamp)"
                       />
                       <span class="text-2xs text-text-secondary truncate">
-                        {{ row._children.length }} rows · {{ row._duration }}
+                        {{ row._children.length }} {{ t("alerts.alertDetails.rowsSeparator") }}
+                        {{ row._duration }}
                       </span>
                     </div>
                     <!-- Normal row -->
@@ -182,6 +183,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ formatTimestampFull(row.timestamp) }}
                     </span>
+                  </template>
+
+                  <!-- T-10: what was observed, against what, and the level it
+                       classified to. Flapping group headers and pre-change
+                       rows (no actual_value) render "—". -->
+                  <template #cell-condition="{ row }">
+                    <span v-if="row._flappingGroup" class="text-text-secondary">—</span>
+                    <div v-else class="flex min-w-0 items-center gap-1.5">
+                      <span class="text-compact whitespace-nowrap tabular-nums">
+                        {{ conditionSummary(row) }}
+                      </span>
+                      <template v-if="row.level">
+                        <span class="text-text-secondary text-2xs shrink-0">→</span>
+                        <OTag type="alertLevel" :value="row.level" class="shrink-0" />
+                      </template>
+                      <span
+                        v-if="row.group_label"
+                        class="text-2xs text-text-secondary min-w-0 truncate"
+                        data-test="alert-history-group-label"
+                      >
+                        {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
+                        <OTooltip :content="row.group_label" :max-width="'300px'" />
+                      </span>
+                    </div>
                   </template>
 
                   <template #cell-evaluation_time="{ row }">
@@ -240,12 +265,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="'bg-surface-subtle border-border-default'"
                 >
                   <div class="flex items-center gap-1.5">
-                    <span class="text-2xs font-medium" :class="'text-text-secondary'"> SQL </span>
+                    <span class="text-2xs font-medium" :class="'text-text-secondary'">
+                      {{ t("alerts.alertDetails.sql") }}
+                    </span>
                   </div>
                   <OButton
                     v-if="anomalySql"
                     @click="
-                      copyToClipboard(anomalySql, {
+                      copyToClipboard(anomalySql, t, {
                         successMessage: 'SQL Copied Successfully!',
                         timeout: 3000,
                       })
@@ -283,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           ? "SQL"
                           : alertDetails.type === "promql"
                             ? "PromQL"
-                            : "Conditions"
+                            : t("alerts.alertDetails.conditions")
                       }}
                     </span>
                   </div>
@@ -294,7 +321,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       alertDetails.conditions !== '--'
                     "
                     @click="
-                      copyToClipboard(alertDetails.conditions, {
+                      copyToClipboard(alertDetails.conditions, t, {
                         successMessage:
                           (alertDetails.type === 'sql'
                             ? t('alerts.alertDetails.sqlQuery')
@@ -319,7 +346,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? alertDetails.type === "sql" || alertDetails.type === "promql"
                         ? alertDetails.conditions
                         : alertDetails.conditions.length !== 2
-                          ? `if ${alertDetails.conditions}`
+                          ? t("alerts.alertDetails.ifCondition", {
+                              condition: alertDetails.conditions,
+                            })
                           : t("alerts.alertDetails.noCondition")
                       : t("alerts.alertDetails.noCondition")
                   }}</pre
@@ -356,7 +385,8 @@ import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { ref, watch, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { conditionSummary, isFiringOutcome, isOkOutcome } from "@/utils/alerts/runOutcome";
 import { formatTimestamp } from "@/utils/date";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -377,7 +407,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 // Props & Emits
@@ -419,13 +449,13 @@ const isLoadingHistory = ref(false);
 const MIN_FLAP_TRANSITIONS = 3; // firing↔ok flips within a run to call it flapping
 const MIN_FLAP_WINDOW = 4; // minimum consecutive rows needed
 
+// Classification is shared with the timeline and the overview so the three
+// cannot disagree about a status again — see utils/alerts/runOutcome.
 function rowIsFiring(s: string) {
-  const v = s?.toLowerCase();
-  return v === "firing" || v === "error" || v === "anomaly" || v === "completed";
+  return isFiringOutcome(s);
 }
 function rowIsOk(s: string) {
-  const v = s?.toLowerCase();
-  return v === "ok" || v === "success" || v === "normal" || v === "condition_not_satisfied";
+  return isOkOutcome(s);
 }
 
 // Build a boolean mask: true = row is inside a flapping run.
@@ -612,7 +642,7 @@ const onPaginationChange = async (params: { page: number; size: number }) => {
 const alertHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -632,6 +662,15 @@ const alertHistoryColumns = [
     accessorKey: "status",
     sortable: true,
     size: 280,
+    meta: { align: "left" as const },
+  },
+  {
+    // T-10 value context: "actual operator threshold → level" per run.
+    id: "condition",
+    header: t("alerts.historyTable.condition"),
+    accessorKey: "actual_value",
+    sortable: false,
+    size: 220,
     meta: { align: "left" as const },
   },
   {
@@ -663,7 +702,7 @@ const alertHistoryColumns = [
 const anomalyHistoryColumns = [
   {
     id: "#",
-    header: "#",
+    header: raw("#"),
     accessorFn: () => null,
     sortable: false,
     size: 48,
@@ -679,7 +718,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "status",
-    header: "Result",
+    header: t("alerts.historyTable.result"),
     accessorKey: "status",
     sortable: false,
     size: 120,
@@ -695,7 +734,7 @@ const anomalyHistoryColumns = [
   },
   {
     id: "anomaly_count",
-    header: "Anomalies",
+    header: t("alerts.historyTable.anomalies"),
     accessorKey: "anomaly_count",
     sortable: false,
     size: 120,
@@ -717,10 +756,11 @@ const getRowClass = (row: any) => {
   if (row?._child) {
     return "!bg-surface-subtle";
   }
-  const status = row?.status?.toLowerCase();
-  const isFiringStatus =
-    status === "firing" || status === "error" || status === "anomaly" || status === "completed";
-  if (isFiringStatus) {
+  // The row wash means "needs attention", which covers both a firing alert and
+  // an evaluation that errored. They are distinguished by the status badge —
+  // only the classification of "did it fire" is shared with the timeline.
+  const status = String(row?.status ?? "").toLowerCase();
+  if (isFiringOutcome(status) || status === "error" || status === "failed") {
     return "!bg-status-error-bg";
   }
   return "";

@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, BrowserCheckSchedule } from "@/types/synthetics";
 import { getCronIntervalDifferenceInSeconds } from "@/utils/queryUtils";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -19,7 +34,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
   emit("update:check", {
@@ -32,7 +47,7 @@ function updateSchedule(patch: Partial<BrowserCheckSchedule>) {
 
 type FrequencyPreset = "1min" | "5min" | "15min" | "30min" | "1hour" | "cron" | "custom";
 
-const frequencyOptions: { label: string; value: FrequencyPreset }[] = [
+const frequencyOptions: { label: I18nText; value: FrequencyPreset }[] = [
   { label: t("synthetics.scheduleAlert.frequencyOptions.1min"), value: "1min" },
   { label: t("synthetics.scheduleAlert.frequencyOptions.5min"), value: "5min" },
   { label: t("synthetics.scheduleAlert.frequencyOptions.15min"), value: "15min" },
@@ -128,28 +143,28 @@ watch(
   },
 );
 
-function buildTimezoneOptions(): { label: string; value: string }[] {
+function buildTimezoneOptions(): { label: I18nText; value: string }[] {
   try {
     const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const options: { label: string; value: string }[] = [
+    const options: { label: I18nText; value: string }[] = [
       {
         label: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
         value: t("synthetics.scheduleAlert.browserTime", { tz: browserTz }),
       },
-      { label: "UTC", value: "UTC" },
+      { label: raw("UTC"), value: "UTC" },
     ];
     // @ts-ignore - supportedValuesOf not in all TS versions
     if (typeof Intl.supportedValuesOf === "function") {
       // @ts-ignore
       for (const tz of Intl.supportedValuesOf("timeZone") as string[]) {
-        if (tz !== "UTC") options.push({ label: tz, value: tz });
+        if (tz !== "UTC") options.push({ label: raw(tz), value: tz });
       }
     }
     return options;
   } catch {
     /* fall through */
   }
-  return [{ label: "UTC", value: "UTC" }];
+  return [{ label: raw("UTC"), value: "UTC" }];
 }
 
 const timezoneOptions = buildTimezoneOptions();
@@ -298,7 +313,7 @@ const startTime = computed({
           </div>
           <OInput
             v-model="cron"
-            placeholder="0 */5 * * * *"
+            :placeholder="raw('0 */5 * * * *')"
             class="w-83!"
             data-test="synthetics-check-schedule-cron-input"
           />

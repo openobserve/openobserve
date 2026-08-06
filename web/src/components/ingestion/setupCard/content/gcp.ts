@@ -22,6 +22,8 @@
 // push endpoint URL and the live detection — the page can't end up watching a
 // different stream than the one GCP is writing to.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import { applySubs, applySubsMasked } from "../subs";
@@ -33,21 +35,19 @@ export default function gcpCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Google Cloud",
-      tagline:
-        "Stream Google Cloud logs into OpenObserve with a Pub/Sub push subscription — no agent or collector to run.",
+      tagline: gt("ingestion.setupCard.taglineGcp"),
       logo: getImageURL("images/ingestion/gcp.svg"),
       tone: "#4285f4",
       runtime: "Google Cloud",
       setupTime: "~5 min",
-      metaBadges: ["Logs"],
+      metaBadges: [gt("common.logs")],
     },
     steps: [
       {
         id: "sink",
-        title: "Route Logs to a Pub/Sub Topic",
-        description:
-          "In the GCP console, create a **Log Router sink** (Logging → Log Router → Create sink) with Pub/Sub as the destination, and let it create the topic. The sink's inclusion filter decides which logs reach OpenObserve.",
-        chip: { kind: "editor", label: "GCP Console" },
+        titleKey: "ingestion.setupCard.gcpSinkTitle",
+        descriptionKey: "ingestion.setupCard.gcpSinkDesc",
+        chip: { kind: "editor", label: raw("GCP Console") },
         required: true,
         completeOn: "copy",
         code: {
@@ -63,10 +63,9 @@ gcloud logging sinks create openobserve-sink \\
       },
       {
         id: "subscription",
-        title: "Push the Topic to OpenObserve",
-        description:
-          "Create a **push** subscription on that topic and paste this as the endpoint URL. It already carries this organization and its ingestion key.",
-        chip: { kind: "terminal", label: "Endpoint" },
+        titleKey: "ingestion.setupCard.gcpSubscriptionTitle",
+        descriptionKey: "ingestion.setupCard.gcpSubscriptionDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.endpointLabel" },
         required: true,
         completeOn: "copy",
         code: {
@@ -78,20 +77,26 @@ gcloud logging sinks create openobserve-sink \\
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Generate some activity in the project (or wait for the sink to match a log), then hit Test.",
-        chip: { kind: "traces", label: "Logs" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyGcpLogsDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipLogs" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Audit Logs", "Cloud Run", "GKE", "Cloud Functions", "VPC Flow"],
+        // Everything after the first pill is a Google Cloud product name.
+        pills: [
+          gt("ingestion.setupCard.pillAuditLogs"),
+          raw("Cloud Run"),
+          raw("GKE"),
+          raw("Cloud Functions"),
+          raw("VPC Flow"),
+        ],
       },
     ],
     streamInput: {
-      label: "Logs Stream Name",
+      labelKey: "ingestion.setupCard.logsStreamNameLabel",
       default: "default",
-      placeholder: "gcp_logs",
-      help: "Used in the push URL above and watched by the check below. A dedicated stream keeps GCP logs separate.",
+      placeholder: raw("gcp_logs"),
+      helpKey: "ingestion.setupCard.gcpStreamHelp",
     },
     // The push subscription writes to exactly this stream, so any row on it in
     // the lookback window is proof the pipeline works end to end.

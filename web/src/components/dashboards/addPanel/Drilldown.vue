@@ -58,7 +58,7 @@
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -71,7 +71,7 @@ export default defineComponent({
   components: { DrilldownPopUp, OButton, OIcon },
   props: ["variablesData"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const showDrilldownPopUp = ref(false);
     const isDrilldownEditMode = ref(false);
@@ -81,7 +81,7 @@ export default defineComponent({
     const drilldownPopUpKey = ref(0);
 
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the drilldown object is initialized in config

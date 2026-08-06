@@ -138,11 +138,9 @@ test.describe("dashboard UI testcases", () => {
         (rows) =>
           rows
             .map((row) =>
-              Array.from(row.querySelectorAll("td"), (cell) => {
-                // Get the span element that contains the actual text, excluding the button
-                const textSpan = cell.querySelector('[data-test="dashboard-table-cell-value"]');
-                return textSpan ? textSpan.textContent.trim() : cell.textContent.trim().replace(/content_copy/g, '').trim();
-              })
+              Array.from(row.querySelectorAll("td"), (cell) =>
+                cell.textContent.trim().replace(/content_copy/g, "").trim()
+              )
             )
             .filter((row) => row.length > 0 && row.some((cell) => cell !== ""))
       );

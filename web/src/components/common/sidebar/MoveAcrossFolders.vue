@@ -19,11 +19,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="move-across-folders-dialog"
     :open="open"
     size="md"
-    :title="`Move ${type.charAt(0).toUpperCase() + type.slice(1)} To Another Folder`"
+    :title="
+      t('dashboard.moveToAnotherFolder', { type: type.charAt(0).toUpperCase() + type.slice(1) })
+    "
     :secondary-button-label="t('dashboard.cancel')"
     :primary-button-label="t('common.move')"
     :primary-button-loading="onSubmit.isLoading.value"
-    :primary-button-disabled="activeFolderId === selectedFolder.value"
+    :primary-button-disabled="!selectedFolder.value || activeFolderId === selectedFolder.value"
     @update:open="emit('update:open', $event)"
     @click:secondary="emit('update:open', false)"
     @click:primary="onSubmit.execute()"
@@ -41,11 +43,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
       <span>&nbsp;</span>
 
-      <!-- select folder or create new folder and select -->
+      <!-- select folder or create new folder and select.
+
+           `excludeFolderId` is what stops the destination opening on the folder
+           named directly above it as the CURRENT one: the same folder appeared
+           twice, reading as "move this to where it already is". Submit was
+           disabled in that state, so nothing could go wrong — the dialog simply
+           gave no clue why. -->
       <SelectFolderDropDown
         :type="type"
         @folder-selected="selectedFolder = $event"
         :activeFolderId="activeFolderId"
+        :excludeFolderId="activeFolderId"
       />
     </div>
   </ODialog>
@@ -53,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getImageURL } from "@/utils/zincutils";
 import { moveModuleToAnotherFolder } from "@/utils/commons";
@@ -91,15 +100,11 @@ export default defineComponent({
   emits: ["updated", "close", "update:open"],
   setup(props, { emit }) {
     const store: any = useStore();
-    //dropdown selected folder
-    const selectedFolder = ref({
-      label:
-        store.state.organizationData.foldersByType?.[props.type]?.find(
-          (item: any) => item.folderId === props.activeFolderId,
-        )?.name ?? "",
-      value: props.activeFolderId,
-    });
-    const { t } = useI18n();
+    // Dropdown selected folder — deliberately empty, not the active folder.
+    // The picker excludes the active folder, so seeding it here would name a
+    // destination the list cannot offer and cannot be re-picked.
+    const selectedFolder = ref({ label: "", value: "" });
+    const { t } = useI18nTyped();
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
     const onSubmit = useLoading(async () => {
@@ -115,7 +120,9 @@ export default defineComponent({
         await moveModuleToAnotherFolder(store, data, props.type, props.activeFolderId);
 
         showPositiveNotification(
-          `${props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1)} moved successfully`,
+          t("toastMessages.sidebar.movedSuccessfully", {
+            type: props?.type?.charAt?.(0)?.toUpperCase() + props?.type?.slice?.(1),
+          }),
           {
             timeout: 5000,
           },

@@ -85,9 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon :name="icon" size="md" />
         </span>
 
-        <div class="flex min-w-0 shrink-0 flex-col justify-center">
+        <!-- shrink-0 keeps a short static title from being squeezed by tabs.
+             An interactive title (titleOverflow="visible") holds a real name
+             that can be long, so it may instead consume the free space in the
+             row and only ellipsise once genuinely out of room. -->
+        <div
+          class="flex min-w-0 flex-col justify-center"
+          :class="titleOverflow === 'visible' ? '' : 'shrink-0'"
+        >
           <h1
-            class="text-text-heading min-h-6 truncate text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            class="text-text-heading min-h-6 text-base! leading-[1.45]! font-semibold! tracking-[-0.02em]!"
+            :class="titleOverflow === 'visible' ? 'min-w-0' : 'truncate'"
             :title="title"
             :data-test="titleDataTest"
           >
@@ -140,6 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { Comment, Text, computed, useSlots } from "vue";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -148,7 +157,7 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
   /** Optional; button falls back to plain "Back" aria-label when omitted. */
-  label?: string;
+  label?: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;
@@ -156,21 +165,30 @@ interface BackTarget {
 
 const props = withDefaults(
   defineProps<{
-    title?: string;
+    title?: I18nText;
     /** Optional data-test attribute rendered on the <h1>, so consumers can
      *  drop the #title slot (whose only purpose was attaching a test hook). */
     titleDataTest?: string;
-    subtitle?: string;
+    subtitle?: I18nText;
     icon?: IconName;
     /** Overlay/dialog back-pill ("‹ {label}") shown leading, before the icon. */
     back?: BackTarget;
     /** Render the #tabs slot as a full-width strip below row 1 (prototype's
      *  two-row header) instead of inline beside the title. */
     tabsBelow?: boolean;
+    /**
+     * The <h1> clips its content by default (truncate → overflow:hidden), which
+     * is right for text but wrong when the #title slot hosts an interactive
+     * control: it would swallow that control's focus ring and any message it
+     * floats below itself. Pass "visible" in that case — the slot content then
+     * owns its own overflow (an inline-edited page name does exactly this).
+     */
+    titleOverflow?: "truncate" | "visible";
   }>(),
   {
-    title: "",
-    subtitle: "",
+    title: raw(""),
+    subtitle: raw(""),
+    titleOverflow: "truncate",
   },
 );
 

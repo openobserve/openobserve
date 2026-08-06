@@ -38,12 +38,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`tab-${tab.value}-dirty-dot`"
         aria-hidden="true"
       />
-      <OTooltip v-if="tab.tooltipLabel" :content="tab.tooltipLabel" />
+      <OTooltip v-if="tab.tooltipLabel" :content="raw(tab.tooltipLabel)" />
     </OToggleGroupItem>
   </OToggleGroup>
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import type { Component } from "vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -53,11 +54,11 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { ToggleGroupItemSize } from "@/lib/core/ToggleGroup/OToggleGroupItem.types";
 
 interface Tab {
-  label: string;
+  label: I18nText;
   value: string;
   style?: Record<string, string>;
   disabled?: boolean;
-  title?: string;
+  title?: I18nText;
   tooltipLabel?: string;
   hide?: boolean;
   icon?: Component | string;
@@ -75,12 +76,12 @@ const props = withDefaults(
     activeTab: string;
     size?: ToggleGroupItemSize;
     // Tooltip shown when hovering an unsaved-changes dot (optional).
-    dirtyTitle?: string;
+    dirtyTitle?: I18nText;
   }>(),
   {
     show: true,
     size: "sm",
-    dirtyTitle: "",
+    dirtyTitle: raw(""),
   },
 );
 

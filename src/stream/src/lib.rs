@@ -29,7 +29,7 @@ use common::meta::{
 // Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
 // these streams for billing); OSS / self-hosted must not block user streams.
 #[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_self_reporting_stream;
+use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -49,7 +49,7 @@ use hashbrown::HashMap;
 use infra::{
     cache::stats,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST,
         get_partition_time_level, unwrap_stream_created_at, unwrap_stream_is_derived,
         unwrap_stream_settings,
     },
@@ -242,7 +242,7 @@ pub async fn create_stream(
     // its schema directly (not via create_stream), so blocking here is safe.
     // Cloud-only: OSS / self-hosted may legitimately use these stream names.
     #[cfg(feature = "cloud")]
-    if is_reserved_self_reporting_stream(stream_name) {
+    if is_reserved_internal_stream(stream_name) {
         return Ok((
             http::StatusCode::BAD_REQUEST,
             [(ERROR_HEADER, "stream name is reserved")],
@@ -459,10 +459,11 @@ pub async fn update_stream_settings(
     stream_type: StreamType,
     mut new_settings: UpdateStreamSettings,
 ) -> Result<HttpResponse, Error> {
-    let Some(mut settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await
-    else {
+    let Some(settings) = infra::schema::get_settings(org_id, stream_name, stream_type).await else {
         return Ok(MetaHttpResponse::not_found("stream not found"));
     };
+    // local editable copy; persisted via save_stream_settings below
+    let mut settings = (*settings).clone();
 
     // process new fields first
     let new_fields = std::mem::take(&mut new_settings.fields);
@@ -783,7 +784,7 @@ where
     // compaction uses a separate internal path, so blocking this user-facing
     // delete is safe and preserves billing/usage accounting. Cloud-only.
     #[cfg(feature = "cloud")]
-    if is_reserved_self_reporting_stream(stream_name) {
+    if is_reserved_internal_stream(stream_name) {
         return Ok((
             http::StatusCode::BAD_REQUEST,
             [(ERROR_HEADER, "stream name is reserved")],
@@ -914,10 +915,7 @@ pub async fn stream_delete_inner(
     drop(w);
 
     // delete stream settings cache
-    let mut w = STREAM_SETTINGS.write().await;
-    w.remove(&key);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    infra::schema::remove_stream_settings(&key).await;
 
     // delete stream record id generator cache
     {
@@ -1114,11 +1112,9 @@ pub async fn get_stream_retention(
     stream_type: StreamType,
     stream: &str,
 ) -> Option<i64> {
-    if let Some(s) = infra::schema::get_settings(org_id, stream, stream_type).await {
-        Some(s.data_retention)
-    } else {
-        None
-    }
+    infra::schema::get_settings(org_id, stream, stream_type)
+        .await
+        .map(|s| s.data_retention)
 }
 
 #[cfg(test)]

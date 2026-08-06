@@ -49,21 +49,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </Teleport>
 
-      <!-- Pipeline name input for NEW pipelines, teleported into the shell
-           header (Functions.vue #o2-page-title-trail) next to the title —
-           mirrors the actions teleport above. Owned here, alongside
-           savePipeline, which validates it via the OForm schema. -->
-      <Teleport v-if="isCreatePipeline" defer to="#o2-page-title-trail">
-        <div class="w-64 shrink-0">
-          <OForm :form="metaForm">
-            <OFormInput
-              name="name"
-              :placeholder="t('pipeline.pipelineName')"
-              hide-bottom-space
-              data-test="pipeline-editor-name-input"
-            />
-          </OForm>
-        </div>
+      <!-- Pipeline name for NEW pipelines, teleported into the shell header
+           (Functions.vue #o2-page-title-trail) next to the title — mirrors the
+           actions teleport above. Owned here, alongside savePipeline, which
+           validates it via the OForm schema. Rendered as inline-edited heading
+           text rather than a boxed field, matching the panel and alert editors;
+           the shell's own breadcrumb already carries "Pipelines ›". -->
+      <Teleport v-if="isCreatePipeline" defer to="#o2-page-title">
+        <OFormInlineEdit
+          name="name"
+          :placeholder="t('pipeline.pipelineName')"
+          :aria-label="t('pipeline.pipelineName')"
+          :edit-hint="t('pipeline.renameHint')"
+          data-test="pipeline-editor-name-input"
+        />
       </Teleport>
 
       <!-- Rail + canvas, laid out exactly like the Dashboards list (folder rail +
@@ -84,8 +83,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              The rail toggle lives up in the page actions, so nothing sits
              between the header and the canvas.
 
-             `relative` (was `relative-position`, a Quasar class that no longer
-             resolves — Quasar is not installed and nothing defines that rule)
+             `relative` (was `relative-position`, a legacy CSS-framework
+             class that nothing in this repo defines, so it never resolved)
              makes this the offset parent for the canvas overlays: the start
              node and the edge-help toast. Without it they anchored to some
              ancestor further up, so the start node sat at a different height
@@ -201,6 +200,7 @@ import {
   onBeforeMount,
   onMounted,
   onUnmounted,
+  provide,
   watch,
   ref,
   type Ref,
@@ -217,13 +217,13 @@ import { onBeforeRouteLeave, useRouter } from "vue-router";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OForm from "@/lib/forms/Form/OForm.vue";
-import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormInlineEdit from "@/lib/forms/InlineEdit/OFormInlineEdit.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import {
   makePipelineMetaSchema,
   pipelineMetaDefaults,
@@ -267,7 +267,7 @@ interface RouteCondition {
 
 interface Function {
   name: string;
-  description: string;
+  description: I18nText;
   stream: string;
   order: number;
   trans_type?: number;
@@ -277,7 +277,7 @@ interface Function {
 interface Pipeline {
   pipeline_id: string;
   name: string;
-  description: string;
+  description: I18nText;
   stream_name: string;
   stream_type: string;
   routing: Routing;
@@ -289,7 +289,7 @@ const pipeline = ref<Pipeline>({
   pipeline_id: "",
   name: "",
   stream_type: "",
-  description: "",
+  description: raw(""),
   stream_name: "",
   routing: {},
   functions: [],
@@ -308,62 +308,65 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 
+// nodeTypes is built at module scope, so `t` has to be in scope above it.
+const { t } = useI18nTyped();
+
 const nodeTypes: any = [
   {
-    label: "Source",
+    label: t("pipeline.sourceNode"),
     icon: "input",
     isSectionHeader: true,
   },
   {
-    label: "Stream",
+    label: t("pipeline.streamNode"),
     subtype: "stream",
     io_type: "input",
     icon: "img:" + streamImage,
-    tooltip: "Source: Stream Node",
+    tooltip: t("pipeline.sourceStreamTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Query",
+    label: t("pipeline.queryNode"),
     subtype: "query",
     io_type: "input",
     icon: "img:" + queryImage,
-    tooltip: "Source: Query Node",
+    tooltip: t("pipeline.sourceQueryTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Transform",
+    label: t("pipeline.transformNode"),
     icon: "processing",
     isSectionHeader: true,
   },
   {
-    label: "Function",
+    label: t("pipeline.functionNode"),
     subtype: "function",
     io_type: "default",
     icon: "img:" + functionImage,
     // Matches the workflow Function node subtitle (workflow.node.functionDesc).
-    tooltip: "Reshape the payload with a function",
+    tooltip: t("pipeline.editorFunctionTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Condition",
+    label: t("pipeline.conditionsNode"),
     subtype: "condition",
     io_type: "default",
     icon: "img:" + conditionImage,
     // Matches the workflow Condition node subtitle (workflow.node.conditionDesc).
-    tooltip: "Branch on a rule",
+    tooltip: t("pipeline.editorConditionTooltip"),
     isSectionHeader: false,
   },
   {
-    label: "Destination",
+    label: t("pipeline.destinationNode"),
     icon: "input",
     isSectionHeader: true,
   },
   {
-    label: "Stream",
+    label: t("pipeline.streamNode"),
     subtype: "stream",
     io_type: "output",
     icon: "img:" + streamOutputImage,
-    tooltip: "Destination: Stream Node",
+    tooltip: t("pipeline.destinationStreamTooltip"),
     isSectionHeader: false,
   },
 ];
@@ -376,7 +379,7 @@ const {
   addSourceNode,
   closeStepPicker,
   onDragStart,
-} = useDragAndDrop();
+} = useDragAndDrop(t);
 
 // Items for the shared step picker: the downstream-addable node types
 // (Transform + Destination; sources aren't "added after" a node).
@@ -445,7 +448,7 @@ const chartContainerRef = ref(null);
 
 const isPipelineSaving = ref(false);
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 const confirmDialogBasicPipeline = ref(false);
 const showJsonEditorDialog = ref(false);
@@ -464,24 +467,30 @@ const toggleJsonEditorAIChat = () => {
   store.dispatch("setIsAiChatEnabled", !store.state.isAiChatEnabled);
 };
 
-const { t } = useI18n();
-
 const validationErrors = ref<string[]>([]);
 
 const { track } = useReo();
 
 // ── Pipeline name: OForm-owned ───────────────────────────────────────────────
-// The name input is a headless OForm so the teleported <OFormInput> validates
-// via the schema (submit-then-change timing; the inline error appears on the
-// first save attempt). `currentSelectedPipeline.name` stays the PERSISTED field
-// — the save payload, JSON editor and FlowChart all read it — so the two are
-// kept mirrored by the guarded watches below (guards break the echo loop).
+// A headless form so the teleported <OFormInlineEdit> validates via the schema
+// (submit-then-change timing; the inline error appears on the first save
+// attempt). `currentSelectedPipeline.name` stays the PERSISTED field — the save
+// payload, JSON editor and FlowChart all read it — so the two are kept mirrored
+// by the guarded watches below (guards break the echo loop).
+//
+// The context is PROVIDED here rather than by wrapping the field in <OForm>.
+// The field teleports into the shell header's <h1>, and a <form> element is
+// both invalid there and useless: this page saves through savePipeline(), not
+// through form submission. provide/inject follows the component tree, which a
+// Teleport preserves, so the teleported field still resolves it.
 const isCreatePipeline = computed(() => router.currentRoute.value.name === "createPipeline");
 
 const metaForm = useOForm<PipelineMetaForm>({
   defaultValues: pipelineMetaDefaults(),
   schema: makePipelineMetaSchema(t),
 });
+
+provide(FORM_CONTEXT_KEY, metaForm);
 
 // form → store: reflect what the user types into the persisted pipeline name.
 watch(

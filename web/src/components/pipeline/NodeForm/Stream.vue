@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OSwitch
           v-if="selectedNodeType == 'input'"
           data-test="create-stream-toggle"
-          :label="isUpdating ? 'Edit Stream' : 'Create new Stream'"
+          :label="isUpdating ? t('logStream.editStream') : t('logStream.createNewStream')"
           v-model="createNewStream"
           class="mb-3"
         />
@@ -84,39 +84,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="selectedNodeType == 'output'"
                 class="note-message bg-banner-warning-bg border-banner-warning-border text-banner-warning-text rounded-default flex w-full flex-col gap-2 border p-3"
               >
-                <div class="text-banner-warning-text text-sm">Guidelines:</div>
+                <div class="text-banner-warning-text text-sm">
+                  {{ t("alerts.guidelinesLabel") }}
+                </div>
                 <div class="text-banner-warning-text flex flex-col gap-1 text-sm">
                   <div class="flex items-start gap-2">
                     <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
-                      Select an existing stream from the list or enter the name to create a new one
+                      {{ t("alerts.selectStreamGuideline") }}
                     </span>
                   </div>
                   <div class="flex items-start gap-2">
                     <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
-                      <span class="highlight text-text-link font-bold">Enrichment_tables</span> as
-                      destination stream is only available for scheduled pipelines
+                      <span class="highlight text-text-link font-bold">{{
+                        t("alerts.enrichmentTablesTerm")
+                      }}</span>
+                      {{ t("alerts.enrichmentTablesDestinationNote") }}
                     </span>
                   </div>
                   <div class="flex items-start gap-2">
                     <OIcon name="info" size="sm" class="text-status-warning-text mt-0.5 shrink-0" />
                     <span>
-                      Use curly braces
+                      {{ t("alerts.useCurlyBracesNote") }}
                       <span
                         class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                         >{}</span
                       >
-                      to configure stream name dynamically. e.g.
+                      {{ t("alerts.configureStreamNameDynamicNote") }}
                       <span
                         class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
-                        >static_text_{fieldname}_postfix</span
-                      >. Static text before/after
+                        >{{ raw("static_text_{fieldname}_postfix") }}</span
+                      >{{ t("alerts.staticTextBeforeAfterNote") }}
                       <span
                         class="code rounded-default bg-code-bg text-code-text px-1 py-px font-mono"
                         >{}</span
                       >
-                      is optional
+                      {{ t("alerts.isOptionalNote") }}
                     </span>
                   </div>
                 </div>
@@ -146,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts" setup>
 import { ref, onMounted, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
@@ -184,20 +188,20 @@ function handleDrawerClose(v: boolean) {
   }
 }
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
 const { addNode, pipelineObj, deletePipelineNode, checkIfDefaultDestinationNode } =
-  useDragAndDrop();
+  useDragAndDrop(t);
 const { getUsedStreamsList } = usePipelines();
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
 const createNewStream = ref(false);
 const isUpdating = ref(false);
 const isFetchingStreams = ref(false);
-const indexOptions = ref<{ label: string; value: string; disabled: boolean }[]>([]);
+const indexOptions = ref<{ label: I18nText; value: string; disabled: boolean }[]>([]);
 const schemaList = ref([]);
 const streams: any = ref({});
 const usedStreams: any = ref([]);
@@ -295,7 +299,7 @@ watch(createNewStream, () => {
 function sanitizeStreamName(input: string): string {
   if (input.length > 100) {
     toast({
-      message: "Stream name should be less than 100 characters",
+      message: t("toastMessages.NodeForm.streamNameShouldBeLessThan"),
       variant: "warning",
     });
     //return empty string so that stream name is not saved and user will be notifid and
@@ -363,7 +367,7 @@ async function getStreamList() {
     streams.value[streamType] = res.list;
     schemaList.value = res.list;
     indexOptions.value = res.list.map((stream: any) => ({
-      label: stream.name,
+      label: raw(stream.name),
       value: stream.name,
       disabled: stream.isDisable || false,
     }));

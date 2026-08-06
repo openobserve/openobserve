@@ -57,18 +57,18 @@ mod tests {
         },
     };
     use enrichment_data::enrichment::storage::{Values, local};
-    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS};
+    use infra::schema::{STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST};
     use ingestion_common::IngestionResponse;
     use openobserve::migration;
     use openobserve_api_grpc::handler::grpc::{auth::check_auth, flight::FlightServiceImpl};
-    use openobserve_api_http::handler::http::{
-        self,
-        router::{basic_routes, config_routes, service_routes},
+    use openobserve_api_http::handler::http::router::{
+        basic_routes, config_routes, service_routes,
     };
     use openobserve_api_management::models::{
         alerts::responses::{GetAlertResponseBody, ListAlertsResponseBody},
         destinations::{Destination, DestinationType},
     };
+    use openobserve_api_pipelines::models::pipelines::{Pipeline as ApiPipeline, PipelineList};
     use openobserve_core::alerts::scheduler::handlers::handle_triggers;
     use prost::Message;
     use proto::{cluster_rpc::search_server::SearchServer, prometheus_rpc};
@@ -2426,8 +2426,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api_http::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_list: PipelineList = json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
         assert!(pipeline.is_some());
         let pipeline = pipeline.unwrap();
@@ -2542,8 +2541,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api_http::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_list: PipelineList = json::from_slice(&body).unwrap();
         let pipelines = pipeline_list.list.first();
         assert!(pipelines.is_some());
         let pipeline = pipelines.unwrap();
@@ -3069,8 +3067,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success());
-        let pipeline_list: openobserve_api_http::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_list: PipelineList = json::from_slice(&body).unwrap();
         let pipeline = pipeline_list.list.first();
         assert!(pipeline.is_some());
         let pipeline = pipeline.unwrap();
@@ -3079,7 +3076,7 @@ mod tests {
         let _ = openobserve_core::pipeline::db::delete(&pipeline.id).await;
     }
 
-    async fn get_pipeline_from_api(pipeline_name: &str) -> http::models::pipelines::Pipeline {
+    async fn get_pipeline_from_api(pipeline_name: &str) -> ApiPipeline {
         let auth = setup();
         // Check if pipeline was saved successfully by doing a list using API
         let app = init_test_router();
@@ -3087,8 +3084,7 @@ mod tests {
         let (status, body) =
             make_request(&app, Method::GET, "/api/e2e/pipelines", Some(headers), None).await;
         assert!(status.is_success(), "Failed to list pipelines");
-        let pipeline_response: openobserve_api_http::handler::http::models::pipelines::PipelineList =
-            json::from_slice(&body).unwrap();
+        let pipeline_response: PipelineList = json::from_slice(&body).unwrap();
         // Get the pipeline that matches the pipeline name
         let pipeline = pipeline_response
             .list
@@ -3166,9 +3162,7 @@ mod tests {
         drop(stream_schemas_latest);
 
         // Verify stream settings cache was updated
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(infra::schema::get_stream_settings_atomic(&schema_key).is_some());
 
         // Get the meta table stats for enrichment table
         let meta_table_stats = db::enrichment_table::get_meta_table_stats(org_id, table_name).await;
@@ -3247,9 +3241,7 @@ mod tests {
         assert!(!stream_schemas_latest.contains_key(&schema_key));
         drop(stream_schemas_latest);
 
-        let stream_settings = STREAM_SETTINGS.read().await;
-        assert!(!stream_settings.contains_key(&schema_key));
-        drop(stream_settings);
+        assert!(infra::schema::get_stream_settings_atomic(&schema_key).is_none());
 
         // wait for 2 seconds
         tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;

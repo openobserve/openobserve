@@ -328,12 +328,19 @@ describe("WorkflowTestDialog", () => {
       await primary(wrapper).trigger("click");
       await flushPromises();
 
-      expect(mockTestWorkflow).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf1",
-        inputs: JSON.parse(VALID_INPUT),
-        from_node: undefined,
-      });
+      // The whole in-memory graph is sent (test-without-saving), not just an id.
+      expect(mockTestWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_identifier: "default",
+          inputs: JSON.parse(VALID_INPUT),
+          from_node: undefined,
+          workflow: expect.objectContaining({
+            id: "wf1",
+            name: "wf",
+            nodes: expect.arrayContaining([expect.objectContaining({ id: "t1" })]),
+          }),
+        }),
+      );
       // success -> the popup closes and the result is stored for the canvas badges
       expect(workflowObj.testRun.show).toBe(false);
       expect(workflowObj.testRun.result).toMatchObject({ errors: {} });

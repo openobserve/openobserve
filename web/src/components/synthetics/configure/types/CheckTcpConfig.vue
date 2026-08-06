@@ -1,14 +1,29 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { ProtocolCheck, TcpCheckConfig } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
 const props = defineProps<{ check: ProtocolCheck }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const cfg = computed<TcpCheckConfig>(() => props.check.tcp!);
 

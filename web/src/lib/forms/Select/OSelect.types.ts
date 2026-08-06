@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { InjectionKey } from "vue";
 import type { FieldWidth } from "../Input/OInput.types";
 
@@ -29,10 +31,25 @@ export const NULL_VALUE_SENTINEL = "__o2__null__";
 
 export type SelectSize = "sm" | "md";
 
+/**
+ * Trigger chrome.
+ *
+ * - `"field"` (default) — the standard bordered control with a fixed height.
+ * - `"inline"` — the trigger reads as a WORD INSIDE RUNNING TEXT: no border, no
+ *   background, no fixed height, sized to its own content and contributing
+ *   nothing to the surrounding line box. For a value that belongs to a sentence
+ *   rather than to a form row — e.g. the folder in a page header's description
+ *   line ("Add Alert in KTX"). Everything else (search, keyboard, options list,
+ *   `#after-options`) is identical to `"field"`.
+ *
+ * Single-select only; `multiple` renders chips that need the field chrome.
+ */
+export type SelectAppearance = "field" | "inline";
+
 // ── Option shape ──────────────────────────────────────────────────────────
 
 export interface SelectOption {
-  label: string;
+  label: I18nText;
   value?: SelectValue;
   disabled?: boolean;
   /** When true, renders the item as a non-selectable group header */
@@ -90,7 +107,7 @@ export interface SelectProps {
   /** Optional dropdown content style passthrough */
   dropdownStyle?: string | Record<string, string | number>;
   /** Placeholder text shown in the internal search input */
-  searchPlaceholder?: string;
+  searchPlaceholder?: I18nText;
   /** Key to read label from each option object */
   labelKey?: string;
   /** Key to read value from each option object */
@@ -98,13 +115,13 @@ export interface SelectProps {
   /** Key to read a OIcon name from each option object — when set, renders an icon before the label in the dropdown list */
   iconKey?: string;
   /** Floating label rendered above the trigger */
-  label?: string;
+  label?: I18nText;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
   /** Placeholder text shown when no value is selected */
-  placeholder?: string;
+  placeholder?: I18nText;
   /** Error message — when truthy the field shows error styling */
-  errorMessage?: string;
+  errorMessage?: I18nText;
   /** Marks the field in error state without a message */
   error?: boolean;
   /** Shows a ✕ button to clear the selection */
@@ -113,12 +130,14 @@ export interface SelectProps {
   disabled?: boolean;
   /** Control size */
   size?: SelectSize;
+  /** Trigger chrome — `field` (default) or the running-text `inline`. */
+  appearance?: SelectAppearance;
   /** HTML id */
   id?: string;
   /** HTML name */
   name?: string;
   /** Helper text displayed below the field */
-  helpText?: string;
+  helpText?: I18nText;
   /**
    * Semantic field width — controls how wide the component renders.
    * Defaults to "full" (fills the container).
@@ -189,7 +208,7 @@ export interface SelectItemProps {
   /** The value emitted when this item is selected */
   value: SelectValue;
   /** Display label */
-  label?: string;
+  label?: I18nText;
   /** Prevents selection */
   disabled?: boolean;
 }
@@ -202,7 +221,7 @@ export interface SelectItemSlots {
 
 export interface SelectGroupProps {
   /** Visible heading above the group */
-  label?: string;
+  label?: I18nText;
 }
 
 export interface SelectGroupSlots {

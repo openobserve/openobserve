@@ -35,8 +35,8 @@ const props = defineProps<{
   disableRowReorder?: (row: any) => boolean;
   /** When true, the global filter is active — drag is auto-disabled. */
   globalFilterActive?: boolean;
-  /** Unique row identifier field (used as VueDraggableNext item-key). */
-  rowKey?: string;
+  /** Unique row identifier field or resolver (used as VueDraggableNext item-key). */
+  rowKey?: string | ((row: any) => string);
   /** Virtual scroll: virtual items from useTableVirtualization */
   virtualRows?: {
     index: number;
@@ -50,12 +50,22 @@ const props = defineProps<{
   baseOffset?: number;
   /** Virtual scroll: ref callback for measuring elements */
   measureElement?: (el: any) => void;
+  /** Variable-height mode: ref callback each row invokes so the virtualizer
+   *  measures its real DOM height. */
+  measureRowElement?: (el: Element | null) => void;
+  /** Variable-height mode flag — drives per-row measurement + data-index. */
+  dynamicRowHeight?: boolean;
   /** Status bar color function per row */
   getStatusBarColor?: (row: any) => string | undefined;
   /** Enable click-to-copy on cell values */
   enableCellCopy?: boolean;
   /** Per-cell inline style function */
   getCellStyle?: (params: { columnId: string; row: any; value: any }) => Record<string, any>;
+  /** Pivot row-field cell merge: returns hide flags for a merged cell. */
+  getPivotMerge?: (
+    row: any,
+    columnId: string,
+  ) => { hideContent: boolean; hideBorder: boolean } | null;
 }>();
 
 const emit = defineEmits<{
@@ -66,6 +76,7 @@ const emit = defineEmits<{
   "row-mouseenter": [row: any, event: MouseEvent];
   "row-mouseleave": [row: any];
   "cell-click": [params: { columnId: string; row: any; value: any }];
+  "cell-contextmenu": [params: { columnId: string; row: any; value: any }];
   "row-reorder": [data: any[]];
 }>();
 
@@ -119,17 +130,16 @@ function isRowDraggable(row: any): boolean {
   return true;
 }
 
+// Keeps the `as` cast out of the template, where `|` in a type union parses as a
+// (deprecated) Vue filter.
+function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string | number {
+  return virtualRow.key as string | number;
+}
+
 const isVirtual = () => !!(props.virtualRows && props.virtualRows.length > 0);
 
 function getRowForIndex(index: number) {
   return props.rows[index];
-}
-
-// Named helper (not an inline `as string | number` cast) so the template
-// expression has no bare `|`, which vue/no-deprecated-filter misparses as
-// a Vue 2 filter pipe.
-function getVirtualRowKey(virtualRow: { key: number | string | bigint }): string | number {
-  return virtualRow.key as string | number;
 }
 
 /** Get the TanStack Row from a draggable model item (plain data). */
@@ -178,6 +188,7 @@ function getRowForItem(item: any): Row<any> {
       :status-bar-color="getStatusBarColor?.(item)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :get-pivot-merge="getPivotMerge"
       :enable-row-reorder="true"
       :row-draggable="isRowDraggable(item)"
       @toggle-selection="emit('toggle-selection', $event)"
@@ -187,6 +198,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <!-- Pass through named cell slots from parent -->
       <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
@@ -225,6 +237,7 @@ function getRowForItem(item: any): Row<any> {
       :status-bar-color="getStatusBarColor?.(row.original)"
       :enable-cell-copy="enableCellCopy"
       :get-cell-style="getCellStyle"
+      :get-pivot-merge="getPivotMerge"
       :enable-row-reorder="props.enableRowReorder"
       :row-draggable="false"
       @toggle-selection="emit('toggle-selection', $event)"
@@ -234,6 +247,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <!-- Pass through named cell slots from parent -->
       <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
@@ -260,6 +274,9 @@ function getRowForItem(item: any): Row<any> {
       :key="getVirtualRowKey(virtualRow)"
       :row="getRowForIndex(virtualRow.index)"
       :measure-el="measureElement"
+      :measure-row-element="measureRowElement"
+      :dynamic-row-height="dynamicRowHeight"
+      :virtual-index="virtualRow.index"
       :table="table"
       :clickable="clickable"
       :selection-enabled="selectionEnabled"
@@ -283,6 +300,8 @@ function getRowForItem(item: any): Row<any> {
       :row-class-fn="rowClass"
       :status-bar-color="getStatusBarColor?.(getRowForIndex(virtualRow.index)?.original)"
       :enable-cell-copy="enableCellCopy"
+      :get-cell-style="getCellStyle"
+      :get-pivot-merge="getPivotMerge"
       :row-style-fn="rowStyleFn"
       @toggle-selection="emit('toggle-selection', $event)"
       @toggle-expansion="emit('toggle-expansion', $event)"
@@ -291,6 +310,7 @@ function getRowForItem(item: any): Row<any> {
       @row-mouseenter="(row: any, evt: MouseEvent) => emit('row-mouseenter', row, evt)"
       @row-mouseleave="(row: any) => emit('row-mouseleave', row)"
       @cell-click="emit('cell-click', $event)"
+      @cell-contextmenu="emit('cell-contextmenu', $event)"
     >
       <template v-for="(_, slotName) in slots" :key="slotName" #[slotName]="slotProps">
         <slot :name="slotName" v-bind="slotProps" />

@@ -47,8 +47,7 @@ use config::{
 use config::{META_ORG_ID, meta::self_reporting::usage::USAGE_STREAM};
 use hashbrown::HashSet;
 use infra::schema::{
-    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS, SchemaCache,
-    unwrap_stream_settings,
+    STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS_LATEST, SchemaCache, unwrap_stream_settings,
 };
 use ingestion_common::StreamSchemaChk;
 use serde_json::{Map, Value};
@@ -780,10 +779,7 @@ pub async fn handle_diff_schema(
             LOCAL_NODE_ID.load(Ordering::Relaxed),
         ));
     }
-    let mut w = STREAM_SETTINGS.write().await;
-    w.insert(cache_key.clone(), stream_setting);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    infra::schema::put_stream_settings(cache_key.clone(), Arc::new(stream_setting)).await;
 
     // update thread cache
     let final_schema = generate_schema_for_defined_schema_fields(

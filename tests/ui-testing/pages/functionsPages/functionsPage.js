@@ -27,9 +27,11 @@ class FunctionsPage {
     this.vrlRadio = this.page.locator('[data-test="function-transform-type-vrl-radio"]');
     this.jsRadio = this.page.locator('[data-test="function-transform-type-js-radio"]');
 
-    // Function form elements
+    // Function form elements. The name is an inline-edited title (OFormInlineEdit):
+    // a display trigger swaps to an input on click.
     this.functionNameInputWrapper = this.page.locator('[data-test="add-function-name-input"]');
-    this.functionNameInputField = this.page.locator('[data-test="add-function-name-input-field"]');
+    this.functionNameTrigger = this.page.locator('[data-test="add-function-name-input-trigger"]');
+    this.functionNameInputField = this.page.locator('[data-test="add-function-name-input-input"]');
     this.functionEditor = this.page.locator('[data-test="logs-vrl-function-editor"]');
     // Monaco mounts inside `data-test="query-editor"` (child of the function editor wrapper)
     this.functionEditorQueryDiv = this.page.locator('[data-test="logs-vrl-function-editor"] [data-test="query-editor"]');
@@ -109,8 +111,9 @@ class FunctionsPage {
 
     await expect(this.addFunctionButton).toBeVisible({ timeout: 10000 });
     await this.addFunctionButton.click();
-    // Wait for the function dialog to actually open
-    await expect(this.functionNameInputField).toBeVisible({ timeout: 10000 });
+    // Wait for the function dialog to actually open — the name trigger is what
+    // renders in display mode (the input only appears once the trigger is clicked).
+    await expect(this.functionNameTrigger).toBeVisible({ timeout: 10000 });
   }
 
   /**
@@ -139,7 +142,10 @@ class FunctionsPage {
   }
 
   async fillFunctionName(name) {
-    // OInput convention: fill the auto-derived `-field` (native input), not the wrapper
+    // Inline-edit convention: click the trigger to open the editor, then fill
+    // the revealed input.
+    await expect(this.functionNameTrigger).toBeVisible({ timeout: 15000 });
+    await this.functionNameTrigger.click();
     await expect(this.functionNameInputField).toBeVisible({ timeout: 15000 });
     await this.functionNameInputField.fill(name);
   }

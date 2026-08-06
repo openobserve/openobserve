@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToIncidentList"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div
@@ -105,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}</span>
             <span class="text-text-secondary text-xs">·</span>
             <span class="text-text-secondary text-xs font-normal"
-              >{{ inc.alert_count }} alerts</span
+              >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
           <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="servicePanelVisible && selectedService"
             class="text-text-secondary ml-1 text-xs font-normal"
           >
-            — viewing
+            {{ t("overview.viewingLabel") }}
             <strong class="text-text-body font-semibold">{{
               selectedService.label ?? selectedService.id
             }}</strong>
@@ -145,7 +145,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToServiceGraph"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div class="relative">
@@ -234,7 +234,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="text-text-body text-sm font-medium"
                   :class="svc.latencyFlag ? 'text-warning-700' : ''"
                 >
-                  {{ svc.latencyMultiplier ? svc.latencyMultiplier + "x" : "—" }}
+                  {{ svc.latencyMultiplier ? raw(svc.latencyMultiplier + "x") : raw("—") }}
                 </span>
               </div>
               <div class="flex items-baseline justify-between gap-2">
@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAnomalies"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div class="flex flex-col gap-1.5">
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-text-link cursor-pointer border-none bg-none p-0 text-xs font-medium whitespace-nowrap opacity-80 transition-opacity duration-150 hover:underline hover:opacity-100"
           @click="goToAlertList"
         >
-          {{ t("overview.viewAll") }} →
+          {{ t("overview.viewAll") }} {{ "→" }}
         </button>
       </div>
       <div
@@ -380,8 +380,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             type="countChip"
             value="error"
             class="shrink-0"
-            :title="`Failed ${ev.failCount} times in this window`"
-            >×{{ ev.failCount }}</OTag
+            :title="t('common.failedTimesInWindow', { count: ev.failCount })"
+            >{{ t("overview.timesSymbol") }}{{ ev.failCount }}</OTag
           >
           <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap">{{
             ev.timeAgo
@@ -506,8 +506,9 @@ const _anomalyCache = new Map<
   string,
   { ts: number; startTime: number; endTime: number; data: any[] }
 >();
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
+import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "@/services/alerts";
@@ -528,7 +529,7 @@ const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -809,9 +810,12 @@ const loadHistoryAndSplit = async () => {
     });
     const hits: any[] = res.data?.hits ?? [];
 
-    // Recent events: firing/error shown per-occurrence; failed deduped by alert_name with count
+    // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
+    // This previously filtered on the literal strings ["firing", "error"], neither
+    // of which the backend ever produced — so it silently matched nothing. The
+    // shared classifier covers both the current and the legacy vocabulary.
     const firingHits = hits
-      .filter((h) => ["firing", "error"].includes(h.status?.toLowerCase()))
+      .filter((h) => isFiringOutcome(h.status))
       .slice(0, 5)
       .map((h, idx) => ({
         id: h.id ?? `ev-${idx}`,
@@ -819,13 +823,16 @@ const loadHistoryAndSplit = async () => {
         service: h.stream_name ?? "—",
         description: h.alert_name ?? "",
         timeAgo: relativeTime_(h.timestamp),
+        // Firing rows need a sort key too — without rawTs they scored 0 and
+        // always sorted beneath every failure row regardless of timestamp.
+        rawTs: h.timestamp,
         failCount: 0,
       }));
 
     // Dedup failed: one row per alert_name, most recent timestamp, total count
     const failedMap = new Map<string, any>();
     hits
-      .filter((h) => h.status?.toLowerCase() === "failed")
+      .filter((h) => isErrorOutcome(h.status))
       .forEach((h) => {
         const key = h.alert_name ?? h.id ?? "unknown";
         const existing = failedMap.get(key);

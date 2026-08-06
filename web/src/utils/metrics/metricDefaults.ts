@@ -28,12 +28,14 @@
  * silently. It is a bare enum in a types module with no imports of its own.
  */
 
+import { raw, type I18nKey, type I18nText } from "@/types/i18n";
+
 import { PromqlStepId } from "@/components/promql/types";
 import type { PromqlBuilderQuery, PromqlLabelMatcher, PromqlStep } from "@/components/promql/types";
 
 /** A filter as callers pass it in: label/value plus an optional operator. */
 interface FilterInput {
-  label: string;
+  label: I18nText;
   value: string;
   operator?: string;
 }
@@ -43,7 +45,7 @@ type FiltersArg = FilterInput[] | Record<string, string> | undefined;
 
 /** A matcher after normalization: validated label, operator and value. */
 interface NormalizedMatcher {
-  label: string;
+  label: I18nText;
   operator: PromqlOperator;
   value: string;
 }
@@ -61,11 +63,19 @@ interface VariantQuery {
   builder?: PromqlBuilderQuery;
 }
 
-/** One variant of a card: an ordered set of queries and its chart shape. */
+/**
+ * One variant of a card: an ordered set of queries and its chart shape.
+ *
+ * Variant names are stored as `labelKey` and translated at render time by
+ * `FunctionConfigDialog.vue` — this module is Vue-free and loads at import, so
+ * resolving text here would freeze it at the boot locale. `label` remains for
+ * names built from live data (`Top 5 by ${label}`); `labelKey` wins if both set.
+ */
 interface Variant {
   id: string;
   footerLabel: string;
-  label: string;
+  label?: I18nText;
+  labelKey?: I18nKey;
   queries: VariantQuery[];
   chartType: string;
   unit?: string;
@@ -79,9 +89,18 @@ interface BuildVariantsContext {
   metricName: string;
   base: string;
   sel: string;
+  /**
+   * `sel` with the NaN guard NEVER applied. A range vector `[w]` may only be
+   * taken over a SELECTOR, so any variant that builds one has to start here —
+   * `(x and x > -Inf)[5m]` does not parse, and the subquery form `(...)[5m:]`
+   * is rejected by the engine unless the inner expression is already a matrix.
+   */
+  rawSel: string;
   baseSel?: string;
   countSel: string;
   w: string;
+  /** The `[w]` for `quantile_over_time`. Wider than `w` — see MIN_PERCENTILE_SAMPLES. */
+  pw: string;
   labels?: string[];
   unit: string;
   builderLabels: PromqlLabelMatcher[];
@@ -115,6 +134,7 @@ interface MetricDefaultsContext {
   familyType?: string;
   filters?: FilterInput[];
   rateWindow?: string;
+  percentileWindow?: string;
   labels?: string[];
   applyNanGuard?: boolean;
 }
@@ -491,7 +511,7 @@ function escapePromqlString(value: unknown): string {
  * cache key stable.
  *
  * @param {string} metricName
- * @param {Array<{label: string, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended verbatim as `=` matchers
  * @returns {string} e.g. `{__name__="http_requests_total",job="api"}`
  */
@@ -520,9 +540,9 @@ export function buildSelector(
  * panel editor's PromQL builder stores. Sharing this step is what keeps the two
  * from drifting apart.
  *
- * @param {Array<{label: string, value: string, operator?: string}>|Record<string,string>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string}>|Record<string,string>} [filters]
  * @param {Record<string,string>} [extraMatchers] appended as `=` matchers
- * @returns {Array<{label: string, operator: string, value: string}>}
+ * @returns {Array<{label: I18nText, operator: string, value: string}>}
  */
 function normalizeMatchers(
   filters?: FiltersArg,
@@ -533,12 +553,12 @@ function normalizeMatchers(
     list.push(...filters);
   } else if (filters && typeof filters === "object") {
     for (const [label, value] of Object.entries(filters)) {
-      list.push({ label, value });
+      list.push({ label: raw(label), value });
     }
   }
   if (extraMatchers && typeof extraMatchers === "object") {
     for (const [label, value] of Object.entries(extraMatchers)) {
-      list.push({ label, value });
+      list.push({ label: raw(label), value });
     }
   }
 
@@ -555,7 +575,7 @@ function normalizeMatchers(
       if (!isPromqlOperator(operator)) {
         throw new Error(`buildSelector: invalid operator "${operator}"`);
       }
-      return { label, operator, value: String(f.value ?? "") };
+      return { label: raw(label), operator, value: String(f.value ?? "") };
     })
     .sort((a, b) =>
       a.label === b.label ? a.value.localeCompare(b.value) : a.label.localeCompare(b.label),
@@ -569,7 +589,7 @@ function normalizeMatchers(
  * Values are handed over RAW: the query modeller escapes them itself when it
  * renders, so escaping here would double it.
  *
- * @returns {Array<{label: string, op: string, value: string}>}
+ * @returns {Array<{label: I18nText, op: string, value: string}>}
  */
 export function builderLabelsOf(filters?: FiltersArg): PromqlLabelMatcher[] {
   return normalizeMatchers(filters).map(({ label, operator, value }) => ({
@@ -623,7 +643,7 @@ export function isRateBasedKind(cardKind: string): boolean {
  * empty only when the window truly holds nothing.
  *
  * @param {string} streamName
- * @param {Array<{label: string, value: string, operator?: string}>} [filters]
+ * @param {Array<{label: I18nText, value: string, operator?: string}>} [filters]
  * @returns {string} PromQL
  */
 export function buildPresenceQuery(streamName: string, filters?: FiltersArg): string {
@@ -712,14 +732,63 @@ export function computeStepSeconds(
  *
  * @returns {string} a PromQL duration, e.g. "4m"
  */
+function rateWindowSeconds(
+  rangeSeconds: number,
+  maxDataPoints: number,
+  scrapeIntervalSeconds: number,
+): number {
+  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
+  return Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
+}
+
 export function computeRateWindow(
   rangeSeconds: number,
   maxDataPoints: number = MAX_DATA_POINTS,
   scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
 ): string {
-  const step = computeStepSeconds(rangeSeconds, maxDataPoints);
-  const w = Math.max(4 * scrapeIntervalSeconds, step + scrapeIntervalSeconds);
-  return formatPromDuration(w);
+  return formatPromDuration(rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds));
+}
+
+/**
+ * Widened `[W]`s to RETRY a rate query with, after the standard window came
+ * back empty on a metric that demonstrably has samples in the range.
+ *
+ * The standard window is sized from the org's CONFIGURED scrape interval, and
+ * that setting is a claim, not a measurement. An app exporting OTLP metrics
+ * every 60s under an org that says `scrape_interval: 15` gets a `[1m]` window
+ * that almost never holds the two samples `rate()` needs — so every rate-based
+ * card reports "too few samples" while the data sits fully ingested in the
+ * selected range.
+ *
+ * The true cadence is unknown at this point (all that is known is that it is
+ * wider than roughly half the window that just failed), so the retries
+ * escalate geometrically: 4x, then 16x. Two rounds cover two orders of
+ * magnitude of mismatch for at most two extra queries, and only on cards
+ * already known to be in this state.
+ *
+ * Capped at half the range: rate over a window wider than that is one global
+ * average masquerading as a trend, and a cadence so slow that two samples do
+ * not fit in half the range could never chart as a rate anyway — at that point
+ * the "too few samples" card is the honest answer.
+ *
+ * @returns {string[]} PromQL durations, each strictly wider than the last and
+ *   than the standard window; empty when the cap leaves no room to widen.
+ */
+export function computeWidenedRateWindows(
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+): string[] {
+  const base = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
+  const cap = Math.floor(Math.max(0, Number(rangeSeconds) || 0) / 2);
+  const widths: number[] = [];
+  for (const factor of [4, 16]) {
+    const w = Math.min(base * factor, cap);
+    if (w > base && w > (widths[widths.length - 1] ?? 0)) widths.push(w);
+    // The cap absorbed this rung; the next factor would only repeat it.
+    if (base * factor >= cap) break;
+  }
+  return widths.map(formatPromDuration);
 }
 
 /**
@@ -740,6 +809,56 @@ export const PANEL_RATE_WINDOW = "$__rate_interval";
 
 /** The window used when a caller supplies no time context. */
 const DEFAULT_RATE_WINDOW = formatPromDuration(4 * DEFAULT_SCRAPE_INTERVAL_SECONDS);
+
+/**
+ * Samples a `quantile_over_time` window should contain before its percentiles
+ * mean anything.
+ *
+ * The rate window is sized for `rate()`, which needs two samples — 4 x scrape is
+ * plenty. A quantile is a different question: over 4 samples, p90 lands at index
+ * 0.9 x 3 = 2.7 and p99 at 2.97, so both interpolate between the same top pair
+ * and draw as one line. That is the whole reason percentiles looked broken.
+ */
+export const MIN_PERCENTILE_SAMPLES = 20;
+
+/**
+ * The `[w]` for a `quantile_over_time`, in a card the explorer executes itself.
+ *
+ * Three bounds, in order of who wins when:
+ *  - FLOOR, the rate window itself: it already guarantees consecutive evaluation
+ *    points leave no gaps, and a quantile can never want LESS data than a rate.
+ *    This dominates at long ranges, where the step is already large — there the
+ *    two windows coincide.
+ *  - TARGET `MIN_PERCENTILE_SAMPLES x scrape`: enough samples to separate the
+ *    percentiles. This dominates at short ranges, where the step is at its floor.
+ *  - CAP `range / 4`: a window near the width of the view returns one global
+ *    quantile per series and flattens the chart. Keeping four windows across the
+ *    view leaves visible variation. Never allowed to undercut the FLOOR.
+ *
+ * @returns {string} a PromQL duration, e.g. "5m"
+ */
+export function computePercentileWindow(
+  rangeSeconds: number,
+  maxDataPoints: number = MAX_DATA_POINTS,
+  scrapeIntervalSeconds: number = DEFAULT_SCRAPE_INTERVAL_SECONDS,
+): string {
+  const floor = rateWindowSeconds(rangeSeconds, maxDataPoints, scrapeIntervalSeconds);
+  const target = MIN_PERCENTILE_SAMPLES * scrapeIntervalSeconds;
+  const cap = Math.max(floor, Math.max(0, Number(rangeSeconds) || 0) / 4);
+  return formatPromDuration(Math.min(Math.max(floor, target), cap));
+}
+
+/**
+ * The percentile window to hand to a PANEL — the `$__rate_interval` counterpart
+ * for `quantile_over_time`, resolved by usePanelVariableSubstitution against the
+ * panel's own range and width. Same reasoning as `PANEL_RATE_WINDOW`.
+ */
+export const PANEL_PERCENTILE_WINDOW = "$__percentile_interval";
+
+/** The percentile window used when a caller supplies no time context. */
+const DEFAULT_PERCENTILE_WINDOW = formatPromDuration(
+  MIN_PERCENTILE_SAMPLES * DEFAULT_SCRAPE_INTERVAL_SECONDS,
+);
 
 /* -------------------------------------------------------------------------- */
 /* Rule set B — unit inference                                                 */
@@ -877,9 +996,10 @@ const TOPK = (k: number, byLabels: string[] = []): PromqlStep => ({
   id: PromqlStepId.TopK,
   params: [k, [...byLabels]],
 });
-const QUANTILE = (ratio: number, byLabels: string[] = []): PromqlStep => ({
-  id: PromqlStepId.Quantile,
-  params: [ratio, [...byLabels]],
+/** `quantile_over_time(ratio, sel[window])` — params are [ratio, window]. */
+const QUANTILE_OVER_TIME = (ratio: number, window: string): PromqlStep => ({
+  id: PromqlStepId.QuantileOverTime,
+  params: [ratio, window],
 });
 const HISTOGRAM_QUANTILE = (ratio: number): PromqlStep => ({
   id: PromqlStepId.HistogramQuantile,
@@ -910,7 +1030,19 @@ function resolveTopkLabel(labels: string[] | undefined): string | null {
  * and an ExponentialHistogram fallback gets only its count line.
  */
 function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
-  const { metricName, base, sel, countSel, w, labels, unit, builderLabels, builderSafe } = ctx;
+  const {
+    metricName,
+    base,
+    sel,
+    rawSel,
+    countSel,
+    w,
+    pw,
+    labels,
+    unit,
+    builderLabels,
+    builderSafe,
+  } = ctx;
 
   /**
    * Builder state for one query, or `undefined` when this variant cannot be
@@ -926,21 +1058,21 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "avg",
           footerLabel: "avg",
-          label: "Average",
+          labelKey: "metrics.explorer.variants.average",
           queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
           chartType: "line",
         },
         {
           id: "sum",
           footerLabel: "sum",
-          label: "Sum",
+          labelKey: "metrics.explorer.variants.sum",
           queries: [q(`sum(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Sum)]))],
           chartType: "line",
         },
         {
           id: "minmax",
           footerLabel: "min / max",
-          label: "Min / Max",
+          labelKey: "metrics.explorer.variants.minMax",
           queries: [
             q(`min(${sel})`, "min", b(metricName, [AGG(PromqlStepId.Min)])),
             q(`max(${sel})`, "max", b(metricName, [AGG(PromqlStepId.Max)])),
@@ -950,21 +1082,39 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "stddev",
           footerLabel: "stddev",
-          label: "Std dev",
+          labelKey: "metrics.explorer.variants.stddev",
           queries: [q(`stddev(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Stddev)]))],
           chartType: "line",
         },
         {
           id: "percentiles",
           footerLabel: "percentiles",
-          label: "Percentiles",
+          labelKey: "metrics.explorer.variants.percentiles",
           // A query per OFFERED percentile, not per default-checked one. The
           // dialog builds its checkboxes from `availablePercentiles`, and
           // `resolveVariant` narrows these queries down to the checked set — so
           // any percentile without a query here is a checkbox that silently does
           // nothing (or worse, empties the subset and falls back to all of them).
+          //
+          // Percentiles OVER TIME, not across series. `quantile(φ, v)` aggregates
+          // the series present at each timestamp, so on a single-series gauge —
+          // the common case — p50, p90 and p99 all collapse onto the raw value
+          // and the tile draws one line under three legends. `quantile_over_time`
+          // asks the question a gauge actually poses ("what was the p99 of this
+          // signal over the last [w]?") and stays meaningful at any series count.
+          //
+          // Built from `rawSel`: a range vector needs a SELECTOR, so the guarded
+          // `(x and x > -Inf)` form cannot carry a range. See `rawSel`'s doc.
+          //
+          // `pw`, NOT `w`: the rate window is sized for rate()'s two-sample need
+          // and leaves a quantile with too few samples to separate. See
+          // MIN_PERCENTILE_SAMPLES.
           queries: GAUGE_PERCENTILES.map((p) =>
-            q(`quantile(${p / 100}, ${sel})`, `p${p}`, b(metricName, [QUANTILE(p / 100)])),
+            q(
+              `quantile_over_time(${p / 100}, ${rawSel}[${pw}])`,
+              `p${p}`,
+              b(metricName, [QUANTILE_OVER_TIME(p / 100, pw)]),
+            ),
           ),
           chartType: "line",
           // Checked by default; the other offered percentiles start unchecked.
@@ -974,11 +1124,13 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
       ];
 
     case CARD_KIND.COUNTER_RATE: {
-      const variants = [
+      // Annotated: the literal entries all carry `labelKey`, so without this TS
+      // narrows the element type and rejects the data-derived `label` pushed below.
+      const variants: Variant[] = [
         {
           id: "rate-sum",
           footerLabel: "sum(rate)",
-          label: "Rate (sum)",
+          labelKey: "metrics.explorer.variants.rateSum",
           queries: [
             q(
               `sum(rate(${sel}[${w}]))`,
@@ -991,7 +1143,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "rate-avg",
           footerLabel: "avg(rate)",
-          label: "Rate (avg)",
+          labelKey: "metrics.explorer.variants.rateAvg",
           queries: [
             q(
               `avg(rate(${sel}[${w}]))`,
@@ -1004,7 +1156,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "increase",
           footerLabel: "sum(increase)",
-          label: "Increase",
+          labelKey: "metrics.explorer.variants.increase",
           queries: [
             q(
               `sum(increase(${sel}[${w}]))`,
@@ -1022,7 +1174,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         variants.push({
           id: "topk",
           footerLabel: `topk(5) by ${topkLabel}`,
-          label: `Top 5 by ${topkLabel}`,
+          label: raw(`Top 5 by ${topkLabel}`),
           queries: [
             q(
               `topk(5, sum by (${topkLabel}) (rate(${sel}[${w}])))`,
@@ -1041,7 +1193,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "heatmap",
           footerLabel: "heatmap",
-          label: "Heatmap",
+          labelKey: "metrics.explorer.variants.heatmap",
           queries: [
             q(
               `sum by (le) (rate(${sel}[${w}]))`,
@@ -1059,7 +1211,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "percentiles",
           footerLabel: "percentiles",
-          label: "Percentiles",
+          labelKey: "metrics.explorer.variants.percentiles",
           queries: DEFAULT_PERCENTILES.map((p) =>
             q(
               `histogram_quantile(${p / 100}, sum by (le) (rate(${sel}[${w}])))`,
@@ -1074,7 +1226,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count-rate",
           footerLabel: "sum(rate) of count",
-          label: "Rate of count",
+          labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
               `sum(rate(${countSel}[${w}]))`,
@@ -1098,7 +1250,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count-rate",
           footerLabel: "sum(rate) of count",
-          label: "Rate of count",
+          labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
               `sum(rate(${countSel}[${w}]))`,
@@ -1118,7 +1270,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "mean",
           footerLabel: "avg",
-          label: "Average",
+          labelKey: "metrics.explorer.variants.average",
           queries: [
             q(
               `sum(rate(${sel}[${w}])) / sum(rate(${countSel}[${w}]))`,
@@ -1134,7 +1286,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count-rate",
           footerLabel: "sum(rate) of count",
-          label: "Rate of count",
+          labelKey: "metrics.explorer.variants.rateOfCount",
           queries: [
             q(
               `sum(rate(${countSel}[${w}]))`,
@@ -1158,7 +1310,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           // mergeable. The copy says "avg of reported quantiles" and the pXX
           // vocabulary is deliberately withheld — that is reserved for
           // histogram_quantile.
-          label: "Avg of reported quantiles",
+          labelKey: "metrics.explorer.variants.avgReportedQuantiles",
           queries: [
             q(
               `avg by (quantile) (${sel})`,
@@ -1171,7 +1323,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "raw-quantiles",
           footerLabel: "raw quantiles",
-          label: "Reported quantiles (raw)",
+          labelKey: "metrics.explorer.variants.reportedQuantilesRaw",
           // {quantile} alone would duplicate legend names across targets.
           queries: [q(sel, "{instance} {quantile}", b(metricName, []))],
           chartType: "line",
@@ -1188,7 +1340,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           {
             id: "buckets",
             footerLabel: "buckets",
-            label: "Buckets",
+            labelKey: "metrics.explorer.variants.buckets",
             queries: [
               q(`sum by (le) (${sel})`, "{le}", b(metricName, [AGG(PromqlStepId.Sum, ["le"])])),
             ],
@@ -1204,7 +1356,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
           {
             id: "avg",
             footerLabel: "avg",
-            label: "Average",
+            labelKey: "metrics.explorer.variants.average",
             queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
             chartType: "line",
           },
@@ -1221,7 +1373,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "avg",
           footerLabel: "avg",
-          label: "Average",
+          labelKey: "metrics.explorer.variants.average",
           queries: [q(`avg(${sel})`, metricName, b(metricName, [AGG(PromqlStepId.Avg)]))],
           chartType: "line",
         },
@@ -1232,7 +1384,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "count",
           footerLabel: "count",
-          label: "Count of series",
+          labelKey: "metrics.explorer.variants.countOfSeries",
           // An info metric carries its payload in its LABELS; the value is
           // always 1. Charting the value would therefore draw a flat line at 1
           // for every such metric — true, and useless. What carries information
@@ -1244,7 +1396,7 @@ function buildVariants(cardKind: string, ctx: BuildVariantsContext): Variant[] {
         {
           id: "series",
           footerLabel: "series",
-          label: "Series (labels)",
+          labelKey: "metrics.explorer.variants.seriesLabels",
           // The label sets themselves. Not previewable: a card renders through
           // ECharts, which does not draw a table at all — and there is no room
           // for one at 120px anyway. Reachable from the ⚙ dialog, and the
@@ -1286,8 +1438,9 @@ const FOOTER_LABEL = {
  * @param {{
  *   streamNames?: Set<string>,   // feeds the `_sum` sibling check
  *   familyType?: string,         // the family's declared type
- *   filters?: Array<{label: string, value: string, operator?: string}>,
+ *   filters?: Array<{label: I18nText, value: string, operator?: string}>,
  *   rateWindow?: string,         // PromQL duration; defaults to the 4m floor
+ *   percentileWindow?: string,   // quantile_over_time's window; defaults to 20 x scrape
  *   labels?: string[],           // the stream's label names, when known
  *   applyNanGuard?: boolean, // retry mode: guard the selector against NaN samples
  * }} [ctx]
@@ -1302,12 +1455,14 @@ export function getMetricDefaults(
   const base = baseNameOf(metricName);
   const filters = ctx?.filters ?? [];
   const w = ctx?.rateWindow || DEFAULT_RATE_WINDOW;
+  const pw = ctx?.percentileWindow || DEFAULT_PERCENTILE_WINDOW;
 
   const supportsNanGuard = RATE_FREE_KINDS.includes(cardKind);
   const guarded = !!ctx?.applyNanGuard && supportsNanGuard;
   const guard = guarded ? withNanGuard : (selector: string) => selector;
 
-  const sel = guard(buildSelector(metricName, filters));
+  const rawSel = buildSelector(metricName, filters);
+  const sel = guard(rawSel);
   const baseSel = guard(buildSelector(base, filters));
   const countSel = buildSelector(`${base}_count`, filters);
 
@@ -1318,9 +1473,11 @@ export function getMetricDefaults(
     metricName,
     base,
     sel,
+    rawSel,
     baseSel,
     countSel,
     w,
+    pw,
     labels: ctx?.labels,
     unit,
     builderLabels: builderLabelsOf(filters),

@@ -117,10 +117,10 @@ pub const PREBUILT_TEMPLATE_PREFIX: &str = "prebuilt_";
 /// `prebuilt_<type>` where `<type>` is a registered prebuilt destination type
 /// (slack, opsgenie, servicenow, ...).
 ///
-/// Lives next to `get_prebuilt_template` so the public API surface
-/// (`handler::http::models`), the service-layer guards
-/// (`service::alerts::templates`), and any future caller all derive the
-/// "is system template" answer from the same source of truth.
+/// Lives next to `get_prebuilt_template` so the API models
+/// (`openobserve_api_management::models`), the service-layer guards
+/// (`openobserve_core::alerts::templates`), and any future caller all derive
+/// the "is system template" answer from the same source of truth.
 ///
 /// User-created templates whose names happen to start with `prebuilt_` but
 /// don't match a registered type stay freely editable and deletable.
@@ -794,17 +794,17 @@ mod tests {
         fs::write(config_path, test_config).unwrap();
 
         // Temporarily replace the main config path
-        if let Ok(config_str) = fs::read_to_string(config_path) {
-            if let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str) {
-                let destinations: Vec<Destination> = config
-                    .destinations
-                    .into_iter()
-                    .filter_map(|dest| convert_to_destination(dest).ok())
-                    .collect();
+        if let Ok(config_str) = fs::read_to_string(config_path)
+            && let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str)
+        {
+            let destinations: Vec<Destination> = config
+                .destinations
+                .into_iter()
+                .filter_map(|dest| convert_to_destination(dest).ok())
+                .collect();
 
-                assert_eq!(destinations.len(), 1);
-                assert_eq!(destinations[0].name, "Test Destination");
-            }
+            assert_eq!(destinations.len(), 1);
+            assert_eq!(destinations[0].name, "Test Destination");
         }
 
         // Clean up

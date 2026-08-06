@@ -33,16 +33,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span class="rounded-default bg-badge-success-solid-bg inline-block h-2 w-2" />
           {{ okCount }} {{ okLabel }}
         </span>
+        <span v-if="errorCount > 0" class="text-2xs flex items-center gap-1">
+          <span class="rounded-default bg-badge-warning-solid-bg inline-block h-2 w-2" />
+          <span class="text-badge-warning-soft-text font-medium"
+            >{{ errorCount }} {{ errorLabel }}</span
+          >
+        </span>
         <span v-if="skippedCount > 0" class="text-2xs text-text-muted flex items-center gap-1">
           <span class="rounded-default bg-border-default inline-block h-2 w-2" />
-          {{ skippedCount }} Skipped
+          {{ skippedCount }} {{ t("alerts.historyTimeline.skipped") }}
         </span>
         <span
           v-if="hasFlappingZone"
           class="text-2xs text-badge-purple-ol-text flex items-center gap-1 font-semibold brightness-90"
         >
           <span class="rounded-default o2-flap-swatch inline-block h-2 w-2" />
-          Flapping
+          {{ t("alerts.historyTimeline.flapping") }}
         </span>
       </div>
 
@@ -68,8 +74,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="o2-flap-pill text-badge-purple-solid-text bg-badge-purple-solid-bg pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 flex -translate-x-1/2 items-center gap-1.25 rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap shadow-md"
             >
-              <span class="font-semibold">⚡ Flapping</span>
-              <span class="font-normal opacity-60">•</span>{{ seg.flips }} flips
+              <span class="font-semibold"
+                >{{ "⚡" }} {{ t("alerts.historyTimeline.flapping") }}</span
+              >
+              <span class="font-normal opacity-60">•</span>{{ seg.flips }}
+              {{ t("alerts.historyTimeline.flipsSuffix") }}
               <span class="font-normal opacity-60">•</span>{{ seg.durationLabel }}
             </div>
             <div
@@ -104,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="mt-0.5 opacity-60">{{ seg.startLabel }}</div>
               <div v-if="seg.count > 1" class="text-3xs opacity-50">
-                {{ seg.count }} evaluations
+                {{ seg.count }} {{ t("alerts.historyTimeline.evaluationsSuffix") }}
               </div>
             </div>
           </div>
@@ -132,44 +141,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import {
+  isErrorOutcome,
+  isFiringOutcome,
+  isOkOutcome,
+  outcomeLabel,
+} from "@/utils/alerts/runOutcome";
 
-const props = withDefaults(
-  defineProps<{
-    history: Array<{ status: string; timestamp: number }>;
-    // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
-    // workflows pass "Failed"/"Success".
-    firingLabel?: string;
-    okLabel?: string;
-  }>(),
-  { firingLabel: "Firing", okLabel: "Ok" },
-);
-const { firingLabel, okLabel } = props;
+const { t } = useI18nTyped();
+
+const props = defineProps<{
+  history: Array<{ status: string; timestamp: number }>;
+  // Legend/tooltip wording. Defaults are alert-centric ("Firing"/"Ok");
+  // workflows pass "Failed"/"Success".
+  firingLabel?: I18nText;
+  okLabel?: I18nText;
+  errorLabel?: I18nText;
+}>();
+
+// Not `withDefaults`: a default is evaluated once at module scope, which would
+// freeze the wording in whatever locale was active when the module loaded.
+const firingLabel = computed(() => props.firingLabel ?? t("alerts.historyTimeline.firing"));
+const okLabel = computed(() => props.okLabel ?? t("alerts.historyTimeline.ok"));
+const errorLabel = computed(() => props.errorLabel ?? t("alerts.historyTimeline.error"));
 
 const hoveredIndex = ref<number | null>(null);
 
 // ── Status helpers ──────────────────────────────────────────────────────────
+// Classification lives in utils/alerts/runOutcome so the timeline, the history
+// drawer and the overview cannot drift apart again.
 
 function isFiring(s: string) {
-  const v = s?.toLowerCase();
-  return v === "firing" || v === "error" || v === "anomaly" || v === "completed";
+  return isFiringOutcome(s);
 }
 
 function isOk(s: string) {
-  const v = s?.toLowerCase();
-  return v === "ok" || v === "success" || v === "normal" || v === "condition_not_satisfied";
+  return isOkOutcome(s);
+}
+
+/** An evaluation that errored: not firing, but not healthy either. */
+function isError(s: string) {
+  return isErrorOutcome(s);
 }
 
 function normalizeStatus(s: string): string {
-  const v = s?.toLowerCase();
-  if (isFiring(v)) return firingLabel;
-  if (isOk(v)) return okLabel;
-  if (v === "skipped") return "Skipped";
-  return s?.replace(/_/g, " ") ?? "Unknown";
+  return outcomeLabel(
+    s,
+    firingLabel.value,
+    okLabel.value,
+    errorLabel.value,
+    t("alerts.historyTimeline.skipped"),
+    t("alerts.historyTimeline.unknown"),
+  );
 }
 
 function blockColor(status: string): string {
   if (isFiring(status)) return "var(--color-badge-error-solid-bg)";
   if (isOk(status)) return "var(--color-badge-success-solid-bg)";
+  // An errored evaluation is not a firing, but it must not read as "no data"
+  // either — give it its own tone rather than the neutral border colour.
+  if (isError(status)) return "var(--color-badge-warning-solid-bg)";
   return "var(--color-border-default)";
 }
 
@@ -181,8 +213,14 @@ const sorted = computed(() => [...props.history].sort((a, b) => a.timestamp - b.
 
 const firingCount = computed(() => props.history.filter((r) => isFiring(r.status)).length);
 const okCount = computed(() => props.history.filter((r) => isOk(r.status)).length);
+// Errored evaluations are counted separately. They are neither firing (the
+// alert did not trigger) nor healthy — previously they fell into the catch-all
+// bucket and were mislabelled "Skipped".
+const errorCount = computed(() => props.history.filter((r) => isError(r.status)).length);
 const skippedCount = computed(
-  () => props.history.filter((r) => !isFiring(r.status) && !isOk(r.status)).length,
+  () =>
+    props.history.filter((r) => !isFiring(r.status) && !isOk(r.status) && !isError(r.status))
+      .length,
 );
 
 // ── Flapping detection ───────────────────────────────────────────────────────

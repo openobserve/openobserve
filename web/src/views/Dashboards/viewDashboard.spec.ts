@@ -96,6 +96,10 @@ vi.mock("@/constants/config", () => ({
 // Global router mock instance
 const mockRouterPush = vi.fn().mockResolvedValue(undefined);
 const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
+const mockRouterBack = vi.fn();
+// Mutable so a test can say what the previous history entry was; the back
+// button prefers real history over rebuilding the folder-scoped list route.
+const mockHistoryState: { back: string | null } = { back: null };
 
 // Comprehensive Vue composable mocks
 vi.mock("vue-router", () => ({
@@ -103,8 +107,9 @@ vi.mock("vue-router", () => ({
     push: mockRouterPush,
     replace: mockRouterReplace,
     go: vi.fn(),
-    back: vi.fn(),
+    back: mockRouterBack,
     forward: vi.fn(),
+    options: { history: { state: mockHistoryState } },
     resolve: vi.fn().mockReturnValue({ href: "/test" }),
     currentRoute: {
       value: {
@@ -127,6 +132,8 @@ vi.mock("vue-router", () => ({
 // Export router mocks for use in tests
 global.mockRouterPush = mockRouterPush;
 global.mockRouterReplace = mockRouterReplace;
+global.mockRouterBack = mockRouterBack;
+global.mockHistoryState = mockHistoryState;
 
 // Global store mock instances
 const mockStoreCommit = vi.fn();
@@ -253,6 +260,8 @@ describe("ViewDashboard", () => {
     // Clear global mock spies
     global.mockRouterPush.mockClear();
     global.mockRouterReplace.mockClear();
+    global.mockRouterBack.mockClear();
+    global.mockHistoryState.back = null;
     global.mockStoreCommit.mockClear();
     global.mockStoreDispatch.mockClear();
     global.mockShowPositiveNotification.mockClear();
@@ -508,6 +517,38 @@ describe("ViewDashboard", () => {
 
       await wrapper.vm.goBackToDashboardList();
 
+      expect(global.mockRouterPush).toHaveBeenCalledWith({
+        path: "/dashboards",
+        query: {
+          folder: "default",
+          org_identifier: "test-org",
+        },
+      });
+    });
+
+    it("should go back through history when the previous entry is the dashboards list", async () => {
+      // Opened from the Favorites pseudo-folder: the URL carries the folder the
+      // dashboard *lives in*, so only history can return the user to Favorites.
+      global.mockHistoryState.back = "/dashboards?folder=__favorites__&org_identifier=test-org";
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.vm.goBackToDashboardList();
+
+      expect(global.mockRouterBack).toHaveBeenCalled();
+      expect(global.mockRouterPush).not.toHaveBeenCalledWith(
+        expect.objectContaining({ path: "/dashboards" }),
+      );
+    });
+
+    it("should not go back through history when the previous entry is not the dashboards list", async () => {
+      global.mockHistoryState.back = "/dashboards/add_panel?dashboard=test-dashboard-1";
+      wrapper = createWrapper();
+      await flushPromises();
+
+      await wrapper.vm.goBackToDashboardList();
+
+      expect(global.mockRouterBack).not.toHaveBeenCalled();
       expect(global.mockRouterPush).toHaveBeenCalledWith({
         path: "/dashboards",
         query: {

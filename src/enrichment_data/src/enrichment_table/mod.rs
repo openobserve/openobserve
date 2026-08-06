@@ -40,10 +40,7 @@ use db;
 use hashbrown::HashSet;
 use infra::{
     cache::stats,
-    schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        SchemaCache,
-    },
+    schema::{STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, SchemaCache},
 };
 use schema::{check_for_schema, stream_schema_exists};
 
@@ -336,10 +333,7 @@ pub async fn delete_enrichment_table(
     drop(w);
 
     // delete stream settings cache
-    let mut w = STREAM_SETTINGS.write().await;
-    w.remove(&key);
-    infra::schema::set_stream_settings_atomic(w.clone());
-    drop(w);
+    infra::schema::remove_stream_settings(&key).await;
 
     // delete record_id generator if present
     {

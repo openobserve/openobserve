@@ -23,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
       <OSelect
         :model-value="pagination.rowsPerPage"
-        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', val)"
+        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', Number(val))"
         :options="formattedPaginationOptions"
         size="sm"
+        :searchable="false"
         class="w-fit!"
         data-test="dashboard-table-rows-per-page-select"
       />
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -125,7 +126,7 @@ export default defineComponent({
   },
   emits: ["update:rowsPerPage", "firstPage", "prevPage", "nextPage", "lastPage"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
       if (totalRows === 0) return "0 of 0";
@@ -138,14 +139,24 @@ export default defineComponent({
       return `${start}-${end} of ${totalRows}`;
     });
 
-    const formattedPaginationOptions = computed(() =>
-      props.paginationOptions.map((opt) => ({
-        label: opt === 0 ? "All" : String(opt),
+    const formattedPaginationOptions = computed(() => {
+      const opts = [...props.paginationOptions];
+      // Include a custom "Records per page" that isn't one of the presets, so the
+      // dropdown reflects it instead of rendering blank.
+      const current = props.pagination?.rowsPerPage;
+      if (current != null && current > 0 && !opts.includes(current)) {
+        const idx = opts.findIndex((o) => o !== 0 && o > current);
+        if (idx === -1) opts.push(current);
+        else opts.splice(idx, 0, current);
+      }
+      return opts.map((opt) => ({
+        label: opt === 0 ? t("common.all") : raw(String(opt)),
         value: opt,
-      })),
-    );
+      }));
+    });
 
     return {
+      raw,
       countDisplay,
       formattedPaginationOptions,
       t,

@@ -23,7 +23,7 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce } from "lodash-es";
@@ -46,6 +46,7 @@ import {
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
@@ -124,6 +125,10 @@ export const defaultAlertValue: any = () => {
         },
       },
       promql_condition: null,
+      // Per-SERIES alerting for PromQL (M-9). PromQL's counterpart to
+      // aggregation.multi_alert — a PromQL alert has no aggregation, so the
+      // flag cannot live there.
+      promql_multi_alert: false,
       vrl_function: null,
       multi_time_range: [],
     },
@@ -153,6 +158,11 @@ export const defaultAlertValue: any = () => {
     lastEditedBy: "",
     folder_id: "",
     creates_incident: false,
+    // Feature 2 (PT-1/PT-6). `null` (not 0) is unset — 0 is not a valid
+    // priority id, and the payload layer drops null so pre-Feature-2 alerts
+    // serialize unchanged.
+    priority: null,
+    tags: [],
   };
 };
 
@@ -184,6 +194,10 @@ export const defaultAnomalyConfig = () => ({
   last_error: undefined as string | undefined,
   last_detection_run: undefined as number | undefined,
   next_run_at: undefined as number | undefined,
+  // Feature 2: anomaly configs carry the same triage metadata as alerts.
+  // `null` (not 0) is unset — 0 is not a valid priority id.
+  priority: null as number | null,
+  tags: [] as string[],
 });
 
 // ─── Composable ─────────────────────────────────────────────────────────────
@@ -214,11 +228,11 @@ export type AlertFormValues = PayloadFormData & {
 
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
-  const { getStreams, getStream } = useStreams();
+  const { getStreams, getStream } = useStreams(t);
   const { buildQueryPayload } = useQuery();
 
   // ── Core State ──────────────────────────────────────────────────────────
@@ -1132,8 +1146,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     for (const message of messages) {
       let node: HTMLElement | null = message.parentElement;
       while (node && node !== form) {
+        // [data-inline-edit-trigger] is OInlineEdit's display-mode button: an
+        // inline-edited field has NO input in the DOM until it is opened, so
+        // without this the header name field would never be reachable here.
         const control = node.querySelector<HTMLElement>(
-          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup]',
+          'input:not([type="hidden"]), textarea, [role="combobox"], button[aria-haspopup], [data-inline-edit-trigger]',
         );
         if (control) {
           control.focus();
@@ -1186,15 +1203,20 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     });
   };
 
-  // Focus a topbar select/input by its Vue component ref
+  // Focus a topbar select/input by its Vue component ref. A component that
+  // exposes its own focus() owns the decision (OInlineEdit has no input in the
+  // DOM until it opens, so "focus me" means "open the editor"); everything else
+  // falls back to the first input inside its root.
   const focusTopbarField = (fieldRef: any) => {
     nextTick(() => {
       const el = fieldRef?.value?.$el as HTMLElement | null;
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        const input = el.querySelector("input") as HTMLElement | null;
-        input?.focus();
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (typeof fieldRef?.value?.focus === "function") {
+        fieldRef.value.focus();
+        return;
       }
+      const input = el?.querySelector("input") as HTMLElement | null;
+      input?.focus();
     });
   };
 
@@ -1215,7 +1237,9 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           variant: "error",
           message: t("alerts.messages.anomalyDetectionNameRequired"),
         });
-        focusTopbarField(anomalyNameRef);
+        // One inline-edit control now serves both alert and anomaly names, so
+        // step1Ref is the anomaly name field too.
+        focusTopbarField(step1Ref);
         return false;
       }
       return true;
@@ -1454,6 +1478,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
       store,
+      t,
       props,
       emit,
       router,
@@ -1472,7 +1497,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       streams,
       getStreams,
       getParser,
-      buildQueryPayload,
+      // Bound here so the validation module keeps its 1-arg buildQueryPayload contract.
+      buildQueryPayload: (options: any) => buildQueryPayload(options, t),
       prepareAndSaveAlert: prepareAndSaveAlertFunction,
     };
 
@@ -1877,6 +1903,14 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         folder_id: (activeFolderId.value as string) || "default",
         alert_destinations:
           c.alert_enabled && c.alert_destination_ids?.length ? c.alert_destination_ids : [],
+        // Feature 2. Priority is sent as an integer (the storage id); omitted
+        // entirely when unset so the payload matches a pre-Feature-2 config.
+        // Tags are always sent so clearing them actually clears — the backend
+        // treats an explicit empty list as "remove all".
+        ...(c.priority === null || c.priority === undefined
+          ? {}
+          : { priority: Number(c.priority) }),
+        tags: Array.isArray(c.tags) ? c.tags : [],
         anomaly_config: {
           query_mode: c.query_mode,
           filters: c.query_mode === "filters" ? (c.filters ?? []) : null,
@@ -2076,11 +2110,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const minutes = String(now.getMinutes()).padStart(2, "0");
       const time = `${hours}:${minutes}`;
 
-      const convertedDateTime = convertDateToTimestamp(
-        date,
-        time,
-        formData.value.trigger_condition.timezone,
+      // Resolve any lingering "Browser Time (<zone>)" label (e.g. an existing
+      // alert opened from an older release) to a plain IANA zone before deriving
+      // the offset — otherwise convertDateToTimestamp returns NaN and tz_offset
+      // serializes to null in the saved payload.
+      const resolvedTimezone = resolveBrowserTimezone(
+        formData.value?.trigger_condition?.timezone ?? "",
       );
+      setF("trigger_condition.timezone", resolvedTimezone);
+
+      const convertedDateTime = convertDateToTimestamp(date, time, resolvedTimezone);
       setF("tz_offset", convertedDateTime.offset);
     }
 
@@ -2117,7 +2156,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       toast({
         variant: "error",
-        message: message,
+        message: raw(message),
         timeout: 6000,
       });
 
@@ -2310,6 +2349,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           // Resolved async AFTER the form.reset below → setF in the .then.
           pendingTimezoneOffset = data.tz_offset;
         }
+      } else {
+        // Heal legacy alerts (e.g. created on older releases) that persisted a
+        // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
+        // picker shows a valid value and the save path computes a real offset.
+        data.trigger_condition.timezone = resolveBrowserTimezone(data.trigger_condition.timezone);
       }
 
       if (data.query_condition.vrl_function) {

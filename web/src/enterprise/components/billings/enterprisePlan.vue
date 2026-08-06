@@ -45,9 +45,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="text-status-error-text mb-2 flex items-center"
       >
         <OIcon name="warning" size="sm" class="mr-2" />
-        <span class="text-text-body text-base leading-[1.375rem]"
-          >Failed to load pricing details. Please refresh the page.</span
-        >
+        <span class="text-text-body text-base leading-[1.375rem]">{{
+          t("billing.pricingErrorMessage")
+        }}</span>
       </div>
       <div
         v-for="(feature, index) in features"
@@ -88,7 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { siteURL } from "@/constants/config";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -101,7 +101,7 @@ export default defineComponent({
   components: { OSeparator, OButton, OTag, OIcon, OCard },
   props: ["features", "pricingError"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const contactSales = () => {
       window.open(siteURL.contactSales, "_blank");

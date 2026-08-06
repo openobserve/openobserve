@@ -237,12 +237,14 @@ impl Metadata for DistinctValues {
                 if let Some(ret) =
                     stream::get_stream_retention(&org_id, stream_type, &stream_name).await
                 {
+                    // local editable copy; persisted via save_stream_settings below
                     let mut new_settings = infra::schema::get_settings(
                         &org_id,
                         &distinct_stream_name,
                         StreamType::Metadata,
                     )
                     .await
+                    .map(|s| (*s).clone())
                     .unwrap_or_default();
                     new_settings.data_retention = ret;
                     if let Err(e) = stream::save_stream_settings(

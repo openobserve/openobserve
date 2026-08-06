@@ -541,6 +541,13 @@ describe("Schema Component Tests", () => {
       expect(wrapper.vm.minDate).toBeDefined();
     });
 
+    // Test 25: calculateDateRange function
+    it("should leave minDate null when data retention is unset (0)", () => {
+      wrapper.vm.dataRetentionDays = 0;
+      wrapper.vm.calculateDateRange();
+      expect(wrapper.vm.minDate).toBeNull();
+    });
+
     // Test 26: openPatternAssociationDialog function
     it("should open pattern association dialog", () => {
       wrapper.vm.patternAssociations = {
@@ -3866,7 +3873,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should block onSubmit when a field has no data type", async () => {
-      // The data-type select is visible + required in the Add Field(s) card, so a
+      // The data-type select is visible + required in the Add Fields card, so a
       // row with a valid name but no type also blocks the save.
       wrapper.vm.isDialogOpen = true;
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [
@@ -3885,7 +3892,7 @@ describe("Schema Component Tests", () => {
     });
 
     it("should save on Enter from a field-name input", async () => {
-      // Enter in the Add Field(s) name input triggers the settings save (the
+      // Enter in the Add Fields name input triggers the settings save (the
       // nested <form> otherwise swallows Enter with 2+ rows).
       wrapper.vm.isDialogOpen = true;
       wrapper.vm.newSchemaFieldsForm.setFieldValue("newSchemaFields", [

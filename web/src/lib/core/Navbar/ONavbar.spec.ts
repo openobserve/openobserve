@@ -3,22 +3,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper } from "@vue/test-utils";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { createI18n } from "vue-i18n";
 import ONavbar from "./ONavbar.vue";
 import type { NavItem } from "./ONavbar.types";
 
 const router = createRouter({
   history: createMemoryHistory(),
   routes: [{ path: "/", component: { template: "<div />" } }],
-});
-
-// Minimal i18n so ONavbar's useI18n()/group-title t() resolve (keys echo back).
-const i18n = createI18n({
-  locale: "en",
-  legacy: false,
-  messages: { en: {} },
-  missingWarn: false,
-  fallbackWarn: false,
 });
 
 // All daily-use (top-level) names — none of these belong to a flyout group, so
@@ -61,7 +51,7 @@ describe("ONavbar", () => {
         ...props,
       },
       global: {
-        plugins: [router, i18n],
+        plugins: [router],
         stubs: {
           "menu-link": menuLinkStub,
           ONavGroup: navGroupStub,
@@ -135,7 +125,7 @@ describe("ONavbar", () => {
       );
     });
 
-    it("keeps Alerts and Reports as separate top-level links", () => {
+    it("collapses Alerts into Reliability and leaves Reports a separate link", () => {
       wrapper = mountNavbar({
         linksList: [
           { title: "Home", icon: "home", link: "/home", name: "home" },
@@ -144,9 +134,15 @@ describe("ONavbar", () => {
         ],
       });
 
-      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(true);
+      // Alerts brings Destinations/Templates with it, so it is a group tile
+      // rather than a bare link; Dashboards is absent so Reports stays a link.
+      expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
+      const reliability = wrapper.find('[data-test="nav-group-reliability"]');
+      expect(reliability.exists()).toBe(true);
+      expect(reliability.attributes("data-children")).toBe(
+        "alertList,alertDestinations,alertTemplates",
+      );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="nav-group-monitoring"]').exists()).toBe(false);
     });
 
     it("renders IAM / Management / AI as plain links (no submenu)", () => {

@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -16,7 +31,7 @@ import {
 } from "@/composables/synthetics/syntheticResultsSchema";
 import syntheticsService from "@/services/synthetics";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   runId: string;
@@ -134,7 +149,7 @@ function toggleSteps(executionId: string) {
     :open="open"
     size="lg"
     :title="t('synthetics.runDetail.title')"
-    :sub-title="fmtTime(scheduledTs)"
+    :sub-title="raw(fmtTime(scheduledTs))"
     @update:open="
       (v) => {
         if (!v) emit('close');
@@ -358,7 +373,7 @@ function toggleSteps(executionId: string) {
                     <a :href="artifactUrl(step.screenshotKey!)" target="_blank">
                       <img
                         :src="artifactUrl(step.screenshotKey!)"
-                        :alt="`Screenshot ${step.stepId}`"
+                        :alt="t('common.screenshotOfStep', { step: step.stepId })"
                         class="block max-h-48 w-full object-contain transition-opacity hover:opacity-90"
                         loading="lazy"
                       />

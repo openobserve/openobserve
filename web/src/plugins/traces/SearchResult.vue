@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :options="rowsPerPageOptions"
             class="select-pagination mt-0! mr-1 ml-1"
             size="sm"
+            :searchable="false"
             data-test="traces-search-result-records-per-page"
             @update:model-value="changeRowsPerPage"
           />
@@ -216,7 +217,7 @@ import {
   type PropType,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import useTraces from "../../composables/useTraces";
 import { useRouter } from "vue-router";
@@ -300,7 +301,7 @@ export default defineComponent({
     },
   },
   setup(_props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
 

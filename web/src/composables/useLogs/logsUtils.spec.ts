@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ref, reactive } from "vue";
+import i18n from "@/locales";
+
+const t = (i18n.global as any).t;
 
 // Create mock searchObj that will be used by logsUtils
 const mockSearchObj = reactive({
@@ -621,7 +624,7 @@ describe("logsUtils", () => {
 
   describe("showCancelSearchNotification", () => {
     it("should call toast with correct parameters", () => {
-      utils.showCancelSearchNotification();
+      utils.showCancelSearchNotification(t);
       expect(mockToast).toHaveBeenCalledWith({
         variant: "info",
         message: "Running query cancelled successfully",

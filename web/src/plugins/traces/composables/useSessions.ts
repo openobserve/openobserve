@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref } from "vue";
 import { useStore } from "vuex";
 import sessionsService from "@/services/sessions";
@@ -76,7 +78,7 @@ export interface SessionTraceRow {
 /** Single message inside a turn (USER block / ASSISTANT block). */
 export interface TurnMessage {
   role: "user" | "assistant" | "system" | "tool";
-  content: string;
+  content: I18nText;
 }
 
 /** Full per-turn payload, lazy-loaded when a turn row is expanded. */
@@ -145,6 +147,7 @@ export interface SessionRow {
 // ---------------------------------------------------------------------------
 const sessions = ref<SessionRow[]>([]);
 const total = ref(0);
+const totalIsExact = ref(true);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const hasLoadedOnce = ref(false);
@@ -251,6 +254,7 @@ export function useSessions() {
         };
       });
       total.value = Number(body.total) || 0;
+      totalIsExact.value = body.total_is_exact ?? true;
       hasLoadedOnce.value = true;
       // Stamp when/which-org this page was fetched — used to keep the "last
       // refreshed" label accurate and to invalidate the cache on org switch.
@@ -616,6 +620,7 @@ export function useSessions() {
   return {
     sessions,
     total,
+    totalIsExact,
     loading,
     error,
     hasLoadedOnce,

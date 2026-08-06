@@ -44,8 +44,7 @@ use hashbrown::HashMap;
 use infra::{
     cache, cluster, file_list,
     schema::{
-        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_SETTINGS,
-        STREAM_STATS_EXISTS,
+        STREAM_RECORD_ID_GENERATOR, STREAM_SCHEMAS, STREAM_SCHEMAS_LATEST, STREAM_STATS_EXISTS,
     },
 };
 use openobserve_api_common::extractors::Headers;
@@ -207,6 +206,10 @@ struct ConfigResponse<'a> {
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
     synthetics_enabled: bool,
+    /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
+    /// answer 501 while it is off, so the UI uses this to hide the menu entry
+    /// rather than offer a page that cannot work.
+    slo_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -365,7 +368,7 @@ pub async fn zo_config() -> impl IntoResponse {
     // Anomaly detection is on when the enterprise feature is compiled in, unless turned off at
     // runtime via O2_ANOMALY_DETECTION_DISABLED. When disabled the UI hides the anomaly tab.
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
-    let online_evals_enabled = enterprise_value!(false, o2cfg.common.online_evals_enabled);
+    let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
@@ -480,6 +483,7 @@ pub async fn zo_config() -> impl IntoResponse {
         online_evals_enabled,
         anomaly_detection_enabled,
         synthetics_enabled,
+        slo_enabled: cfg.slo.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
@@ -531,7 +535,7 @@ pub async fn cache_status() -> impl IntoResponse {
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),
     );
 
-    let (len, cap, mem_size) = STREAM_SETTINGS.stats().await;
+    let (len, cap, mem_size) = infra::schema::get_stream_settings_stats().await;
     stats.insert(
         "STREAM_SETTINGS",
         json::json!({"len": len, "cap": cap, "mem_size": mem_size}),

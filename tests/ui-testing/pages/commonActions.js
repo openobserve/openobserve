@@ -18,6 +18,9 @@ import testLogger from '../playwright-tests/utils/test-logger.js';
 export const NAV_GROUP_TILE = {
     data: '[data-test="menu-link-\\/streams-item"]',
     dashboards: '[data-test="menu-link-\\/dashboards-item"]',
+    // The group root, not its inner tile: hover is handled on the root, and this
+    // selector does not move if the group's parentLink ever changes.
+    reliability: '[data-test="nav-group-reliability"]',
 };
 
 // route `name` of each child within its group (matches navGroups.ts).
@@ -28,6 +31,11 @@ export const NAV_FLYOUT_CHILD = {
     ingestion: { group: 'data', name: 'ingestion' },
     streams: { group: 'data', name: 'logstreams' },
     reports: { group: 'dashboards', name: 'reports' },
+    // Notification Destinations and Templates left Settings for the Reliability
+    // group — they are alerting configuration. Their pages are unchanged; only
+    // the way you reach them is.
+    destinations: { group: 'reliability', name: 'alertDestinations' },
+    templates: { group: 'reliability', name: 'alertTemplates' },
 };
 
 /**

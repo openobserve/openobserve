@@ -30,6 +30,8 @@ import { hasMetricsEditorParams } from "@/utils/metrics/metricsEditorParams";
 
 const Search = () => import("@/plugins/logs/Index.vue");
 const SearchJobInspector = () => import("@/plugins/logs/SearchJobInspector.vue");
+const SearchHistory = () => import("@/plugins/logs/SearchHistory.vue");
+const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.vue");
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
@@ -44,6 +46,8 @@ const StreamExplorer = () => import("@/views/StreamExplorer.vue");
 const LogStream = () => import("@/views/LogStream.vue");
 const Dashboards = () => import("@/views/Dashboards/Dashboards.vue");
 const AlertList = () => import("@/components/alerts/AlertList.vue");
+const AlertsDestinationList = () => import("@/components/alerts/AlertsDestinationList.vue");
+const TemplateList = () => import("@/components/alerts/TemplateList.vue");
 
 const Functions = () => import("@/views/Functions.vue");
 const FunctionList = () => import("@/components/functions/FunctionList.vue");
@@ -134,6 +138,17 @@ const useRoutes = () => {
         title: "Logs",
       },
       beforeEnter(to: any, from: any, next: any) {
+        // Back-compat: Search History / Scheduler used to be `?action=…` overlays
+        // on /logs. Redirect old bookmarks / shared links to the standalone routes.
+        const action = to.query?.action;
+        if (action === "history") {
+          next({ name: "searchHistory", query: { org_identifier: to.query?.org_identifier } });
+          return;
+        }
+        if (action === "search_scheduler") {
+          next({ name: "searchScheduler", query: { org_identifier: to.query?.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
@@ -146,6 +161,40 @@ const useRoutes = () => {
         title: "Search Job Inspector",
       },
       beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Standalone page (was a `?action=history` overlay on /logs). Not
+      // enterprise-gated — available in OSS; the component itself shows an
+      // "enable usage reporting" message when zoConfig.usage_enabled is off.
+      path: "logs/search-history",
+      name: "searchHistory",
+      component: SearchHistory,
+      meta: {
+        keepAlive: false,
+        title: "Search History",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Standalone page (was a `?action=search_scheduler` overlay on /logs).
+      // Enterprise-only: the scheduled-search endpoints 403 in OSS, so a
+      // hand-typed URL is bounced back to the logs page.
+      path: "logs/search-scheduler",
+      name: "searchScheduler",
+      component: SearchSchedulersList,
+      meta: {
+        keepAlive: false,
+        title: "Search Scheduler",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        if (config.isEnterprise !== "true") {
+          next({ name: "logs" });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },
@@ -423,11 +472,129 @@ const useRoutes = () => {
       ],
     },
     {
+      path: "slos",
+      name: "sloList",
+      component: () => import("@/views/slos/SloList.vue"),
+      meta: {
+        title: "SLOs",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Literal segments before the {slo_id} catch-all, matching the router's
+      // ordering rule.
+      path: "slos/add",
+      name: "addSlo",
+      component: () => import("@/views/slos/AddSlo.vue"),
+      meta: {
+        title: "New SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "slos/edit/:slo_id",
+      name: "editSlo",
+      component: () => import("@/views/slos/AddSlo.vue"),
+      meta: {
+        title: "Edit SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "slos/:slo_id",
+      name: "sloDetail",
+      component: () => import("@/views/slos/SloDetail.vue"),
+      meta: {
+        title: "SLO",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "alerts",
       name: "alertList",
       component: AlertList,
       meta: {
         title: "Alerts",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Notification destinations and templates: alerting configuration, so
+      // they moved out of /settings (which wrapped them in the Settings shell)
+      // and into the Reliability rail group.
+      //
+      // Top-level and FLAT, not under /alerts: they are siblings of Alerts, not
+      // sub-pages of it. Nesting them made the URL claim otherwise, and the rail
+      // believed it — /alerts/destinations lit up Alerts as well, because that
+      // is exactly how a real drill-down like /alerts/detail/:id behaves. Every
+      // other Reliability section is top-level too (/alerts, /slos, /incidents).
+      //
+      // The route NAMES are unchanged — every call site navigates by name — and
+      // the old /settings/* paths still redirect here for existing bookmarks.
+      path: "alert-destinations",
+      name: "alertDestinations",
+      component: AlertsDestinationList,
+      meta: {
+        title: "Notification Destinations",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "alert-templates",
+      name: "alertTemplates",
+      component: TemplateList,
+      meta: {
+        title: "Templates",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Alert Sources feeds Incidents (correlation, resolve lifecycle) — same
+      // Reliability workflow as Alerts/SLOs/Incidents/Destinations/Templates
+      // above, so it's flat and top-level for the same reason those are.
+      // Moved out of /settings/alert_sources, which redirects here.
+      //
+      // Enterprise/cloud-only (unlike destinations/templates): the route stays
+      // registered so the redirect below has somewhere to land, but bounces to
+      // Alerts on OSS builds — mirrors the anomaly-detection routes above.
+      path: "alert-sources",
+      name: "alertSources",
+      component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
+      meta: {
+        title: "External Alert Sources",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      // Alert status page. Replaces the row-click side panel, and is where a
+      // multi-alert's per-group state lives (alerts_2.md §5.4).
+      path: "alerts/detail/:alert_id",
+      name: "alertDetail",
+      component: () => import("@/views/alerts/AlertDetail.vue"),
+      meta: {
+        title: "Alert Detail",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

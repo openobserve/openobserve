@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
@@ -96,7 +96,7 @@ const emit = defineEmits<{
   (e: "update:b", value: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const optionsWithoutUnset = computed(() => props.versions.filter((o) => o.value !== UNSET));
 

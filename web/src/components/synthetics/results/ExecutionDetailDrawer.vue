@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type {
@@ -10,7 +25,7 @@ import type {
   StepResult,
 } from "@/composables/synthetics/syntheticResultsSchema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   execution: RunLocationResult | null;
@@ -87,7 +102,7 @@ function fmtDuration(ms: number) {
               <span
                 class="material-symbols-outlined text-text-muted text-base normal-case not-italic"
               >
-                {{ DEVICE_ICON[execution.device] ?? "devices" }}
+                {{ DEVICE_ICON[execution.device] ?? raw("devices") }}
               </span>
               <span class="text-text-heading font-semibold capitalize">
                 {{ execution.browserEngine }} · {{ execution.device.replace(/_/g, " ") }}

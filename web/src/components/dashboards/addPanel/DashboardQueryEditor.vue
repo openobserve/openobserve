@@ -17,15 +17,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="col-auto" data-test="dashboard-panel-searchbar">
     <div
-      class="sql-bar bg-section-header-bg flex h-10 flex-row items-center justify-between gap-x-3"
+      class="sql-bar bg-section-header-bg border-border-default flex h-10 flex-row items-center justify-between gap-x-3 border-t border-b"
       @click.stop
     >
-      <div class="flex min-w-0 flex-1 flex-row items-center" data-test="dashboard-query-data">
-        <div class="max-w-150 overflow-hidden">
+      <div
+        class="flex min-w-0 flex-1 flex-row items-center self-stretch"
+        data-test="dashboard-query-data"
+      >
+        <!-- -mt-0.75 cancels OTabs' inner pt-0.75 so the tabs sit centred
+             between the bar's separators. -->
+        <div class="-mt-0.75 min-w-0 self-stretch">
           <OTabs
             v-model="dashboardPanelData.layout.currentQueryIndex"
-            dense
-            mobile-arrows
             @click.stop
             data-test="dashboard-panel-query-tab"
           >
@@ -36,38 +39,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop
               :data-test="`dashboard-panel-query-tab-${index}`"
             >
-              <!-- Inline editable query name (multi-SQL).
-                   Wrapped in a <div @click.stop> because OInput has
-                   inheritAttrs: false and doesn't re-emit `click`, so a
-                   listener on <OInput> wouldn't catch the tab-click. -->
-              <div
+              <!-- Box mirrors the display span (px-0.5, text-sm, OTab's gap-1.5,
+                   content-sized width) so the tab can't resize on edit. -->
+              <span
                 v-if="editingQueryIndex === index"
                 @click.stop
-                class="inline-block w-22.5 max-w-40 min-w-12.5"
+                class="inline-flex items-center gap-1.5"
               >
-                <OInput
-                  ref="renameInputRef"
+                <input
                   v-model="editingQueryName"
-                  size="sm"
-                  autofocus
+                  type="text"
+                  size="1"
+                  :maxlength="60"
                   :id="`dashboard-query-rename-input-${index}`"
-                  class="query-tab-name-input"
+                  :aria-label="t('dashboard.renameQuery')"
+                  class="text-tabs-active-text field-sizing-content max-w-40 min-w-0 shrink-0 bg-transparent px-0.5 text-sm outline-none"
                   :data-test="`dashboard-panel-query-tab-name-input-${index}`"
+                  @mousedown.stop
+                  @dblclick.stop
                   @keydown.enter.stop="saveQueryName(index)"
                   @keydown.escape.stop="cancelQueryNameEdit"
                   @blur="saveQueryName(index)"
                 />
-              </div>
+                <span class="relative inline-flex items-center">
+                  <OIcon
+                    name="check"
+                    size="xs"
+                    :aria-label="t('common.save')"
+                    class="text-text-secondary cursor-pointer opacity-70 transition-opacity duration-150 hover:opacity-100"
+                    @click.stop.prevent="saveQueryName(index)"
+                    @mousedown.stop.prevent
+                    @pointerdown.stop.prevent
+                    :data-test="`dashboard-panel-query-tab-rename-save-${index}`"
+                  />
+                  <OTooltip :content="t('common.save')" />
+                </span>
+              </span>
               <span
                 v-else
                 @dblclick.stop.prevent="startEditQueryName(index, tab)"
-                class="cursor-pointer text-xs whitespace-nowrap select-none"
-                :title="'Double-click to rename'"
+                class="cursor-pointer px-0.5 text-sm whitespace-nowrap select-none"
                 :data-test="`dashboard-panel-query-tab-name-${index}`"
-                >{{ tab.tabName || "Query " + (Number(index) + 1) }}</span
+                >{{ tab.tabName || t("common.queryNumber", { index: Number(index) + 1 }) }}</span
               >
-              <!-- Eye icon + its tooltip wrapped in a span so the tooltip's
-                   trigger is scoped to JUST the icon, not the entire OTab. -->
+              <!-- xs matches the tick it swaps with, so the tab keeps its width. -->
+              <span v-if="editingQueryIndex !== index" class="relative inline-flex items-center">
+                <OIcon
+                  name="edit"
+                  size="xs"
+                  class="text-text-secondary cursor-pointer opacity-60 transition-opacity duration-150 hover:opacity-100"
+                  @click.stop.prevent="startEditQueryName(index, tab)"
+                  @mousedown.stop.prevent
+                  @pointerdown.stop.prevent
+                  :data-test="`dashboard-panel-query-tab-rename-${index}`"
+                />
+                <OTooltip :content="t('dashboard.renameQuery')" />
+              </span>
+              <!-- Hiding the only query would leave the panel with nothing to
+                   draw, so the eye appears from the second query onwards. -->
               <span
                 v-if="promqlMode || dashboardPanelData.data.queries.length > 1"
                 class="relative inline-flex items-center"
@@ -78,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       ? 'visibility-off'
                       : 'visibility'
                   "
-                  class="hover:bg-hover-gray ml-1 cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
+                  class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-[0.7] transition-all duration-150 hover:rounded-full hover:opacity-100"
                   @click.stop="toggleQueryVisibility(index)"
                   @mousedown.stop.prevent
                   @pointerdown.stop.prevent
@@ -104,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
                 name="close"
                 size="sm"
-                class="hover:bg-hover-gray cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
+                class="hover:bg-hover-gray text-text-secondary cursor-pointer opacity-60 transition-all duration-150 hover:rounded-full hover:opacity-100"
                 @click.stop.prevent="removeTab(index)"
                 @mousedown.stop.prevent
                 @pointerdown.stop.prevent
@@ -167,33 +196,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-border-default h-full w-1 transition-colors hover:bg-[orange]"></div>
             </template>
             <template #before>
-              <UnifiedQueryEditor
-                ref="queryEditorRef"
-                :languages="['sql', 'promql']"
-                :default-language="dashboardPanelData.data.queryType"
-                :query="
-                  dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].query
-                "
-                :read-only="
-                  !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery
-                "
-                :hide-nl-toggle="
-                  !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-                    .customQuery
-                "
-                :keywords="currentEditorKeywords"
-                :suggestions="currentEditorSuggestions"
-                @update:query="handleQueryUpdate"
-                @focus="_sqlOnFocus"
-                @blur="_sqlOnBlur"
-                @language-change="handleLanguageChange"
-                @ask-ai="handleAskAI"
-                @run-query="handleRunQuery"
-                data-test="dashboard-panel-query-editor"
-                data-test-prefix="dashboard-query"
-                editor-height="100%"
-              />
+              <div class="relative h-full w-full">
+                <UnifiedQueryEditor
+                  ref="queryEditorRef"
+                  :languages="['sql', 'promql']"
+                  :default-language="dashboardPanelData.data.queryType"
+                  :query="
+                    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .query
+                  "
+                  :read-only="
+                    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
+                  "
+                  :hide-nl-toggle="
+                    !dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
+                      .customQuery
+                  "
+                  :keywords="currentEditorKeywords"
+                  :suggestions="currentEditorSuggestions"
+                  :field-value-resolver="resolveFieldValues"
+                  @update:query="handleQueryUpdate"
+                  @focus="_sqlOnFocus"
+                  @blur="_sqlOnBlur"
+                  @language-change="handleLanguageChange"
+                  @ask-ai="handleAskAI"
+                  @run-query="handleRunQuery"
+                  data-test="dashboard-panel-query-editor"
+                  data-test-prefix="dashboard-query"
+                  editor-height="100%"
+                />
+              </div>
             </template>
             <template #after>
               <div class="flex h-full w-full flex-col">
@@ -211,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :hide-nl-toggle="false"
                     :disable-ai="false"
-                    :disable-ai-reason="''"
+                    :disable-ai-reason="raw('')"
                     :ai-placeholder="t('function.askAIFunctionPlaceholder')"
                     :ai-tooltip="t('function.enterFunctionPrompt')"
                     editor-height="100%"
@@ -276,7 +309,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 // @ts-nocheck
 import { defineComponent, ref, watch, computed, onMounted, nextTick, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import QueryTypeSelector from "../addPanel/QueryTypeSelector.vue";
@@ -300,7 +333,6 @@ import type { SelectModelValue, SelectOptionInput } from "@/lib/forms/Select/OSe
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 
 // Minimal surface of UnifiedQueryEditor's exposed methods used here.
@@ -331,7 +363,6 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OSplitter,
-    OInput,
     OTag,
   },
   emits: ["searchdata", "run-query"],
@@ -342,7 +373,7 @@ export default defineComponent({
   },
   setup() {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { showErrorNotification, showPositiveNotification } = useNotifications();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
@@ -364,11 +395,6 @@ export default defineComponent({
         }
 
         store.state.organizationData.functions.map((data: any) => {
-          const args: any = [];
-          for (let i = 0; i < parseInt(data.num_args); i++) {
-            args.push("'${1:value}'");
-          }
-
           functionList.value.push({
             name: data.name,
             function: data.function,
@@ -418,7 +444,7 @@ export default defineComponent({
       addQuery,
       removeQuery,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const splitterModel = ref(
       promqlMode || !dashboardPanelData.layout.vrlFunctionToggle ? 100 : 70,
@@ -448,6 +474,7 @@ export default defineComponent({
       getSuggestions: sqlGetSuggestions,
       updateAllKeywords: sqlUpdateAllKeywords,
       updateStreamKeywords: sqlUpdateStreamKeywords,
+      resolveFieldValues,
     } = useSqlSuggestions();
 
     const queryEditorRef = ref<QueryEditorInstance | null>(null);
@@ -647,6 +674,27 @@ export default defineComponent({
         sqlUpdateStreamKeywords((newResults ?? []).map((stream: any) => ({ name: stream.name })));
       },
       { immediate: true },
+    );
+
+    // Field VALUES are looked up under "org|streamType|streamName|field", so the
+    // resolver returns nothing at all until this is set. Tracked per QUERY, not
+    // per panel: each tab has its own stream, and switching tabs must not leave
+    // the previous tab's values on offer. A multi-stream query is keyed on its
+    // primary stream — the same one the Fields panel is built from.
+    watch(
+      [
+        () => dashboardPanelData.layout.currentQueryIndex,
+        () =>
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields,
+      ],
+      () => {
+        const fields =
+          dashboardPanelData.data.queries?.[dashboardPanelData.layout.currentQueryIndex]?.fields;
+        sqlAutoCompleteData.value.org = store.state.selectedOrganization?.identifier ?? "";
+        sqlAutoCompleteData.value.streamType = String(fields?.stream_type ?? "");
+        sqlAutoCompleteData.value.streamName = String(fields?.stream ?? "");
+      },
+      { immediate: true, deep: true },
     );
 
     const removeTab = async (rawIndex: string | number) => {
@@ -858,23 +906,21 @@ export default defineComponent({
     // Inline query tab renaming
     const editingQueryIndex = ref(-1);
     const editingQueryName = ref("");
-    // Vue ref to the OInput wrapper for the rename field.
-    // OInput doesn't call defineExpose, so we reach into $el and grab the
-    // underlying <input> via querySelector. Cleaner than a global DOM lookup.
-    const renameInputRef = ref<any>(null);
 
     const startEditQueryName = (rawIndex: string | number, tab: any) => {
       const index = Number(rawIndex);
       editingQueryIndex.value = index;
-      editingQueryName.value = tab.tabName || "Query " + (index + 1);
-      // OInput renders on the next tick; focus + select the inner <input>
-      // by its deterministic id (forwarded by OInput onto the input element).
+      editingQueryName.value = tab.tabName || t("common.queryNumber", { index: index + 1 });
+      // Caret at the end, not select-all: the first keystroke must not wipe
+      // the whole name.
       nextTick(() => {
         const el = document.getElementById(
           `dashboard-query-rename-input-${index}`,
         ) as HTMLInputElement | null;
-        el?.focus();
-        el?.select();
+        if (!el) return;
+        el.focus();
+        const len = el.value.length;
+        el.setSelectionRange(len, len);
       });
     };
 
@@ -892,6 +938,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       router,
       onDropDownClick,
@@ -932,11 +979,11 @@ export default defineComponent({
       handleVrlGenerationSuccess,
       editingQueryIndex,
       editingQueryName,
-      renameInputRef,
       startEditQueryName,
       saveQueryName,
       cancelQueryNameEdit,
       currentEditorKeywords,
+      resolveFieldValues,
       currentEditorSuggestions,
       _sqlOnFocus,
       _sqlOnBlur,

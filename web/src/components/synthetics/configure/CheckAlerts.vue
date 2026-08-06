@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import type { BrowserCheck } from "@/types/synthetics";
@@ -21,7 +36,7 @@ const emit = defineEmits<{
   "refresh:destinations": [];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
@@ -115,7 +130,7 @@ const silenceMinutes = computed({
           v-model="failureThreshold"
           type="number"
           class="w-25!"
-          placeholder="1"
+          :placeholder="raw('1')"
           data-test="synthetics-check-alerts-threshold-input"
         />
         <span class="text-text-body text-sm whitespace-nowrap">{{

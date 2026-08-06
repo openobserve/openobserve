@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { Ref, ref } from "vue";
 import { useTreeVisualization, TreeNode } from "@/composables/useTreeVisualization";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
@@ -27,7 +29,7 @@ export interface ServiceGraphData {
 
 export interface ServiceGraphNode {
   id: string;
-  label?: string;
+  label?: I18nText;
   requests?: number;
   errors?: number;
   error_rate?: number;

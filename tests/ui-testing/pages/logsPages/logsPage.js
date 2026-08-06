@@ -10,7 +10,7 @@ import * as path from 'path';
 
 // Import testLogger for proper logging
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment, authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
 const MonacoEditorHelper = require('../../playwright-tests/utils/MonacoEditorHelper.js');
 
 export class LogsPage {
@@ -73,13 +73,13 @@ export class LogsPage {
         this.histogramToggleCheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="checked"]';
         this.histogramToggleUncheckedBtn = '[data-test="logs-search-bar-show-histogram-toggle-btn"] [data-state="unchecked"]';
         this.exploreButton = '[data-test="logs-search-explore-btn"]';
-        this.timestampColumnMenu = '[data-test="log-table-column-1-_timestamp"] [data-test="table-row-expand-menu"]';
+        this.timestampColumnMenu = '[data-test="o2-table-expand-1"]';
         this.resultText = '[data-test="logs-search-search-result"]';
         this.logsSearchResultLogsTable = '[data-test="logs-search-result-logs-table"]';
         this.kubernetesFieldsSelector = '[data-test*="log-search-expand-kubernetes"]';
         this.allFieldsSelector = '[data-test*="log-search-expand-"]';
         this.matchingFieldsSelector = '[data-test*="log-search-expand-"]';
-        this.logTableColumnSource = '[data-test="log-table-column-0-source"]';
+        this.logTableColumnSource = '[data-test="o2-table-row-0"] [data-test="o2-table-cell-source"]';
         this.logsSearchBarQueryEditor = '[data-test="logs-search-bar-query-editor"]';
         this.searchBarRefreshButton = '[data-test="logs-search-bar-refresh-btn"]';
         this.relative15MinButton = '[data-test="date-time-relative-15-m-btn"]';
@@ -167,7 +167,7 @@ export class LogsPage {
         // [data-test="log-search-expand-<field>-field-btn"]. Deterministic data-test for waits.
         this.expandCodeFieldBtn = '[data-test="log-search-expand-code-field-btn"]';
         this.logsDetailTableSearchAroundBtn = '[data-test="logs-detail-table-search-around-btn"]';
-        this.logTableColumn3Source = '[data-test="log-table-column-3-source"]';
+        this.logTableColumn3Source = '[data-test="o2-table-row-3"] [data-test="o2-table-cell-source"]';
         this.histogramToggleDiv = '[data-test="logs-search-bar-show-histogram-toggle-btn"] div';
 
         // Additional locators
@@ -305,6 +305,20 @@ export class LogsPage {
         this.dashboardPanelTable = '[data-test="dashboard-panel-table"]';
         // Composite: any of the three indicates the build/visualize tab finished initial render.
         this.buildInitIndicator = `${this.chartRenderer}, ${this.dashboardPanelTable}, ${this.noDataMessage}`;
+        // Composite: a *painted* chart — either an echarts canvas or a rendered table panel.
+        // Scoped with :visible because the logs histogram keeps its own (hidden) chart-renderer
+        // in the DOM while the Visualize tab is active.
+        this.renderedChartIndicator = `${this.chartRenderer} canvas:visible, ${this.dashboardPanelTable}:visible`;
+
+        // ===== VISUALIZE ERROR PANEL (DashboardErrors.vue) =====
+        // Rendered only when errorData.errors is non-empty (v-if), so count 0 == no errors.
+        this.dashboardError = '[data-test="dashboard-error"]';
+        this.dashboardErrorsListItem = '[data-test="dashboard-errors-list-item"]';
+        // Error text thrown by convertPanelData() for builder-mode panels with empty x/y
+        // (web/src/utils/dashboard/convertPanelData.ts).
+        this.requiredFieldsErrorText = 'Please select required fields to render the chart';
+        // logs.index.selectStarNotSupportedForVisualization (en-US.json)
+        this.selectStarNotSupportedToastText = 'Select * query is not supported for visualization';
 
         // ===== SHARE LINK SELECTORS (VERIFIED) =====
         this.shareLinkButton = '[data-test="logs-search-bar-share-link-btn"]';
@@ -392,8 +406,8 @@ export class LogsPage {
 
         // Table and pagination CSS selectors
         this.tableBottom = '[data-test="logs-search-result-pagination"]';
-        this.tableBodyRow = 'tbody tr';
-        this.tableBodyRowWithIndex = 'tbody tr[data-index]';
+        this.tableBodyRow = 'tbody tr[data-test^="o2-table-row-"]';
+        this.tableBodyRowWithIndex = 'tbody tr[data-test^="o2-table-row-"]';
         this.tableHeaderCell = 'thead th';
         this.tableHeaders = 'thead th';
 
@@ -441,10 +455,10 @@ export class LogsPage {
         this.patternEmptyState = 'text=No patterns found';
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
-        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr';
-        this.tableRowExpandMenu = '[data-test="table-row-expand-menu"]';
+        this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
-        this.timestampCells = '[data-test^="log-table-column-"][data-test$="-_timestamp"]';
+        this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
         this.searchResultText = '[data-test="logs-search-search-result"]';
         this.logDetailPanel = '[data-test="logs-search-result-detail-dialog"], [data-test*="log-detail"]';
         this.logDetailDialog = '[data-test="logs-search-result-detail-dialog"]';
@@ -844,7 +858,9 @@ export class LogsPage {
             await expect.poll(async () => {
                 pollCount++;
                 try {
-                    const response = await this.page.request.get(url, { headers: getAuthHeaders() });
+                    // authedRequest self-heals on 401/403 (refresh passcode / re-auth) so a
+                    // rotated-credential 401 from a concurrent shard doesn't stall the poll.
+                    const response = await authedRequest(this.page, 'get', url);
                     const status = response.status();
                     if (response.ok()) {
                         const data = await response.json();
@@ -1074,7 +1090,7 @@ export class LogsPage {
     }
 
     async expectTimestampColumnVisible() {
-        const timestampColumn = this.page.locator('[data-test="log-table-column-1-_timestamp"]');
+        const timestampColumn = this.page.locator('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]');
         await expect(timestampColumn, 'Timestamp column should be visible').toBeVisible({ timeout: 5000 });
         testLogger.info('Timestamp column visible in table');
     }
@@ -1502,7 +1518,7 @@ export class LogsPage {
     }
 
     async expectLogsTableRowCount(count) {
-        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr')).toHaveCount(count);
+        return await expect(this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]')).toHaveCount(count);
     }
 
     // Time and date methods
@@ -1527,6 +1543,11 @@ export class LogsPage {
     async setDateTimeTo15Minutes() {
         await this.page.locator(this.dateTimeButton).click();
         await this.page.locator('[data-test="date-time-relative-15-m-btn"]').click();
+    }
+
+    async setDateTimeToPast1Hour() {
+        await this.page.locator(this.dateTimeButton).click();
+        await this.page.locator(this.relative1HourButton).click();
     }
 
     async setAbsoluteDate(year, month, day, currentMonth, currentYear) {
@@ -1856,7 +1877,7 @@ export class LogsPage {
     async openTimestampMenu() {
         try {
             await this.page.waitForSelector('[data-test="logs-search-result-logs-table"]', { state: 'visible', timeout: 10000 });
-            await this.page.waitForSelector('[data-test="log-table-column-1-_timestamp"]', { state: 'visible', timeout: 10000 });
+            await this.page.waitForSelector('[data-test="o2-table-row-1"] [data-test="o2-table-cell-_timestamp"]', { state: 'visible', timeout: 10000 });
             await this.timestampColumnMenu.waitFor({ state: 'visible', timeout: 10000 });
             await this.timestampColumnMenu.scrollIntoViewIfNeeded();
             
@@ -2285,11 +2306,11 @@ export class LogsPage {
             }
         }
 
-        const rows = await this.page.locator('[data-test^="logs-search-result-detail-"]').all();
+        const rows = await this.page.locator('[data-test^="o2-table-row-"]').all();
         let previousValue = orderType === 'desc' ? Number.MAX_SAFE_INTEGER : Number.MIN_SAFE_INTEGER;
 
         for (const row of rows) {
-            const sourceCell = await row.locator('[data-test^="log-table-column-"][data-test$="-source"]').textContent();
+            const sourceCell = await row.locator('[data-test="o2-table-cell-source"]').textContent();
             try {
                 const logcountMatch = sourceCell.match(/logcount":(\d+)/);
                 const currentValue = logcountMatch ? parseInt(logcountMatch[1]) : 0;
@@ -2948,7 +2969,7 @@ export class LogsPage {
     async waitForTableHits(timeout = 15000) {
         try {
             await this.page.waitForFunction(
-                () => document.querySelector('[data-test^="log-table-column-0-"]') !== null,
+                () => document.querySelector('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]') !== null,
                 { timeout },
             );
             return true;
@@ -3335,6 +3356,25 @@ export class LogsPage {
         }, this.queryEditor);
     }
 
+    /**
+     * Read the query-editor text, polling until it is populated. Monaco is lazy-loaded and
+     * prefills its model asynchronously (e.g. after a saved view is applied on a fresh page
+     * load), so a one-shot read can catch an empty editor and return "". Poll instead: return
+     * the text once it is non-empty (or contains `expectedSubstring` when given). If the editor
+     * never populates, expect.poll throws on timeout — so a genuine prefill failure still fails
+     * the test rather than being masked.
+     * @param {string} [expectedSubstring] substring that must be present before returning
+     * @param {number} [timeout] max time to wait for the editor to populate, ms
+     */
+    async getQueryEditorTextWhenReady(expectedSubstring = '', timeout = 15000) {
+        let last = '';
+        await expect.poll(async () => {
+            last = (await this.getQueryEditorText()) || '';
+            return expectedSubstring ? last.includes(expectedSubstring) : last.trim().length > 0;
+        }, { timeout, intervals: [300, 500, 800, 1200] }).toBe(true);
+        return last;
+    }
+
     async clickLogTableColumnSource() {
         // Open the first result row's detail/search-around. With the FTS
         // default-column feature the first cell may be the generic "source"
@@ -3344,7 +3384,7 @@ export class LogsPage {
         // Playwright's auto-retrying click is allowed to settle via a short
         // post-condition wait on the detail dialog by callers.
         const firstRowCell = this.page
-            .locator('[data-test^="log-table-column-0-"]')
+            .locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]')
             .first();
         await firstRowCell.waitFor({ state: 'visible', timeout: 30000 });
         return await firstRowCell.click();
@@ -3366,7 +3406,7 @@ export class LogsPage {
     /**
      * Opens the log detail sidebar by clicking the first result row.
      * Clicks whichever first-row cell is rendered (matched by the
-     * `log-table-column-0-` prefix) — the default column may be the generic
+     * first row) — the default column may be the generic
      * "source" column OR the FTS "body"/message column — then waits for the
      * detail dialog. Includes a force-click fallback for transient instability.
      * @returns {Promise<void>}
@@ -3377,7 +3417,7 @@ export class LogsPage {
         // the highlighting test stream). Waiting on the exact "...-source" cell timed out
         // whenever the body column was rendered instead, so target any first-row cell by
         // prefix — mirroring clickLogTableColumnSource / waitForSearchResults.
-        const sourceCell = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const sourceCell = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         // Under CI load the row can resolve in the DOM while the results table is still
         // streaming/re-rendering, so a plain click waits out its timeout on "element is not
         // stable". Wait for the cell to be visible, bring it into view, then click with a
@@ -3558,8 +3598,11 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isViewRelatedButtonVisible() {
+        // Correlation ("View Related") was redesigned into inline tabs in the log-detail drawer;
+        // the old log-correlation-btn is gone. The presence of the traces correlation tab means
+        // the enterprise correlation feature is available (OSS lacks it, so the caller skips).
         try {
-            await this.page.locator(this.viewRelatedBtn).waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.locator(this.correlatedTracesTab).waitFor({ state: 'visible', timeout: 5000 });
             return true;
         } catch (e) {
             return false;
@@ -3589,8 +3632,10 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickViewRelatedButton() {
-        await this.page.locator(this.viewRelatedBtn).click();
-        testLogger.info('Clicked View Related button');
+        // Open the traces correlation area — now an inline tab in the log-detail drawer
+        // (replaces the removed log-correlation-btn / correlation dashboard).
+        await this.page.locator(this.correlatedTracesTab).click();
+        testLogger.info('Opened correlated traces tab');
         // Wait for correlation to start loading
         await this.page.waitForTimeout(1000);
     }
@@ -3692,10 +3737,15 @@ export class LogsPage {
     }
 
     async hoverOnCorrelationDashboard() {
-        const closeBtn = this.page.locator(this.correlationDashboardClose);
-        const dashboardPanel = closeBtn.locator('..');
-        await dashboardPanel.hover();
-        testLogger.info('Hovered over correlation dashboard panel');
+        // Bug #11469: hovering the traces correlation area must NOT surface the log-field
+        // copy/include/exclude context menu. The old correlation-dashboard-close element is
+        // gone; hover the active traces correlation tab panel instead. Verified live on alpha:
+        // in this panel the include/exclude field buttons are not present, so the assertion in
+        // expectNoContextMenuVisible() stays real (fails if a menu ever appears on hover).
+        const panel = this.page.locator('[role="tabpanel"]:visible').first();
+        await panel.waitFor({ state: 'visible', timeout: 10000 });
+        await panel.hover();
+        testLogger.info('Hovered over correlated traces panel');
     }
 
     async expectNoContextMenuVisible() {
@@ -3897,7 +3947,7 @@ export class LogsPage {
         // The default view may render the generic "source" column OR the FTS
         // "body" column, so wait for any first-row cell rather than "source"
         // specifically — both mean "results rendered".
-        const firstRow = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const firstRow = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         await firstRow.waitFor({ state: 'visible', timeout });
         return true;
     }
@@ -4755,7 +4805,7 @@ export class LogsPage {
     }
 
     async expectTableColumnHeaderVisible(columnName) {
-        const columnHeader = this.page.locator(`[data-test="log-search-result-table-th-${columnName}"]`);
+        const columnHeader = this.page.locator(`[data-test="o2-table-th-${columnName}"]`);
         await expect(columnHeader, `Column header ${columnName} should be visible`).toBeVisible({ timeout: 5000 });
         testLogger.info(`Column header ${columnName} is visible`);
     }
@@ -4825,7 +4875,7 @@ export class LogsPage {
      */
     async expectLogTableColumnSourceVisible() {
         const sourceCol = this.page.locator(this.logTableColumnSource);
-        const anyFirstRowCol = this.page.locator('[data-test^="log-table-column-0-"]').first();
+        const anyFirstRowCol = this.page.locator('[data-test="o2-table-row-0"] [data-test^="o2-table-cell-"]').first();
         // Whichever appears first satisfies "results rendered".
         await Promise.race([
             sourceCol.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
@@ -4845,7 +4895,7 @@ export class LogsPage {
      * @param {number} rowIndex - Row index (default 0 = first row)
      */
     async expectLogTableColumnVisible(columnName, rowIndex = 0) {
-        const element = this.page.locator(`[data-test="log-table-column-${rowIndex}-${columnName}"]`);
+        const element = this.page.locator(`[data-test="o2-table-row-${rowIndex}"] [data-test="o2-table-cell-${columnName}"]`);
         await element.waitFor({ state: 'visible', timeout: 30000 });
         return await expect(element).toBeVisible();
     }
@@ -5438,7 +5488,7 @@ export class LogsPage {
         // logs table. Wait for either signal — both fire on success.
         await Promise.any([
             this.page.locator(`[data-test="log-search-index-list-remove-${fieldName}-field-btn"]`).waitFor({ state: 'visible', timeout: 10000 }),
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`).waitFor({ state: 'visible', timeout: 10000 }),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`).waitFor({ state: 'visible', timeout: 10000 }),
         ]).catch(() => {});
     }
 
@@ -5450,12 +5500,12 @@ export class LogsPage {
         // reverts to an add button. Wait on either DOM convergence.
         await Promise.any([
             this.page.locator(`[data-test="log-search-index-list-add-${fieldName}-field-btn"]`).waitFor({ state: 'visible', timeout: 10000 }),
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`).waitFor({ state: 'hidden', timeout: 10000 }),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`).waitFor({ state: 'hidden', timeout: 10000 }),
         ]).catch(() => {});
     }
 
     async expectFieldInTableHeader(fieldName, timeout = 10000) {
-        return await expect(this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`)).toBeVisible({ timeout });
+        return await expect(this.page.locator(`[data-test="o2-table-th-${fieldName}"]`)).toBeVisible({ timeout });
     }
 
     async expectFieldNotInTableHeader(fieldName) {
@@ -5463,7 +5513,7 @@ export class LogsPage {
         // (Asserting on the removed field is mode-agnostic: the default view may
         // fall back to the generic "source" column or the FTS "body" column.)
         return await expect(
-            this.page.locator(`[data-test="log-search-result-table-th-${fieldName}"]`),
+            this.page.locator(`[data-test="o2-table-th-${fieldName}"]`),
         ).toHaveCount(0);
     }
 
@@ -5478,8 +5528,8 @@ export class LogsPage {
      * @returns {Promise<'message'|'log'>} The FTS field currently in the header.
      */
     async resolveFtsDefaultField(timeout = 15000) {
-        const message = this.page.locator('[data-test="log-search-result-table-th-message"]');
-        const log = this.page.locator('[data-test="log-search-result-table-th-log"]');
+        const message = this.page.locator('[data-test="o2-table-th-message"]');
+        const log = this.page.locator('[data-test="o2-table-th-log"]');
         await expect(message.or(log).first()).toBeVisible({ timeout });
         return (await message.isVisible().catch(() => false)) ? 'message' : 'log';
     }
@@ -5498,10 +5548,10 @@ export class LogsPage {
      */
     async clickCloseColumnButton(fieldName) {
         const header = this.page.locator(
-            `[data-test="log-search-result-table-th-${fieldName}"]`,
+            `[data-test="o2-table-th-${fieldName}"]`,
         );
         const closeBtn = this.page.locator(
-            `[data-test="logs-search-result-table-th-remove-${fieldName}-btn"]`,
+            `[data-test="o2-table-th-remove-${fieldName}-btn"]`,
         );
         // Hover the column header to reveal its hover-gated X, then click normally
         // so the actionability check still runs (no force).
@@ -5552,7 +5602,7 @@ export class LogsPage {
 
     async openFirstLogDetails() {
         // Click on the first log entry to open details (expand the first column)
-        await this.page.locator('[data-index="0"] [data-test="table-row-expand-menu"]').click();
+        await this.page.locator('[data-test="o2-table-expand-0"]').click();
         // Wait for the details drawer to open — keys off the actual reveal instead of a buffer.
         await this.page.locator('[data-test="logs-search-result-detail-dialog"], [data-test="log-details-include-exclude-field-btn"], [data-test="log-details-include-field-btn"]').first().waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
     }
@@ -6062,11 +6112,11 @@ export class LogsPage {
     }
 
     async clickTableExpandMenuFirst() {
-        return await this.page.locator('[data-test="table-row-expand-menu"]').first().click({ force: true });
+        return await this.page.locator('[data-test^="o2-table-expand-"]').first().click({ force: true });
     }
 
     async clickTimestampColumnMenu() {
-        return await this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]').click();
+        return await this.page.locator('[data-test="o2-table-expand-0"]').click();
     }
 
     async clickDateTimeButton() {
@@ -6170,7 +6220,7 @@ export class LogsPage {
     }
 
     async getLogsTableRowCount() {
-        return await this.page.locator(`${this.logsTable} tbody tr`).count();
+        return await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).count();
     }
 
     /**
@@ -6179,7 +6229,7 @@ export class LogsPage {
      * @returns {Promise<string[]>} Array of row text content
      */
     async getLogsTableRowTexts(limit = 10) {
-        const rows = this.page.locator(`${this.logsTable} tbody tr`);
+        const rows = this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`);
         const count = Math.min(await rows.count(), limit);
         const texts = [];
         for (let i = 0; i < count; i++) {
@@ -6698,43 +6748,37 @@ export class LogsPage {
      */
     async countSeverityColorBars() {
         return await this.page
-            .locator('tbody tr[data-index] [data-test="log-table-row-status-color"]')
+            .locator('tbody tr[data-status-bar="true"]')
             .count();
     }
 
     async getSeverityColors() {
         return await this.page.evaluate(() => {
-            const rows = document.querySelectorAll('tbody tr[data-index]');
+            const rows = document.querySelectorAll('tbody tr[data-status-bar="true"]');
             const findings = [];
 
             for (const row of rows) {
                 const text = row.textContent;
-                // The status color bar carries data-test="log-table-row-status-color"
-                // and data-test-status-level="<level>". This makes the detected
-                // severity/level machine-readable regardless of which column is
-                // shown (the FTS "body" column hides the raw "source" JSON).
-                let colorDiv = row.querySelector('[data-test="log-table-row-status-color"]');
-
-                // Fallbacks for older renders: inline-style / absolute-positioned div.
-                if (!colorDiv) colorDiv = row.querySelector('div[style*="background"]');
-                if (!colorDiv) colorDiv = row.querySelector('div[class*="tw\\:absolute"]');
-                if (!colorDiv) {
-                    const divs = row.querySelectorAll('div');
-                    for (const div of divs) {
-                        const style = window.getComputedStyle(div);
-                        if (style.position === 'absolute' && style.left === '0px' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                            colorDiv = div;
-                            break;
-                        }
-                    }
+                // OTable draws the spine as a ::before on the row's first cell, fed by
+                // the --row-status-color custom property set inline on the <tr>, and
+                // marks the row with data-status-bar. The level rides along on the row
+                // class (o2-log-level-<level>) so it stays machine-readable whichever
+                // column is shown.
+                const raw = row.style.getPropertyValue('--row-status-color').trim();
+                if (!raw || raw === 'rgba(0, 0, 0, 0)' || raw === 'transparent') continue;
+                // The token resolves to a hex; callers normalise through rgbToHex,
+                // so hand back the rgb() form a computed style would have given.
+                let bgColor = raw;
+                const hex = raw.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+                if (hex) {
+                    let h = hex[1];
+                    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+                    const n = parseInt(h, 16);
+                    bgColor = `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
                 }
 
-                if (!colorDiv) continue;
-
-                const bgColor = window.getComputedStyle(colorDiv).backgroundColor;
-                if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') continue;
-
-                const level = colorDiv.getAttribute('data-test-status-level') || null;
+                const levelClass = Array.from(row.classList).find((c) => c.startsWith('o2-log-level-'));
+                const level = levelClass ? levelClass.replace('o2-log-level-', '') : null;
 
                 // Best-effort: also recover the raw severity number when the JSON
                 // source column is visible (kept for backward compatibility).
@@ -7100,7 +7144,7 @@ export class LogsPage {
      * reactive store before callers check for the analyze button or row-dependent UI.
      */
     async waitForSearchResultRows(timeout = 20000) {
-        await this.page.locator(`${this.logsTable} tbody tr`).first()
+        await this.page.locator(`${this.logsTable} tbody tr[data-test^="o2-table-row-"]`).first()
             .waitFor({ state: 'visible', timeout });
         testLogger.info('waitForSearchResultRows: at least one result row is visible');
     }
@@ -7786,8 +7830,9 @@ export class LogsPage {
             }
         }
         // Fallback: streams listing page (LogStream.vue) uses a custom #bottom
-        // slot that renders "{totalRows} Stream(s)" without a data-test.
-        const streamCount = this.page.locator('text=/\\d+ Stream\\(s\\)/').first();
+        // slot that renders "{count} Stream" / "{count} Streams" (pluralised via
+        // i18n, so match both forms) without a data-test.
+        const streamCount = this.page.locator('text=/\\d+ Streams?\\b/').first();
         if (await streamCount.count().catch(() => 0) > 0) {
             const text = await streamCount.textContent().catch(() => null);
             if (text && text.trim()) return text.trim();
@@ -9417,6 +9462,250 @@ export class LogsPage {
         testLogger.info('Live mode refresh-interval button is visible');
     }
 
+    // ===== LOGS VISUALIZE — CHART RENDER / ERROR ASSERTIONS (PR #13244, issue #12897) =====
+
+    /**
+     * Wait for the Visualize (Timechart) panel to actually PAINT a chart, then
+     * assert the "No Data" empty state is gone.
+     *
+     * This is the deterministic positive end-state that every negative assertion
+     * below must be sequenced after — never assert "no error" against a panel
+     * that has not finished rendering yet.
+     * @param {number} timeout - Max wait for the chart to paint (default 45000)
+     */
+    async expectVisualizeChartRendered(timeout = 45000) {
+        await expect(this.page.locator(this.renderedChartIndicator).first())
+            .toBeVisible({ timeout });
+        // `no-data` is a v-if empty state, so it is removed from the DOM once the
+        // panel has rows. toHaveCount(0) auto-retries, so a brief no-data flash
+        // while the first chunk streams in does not fail the assertion.
+        await expect(this.page.locator(this.noDataMessage)).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('Visualize chart is rendered (not the No Data state)');
+    }
+
+    /**
+     * Assert the Visualize errors panel (DashboardErrors.vue) is absent.
+     * The container is rendered behind `v-if="errors.length"`, and errors are only
+     * cleared by an explicit resetErrors() — i.e. an error raised at any point in
+     * the current run is still present when this runs. Call AFTER
+     * expectVisualizeChartRendered() so the panel has settled.
+     */
+    async expectNoDashboardErrors() {
+        await expect(this.page.locator(this.dashboardError)).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('No dashboard error panel is present');
+    }
+
+    /**
+     * Assert the false "Please select required fields to render the chart" error
+     * (convertPanelData's builder-mode guard) never landed in the errors panel.
+     * Targets the message specifically so an unrelated backend error still reports
+     * a meaningful failure via expectNoDashboardErrors().
+     */
+    async expectNoRequiredFieldsError() {
+        const errorItems = this.page.locator(this.dashboardErrorsListItem, {
+            hasText: this.requiredFieldsErrorText,
+        });
+        await expect(errorItems).toHaveCount(0, { timeout: 15000 });
+        testLogger.info('No "required fields" error is present in the errors panel');
+    }
+
+    // ===== LOGS VISUALIZE — TOAST RECORDER =====
+
+    /**
+     * Install a toast recorder that survives navigation.
+     *
+     * Toasts auto-dismiss, so polling for one after the page has settled is
+     * inherently racy — the toast we are asserting the ABSENCE of may have come
+     * and gone. Instead this attaches a MutationObserver that records every
+     * `[data-test="o-toast-message"]` text into `window.__o2RecordedToasts`, and
+     * registers it as an init script so it is re-installed at document-start on
+     * every subsequent navigation (including `page.reload()`). The assertion then
+     * inspects the recorded log after a deterministic positive end-state.
+     *
+     * Call this BEFORE the navigation/reload under test.
+     */
+    async startToastRecorder() {
+        const installer = () => {
+            if (window.__o2ToastRecorderInstalled) return;
+            window.__o2ToastRecorderInstalled = true;
+            window.__o2RecordedToasts = [];
+            const SELECTOR = '[data-test="o-toast-message"]';
+            const scan = () => {
+                document.querySelectorAll(SELECTOR).forEach((el) => {
+                    const text = (el.textContent || '').trim();
+                    if (text && !window.__o2RecordedToasts.includes(text)) {
+                        window.__o2RecordedToasts.push(text);
+                    }
+                });
+            };
+            const start = () => {
+                scan();
+                // characterData is required too: Vue inserts the toast node first and
+                // fills its text on a later tick, so childList alone can miss the text.
+                new MutationObserver(scan).observe(document.documentElement, {
+                    childList: true,
+                    subtree: true,
+                    characterData: true,
+                });
+            };
+            if (document.documentElement) {
+                start();
+            } else {
+                document.addEventListener('DOMContentLoaded', start);
+            }
+        };
+        await this.page.addInitScript(installer);
+        // Also install on the CURRENT document — addInitScript only affects future loads.
+        await this.page.evaluate(installer).catch(() => {});
+        testLogger.info('Toast recorder installed');
+    }
+
+    /**
+     * Read every toast message recorded since startToastRecorder().
+     * @returns {Promise<string[]>}
+     */
+    async getRecordedToastMessages() {
+        return await this.page.evaluate(() => window.__o2RecordedToasts ?? []);
+    }
+
+    /**
+     * Assert no recorded toast contains the given text.
+     * @param {string} text - Substring that must not appear in any recorded toast
+     */
+    async expectNoToastContaining(text) {
+        const messages = await this.getRecordedToastMessages();
+        const matches = messages.filter((m) => m.includes(text));
+        expect(
+            matches,
+            `Expected no toast containing "${text}". Recorded toasts: ${JSON.stringify(messages)}`
+        ).toEqual([]);
+        testLogger.info(`No toast containing "${text}" was emitted`);
+    }
+
+    /**
+     * Assert the "Select * query is not supported for visualization" toast was
+     * never emitted (the symptom of the `select * from "undefined"` page-load race).
+     */
+    async expectNoSelectStarVisualizationToast() {
+        await this.expectNoToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    /**
+     * Assert a toast containing the given text WAS emitted since startToastRecorder().
+     * Polls because the toast arrives asynchronously after the triggering action.
+     * @param {string} text - Substring expected in one of the recorded toasts.
+     */
+    async expectToastContaining(text, timeout = 15000) {
+        await expect
+            .poll(
+                async () => (await this.getRecordedToastMessages()).some((m) => m.includes(text)),
+                {
+                    timeout,
+                    message: `Expected a toast containing "${text}" but none was emitted`,
+                }
+            )
+            .toBe(true);
+        testLogger.info(`Toast containing "${text}" was emitted`);
+    }
+
+    /**
+     * Assert the "Select * query is not supported for visualization" toast WAS emitted.
+     */
+    async expectSelectStarVisualizationToast() {
+        await this.expectToastContaining(this.selectStarNotSupportedToastText);
+    }
+
+    /**
+     * Read `quick_mode_enabled` from the instance /config endpoint.
+     * isSelectStarForTable() short-circuits to false when this is off, so the
+     * SELECT * table guard simply does not apply on such an instance.
+     * @returns {Promise<boolean>}
+     */
+    async isQuickModeEnabledOnInstance() {
+        return await this.page
+            .evaluate(async () => {
+                const res = await fetch('/config');
+                if (!res.ok) return false;
+                const cfg = await res.json();
+                return cfg.quick_mode_enabled === true;
+            })
+            .catch(() => false);
+    }
+
+    // ===== LOGS VISUALIZE — URL STATE =====
+
+    /**
+     * Wait until the URL carries the Visualize tab state, so a subsequent
+     * page.reload() actually exercises URL restoration instead of reloading a URL
+     * that has not been synced yet (updateUrlQueryParams runs asynchronously after
+     * the chart renders).
+     * @param {{ requireVisualizationData?: boolean, requireFunctionContent?: boolean, timeout?: number }} options
+     */
+    async waitForVisualizeUrlState({
+        requireVisualizationData = true,
+        requireFunctionContent = false,
+        timeout = 20000,
+    } = {}) {
+        await expect
+            .poll(
+                () => {
+                    const url = this.page.url();
+                    const hasToggle = url.includes('logs_visualize_toggle=visualize');
+                    const hasConfig =
+                        !requireVisualizationData || url.includes('visualization_data=');
+                    // functionContent is only written when transformType === "function"
+                    // AND tempFunctionContent is non-empty, so requiring it proves a VRL
+                    // body really is part of the restorable state before we reload.
+                    const hasVrl = !requireFunctionContent || url.includes('functionContent=');
+                    return hasToggle && hasConfig && hasVrl;
+                },
+                {
+                    timeout,
+                    message:
+                        'URL never picked up logs_visualize_toggle=visualize / visualization_data' +
+                        (requireFunctionContent ? ' / functionContent' : ''),
+                }
+            )
+            .toBe(true);
+        testLogger.info('URL carries the visualize tab state');
+    }
+
+    /**
+     * Decode the `visualization_data` URL param (base64-encoded JSON written by
+     * updateUrlQueryParams from dashboardPanelData). After a reload the app
+     * regenerates this param from its restored in-memory state, so comparing the
+     * pre- and post-reload payloads proves the restore actually repopulated the
+     * panel — not merely that the query string survived.
+     * @returns {Promise<object|null>} Decoded payload, or null if absent/unparsable.
+     */
+    async getVisualizationDataFromUrl() {
+        const raw = new URL(this.page.url()).searchParams.get('visualization_data');
+        if (!raw) return null;
+        try {
+            // URLSearchParams decodes a literal '+' as a space, and standard base64
+            // uses '+', so put those back before decoding.
+            const normalized = raw.replace(/ /g, '+');
+            return JSON.parse(Buffer.from(normalized, 'base64').toString('utf8'));
+        } catch (error) {
+            testLogger.warn(`Could not decode visualization_data: ${error.message}`);
+            return null;
+        }
+    }
+
+    /**
+     * Assert the VRL (transform) editor currently contains the given text.
+     * @param {string} text - Substring expected in the editor.
+     */
+    async expectVrlEditorContains(text) {
+        await expect
+            .poll(async () => await this.getVrlEditorContent(), {
+                timeout: 15000,
+                message: `VRL editor never contained "${text}"`,
+            })
+            .toContain(text);
+        testLogger.info(`VRL editor contains "${text}"`);
+    }
+
     /**
      * Expect Build tab toggle to be visible
      */
@@ -9924,70 +10213,50 @@ export class LogsPage {
      * @returns {Promise<string|null>} The current chart type or null
      */
     async getCurrentChartType() {
-        const chartTypes = ['bar', 'line', 'area', 'area-stacked', 'metric', 'table', 'scatter', 'pie', 'donut', 'h-bar', 'h-stacked', 'stacked', 'heatmap', 'gauge'];
-
-        for (const chartType of chartTypes) {
-            const chartItem = this.page.locator(this.chartTypeItem(chartType)).first();
-            const isVisible = await chartItem.isVisible().catch(() => false);
-            if (isVisible) {
-                const parent = chartItem.locator('..');
-                // Prefer data-selected attribute (ChartSelection.vue exposes it on the <li>).
-                // Fall back to legacy bg-grey-3/5 (framework) and bg-gray-200/400 (Tailwind).
-                const dataSelected = await parent.getAttribute('data-selected');
-                if (dataSelected === 'true') {
-                    testLogger.info(`Current chart type detected: ${chartType}`);
-                    return chartType;
-                }
-                if (dataSelected === null) {
-                    const parentClassList = (await parent.getAttribute('class')) || '';
-                    if (
-                        parentClassList.includes('bg-grey-3') ||
-                        parentClassList.includes('bg-grey-5') ||
-                        parentClassList.includes('bg-gray-200') ||
-                        parentClassList.includes('bg-gray-400')
-                    ) {
-                        testLogger.info(`Current chart type detected: ${chartType}`);
-                        return chartType;
-                    }
+        // ChartSelection.vue marks the selected chart on the <li> via
+        // :data-test-selected="item.id" (the inner div carries data-selected="true|false",
+        // so reading data-selected off the <li> always yields null). PanelEditor is
+        // mounted in both the Build and Visualize tabs via v-show, so filter to the
+        // visible instance with offsetParent — same approach as verifyChartTypeSelected.
+        const chartType = await this.page.evaluate(() => {
+            const items = document.querySelectorAll('[data-test-selected]');
+            for (const item of items) {
+                if (item.offsetParent !== null) {
+                    return item.getAttribute('data-test-selected');
                 }
             }
+            return null;
+        }).catch(() => null);
+
+        if (chartType) {
+            testLogger.info(`Current chart type detected: ${chartType}`);
+            return chartType;
         }
         testLogger.warn('No chart type detected as selected');
         return null;
     }
 
     /**
-     * Wait for any chart type to become selected (theme-aware).
-     * Uses page.waitForFunction for reliable detection of bg-grey-3/bg-grey-5
-     * directly in the DOM, surviving reactive re-renders across tab switches.
+     * Wait for any chart type to become selected and return its id.
+     * ChartSelection.vue sets :data-test-selected="item.id" on the selected <li>
+     * (and only on that one), so the attribute value IS the chart type. The inner
+     * div's data-selected="true|false" lives on a different element, and the legacy
+     * bg-grey and bg-gray classes no longer exist (the selected <li> now uses the
+     * bg-label-chip-url-bg token), so neither is a usable signal here.
      * @param {number} timeout - Max wait time in ms (default 20000)
      * @returns {Promise<string|null>} The selected chart type or null if timeout
      */
     async waitForChartTypeStabilized(timeout = 20000) {
         try {
-            // Use waitForFunction to detect bg-grey-3 or bg-grey-5 on chart selection items
-            // This is more reliable than Playwright locator polling during reactive re-renders
+            // waitForFunction rather than locator polling: the panel re-renders
+            // reactively across tab switches and URL restoration.
             const result = await this.page.waitForFunction(() => {
-                const items = document.querySelectorAll('[data-test="dashboard-addpanel-chart-selection-item"]');
+                const items = document.querySelectorAll('[data-test-selected]');
                 for (const item of items) {
-                    const classes = item.className || '';
-                    // Prefer data-selected attribute (ChartSelection.vue), fall back to legacy classes
-                    const dataSelected = item.getAttribute('data-selected');
-                    const matchesSelected = dataSelected === 'true' ||
-                        (dataSelected === null && (
-                            classes.includes('bg-grey-3') ||
-                            classes.includes('bg-grey-5') ||
-                            classes.includes('bg-gray-200') ||
-                            classes.includes('bg-gray-400')
-                        ));
-                    if (matchesSelected) {
-                        // Found selected item - extract chart type from child data-test attribute
-                        const section = item.querySelector('[data-test^="selected-chart-"][data-test$="-item"]');
-                        if (section) {
-                            const attr = section.getAttribute('data-test');
-                            const match = attr.match(/^selected-chart-(.+)-item$/);
-                            if (match) return match[1];
-                        }
+                    // PanelEditor is mounted in both Build and Visualize tabs via
+                    // v-show, so skip the hidden copy.
+                    if (item.offsetParent !== null) {
+                        return item.getAttribute('data-test-selected');
                     }
                 }
                 return null;
@@ -10458,7 +10727,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getLogsTableRows() {
-        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr');
+        return this.page.locator('[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]');
     }
 
     /**
@@ -10466,7 +10735,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getFirstRowExpandMenu() {
-        return this.page.locator('[data-test="table-row-expand-menu"]').first();
+        return this.page.locator('[data-test^="o2-table-expand-"]').first();
     }
 
     /**
@@ -10601,14 +10870,11 @@ export class LogsPage {
      * Shared by getScrollContainerPosition()/scrollToResultsBottom() so both
      * always act on the same element.
      *
-     * Since the histogram-pinning change in logs/SearchResult.vue the histogram
-     * strip no longer scrolls: the results table below it (`<TenstackTable>`,
-     * rendered as `[data-test="logs-search-result-logs-table"]`) owns the
-     * scrollbar. Its scroll parent is the `ref="parentRef"` div
-     * (`.o2-scroll-container`, `overflow: auto`) — the outer `scrollContainerRef`
-     * pane is now `overflow: hidden` in the logs view. So walk UP from the table
-     * to the nearest ancestor with a scrollable computed overflow-y (class
-     * renames don't break it).
+     * The results table (`[data-test="logs-search-result-logs-table"]`) does not
+     * own the scrollbar itself — it delegates scrolling to an ancestor pane that
+     * it shares with the pinned histogram. So walk UP from the table to the
+     * nearest ancestor with a scrollable computed overflow-y, matched by computed
+     * style so class renames (or another move of the scroller) don't break it.
      *
      * Falls back to the older pagination sibling-walk for the patterns view,
      * where the whole `scrollContainerRef` pane still scrolls as one.
@@ -10816,7 +11082,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getTimestampColumnHeader() {
-        return this.page.locator('[data-test="log-search-result-table-th-timestamp"]');
+        return this.page.locator('[data-test="o2-table-th-timestamp"]');
     }
 
     /**
@@ -10824,7 +11090,7 @@ export class LogsPage {
      * @returns {import('@playwright/test').Locator}
      */
     getSourceColumnHeader() {
-        return this.page.locator('[data-test="log-search-result-table-th-source"]');
+        return this.page.locator('[data-test="o2-table-th-source"]');
     }
 
     /**

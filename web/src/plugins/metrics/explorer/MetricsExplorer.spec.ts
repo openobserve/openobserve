@@ -107,9 +107,11 @@ vi.mock("vuex", async (importOriginal) => ({
 // Controllable route/router so the URL-state tests can seed `route.query` before
 // mount (hydration) and inspect `router.replace` (sync). `name` must be "metrics"
 // or syncVisualizeUrl and the route.query watcher short-circuit.
+// Both verbs resolve a promise, as the real router does — syncUrlState chains
+// `.catch()` on whichever it picks.
 const routerState = vi.hoisted(() => ({
   replace: vi.fn().mockResolvedValue(undefined),
-  push: vi.fn(),
+  push: vi.fn().mockResolvedValue(undefined),
   query: {} as Record<string, any>,
 }));
 vi.mock("vue-router", () => ({
@@ -522,8 +524,35 @@ describe("MetricsExplorer wiring", () => {
       (wrapper.vm as any).onSelect(CARD);
 
       expect(grid.effectiveVariant).toHaveBeenCalled();
+      // The default handoff: `$__rate_interval`, for the editor to re-derive
+      // against its own range and width.
+      expect(grid.effectiveVariant).toHaveBeenCalledWith(
+        CARD,
+        undefined,
+        expect.objectContaining({ rateWindow: "$__rate_interval" }),
+      );
       expect((wrapper.vm as any).mode).toBe("visualize");
       expect((wrapper.vm as any).visualizeSeed).toBeTruthy();
+    });
+
+    it("a card that charted through a WIDENED window hands the editor that window", () => {
+      // The editor resolves `$__rate_interval` from the org's scrape interval —
+      // the very value whose overstatement forced the card to widen — so the
+      // variable would resolve straight back to the window that returned
+      // nothing, and the drill-in would open on an empty chart of a metric the
+      // card is visibly charting.
+      grid.previews.value[CARD.name] = { widenedRateWindow: "4m" };
+      const wrapper = mountExplorer();
+
+      (wrapper.vm as any).onSelect(CARD);
+
+      expect(grid.effectiveVariant).toHaveBeenCalledWith(
+        CARD,
+        undefined,
+        expect.objectContaining({ rateWindow: "4m" }),
+      );
+      expect((wrapper.vm as any).mode).toBe("visualize");
+      delete grid.previews.value[CARD.name];
     });
   });
 
@@ -819,6 +848,57 @@ describe("MetricsExplorer wiring", () => {
           (c: any) => c[0]?.query && !("metrics_data" in c[0].query),
         );
         expect(stripped).toBe(true);
+      });
+
+      // Explore -> Visualize never changes ROUTE (mode is a query param on
+      // `metrics`), so a `replace` here overwrote the Explore entry outright and
+      // Back jumped clean over the page to whatever preceded it — /logs, in
+      // practice, since useLogs pushes an entry per search. The mode transition
+      // has to push; nothing else may.
+      it("pushes a history entry when switching to Visualize, so Back returns here", async () => {
+        routerState.query = { org_identifier: "org1" };
+        const wrapper = mountExplorer();
+        routerState.push.mockClear();
+        routerState.replace.mockClear();
+
+        await enterVisualizeWith(wrapper, "up");
+
+        const pushedModes = routerState.push.mock.calls.map((c: any) => c[0]?.query?.mode);
+        expect(pushedModes).toContain("visualize");
+        expect(routerState.replace.mock.calls.map((c: any) => c[0]?.query?.mode)).not.toContain(
+          "visualize",
+        );
+      });
+
+      it("pushes on the way back out of Visualize too", async () => {
+        const wrapper = mountExplorer();
+        await enterVisualizeWith(wrapper, "up");
+        // The mock's route.query does not follow navigations, so stand it up by
+        // hand: this is the URL the push above just produced.
+        routerState.query = { mode: "visualize" };
+        routerState.push.mockClear();
+
+        (wrapper.vm as any).setMode("explore");
+        await wrapper.vm.$nextTick();
+
+        // `explore` serializes to an absent key, so the pushed query has no mode.
+        expect(routerState.push).toHaveBeenCalled();
+        expect(routerState.push.mock.calls.at(-1)[0].query.mode).toBeUndefined();
+      });
+
+      it("still REPLACES a same-mode edit — those must not stack history", async () => {
+        const wrapper = mountExplorer();
+        routerState.push.mockClear();
+        routerState.replace.mockClear();
+
+        // refreshInterval is a real component ref (the grid mock's fields are
+        // plain objects and drive nothing), so this exercises syncUrlState with
+        // mode held constant.
+        (wrapper.vm as any).refreshInterval = 60;
+        await wrapper.vm.$nextTick();
+
+        expect(routerState.replace).toHaveBeenCalled();
+        expect(routerState.push).not.toHaveBeenCalled();
       });
 
       it("does not touch metrics_data while in a grid mode", async () => {

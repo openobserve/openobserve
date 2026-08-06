@@ -45,6 +45,7 @@
 
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
 import { defineComponent, computed, watch, type PropType } from "vue";
 import { VueFlow, type Node, type Edge } from "@vue-flow/core";
@@ -70,7 +71,7 @@ type PipelineEdge = Edge;
 
 interface Pipeline {
   name: string;
-  description: string;
+  description: I18nText;
   source: { source_type: string };
   nodes: PipelineNode[];
   edges: PipelineEdge[];
@@ -83,7 +84,8 @@ export default defineComponent({
   },
   components: { VueFlow, CustomNode, DropzoneBackground, FlowEdge },
   setup(props) {
-    const { pipelineObj } = useDragAndDrop();
+    const { t } = useI18nTyped();
+    const { pipelineObj } = useDragAndDrop(t);
     const vueFlowRef = ref<InstanceType<typeof VueFlow> | null>(null);
     // Computed properties for nodes and edges
     const lockedNodes = computed(() => {
@@ -108,66 +110,66 @@ export default defineComponent({
     onMounted(async () => {
       pipelineObj.nodeTypes = [
         {
-          label: "Source",
+          label: t("pipeline.sourceNode"),
           icon: "input",
           isSectionHeader: true,
         },
         {
-          label: "Stream",
+          label: t("pipeline.streamNode"),
           subtype: "stream",
           io_type: "input",
           icon: "img:" + streamImage,
-          tooltip: "Source: Stream Node",
+          tooltip: t("pipeline.sourceStreamTooltip"),
           isSectionHeader: false,
         },
         {
-          label: "Query",
+          label: t("pipeline.queryNode"),
           subtype: "query",
           io_type: "input",
           icon: "img:" + queryImage,
-          tooltip: "Source: Query Node",
+          tooltip: t("pipeline.sourceQueryTooltip"),
           isSectionHeader: false,
         },
         {
-          label: "Transform",
+          label: t("pipeline.transformNode"),
           icon: "processing",
           isSectionHeader: true,
         },
         {
-          label: "Function",
+          label: t("pipeline.functionNode"),
           subtype: "function",
           io_type: "default",
           icon: "img:" + functionImage,
-          tooltip: "Function Node",
+          tooltip: t("pipeline.functionTooltip"),
           isSectionHeader: false,
         },
         {
-          label: "Conditions",
+          label: t("pipeline.conditionsNode"),
           subtype: "condition",
           io_type: "default",
           icon: "img:" + conditionImage,
-          tooltip: "Condition Node",
+          tooltip: t("pipeline.conditionTooltip"),
           isSectionHeader: false,
         },
         {
-          label: "Destination",
+          label: t("pipeline.destinationNode"),
           icon: "input",
           isSectionHeader: true,
         },
         {
-          label: "Stream",
+          label: t("pipeline.streamNode"),
           subtype: "stream",
           io_type: "output",
           icon: "img:" + streamOutputImage,
-          tooltip: "Destination: Stream Node",
+          tooltip: t("pipeline.destinationStreamTooltip"),
           isSectionHeader: false,
         },
         {
-          label: "Remote",
+          label: t("pipeline.remoteNode"),
           subtype: "remote_stream",
           io_type: "output",
           icon: "img:" + externalOutputImage,
-          tooltip: "Destination: External Destination Node",
+          tooltip: t("pipeline.destinationExternalTooltip"),
           isSectionHeader: false,
         },
       ];

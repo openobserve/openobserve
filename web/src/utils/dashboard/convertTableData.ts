@@ -135,6 +135,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
       // override_config is keyed by alias; the TanStack column id is the data field.
       obj["alias"] = it.alias;
       obj["isNumeric"] = isNumber;
+      obj["mono"] = isNumber || histogramFields.includes(it.alias);
       obj["sortable"] = true;
 
       applyColumnOverrides(obj, aliasLower, overrideMaps, !isNumber ? "left" : "right");
@@ -274,6 +275,7 @@ export const convertTableData = (panelSchema: any, searchQueryData: any, store: 
         obj["field"] = String(it);
         obj["label"] = it != null && it !== "" ? String(it) : "";
         obj["sortable"] = true;
+        obj["mono"] = isNumber || histogramFields.includes(it);
         // Overrides keyed by the lower-cased transposed value (transpose path).
         applyColumnOverrides(
           obj,
@@ -525,6 +527,7 @@ export const convertMultiQueryTableData = (
           field: it,
           label: it,
           sortable: true,
+          mono: isNumber || detectedTimestampAliases.has(it),
         };
         applyColumnOverrides(
           col,
@@ -592,6 +595,7 @@ export const convertMultiQueryTableData = (
       field: colName,
       label: fieldConfig?.label || colName,
       sortable: true,
+      mono: isNumber || isTimestamp,
     };
 
     applyColumnOverrides(

@@ -190,37 +190,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="flex h-full flex-col">
         <div class="logs-table-container w-full flex-1 overflow-auto">
           <!-- Actual Table (when data is loaded) -->
-          <TenstackTable
+          <OTable
             v-if="hasResults"
             :key="`page-${currentPage}`"
-            :rows="pagedResults"
+            :data="pagedResults"
             :columns="tableColumns"
             :wrap="wrapTableCells"
             :loading="isLoading"
-            :err-msg="''"
-            :function-error-msg="''"
-            :expanded-rows="expandedRows"
-            :highlight-timestamp="-1"
-            :default-columns="showingDefaultColumns"
-            :jsonpreview-stream-name="jsonPreviewStreamName"
-            :highlight-query="highlightQuery"
-            :selected-stream-fts-keys="ftsFields"
-            :selected-stream-fields="selectedFields"
-            :hide-search-term-actions="hideSearchTermActions"
-            :hide-view-related-button="hideViewRelatedButton"
+            :row-key="correlatedRowKey"
+            :default-columns="false"
+            :show-global-filter="false"
+            pagination="none"
+            :enable-column-reorder="true"
+            :enable-column-resize="true"
+            :get-row-status-color="getCorrelatedRowStatusColor"
+            expansion="multiple"
+            :expanded-ids="correlatedExpandedIds"
             class="overflow-y-auto!"
-            @click:dataRow="handleRowClick"
-            @copy="handleCopy"
-            @sendToAiChat="handleSendToAiChat"
-            @addSearchTerm="handleAddSearchTerm"
-            @addFieldToTable="handleAddFieldToTable"
-            @closeColumn="handleCloseColumn"
-            @update:columnOrder="handleColumnOrderChange"
-            @expandRow="handleExpandRow"
-            @view-trace="handleViewTrace"
-            @show-correlation="handleNestedCorrelation"
             data-test="logs-tenstack-table"
-          />
+            @row-click="handleRowClick"
+            @close-column="handleCloseColumn"
+            @column-order-change="handleColumnOrderChange"
+            @update:expandedIds="onCorrelatedExpandedIdsChange"
+          >
+            <template
+              v-for="col in tableColumns"
+              :key="col.id"
+              #[`cell-${col.id}`]="{ row, value }"
+            >
+              <span
+                v-if="correlatedCellHtml(col.id, row)"
+                class="log-cell-html"
+                v-html="correlatedCellHtml(col.id, row)"
+              />
+              <span v-else>{{ value }}</span>
+            </template>
+
+            <template #cell-hover-actions="{ row, column, active }">
+              <O2AIContextAddBtn
+                v-if="active && column.id === correlatedTimestampCol"
+                class="ai-btn"
+                @send-to-ai-chat="handleSendToAiChat(JSON.stringify(row))"
+              />
+              <CellActions
+                v-else-if="active && column.meta?.closable && row[column.id] != null"
+                :column="column"
+                :row="row"
+                :selected-stream-fields="selectedFields"
+                :hide-search-term-actions="hideSearchTermActions"
+                @copy="handleCopy"
+                @add-search-term="handleAddSearchTerm"
+                @send-to-ai-chat="handleSendToAiChat"
+              />
+            </template>
+
+            <template #expansion="{ row }">
+              <JsonPreview
+                :value="row"
+                mode="expanded"
+                :stream-name="jsonPreviewStreamName"
+                :highlight-query="highlightQuery"
+                :hide-search-term-actions="hideSearchTermActions"
+                :hide-view-related="hideViewRelatedButton"
+                @copy="handleCopy"
+                @add-field-to-table="handleAddFieldToTable"
+                @add-search-term="handleAddSearchTerm"
+                @view-trace="handleViewTrace"
+                @show-correlation="handleNestedCorrelation"
+                @send-to-ai-chat="handleSendToAiChat"
+              />
+            </template>
+          </OTable>
 
           <!-- Table Skeleton (initial load) -->
           <div
@@ -273,7 +313,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ (currentPage - 1) * displayPageSize + 1 }}–{{
               Math.min(currentPage * displayPageSize, searchResults.length)
             }}
-            of {{ searchResults.length }}
+            {{ t("search.of") }} {{ searchResults.length }}
           </span>
           <OPagination
             :model-value="currentPage"
@@ -295,7 +335,7 @@ import {
   resolveSetId,
   type SubjectButtonSpec,
 } from "@/composables/useMetricSubjectButtons";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -307,12 +347,17 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useCorrelatedLogs } from "@/composables/useCorrelatedLogs";
 import type { CorrelatedLogsProps } from "@/composables/useCorrelatedLogs";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
-import TenstackTable from "@/plugins/logs/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import JsonPreview from "@/plugins/logs/JsonPreview.vue";
+import CellActions from "@/plugins/logs/data-table/CellActions.vue";
+import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
+import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { extractStatusFromLog } from "@/utils/logs/statusParser";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { copyToClipboard } from "@/utils/clipboard";
-import type { ColumnDef } from "@tanstack/vue-table";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { byString } from "@/utils/json";
 import { searchState } from "@/composables/useLogs/searchState";
@@ -332,7 +377,7 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 const { searchObj } = searchState();
@@ -555,7 +600,7 @@ const highlightQuery = computed(() => {
 const getFilterOptions = (
   key: string,
   currentValue: string,
-): Array<{ label: string; value: string }> => {
+): Array<{ label: I18nText; value: string }> => {
   const uniqueValues = new Set<string>();
 
   // Always include wildcard option
@@ -589,7 +634,7 @@ const getFilterOptions = (
 
   // Convert to { label, value } format for the select with map-options
   return Array.from(uniqueValues).map((val) => ({
-    label: val === SELECT_ALL_VALUE ? "All Values" : val,
+    label: val === SELECT_ALL_VALUE ? t("correlation.logs.allValues") : raw(val),
     value: val,
   }));
 };
@@ -798,7 +843,7 @@ const getColumnWidthHelper = (field: string): number => {
 };
 
 // Generate table columns dynamically from visible fields in custom order
-const tableColumns = computed<ColumnDef<any>[]>(() => {
+const tableColumns = computed<OTableColumnDef<any>[]>(() => {
   // Use the computed visibleFields
   const fields = visibleFields.value;
 
@@ -813,7 +858,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
         id: field,
         accessorKey: field,
         label: t("search.timestamp") + ` (${store.state.timezone})`,
-        header: t("search.timestamp") + ` (${store.state.timezone})`,
+        header: raw(`${t("search.timestamp")} (${store.state.timezone})`),
         align: "left",
         sortable: true,
         enableResizing: false,
@@ -846,7 +891,7 @@ const tableColumns = computed<ColumnDef<any>[]>(() => {
       name: field,
       id: field,
       accessorKey: field,
-      header: field,
+      header: raw(field),
       align: "left",
       sortable: true,
       enableResizing: true,
@@ -951,8 +996,8 @@ const handleRowClick = () => {};
 
 const handleCopy = (log: any, copyAsJson: boolean = true) => {
   const copyData = copyAsJson ? JSON.stringify(log) : log;
-  copyToClipboard(copyData, {
-    successMessage: "Content Copied Successfully!",
+  copyToClipboard(copyData, t, {
+    successMessage: t("common.contentCopiedSuccessfully"),
     timeout: 1000,
   });
 };
@@ -979,14 +1024,14 @@ const handleAddFieldToTable = (field: string) => {
     // Show success notification
     toast({
       variant: "success",
-      message: `Column "${field}" added to table`,
+      message: t("toastMessages.correlation.columnAddedToTable", { name: field }),
       timeout: 1500,
     });
   } else {
     // Field is already visible, show info notification
     toast({
       variant: "info",
-      message: `Column "${field}" is already visible`,
+      message: t("toastMessages.correlation.columnIsAlreadyVisible", { name: field }),
       timeout: 1500,
     });
   }
@@ -1096,6 +1141,82 @@ const handleExpandRow = (row: any) => {
   } else {
     expandedRows.value.push(row);
   }
+};
+
+// ── Logs rendering ──
+// Same FTS pipeline as the logs grid: chunked colorized HTML rendered per cell.
+const { processedResults: correlatedProcessed, processHitsInChunks: correlatedProcessChunks } =
+  useLogsHighlighter();
+
+const correlatedTimestampCol = computed(
+  () => store.state.zoConfig.timestamp_column || "_timestamp",
+);
+
+// Guarded: `pagedResults` is undefined while the composable initialises.
+const pagedRows = (): any[] => ((pagedResults as any)?.value as any[]) || [];
+
+// Row → index within the current page; the highlight cache is keyed off it.
+const correlatedHitIndexMap = computed(() => {
+  const m = new Map<any, number>();
+  pagedRows().forEach((h: any, i: number) => m.set(h, i));
+  return m;
+});
+const correlatedCellHtml = (columnId: string, row: any): string | null => {
+  const idx = correlatedHitIndexMap.value.get(row);
+  if (idx == null || idx < 0) return null;
+  return (correlatedProcessed.value as any)[`${columnId}_${idx}`] ?? null;
+};
+const reprocessCorrelatedHighlight = (clearCache: boolean) => {
+  correlatedProcessChunks(
+    pagedRows(),
+    (tableColumns.value as any[]) || [],
+    clearCache,
+    highlightQuery.value || "",
+    100,
+    ftsFields.value || [],
+  );
+};
+watch(
+  () => tableColumns.value,
+  () => reprocessCorrelatedHighlight(true),
+);
+watch(
+  () => (pagedResults as any)?.value,
+  () => reprocessCorrelatedHighlight(false),
+);
+
+const getCorrelatedRowStatusColor = (row: any): string | undefined =>
+  extractStatusFromLog(row)?.color;
+
+// Row identity is the row's position in the current page, NOT its `_timestamp`:
+// a timestamp repeats across rows ingested in the same batch, and keying on it
+// expanded every row sharing the value off a single click. `expandedRows` holds
+// row objects, so translate them through the same page-index map.
+const correlatedRowKey = (row: any): string => String(correlatedHitIndexMap.value.get(row) ?? -1);
+const correlatedExpandedIds = computed<string[]>(() =>
+  (expandedRows.value || [])
+    .map((r: any) => correlatedHitIndexMap.value.get(r))
+    .filter((i: number | undefined): i is number => i != null)
+    .map(String),
+);
+const onCorrelatedExpandedIdsChange = (newIds: string[]) => {
+  const prev = new Set(correlatedExpandedIds.value);
+  const next = new Set(newIds);
+  let toggled: string | null = null;
+  for (const k of next)
+    if (!prev.has(k)) {
+      toggled = k;
+      break;
+    }
+  if (toggled == null)
+    for (const k of prev)
+      if (!next.has(k)) {
+        toggled = k;
+        break;
+      }
+  if (toggled == null) return;
+  const row = pagedRows()[Number(toggled)];
+  if (row) handleExpandRow(row);
 };
 
 const handleViewTrace = (log: any) => {
@@ -1226,7 +1347,7 @@ const unifiedChips = computed<DimensionChip[]>(() =>
       (key) =>
         ({
           key,
-          label: dimensionDisplayLabel(key),
+          label: raw(dimensionDisplayLabel(key)),
           value: chipDimensionSource.value[key],
           kind: "context" as DimensionChip["kind"],
         }) as DimensionChip,

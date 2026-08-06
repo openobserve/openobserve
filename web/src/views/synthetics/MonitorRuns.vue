@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="lastTriggeredAt > 0"
               icon="schedule"
               :label="t('synthetics.results.jumpToLatestData')"
-              :sublabel="lastTriggeredAtSublabel"
+              :sublabel="raw(lastTriggeredAtSublabel)"
               data-test="monitor-runs-empty-jump-latest"
               @click="handleJumpToLatestData"
             />
@@ -164,6 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <MonitorStatusTimeline
                     :segments="timelineSegments"
                     :is-browser="isBrowser"
+                    :truncated="timelineTruncated"
                     :fail-count="timelineFailCount"
                     :pass-count="timelinePassCount"
                     :mixed-count="timelineMixedCount"
@@ -270,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         </span>
                         <span class="flex-1" />
                         <OBadge v-if="!histogramError" variant="default" size="sm">
-                          p95 {{ p95Label }}
+                          {{ t("synthetics.results.p95Label") }} {{ p95Label }}
                         </OBadge>
                         <span
                           v-else
@@ -421,7 +422,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="b.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="b.name">
+                          <OTooltip :content="raw(b.name)">
                             <span
                               class="text-text-body w-20 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -463,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="l.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="l.name">
+                          <OTooltip :content="raw(l.name)">
                             <span
                               class="text-text-body w-40 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -505,7 +506,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="d.name">
+                          <OTooltip :content="raw(d.name)">
                             <span
                               class="text-text-body text-capitalize w-18 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -547,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           class="border-border-default flex items-center gap-3 border-b py-2.25 last:border-b-0"
                         >
                           <OIcon :name="d.icon" size="sm" class="text-text-secondary flex-none" />
-                          <OTooltip :content="d.name">
+                          <OTooltip :content="raw(d.name)">
                             <span
                               class="text-text-body w-34 flex-none cursor-help truncate text-xs font-semibold"
                             >
@@ -710,7 +711,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="(row as VisibleRun).scheduledTs"
                       unit="ms"
                       mode="absolute"
-                      empty-label="—"
+                      :empty-label="raw('—')"
                     />
                   </template>
                   <template #cell-last_run_at="{ row }">
@@ -718,7 +719,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="(row as VisibleRun).lastRunTs"
                       unit="ms"
                       mode="absolute"
-                      empty-label="—"
+                      :empty-label="raw('—')"
                     />
                   </template>
                   <template #cell-duration="{ row }">
@@ -741,7 +742,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-device="{ row }">
                     <span class="text-text-body inline-flex items-center gap-1 text-sm">
                       <OIcon :name="deviceIconName((row as VisibleRun).device)" size="sm" />
-                      {{ deviceLabel((row as VisibleRun).device) }}
+                      {{ deviceDisplay((row as VisibleRun).device) }}
                     </span>
                   </template>
                   <template #cell-trigger_type="{ row }">
@@ -766,7 +767,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <EmptyStateActionCard
                             icon="schedule"
                             :label="t('synthetics.results.jumpToLastRun')"
-                            :sublabel="lastRunLabel"
+                            :sublabel="raw(lastRunLabel)"
                             data-test="monitor-runs-empty-jump-last-run"
                             @click="handleEmptyStateAction('jump-to-last-run')"
                           />
@@ -811,6 +812,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- ════════════ STEPS ════════════ -->
           <OTabPanel name="steps">
             <div class="mx-auto flex flex-col gap-2">
+              <!--
+                P2a — the tally takes the newest N executions, so on a busy check
+                it describes a window far shorter than the one the picker shows.
+                A 1-minute check across 2 locations x 4 browser/device combos
+                produces 11 520 executions a day: a 5000-row cap is about ten
+                hours of a "last 7 days" selection. The numbers were right; the
+                label was wrong, and silently so.
+              -->
+              <p
+                v-if="!stepsLoading && stepsCoverage.truncated"
+                class="text-text-secondary px-2 text-xs"
+                data-test="monitor-runs-steps-coverage"
+              >
+                {{
+                  t("synthetics.runs.stepsWindowTruncated", {
+                    count: stepsCoverage.executions,
+                    from: fmtTimestamp(stepsCoverage.fromMs),
+                    to: fmtTimestamp(stepsCoverage.toMs),
+                  })
+                }}
+              </p>
               <!-- Loading skeleton -->
               <template v-if="stepsLoading || !stepsHasLoadedOnce">
                 <div class="grid grid-cols-2 gap-2">
@@ -1043,8 +1065,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, onMounted, ref, watch } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -1073,7 +1095,7 @@ import MonitorStatusTimeline from "@/views/synthetics/MonitorStatusTimeline.vue"
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import useSyntheticResults from "@/composables/useSyntheticResults";
 import type { SyntheticRun } from "@/composables/synthetics/syntheticResultsSchema";
-import { deviceIconName, deviceLabel } from "@/composables/synthetics/syntheticResultsSchema";
+import { deviceIconName, deviceLabelKey } from "@/composables/synthetics/syntheticResultsSchema";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -1082,12 +1104,23 @@ import webkitSvgUrl from "@/assets/images/synthetics/webkit.svg";
 import SkeletonBox from "@/components/shared/SkeletonBox.vue";
 import syntheticsService from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
+import {
+  rollUpStatus,
+  tallyStatuses,
+  type AggregateStatus,
+  type StatusTally,
+} from "@/utils/synthetics/rollUpStatus";
 import { formatTimeWithSuffix } from "@/utils/formatters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 defineOptions({ name: "SyntheticMonitorRuns" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
+
+const deviceDisplay = (id: string): I18nText => {
+  const key = deviceLabelKey(id);
+  return key ? t(key) : raw(id);
+};
 
 const emit = defineEmits<{
   (e: "edit"): void;
@@ -1099,9 +1132,9 @@ const emit = defineEmits<{
 const store = useStore();
 const route = useRoute();
 const orgIdentifier = computed(() => (store.state as any).selectedOrganization?.identifier ?? "");
-// The check's folder (name), carried on the results-page route as ?folder=.
+// The check's folder ID, carried on the results-page route as ?folder=.
 // Passed to per-check API calls so RBAC can resolve folder-scoped grants.
-const folderName = computed(() => String(route.query.folder ?? ""));
+const folderId = computed(() => String(route.query.folder ?? ""));
 
 // id -> "Name (region)" — run records carry the raw location id (KSUID for
 // private, "aws-us-east-1" for public); resolve to a human label wherever
@@ -1135,15 +1168,25 @@ interface Props {
   /** Check type ("browser" | "http" | etc.) — provided by the parent after it
    * fetches the check. Controls the tabs grid layout and step analysis visibility. */
   checkType?: string;
+  /** The check's configured retry count.
+   *
+   * At 0 the probe never retries, so no run can ever be observed as flaky and
+   * `retry_step_ids` is never written. The tiles must read "—", not "0.0%":
+   * a zero is a measurement, and this is the absence of one. */
+  retries?: number;
 }
 const props = withDefaults(defineProps<Props>(), {
   monitorStatus: "healthy",
   lastTriggeredAt: 0,
   checkType: "browser",
+  retries: 0,
 });
 
+/** Whether flakiness is observable at all for this check. */
+const retriesEnabled = computed(() => props.retries > 0);
+
 // ── Synthetic results composable ──────────────────────────────────────────
-const synthetics = useSyntheticResults();
+const synthetics = useSyntheticResults(t);
 const kpiLoading = computed(() => synthetics.kpiLoading.value);
 const histogramLoading = computed(() => synthetics.histogramLoading.value);
 const runsLoading = computed(() => synthetics.runsLoading.value);
@@ -1282,33 +1325,48 @@ async function handleEmptyStateAction(id: string) {
   }
 
   if (id === "trigger-run") {
-    if (runTriggerLoading.value) return;
-    runTriggerLoading.value = true;
-    const dismiss = toast({
-      variant: "loading",
-      message: t("synthetics.toast.triggeringSingle", { name: props.monitorName }),
-      timeout: 0,
+    await triggerRun();
+  }
+}
+
+/**
+ * Run this monitor once, now.
+ *
+ * Lives here — not in the page shell — because this is where the org, folder
+ * and monitor id already are, and where `refresh` is emitted. The page header
+ * calls it through `defineExpose`; duplicating the service call up there is
+ * what would let the two drift.
+ */
+async function triggerRun() {
+  if (runTriggerLoading.value) return;
+  runTriggerLoading.value = true;
+  const dismiss = toast({
+    variant: "loading",
+    message: t("synthetics.toast.triggeringSingle", { name: props.monitorName }),
+    timeout: 0,
+  });
+  try {
+    await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderId.value);
+    dismiss();
+    // "Queued", not "Done": the API enqueues a job, and a browser run takes tens
+    // of seconds to land in the results stream. The refresh below fires
+    // immediately and will NOT contain this run, so a success message claiming
+    // otherwise sends the user hunting for a row that cannot be there yet.
+    toast({
+      variant: "success",
+      message: t("synthetics.toast.triggerSuccessSingle", { name: props.monitorName }),
     });
-    try {
-      await syntheticsService.run(orgIdentifier.value, props.monitorId, {}, folderName.value);
-      dismiss();
-      toast({
-        variant: "success",
-        message: t("synthetics.toast.triggerSuccessSingle", { name: props.monitorName }),
-      });
-      // Emit refresh so parent reloads data
-      emit("refresh");
-    } catch (err: any) {
-      dismiss();
-      toast({
-        variant: "error",
-        message:
-          err?.response?.data?.message ||
-          t("synthetics.toast.triggerFailedSingle", { name: props.monitorName }),
-      });
-    } finally {
-      runTriggerLoading.value = false;
-    }
+    emit("refresh");
+  } catch (err: any) {
+    dismiss();
+    toast({
+      variant: "error",
+      message:
+        err?.response?.data?.message ||
+        t("synthetics.toast.triggerFailedSingle", { name: props.monitorName }),
+    });
+  } finally {
+    runTriggerLoading.value = false;
   }
 }
 
@@ -1320,7 +1378,7 @@ function uniqueValues(key: "browser" | "device" | "location"): string[] {
 const browserOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allBrowsers"), value: "all", icon: "language" },
   ...uniqueValues("browser").map((v) => ({
-    label: v,
+    label: raw(v),
     value: v,
     icon: browserIcon(v),
   })),
@@ -1328,7 +1386,7 @@ const browserOptions = computed<SelectOption[]>(() => [
 const deviceOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allDevices"), value: "all", icon: "devices" },
   ...uniqueValues("device").map((v) => ({
-    label: deviceLabel(v),
+    label: deviceDisplay(v),
     value: v,
     icon: deviceIconName(v),
   })),
@@ -1336,7 +1394,7 @@ const deviceOptions = computed<SelectOption[]>(() => [
 const locationOptions = computed<SelectOption[]>(() => [
   { label: t("synthetics.filters.allLocations"), value: "all", icon: "location-on" },
   ...uniqueValues("location").map((v) => ({
-    label: locationLabel(v),
+    label: raw(locationLabel(v)),
     value: v,
     icon: locationIcon(v),
   })),
@@ -1439,7 +1497,7 @@ const failCount = computed(() => String(synthetics.kpi.value.failedRuns));
 
 interface KpiCard {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   unit?: string;
   valueClass?: string;
@@ -1482,15 +1540,37 @@ const kpiCards = computed<KpiCard[]>(() => {
       {
         key: "retry-rate",
         label: t("synthetics.runs.retryRate"),
-        value: k.totalRuns > 0 ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
+        value: !retriesEnabled.value
+          ? "—"
+          : k.totalRuns > 0
+            ? ((k.retriedRuns / k.totalRuns) * 100).toFixed(1) + "%"
+            : "0.0%",
         valueClass: k.retriedRuns > 0 ? "text-text-body!" : undefined,
       },
-      {
-        key: "warning-runs",
-        label: t("synthetics.runs.warningRuns"),
-        value: String(k.warningRuns),
-        valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
-      },
+      // Flaky rate is only measurable when retries are on — a check that cannot
+      // retry cannot be seen to recover. Rather than burn the slot on a
+      // permanent "—", hand it to Warning runs, which is always meaningful and
+      // was otherwise absent from the live card set entirely: with retries off,
+      // a monitor could badge every row "Warning" in the table below while no
+      // KPI card mentioned warnings at all.
+      retriesEnabled.value
+        ? {
+            // D4 — the denominator is EXECUTIONS, the grain `totalRuns` and the
+            // runs list both use. Dividing by scheduled runs instead would be
+            // smaller by the location × browser × device fan-out and inflate
+            // this several-fold.
+            key: "flaky-rate",
+            label: t("synthetics.runs.flakyRate"),
+            value:
+              k.totalRuns > 0 ? ((k.flakyExecutions / k.totalRuns) * 100).toFixed(1) + "%" : "0.0%",
+            valueClass: k.flakyExecutions > 0 ? "text-status-warning-text!" : undefined,
+          }
+        : {
+            key: "warning-runs",
+            label: t("synthetics.runs.warningRuns"),
+            value: String(k.warningRuns),
+            valueClass: k.warningRuns > 0 ? "text-status-warning-text!" : undefined,
+          },
       {
         key: "failed-runs",
         label: t("synthetics.results.failedRuns"),
@@ -1557,12 +1637,15 @@ interface TimelineExecution {
 
 interface TimelineSegment {
   runId: string;
-  status: "all-pass" | "all-warning" | "mixed" | "all-fail";
+  status: AggregateStatus;
   color: string;
-  title: string;
+  title: I18nText;
   /** Epoch ms of the first execution in this logical run. */
   timestampMs: number;
   executions: TimelineExecution[];
+  /** Bucket counts for the tooltip header. Computed once, here, so the segment
+   * title and the tooltip cannot disagree about the same run. */
+  tally: StatusTally;
 }
 
 // ── Status timeline ──────────────────────────────────────────────────────
@@ -1586,16 +1669,9 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
 
   return groupOrder.map((runId) => {
     const executions = groupMap.get(runId)!;
-    const allPass = executions.every((e) => e.status === "pass" || e.status === "warning");
-    const allFail = executions.every((e) => e.status === "fail" || e.status === "error");
-    const allWarning = executions.every((e) => e.status === "warning");
-    const status: TimelineSegment["status"] = allPass
-      ? allWarning
-        ? "all-warning"
-        : "all-pass"
-      : allFail
-        ? "all-fail"
-        : "mixed";
+    const statuses = executions.map((e) => e.status);
+    const status = rollUpStatus(statuses);
+    const tally = tallyStatuses(statuses);
 
     const color =
       status === "all-pass"
@@ -1606,21 +1682,20 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
             ? "bg-badge-error-solid-bg/80"
             : "bg-badge-orange-solid-bg/80";
 
-    const passCount = executions.filter(
-      (e) => e.status === "pass" || e.status === "warning",
-    ).length;
-    const failCount = executions.length - passCount;
     const title =
       status === "all-pass"
-        ? t("synthetics.runs.timelineAllPassed", { count: executions.length })
+        ? t("synthetics.runs.timelineAllPassed", { count: tally.total })
         : status === "all-warning"
-          ? t("synthetics.runs.timelineAllWarning", { count: executions.length })
+          ? t("synthetics.runs.timelineAllWarning", { count: tally.total })
           : status === "all-fail"
-            ? t("synthetics.runs.timelineAllFailed", { count: executions.length })
+            ? t("synthetics.runs.timelineAllFailed", { count: tally.total })
             : t("synthetics.runs.timelineMixed", {
-                passed: passCount,
-                failed: failCount,
-                total: executions.length,
+                // `passed` here is "not failed", matching the mixed-run wording
+                // ("N of M passed"). Warnings are healthy runs with a caveat, and
+                // the tooltip breaks them out separately.
+                passed: tally.passed + tally.warning,
+                failed: tally.failed,
+                total: tally.total,
               });
 
     const execDetails: TimelineExecution[] = executions.map((e) => ({
@@ -1646,9 +1721,18 @@ const timelineSegments = computed<TimelineSegment[]>(() => {
       title,
       timestampMs: executions[0]?.scheduledTs || 0,
       executions: execDetails,
+      tally,
     };
   });
 });
+
+/**
+ * The runs list hit its query cap, so the timeline shows only the most recent
+ * slice of the window while the KPI cards above it aggregate the whole thing.
+ * Surfaced in the timeline footer — silent truncation reads as complete
+ * coverage, and then the two disagree with no explanation.
+ */
+const timelineTruncated = computed(() => !!synthetics.runsTruncated?.value);
 
 const timelineFailCount = computed(() =>
   String(timelineSegments.value.filter((s) => s.status === "all-fail").length),
@@ -1788,7 +1872,7 @@ const deviceBreakdown = computed<BreakdownItem[]>(() => {
   return Array.from(groups.entries()).map(([id, g]) => {
     const pct = g.total > 0 ? Math.round((g.pass / g.total) * 100) : 100;
     return {
-      name: deviceLabel(id),
+      name: deviceDisplay(id),
       icon: deviceIconName(id),
       pct: pct + "%",
       barColor: "var(--color-status-success-text)",
@@ -1997,7 +2081,7 @@ const failedStepOptions = computed<SelectOption[]>(() => {
   const withLocator = stepNames().filter((n) => meta[n].locator);
   return [
     { label: t("synthetics.filters.anyFailedStep"), value: "all" },
-    ...withLocator.map((n) => ({ label: n, value: n })),
+    ...withLocator.map((n) => ({ label: raw(n), value: n })),
   ];
 });
 
@@ -2056,7 +2140,7 @@ const visibleRuns = computed<VisibleRun[]>(() => {
       locationName: locationLabel(run.location),
       browser: run.browser,
       device: run.device,
-      deviceName: deviceLabel(run.device),
+      deviceName: deviceDisplay(run.device),
     };
   });
 });
@@ -2133,6 +2217,24 @@ const runColumns = computed<OTableColumnDef[]>(() => {
 
 // ── Steps: real data from composable ────────────────────────────────────
 const stepGroupsData = computed(() => synthetics.stepStats.value.stepGroups);
+/** What the tally actually covered, so the panel can say so when the row cap
+ *  bound rather than the selected time range (P2a). */
+const stepsCoverage = computed(
+  () =>
+    synthetics.stepStats.value.coverage ?? {
+      executions: 0,
+      fromMs: 0,
+      toMs: 0,
+      // Absent coverage means "this result predates the field", which is not
+      // evidence the window was truncated. The banner stays hidden.
+      truncated: false,
+    },
+);
+
+/** Epoch ms as a local timestamp, matching the other stamps on this page. */
+function fmtTimestamp(ms: number): string {
+  return ms > 0 ? new Date(ms).toLocaleString() : "—";
+}
 
 // ── Display helpers for step analysis ────────────────────────────────────
 
@@ -2436,12 +2538,41 @@ function openRun(row: { id: number }) {
   emit("open-run", String(row.id), "");
 }
 
+// ── Steps tab — loaded lazily ────────────────────────────────────────────
+//
+// The step aggregation walks the REST /runs payload and is the heaviest query
+// the page issues, so it runs only when the Steps tab is actually in view. Two
+// triggers, and nothing else: opening the tab, and a new time window while the
+// tab is open. A window change with the tab closed just marks the aggregation
+// stale so the next visit refetches.
+
+/** Whether `stepStats` was computed over the window in `timeRangeMicros`. */
+const stepsMatchWindow = ref(false);
+
+async function loadSteps() {
+  const tr = timeRangeMicros.value;
+  if (!tr) return;
+  stepsMatchWindow.value = true;
+  await synthetics.fetchSteps(props.monitorId, tr.startTime, tr.endTime);
+}
+
+watch(activeTab, (tab) => {
+  if (tab === "steps" && !stepsMatchWindow.value) void loadSteps();
+});
+
 // ── Public API — parent drives all (re)loads ─────────────────────────────
 async function refresh(startTime?: number, endTime?: number) {
   if (!startTime || !endTime) return;
   timeRangeMicros.value = { startTime, endTime };
-  await synthetics.fetchAll(props.monitorId, startTime, endTime);
+  // The new window invalidates whatever the Steps tab is holding. Refetch right
+  // away if it is the open tab — this is also the path the steps error-state
+  // retry button takes — otherwise defer to the next time it is opened.
+  stepsMatchWindow.value = false;
+  await Promise.all([
+    synthetics.fetchAll(props.monitorId, startTime, endTime),
+    activeTab.value === "steps" ? loadSteps() : Promise.resolve(),
+  ]);
 }
 
-defineExpose({ refresh });
+defineExpose({ refresh, triggerRun, runTriggerLoading });
 </script>

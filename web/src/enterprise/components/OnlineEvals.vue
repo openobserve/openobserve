@@ -67,8 +67,8 @@ the Free Software Foundation, either version 3 of the License, or
 
       <OPageHeader
         v-if="hideTabBar && embeddedHeader"
-        :title="embeddedHeader.title"
-        :subtitle="embeddedHeader.subtitle"
+        :title="raw(embeddedHeader.title)"
+        :subtitle="raw(embeddedHeader.subtitle)"
         :icon="embeddedHeader.icon"
         class="border-border-default shrink-0 border-b"
       >
@@ -279,8 +279,10 @@ the Free Software Foundation, either version 3 of the License, or
         side="right"
         size="lg"
         :title="t('onlineEvals.scoreConfig.import.libraryDrawerTitle')"
-        secondary-button-label="Cancel"
-        :primary-button-label="`Import (${scoreConfigLibrarySelectedCount})`"
+        :secondary-button-label="t('onlineEvals.buttons.cancel')"
+        :primary-button-label="
+          t('onlineEvals.importCount', { count: scoreConfigLibrarySelectedCount })
+        "
         :primary-button-disabled="scoreConfigLibrarySelectedCount === 0"
         :primary-button-loading="scoreConfigLibraryImporting"
         data-test="score-config-library-drawer"
@@ -301,8 +303,8 @@ the Free Software Foundation, either version 3 of the License, or
         side="right"
         size="lg"
         :title="t('onlineEvals.scorer.import.libraryDrawerTitle')"
-        secondary-button-label="Cancel"
-        :primary-button-label="`Import (${scorerLibrarySelectedCount})`"
+        :secondary-button-label="t('onlineEvals.buttons.cancel')"
+        :primary-button-label="t('onlineEvals.importCount', { count: scorerLibrarySelectedCount })"
         :primary-button-disabled="scorerLibrarySelectedCount === 0"
         :primary-button-loading="scorerLibraryImporting"
         data-test="scorer-library-drawer"
@@ -362,7 +364,7 @@ the Free Software Foundation, either version 3 of the License, or
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
   type EvalJob,
@@ -415,6 +417,7 @@ import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/us
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import { downloadFile } from "@/utils/dom";
+import type { I18nKey } from "@/types/i18n";
 import {
   ALL_AGENTS_VALUE,
   agentFilterKey,
@@ -440,7 +443,7 @@ withDefaults(defineProps<{ hideTabBar?: boolean }>(), { hideTabBar: false });
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const activeTab = ref<ActiveTab>(parseTabFromRoute(route.query.tab));
@@ -532,7 +535,7 @@ const filteredRows = computed<AnyRow[]>(() => {
   );
 });
 
-const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>>(() => [
+const tabs = computed<Array<{ value: ActiveTab; label: I18nText; badge?: string }>>(() => [
   { value: "quality", label: t("onlineEvals.tabs.quality") },
   { value: "jobs", label: t("onlineEvals.tabs.jobs") },
   { value: "scorers", label: t("onlineEvals.tabs.scorers") },
@@ -544,7 +547,7 @@ const tabs = computed<Array<{ value: ActiveTab; label: string; badge?: string }>
 // shares the same title strip. Title + icon track the active rail item.
 const EMBEDDED_HEADER_META: Record<
   ActiveTab,
-  { i18nKey: string; subtitleKey: string; icon: IconName }
+  { i18nKey: I18nKey; subtitleKey: I18nKey; icon: IconName }
 > = {
   quality: {
     i18nKey: "aiObservability.nav.quality",
@@ -634,9 +637,9 @@ const qualityPageRef = ref<{
 } | null>(null);
 
 const qualityAgentOptions = computed(() => [
-  { label: "All Agents", value: ALL_AGENTS_VALUE },
+  { label: t("onlineEvals.quality.allAgents"), value: ALL_AGENTS_VALUE },
   ...qualityAgents.value.map((agent) => ({
-    label: agentFilterLabel(agent),
+    label: raw(agentFilterLabel(agent)),
     value: agentFilterKey(agent),
   })),
 ]);
@@ -1021,7 +1024,7 @@ function exportScoreConfigRow(row: ScoreConfig) {
     "application/json",
   );
   if (!ok) {
-    toast({ variant: "error", message: "Failed to export score config" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScoreConfig") });
   }
 }
 
@@ -1066,7 +1069,7 @@ function exportScorerRow(row: Scorer) {
     "application/json",
   );
   if (!ok) {
-    toast({ variant: "error", message: "Failed to export scorer" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScorer") });
   }
 }
 
@@ -1075,7 +1078,7 @@ function exportScorerBulk(ids: string[]) {
     (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
-    toast({ variant: "warning", message: "No scorers selected" });
+    toast({ variant: "warning", message: t("toastMessages.components.noScorersSelected") });
     return;
   }
   const payload = selected.map((row) =>
@@ -1092,10 +1095,12 @@ function exportScorerBulk(ids: string[]) {
   if (ok) {
     toast({
       variant: "success",
-      message: `Exported ${selected.length} scorer${selected.length > 1 ? "s" : ""}`,
+      message: t("toastMessages.components.exportedScorer", {
+        count: selected.length,
+      }),
     });
   } else {
-    toast({ variant: "error", message: "Failed to export scorers" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScorers") });
   }
 }
 
@@ -1104,7 +1109,7 @@ function exportScoreConfigBulk(ids: string[]) {
     (row) => ids.includes(entityId(row)) || ids.includes(row.id),
   );
   if (selected.length === 0) {
-    toast({ variant: "warning", message: "No score configs selected" });
+    toast({ variant: "warning", message: t("toastMessages.components.noScoreConfigsSelected") });
     return;
   }
   const payload = selected.map(stripScoreConfigForExport);
@@ -1116,10 +1121,12 @@ function exportScoreConfigBulk(ids: string[]) {
   if (ok) {
     toast({
       variant: "success",
-      message: `Exported ${selected.length} score config${selected.length > 1 ? "s" : ""}`,
+      message: t("toastMessages.components.exportedScoreConfig", {
+        count: selected.length,
+      }),
     });
   } else {
-    toast({ variant: "error", message: "Failed to export score configs" });
+    toast({ variant: "error", message: t("toastMessages.components.failedToExportScoreConfigs") });
   }
 }
 

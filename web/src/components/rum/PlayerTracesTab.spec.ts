@@ -188,34 +188,24 @@ const globalStubs = {
       "initialTimelineExpanded",
     ],
   },
-  // Fix 7: stub TenstackTable so we can trigger row clicks and inspect
-  // scoped-slot content (route, duration) without mounting the real component.
-  TenstackTable: {
-    name: "TenstackTable",
-    props: [
-      "rows",
-      "columns",
-      "rowHeight",
-      "enableRowExpand",
-      "enableTextHighlight",
-      "enableStatusBar",
-      "defaultColumns",
-      "enableColumnReorder",
-      "enableAiContextButton",
-      "rowClass",
-    ],
-    emits: ["click:dataRow"],
+  // Stub OTable so row clicks and scoped-slot content (route, duration) can be
+  // exercised without mounting the real component.
+  OTable: {
+    name: "OTable",
+    props: ["data", "columns", "rowHeight", "defaultColumns", "enableColumnReorder", "rowClass"],
+    emits: ["row-click"],
     template: `
-      <div data-test="rum-player-traces-tab-table">
+      <div>
         <div
-          v-for="(row, i) in rows"
+          v-for="(row, i) in data"
           :key="i"
           :data-test="'table-row-' + i"
-          @click="$emit('click:dataRow', row)"
+          @click="$emit('row-click', row)"
         >
-          <slot name="cell-route"    :item="row" :cell="{ column: { getSize: () => 100 } }" />
-          <slot name="cell-duration" :item="row" :cell="{ column: { getSize: () => 100 } }" />
-          <slot name="cell-status"   :item="row" :cell="{ column: { getSize: () => 100 } }" />
+          <slot name="cell-timestamp" :row="row" :value="null" :column="{}" />
+          <slot name="cell-route"     :row="row" :value="null" :column="{}" />
+          <slot name="cell-duration"  :row="row" :value="null" :column="{}" />
+          <slot name="cell-status"    :row="row" :value="null" :column="{}" />
         </div>
       </div>
     `,
@@ -1001,6 +991,97 @@ describe("PlayerTracesTab", () => {
       await flushPromises();
 
       expect(mockSearch).not.toHaveBeenCalled();
+    });
+  });
+
+  // =========================================================================
+  // SQL is schema-guarded so a mobile stream never 400s
+  //
+  // Mobile RUM streams lack the browser-shaped view columns: `view_loading_type`
+  // is browser-only, and `action_id` may be absent. Referencing a column the
+  // stream does not have fails the whole query with a 400. Every optional column
+  // must therefore be selected only when present, and the `action_id` filter
+  // applied only when that column exists.
+  // =========================================================================
+
+  describe("schema-guarded SQL", () => {
+    function lastRumSql(): string {
+      const call = mockSearch.mock.calls.find((c: any[]) => c[1] === "RUM");
+      return call?.[0]?.query?.query?.sql ?? "";
+    }
+
+    it("omits view_loading_type and the action_id filter on a mobile schema", async () => {
+      // Arrange: a mobile-shaped schema — trace_id present, but no view_loading_type
+      // and no action_id.
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [
+          { name: "_o2_trace_id" },
+          { name: "session_id" },
+          { name: "view_url" },
+          { name: "view_id" },
+          { name: "type" },
+          { name: "date" },
+        ],
+      });
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert: query ran (no early return), references neither absent column.
+      const sql = lastRumSql();
+      expect(sql).not.toBe("");
+      expect(sql).not.toContain("max(view_loading_type)");
+      expect(sql).toContain("NULL as _view_loading_type");
+      expect(sql).not.toContain("action_id is not null");
+      expect(sql).toContain("_o2_trace_id");
+      expect(sql).toContain("max(view_url)");
+    });
+
+    it("keeps view_loading_type and the action_id filter on a full browser schema", async () => {
+      // Arrange: browser schema carries every column.
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [
+          { name: "_oo_trace_id" },
+          { name: "session_id" },
+          { name: "view_url" },
+          { name: "view_id" },
+          { name: "view_loading_type" },
+          { name: "type" },
+          { name: "date" },
+          { name: "action_id" },
+        ],
+      });
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert
+      const sql = lastRumSql();
+      expect(sql).toContain("max(view_loading_type) as _view_loading_type");
+      expect(sql).toContain("action_id is not null");
+    });
+
+    it("does not query at all when the stream has no trace_id column", async () => {
+      // Arrange: neither namespace present → nothing to correlate.
+      wrapper.unmount();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "session_id" }, { name: "view_url" }],
+      });
+      mockSearch.mockClear();
+
+      // Act
+      wrapper = mountComponent();
+      await flushPromises();
+
+      // Assert: early return, no search issued, empty state shown.
+      expect(mockSearch).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="rum-player-traces-tab-empty"]').exists()).toBe(true);
     });
   });
 });

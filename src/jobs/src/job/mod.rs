@@ -27,20 +27,7 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
-#[cfg(feature = "enterprise")]
-fn eval_scheduler_fetch_size(total: usize, max_rows: usize) -> anyhow::Result<i64> {
-    if total > max_rows {
-        return Err(anyhow::anyhow!(
-            "online eval scheduler interval has {total} rows, exceeding the safe limit of {max_rows}"
-        ));
-    }
-    let fetch_size = total
-        .checked_add(1)
-        .ok_or_else(|| anyhow::anyhow!("online eval scheduler result count exceeds search size"))?;
-    i64::try_from(fetch_size)
-        .map_err(|_| anyhow::anyhow!("online eval scheduler result count exceeds search size"))
-}
-
+mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
 mod alert_manager;
@@ -65,6 +52,7 @@ mod promql_self_consume;
 #[cfg(feature = "enterprise")]
 mod service_graph;
 mod session_cleanup;
+mod slo_maintenance;
 mod stats;
 
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;
@@ -199,10 +187,11 @@ async fn enforce_usage_stream_retention() {
         META_ORG_ID,
         meta::{self_reporting::usage::USAGE_STREAM, stream::StreamType},
     };
-    if let Some(mut s) =
-        infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
+    if let Some(s) = infra::schema::get_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs).await
         && s.data_retention < 32
     {
+        // local editable copy; persisted via save_stream_settings below
+        let mut s = (*s).clone();
         s.data_retention = 32;
         stream::save_stream_settings(META_ORG_ID, USAGE_STREAM, StreamType::Logs, s)
             .await
@@ -511,6 +500,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::alerts::destinations::watch());
     tokio::task::spawn(db::alerts::realtime_triggers::watch());
     tokio::task::spawn(db::alerts::alert::watch());
+    // Synthetics config caches (checks, locations, probe tokens, agents) live on
+    // every node, so every node must hear invalidations — including routers,
+    // which serve the probe auth path.
+    tokio::task::spawn(infra::coordinator::synthetics::watch());
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
@@ -698,6 +691,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
+        let llm_eval_config =
+            &o2_enterprise::enterprise::common::config::get_config().llm_eval_config;
+        infra::table::online_eval_jobs::init_completion_window_defaults(
+            llm_eval_config.trace_idle_timeout_secs,
+            llm_eval_config.trace_max_age_secs,
+            llm_eval_config.session_idle_timeout_secs,
+            llm_eval_config.session_max_age_secs,
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_evaluator_trace_exporter(
             |org_id, traces, node_idx| {
                 Box::pin(async move {
@@ -717,7 +719,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::register_search_executor(
-            |org_id, stream_type, sql, start_time, end_time| {
+            |org_id, stream_type, sql, start_time, end_time, truncate_over_limit| {
                 Box::pin(async move {
                     let count_req = config::meta::search::Request {
                         query: config::meta::search::Query {
@@ -741,7 +743,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                             total: count_response.total,
                             is_partial: count_response.is_partial,
                             function_error: count_response.function_error,
-                            hits: Vec::new(),
+                            ..Default::default()
                         });
                     }
 
@@ -749,12 +751,20 @@ pub async fn init() -> Result<(), anyhow::Error> {
                     if total == 0 {
                         return Ok(Default::default());
                     }
-                    let max_rows = o2_enterprise::enterprise::common::config::get_config()
-                        .llm_eval_config
-                        .max_buffer_size
-                        .saturating_mul(10)
-                        .max(10_001);
-                    let size = eval_scheduler_fetch_size(total, max_rows)?;
+                    let max_rows = o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::EVAL_DETECTION_MAX_ROWS;
+                    let over_limit = total > max_rows;
+                    if over_limit && !truncate_over_limit {
+                        // The scheduler splits the window in half rather than
+                        // fetching an oversized result set.
+                        return Ok(o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::SchedulerSearchResult {
+                            total,
+                            over_limit: true,
+                            ..Default::default()
+                        });
+                    }
+                    // total <= max_rows here; fetch one extra row so a count
+                    // that grew after the count query fails closed downstream.
+                    let size = (if over_limit { max_rows } else { total + 1 }) as i64;
                     let data_req = config::meta::search::Request {
                         query: config::meta::search::Query {
                             sql,
@@ -775,6 +785,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
                                 total,
                                 is_partial: response.is_partial,
                                 function_error: response.function_error,
+                                over_limit,
                             }
                         })
                         .map_err(|e| anyhow::anyhow!(e))
@@ -904,7 +915,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             |org_id, anomaly_id, anomaly_name, success, error_msg, start_us, end_us| {
                 Box::pin(async move {
                     use config::meta::self_reporting::usage::{
-                        TriggerData, TriggerDataStatus, TriggerDataType,
+                        RunOutcome, TriggerData, TriggerDataType,
                     };
                     usage_reporting::publish_triggers_usage(TriggerData {
                         _timestamp: start_us,
@@ -915,9 +926,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         is_realtime: false,
                         is_silenced: false,
                         status: if success {
-                            TriggerDataStatus::Completed
+                            RunOutcome::Succeeded
                         } else {
-                            TriggerDataStatus::Failed
+                            RunOutcome::Error
                         },
                         start_time: start_us,
                         end_time: end_us,
@@ -1056,6 +1067,15 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(pipeline::run());
     pipeline_error_cleanup::run();
     session_cleanup::run();
+    // Multi-alert group lifecycle (M-7): retires groups the evaluation path
+    // can never retire on its own, because a vanished group produces no
+    // observation to act on.
+    alert_group_reaper::run();
+    // Reconciliation is what makes the rolling window actually roll: the
+    // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
+    // climbs past what its window can hold. Also releases expired budget
+    // residuals (S-14c).
+    slo_maintenance::run();
 
     if LOCAL_NODE.is_compactor() {
         tokio::task::spawn(file_list_dump::run());
@@ -1176,20 +1196,4 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
-}
-
-#[cfg(all(test, feature = "enterprise"))]
-mod tests {
-    use super::eval_scheduler_fetch_size;
-
-    #[test]
-    fn eval_scheduler_fetches_one_row_past_the_count() {
-        assert_eq!(eval_scheduler_fetch_size(10_001, 100_000).unwrap(), 10_002);
-    }
-
-    #[test]
-    fn eval_scheduler_rejects_intervals_above_the_safe_limit() {
-        let error = eval_scheduler_fetch_size(100_001, 100_000).unwrap_err();
-        assert!(error.to_string().contains("exceeding the safe limit"));
-    }
 }

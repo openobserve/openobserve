@@ -24,6 +24,7 @@ use futures::StreamExt;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
+    arrow::ToArrowType,
     expr::{root, select},
     file::{OpenOptionsSessionExt, VortexFile},
     io::{

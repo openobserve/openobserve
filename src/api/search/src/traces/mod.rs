@@ -56,26 +56,6 @@ pub(crate) mod schema_compat;
 pub mod session;
 pub mod user;
 
-#[derive(Default, Clone, Debug)]
-pub(crate) struct TraceDetail {
-    pub(crate) start_time: i64,
-    pub(crate) end_time: i64,
-    pub(crate) gen_ai_usage_input_tokens: i64,
-    pub(crate) gen_ai_usage_output_tokens: i64,
-    pub(crate) gen_ai_usage_total_tokens: i64,
-    pub(crate) gen_ai_usage_cost: f64,
-    pub(crate) gen_ai_usage_cache_read_input_tokens: i64,
-    pub(crate) gen_ai_usage_cache_creation_input_tokens: i64,
-    pub(crate) gen_ai_usage_cost_cache_read_input: f64,
-    pub(crate) gen_ai_usage_cost_cache_creation_input: f64,
-    pub(crate) gen_ai_usage_cost_estimated_without_cache: f64,
-    pub(crate) gen_ai_usage_cost_cache_read_savings: f64,
-    pub(crate) gen_ai_usage_cost_net_cache_impact: f64,
-    pub(crate) error_count: i64,
-    pub(crate) user_id: Option<String>,
-    pub(crate) first_user_message: Option<String>,
-}
-
 /// TracesIngest
 #[utoipa::path(
     post,

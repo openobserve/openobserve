@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="xs"
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
-                            title="Search only this folder"
+                            :title="t('alerts.searchThisFolderTooltip')"
                             >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
                           >
                           <OToggleGroupItem
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="xs"
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
-                            title="Search across all folders"
+                            :title="t('alerts.searchAllFoldersTooltip')"
                             >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
                           >
                         </OToggleGroup>
@@ -207,7 +207,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
                 >
-                  <OTooltip side="bottom" content="Reload alerts" shortcut-id="alertsRefresh" />
+                  <OTooltip
+                    side="bottom"
+                    :content="t('alerts.reloadAlertsTooltip')"
+                    shortcut-id="alertsRefresh"
+                  />
                 </OButton>
               </template>
 
@@ -248,7 +252,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     unit="us"
                     mode="relative"
                     :timezone="store.state.timezone"
-                    empty-label="Never"
+                    :empty-label="t('alerts.anomaly.retrainNever')"
                   />
                 </span>
               </template>
@@ -259,17 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   unit="iso"
                   mode="absolute"
                   :timezone="store.state.timezone"
-                  empty-label="Never"
-                />
-              </template>
-
-              <template #cell-last_trained_at="{ row }">
-                <OTimeCell
-                  :value="row.last_trained_at"
-                  unit="iso"
-                  mode="absolute"
-                  :timezone="store.state.timezone"
-                  empty-label="—"
+                  :empty-label="t('alerts.anomaly.retrainNever')"
                 />
               </template>
 
@@ -285,37 +279,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="text-text-body">—</span>
               </template>
 
-              <template #cell-state="{ row }">
+              <!-- Priority (PT-3). Unset renders an em dash, not a chip:
+                   most alerts have none and a wall of grey chips is noise. -->
+              <template #cell-priority="{ row }">
                 <OTag
-                  :variant="stateVariant(row)"
-                  size="sm"
-                  :data-test="`alert-list-${row.name}-state`"
+                  v-if="row.priority"
+                  type="alertPriority"
+                  :value="`p${row.priority}`"
+                  :data-test="`alert-list-${row.name}-priority`"
+                />
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <!-- Tags (PT-6). Three visible + overflow count, so an alert
+                   carrying 64 tags cannot blow out the row height. -->
+              <template #cell-tags="{ row }">
+                <div v-if="row.tags?.length" class="flex flex-wrap items-center gap-1">
+                  <OTag
+                    v-for="tag in row.tags.slice(0, 3)"
+                    :key="tag"
+                    type="exampleChip"
+                    value="dim"
+                    :label="tag"
+                    :data-test="`alert-list-${row.name}-tag`"
+                  />
+                  <OTooltip v-if="row.tags.length > 3" :content="row.tags.join(', ')">
+                    <span class="text-text-secondary text-2xs">+{{ row.tags.length - 3 }}</span>
+                  </OTooltip>
+                </div>
+                <span v-else class="text-text-secondary">—</span>
+              </template>
+
+              <!--
+                Multi-alert fan-out summary (§5.4). Both counts come from the
+                rollup row and are PRE-cap, so they keep telling the truth when
+                the M-6 cap truncates what is actually tracked. Each is rendered
+                with a `≥` when its persisted lower-bound marker says the fetch
+                page could not prove exactness — under-reporting silently is the
+                failure M-6 forbids.
+              -->
+              <template #cell-groups="{ row }">
+                <div
+                  v-if="
+                    row.multi_alert &&
+                    row.groups_observed !== undefined &&
+                    row.groups_observed !== null
+                  "
+                  class="flex flex-wrap items-center gap-1"
+                  :data-test="`alert-list-${row.name}-groups`"
                 >
-                  <template #icon>
-                    <OIcon :name="stateIconName(row)" size="xs" />
-                  </template>
-                  {{ stateLabel(row) }}
-                </OTag>
+                  <OTag
+                    v-if="row.groups_firing"
+                    type="alertLevel"
+                    value="critical"
+                    :label="
+                      t('alerts.groups.firingCount', {
+                        count: formatGroupCount(
+                          row.groups_firing,
+                          row.groups_firing_is_lower_bound,
+                        ),
+                      })
+                    "
+                    size="sm"
+                  />
+                  <span class="text-text-secondary text-2xs">
+                    {{
+                      t("alerts.groups.ofNGroups", {
+                        count: formatGroupCount(
+                          row.groups_observed,
+                          row.groups_observed_is_lower_bound,
+                        ),
+                      })
+                    }}
+                  </span>
+                </div>
+                <span v-else class="text-text-secondary">—</span>
               </template>
 
-              <template #cell-period="{ row }">
-                {{
-                  row.period
-                    ? row.period >= 60
-                      ? row.period % 60 === 0
-                        ? `${Math.floor(row.period / 60)} Hours`
-                        : `${Math.floor(row.period / 60)} Hours ${row.period % 60} Mins`
-                      : `${row.period} Mins`
-                    : "--"
-                }}
-              </template>
-
-              <template #cell-frequency="{ row }">
-                {{
-                  row.frequency
-                    ? row.frequency + (row.frequency_type == "cron" ? "" : " Mins")
-                    : "--"
-                }}
+              <template #cell-last_outcome="{ row }">
+                <!--
+                  Only rendered for enabled alerts: a disabled alert keeps
+                  whatever outcome it last recorded, so showing it would display
+                  "Firing" forever on something that is not running.
+                -->
+                <OTooltip v-if="showRunOutcome(row)" :content="runOutcomeTooltip(row)">
+                  <OTag
+                    type="alertState"
+                    :value="row.last_outcome"
+                    size="sm"
+                    :data-test="`alert-list-${row.name}-last-outcome`"
+                  />
+                </OTooltip>
+                <span v-else class="text-text-body">—</span>
               </template>
 
               <template #cell-folder_name="{ row }">
@@ -331,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 33.14px; height: auto"
                     class="ml-1 flex items-center justify-center"
-                    :title="`Turning ${row.enabled ? 'Off' : 'On'}`"
+                    :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
                   </div>
@@ -415,7 +470,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon name="drive-file-move" size="sm" />
                       </template>
-                      Move
+                      {{ t("common.move") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <ODropdownItem
@@ -438,7 +493,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <template #icon-left>
                         <OIcon size="sm" name="download" />
                       </template>
-                      Export
+                      {{ t("common.export") }}
                     </ODropdownItem>
                     <ODropdownSeparator />
                     <!-- Anomaly Detection: Trigger Detection + Re-train -->
@@ -450,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="sound-sampler" />
                         </template>
-                        Trigger Detection
+                        {{ t("alerts.triggerDetection") }}
                       </ODropdownItem>
                       <ODropdownItem
                         :data-test="`alert-list-${row.name}-retrain-anomaly`"
@@ -459,7 +514,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left>
                           <OIcon size="sm" name="replay" />
                         </template>
-                        Re-train
+                        {{ t("alerts.retrain") }}
                       </ODropdownItem>
                     </template>
                     <!-- Regular alerts: Trigger Alert item -->
@@ -512,7 +567,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-12 w-full items-center justify-between gap-1">
                   <div class="flex min-w-25 items-center text-xs font-normal">
                     <template v-if="selectedAlerts.length > 0"
-                      >{{ selectedAlerts.length }} of {{ resultTotal }} selected</template
+                      >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
+                      {{ t("alerts.selectedLabel") }}</template
                     >
                     <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
                   </div>
@@ -524,7 +580,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="drive-file-move"
                     @click="moveMultipleAlerts"
-                    >Move</OButton
+                    >{{ t("common.move") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -533,7 +589,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="download"
                     @click="multipleExportAlert"
-                    >Export</OButton
+                    >{{ t("common.export") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -542,7 +598,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="pause"
                     @click="bulkToggleAlerts('pause')"
-                    >Pause</OButton
+                    >{{ t("alerts.pause") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -551,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="sm"
                     icon-left="play-arrow"
                     @click="bulkToggleAlerts('resume')"
-                    >Resume</OButton
+                    >{{ t("alerts.resume") }}</OButton
                   >
                   <OButton
                     v-if="selectedAlerts.length > 0"
@@ -561,7 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="delete"
                     :loading="bulkDeleteLoading"
                     @click="openBulkDeleteDialog"
-                    >Delete</OButton
+                    >{{ t("common.delete") }}</OButton
                   >
                 </div>
               </template>
@@ -595,16 +651,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
 
     <ConfirmDialog
-      title="Delete Alert"
-      message="Are you sure you want to delete this alert?"
+      :title="t('alerts.deleteAlertTitle')"
+      :message="t('alerts.deleteAlertMessage')"
       @update:ok="deleteAlertByAlertId"
       @update:cancel="confirmDelete = false"
       v-model="confirmDelete"
     />
 
     <ConfirmDialog
-      title="Delete Alerts"
-      :message="`Are you sure you want to delete ${selectedAlerts.length} alert(s)?`"
+      :title="t('alerts.deleteAlertsTitle')"
+      :message="t('alerts.confirmDeleteAlerts', { count: selectedAlerts.length })"
       @update:ok="bulkDeleteAlerts"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
@@ -627,12 +683,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OInput
             data-test="to-be-clone-alert-name"
             v-model="toBeCloneAlertName"
-            label="Alert Name"
+            :label="t('alerts.alertName')"
           />
           <OSelect
             data-test="to-be-clone-stream-type"
             v-model="toBeClonestreamType"
-            label="Stream Type"
+            :label="t('alerts.streamType')"
             :options="streamTypes"
             @update:model-value="updateStreams()"
             class="mt-1"
@@ -641,7 +697,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="to-be-clone-stream-name"
             v-model="toBeClonestreamName"
             :disabled="!toBeClonestreamType"
-            label="Stream Name"
+            :label="t('alerts.stream_name')"
             :options="indexOptions"
             searchable
             @update:model-value="updateStreamName"
@@ -664,16 +720,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         type="alerts"
         @updated="updateAcrossFolders"
         data-test="dashboard-move-to-another-folder-dialog"
-      />
-
-      <!-- Alert Details Dialog -->
-      <AlertHistoryDrawer
-        v-model:open="showAlertDetailsDrawer"
-        :alert-details="selectedAlertDetails"
-        :alert-id="selectedAlertDetails?.alert_id || ''"
-        :alert-type="selectedAlertDetails?.alert_type"
-        @edit="editAlertFromDrawer"
-        data-test="alert-details-dialog"
       />
     </template>
   </div>
@@ -699,7 +745,8 @@ import { useRouter } from "vue-router";
 import useStreams from "@/composables/useStreams";
 
 import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -723,13 +770,11 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import AlertHistoryDrawer from "@/components/alerts/AlertHistoryDrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
-import { buildConditionsString } from "@/utils/alerts/conditionsFormatter";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -739,7 +784,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
-import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -762,7 +806,6 @@ export default defineComponent({
     OInput,
     OTooltip,
     SelectFolderDropDown,
-    AlertHistoryDrawer,
     OButton,
     OIcon,
     ODialog,
@@ -780,7 +823,7 @@ export default defineComponent({
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -797,6 +840,17 @@ export default defineComponent({
     const showAddAlertDialog: any = ref(false);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
+    /**
+     * Render a multi-alert group count, marking it as a lower bound when the
+     * evaluation could not prove exactness (§5.4).
+     *
+     * The `≥` is not decoration: past the M-6 cap, or when the whole fetch page
+     * was still firing, the stored number is the most the evaluation could see,
+     * not the real total. Printing it bare would understate an incident.
+     */
+    const formatGroupCount = (count: number, isLowerBound?: boolean) =>
+      isLowerBound ? `≥${count}` : String(count);
+
     const confirmDelete = ref<boolean>(false);
     const splitterModel = ref(200);
     const showForm = ref(false);
@@ -823,7 +877,7 @@ export default defineComponent({
     const selectedHistoryAlertId = ref("");
     const selectedHistoryAlertName = ref("");
 
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     const toBeCloneAlertName = ref("");
     const toBeClonedID = ref("");
@@ -843,63 +897,20 @@ export default defineComponent({
     ]);
     const activeFolderId = ref<any>(router.currentRoute.value.query.folder ?? "default");
     const showMoveAlertDialog = ref(false);
-    const showAlertDetailsDrawer = ref(false);
-    const selectedAlertDetails: Ref<any> = ref(null);
-
+    // Clicking a row opens the alert's own status page. It replaced a side
+    // drawer: a multi-alert's per-group table, group history and cap banner
+    // do not fit a panel, and a routed page is linkable and back-navigable.
     const triggerExpand = (row: any) => {
-      // Open drawer instead of inline expansion
-      const alert = row;
-
-      // LAZY CONVERSION: Convert conditions on-demand only when expanding
-      // This improves performance by avoiding conversion of all alerts on list load
-      let displayConditions = "--";
-      if (alert.rawCondition && Object.keys(alert.rawCondition).length) {
-        if (alert.rawCondition.type == "custom") {
-          const conditionData = alert.rawCondition.conditions;
-
-          // Detect format by structure, not by version field (more reliable)
-          if (conditionData?.filterType === "group") {
-            // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-            displayConditions = transformV2ToExpression(conditionData);
-          } else if (conditionData?.version === 2 && conditionData?.conditions) {
-            // V2 format with version wrapper: {version: 2, conditions: {filterType: "group", ...}}
-            displayConditions = transformV2ToExpression(conditionData.conditions);
-          } else if (conditionData?.or || conditionData?.and) {
-            // V1 format: {or: [...]} or {and: [...]}
-            displayConditions = transformToExpression(conditionData);
-          } else if (Array.isArray(conditionData) && conditionData.length > 0) {
-            // V0 format (legacy): flat array [{column, operator, value}, ...]
-            // V0 had implicit AND between all conditions (no groups)
-            const parts = conditionData.map((item: any) => {
-              const column = item.column || "field";
-              const operator = item.operator || "=";
-              const value = typeof item.value === "string" ? `'${item.value}'` : item.value;
-              return `${column} ${operator} ${value}`;
-            });
-            displayConditions = parts.length > 0 ? `(${parts.join(" AND ")})` : "--";
-          } else {
-            // Unknown format or empty
-            displayConditions = typeof conditionData === "string" ? conditionData : "--";
-          }
-        } else if (alert.rawCondition.sql) {
-          displayConditions = alert.rawCondition.sql;
-        } else if (alert.rawCondition.promql) {
-          displayConditions = alert.rawCondition.promql;
-        }
-      }
-
-      // Set selectedAlertDetails with converted conditions
-      selectedAlertDetails.value = {
-        ...alert,
-        conditions: displayConditions,
-      };
-
-      showAlertDetailsDrawer.value = true;
+      if (!row?.alert_id) return;
+      router.push({
+        name: "alertDetail",
+        params: { alert_id: row.alert_id },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: row.folder_id || router.currentRoute.value.query.folder || "default",
+        },
+      });
     };
-
-    // ESC and click-outside dismissal are handled by ODrawer itself (reka-ui
-    // DismissableLayer → @escape-key-down / @interact-outside), which also knows
-    // to ignore clicks inside portaled dropdowns opened from within the drawer.
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);
@@ -959,6 +970,29 @@ export default defineComponent({
       return row?.enabled ? "active" : "paused";
     };
 
+    // ── Last run outcome (Part IV) ─────────────────────────────────────────
+    // A disabled alert freezes its last outcome, so the badge is suppressed
+    // unless the alert is actually running — otherwise a paused alert would
+    // advertise "Firing" indefinitely.
+    const showRunOutcome = (row: any): boolean =>
+      shouldShowRunOutcome(row?.enabled, row?.last_outcome);
+
+    // Never present the outcome as live state: it is the result of the LAST
+    // evaluation, so it is always qualified with when that ran.
+    const runOutcomeTooltip = (row: any) => {
+      const at = row?.last_outcome_at ? convertUnixToDateFormat(row.last_outcome_at) : null;
+      // Pass every label: outcomeLabel's own defaults are English.
+      const label = outcomeLabel(
+        row?.last_outcome,
+        t("alerts.historyTimeline.firing"),
+        t("alerts.historyTimeline.ok"),
+        t("alerts.historyTimeline.error"),
+        t("alerts.historyTimeline.skipped"),
+        t("alerts.historyTimeline.unknown"),
+      );
+      return raw(at ? `${label} ${t("alerts.asOf")} ${at}` : label);
+    };
+
     // Full-row highlight — only the EXCEPTIONS get a wash, so attention goes to
     // what's off, not what's fine: failed=light red, paused=muted grey, active
     // stays clean (its state still reads from the green left rail).
@@ -991,24 +1025,6 @@ export default defineComponent({
           ? "text-status-warning-text"
           : "text-text-secondary";
 
-    // Redesigned State chip (icon + colour + word).
-    const stateVariant = (row: any): BadgeVariant => {
-      const s = alertState(row);
-      return s === "failed" ? "error-soft" : s === "paused" ? "default-soft" : "success-soft";
-    };
-    const stateIconName = (row: any): IconName => {
-      const s = alertState(row);
-      return s === "failed" ? "error-outline" : s === "paused" ? "pause" : "check-circle";
-    };
-    const stateLabel = (row: any): string => {
-      const s = alertState(row);
-      return s === "failed"
-        ? t("alerts.stateFailed")
-        : s === "paused"
-          ? t("alerts.statePaused")
-          : t("alerts.stateActive");
-    };
-
     // At-a-glance operational counts for the summary strip. Counts over the rows
     // currently shown (folder + tab + search) so it tracks what the user sees.
     const stateCounts = computed(() => {
@@ -1018,6 +1034,9 @@ export default defineComponent({
       let failed = 0;
       let recent = 0;
       for (const r of rows) {
+        // active = unpaused (enabled); paused = disabled. These two partition the
+        // rows. `failed` is an orthogonal health overlay (a failed anomaly is still
+        // active), so it is counted separately and may overlap with active/paused.
         if (r.enabled) active += 1;
         else paused += 1;
         if (r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed")
@@ -1102,7 +1121,13 @@ export default defineComponent({
       if (!f) return rows;
       if (f === "recent")
         return rows.filter((r: any) => recencyLevel(r.last_triggered_at_raw) === "hot");
-      return rows.filter((r: any) => alertState(r) === f);
+      if (f === "failed")
+        return rows.filter(
+          (r: any) => r.is_real_time === "anomaly" && String(r.status).toLowerCase() === "failed",
+        );
+      // active = unpaused (enabled); paused = disabled — matching the summary
+      // counts. A failed anomaly is still active here (failed is an overlay).
+      return rows.filter((r: any) => (f === "active" ? r.enabled : !r.enabled));
     });
     const onStatSelect = (key: string) => {
       if (key === "total") {
@@ -1160,19 +1185,61 @@ export default defineComponent({
           // Flex: fills the leftover width on load, freezes on first resize.
           meta: { align: "left", flex: true },
         },
-        // "state" (Active / Paused) — a single at-a-glance operational state for
-        // EVERY alert type, derived from `enabled`. Sits right after the name so
-        // it's always visible without horizontal scroll. Distinct from the
-        // anomaly-only "status" (training) column: this answers "is it running?".
+        // "last_outcome" — did the most recent evaluation fire? Distinct from
+        // "state" (is it running?) and from the anomaly-only "status" (is the
+        // model trained?). Backed by the alert_states rollup row.
         {
-          id: "state",
-          accessorKey: "enabled",
-          header: t("alerts.state"),
+          id: "last_outcome",
+          accessorKey: "last_outcome",
+          header: t("alerts.lastOutcome"),
           cell: " ",
           sortable: true,
           resizable: true,
           hideable: true,
           size: COL.status,
+          minSize: 130,
+          meta: { align: "left" },
+        },
+        // "priority" — how much humans care (Feature 2, PT-3). A different
+        // axis from "last_outcome" (did it fire): a P1 alert whose last run was
+        // normal is perfectly ordinary.
+        {
+          id: "priority",
+          accessorKey: "priority",
+          header: t("alerts.priority"),
+          cell: " ",
+          sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.status,
+          meta: { align: "left" },
+        },
+        // "groups" — multi-alert fan-out summary (alerts_2.md §5.4). Blank for
+        // every alert that has not opted in to per-group evaluation. Not
+        // sortable: the value is a composite of two counts plus their
+        // exactness, so a single sort order would misrepresent it.
+        {
+          id: "groups",
+          accessorKey: "groups_observed",
+          header: t("alerts.groups.tab"),
+          cell: " ",
+          sortable: false,
+          resizable: true,
+          hideable: true,
+          size: 170,
+          meta: { align: "left" },
+        },
+        // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
+        // no meaningful order and sorting by it would imply one.
+        {
+          id: "tags",
+          accessorKey: "tags",
+          header: t("alerts.tags"),
+          cell: " ",
+          sortable: false,
+          resizable: true,
+          hideable: true,
+          size: 200,
           meta: { align: "left" },
         },
         {
@@ -1186,38 +1253,6 @@ export default defineComponent({
           size: COL.owner,
           meta: { align: "left" },
         },
-        // "period" (Look back window) — all tabs except realTime
-        ...(activeTab.value !== "realTime"
-          ? [
-              {
-                id: "period",
-                accessorKey: "period",
-                header: t("alerts.period"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: 150,
-                meta: { align: "left" },
-              } as OTableColumnDef,
-            ]
-          : []),
-        // "frequency" (Check every) — all tabs except realTime
-        ...(activeTab.value !== "realTime"
-          ? [
-              {
-                id: "frequency",
-                accessorKey: "frequency",
-                header: t("alerts.frequency"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: COL.frequency,
-                meta: { align: "left" },
-              } as OTableColumnDef,
-            ]
-          : []),
         {
           id: "last_triggered_at",
           accessorKey: "last_triggered_at",
@@ -1243,17 +1278,6 @@ export default defineComponent({
         // Anomaly Detection columns — shown on anomalyDetection and all tabs
         ...(activeTab.value === "anomalyDetection" || activeTab.value === "all"
           ? [
-              {
-                id: "last_trained_at",
-                accessorKey: "last_trained_at",
-                header: t("alerts.lastTrainedAt"),
-                cell: " ",
-                sortable: true,
-                resizable: true,
-                hideable: true,
-                size: COL.dateAbsolute,
-                meta: { align: "left" },
-              } as OTableColumnDef,
               {
                 id: "status",
                 accessorKey: "status",
@@ -1282,7 +1306,7 @@ export default defineComponent({
         baseColumns.splice(1, 0, {
           id: "folder_name",
           accessorKey: "folder_name",
-          header: "Folder",
+          header: t("alerts.folder"),
           cell: " ",
           sortable: true,
           resizable: true,
@@ -1415,7 +1439,7 @@ export default defineComponent({
       }
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alerts...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
         timeout: 0,
       });
       if (query) {
@@ -1484,6 +1508,37 @@ export default defineComponent({
             last_satisfied_at: convertUnixToDateFormat(data.last_satisfied_at),
             last_trained_at: "",
             status: "--",
+            // Durable run state from the alert_states rollup row (Part IV).
+            // This is the LAST RUN outcome, not a live firing flag — always
+            // paired with last_outcome_at so the UI can say "as of <time>".
+            last_outcome: data.last_outcome ?? null,
+            // Configured priority & tags (Feature 2). Must be carried
+            // explicitly: this mapping builds the row object field by field,
+            // so anything not listed here is invisible to the table no matter
+            // what the API returns.
+            priority: data.priority ?? null,
+            tags: data.tags ?? [],
+            // Severity axis (alerts_2.md Feature 1) — independent of outcome.
+            level: data.level ?? null,
+            level_since: data.level_since ?? null,
+            // Whether the alert CURRENTLY evaluates per group — either the
+            // aggregation opt-in or the PromQL per-series one. The counts
+            // below survive an opt-out (§5.3 leaves the rollup row alone), so
+            // without this flag a simple alert would keep advertising the
+            // group summary from back when it was a multi-alert.
+            multi_alert:
+              data.condition?.type === "promql"
+                ? !!data.condition?.promql_multi_alert
+                : !!data.condition?.aggregation?.multi_alert,
+            // Multi-alert fan-out counts (§5.4). `undefined` — not 0 — for an
+            // alert that never opted in, so the cell can render "—" rather
+            // than claiming it observed zero groups.
+            groups_observed: data.groups_observed,
+            groups_firing: data.groups_firing,
+            groups_observed_is_lower_bound: data.groups_observed_is_lower_bound,
+            groups_firing_is_lower_bound: data.groups_firing_is_lower_bound,
+            last_outcome_at: data.last_outcome_at ?? null,
+            last_outcome_since: data.last_outcome_since ?? null,
             selected: false,
             type: data.condition.type,
             folder_name: {
@@ -1544,7 +1599,7 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "error",
-          message: "Error while pulling alerts.",
+          message: t("toastMessages.alerts.errorWhilePullingAlerts"),
         });
       } finally {
         loading.value = false;
@@ -1553,7 +1608,7 @@ export default defineComponent({
     const getAlertById = async (id: string) => {
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while loading alert...",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlert"),
         timeout: 0,
       });
       try {
@@ -1761,7 +1816,7 @@ export default defineComponent({
             console.error("AlertList: Failed to load alert", error);
             toast({
               variant: "error",
-              message: "Failed to load alert for editing",
+              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
             });
           }
         }
@@ -1790,7 +1845,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching destinations.",
+            message: t("toastMessages.alerts.errorWhileFetchingDestinations"),
           }),
         );
     };
@@ -1806,7 +1861,7 @@ export default defineComponent({
         .catch(() =>
           toast({
             variant: "error",
-            message: "Error while fetching templates.",
+            message: t("toastMessages.alerts.errorWhileFetchingTemplates"),
           }),
         );
     };
@@ -1842,21 +1897,21 @@ export default defineComponent({
         if (!toBeClonestreamType.value) {
           toast({
             variant: "error",
-            message: "Please select stream type ",
+            message: t("toastMessages.alerts.pleaseSelectStreamType"),
           });
           return;
         }
         if (!toBeClonestreamName.value) {
           toast({
             variant: "error",
-            message: "Please select stream name",
+            message: t("toastMessages.alerts.pleaseSelectStreamName"),
           });
           return;
         }
         isSubmitting.value = true;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait...",
+          message: t("toastMessages.alerts.pleaseWait"),
           timeout: 0,
         });
         try {
@@ -1874,7 +1929,7 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: "Anomaly detection cloned successfully",
+            message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
           await getAlertsFn(store, folderIdToBeCloned.value);
@@ -1894,28 +1949,28 @@ export default defineComponent({
       if (!toBeClonedAlert.value) {
         toast({
           variant: "error",
-          message: "Alert not found",
+          message: t("toastMessages.alerts.alertNotFound"),
         });
         return;
       }
       if (!toBeClonestreamType.value) {
         toast({
           variant: "error",
-          message: "Please select stream type ",
+          message: t("toastMessages.alerts.pleaseSelectStreamType"),
         });
         return;
       }
       if (!toBeClonestreamName.value) {
         toast({
           variant: "error",
-          message: "Please select stream name",
+          message: t("toastMessages.alerts.pleaseSelectStreamName"),
         });
         return;
       }
       isSubmitting.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait...",
+        message: t("toastMessages.alerts.pleaseWait"),
         timeout: 0,
       });
 
@@ -1944,7 +1999,7 @@ export default defineComponent({
             if (res.data.code == 200) {
               toast({
                 variant: "success",
-                message: "Alert Cloned Successfully",
+                message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
               await getAlertsFn(store, folderIdToBeCloned.value);
@@ -2123,7 +2178,9 @@ export default defineComponent({
           });
           toast({
             variant: "success",
-            message: isEnabled ? "Alert Resumed Successfully" : "Alert Paused Successfully",
+            message: isEnabled
+              ? t("toastMessages.alerts.alertResumedSuccessfully")
+              : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
         })
         .finally(() => {
@@ -2248,7 +2305,7 @@ export default defineComponent({
         row.status = "training";
         toast({
           variant: "success",
-          message: "Retraining triggered",
+          message: t("toastMessages.alerts.retrainingTriggered"),
         });
       } catch (error: any) {
         toast({
@@ -2337,16 +2394,6 @@ export default defineComponent({
       });
     };
 
-    const editAlertFromDrawer = async () => {
-      if (!selectedAlertDetails.value) return;
-
-      // Close the drawer first
-      showAlertDetailsDrawer.value = false;
-
-      // Reuse the same edit flow as the listing page
-      await editAlert(selectedAlertDetails.value);
-    };
-
     const moveAlertToAnotherFolder = (row: any) => {
       showMoveAlertDialog.value = true;
       if (row.type === "anomaly") {
@@ -2406,7 +2453,7 @@ export default defineComponent({
       if (!query) return;
       const dismiss = toast({
         variant: "loading",
-        message: "Please wait while searching for dashboards...",
+        message: t("toastMessages.alerts.pleaseWaitWhileSearchingForDashboards"),
         timeout: 0,
       });
       dismiss();
@@ -2477,7 +2524,7 @@ export default defineComponent({
       try {
         const dismiss = toast({
           variant: "loading",
-          message: "Exporting alerts...",
+          message: t("toastMessages.alerts.exportingAlerts"),
           timeout: 0, // Set timeout to 0 to keep it showing until dismissed
         });
 
@@ -2511,7 +2558,9 @@ export default defineComponent({
         dismiss();
         toast({
           variant: "success",
-          message: `Successfully exported ${selectedAlertsToExport.length} alert${selectedAlertsToExport.length > 1 ? "s" : ""}`,
+          message: t("toastMessages.alerts.successfullyExportedAlert", {
+            count: selectedAlertsToExport.length,
+          }),
         });
         selectedAlerts.value = [];
         allSelectedAlerts.value = false;
@@ -2519,7 +2568,7 @@ export default defineComponent({
         console.error("Error exporting alerts:", error);
         toast({
           variant: "error",
-          message: "Error exporting alerts. Please try again.",
+          message: t("toastMessages.alerts.errorExportingAlertsPleaseTryAgain"),
         });
       }
     };
@@ -2568,18 +2617,6 @@ export default defineComponent({
       return wrap ? `(${joined})` : joined;
     }
 
-    // V2 format: {filterType: "group", logicalOperator: "AND", conditions: [...]}
-    // Uses shared buildConditionsString utility for consistency
-    function transformV2ToExpression(group: any, isRoot = true): string {
-      const result = buildConditionsString(group, {
-        sqlMode: false, // Display format (lowercase operators)
-        addWherePrefix: false,
-        formatValues: false, // Simple display without type-aware formatting
-      });
-
-      // Wrap in parentheses if it's the root level and has content
-      return isRoot && result ? `(${result})` : result;
-    }
     //this function is used to filter the alerts by the local search not the global search
     //this will be used when the user is searching for the alerts in the same folder
     const filterAlertsByQuery = (query: string) => {
@@ -2602,7 +2639,10 @@ export default defineComponent({
     const bulkToggleAlerts = async (action: "pause" | "resume") => {
       const dismiss = toast({
         variant: "loading",
-        message: `${action === "resume" ? "Resuming" : "Pausing"} alerts...`,
+        message:
+          action === "resume"
+            ? t("toastMessages.alerts.resumingAlerts")
+            : t("toastMessages.alerts.pausingAlerts"),
         timeout: 0,
       });
       try {
@@ -2616,7 +2656,10 @@ export default defineComponent({
         if (alertsToToggle.length === 0) {
           toast({
             variant: "error",
-            message: `No alerts to ${action}`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.noAlertsToResume")
+                : t("toastMessages.alerts.noAlertsToPause"),
           });
           dismiss();
           return;
@@ -2639,7 +2682,10 @@ export default defineComponent({
           dismiss();
           toast({
             variant: "success",
-            message: `Alerts ${action}d successfully`,
+            message:
+              action === "resume"
+                ? t("toastMessages.alerts.alertsResumedSuccessfully")
+                : t("toastMessages.alerts.alertsPausedSuccessfully"),
           });
         }
         // Refresh alerts
@@ -2653,7 +2699,10 @@ export default defineComponent({
         console.error(`Error ${action}ing alerts:`, error);
         toast({
           variant: "error",
-          message: `Error ${action}ing alerts. Please try again.`,
+          message:
+            action === "resume"
+              ? t("toastMessages.alerts.errorResumingAlerts")
+              : t("toastMessages.alerts.errorPausingAlerts"),
         });
       }
     };
@@ -2669,7 +2718,7 @@ export default defineComponent({
       bulkDeleteLoading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Deleting alerts...",
+        message: t("toastMessages.alerts.deletingAlerts"),
         timeout: 0,
       });
 
@@ -2677,7 +2726,7 @@ export default defineComponent({
         if (selectedAlerts.value.length === 0) {
           toast({
             variant: "error",
-            message: "No alerts selected for deletion",
+            message: t("toastMessages.alerts.noAlertsSelectedForDeletion"),
           });
           dismiss();
           return;
@@ -2706,27 +2755,32 @@ export default defineComponent({
             // Partial success
             toast({
               variant: "warning",
-              message: `${successCount} alert(s) deleted successfully, ${failCount} failed`,
+              message: t("toastMessages.alerts.alertsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
             // All failed
             toast({
               variant: "error",
-              message: `Failed to delete ${failCount} alert(s)`,
+              message: t("toastMessages.alerts.failedToDeleteAlerts", { count: failCount }),
             });
           } else {
             // All successful
             toast({
               variant: "success",
-              message: `${successCount} alert(s) deleted successfully`,
+              message: t("toastMessages.alerts.alertsDeletedSuccessfully", { count: successCount }),
             });
           }
         } else {
           // Fallback success message
           toast({
             variant: "success",
-            message: `${selectedAlerts.value.length} alert(s) deleted successfully`,
+            message: t("toastMessages.alerts.alertsDeletedSuccessfully", {
+              count: selectedAlerts.value.length,
+            }),
           });
         }
 
@@ -2804,6 +2858,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       store,
       router,
@@ -2813,9 +2868,6 @@ export default defineComponent({
       alertRowStyle,
       typeIconName,
       typeIconClass,
-      stateVariant,
-      stateIconName,
-      stateLabel,
       stateCounts,
       summaryStats,
       stateFilter,
@@ -2861,6 +2913,8 @@ export default defineComponent({
       folders,
       splitterModel,
       alertStateLoadingMap,
+      showRunOutcome,
+      runOutcomeTooltip,
       toggleAlertState,
       templates,
       routeTo,
@@ -2876,7 +2930,6 @@ export default defineComponent({
       updateActiveFolderId,
       activeFolderId,
       editAlert,
-      editAlertFromDrawer,
       deleteAlertByAlertId,
       showMoveAlertDialog,
       selectedAlertToMove,
@@ -2893,8 +2946,7 @@ export default defineComponent({
       clearSearchHistory,
       filteredResults,
       triggerExpand,
-      showAlertDetailsDrawer,
-      selectedAlertDetails,
+      formatGroupCount,
       allSelectedAlerts,
       copyToClipboard,
       openMenu,

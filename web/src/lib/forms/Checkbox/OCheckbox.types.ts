@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 import type { InjectionKey } from "vue";
 
 export type CheckboxSize = "xs" | "sm" | "md";
@@ -29,7 +31,7 @@ export interface CheckboxProps {
   /** Compatibility alias for `value` */
   val?: CheckboxPrimitive;
   /** Accessible label rendered next to the checkbox */
-  label?: string;
+  label?: I18nText;
   /** Control size */
   size?: CheckboxSize;
   /** Value to emit when checked in custom-value mode */

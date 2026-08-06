@@ -13,17 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// WorkflowStepResultDrawer — the "Test Step Result" drawer. By design it only
-// opens for ERROR nodes: Input = the CENTRAL testRun.input (same payload the
-// Test dialog edits), Output = the NodeErrors messages (the backend returns no
-// per-node node_io), plus Replay (executeTestRun with fromNode). A history run
-// is read-only: per-node captured input, no Replay.
+// WorkflowStepResultDrawer — the "Test Step Result" drawer. Opens for ANY node
+// after a Test run. Input = the records THIS node received (from the backend
+// per-node `inputs` map), editable + replayable. Output = what it emitted, derived
+// per outgoing edge (child input == parent output on a single-incoming tree),
+// rendered in a read-only editor. Errored nodes show the error AND what they still
+// forwarded. Status badge = Passed / Errored / No Records. "Use as Test Input"
+// promotes a pane's records to the whole-flow payload. History runs are read-only.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
+
+const t = (k: string, p?: any) => i18n.global.t(k, p);
 
 const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -65,7 +69,6 @@ const ODrawerStub = {
 };
 const OButtonStub = {
   name: "OButton",
-  // `title` is intentionally NOT declared so it falls through to the button.
   props: ["variant", "size", "disabled", "loading"],
   template: `<button :disabled="disabled" :data-loading="String(!!loading)"><slot /></button>`,
 };
@@ -88,7 +91,7 @@ const CodeQueryEditorStub = {
   name: "CodeQueryEditor",
   props: ["editorId", "language", "query", "readOnly", "showAutoComplete"],
   emits: ["update:query"],
-  template: `<div class="code-editor" :data-readonly="String(!!readOnly)">{{ query }}</div>`,
+  template: `<div class="code-editor" :data-editor="editorId" :data-readonly="String(!!readOnly)">{{ query }}</div>`,
 };
 
 const globalConfig = {
@@ -103,45 +106,50 @@ const globalConfig = {
   },
 };
 
+// trigger(t1) -> function(f1) -> destination(d1)
 const NODES = [
   { id: "t1", data: { node_type: "workflow_trigger" } },
   { id: "f1", data: { node_type: "function", name: "parse_json" } },
   { id: "d1", data: { node_type: "destination", destination_id: "sink-a" } },
 ];
+const EDGES = [
+  { source: "t1", target: "f1" },
+  { source: "f1", target: "d1" },
+];
 
-const VALID_INPUT = '[{"meta":{"alert_name":"a"},"data":[{"x":1}]}]';
+// A trigger-shape record (nested { meta, data }).
+const rec = (x: number) => ({ meta: { alert_name: "a" }, data: [{ x }] });
 
-const errorResult = (extra: Record<string, any> = {}) => ({
-  errors: {
-    f1: { error_count: 2, errors: [["boom", { x: 1 }], ["bad record"]] },
-  },
+// Every node received records; nothing errored.
+const okResult = () => ({
+  errors: {},
+  inputs: { t1: [rec(1)], f1: [rec(2)], d1: [rec(3)] },
+  ranNodeIds: ["t1", "f1", "d1"],
+  blockedNodeIds: [],
+});
+
+// f1 errored but still forwarded records to d1.
+const errorResult = () => ({
+  errors: { f1: { error_count: 2, errors: [["boom", [{ x: 1 }]], ["bad record"]] } },
+  inputs: { t1: [rec(1)], f1: [rec(2)], d1: [rec(3)] },
   ranNodeIds: ["t1", "f1", "d1"],
   blockedNodeIds: ["d1"],
-  ...extra,
 });
 
 const setup = (
-  opts: {
-    nodeId?: string;
-    input?: string;
-    result?: any;
-    nodes?: any[];
-  } = {},
+  opts: { nodeId?: string; input?: string; result?: any; nodes?: any[]; edges?: any[] } = {},
 ) => {
   workflowObj.currentSelectedWorkflow = {
     id: "wf1",
     name: "wf",
     nodes: opts.nodes ?? NODES,
-    edges: [
-      { source: "t1", target: "f1" },
-      { source: "f1", target: "d1" },
-    ],
+    edges: opts.edges ?? EDGES,
   } as any;
   workflowObj.testRun = {
     show: false,
-    input: opts.input ?? VALID_INPUT,
+    input: opts.input ?? "",
     fromNode: "",
-    result: opts.result === undefined ? errorResult() : opts.result,
+    result: opts.result === undefined ? okResult() : opts.result,
     resultDrawer: { show: true, nodeId: opts.nodeId ?? "f1" },
   } as any;
 };
@@ -149,9 +157,17 @@ const setup = (
 const mountDrawer = () =>
   mount(WorkflowStepResultDrawer, { global: globalConfig, attachTo: document.body });
 
-const editorVm = (w: any) => w.findComponent(CodeQueryEditorStub as any);
+const editors = (w: any) => w.findAllComponents(CodeQueryEditorStub as any);
+const inputEditor = (w: any) =>
+  editors(w).find((e: any) => e.props("editorId") === "workflow-step-input");
+const outputEditor = (w: any) =>
+  editors(w).find((e: any) => e.props("editorId") === "workflow-step-output");
+const statusBadge = (w: any) => w.find('[data-test="workflow-step-result-status"]');
 const replayBtn = (w: any) => w.find('[data-test="workflow-step-replay-btn"]');
-const iconButtons = (w: any) => w.findAll(".o-drawer button");
+const useInputBtn = (w: any) => w.find('[data-test="workflow-step-use-input-as-test"]');
+const useOutputBtn = (w: any) => w.find('[data-test="workflow-step-use-output-as-test"]');
+const tooltipFor = (w: any, content: string) =>
+  w.findAll(".o-tooltip").find((tt: any) => tt.attributes("data-content") === content);
 
 describe("WorkflowStepResultDrawer", () => {
   beforeEach(() => {
@@ -160,10 +176,9 @@ describe("WorkflowStepResultDrawer", () => {
   });
 
   describe("title", () => {
-    it("shows '<Type> - <detail>' for the errored node", () => {
-      const wrapper = mountDrawer();
-      expect(wrapper.find(".o-drawer").attributes("data-title")).toBe(
-        `${i18n.global.t("workflow.node.function")} - parse_json`,
+    it("shows '<Type> - <detail>' for the node", () => {
+      expect(mountDrawer().find(".o-drawer").attributes("data-title")).toBe(
+        `${t("workflow.node.function")} - parse_json`,
       );
     });
 
@@ -173,209 +188,307 @@ describe("WorkflowStepResultDrawer", () => {
         nodes: [
           {
             id: "f1",
-            data: {
-              node_type: "function",
-              name: "a_really_long_vrl_function_name_here",
-            },
+            data: { node_type: "function", name: "a_really_long_vrl_function_name_here" },
           },
         ],
       });
-      const wrapper = mountDrawer();
-      const title = wrapper.find(".o-drawer").attributes("data-title")!;
-      expect(title).toHaveLength(31); // 30 chars + the ellipsis
+      const title = mountDrawer().find(".o-drawer").attributes("data-title")!;
+      expect(title).toHaveLength(31);
       expect(title.endsWith("…")).toBe(true);
     });
 
     it("falls back to the raw node_type when it is not in the palette", () => {
-      setup({ nodeId: "x1", nodes: [{ id: "x1", data: { node_type: "mystery" } }] });
-      const wrapper = mountDrawer();
-      expect(wrapper.find(".o-drawer").attributes("data-title")).toBe("mystery");
+      setup({ nodeId: "x1", nodes: [{ id: "x1", data: { node_type: "mystery" } }], edges: [] });
+      expect(mountDrawer().find(".o-drawer").attributes("data-title")).toBe("mystery");
     });
 
     it("renders an empty title when the node id no longer exists", () => {
       setup({ nodeId: "ghost" });
-      const wrapper = mountDrawer();
-      expect(wrapper.find(".o-drawer").attributes("data-title")).toBe("");
+      expect(mountDrawer().find(".o-drawer").attributes("data-title")).toBe("");
     });
   });
 
-  describe("status + output (errors only, by design)", () => {
-    it("always shows the Errored badge (the drawer only opens for error nodes)", () => {
-      const wrapper = mountDrawer();
-      const badge = wrapper.find(".o-badge");
+  describe("status badge", () => {
+    it("Passed (success) when records reached the node", () => {
+      const badge = statusBadge(mountDrawer());
+      expect(badge.attributes("data-variant")).toBe("success-soft");
+      expect(badge.text()).toBe(t("workflow.test.stepResult.status.ok"));
+    });
+
+    it("Errored (error) when the node is in the errors map", () => {
+      setup({ result: errorResult() });
+      const badge = statusBadge(mountDrawer());
       expect(badge.attributes("data-variant")).toBe("error-soft");
-      expect(badge.text()).toBe(i18n.global.t("workflow.test.stepResult.status.error"));
+      expect(badge.text()).toBe(t("workflow.test.stepResult.status.error"));
     });
 
-    it("renders each NodeErrors message as the Output — first tuple element only", () => {
-      const wrapper = mountDrawer();
-      const lines = wrapper.findAll("[data-test='workflow-step-result-error-line']");
-      expect(lines).toHaveLength(2);
-      expect(lines[0].text()).toBe("boom");
-      expect(lines[1].text()).toBe("bad record");
-    });
-
-    it("stringifies a non-tuple error entry", () => {
+    it("No Records (default) when the node ran but got nothing (absent from inputs)", () => {
+      // d1 reachable but not in inputs -> the condition/function above filtered all.
       setup({
+        nodeId: "d1",
         result: {
-          errors: { f1: { error_count: 1, errors: ["flat message"] } },
-          ranNodeIds: [],
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      const badge = statusBadge(mountDrawer());
+      expect(badge.attributes("data-variant")).toBe("default-soft");
+      expect(badge.text()).toBe(t("workflow.test.stepResult.status.skipped"));
+    });
+  });
+
+  describe("input pane — the records this node received", () => {
+    it("shows the node's own input, editable, in the editor", () => {
+      const editor = inputEditor(mountDrawer());
+      expect(editor.props("readOnly")).toBe(false);
+      expect(JSON.parse(editor.props("query"))).toEqual([rec(2)]); // f1's input
+    });
+
+    it("seeds a DIFFERENT node's input (per-node, not a shared sample)", () => {
+      setup({ nodeId: "t1" });
+      expect(JSON.parse(inputEditor(mountDrawer()).props("query"))).toEqual([rec(1)]);
+    });
+
+    it("shows an empty state (not a blank editor) when 0 records reached the node", () => {
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
           blockedNodeIds: [],
         },
       });
       const wrapper = mountDrawer();
-      expect(wrapper.find("[data-test='workflow-step-result-error-line']").text()).toBe(
-        "flat message",
+      expect(inputEditor(wrapper)).toBeUndefined(); // no input editor rendered
+      expect(wrapper.find('[data-test="workflow-step-result-no-input"]').text()).toBe(
+        t("workflow.test.stepResult.noInput"),
       );
     });
 
-    it("shows the no-output placeholder when the node has no error entries", () => {
-      setup({ result: { errors: {}, ranNodeIds: [], blockedNodeIds: [] } });
-      const wrapper = mountDrawer();
-      expect(wrapper.find("[data-test='workflow-step-result-error-line']").exists()).toBe(false);
-      expect(wrapper.find("[data-test='workflow-step-result-no-output']").text()).toBe(
-        i18n.global.t("workflow.test.stepResult.noOutput"),
-      );
-    });
-
-    it("tolerates a null result and a malformed errors entry", () => {
-      setup({ result: null });
-      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(
-        true,
-      );
-
+    it("unwraps a JSON-stringified `data` field for readability", () => {
+      const flat = { meta_alert_name: "a", data: '[{"x":9}]' };
       setup({
-        result: { errors: { f1: { errors: "not-an-array" } } },
+        nodeId: "d1",
+        result: { errors: {}, inputs: { d1: [flat] }, ranNodeIds: ["d1"], blockedNodeIds: [] },
+        nodes: [{ id: "d1", data: { node_type: "destination", destination_id: "sink-a" } }],
+        edges: [],
       });
-      expect(mountDrawer().find("[data-test='workflow-step-result-no-output']").exists()).toBe(
-        true,
-      );
+      const parsed = JSON.parse(inputEditor(mountDrawer()).props("query"));
+      expect(parsed[0].data).toEqual([{ x: 9 }]); // parsed, not the escaped string
     });
   });
 
-  describe("input — bound to the central testRun.input (test mode)", () => {
-    it("shows the central input, editable", () => {
+  describe("output pane — what the node emitted (derived)", () => {
+    it("single downstream: the records the child received, in a read-only editor", () => {
+      const editor = outputEditor(mountDrawer());
+      expect(editor.props("readOnly")).toBe(true);
+      expect(JSON.parse(editor.props("query"))).toEqual([rec(3)]); // f1's output == d1's input
+    });
+
+    it("single downstream: NO caption (the target is obvious from the canvas)", () => {
+      // f1 -> d1 (single). No "→ Destination · sink-a" line, no record count — just
+      // the records in the editor.
       const wrapper = mountDrawer();
-      expect(editorVm(wrapper).props("query")).toBe(VALID_INPUT);
-      expect(editorVm(wrapper).props("readOnly")).toBe(false);
-    });
-
-    it("writes edits straight back to testRun.input (stays in sync with the Test dialog)", async () => {
-      const wrapper = mountDrawer();
-      editorVm(wrapper).vm.$emit("update:query", '[{"y":2}]');
-      await nextTick();
-      expect(workflowObj.testRun.input).toBe('[{"y":2}]');
-      expect(editorVm(wrapper).props("query")).toBe('[{"y":2}]');
-    });
-
-    it("shows the invalid-JSON hint for a malformed payload", async () => {
-      setup({ input: "{oops" });
-      const wrapper = mountDrawer();
-      expect(wrapper.find("[data-test='workflow-step-result-input-error']").text()).toBe(
-        i18n.global.t("workflow.test.invalidJson"),
-      );
-    });
-
-    it("treats a non-array payload as invalid", () => {
-      setup({ input: '{"a":1}' });
-      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(
-        true,
-      );
-    });
-
-    it("treats an empty payload as invalid (nothing to replay)", () => {
-      setup({ input: "   " });
-      const wrapper = mountDrawer();
-      expect(wrapper.find("[data-test='workflow-step-result-input-error']").exists()).toBe(true);
-      expect(replayBtn(wrapper).attributes("disabled")).toBeDefined();
-    });
-
-    it("hides the invalid-JSON hint for a valid array", () => {
-      expect(mountDrawer().find("[data-test='workflow-step-result-input-error']").exists()).toBe(
+      expect(wrapper.find('[data-test="workflow-step-result-output-branch-label"]').exists()).toBe(
         false,
       );
+      expect(outputEditor(wrapper)).toBeTruthy();
+    });
+
+    it("terminal (destination): shows the records it sent, with the 'sent externally' caption", () => {
+      setup({ nodeId: "d1" });
+      const wrapper = mountDrawer();
+      expect(JSON.parse(outputEditor(wrapper).props("query"))).toEqual([rec(3)]);
+      expect(wrapper.text()).toContain(t("workflow.test.stepResult.sentExternally"));
+    });
+
+    it("fan-out: one object keyed by '→ target' so each branch stays labelled", () => {
+      // t1 -> f1 and t1 -> d1 (broadcast). Inspect t1's output.
+      setup({
+        nodeId: "t1",
+        edges: [
+          { source: "t1", target: "f1" },
+          { source: "t1", target: "d1" },
+        ],
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)], d1: [rec(3)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      const wrapper = mountDrawer();
+      const out = JSON.parse(outputEditor(wrapper).props("query"));
+      const keys = Object.keys(out);
+      expect(keys).toHaveLength(2);
+      expect(keys.every((k) => k.startsWith("→ "))).toBe(true);
+      // fan-out DOES keep a caption per branch (to tell them apart)
+      expect(
+        wrapper.findAll('[data-test="workflow-step-result-output-branch-label"]'),
+      ).toHaveLength(2);
+    });
+
+    it("errored node: shows the error message(s) AND the records it forwarded", () => {
+      setup({ result: errorResult() });
+      const wrapper = mountDrawer();
+      const lines = wrapper.findAll('[data-test="workflow-step-result-error-line"]');
+      expect(lines.map((l: any) => l.text())).toEqual(["boom", "bad record"]);
+      // forwarded editor still present (f1 passed records to d1)
+      expect(JSON.parse(outputEditor(wrapper).props("query"))).toEqual([rec(3)]);
+      // both section headings shown
+      expect(wrapper.text()).toContain(t("workflow.test.stepResult.errorHeading"));
+      expect(wrapper.text()).toContain(t("workflow.test.stepResult.forwardedHeading"));
+    });
+
+    it("errored terminal: shows the error alone (a failed send has no output)", () => {
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: { d1: { error_count: 1, errors: [["send failed"]] } },
+          inputs: { d1: [rec(3)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      const wrapper = mountDrawer();
+      expect(wrapper.find('[data-test="workflow-step-result-error-line"]').text()).toBe(
+        "send failed",
+      );
+      expect(outputEditor(wrapper)).toBeUndefined();
+    });
+
+    it("filtered non-terminal: centered empty state, no editor", () => {
+      // f1 forwarded nothing to d1 -> f1's output is empty.
+      setup({
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      const wrapper = mountDrawer();
+      expect(outputEditor(wrapper)).toBeUndefined();
+      expect(wrapper.find('[data-test="workflow-step-result-output-empty"]').exists()).toBe(true);
+    });
+
+    it("condition that matched nothing explains why in the empty state", () => {
+      setup({
+        nodeId: "c1",
+        nodes: [
+          { id: "c1", data: { node_type: "condition" } },
+          { id: "d1", data: { node_type: "destination", destination_id: "s" } },
+        ],
+        edges: [{ source: "c1", target: "d1" }],
+        result: {
+          errors: {},
+          inputs: { c1: [rec(1)] },
+          ranNodeIds: ["c1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      expect(mountDrawer().find('[data-test="workflow-step-result-output-empty"]').text()).toBe(
+        t("workflow.test.stepResult.conditionNoMatch"),
+      );
+    });
+
+    it("terminal with 0 records: 'nothing was sent', not a false send", () => {
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      expect(mountDrawer().find('[data-test="workflow-step-result-output-empty"]').text()).toBe(
+        t("workflow.test.stepResult.destinationNoRecords"),
+      );
     });
   });
 
-  describe("history mode (read-only past run)", () => {
-    const historyResult = () =>
-      errorResult({
-        mode: "history",
-        runId: "r1",
-        nodeInputs: { f1: [{ meta: { alert_name: "a" }, data: [{ x: 1 }] }] },
+  describe("use as test input", () => {
+    it("Input: promotes the records to the flow payload and opens the Test dialog", async () => {
+      const wrapper = mountDrawer();
+      expect(useInputBtn(wrapper).attributes("disabled")).toBeUndefined();
+      await useInputBtn(wrapper).trigger("click");
+      expect(JSON.parse(workflowObj.testRun.input)).toEqual([rec(2)]); // f1's input
+      expect(workflowObj.testRun.show).toBe(true);
+      expect(workflowObj.testRun.resultDrawer.show).toBe(false);
+    });
+
+    it("Output: promotes what the node emitted", async () => {
+      const wrapper = mountDrawer();
+      await useOutputBtn(wrapper).trigger("click");
+      expect(JSON.parse(workflowObj.testRun.input)).toEqual([rec(3)]); // f1's output
+      expect(workflowObj.testRun.show).toBe(true);
+    });
+
+    it("disables + explains when the pane has no records", () => {
+      // d1 got nothing -> both input and output empty.
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
       });
-
-    it("shows the per-node captured input, pretty-printed and read-only", () => {
-      setup({ result: historyResult() });
       const wrapper = mountDrawer();
-      const editor = editorVm(wrapper);
-      expect(editor.props("readOnly")).toBe(true);
-      expect(editor.props("query")).toBe(
-        JSON.stringify([{ meta: { alert_name: "a" }, data: [{ x: 1 }] }], null, 2),
-      );
+      expect(useInputBtn(wrapper).attributes("disabled")).toBeDefined();
+      expect(useOutputBtn(wrapper).attributes("disabled")).toBeDefined();
+      expect(tooltipFor(wrapper, t("workflow.test.stepResult.useAsTestInputNoInput"))).toBeTruthy();
+      expect(
+        tooltipFor(wrapper, t("workflow.test.stepResult.useAsTestInputNoOutput")),
+      ).toBeTruthy();
     });
 
-    it("shows an empty input when the run captured none for this node", () => {
-      setup({ result: errorResult({ mode: "history", nodeInputs: {} }) });
-      expect(editorVm(mountDrawer()).props("query")).toBe("");
-    });
-
-    it("ignores editor writes (the setter no-ops) so the central input is untouched", async () => {
-      setup({ result: historyResult() });
+    it("is ALSO available in history mode — it drops the user into a fresh test", async () => {
+      setup({ result: okResult(), input: "" });
+      workflowObj.testRun.result = { ...okResult(), mode: "history" } as any;
+      workflowObj.testRun.show = false;
       const wrapper = mountDrawer();
-      editorVm(wrapper).vm.$emit("update:query", "tampered");
-      await nextTick();
-      expect(workflowObj.testRun.input).toBe(VALID_INPUT);
-    });
+      expect(useInputBtn(wrapper).exists()).toBe(true);
+      expect(useOutputBtn(wrapper).exists()).toBe(true);
 
-    it("hides Replay and the invalid-JSON hint (a past run is read-only)", () => {
-      setup({ input: "{oops", result: historyResult() });
-      const wrapper = mountDrawer();
-      expect(replayBtn(wrapper).exists()).toBe(false);
-      expect(wrapper.find("[data-test='workflow-step-result-input-error']").exists()).toBe(false);
-    });
-
-    it("still shows the error output for the past run", () => {
-      setup({ result: historyResult() });
-      expect(mountDrawer().findAll("[data-test='workflow-step-result-error-line']")).toHaveLength(
-        2,
-      );
+      await useInputBtn(wrapper).trigger("click");
+      // seeds the flow payload with the historical node's input and opens the Test dialog
+      expect(JSON.parse(workflowObj.testRun.input)).toEqual([rec(2)]);
+      expect(workflowObj.testRun.show).toBe(true);
     });
   });
 
   describe("replay", () => {
-    it("re-runs the workflow FROM this node with the edited input, then closes", async () => {
-      mockTestWorkflow.mockResolvedValue({ data: { errors: {} } });
+    it("re-runs FROM this node with its (edited) input, then closes", async () => {
+      mockTestWorkflow.mockResolvedValue({ data: { errors: {}, inputs: {} } });
       const wrapper = mountDrawer();
       expect(replayBtn(wrapper).attributes("disabled")).toBeUndefined();
 
       await replayBtn(wrapper).trigger("click");
       await flushPromises();
 
-      expect(mockTestWorkflow).toHaveBeenCalledWith({
-        org_identifier: "default",
-        id: "wf1",
-        inputs: JSON.parse(VALID_INPUT),
-        from_node: "f1",
-      });
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: false,
-        nodeId: "",
-      });
+      expect(mockTestWorkflow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_identifier: "default",
+          inputs: [rec(2)], // f1's own input, unwrapped
+          from_node: "f1",
+          workflow: expect.objectContaining({ id: "wf1" }),
+        }),
+      );
+      expect(workflowObj.testRun.resultDrawer).toEqual({ show: false, nodeId: "" });
     });
 
     it("keeps the drawer open and toasts the backend message on failure", async () => {
-      mockTestWorkflow.mockRejectedValue({
-        response: { data: { message: "vrl compile error" } },
-      });
+      mockTestWorkflow.mockRejectedValue({ response: { data: { message: "vrl compile error" } } });
       const wrapper = mountDrawer();
       await replayBtn(wrapper).trigger("click");
       await flushPromises();
-
-      expect(mockToast).toHaveBeenCalledWith({
-        message: "vrl compile error",
-        variant: "error",
-      });
+      expect(mockToast).toHaveBeenCalledWith({ message: "vrl compile error", variant: "error" });
       expect(workflowObj.testRun.resultDrawer.show).toBe(true);
     });
 
@@ -385,98 +498,132 @@ describe("WorkflowStepResultDrawer", () => {
       await replayBtn(wrapper).trigger("click");
       await flushPromises();
       expect(mockToast).toHaveBeenCalledWith({
-        message: i18n.global.t("workflow.test.runError"),
+        message: t("workflow.test.runError"),
         variant: "error",
       });
     });
 
-    it("is disabled and inert while a replay is in flight", async () => {
+    it("is disabled + inert while a replay is in flight", async () => {
       let resolve!: (v: any) => void;
-      mockTestWorkflow.mockReturnValue(
-        new Promise((r) => {
-          resolve = r;
-        }),
-      );
+      mockTestWorkflow.mockReturnValue(new Promise((r) => (resolve = r)));
       const wrapper = mountDrawer();
       await replayBtn(wrapper).trigger("click");
       await nextTick();
-
       expect(replayBtn(wrapper).attributes("data-loading")).toBe("true");
       expect(replayBtn(wrapper).attributes("disabled")).toBeDefined();
-      // a second click while replaying is a no-op
       await replayBtn(wrapper).trigger("click");
       expect(mockTestWorkflow).toHaveBeenCalledTimes(1);
-
-      resolve({ data: { errors: {} } });
+      resolve({ data: { errors: {}, inputs: {} } });
       await flushPromises();
     });
 
-    it("does not call the API when the input is not a valid JSON array", async () => {
-      setup({ input: "not json" });
-      const wrapper = mountDrawer();
-      await replayBtn(wrapper).trigger("click");
-      await flushPromises();
-      expect(mockTestWorkflow).not.toHaveBeenCalled();
+    it("is disabled when no records reached the node (nothing to replay)", () => {
+      setup({
+        nodeId: "d1",
+        result: {
+          errors: {},
+          inputs: { t1: [rec(1)], f1: [rec(2)] },
+          ranNodeIds: ["t1", "f1", "d1"],
+          blockedNodeIds: [],
+        },
+      });
+      expect(replayBtn(mountDrawer()).attributes("disabled")).toBeDefined();
     });
 
     it("carries the replay hint tooltip", () => {
-      expect(mountDrawer().find(".o-tooltip").attributes("data-content")).toBe(
-        i18n.global.t("workflow.test.stepResult.replayHint"),
+      expect(tooltipFor(mountDrawer(), t("workflow.test.stepResult.replayHint"))).toBeTruthy();
+    });
+  });
+
+  describe("history mode (read-only past run)", () => {
+    // History carries the SAME per-node `inputs` map as a Test run — the drawer
+    // renders Input/Output for every node, just read-only (no Replay).
+    const historyResult = () => ({
+      errors: { f1: { error_count: 1, errors: [["boom"]] } },
+      inputs: { t1: [rec(1)], f1: [{ meta: { alert_name: "a" }, data: [{ x: 1 }] }], d1: [rec(3)] },
+      ranNodeIds: ["t1", "f1", "d1"],
+      blockedNodeIds: ["d1"],
+      mode: "history",
+      runId: "r1",
+    });
+
+    it("shows the per-node input, read-only", () => {
+      setup({ result: historyResult() });
+      const editor = inputEditor(mountDrawer());
+      expect(editor.props("readOnly")).toBe(true);
+      expect(JSON.parse(editor.props("query"))).toEqual([
+        { meta: { alert_name: "a" }, data: [{ x: 1 }] },
+      ]);
+    });
+
+    it("derives Output for a NON-error node too (not just error nodes)", () => {
+      // f1 -> d1: f1's output == d1's input.
+      setup({ result: historyResult() });
+      expect(JSON.parse(outputEditor(mountDrawer()).props("query"))).toEqual([rec(3)]);
+    });
+
+    it("hides Replay (read-only) but KEEPS Use-as-input (seed a fresh test)", () => {
+      setup({ result: historyResult() });
+      const wrapper = mountDrawer();
+      expect(replayBtn(wrapper).exists()).toBe(false);
+      expect(useInputBtn(wrapper).exists()).toBe(true);
+    });
+
+    it("still shows the error output for the past run", () => {
+      setup({ result: historyResult() });
+      expect(mountDrawer().find('[data-test="workflow-step-result-error-line"]').text()).toBe(
+        "boom",
       );
     });
   });
 
   describe("copy", () => {
-    it("copies the input with the input success message", async () => {
+    it("copies the input records with the input success message", async () => {
       const wrapper = mountDrawer();
-      const btns = wrapper.findAll(
-        `[title="${i18n.global.t("workflow.test.stepResult.copyInput")}"]`,
+      const btn = wrapper.find(`[title="${t("workflow.test.stepResult.copyInput")}"]`);
+      await btn.trigger("click");
+      expect(mockCopy).toHaveBeenCalledWith(
+        JSON.stringify([rec(2)], null, 2),
+        expect.any(Function),
+        {
+          successMessage: t("workflow.test.stepResult.copiedInput"),
+        },
       );
-      await btns[0].trigger("click");
-      expect(mockCopy).toHaveBeenCalledWith(VALID_INPUT, {
-        successMessage: i18n.global.t("workflow.test.stepResult.copiedInput"),
-      });
     });
 
-    it("copies the output as the joined error messages", async () => {
+    it("copies the output records", async () => {
       const wrapper = mountDrawer();
-      const btns = wrapper.findAll(
-        `[title="${i18n.global.t("workflow.test.stepResult.copyOutput")}"]`,
+      const btn = wrapper.find(`[title="${t("workflow.test.stepResult.copyOutput")}"]`);
+      await btn.trigger("click");
+      expect(mockCopy).toHaveBeenCalledWith(
+        JSON.stringify([rec(3)], null, 2),
+        expect.any(Function),
+        {
+          successMessage: t("workflow.test.stepResult.copiedOutput"),
+        },
       );
-      await btns[0].trigger("click");
-      expect(mockCopy).toHaveBeenCalledWith("boom\nbad record", {
-        successMessage: i18n.global.t("workflow.test.stepResult.copiedOutput"),
-      });
     });
 
-    it("disables both copy buttons and copies nothing when there is no text", async () => {
-      setup({ input: "", result: { errors: {} } });
+    it("copies error + forwarded together for an errored node", async () => {
+      setup({ result: errorResult() });
       const wrapper = mountDrawer();
-      const copyIn = wrapper.find(
-        `[title="${i18n.global.t("workflow.test.stepResult.copyInput")}"]`,
-      );
-      const copyOut = wrapper.find(
-        `[title="${i18n.global.t("workflow.test.stepResult.copyOutput")}"]`,
-      );
-      expect(copyIn.attributes("disabled")).toBeDefined();
-      expect(copyOut.attributes("disabled")).toBeDefined();
-
-      // even if invoked, an empty payload is a no-op
-      await copyIn.trigger("click");
-      await copyOut.trigger("click");
-      expect(mockCopy).not.toHaveBeenCalled();
+      const btn = wrapper.find(`[title="${t("workflow.test.stepResult.copyOutput")}"]`);
+      await btn.trigger("click");
+      const copied = mockCopy.mock.calls[0][0];
+      expect(copied).toContain("boom");
+      expect(copied).toContain('"x": 3'); // forwarded records included
     });
   });
 
   describe("fullscreen", () => {
     const fsButtons = (w: any) =>
-      w.findAll(`[title="${i18n.global.t("workflow.test.stepResult.enterFullscreen")}"]`);
+      w.findAll(`[title="${t("workflow.test.stepResult.enterFullscreen")}"]`);
 
     it("toggles the Input+Output container as one unit", async () => {
       const wrapper = mountDrawer();
       await fsButtons(wrapper)[0].trigger("click");
       expect(mockToggleFullscreen).toHaveBeenCalledWith(
-        wrapper.find("[data-test='workflow-step-io-container']").element,
+        wrapper.find('[data-test="workflow-step-io-container"]').element,
       );
     });
 
@@ -490,34 +637,7 @@ describe("WorkflowStepResultDrawer", () => {
       spy.mockRestore();
     });
 
-    it("flips the icon + title once the document reports fullscreen", async () => {
-      const wrapper = mountDrawer();
-      const el = wrapper.find("[data-test='workflow-step-io-container']").element;
-      expect(wrapper.findAll('[data-icon="fullscreen"]')).toHaveLength(2);
-
-      Object.defineProperty(document, "fullscreenElement", {
-        configurable: true,
-        value: el,
-      });
-      document.dispatchEvent(new Event("fullscreenchange"));
-      await nextTick();
-
-      expect(wrapper.findAll('[data-icon="fullscreen-exit"]')).toHaveLength(2);
-      expect(
-        wrapper.findAll(`[title="${i18n.global.t("workflow.test.stepResult.exitFullscreen")}"]`),
-      ).toHaveLength(2);
-
-      // leaving fullscreen flips it back
-      Object.defineProperty(document, "fullscreenElement", {
-        configurable: true,
-        value: null,
-      });
-      document.dispatchEvent(new Event("fullscreenchange"));
-      await nextTick();
-      expect(wrapper.findAll('[data-icon="fullscreen"]')).toHaveLength(2);
-    });
-
-    it("removes its fullscreen listeners on unmount", async () => {
+    it("removes its fullscreen listeners on unmount", () => {
       const remove = vi.spyOn(document, "removeEventListener");
       mountDrawer().unmount();
       const events = remove.mock.calls.map((c) => c[0]);
@@ -532,12 +652,9 @@ describe("WorkflowStepResultDrawer", () => {
       const wrapper = mountDrawer();
       const close = wrapper
         .findAll(".drawer-footer button")
-        .find((b: any) => b.text() === i18n.global.t("common.close"))!;
+        .find((b: any) => b.text() === t("common.close"))!;
       await close.trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: false,
-        nodeId: "",
-      });
+      expect(workflowObj.testRun.resultDrawer).toEqual({ show: false, nodeId: "" });
     });
 
     it("clears the result drawer when the drawer dismisses itself", async () => {
@@ -545,19 +662,11 @@ describe("WorkflowStepResultDrawer", () => {
       await wrapper.find(".drawer-dismiss").trigger("click");
       expect(workflowObj.testRun.resultDrawer.show).toBe(false);
     });
-
-    it("keeps it open when the drawer reports open=true", async () => {
-      const wrapper = mountDrawer();
-      wrapper.findComponent(ODrawerStub as any).vm.$emit("update:open", true);
-      await nextTick();
-      expect(workflowObj.testRun.resultDrawer.show).toBe(true);
-    });
   });
 
-  it("mounts fine when there are only icon buttons and no node data at all", () => {
-    setup({ nodeId: "", nodes: [], result: null });
+  it("mounts fine with no node data and no result at all", () => {
+    setup({ nodeId: "", nodes: [], edges: [], result: null });
     const wrapper = mountDrawer();
     expect(wrapper.find(".o-drawer").exists()).toBe(true);
-    expect(iconButtons(wrapper).length).toBeGreaterThan(0);
   });
 });

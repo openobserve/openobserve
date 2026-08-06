@@ -40,19 +40,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           data-test="dashboard-panel-drag"
         />
+        <!-- me-5 is a truncation MARGIN, not decoration. The spacer after this
+             collapses to nothing once the title fills the bar, so an ellipsised
+             title otherwise ends flush against the first control and reads as
+             running into it. The margin is outside the overflow box, so the
+             ellipsis always lands a gap short of the icons. A title that fits is
+             unaffected — the spacer just absorbs 1.25rem less. -->
         <div
           :title="props.data.title"
-          class="text-compact text-text-heading overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
           data-test="dashboard-panel-header"
         >
           {{ props.data.title }}
         </div>
         <div class="flex-1" />
 
+        <!-- HOVER-REVEALED CONTROLS (this button through the fullscreen one).
+             They are hidden, never unmounted: dropping them from the layout on
+             mouseleave handed their width back to the title, which then
+             re-truncated at a different point every time the pointer entered or
+             left the panel. Reserving the space keeps ONE truncation point —
+             `invisible` also drops them from the tab order and the a11y tree, so
+             hidden controls stay unreachable. -->
         <!-- Show Legends button (hidden when the chart has no data) -->
         <OButton
+          :class="hoverRevealClass"
           v-if="
-            isCurrentlyHoveredPanel &&
             props.showLegendsButton &&
             !PanleSchemaRendererRef?.noData &&
             ![
@@ -82,10 +95,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Add Annotations button -->
         <OButton
+          :class="hoverRevealClass"
           v-if="
             !viewOnly &&
             !simplifiedPanelView &&
-            isCurrentlyHoveredPanel &&
             [
               'area',
               'area-stacked',
@@ -119,15 +132,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
 
         <OIcon
-          v-if="
-            !viewOnly &&
-            !simplifiedPanelView &&
-            isCurrentlyHoveredPanel &&
-            props.data.description != ''
-          "
+          v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
           name="info-outline"
           size="sm"
           class="cursor-pointer"
+          :class="hoverRevealClass"
           data-test="dashboard-panel-description-info"
         >
           <OTooltip side="bottom" align="end" max-width="13.75rem">
@@ -137,7 +146,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OTooltip>
         </OIcon>
         <OButton
-          v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
+          :class="hoverRevealClass"
+          v-if="!viewOnly && !simplifiedPanelView"
           variant="ghost"
           size="icon"
           @click="onPanelModifyClick('ViewPanel')"
@@ -420,7 +430,7 @@ import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 
@@ -488,7 +498,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const metaData = ref();
     const showViewPanel = ref(false);
     const showLegendsDialog = ref(false);
@@ -557,6 +567,14 @@ export default defineComponent({
 
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
+
+    // Applied to every hover-revealed control in the panel bar. They stay in the
+    // layout while hidden so the title's truncation point never moves when the
+    // pointer enters or leaves; `invisible` (visibility:hidden) also takes them
+    // out of the tab order and the a11y tree, so nothing hidden is reachable.
+    const hoverRevealClass = computed(() =>
+      isCurrentlyHoveredPanel.value ? "" : "invisible pointer-events-none",
+    );
 
     //for edit panel
     const onEditPanel = (data: any) => {
@@ -712,6 +730,7 @@ export default defineComponent({
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
+            t,
           );
         } else {
           showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
@@ -922,6 +941,7 @@ export default defineComponent({
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
+      hoverRevealClass,
       showViewPanel,
       dependentAdHocVariable,
       confirmDeletePanelDialog,

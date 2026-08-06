@@ -52,10 +52,19 @@ vi.mock("vuex", async (importOriginal) => {
       state: {
         timezone: "UTC",
         selectedOrganization: { identifier: "org-1" },
+        // `?folder=` carries the folder ID; the header resolves it to a name
+        // against this cached list.
+        organizationData: {
+          foldersByType: { synthetics: [{ folderId: "f-1", name: "Production" }] },
+        },
       },
     }),
   };
 });
+
+vi.mock("@/utils/commons", () => ({
+  getFoldersListByType: vi.fn(() => Promise.resolve([])),
+}));
 
 vi.mock("@/utils/date", () => ({
   getConsumableRelativeTime: vi.fn((period: string) => {
@@ -228,6 +237,7 @@ describe("MonitorResults", () => {
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics-edit",
         params: { id: "mon-1" },
+        query: { org_identifier: "org-1" },
       });
     });
   });
@@ -356,6 +366,7 @@ describe("MonitorResults", () => {
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics-edit",
         params: { id: "mon-1" },
+        query: { org_identifier: "org-1" },
       });
     });
 

@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <span class="text-xs">
                     {{ cfg.label }}
-                    <OTooltip :content="cfg.groupField" />
+                    <OTooltip :content="raw(cfg.groupField)" />
                   </span>
                 </ODropdownItem>
               </template>
@@ -271,21 +271,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="svc-panel-table overflow-hidden"
               data-test="service-graph-side-panel-operations-table"
             >
-              <TenstackTable
+              <OTable
                 :columns="operationsTableColumns"
-                :rows="sortedOperationsTableRows"
+                :data="sortedOperationsTableRows"
+                sorting="server"
                 :sort-by="sortBy"
                 :sort-order="sortOrderProp"
                 :loading="loadingOperations"
                 :default-columns="false"
-                :enable-column-reorder="false"
-                :enable-row-expand="false"
-                :enable-text-highlight="false"
-                :enable-status-bar="false"
-                :enable-ai-context-button="false"
                 :row-height="38"
-                @sort-change="handleSortChange"
-                @click:data-row="
+                :show-global-filter="false"
+                :fill-height="false"
+                pagination="none"
+                @sort-change="(p: any) => handleSortChange(p.column)"
+                @row-click="
                   (row: any) =>
                     navigateToTraces({
                       operationName: row.operation,
@@ -293,55 +292,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                 "
               >
-                <template #cell-errors="{ item }">
-                  <span
-                    :class="
-                      item.errors > 0 ? 'font-semibold text-[var(--color-status-negative)]' : ''
-                    "
-                    >{{ item.errors }}</span
-                  >
+                <template #cell-errors="{ row }">
+                  <span :class="row.errors > 0 ? 'text-status-negative font-semibold' : ''">{{
+                    row.errors
+                  }}</span>
                 </template>
-                <template #cell-p99="{ item }">
+                <template #cell-p99="{ row }">
                   <ServiceCatalogBarCell
-                    :value="item.p99"
+                    :value="row.p99"
                     :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
-                    :label="formatOperationLatency(item.p99)"
+                    :label="raw(formatOperationLatency(row.p99))"
                     variant="warning"
                     align="right"
                     inline
                   />
                 </template>
-                <template #cell-p95="{ item }">
+                <template #cell-p95="{ row }">
                   <ServiceCatalogBarCell
-                    :value="item.p95"
+                    :value="row.p95"
                     :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
-                    :label="formatOperationLatency(item.p95)"
+                    :label="raw(formatOperationLatency(row.p95))"
                     align="right"
                     inline
                   />
                 </template>
-                <template #cell-p75="{ item }">
+                <template #cell-p75="{ row }">
                   <ServiceCatalogBarCell
-                    :value="item.p75"
+                    :value="row.p75"
                     :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
-                    :label="formatOperationLatency(item.p75)"
+                    :label="raw(formatOperationLatency(row.p75))"
                     align="right"
                     inline
                   />
                 </template>
-                <template #cell-actions="{ row, column, active }">
+                <template #cell-hover-actions="{ row, column, active }">
                   <OButton
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="absolute! right-1! ml-1"
                     data-test="service-graph-side-panel-view-traces-btn"
                     @click.stop="
                       navigateToTraces({
                         operationName: row.operation,
                         callerService: isInferred ? row.caller : undefined,
                         errorsOnly: column.id === 'errors',
-                        minDurationMicros: isDurationColumn(column.id) ? row[column.id] : undefined,
+                        minDurationMicros: isDurationColumn(column.id)
+                          ? (row as Record<string, any>)[column.id]
+                          : undefined,
                       })
                     "
                   >
@@ -356,7 +353,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     {{ t("traces.serviceGraphNodeSidePanel.noOperationsFound") }}
                   </div>
                 </template>
-              </TenstackTable>
+              </OTable>
             </div>
           </OTabPanel>
 
@@ -399,21 +396,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="svc-panel-table overflow-hidden"
               :data-test="`service-graph-side-panel-${cfg.id}-table`"
             >
-              <TenstackTable
+              <OTable
                 :columns="buildEntityTableColumns(cfg.colId, cfg.colLabel)"
-                :rows="sortResourceRows(buildResourceTableRows(cfg))"
+                :data="sortResourceRows(buildResourceTableRows(cfg))"
+                sorting="server"
                 :sort-by="sortBy"
                 :sort-order="sortOrderProp"
                 :loading="resourceTabLoading[cfg.id]"
                 :default-columns="false"
-                :enable-column-reorder="false"
-                :enable-row-expand="false"
-                :enable-text-highlight="false"
-                :enable-status-bar="false"
-                :enable-ai-context-button="false"
                 :row-height="38"
-                @sort-change="handleSortChange"
-                @click:data-row="
+                :show-global-filter="false"
+                :fill-height="false"
+                pagination="none"
+                @sort-change="(p: any) => handleSortChange(p.column)"
+                @row-click="
                   (row: any) =>
                     navigateToTraces({
                       resourceFilter: cfg.fields
@@ -422,12 +418,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     })
                 "
               >
-                <template #cell-actions="{ row, column, active }">
+                <template #cell-hover-actions="{ row, column, active }">
                   <OButton
                     v-if="active"
                     variant="ghost"
                     size="icon"
-                    class="bg-table-row-hover-bg! rounded-default absolute! right-1! ml-1 shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
+                    class="bg-table-row-hover-bg! rounded-default shadow-[-0.5rem_0_0.5rem_var(--color-table-row-hover-bg)]"
                     :data-test="`service-graph-side-panel-${cfg.id}-view-traces-btn`"
                     @click.stop="
                       navigateToTraces({
@@ -443,38 +439,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OTooltip :content="t('traces.serviceGraphNodeSidePanel.viewInTraces')" />
                   </OButton>
                 </template>
-                <template #cell-errors="{ item }">
-                  <span
-                    :class="
-                      item.errors > 0 ? 'font-semibold text-[var(--color-status-negative)]' : ''
-                    "
-                    >{{ item.errors }}</span
-                  >
+                <template #cell-errors="{ row }">
+                  <span :class="row.errors > 0 ? 'text-status-negative font-semibold' : ''">{{
+                    row.errors
+                  }}</span>
                 </template>
-                <template #cell-p99="{ item }">
+                <template #cell-p99="{ row }">
                   <ServiceCatalogBarCell
-                    :value="item.p99"
+                    :value="row.p99"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
-                    :label="formatOperationLatency(item.p99)"
+                    :label="raw(formatOperationLatency(row.p99))"
                     variant="warning"
                     align="right"
                     inline
                   />
                 </template>
-                <template #cell-p95="{ item }">
+                <template #cell-p95="{ row }">
                   <ServiceCatalogBarCell
-                    :value="item.p95"
+                    :value="row.p95"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
-                    :label="formatOperationLatency(item.p95)"
+                    :label="raw(formatOperationLatency(row.p95))"
                     align="right"
                     inline
                   />
                 </template>
-                <template #cell-p75="{ item }">
+                <template #cell-p75="{ row }">
                   <ServiceCatalogBarCell
-                    :value="item.p75"
+                    :value="row.p75"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
-                    :label="formatOperationLatency(item.p75)"
+                    :label="raw(formatOperationLatency(row.p75))"
                     align="right"
                     inline
                   />
@@ -490,7 +483,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     }}
                   </div>
                 </template>
-              </TenstackTable>
+              </OTable>
             </div>
           </OTabPanel>
 
@@ -628,7 +621,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -646,7 +639,7 @@ const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-const TenstackTable = defineAsyncComponent(() => import("@/components/TenstackTable.vue"));
+const OTable = defineAsyncComponent(() => import("@/lib/core/Table/OTable.vue"));
 
 // Agent-scoped behavior signals shown on agent nodes (enterprise). Async so the
 // enterprise chunk only loads when an agent node's Behavior tab is opened.
@@ -669,9 +662,9 @@ const AgentNodeBehaviorTab = defineAsyncComponent(
 
 export interface ResourceTabConfig {
   id: string; // unique tab name (= FoundGroup.group_id)
-  label: string; // display label
+  label: I18nText; // display label
   groupField: string; // SQL GROUP BY field (= FoundGroup.aliases["traces"])
-  colLabel: string; // header of the first column (entity name)
+  colLabel: I18nText; // header of the first column (entity name)
   colId: string; // row property key for the entity name column
   environment: string; // env key derived from group_id first segment
   isDefault: boolean; // pre-selected when the environment is first detected
@@ -703,10 +696,15 @@ export interface ResourceTabConfig {
 export interface InferredServiceTab {
   /** Unique tab identifier, e.g. "hosts", "databases", "queries" */
   id: string;
-  /** User-facing tab label, e.g. "Hosts", "Databases", "Queries" */
-  label: string;
-  /** Column header shown in the resource table, e.g. "Host", "Database", "DB Operation" */
-  colLabel: string;
+  /** Pre-resolved label — only for names that read the same in every language. */
+  label?: I18nText;
+  /** Preferred over `label`. This registry is module-scope so it cannot call
+   *  t(); the mapper in setup() resolves the key. */
+  labelKey?: I18nKey;
+  /** Key for the column header shown in the resource table, e.g. "Host",
+   *  "Database", "DB Operation". A key, not text: this registry is module-scope
+   *  so it cannot call t() — the mapper in setup() resolves it, like `labelKey`. */
+  colLabelKey: I18nKey;
   /**
    * Fallback-ordered field names for the attribute column, evaluated against the
    * stream schema at runtime. The first field present in the schema wins as the
@@ -742,62 +740,62 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   database: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "databases",
-      label: "Databases",
-      colLabel: "Database",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabDatabases",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDatabase",
       fields: ["db_namespace", "db_name"],
     },
     {
       id: "queries",
-      label: "Queries",
-      colLabel: "DB Operation",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabQueries",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDbOperation",
       fields: ["db_operations"],
     },
   ],
   queue: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "destinations",
-      label: "Destinations",
-      colLabel: "Destination",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabDestinations",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDestination",
       fields: ["messaging_destination_name", "messaging_destination"],
     },
   ],
   rpc: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "rpc_services",
-      label: "RPC Services",
-      colLabel: "RPC Service",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabRpcServices",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colRpcService",
       fields: ["rpc_service"],
     },
   ],
   external: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "urls",
-      label: "URLs",
-      colLabel: "URL",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabUrls",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colUrl",
       fields: ["http_url", "url_full"],
     },
   ],
@@ -884,7 +882,7 @@ export default defineComponent({
     ODropdownItem,
     ODrawer,
     TelemetryCorrelationDashboard,
-    TenstackTable,
+    OTable,
     RenderDashboardCharts,
     OTooltip,
     OCheckbox,
@@ -922,9 +920,9 @@ export default defineComponent({
   emits: ["close", "view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -1157,7 +1155,7 @@ export default defineComponent({
       rangeFiltersVersion.value;
       const chips: {
         key: string;
-        label: string;
+        label: I18nText;
         type: "duration" | "error";
       }[] = [];
       localRangeFilters.value.forEach((f, key) => {
@@ -1255,7 +1253,7 @@ export default defineComponent({
       sourceEvent?: {
         timestamp?: number | string;
         severity?: string;
-        message?: string;
+        message?: I18nText;
       };
       logStreams: any[];
       metricStreams: any[];
@@ -1478,7 +1476,7 @@ export default defineComponent({
 
     /** Fetch the trace stream schema and populate streamFieldSet.
      *  Idempotent — skips if already resolved for the current stream.
-     *  Uses useStreams().getStream() which caches the schema in the Vuex store
+     *  Uses useStreams(t).getStream() which caches the schema in the Vuex store
      *  so other components benefit from the cached data. */
     const resolveStreamSchema = async () => {
       if (
@@ -1515,15 +1513,16 @@ export default defineComponent({
       // schema fetch completes (reactive via streamFieldSet).
       if (!schemaResolved.value) return [];
       const resolved: ResourceTabConfig[] = [];
-      for (const t of tabs) {
-        const present = t.fields.filter((f) => fieldSet.has(f));
+      // named `tab`, not `t` — that would shadow the translator used just below
+      for (const tab of tabs) {
+        const present = tab.fields.filter((f) => fieldSet.has(f));
         if (present.length === 0) continue;
         resolved.push({
-          id: t.id,
-          label: t.label,
+          id: tab.id,
+          label: tab.labelKey ? t(tab.labelKey) : (tab.label ?? raw("")),
           groupField: `COALESCE(${buildCoalesceExpr(present)})`,
-          colLabel: t.colLabel,
-          colId: t.id,
+          colLabel: t(tab.colLabelKey),
+          colId: tab.id,
           environment: "",
           isDefault: true,
           fields: present,
@@ -1638,15 +1637,15 @@ export default defineComponent({
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
         return {
-          requestRate: "N/A",
-          requestRateValue: "N/A",
+          requestRate: t("common.notAvailable"),
+          requestRateValue: t("common.notAvailable"),
           totalRequests: 0,
           incomingRequests: 0,
           outgoingRequests: 0,
-          errorRate: "N/A",
-          p50Latency: "N/A",
-          p95Latency: "N/A",
-          p99Latency: "N/A",
+          errorRate: t("common.notAvailable"),
+          p50Latency: t("common.notAvailable"),
+          p95Latency: t("common.notAvailable"),
+          p99Latency: t("common.notAvailable"),
         };
       }
 
@@ -1702,9 +1701,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + "%",
-        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : "N/A",
-        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : "N/A",
-        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : "N/A",
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : t("common.notAvailable"),
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : t("common.notAvailable"),
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : t("common.notAvailable"),
       };
     });
 
@@ -1855,7 +1854,7 @@ export default defineComponent({
     };
 
     // Generic helper: builds table columns with a dynamic first (entity) column
-    const buildEntityTableColumns = (entityId: string, entityHeader: string) => [
+    const buildEntityTableColumns = (entityId: string, entityHeader: I18nText) => [
       {
         id: entityId,
         accessorKey: entityId,
@@ -1883,7 +1882,7 @@ export default defineComponent({
       {
         id: "p99",
         accessorKey: "p99",
-        header: "P99",
+        header: t("traces.serviceGraphNodeSidePanel.p99"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -1891,7 +1890,7 @@ export default defineComponent({
       {
         id: "p95",
         accessorKey: "p95",
-        header: "P95",
+        header: t("traces.serviceGraphNodeSidePanel.p95"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -1899,7 +1898,7 @@ export default defineComponent({
       {
         id: "p75",
         accessorKey: "p75",
-        header: "P75",
+        header: t("traces.serviceGraphNodeSidePanel.p75"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -2222,9 +2221,9 @@ export default defineComponent({
           const envKey = groupEnvKey(g.group_id) ?? g.group_id.split("-")[0];
           return {
             id: g.group_id,
-            label: g.display,
+            label: raw(g.display),
             groupField: field,
-            colLabel: g.display,
+            colLabel: raw(g.display),
             colId: g.group_id.replace(/-/g, "_"),
             environment: envKey,
             isDefault: DEFAULT_GROUP_FIELDS.has(field),
@@ -2419,7 +2418,7 @@ export default defineComponent({
       } else if (correlationError.value) {
         toast({
           variant: "warning",
-          message: correlationError.value,
+          message: raw(correlationError.value),
         });
       }
     };
@@ -2465,6 +2464,7 @@ export default defineComponent({
     }
 
     return {
+      raw,
       t,
       serviceMetrics,
       serviceHealth,
@@ -2579,7 +2579,7 @@ export default defineComponent({
 /* The panel itself scrolls, so these short summary tables should render at their
    natural height without their own scrollbars. Let the inner scroll container
    grow to content and hide its scrollbars. */
-.svc-panel-table :deep(.o2-scroll-container) {
+.svc-panel-table :deep([data-test="o2-table-scroll-container"]) {
   overflow: hidden;
   height: auto;
   max-height: none;

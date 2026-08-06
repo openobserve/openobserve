@@ -17,7 +17,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { shallowMount } from "@vue/test-utils";
 import ImportTemplate from "./ImportTemplate.vue";
 import { createStore } from "vuex";
-import { createI18n } from "vue-i18n";
 import { ref } from "vue";
 
 // ─── Service mocks ────────────────────────────────────────────────────────────
@@ -64,10 +63,8 @@ const mockStore = createStore({
   },
 });
 
-const mockI18n = createI18n({
-  locale: "en",
-  messages: { en: {} },
-});
+// No local createI18n here: setupTests.ts installs the real i18n globally, and a
+// mount-level plugin would replace it with a partial bag.
 
 // ─── BaseImport stub ──────────────────────────────────────────────────────────
 const BaseImportStub = {
@@ -102,7 +99,6 @@ function createWrapper(props = defaultProps) {
   return shallowMount(ImportTemplate, {
     props,
     global: {
-      plugins: [mockI18n],
       provide: { store: mockStore },
       mocks: { $store: mockStore },
       stubs: { BaseImport: BaseImportStub },
@@ -132,7 +128,6 @@ describe("ImportTemplate", () => {
     it("accepts default empty-array props", () => {
       const w = shallowMount(ImportTemplate, {
         global: {
-          plugins: [mockI18n],
           provide: { store: mockStore },
           mocks: { $store: mockStore },
           stubs: { BaseImport: BaseImportStub },
@@ -621,7 +616,7 @@ describe("ImportTemplate", () => {
       });
 
       expect(mockToast).toHaveBeenCalledWith(
-        expect.objectContaining({ message: "Successfully imported template(s)" }),
+        expect.objectContaining({ message: "Successfully imported 1 template" }),
       );
 
       vi.runAllTimers();

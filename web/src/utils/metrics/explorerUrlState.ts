@@ -25,6 +25,8 @@
  * would never be seen.
  */
 
+import { raw } from "@/types/i18n";
+
 import type { LocationQuery } from "vue-router";
 import type { LabelFilter } from "@/composables/metrics/useMetricsExplorerGrid";
 
@@ -134,9 +136,9 @@ export function queryToExplorerFilters(
 const MATCHER = /^([a-zA-Z_:][a-zA-Z0-9_:]*)(=~|!~|!=|=)(.*)$/s;
 
 /** A hand-edited or truncated URL must degrade to "no filter", never throw. */
-function parseMatcher(raw: unknown): LabelFilter | null {
-  if (typeof raw !== "string") return null;
-  const m = raw.match(MATCHER);
+function parseMatcher(matcher: unknown): LabelFilter | null {
+  if (typeof matcher !== "string") return null;
+  const m = matcher.match(MATCHER);
   if (!m) return null;
-  return { label: m[1], operator: m[2], value: m[3] };
+  return { label: raw(m[1]), operator: m[2], value: m[3] };
 }

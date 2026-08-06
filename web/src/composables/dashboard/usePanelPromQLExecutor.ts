@@ -19,6 +19,7 @@ import { createPromQLChunkProcessor } from "./promqlChunkProcessor";
 import { computeStepSeconds } from "@/utils/metrics/metricDefaults";
 import { HEATMAP_MAX_COLUMNS } from "@/utils/dashboard/heatmapDefaults";
 import { parseSearchError } from "@/utils/query/searchError";
+import { gt } from "@/types/i18n";
 
 export const usePanelPromQLExecutor = (ctx: {
   state: any;
@@ -157,11 +158,12 @@ export const usePanelPromQLExecutor = (ctx: {
             const heatmapStepValue =
               isHeatmap && !queryStepValue && !panelStepValue
                 ? `${computeStepSeconds(
-                    // MILLISECONDS. `usePanelDataLoader` builds these with
-                    // `new Date(...).getTime()`; only the request payload converts
-                    // to the microseconds the backend wants — these raw values
-                    // never are. Divide by 1000 (not 1e6) to get seconds.
-                    (endISOTimestamp - startISOTimestamp) / 1000,
+                    // MICROSECONDS. `selectedTimeObj` carries Dates built from the
+                    // microsecond epoch the pickers emit, so the `.getTime()` values
+                    // `usePanelDataLoader` derives keep that magnitude — see the
+                    // matching `__range_seconds` conversion in
+                    // usePanelVariableSubstitution. Divide by 1e6 to get seconds.
+                    (endISOTimestamp - startISOTimestamp) / 1_000_000,
                     HEATMAP_MAX_COLUMNS,
                   )}s`
                 : undefined;
@@ -257,7 +259,7 @@ export const usePanelPromQLExecutor = (ctx: {
               // parseSearchError unwraps the backend's internal error envelope
               // ("Error during planning: ErrorCode# {...}") into a readable
               // sentence; the raw `content.message` would show the envelope.
-              const parsed = parseSearchError(err, "Unknown error");
+              const parsed = parseSearchError(err, gt("search.unknownError"));
 
               state.errorDetail = {
                 message: parsed.message,

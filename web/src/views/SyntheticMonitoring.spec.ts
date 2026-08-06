@@ -751,4 +751,81 @@ describe("SyntheticMonitoring", () => {
       );
     });
   });
+
+  // Regression coverage for the routing audit: every hop out of this page must
+  // carry `org_identifier` (otherwise a refresh/share resolves against whatever
+  // org is in localStorage), and `?folder=` must carry the folder *ID* — the
+  // server documents it as "Current folder ID of the synthetic (for RBAC)" and
+  // this page used to send the display name, which is "—" before folders load.
+  describe("navigation out of the list", () => {
+    // Shaped like a row emitted by MonitorTable: `folderId` is the KSUID,
+    // `folder_name` the display string the page used to send by mistake.
+    const row = {
+      id: "mon-9",
+      name: "Checkout flow",
+      folderId: "f_ksuid_prod",
+      folder_name: "Production",
+      lastTriggeredAt: 1_700_000_000_000_000,
+      enabled: true,
+    };
+
+    const findTable = () =>
+      wrapper.findComponent('[data-test="synthetic-monitoring-monitors-table"]');
+
+    const mountReady = async () => {
+      wrapper = mountPage();
+      await flushPromises();
+    };
+
+    it("sends org_identifier and the folder ID when opening a monitor's results", async () => {
+      await mountReady();
+      findTable().vm.$emit("row-click", row);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetic-monitor-results",
+        params: { id: "mon-9" },
+        query: {
+          org_identifier: "default",
+          folder: "f_ksuid_prod",
+          name: "Checkout flow",
+          last_triggered_at: "1700000000000000",
+        },
+      });
+    });
+
+    it("sends org_identifier and the folder ID when editing a monitor", async () => {
+      await mountReady();
+      findTable().vm.$emit("edit", row);
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics-edit",
+        params: { id: "mon-9" },
+        query: { org_identifier: "default", folder: "f_ksuid_prod" },
+      });
+    });
+
+    it("sends org_identifier and the active folder when creating a check", async () => {
+      await mountReady();
+      // The picker lives in a dialog, so it only renders once opened.
+      await wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').trigger("click");
+      await nextTick();
+      wrapper
+        .findComponent('[data-test="synthetic-monitoring-check-type-picker-modal"]')
+        .vm.$emit("select", "http");
+      await nextTick();
+
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics-add",
+        query: { org_identifier: "default", folder: "default", type: "http" },
+      });
+    });
+
+    it("passes the folder ID — not the display name — to per-check API calls", async () => {
+      await mountReady();
+      findTable().vm.$emit("run", row);
+      await flushPromises();
+
+      expect(mockServiceRun).toHaveBeenCalledWith("default", "mon-9", {}, "f_ksuid_prod");
+    });
+  });
 });

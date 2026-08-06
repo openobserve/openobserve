@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :key="tabItem.name"
             :data-test="tabItem.dataTest"
             :name="tabItem.name"
-            :label="tabItem.label"
+            :label="raw(tabItem.label)"
           />
         </OTabs>
       </div>
@@ -96,9 +96,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :columns="tableColumns"
               row-key="_rowKey"
               pagination="none"
+              :row-height="24"
               :default-columns="false"
-              class="o2-table o2-row-md o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
+              :show-global-filter="false"
+              :global-filter="detailSearchQuery"
+              class="o2-table o2-schema-table log-detail-source-table border-card-glass-border w-full border border-solid"
             >
+              <template #toolbar>
+                <OSearchInput
+                  v-model="detailSearchQuery"
+                  data-test="log-detail-table-search-input"
+                  class="flex-1"
+                  :placeholder="t('common.search')"
+                />
+              </template>
               <template #cell-field="{ value }">
                 <div
                   :data-test="`log-detail-${value}-key`"
@@ -429,7 +440,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
@@ -458,6 +469,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 const defaultValue: any = () => {
   return {
@@ -491,6 +503,7 @@ export default defineComponent({
     OSpinner,
     OIcon,
     OTable,
+    OSearchInput,
   },
   emits: [
     "showPrevDetail",
@@ -540,7 +553,7 @@ export default defineComponent({
     },
     initialTab: {
       type: String,
-      default: "table",
+      default: "json",
     },
   },
   methods: {
@@ -567,22 +580,22 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const rowData: any = ref({});
     const router = useRouter();
     const store = useStore();
     const { isDark } = useTheme();
     const tableDropdownOpenMap = reactive<Record<string, boolean>>({});
-    const tab = ref(props.initialTab || "table");
+    const tab = ref(props.initialTab || "json");
     const selectedRelativeValue = ref<number>(10);
-    const recordSizeOptions = ref<Array<{ label: string; value: number }>>([
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "200", value: 200 },
-      { label: "500", value: 500 },
-      { label: "1000", value: 1000 },
+    const recordSizeOptions = ref<Array<{ label: I18nText; value: number }>>([
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
+      { label: raw("200"), value: 200 },
+      { label: raw("500"), value: 500 },
+      { label: raw("1000"), value: 1000 },
     ]);
     const shouldWrapValues: any = ref(true);
     const { searchObj } = searchState();
@@ -659,6 +672,8 @@ export default defineComponent({
     ];
 
     // Transform rowData object into array of rows
+    const detailSearchQuery = ref("");
+
     const tableRows = computed<
       { _rowKey: string; field: string; value: string | number | boolean }[]
     >(() => {
@@ -693,14 +708,14 @@ export default defineComponent({
     const availableTabs = computed(() => {
       const tabs = [
         {
-          name: "table",
-          label: t("common.table"),
-          dataTest: "log-detail-table-tab",
-        },
-        {
           name: "json",
           label: t("common.json"),
           dataTest: "log-detail-json-tab",
+        },
+        {
+          name: "table",
+          label: t("common.table"),
+          dataTest: "log-detail-table-tab",
         },
       ];
       if (serviceStreamsEnabled.value && config.isEnterprise === "true") {
@@ -829,7 +844,7 @@ export default defineComponent({
     };
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("logs.detailTable.contentCopiedSuccessfully"),
         timeout: 1000,
       });
@@ -1000,6 +1015,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       router,
@@ -1027,6 +1043,7 @@ export default defineComponent({
       statusColor,
       tableColumns,
       tableRows,
+      detailSearchQuery,
       serviceStreamsEnabled,
       tabOrder,
       onTabReorder,

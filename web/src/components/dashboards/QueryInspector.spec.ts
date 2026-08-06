@@ -177,10 +177,6 @@ describe("QueryInspector", () => {
         stubs: {
           ODialog: ODialogStub,
           OButton: OButtonStub,
-          QIcon: {
-            template: '<span data-test="OIcon" :class="name"><slot /></span>',
-            props: ["name", "size"],
-          },
         },
         directives: {
           "close-popup": () => {},
@@ -1238,7 +1234,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Variable(s)");
+      expect(wrapper.text()).toContain("Variables");
       expect(wrapper.text()).toContain("level");
       expect(wrapper.text()).toContain("error");
     });
@@ -1247,7 +1243,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Fixed Variable(s)");
+      expect(wrapper.text()).toContain("Fixed Variables");
       expect(wrapper.text()).toContain("service");
       expect(wrapper.text()).toContain("api");
     });
@@ -1256,7 +1252,7 @@ describe("QueryInspector", () => {
       wrapper = createWrapper();
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Dynamic Variable(s)");
+      expect(wrapper.text()).toContain("Dynamic Variables");
       expect(wrapper.text()).toContain("count");
       expect(wrapper.text()).toContain(">=");
       expect(wrapper.text()).toContain("100");

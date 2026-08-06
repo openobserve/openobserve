@@ -53,9 +53,12 @@ import {
   setActiveOverlay,
   clearActiveOverlay,
 } from "@/lib/overlay/Dropdown/ODropdown.context";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 type NormalizedOption = {
-  label: string;
+  label: I18nText;
   value: SelectPrimitiveValue;
   disabled: boolean;
   header: boolean;
@@ -64,7 +67,7 @@ type NormalizedOption = {
    *  Used when the icon isn't a string name in the OIcon registry. */
   iconComponent?: any;
   /** Secondary description text shown below the label in the dropdown item. */
-  subLabel?: string;
+  subLabel?: I18nText;
   /** When true, renders subLabel on the same line as the label (name – url style). */
   subLabelInline?: boolean;
   /** Array of CSS color strings used to render a gradient swatch below the label. */
@@ -87,6 +90,7 @@ const DEFAULT_OPTION_DISABLED = "disabled";
 
 const props = withDefaults(defineProps<SelectProps>(), {
   size: "md",
+  appearance: "field",
   disabled: false,
   clearable: false,
   error: false,
@@ -96,7 +100,6 @@ const props = withDefaults(defineProps<SelectProps>(), {
   hideSelected: false,
   collapsibleGroups: false,
   creatable: false,
-  searchPlaceholder: "Search...",
   labelKey: DEFAULT_OPTION_LABEL,
   valueKey: DEFAULT_OPTION_VALUE,
   iconKey: undefined,
@@ -160,26 +163,26 @@ function toRekaString(v: SelectPrimitiveValue): string {
   return String(v);
 }
 
-function normalizeOption(raw: unknown): NormalizedOption | null {
-  if (isPrimitiveSelectValue(raw)) {
+function normalizeOption(input: unknown): NormalizedOption | null {
+  if (isPrimitiveSelectValue(input)) {
     return {
-      label: String(raw),
-      value: raw,
+      label: raw(String(input)),
+      value: input,
       disabled: false,
       header: false,
     };
   }
 
-  if (!raw || typeof raw !== "object") return null;
+  if (!input || typeof input !== "object") return null;
 
-  const option = raw as Record<string, unknown>;
+  const option = input as Record<string, unknown>;
   const rawLabel = option[props.labelKey];
 
   // Group header: items with header:true or isTab:true are non-selectable labels
   const isHeader = Boolean(option["header"]) || Boolean(option["isTab"]);
   if (isHeader) {
     return {
-      label: rawLabel === undefined || rawLabel === null ? "" : String(rawLabel),
+      label: raw(rawLabel === undefined || rawLabel === null ? "" : String(rawLabel)),
       value: `__header__${String(rawLabel)}`,
       disabled: true,
       header: true,
@@ -198,13 +201,13 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
   const rawSubLabelInline = option["subLabelInline"];
   const rawColorPalette = option["colorPalette"];
   return {
-    label: rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel),
+    label: raw(rawLabel === undefined || rawLabel === null ? String(rawValue) : String(rawLabel)),
     value: rawValue,
     disabled: Boolean(option[DEFAULT_OPTION_DISABLED]),
     header: false,
     icon: typeof rawIcon === "string" && rawIcon ? rawIcon : undefined,
     iconComponent: rawIconComponent ?? undefined,
-    subLabel: typeof rawSubLabel === "string" ? rawSubLabel : undefined,
+    subLabel: typeof rawSubLabel === "string" ? raw(rawSubLabel) : undefined,
     subLabelInline: rawSubLabelInline === true,
     colorPalette: Array.isArray(rawColorPalette) ? (rawColorPalette as string[]) : undefined,
     badge: typeof option["badge"] === "string" ? (option["badge"] as string) : undefined,
@@ -220,7 +223,7 @@ function normalizeOption(raw: unknown): NormalizedOption | null {
 const normalizedOptions = computed<NormalizedOption[]>(() => {
   if (!props.options?.length) return [];
   return props.options
-    .map((raw) => normalizeOption(raw))
+    .map((option) => normalizeOption(option))
     .filter((opt): opt is NormalizedOption => opt !== null);
 });
 
@@ -245,6 +248,12 @@ const filterDebounceTimer = ref<ReturnType<typeof setTimeout> | null>(null);
 const pinnedSelected = ref<Set<string>>(new Set());
 
 const inputEnabled = computed(() => props.searchable);
+
+// Not a `withDefaults` default: that is evaluated once at module scope, which
+// would freeze the placeholder in whatever locale was active at first load.
+const resolvedSearchPlaceholder = computed(
+  () => props.searchPlaceholder ?? t("common.searchEllipsis"),
+);
 
 const baseFilteredOptions = computed(() => {
   if (!inputEnabled.value) return normalizedOptions.value;
@@ -985,6 +994,28 @@ const overflowSelectedCount = computed(() =>
 // flex container at the trigger's right edge, so changing this padding only
 // squeezes the content area — it does not shift the chevron position when the
 // clear button toggles into view.
+const isInlineAppearance = computed(() => props.appearance === "inline");
+
+/**
+ * Inline-appearance trigger chrome. Deliberately contributes NOTHING to the
+ * line box it sits in: the hover boundary is an inset ring (painted inside the
+ * box, no size) and the negative margins cancel the padding — so dropping this
+ * into a fixed-height description band does not stretch it.
+ */
+const inlineTriggerClasses = computed(() => [
+  "rounded-default relative -mx-1 -my-0.5 flex w-auto shrink-0 items-center px-1 pe-6 py-0.5",
+  "text-text-body text-xs font-medium",
+  "ring-1 ring-inset transition-[color,background-color,box-shadow] duration-150",
+  "focus:outline-none focus-visible:outline-accent/40 focus-visible:outline-2",
+  // The hover ring is gated on !hasError so it can't override the resting error
+  // ring on hover (equal specificity, later class wins) and hide the error.
+  props.disabled
+    ? "ring-transparent cursor-not-allowed opacity-60"
+    : hasError.value
+      ? "ring-select-border-error cursor-pointer hover:bg-surface-subtle hover:text-text-heading"
+      : "ring-transparent cursor-pointer hover:bg-surface-subtle hover:text-text-heading hover:ring-border-default",
+]);
+
 const triggerEndPadding = computed(() =>
   props.clearable && hasSelection.value ? "pe-12" : "pe-7",
 );
@@ -1008,7 +1039,11 @@ const fieldWidthClass = computed(() => {
 <template>
   <div
     v-bind="wrapperAttrs"
-    :class="['flex flex-col gap-1', fieldWidthClass, labelPosition === 'inside' ? 'min-w-0' : '']"
+    :class="[
+      'flex flex-col gap-1',
+      isInlineAppearance ? 'w-auto' : fieldWidthClass,
+      labelPosition === 'inside' ? 'min-w-0' : '',
+    ]"
   >
     <!-- Label -->
     <label
@@ -1058,22 +1093,30 @@ const fieldWidthClass = computed(() => {
                   : ''
             "
             :data-test-selected-label="triggerDisplayLabel"
-            :class="[
-              'rounded-default relative flex w-full border',
-              // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
-              labelPosition === 'inside' && label ? '' : $slots['icon-left'] ? 'ps-2' : 'ps-3',
-              'bg-select-bg',
-              hasError
-                ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
-              /* Keep the red error border on focus; focus border color applies only when there's no error. */
-              'focus:outline-none',
-              'transition-[color,background-color,border-color,box-shadow] duration-150',
-              'disabled:bg-select-disabled-bg disabled:cursor-not-allowed disabled:border-dashed',
-              labelPosition === 'inside' && label
-                ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
-                : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
-            ]"
+            :class="
+              isInlineAppearance
+                ? inlineTriggerClasses
+                : [
+                    'rounded-default relative flex w-full border',
+                    // In inside-label mode padding is handled per-row; in normal mode it goes on the trigger
+                    labelPosition === 'inside' && label
+                      ? ''
+                      : $slots['icon-left']
+                        ? 'ps-2'
+                        : 'ps-3',
+                    'bg-select-bg',
+                    hasError
+                      ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
+                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                    /* Keep the red error border on focus; focus border color applies only when there's no error. */
+                    'focus:outline-none',
+                    'transition-[color,background-color,border-color,box-shadow] duration-150',
+                    'disabled:bg-select-disabled-bg disabled:cursor-not-allowed disabled:border-dashed',
+                    labelPosition === 'inside' && label
+                      ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
+                      : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
+                  ]
+            "
           >
             <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
             <span
@@ -1123,7 +1166,7 @@ const fieldWidthClass = computed(() => {
                       class="rounded-default bg-select-item-hover-bg text-select-text inline-flex shrink-0 items-center px-2 py-0.5 text-xs"
                       data-test="o-select-overflow-chip"
                     >
-                      +{{ overflowSelectedCount }} more
+                      +{{ overflowSelectedCount }} {{ t("components.select.more") }}
                     </span>
                   </div>
                 </template>
@@ -1131,7 +1174,11 @@ const fieldWidthClass = computed(() => {
                   v-else
                   :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
                   :class="[
-                    'flex-1 truncate text-start text-sm',
+                    'text-start',
+                    // An inline trigger is a word in a sentence: it grows to fit
+                    // its value. `truncate` would also zero its min-content
+                    // width, letting any ancestor squeeze it to a lone ellipsis.
+                    isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
                     labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                     disabled
                       ? 'text-select-disabled-text'
@@ -1154,12 +1201,17 @@ const fieldWidthClass = computed(() => {
             is anchored to the container's right edge, toggling the clear
             button in or out does not shift the chevron.
           -->
-          <div class="pointer-events-none absolute end-2.5 flex items-center gap-1.5">
+          <div
+            :class="[
+              'pointer-events-none absolute flex items-center gap-1.5',
+              isInlineAppearance ? 'end-1' : 'end-2.5',
+            ]"
+          >
             <button
-              v-if="clearable && hasSelection"
+              v-if="clearable && hasSelection && !isInlineAppearance"
               type="button"
               tabindex="-1"
-              aria-label="Clear selection"
+              :aria-label="t('components.select.clearSelection')"
               :class="[
                 'flex size-3.5 items-center justify-center',
                 'text-input-clear-btn hover:text-input-clear-btn-hover',
@@ -1252,7 +1304,7 @@ const fieldWidthClass = computed(() => {
                     'border-input-border border-b',
                     heightClasses[size ?? 'md'],
                   ]"
-                  :placeholder="searchPlaceholder"
+                  :placeholder="resolvedSearchPlaceholder"
                   @keydown="handleDropdownKeydown"
                 />
 
@@ -1267,7 +1319,7 @@ const fieldWidthClass = computed(() => {
                   v-if="selectAll && multiple && selectableOptions.length > 0"
                   role="button"
                   tabindex="0"
-                  aria-label="Toggle all options"
+                  :aria-label="t('components.select.toggleAllOptions')"
                   :aria-checked="allSelected ? 'true' : partiallySelected ? 'mixed' : 'false'"
                   :class="[
                     'relative flex w-full shrink-0 items-center gap-2',
@@ -1308,7 +1360,9 @@ const fieldWidthClass = computed(() => {
                       <polyline points="2,6 5,9 10,3" />
                     </svg>
                   </span>
-                  <span class="truncate font-medium">Select all</span>
+                  <span class="truncate font-medium">{{
+                    t("components.select.selectAllLabel")
+                  }}</span>
                 </div>
 
                 <!-- Consumer-supplied rows rendered above the option list -->
@@ -1327,7 +1381,7 @@ const fieldWidthClass = computed(() => {
                     v-if="filteredOptions.length === 0"
                     class="text-select-placeholder px-3 py-2 text-sm"
                   >
-                    <slot name="empty">No options found</slot>
+                    <slot name="empty">{{ t("components.select.noOptionsFound") }}</slot>
                   </div>
 
                   <!-- Virtualised list — spacer div with absolutely positioned rows -->
@@ -1592,7 +1646,7 @@ const fieldWidthClass = computed(() => {
                           <polyline points="1.5,5 4,8 8.5,2" />
                         </svg>
                       </span>
-                      <span>Multi select</span>
+                      <span>{{ t("components.select.multiSelect") }}</span>
                     </span>
 
                     <span class="bg-input-border h-3.5 w-px shrink-0" aria-hidden="true" />
@@ -1613,7 +1667,7 @@ const fieldWidthClass = computed(() => {
                       >
                         <path d="M4 2h6M4 5h6M4 8h3" />
                       </svg>
-                      <span>Single select</span>
+                      <span>{{ t("components.select.singleSelect") }}</span>
                     </span>
                   </div>
                 </template>
@@ -1645,22 +1699,26 @@ const fieldWidthClass = computed(() => {
           :id="inputId"
           :tabindex="inputTabindex"
           :data-test="parentDataTest ? `${parentDataTest}-trigger` : undefined"
-          :class="[
-            'rounded-default relative flex w-full border',
-            // In inside-label mode padding is handled per-row
-            labelPosition === 'inside' && label ? '' : 'ps-3',
-            'bg-select-bg',
-            hasError
-              ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-              : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
-            /* Keep the red error border on focus; focus border color applies only when there's no error. */
-            'focus:outline-none',
-            'transition-[color,background-color,border-color,box-shadow] duration-150',
-            'data-disabled:bg-select-disabled-bg data-disabled:cursor-not-allowed data-disabled:border-dashed',
-            labelPosition === 'inside' && label
-              ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
-              : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
-          ]"
+          :class="
+            isInlineAppearance
+              ? inlineTriggerClasses
+              : [
+                  'rounded-default relative flex w-full border',
+                  // In inside-label mode padding is handled per-row
+                  labelPosition === 'inside' && label ? '' : 'ps-3',
+                  'bg-select-bg',
+                  hasError
+                    ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
+                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                  /* Keep the red error border on focus; focus border color applies only when there's no error. */
+                  'focus:outline-none',
+                  'transition-[color,background-color,border-color,box-shadow] duration-150',
+                  'data-disabled:bg-select-disabled-bg data-disabled:cursor-not-allowed data-disabled:border-dashed',
+                  labelPosition === 'inside' && label
+                    ? ['flex-col justify-between py-0.5', heightClasses[size ?? 'md']]
+                    : ['items-center', triggerEndPadding, heightClasses[size ?? 'md']],
+                ]
+          "
         >
           <!-- Inside label: in-flow with whitespace-nowrap so it drives the trigger's auto-width -->
           <span
@@ -1680,7 +1738,8 @@ const fieldWidthClass = computed(() => {
             <SelectValue
               :placeholder="placeholder"
               :class="[
-                'flex-1 truncate text-start text-sm',
+                'text-start',
+                isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
                 labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
                 disabled
                   ? 'text-select-disabled-text'
@@ -1696,12 +1755,17 @@ const fieldWidthClass = computed(() => {
 
         <!-- Trailing icons: clear (left) then chevron (right). See note in
              the listbox branch above for the pointer-events strategy. -->
-        <div class="pointer-events-none absolute end-2.5 flex items-center gap-1.5">
+        <div
+          :class="[
+            'pointer-events-none absolute flex items-center gap-1.5',
+            isInlineAppearance ? 'end-1' : 'end-2.5',
+          ]"
+        >
           <button
-            v-if="clearable && hasSelection"
+            v-if="clearable && hasSelection && !isInlineAppearance"
             type="button"
             tabindex="-1"
-            aria-label="Clear selection"
+            :aria-label="t('components.select.clearSelection')"
             :class="[
               'flex size-3.5 items-center justify-center',
               'text-input-clear-btn hover:text-input-clear-btn-hover',

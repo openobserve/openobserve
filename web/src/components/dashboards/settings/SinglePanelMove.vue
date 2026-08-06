@@ -73,7 +73,7 @@ import { getDashboard } from "@/utils/commons";
 import { reactive } from "vue";
 import { onMounted } from "vue";
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
@@ -89,7 +89,7 @@ export default defineComponent({
   emits: ["update:ok", "update:cancel", "refresh", "update:modelValue"],
   props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");

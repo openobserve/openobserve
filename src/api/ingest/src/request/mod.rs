@@ -17,5 +17,3 @@ pub mod clusters;
 pub mod logs;
 pub mod metrics;
 pub mod rum;
-
-pub use common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO};

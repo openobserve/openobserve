@@ -166,18 +166,19 @@ describe("useTracesTableColumns", () => {
       return buildCols(false, "spans", ["span_kind"]).find((c) => c.id === "span_kind");
     }
 
-    it("should use 'Span Kind' as the header", () => {
-      expect(getSpanKindCol()?.header).toBe("Span Kind");
+    // The mocked `t` above echoes keys back, so the header comes out as its key.
+    it("should translate the Span Kind header key", () => {
+      expect(getSpanKindCol()?.header).toBe("traces.tableColumns.spanKind");
     });
 
     it("should use size 120", () => {
       expect(getSpanKindCol()?.size).toBe(120);
     });
 
-    it("should have meta.align=left, slot=false, closable=true", () => {
+    it("should have meta.align=left, closable=true (OTable auto-detects cell slots — no meta.slot)", () => {
       const meta = getSpanKindCol()?.meta as Record<string, unknown>;
       expect(meta?.align).toBe("left");
-      expect(meta?.slot).toBe(false);
+      expect(meta?.slot).toBeUndefined();
       expect(meta?.closable).toBe(true);
     });
 
@@ -282,9 +283,9 @@ describe("useTracesTableColumns", () => {
       expect(ids).toContain("span_status");
     });
 
-    it("should use 'Span Status' as the header for span_status", () => {
+    it("should translate the Span Status header key for span_status", () => {
       const col = buildCols(false, "spans", ["span_status"]).find((c) => c.id === "span_status");
-      expect(col?.header).toBe("Span Status");
+      expect(col?.header).toBe("traces.tableColumns.spanStatus");
     });
 
     it("should use size 120 for span_status", () => {
@@ -292,10 +293,10 @@ describe("useTracesTableColumns", () => {
       expect(col?.size).toBe(120);
     });
 
-    it("should have slot:true and disableCellAction:true in meta for span_status", () => {
+    it("should have disableCellAction:true in meta for span_status (no meta.slot — OTable auto-detects)", () => {
       const col = buildCols(false, "spans", ["span_status"]).find((c) => c.id === "span_status");
       const meta = col?.meta as Record<string, unknown>;
-      expect(meta?.slot).toBe(true);
+      expect(meta?.slot).toBeUndefined();
       expect(meta?.disableCellAction).toBe(true);
     });
   });
@@ -450,10 +451,10 @@ describe("useTracesTableColumns", () => {
       expect(typeof (col as any)?.accessorFn).toBe("function");
     });
 
-    it("should have meta.class set to 'capitalize!' when auto-prepended", () => {
+    it("should have meta.headerClass set to 'capitalize!' when auto-prepended", () => {
       const col = buildCols(false, "spans", []).find((c) => c.id === "_timestamp");
       const meta = col?.meta as Record<string, unknown>;
-      expect(meta?.class).toBe("capitalize!");
+      expect(meta?.headerClass).toBe("capitalize!");
     });
 
     it("should have meta.sortable=true on timestamp column", () => {

@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :frame="false"
           :key="activeTab"
           data-test="pipeline-list-table"
-          :data="filteredPipelines"
+          :data="displayedPipelines"
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
@@ -43,13 +43,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model:selected-ids="selectedPipelineIds"
           :expansion="activeTab === 'scheduled' ? 'single' : 'none'"
           :expand-on-row-click="(row: any) => row.source?.source_type === 'scheduled'"
-          :row-class="
-            (row: any) => (row.source?.source_type === 'scheduled' ? 'cursor-pointer' : '')
-          "
+          :row-class="pipelineRowClass"
+          :get-row-style="pipelineRowStyle"
           v-model:expanded-ids="expandedId"
           width="100%"
           class="h-full w-full"
         >
+          <!-- Summary strip: operational state counts for the current tab, doubling
+               as the state facet (the toggle group above facets by pipeline TYPE,
+               so the two never overlap). Always rendered so rows never shift. -->
+          <template #subheader>
+            <div
+              class="px-page-edge border-table-row-divider border-b py-1.5"
+              data-test="pipeline-list-summary"
+            >
+              <OStatStrip
+                :items="summaryStats"
+                :loading="loading"
+                selectable
+                :selected-key="stateFilter"
+                @select="onStatSelect"
+              />
+            </div>
+          </template>
+
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <OToggleGroup
@@ -108,6 +125,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #cell-type="{ row }">
             <OTag type="pipelineType" :value="row.type" />
+          </template>
+
+          <!-- State: the page's primary signal. Errored rows also carry WHEN they
+               last failed — recency is shown for the exception only, never for the
+               healthy majority. -->
+          <template #cell-state="{ row }">
+            <span class="inline-flex min-w-0 items-center gap-1.5">
+              <OTag
+                :variant="stateVariant(row)"
+                size="sm"
+                :data-test="`pipeline-list-${row.name}-state`"
+              >
+                <template #icon>
+                  <OIcon :name="stateIconName(row)" size="xs" />
+                </template>
+                {{ stateLabel(row) }}
+              </OTag>
+              <span v-if="pipelineState(row) === 'errored'" class="text-text-secondary text-xs">
+                <OTimeCell
+                  :value="row.last_error?.last_error_timestamp"
+                  unit="us"
+                  mode="relative"
+                  :timezone="store.state.timezone"
+                />
+              </span>
+            </span>
           </template>
 
           <template #cell-actions="{ row }">
@@ -212,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #icon-left>
                     <OIcon size="sm" name="refresh" />
                   </template>
-                  Create Backfill
+                  {{ t("pipeline_list.createBackfill") }}
                 </ODropdownItem>
                 <ODropdownSeparator v-if="row.last_error" />
                 <ODropdownItem
@@ -224,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon size="sm" name="error" />
                   </template>
                   <div class="flex flex-col">
-                    <div>View Error</div>
+                    <div>{{ t("pipeline_list.viewError") }}</div>
                     <div class="text-text-secondary text-xs">
                       {{ new Date(row.last_error.last_error_timestamp / 1000).toLocaleString() }}
                     </div>
@@ -258,11 +301,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OEmptyState
               size="hero"
               preset="no-pipelines"
-              :filtered="!!filterQuery"
+              :filtered="!!(filterQuery || stateFilter)"
               @action="
                 (id) =>
                   id === 'clear-filters'
-                    ? (filterQuery = '')
+                    ? ((filterQuery = ''), (stateFilter = null))
                     : id === 'import'
                       ? goToImportPipeline()
                       : goToCreatePipeline()
@@ -311,7 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="openBulkDeleteDialog"
                   icon-left="delete"
                 >
-                  Delete
+                  {{ t("common.delete") }}
                 </OButton>
               </div>
             </div>
@@ -365,7 +408,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="errorDialog.data?.name"
     :sub-title="
       errorDialog.data
-        ? `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`
+        ? raw(
+            `${t('pipeline_list.last_error')}: ${new Date(errorDialog.data.last_error.last_error_timestamp / 1000).toLocaleString()}`,
+          )
         : undefined
     "
     :primary-button-label="t('pipeline_list.close')"
@@ -443,7 +488,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, watch, onMounted } from "vue";
 import { normalizeNodeErrorMessages } from "@/utils/pipelines/nodeErrors";
 import { MarkerType } from "@vue-flow/core";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
 import pipelineService from "@/services/pipelines";
@@ -453,6 +498,11 @@ import config from "@/aws-exports";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
+import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -475,7 +525,7 @@ import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 
 // Row original data rendered by the pipelines table. Only the fields read in the
@@ -501,7 +551,7 @@ const resumePipelineDialogMeta: any = ref({
   onCancel: () => handleCancelResumePipeline(),
 });
 
-const { pipelineObj } = useDragAndDrop();
+const { pipelineObj } = useDragAndDrop(t);
 
 watch(
   () => router.currentRoute.value.name,
@@ -555,6 +605,139 @@ const currentRouteName = computed(() => {
 
 const otableColumns = computed(() => columns.value);
 
+// ── Pipeline operational state (single source of truth) ─────────────────────
+// errored → last run reported an error (needs attention, whether or not it runs)
+// active  → enabled and running
+// paused  → disabled
+const pipelineState = (row: any): "errored" | "active" | "paused" => {
+  if (row?.last_error) return "errored";
+  return row?.enabled ? "active" : "paused";
+};
+
+const stateVariant = (row: any): BadgeVariant => {
+  const s = pipelineState(row);
+  return s === "errored" ? "error-soft" : s === "paused" ? "default-soft" : "success-soft";
+};
+const stateIconName = (row: any): IconName => {
+  const s = pipelineState(row);
+  return s === "errored" ? "error-outline" : s === "paused" ? "pause" : "check-circle";
+};
+const stateLabel = (row: any): string => {
+  const s = pipelineState(row);
+  return s === "errored"
+    ? t("pipeline_list.stateErrored")
+    : s === "paused"
+      ? t("pipeline_list.statePaused")
+      : t("pipeline_list.stateActive");
+};
+
+// Full-row wash for the EXCEPTIONS only — errored gets a light red, paused a
+// muted grey, healthy rows stay clean (their state reads from the green rail).
+// Scheduled rows keep their click affordance for the SQL expansion.
+const pipelineRowClass = (row: any): string => {
+  const s = pipelineState(row);
+  const stateClass =
+    s === "errored" ? "!bg-status-error-bg" : s === "paused" ? "!bg-surface-panel" : "";
+  const cursorClass = row?.source?.source_type === "scheduled" ? "cursor-pointer" : "";
+  return [cursorClass, stateClass].filter(Boolean).join(" ");
+};
+
+// Extreme-left state rail — inset box-shadow so it paints regardless of
+// border-collapse; rem width + token colour keep it theme-aware.
+const pipelineRowStyle = (row: any): Record<string, string> => {
+  const s = pipelineState(row);
+  const color =
+    s === "errored"
+      ? "var(--color-error-500)"
+      : s === "paused"
+        ? "var(--color-grey-400)"
+        : "var(--color-success-500)";
+  return { boxShadow: `inset 0.25rem 0 0 0 ${color}` };
+};
+
+// ── State facet + summary strip ─────────────────────────────────────────────
+// Counts run over the TYPE-filtered rows (not the state-filtered ones) so the
+// tiles keep their totals while a facet is active.
+const stateFilter = ref<"errored" | "paused" | "active" | null>(null);
+
+const displayedPipelines = computed(() => {
+  const rows = filteredPipelines.value || [];
+  const f = stateFilter.value;
+  if (!f) return rows;
+  return rows.filter((row: any) => pipelineState(row) === f);
+});
+
+const onStatSelect = (key: string) => {
+  if (key === "total") {
+    stateFilter.value = null;
+    return;
+  }
+  stateFilter.value = stateFilter.value === key ? null : (key as "errored" | "paused" | "active");
+};
+
+const stateCounts = computed(() => {
+  const rows = filteredPipelines.value || [];
+  let errored = 0;
+  let paused = 0;
+  let active = 0;
+  for (const row of rows) {
+    const s = pipelineState(row);
+    if (s === "errored") errored += 1;
+    else if (s === "paused") paused += 1;
+    else active += 1;
+  }
+  return { errored, paused, active, total: rows.length };
+});
+
+// Attention-first, left → right: errored (needs action) → paused (inert) →
+// active (healthy) → Total last, and never itself the selected tile.
+const summaryStats = computed<StatItem[]>(() => {
+  const c = stateCounts.value;
+  const hasData = c.total > 0;
+  const v = (n: number): string | number => (hasData ? n : "—");
+  const share = hasData ? c.total : undefined;
+  return [
+    {
+      key: "errored",
+      label: t("pipeline_list.summaryErrored"),
+      value: v(c.errored),
+      icon: "error-outline",
+      tone: "error",
+      max: share,
+      dataTest: "pipeline-summary-errored",
+    },
+    {
+      key: "paused",
+      label: t("pipeline_list.summaryPaused"),
+      value: v(c.paused),
+      icon: "pause",
+      tone: "neutral",
+      max: share,
+      dataTest: "pipeline-summary-paused",
+    },
+    {
+      key: "active",
+      label: t("pipeline_list.summaryActive"),
+      value: v(c.active),
+      icon: "check-circle",
+      tone: "success",
+      max: share,
+      dataTest: "pipeline-summary-active",
+    },
+    {
+      key: "total",
+      label: t("pipeline_list.summaryTotal"),
+      value: v(c.total),
+      icon: "format-list-bulleted",
+      tone: "primary",
+      // Clickable (it CLEARS the state facet) but never shows the ring — the
+      // selected key is only ever a real state, never "total". No bar: its share
+      // of itself is always 100%.
+      dataTest: "pipeline-summary-total",
+    },
+  ];
+});
+
 const updateActiveTab = () => {
   expandedId.value = [];
   if (activeTab.value === "all") {
@@ -594,7 +777,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         ? `${row.name} state resumed successfully`
         : `${row.name} state paused successfully`;
       toast({
-        message: message,
+        message: raw(message),
         variant: "success",
       });
       await getPipelines();
@@ -620,6 +803,18 @@ const getColumnsForActiveTab = (tab: any) => {
     size: COL.name,
     minSize: 160,
     meta: { align: "left", flex: true },
+  };
+  const stateColumn = {
+    id: "state",
+    header: t("pipeline_list.state"),
+    // Sorts by the state word so errored / paused / active group together.
+    accessorFn: (row: any) => pipelineState(row),
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.status,
+    minSize: 96,
+    meta: { align: "left" },
   };
   const streamNameColumn = {
     id: "stream_name",
@@ -702,6 +897,7 @@ const getColumnsForActiveTab = (tab: any) => {
   if (tab === "all") {
     return [
       nameColumn,
+      stateColumn,
       typeColumn,
       streamNameColumn,
       scheduledStreamTypeColumn,
@@ -712,10 +908,11 @@ const getColumnsForActiveTab = (tab: any) => {
     ];
   }
   if (tab === "realtime") {
-    return [nameColumn, streamNameColumn, streamTypeColumn, actionsColumn];
+    return [nameColumn, stateColumn, streamNameColumn, streamTypeColumn, actionsColumn];
   }
   return [
     nameColumn,
+    stateColumn,
     scheduledStreamTypeColumn,
     frequencyColumn,
     periodColumn,
@@ -831,7 +1028,7 @@ const openDeleteDialog = (pipeline: any) => {
 
 const savePipeline = (data: any) => {
   const dismiss = toast({
-    message: "saving pipeline...",
+    message: t("toastMessages.pipeline.savingPipeline"),
     variant: "loading",
     timeout: 0,
   });
@@ -846,7 +1043,7 @@ const savePipeline = (data: any) => {
       dismiss();
       showCreatePipeline.value = false;
       toast({
-        message: "Pipeline created successfully",
+        message: t("toastMessages.pipeline.pipelineCreatedSuccessfully"),
         variant: "success",
       });
     })
@@ -863,7 +1060,7 @@ const savePipeline = (data: any) => {
 
 const deletePipeline = async () => {
   const dismiss = toast({
-    message: "deleting pipeline...",
+    message: t("toastMessages.pipeline.deletingPipeline"),
     variant: "loading",
     timeout: 0,
   });
@@ -876,7 +1073,7 @@ const deletePipeline = async () => {
     })
     .then(async () => {
       toast({
-        message: "Pipeline deleted successfully",
+        message: t("toastMessages.pipeline.pipelineDeletedSuccessfully"),
         variant: "success",
       });
     })
@@ -949,7 +1146,9 @@ const exportBulkPipelines = () => {
 
   selectedPipelineIds.value = [];
   toast({
-    message: `${pipelinesToExport.length} pipelines exported successfully`,
+    message: t("toastMessages.pipeline.pipelinesExportedSuccessfully", {
+      count: pipelinesToExport.length,
+    }),
     variant: "success",
   });
 };
@@ -986,7 +1185,10 @@ const goToBackfillJobs = () => {
 const bulkTogglePipelines = async (action: "pause" | "resume") => {
   const dismiss = toast({
     variant: "loading",
-    message: `${action === "resume" ? "Resuming" : "Pausing"} pipelines...`,
+    message:
+      action === "resume"
+        ? t("toastMessages.pipeline.resumingPipelines")
+        : t("toastMessages.pipeline.pausingPipelines"),
     timeout: 0,
   });
   try {
@@ -999,7 +1201,10 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     if (pipelinesToToggle.length === 0) {
       toast({
         variant: "error",
-        message: `No pipelines to ${action}`,
+        message:
+          action === "resume"
+            ? t("toastMessages.pipeline.noPipelinesToResume")
+            : t("toastMessages.pipeline.noPipelinesToPause"),
       });
       dismiss();
       return;
@@ -1021,7 +1226,10 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
       dismiss();
       toast({
         variant: "success",
-        message: `Pipelines ${action}d successfully`,
+        message:
+          action === "resume"
+            ? t("toastMessages.pipeline.pipelinesResumedSuccessfully")
+            : t("toastMessages.pipeline.pipelinesPausedSuccessfully"),
       });
     }
 
@@ -1033,7 +1241,10 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     console.error(`Error ${action}ing pipelines:`, error);
     toast({
       variant: "error",
-      message: `Error ${action}ing pipelines. Please try again.`,
+      message:
+        action === "resume"
+          ? t("toastMessages.pipeline.errorResumingPipelines")
+          : t("toastMessages.pipeline.errorPausingPipelines"),
     });
   }
 };
@@ -1050,7 +1261,7 @@ const bulkDeletePipelines = async () => {
   bulkDeleteLoading.value = true;
   const dismiss = toast({
     variant: "loading",
-    message: "Deleting pipelines...",
+    message: t("toastMessages.pipeline.deletingPipelines"),
     timeout: 0,
   });
 
@@ -1058,7 +1269,7 @@ const bulkDeletePipelines = async () => {
     if (selectedPipelines.value.length === 0) {
       toast({
         variant: "error",
-        message: "No pipelines selected for deletion",
+        message: t("toastMessages.pipeline.noPipelinesSelectedForDeletion"),
       });
       dismiss();
       return;
@@ -1086,27 +1297,34 @@ const bulkDeletePipelines = async () => {
         // Partial success
         toast({
           variant: "warning",
-          message: `${successCount} pipeline(s) deleted successfully, ${failCount} failed`,
+          message: t("toastMessages.pipeline.pipelinesDeletedWithFailures", {
+            count: successCount,
+            failed: failCount,
+          }),
           timeout: 5000,
         });
       } else if (failCount > 0) {
         // All failed
         toast({
           variant: "error",
-          message: `Failed to delete ${failCount} pipeline(s)`,
+          message: t("toastMessages.pipeline.failedToDeletePipelines", { count: failCount }),
         });
       } else {
         // All successful
         toast({
           variant: "success",
-          message: `${successCount} pipeline(s) deleted successfully`,
+          message: t("toastMessages.pipeline.pipelinesDeletedSuccessfully", {
+            count: successCount,
+          }),
         });
       }
     } else {
       // Fallback success message
       toast({
         variant: "success",
-        message: `${selectedPipelines.value.length} pipeline(s) deleted successfully`,
+        message: t("toastMessages.pipeline.pipelinesDeletedSuccessfully", {
+          count: selectedPipelines.value.length,
+        }),
       });
     }
 

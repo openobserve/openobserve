@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <img
                         :src="chart.asset"
-                        :alt="chart.label"
+                        :alt="t(chart.labelKey)"
                         class="h-full w-full object-cover"
                         loading="lazy"
                       />
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OCardSection>
                   <OCardSection class="px-2 pt-0 pb-2">
                     <div class="text-center text-xs font-medium">
-                      {{ chart.label }}
+                      {{ t(chart.labelKey) }}
                     </div>
                   </OCardSection>
                 </OCard>
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, nextTick, computed, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
@@ -189,9 +189,9 @@ export default defineComponent({
   },
   emits: ["close", "select"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
-    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey);
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
     const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabel || "");
@@ -218,8 +218,9 @@ export default defineComponent({
       const filtered: ChartCategory[] = [];
 
       chartCategories.value.forEach((category) => {
+        // Match the resolved name, not the key — users search what they can see.
         const filteredCharts = category.type.filter((chart) =>
-          chart.label.toLowerCase().includes(query),
+          t(chart.labelKey).toLowerCase().includes(query),
         );
 
         if (filteredCharts.length > 0) {

@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -13,14 +28,16 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps<{
   check: BrowserCheck;
   folders?: SyntheticsFolder[];
+  /** True while the parent is still fetching the folder list. */
+  foldersLoading?: boolean;
   validationErrors?: Record<string, string>;
   /** Override the target field label/placeholder (protocol checks take a host, not a URL). */
-  targetLabel?: string;
-  targetPlaceholder?: string;
+  targetLabel?: I18nText;
+  targetPlaceholder?: I18nText;
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function update(patch: Partial<BrowserCheck>) {
   emit("update:check", { ...props.check, ...patch });
@@ -49,17 +66,19 @@ const url = computed({
 
 const description = computed({
   get: () => props.check.description ?? "",
-  set: (v: string) => update({ description: v }),
+  set: (v: string) => update({ description: raw(v) }),
 });
 
 const tagInput = ref("");
 
-const folderOptions = computed(() => {
-  const opts = (props.folders ?? []).map((f) => ({ label: f.name, value: f.folderId }));
-  return opts.length
-    ? opts
-    : [{ label: t("synthetics.checkDetails.defaultFolder"), value: "default" }];
-});
+// No fabricated fallback option. The loaded list always carries a "default"
+// entry (getFoldersListByType prepends one), so an empty list means the fetch
+// has not landed — and standing a fake "Default" in for it made a failed load
+// look identical to an org that only has the default folder, while the select
+// rendered the unresolvable id verbatim.
+const folderOptions = computed(() =>
+  (props.folders ?? []).map((f) => ({ label: raw(f.name), value: f.folderId })),
+);
 
 function addTag() {
   const tag = tagInput.value.trim();
@@ -100,7 +119,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :label="t('synthetics.checkDetails.name')"
         required
         :error="!!props.validationErrors?.name"
-        :error-message="props.validationErrors?.name"
+        :error-message="raw(props.validationErrors?.name)"
         :placeholder="t('synthetics.checkDetails.namePlaceholder')"
         data-test="synthetics-check-details-name-input"
       />
@@ -109,9 +128,18 @@ function handleTagKeydown(event: KeyboardEvent) {
         v-model="folder"
         :label="t('synthetics.checkDetails.folder')"
         :options="folderOptions"
+        :loading="props.foldersLoading"
+        :error="!!props.validationErrors?.folder"
+        :error-message="raw(props.validationErrors?.folder)"
         :placeholder="t('synthetics.checkDetails.folderPlaceholder')"
         data-test="synthetics-check-details-folder-select"
-      />
+      >
+        <template #empty>{{
+          props.foldersLoading
+            ? t("synthetics.checkDetails.foldersLoading")
+            : t("synthetics.checkDetails.foldersUnavailable")
+        }}</template>
+      </OSelect>
 
       <OSwitch
         v-model="enabled"
@@ -124,7 +152,7 @@ function handleTagKeydown(event: KeyboardEvent) {
         :label="targetLabel ?? t('synthetics.checkDetails.startingUrl')"
         required
         :error="!!props.validationErrors?.url"
-        :error-message="props.validationErrors?.url"
+        :error-message="raw(props.validationErrors?.url)"
         :placeholder="targetPlaceholder ?? t('synthetics.checkDetails.startingUrlPlaceholder')"
         data-test="synthetics-check-details-url-input"
       />

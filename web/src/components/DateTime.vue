@@ -140,7 +140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         side="right"
                         align="center"
                         max-width="300px"
-                        :content="queryRangeRestrictionMsg"
+                        :content="raw(queryRangeRestrictionMsg)"
                       />
                     </OButton>
                   </div>
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     align="center"
                     max-width="300px"
                     v-if="queryRangeRestrictionInHour > 0"
-                    :content="queryRangeRestrictionMsg"
+                    :content="raw(queryRangeRestrictionMsg)"
                   />
 
                   <div class="flex min-w-0 flex-1 gap-2">
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   align="center"
                   max-width="300px"
                   v-if="queryRangeRestrictionInHour > 0"
-                  :content="queryRangeRestrictionMsg"
+                  :content="raw(queryRangeRestrictionMsg)"
                 />
                 <div class="flex justify-center px-3 py-2">
                   <ODateRangeCalendar
@@ -219,12 +219,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <td
                         class="label o-input-label text-compact text-input-label-text w-1/2 pr-1.5 leading-tight font-medium"
                       >
-                        Start time
+                        {{ t("common.startTime") }}
                       </td>
                       <td
                         class="label o-input-label text-compact text-input-label-text w-1/2 pl-1.5 leading-tight font-medium"
                       >
-                        End time
+                        {{ t("common.endTime") }}
                       </td>
                     </tr>
                     <tr>
@@ -315,7 +315,7 @@ import {
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
@@ -410,7 +410,7 @@ export default defineComponent({
 
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedType = ref("relative");
     const selectedTime = ref({
       startTime: "00:00:00",
@@ -466,7 +466,7 @@ export default defineComponent({
     const isTimezoneSelectOpen = ref(false);
 
     const timezoneSelectOptions = computed(() =>
-      timezoneOptions.map((tz: string) => ({ label: tz, value: tz })),
+      timezoneOptions.map((tz: string) => ({ label: raw(tz), value: tz })),
     );
 
     let relativePeriods = [
@@ -546,7 +546,6 @@ export default defineComponent({
 
     onMounted(() => {
       // updateDisplayValue();
-      if (props.disableRelative) setDateType("absolute");
       try {
         resetTime("", "");
 
@@ -567,7 +566,8 @@ export default defineComponent({
               : props.defaultAbsoluteTime?.endTime * 1000;
         }
 
-        selectedType.value = props.defaultType;
+        const initialType = props.disableRelative ? "absolute" : props.defaultType;
+        selectedType.value = initialType;
 
         setAbsoluteTime(startTime, endTime);
 
@@ -575,7 +575,7 @@ export default defineComponent({
 
         if (props.queryRangeRestrictionInHour) computeRelativePeriod();
         // displayValue.value = getDisplayValue();
-        saveDate(props.defaultType);
+        saveDate(initialType);
       } catch (e) {
         console.log(e);
       }
@@ -979,7 +979,7 @@ export default defineComponent({
       // reinterpret using the pasting tab's own timezone).
       const { startTime, endTime } = getConsumableDateTime();
       const payload = JSON.stringify({ start_date: startTime, end_date: endTime });
-      copyToClipboard(payload, { successMessage: t("common.dateRangeCopied") });
+      copyToClipboard(payload, t, { successMessage: t("common.dateRangeCopied") });
     };
 
     // Converts a parsed absolute date[+time] string, interpreted as wall-clock
@@ -1283,6 +1283,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       menuOpen,
       onMenuOpenChange,

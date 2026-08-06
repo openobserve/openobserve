@@ -1,4 +1,17 @@
 // Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, ref } from "vue";
 import { synthetics } from "@/constants/config";
@@ -17,6 +30,7 @@ import type {
   WireStep,
 } from "@/types/synthetics";
 import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
+import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 
 /**
  * Encapsulates all communication with the OpenObserve Extension (playwright-crx)
@@ -52,6 +66,24 @@ const useSyntheticsRecorder = () => {
 
   const BRIDGE_CHANNEL = "oo-bridge";
   const COMMAND_TIMEOUT_MS = 4000;
+
+  // `replay` is the one command the extension answers only when the whole
+  // journey has finished — the service worker resolves it from handleReplay,
+  // after the last step. Racing it against COMMAND_TIMEOUT_MS made the UI fall
+  // back to "idle" four seconds in while the extension kept replaying in its
+  // own window. A single step alone may legitimately take 60 s (the flat
+  // preview timeout, P1.R.1), so this is not a journey bound — it is a
+  // last-resort watchdog for a bridge that died without answering. Sized to
+  // LEASE_SECS = 900 (D-9), the outer bound one attempt is ever contained in;
+  // anything shorter would make the preview stricter than production (X-8.1).
+  // See docs/synthetics/reliability/synthetics-recorded-test-reliability-spec.md.
+  const REPLAY_TIMEOUT_MS = 15 * 60 * 1000;
+
+  // Bumped on every replay start and on every stop. `replay()` captures the value it
+  // started with and refuses to touch phase state once it no longer matches — otherwise a
+  // Stop followed quickly by Re-run lets the OLD replay's response land on the NEW run and
+  // knock `running` back to `stopped`. Latent until stopping became fast enough to hit.
+  let replayGeneration = 0;
 
   let nonceCounter = 0;
   function nextNonce(): string {
@@ -117,19 +149,32 @@ const useSyntheticsRecorder = () => {
     bridgeDataHandler?.(msg);
   });
 
-  /** One-shot command via postMessage. Resolves `null` when the extension is unreachable. */
-  function sendCommand<T>(command: RecorderCommand): Promise<T | null> {
+  /**
+   * One-shot command via postMessage. Resolves `null` when the extension is
+   * unreachable. `timeoutMs` is how long to wait for the ack — long-running
+   * commands (`replay`) pass their own window.
+   */
+  function sendCommand<T>(
+    command: RecorderCommand,
+    timeoutMs: number = COMMAND_TIMEOUT_MS,
+  ): Promise<T | null> {
     const nonce = nextNonce();
 
-    const timeout = new Promise<null>((resolve) =>
-      setTimeout(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<null>((resolve) => {
+      timer = setTimeout(() => {
         pendingCommands.delete(nonce);
         resolve(null);
-      }, COMMAND_TIMEOUT_MS),
-    );
+      }, timeoutMs);
+    });
 
     const promise = new Promise<T | null>((resolve) => {
-      pendingCommands.set(nonce, resolve);
+      pendingCommands.set(nonce, (response) => {
+        // Release the watchdog — a replay's is 15 minutes long, and leaving one
+        // armed per replay would keep the timer alive well past the answer.
+        clearTimeout(timer);
+        resolve(response);
+      });
     });
     window.postMessage(
       { ch: BRIDGE_CHANNEL, dir: "to-ext", nonce, msg: { type: "synthetics-command", command } },
@@ -172,7 +217,10 @@ const useSyntheticsRecorder = () => {
     const { payload } = msg;
     switch (payload.method) {
       case "setActions":
-        liveSteps.value = mapWireSteps(payload.browserSteps);
+        // Live capture: keep the extension's own step for replay fidelity. These
+        // wires carry fields the v2 schema cannot store (options, modifiers,
+        // button, position, framePath).
+        liveSteps.value = mapWireSteps(payload.browserSteps, { preserveWire: true });
         break;
       case "recordingStarted":
         currentUrl.value = payload.url;
@@ -190,6 +238,10 @@ const useSyntheticsRecorder = () => {
         mode.value = payload.mode;
         break;
       case "stepReplayResult":
+        // A result already in flight when Stop was pressed is real evidence — the step
+        // did run — so it still counts toward "completed X of N" while `stopping`. Once
+        // the replay is over, late arrivals belong to a run nobody is looking at.
+        if (replayPhase.value !== "running" && replayPhase.value !== "stopping") break;
         stepResults.set(payload.stepId, {
           stepId: payload.stepId,
           stepName: payload.stepName ?? "",
@@ -197,10 +249,18 @@ const useSyntheticsRecorder = () => {
           durationMs: payload.duration_ms,
           error: payload.error,
           structuredError: payload.structuredError,
+          // X-8.2: the player reports what it could not reproduce. Dropping this
+          // made every such divergence silent — including a skipped step that
+          // would otherwise read as a pass.
+          fidelity: payload.fidelity,
         });
         activeStepId.value = null;
         break;
       case "stepReplayStarted":
+        // Only a running replay may light a step up. A `stepStarted` that arrives after
+        // Stop describes a step that will never report a result, and honouring it is what
+        // left the journey with a step spinning forever.
+        if (replayPhase.value !== "running") break;
         activeStepId.value = payload.stepId;
         break;
       // setSources / elementPicked: not consumed yet
@@ -227,7 +287,7 @@ const useSyntheticsRecorder = () => {
    * `targetUrl` is kept only for the local recording banner — the extension
    * command itself takes no URL.
    */
-  async function startRecording(targetUrl: string): Promise<void> {
+  async function startRecording(targetUrl: string, testIdAttr?: string): Promise<void> {
     error.value = "";
     liveSteps.value = [];
     currentUrl.value = targetUrl;
@@ -247,7 +307,17 @@ const useSyntheticsRecorder = () => {
       isRecording.value = false;
     };
 
-    const res = await sendCommand<RecorderStartResponse>({ action: "startRecording", targetUrl });
+    // The extension defaults to Playwright's `data-testid` when this is absent,
+    // and it was absent on every recording ever made — the field existed on the
+    // command type but nothing populated it. O2 markup uses `data-test`, which
+    // only produced test-attribute candidates because upstream's generator
+    // happens to carry a hardcoded fallback list containing it. An app on
+    // `data-qa` or `data-cy` got none at all, silently.
+    const res = await sendCommand<RecorderStartResponse>({
+      action: "startRecording",
+      targetUrl,
+      testIdAttr: testIdAttr || DEFAULT_TEST_ID_ATTR,
+    });
     if (!res?.success) {
       console.debug("Disconnect ---", res);
       error.value = res?.error || "Failed to start recording.";
@@ -325,6 +395,7 @@ const useSyntheticsRecorder = () => {
     activeStepId.value = null;
     replayPhase.value = "running";
     isReplaying.value = true;
+    const generation = ++replayGeneration;
 
     // // Substitute {{ VAR_NAME }} placeholders in wire step fields with actual variable values.
     const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
@@ -347,18 +418,27 @@ const useSyntheticsRecorder = () => {
     // intercept property access — postMessage structured clone sees the proxy,
     // not the underlying object, and silently drops all fields.
     const plainSteps = JSON.parse(JSON.stringify(resolvedSteps)) as WireStep[];
-    const res = await sendCommand<ReplayResponse>({
-      action: "replay",
-      steps: plainSteps,
-      targetUrl,
-    });
+    const res = await sendCommand<ReplayResponse>(
+      {
+        action: "replay",
+        steps: plainSteps,
+        targetUrl,
+      },
+      REPLAY_TIMEOUT_MS,
+    );
+    // Superseded — this response belongs to a replay the user has already stopped or
+    // re-run past. Reporting it would overwrite the state of the run now on screen.
+    if (generation !== replayGeneration) return res;
     isReplaying.value = false;
     replayResult.value = res;
     if (res) {
       if (res.stopped) replayPhase.value = "stopped";
       else if (res.passed) replayPhase.value = "passed";
-      else if (stepResults.size === 0)
-        replayPhase.value = "idle"; // pre-flight failure (e.g. incognito)
+      // Nothing streamed back, so no step ran: a pre-flight failure, not a
+      // journey that failed on the page. Stay `idle` rather than `failed` —
+      // the caller classifies the cause from `res.error` (see
+      // CreateBrowserTest's `blockedReason`) and must not assume incognito.
+      else if (stepResults.size === 0) replayPhase.value = "idle";
       else replayPhase.value = "failed";
     } else {
       replayPhase.value = "idle";
@@ -366,9 +446,24 @@ const useSyntheticsRecorder = () => {
     return res;
   }
 
-  /** Cancel an in-flight replay; the pending `replay` promise resolves with `stopped`. */
-  function stopReplay(): Promise<unknown> {
-    return sendCommand({ action: "stopReplay" });
+  /**
+   * Cancel an in-flight replay, holding the UI in `stopping` until the extension has
+   * confirmed. The wait is what makes the Stop button honest — the run is not over the
+   * instant the button is clicked — and `sendCommand` resolves `null` at
+   * COMMAND_TIMEOUT_MS, so `stopping` is bounded and cannot strand the journey.
+   */
+  async function stopReplay(): Promise<void> {
+    if (replayPhase.value !== "running") return;
+    replayPhase.value = "stopping";
+    await sendCommand({ action: "stopReplay" });
+    // Orphan the in-flight `replay` promise: its response describes a run the user has
+    // already abandoned, and it would otherwise re-report a phase behind this one.
+    replayGeneration++;
+    // The step that was mid-flight never produced a result, so nothing else will ever
+    // clear this. Left set, it renders as a step stuck in progress.
+    activeStepId.value = null;
+    isReplaying.value = false;
+    replayPhase.value = "stopped";
   }
 
   function setMode(next: RecorderMode): Promise<unknown> {

@@ -36,8 +36,19 @@ class WorkflowsPage {
     this.listTable = '[data-test="workflows-list-page"]';
     // Editor
     this.editorPage = '[data-test="workflow-editor-page"]';
-    this.nameField = '[data-test="workflow-editor-name-field"]';
-    this.descField = '[data-test="workflow-editor-description-field"]';
+    // Name and description are inline-edited titles (OInlineEdit): a display
+    // trigger swaps to an input on click, then commits (Enter/blur) back to the
+    // read-only value span. -trigger opens, -input edits, -value reads.
+    this.nameTrigger = '[data-test="workflow-editor-name-trigger"]';
+    this.nameInput = '[data-test="workflow-editor-name-input"]';
+    this.nameValue = '[data-test="workflow-editor-name-value"]';
+    this.descTrigger = '[data-test="workflow-editor-description-trigger"]';
+    this.descInput = '[data-test="workflow-editor-description-input"]';
+    // Inline "create function" form inside a Function node drawer — the name is
+    // an inline-edited title (OFormInlineEdit), same as the Functions page.
+    this.nodeFunctionCreateToggle = '[data-test="create-function-toggle-btn"]';
+    this.nodeFunctionNameTrigger = '[data-test="add-function-name-input-trigger"]';
+    this.nodeFunctionNameInput = '[data-test="add-function-name-input-input"]';
     this.saveBtn = '[data-test="workflow-editor-save"]';
     this.testBtn = '[data-test="workflow-editor-test"]';
     this.cancelBtn = '[data-test="workflow-editor-cancel"]';
@@ -120,7 +131,7 @@ class WorkflowsPage {
   async goToAddEmpty() {
     const url = `${process.env.ZO_BASE_URL}/web/workflows/add?org_identifier=${getOrgIdentifier()}`;
     await this.page.goto(url, { timeout: 60000 });
-    await this.page.locator(this.nameField).waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nameTrigger).waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
   }
 
   /**
@@ -144,12 +155,21 @@ class WorkflowsPage {
 
   // ---------- editor helpers ----------
   async setName(name) {
-    await this.page.locator(this.nameField).fill(name);
+    // Open the inline editor, fill it, and commit (Enter) so the name lands in
+    // the read-only value span. The name has no owning <form>, so Enter only
+    // commits — it does not submit/navigate.
+    await this.page.locator(this.nameTrigger).click();
+    const input = this.page.locator(this.nameInput);
+    await input.waitFor({ state: 'visible' });
+    await input.fill(name);
+    await input.press('Enter');
   }
 
   // ---------- assertions (keep raw locators out of specs) ----------
   async expectNameValue(name) {
-    await expect(this.page.locator(this.nameField)).toHaveValue(name);
+    // After commit the name renders as the read-only value span; textContent is
+    // the full value even when CSS-truncated visually.
+    await expect(this.page.locator(this.nameValue)).toHaveText(name);
   }
 
   async expectEditorVisible() {
@@ -161,7 +181,12 @@ class WorkflowsPage {
   }
 
   async setDescription(desc) {
-    await this.page.locator(this.descField).fill(desc);
+    // Description is inline-edited too: open, fill, commit.
+    await this.page.locator(this.descTrigger).click();
+    const input = this.page.locator(this.descInput);
+    await input.waitFor({ state: 'visible' });
+    await input.fill(desc);
+    await input.press('Enter');
   }
 
   // K9: bypass the tooltip that intercepts pointer events on Save.
@@ -230,15 +255,22 @@ class WorkflowsPage {
   }
 
   /**
-   * In an open Destination node drawer, create a new remote destination inline via the 2-step
-   * wizard (Choose Type -> Connection) and bind it to the node.
+   * In an open Destination node drawer, create a new remote destination inline and bind it to
+   * the node.
+   *
+   * The workflow destination node passes `forced-type="custom"` (WorkflowDestination.vue) to the
+   * shared DestinationPicker, so CreateDestinationForm opens DIRECTLY on the Connection step
+   * (name/url) with `step === 2` and hides the type-selection step — there is no
+   * `destination-type-card-*` / `step1-continue-btn` in this flow. We assert that expected UX
+   * (name field present right after toggling create); we do NOT tolerate a type-selection step
+   * here — if it reappears, the forced-type contract has changed and this should fail loudly.
    */
-  async createDestinationInline({ name, url, type = 'custom' }) {
+  async createDestinationInline({ name, url }) {
     await this.page.locator(this.destPickerCreateToggle).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.destTypeCard(type)).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.destStep1Continue).click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.destNameField).waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator(this.destNameField).fill(name);
+
+    const nameField = this.page.locator(this.destNameField);
+    await nameField.waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
+    await nameField.fill(name);
     await this.page.locator(this.destUrlField).fill(url);
     await this.page.locator(this.destSubmitBtn).click({ timeout: DRAWER_TIMEOUT_MS });
   }
@@ -288,9 +320,12 @@ class WorkflowsPage {
    * assert that INVALID function code is rejected gracefully (a compile-error message, no crash).
    */
   async attemptCreateFunction({ name, code }) {
-    await this.page.locator('[data-test="create-function-toggle-btn"]').click({ timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator('[data-test="add-function-name-input-field"]').waitFor({ state: 'attached', timeout: DRAWER_TIMEOUT_MS });
-    await this.page.locator('[data-test="add-function-name-input-field"]').fill(name);
+    await this.page.locator(this.nodeFunctionCreateToggle).click({ timeout: DRAWER_TIMEOUT_MS });
+    // Open the inline name editor, then fill the revealed input.
+    await this.page.locator(this.nodeFunctionNameTrigger).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeFunctionNameTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeFunctionNameInput).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeFunctionNameInput).fill(name);
     // Function code editor (workflow functions run on QuickJS — JavaScript, not VRL).
     const editor = this.page.locator('[data-test="logs-vrl-function-editor"]');
     await editor.click();

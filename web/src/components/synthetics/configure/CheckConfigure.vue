@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type {
   BrowserCheck,
   SyntheticCheckType,
@@ -27,12 +42,15 @@ const props = defineProps<{
   devices?: SyntheticsDevice[];
   destinations?: string[];
   folders?: SyntheticsFolder[];
+  foldersLoading?: boolean;
   validationErrors?: Record<string, string>;
   /** Protocol checks show the private-locations subsection + setup CTA. */
   allowPrivateLocations?: boolean;
+  /** When true, CheckLocations shows skeleton rows instead of the list. */
+  loadingLocations?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Browser/http take a full URL; tcp/tls/ssh take a bare host (the server
 // rejects URLs for those types — validate_host_target).
@@ -57,7 +75,9 @@ const showAuthNetwork = computed(() =>
 const emit = defineEmits<{
   "update:check": [value: BrowserCheck];
   "refresh:destinations": [];
-  "setup-agent": [];
+  "new-location": [];
+  "add-agent": [locationId: string];
+  "refresh-locations": [];
 }>();
 
 function handleUpdate(value: BrowserCheck) {
@@ -71,6 +91,7 @@ function handleUpdate(value: BrowserCheck) {
       <CheckDetails
         :check="check"
         :folders="folders ?? []"
+        :folders-loading="foldersLoading"
         :validation-errors="props.validationErrors ?? {}"
         :target-label="targetLabel"
         :target-placeholder="targetPlaceholder"
@@ -110,9 +131,12 @@ function handleUpdate(value: BrowserCheck) {
         :locations="locations ?? []"
         :allow-private="allowPrivateLocations"
         :validation-errors="props.validationErrors ?? {}"
+        :loading-locations="loadingLocations ?? false"
         data-test="synthetics-check-configure-locations"
         @update:check="handleUpdate"
-        @setup-agent="emit('setup-agent')"
+        @new-location="emit('new-location')"
+        @add-agent="(id: string) => emit('add-agent', id)"
+        @refresh-locations="emit('refresh-locations')"
       />
       <CheckBrowserDevices
         v-if="(checkType ?? 'browser') === 'browser'"

@@ -146,6 +146,26 @@ or duplicate styles for dark mode around an O2 component. If something looks
 wrong in dark mode, the fix is a token value in `dark.css`, not a per-component
 conditional.
 
+### Comments stay short
+
+**One or two lines.** A comment carries the *why* behind a non-obvious choice —
+not a re-telling of the code, and not the history of the PR that added it.
+
+```vue
+<!-- good -->
+<!-- OSelect fills its container, so the width lives on the wrapper. -->
+
+<!-- bad — a paragraph, half of it review archaeology -->
+<!-- Bounded elastic column: absorbs leftover width but stays inside the
+     horizontal-scroll container instead of stretching to fit its longest
+     value. Matches the recipe used by Nodes.vue, PipelinesList.vue, etc.
+     (tag 02 review finding) -->
+```
+
+Drop ticket ids, "review finding", "as discussed", "previously we…", and any
+line that just narrates the next statement. Same rule in `.spec.ts` files: one
+line on why a setup is unusual, not a paragraph defending it.
+
 ### No component fits? Build a reusable one — don't assemble raw classes
 
 When you need a UI element and **no existing component matches it**, the answer
@@ -283,6 +303,31 @@ view (src/views)
 **Why.** The layer boundary is what lets a second screen reuse a fetch, lets a
 test mock a service, and keeps the store from silting up with ephemeral state. A
 component that calls axios directly can't be reused or tested without a network.
+
+### The same figure must render identically everywhere
+
+**What.** When a number/label you're adding already appears on another screen —
+the same API field, the same meaning — reuse that screen's **formatter and i18n
+key**; don't re-derive either. If the existing formatter is a private function
+inside a component, promote it to `utils/formatters.ts` and have both import it.
+
+**Why.** Two call sites formatting one field always drift: Home → Usage printed
+`2.9B` while a new Streams tile printed `2,900,000,000` from the identical
+`/summary` payload, and a duplicated `formatEventCount` was the cause. Same for
+labels — parallel `page.summaryStreams` / `home.streams` keys with the same
+English value will diverge the first time someone edits one. Sharing the key is
+what makes the two surfaces stay in sync.
+
+**How.**
+- Before adding a formatter, grep `utils/formatters.ts` (and the sibling screen)
+  for one that already exists — `formatEventCount`, `formatSizeFromMB`,
+  `addCommasToNumber`, `formatLargeNumber`, `formatTimeWithSuffix`.
+- Reuse the other screen's i18n key outright when the label is the same thing
+  (`t("home.totalDataIngested")` from the Streams page is correct, not a
+  duplicate). A new key is for a genuinely new label.
+- Match the icon and tone family too when the tiles sit on comparable surfaces —
+  but never copy a *semantic* colour (green/amber/red) onto a non-health number
+  just to match; that's the one thing worth diverging on.
 
 ### Registering a new page in navigation
 

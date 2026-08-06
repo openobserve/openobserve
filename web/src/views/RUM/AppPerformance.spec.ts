@@ -126,7 +126,7 @@ describe("AppPerformance.vue", () => {
           rum: {
             performanceSummaryLabel: "Performance Summary",
             overview: "Overview",
-            webVitals: "Web Vitals",
+            vitals: "Vitals",
             errors: "Errors",
             api: "API",
           },
@@ -233,7 +233,7 @@ describe("AppPerformance.vue", () => {
 
       const expectedTabs = [
         { label: "Overview", value: "overview" },
-        { label: "Web Vitals", value: "web_vitals" },
+        { label: "Vitals", value: "web_vitals" },
         { label: "Errors", value: "errors" },
         { label: "API", value: "api" },
       ];
@@ -261,8 +261,6 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QSeparator: { template: "<hr />" },
-            QBtn: { template: "<button></button>" },
             AutoRefreshInterval: { template: "<div></div>" },
             AppTabs: { template: "<div></div>" },
             DateTimePickerDashboard: { template: "<div></div>" },
@@ -285,8 +283,6 @@ describe("AppPerformance.vue", () => {
         global: {
           plugins: [store, router, i18n],
           stubs: {
-            QSeparator: { template: "<hr />" },
-            QBtn: { template: "<button></button>" },
             AutoRefreshInterval: { template: "<div></div>" },
             AppTabs: { template: "<div></div>" },
             DateTimePickerDashboard: { template: "<div></div>" },

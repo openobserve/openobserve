@@ -1,12 +1,27 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 //
 // Create/edit view for protocol checks (http/tcp/tls/ssh) — single configure
 // page, no journey step. Mirrors CreateBrowserTest's data fetching and save
 // flow; the per-type request card is slotted into CheckConfigure.
-import { computed, onMounted, ref, type Component } from "vue";
+import { computed, onMounted, ref, watch, type Component } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   AgentSetup,
@@ -22,12 +37,12 @@ import {
   mapResponseToProtocolCheck,
 } from "@/utils/synthetics/buildPayload";
 import { getFoldersListByType } from "@/utils/commons";
+import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
@@ -47,7 +62,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const typeConfigCards: Record<ProtocolCheckType, Component> = {
   http: CheckHttpConfig,
@@ -93,19 +108,84 @@ const typeLabel = computed(() => t(`synthetics.newCheck.${props.checkType}`));
 
 // Server-driven lists, threaded down to CheckConfigure (same as browser flow).
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
+const foldersLoading = ref(false);
+/** Only ever carries `folder` today — the folder select is the one field this
+ *  view can invalidate on its own. */
+const validationErrors = ref<Record<string, string>>({});
+
+const orgIdentifier = computed<string>(
+  () => (store.state as any).selectedOrganization?.identifier ?? "",
+);
+
+/**
+ * Where every exit from this wizard lands — mirrors CreateBrowserTest.backTo.
+ * Tracks `check.folder` so backing out after a folder change returns to the
+ * folder the check now lives in, with `org_identifier` stamped from the store.
+ */
+const backTo = computed(() =>
+  syntheticsListRoute({ orgIdentifier: orgIdentifier.value, folderId: check.value.folder }),
+);
+
+/** Resolves once orgIdentifier is populated — on a hard reload or browser
+ *  back-navigation onto this route the store is not hydrated synchronously yet.
+ *  Mirrors waitForOrgIdentifier in SyntheticMonitoring.vue. */
+function waitForOrgIdentifier(): Promise<void> {
+  if (orgIdentifier.value) return Promise.resolve();
+  return new Promise<void>((resolve) => {
+    const stop = watch(orgIdentifier, (val) => {
+      if (val) {
+        stop();
+        resolve();
+      }
+    });
+  });
+}
 
 async function fetchFolders() {
+  foldersLoading.value = true;
   try {
+    // Without this wait a reload of /synthetics/add?folder=… fires the request
+    // against an empty org, and the single catch below would pin the list to []
+    // for the rest of the session — leaving the folder select unable to resolve
+    // the preselected id and rendering it raw.
+    await waitForOrgIdentifier();
     const res = await getFoldersListByType(store, "synthetics");
     folders.value = (res ?? []) as SyntheticsFolder[];
-  } catch {
+  } catch (err) {
+    console.error("[synthetics] failed to load folders", err);
     folders.value = [];
+  } finally {
+    foldersLoading.value = false;
   }
 }
 
+/**
+ * Reconcile the selected folder against the folders this org actually has.
+ * Same hazard as the browser flow: `?folder=` and stored checks are unvalidated,
+ * and an unresolvable id is rendered raw and then sent back as `?folder=`, which
+ * the server treats as authoritative for the destination folder and the RBAC
+ * gate. Skipped while the list is empty — that means the fetch has not landed.
+ */
+watch(
+  [folders, () => check.value.folder],
+  () => {
+    if (!folders.value.length) return;
+    const folderId = check.value.folder;
+    if (!folderId || folders.value.some((f) => f.folderId === folderId)) return;
+    check.value = { ...check.value, folder: "default" };
+    validationErrors.value = {
+      ...validationErrors.value,
+      folder: t("synthetics.validation.folderUnavailable", { folder: folderId }),
+    };
+  },
+  { immediate: true },
+);
+
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -120,16 +200,29 @@ async function fetchLocations() {
         l.enabled !== false &&
         (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
     );
-  } catch {
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -167,7 +260,7 @@ async function loadForEdit(id: string) {
     // redirect to the synthetics list with a message.
     if (err?.response?.status === 404) {
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isLoadingEdit.value = false;
       return;
@@ -247,12 +340,12 @@ async function saveCheck() {
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
-    router.push({ name: "synthetics", query: { folder: check.value.folder } });
+    router.push(backTo.value);
   } catch (err: any) {
     dismiss();
     if (err?.response?.status === 404) {
       forceLeave = true;
-      router.push({ name: "synthetics" });
+      router.push(backTo.value);
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       isSaving.value = false;
       return;
@@ -275,7 +368,7 @@ async function saveCheck() {
   <OPageLayout
     :back="{
       label: t('synthetics.newCheck.back'),
-      to: { name: 'synthetics' },
+      to: backTo,
       dataTest: 'synthetics-create-back-btn',
     }"
     bleed
@@ -293,13 +386,18 @@ async function saveCheck() {
           :check="check"
           :check-type="checkType"
           :locations="locations"
+          :loading-locations="locationsLoading"
           :destinations="destinations"
           :folders="folders"
+          :folders-loading="foldersLoading"
+          :validation-errors="validationErrors"
           allow-private-locations
           class="w-full!"
           @refresh:destinations="fetchDestinations"
           @update:check="onConfigureUpdate"
-          @setup-agent="openAgentSetup"
+          @new-location="openAgentSetup()"
+          @add-agent="(id: string) => openAgentSetup(id)"
+          @refresh-locations="fetchLocations"
         >
           <template #type-config>
             <component
@@ -320,7 +418,7 @@ async function saveCheck() {
           variant="ghost"
           size="sm"
           data-test="synthetics-create-cancel-btn"
-          @click="router.push({ name: 'synthetics' })"
+          @click="router.push(backTo)"
         >
           {{ t("common.cancel") }}
         </OButton>
@@ -335,8 +433,8 @@ async function saveCheck() {
         </OButton>
       </div>
 
-      <!-- Private agent setup drawer; locations reload on close so a freshly
-           registered location becomes selectable without leaving the form. -->
+      <!-- Private agent setup drawer; a freshly registered location appears via
+           the locations card's Refresh button. -->
       <AgentSetupDrawer
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
@@ -344,9 +442,14 @@ async function saveCheck() {
         :o2-url="agentSetup?.o2_url"
         :script-url="agentSetup?.script_url"
         :install="agentSetup?.install"
+        :location-id="agentSetupLocationId"
+        :location-name="agentSetupLocationName"
         @update:open="
           (open: boolean) => {
-            if (!open) fetchLocations();
+            if (!open) {
+              agentSetupLocationId = null;
+              agentSetupLocationName = null;
+            }
           }
         "
       />

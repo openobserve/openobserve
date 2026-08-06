@@ -66,6 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :back="back"
           :title-data-test="titleDataTest"
           :tabs-below="tabsBelow"
+          :title-overflow="titleOverflow"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix
@@ -150,6 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { ref, computed, watch, useSlots } from "vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
@@ -158,7 +160,7 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 
 interface BackTarget {
-  label: string;
+  label: I18nText;
   to?: import("vue-router").RouteLocationRaw;
   onClick?: () => void;
   dataTest?: string;
@@ -167,13 +169,18 @@ interface BackTarget {
 const props = withDefaults(
   defineProps<{
     // Header (from props)
-    title?: string;
-    subtitle?: string;
+    title?: I18nText;
+    subtitle?: I18nText;
     icon?: IconName;
     back?: BackTarget;
     titleDataTest?: string;
     /** Render #header-tabs on a second row below the title (Level-2 module nav). */
     tabsBelow?: boolean;
+    /**
+     * Forwarded to OPageHeader. Pass "visible" when #title hosts an interactive
+     * control (an inline-edited page name) so the <h1> stops clipping it.
+     */
+    titleOverflow?: "truncate" | "visible";
     // Body
     bleed?: boolean;
     padY?: boolean;

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { gt } from "@/types/i18n";
 import { normalizeScorerInput, prepareScorerImport, validateScorer } from "./importScorer";
 import type { Provider, ScoreConfig } from "@/services/online-evals.service";
 
@@ -29,6 +30,7 @@ const baseCtx = {
   nameCounts: new Map<string, number>(),
   scoreConfigs: [] as ScoreConfig[],
   providers: [] as Provider[],
+  t: gt,
 };
 
 describe("normalizeScorerInput", () => {
@@ -362,6 +364,7 @@ describe("prepareScorerImport", () => {
         existingScorerNames: [],
         scoreConfigs: [sc()],
         providers: [prov()],
+        t: gt,
       },
     );
 
@@ -382,6 +385,7 @@ describe("prepareScorerImport", () => {
       existingScorerNames: [],
       scoreConfigs: [sc()],
       providers: [prov()],
+      t: gt,
     });
     expect(result.hasErrors).toBe(true);
     expect(result.errors.length).toBeGreaterThan(1);
@@ -409,7 +413,7 @@ describe("prepareScorerImport", () => {
           },
         },
       ],
-      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()] },
+      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()], t: gt },
     );
     expect(result.errors.filter((e) => e.field === "duplicate")).toHaveLength(2);
   });
@@ -427,7 +431,7 @@ describe("prepareScorerImport", () => {
           },
         },
       ],
-      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()] },
+      { existingScorerNames: [], scoreConfigs: [sc()], providers: [prov()], t: gt },
     );
     const params = result.items[0].payload?.scorer.params;
     expect(params).not.toHaveProperty("providerName");

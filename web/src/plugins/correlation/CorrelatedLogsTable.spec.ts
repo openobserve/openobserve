@@ -55,10 +55,10 @@ vi.mock("@/composables/useServiceCorrelation", () => ({
   getSemanticGroupsCacheStatus: vi.fn(),
 }));
 
-// Mock TenstackTable component
-vi.mock("@/plugins/logs/TenstackTable.vue", () => ({
+// Mock OTable
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "TenstackTable",
+    name: "OTable",
     template: "<div data-test='tenstack-table'><slot /></div>",
   },
 }));
@@ -77,6 +77,7 @@ const mockTranslations = {
   "search.showHideColumns": "Show/Hide Columns",
   "correlation.logs.filtersLabel": "Filters",
   "correlation.logs.unstableDimension": "Unstable Dimension",
+  "correlation.logs.allValues": "All Values",
   "common.apply": "Apply",
 };
 
@@ -112,7 +113,7 @@ describe("CorrelatedLogsTable.vue", () => {
       global: {
         plugins: [i18n, store],
         stubs: {
-          TenstackTable: true,
+          OTable: true,
           DimensionFiltersBar: true,
           // Render ODropdown inline so data-test attrs are findable in tests
           ODropdown: {

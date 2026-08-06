@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : searchObj.data.stream.selectedStream
           "
           :options="streamOptions"
-          :placeholder="placeHolderText"
+          :placeholder="raw(placeHolderText)"
           :multiple="selectionMode === 'multi'"
           :row-click-single-select="selectionMode === 'multi'"
           class="w-full"
@@ -57,7 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           side="bottom"
           align="start"
           max-width="280px"
-          :content="searchObj.data.stream.selectedStream.join(', ')"
+          :content="raw(searchObj.data.stream.selectedStream.join(', '))"
         />
       </div>
     </div>
@@ -261,7 +261,7 @@ import {
   nextTick,
   defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import useLogs from "../../composables/useLogs";
@@ -294,7 +294,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { captureFromValuesApi } from "@/composables/useFieldValueStore";
+import { captureFromValuesApi } from "@/composables/fieldValueStore";
 import { saveLogsStreamType, saveLogsStream } from "@/utils/streamPersist";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -354,15 +354,15 @@ export default defineComponent({
   setup(props, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
-    const { reorderSelectedFields, getFilterExpressionByFieldType, extractValueQuery } = useLogs();
+    const { t } = useI18nTyped();
+    const { reorderSelectedFields, getFilterExpressionByFieldType, extractValueQuery } = useLogs(t);
 
     const { filterHitsColumns, extractFields, getStreamList } = useStreamFields();
 
     const { searchObj, streamSchemaFieldsIndexMapping } = searchState();
 
-    const { onStreamChange, handleQueryData } = useSearchBar();
-    const { validateFilterForMultiStream } = useSearchStream();
+    const { onStreamChange, handleQueryData } = useSearchBar(t);
+    const { validateFilterForMultiStream } = useSearchStream(t);
 
     const { fnParsedSQL, fnUnparsedSQL, updatedLocalLogFilterField } = logsUtils();
 
@@ -1812,6 +1812,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       router,

@@ -26,6 +26,8 @@
 //     ndjson` into the agent's TCP receiver. That daemon is the thing to check
 //     when host metrics arrive but unified log entries do not.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
@@ -45,34 +47,39 @@ export default function macosCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "macOS",
-      tagline:
-        "Install the OpenObserve agent on any Mac — the unified log and standard log files plus CPU, memory, disk and network metrics.",
+      tagline: gt("ingestion.setupCard.taglineMacos"),
       logo: getImageURL("images/common/macos.png"),
       tone: "#86868b",
       runtime: "Host",
       setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      metaBadges: [gt("common.logs"), gt("common.metrics")],
     },
     steps: [
       {
         id: "install",
-        title: "Install the Agent",
-        description:
-          "Run this on the Mac with `sudo`. It installs the agent as a launchd daemon, plus a second daemon that bridges the macOS unified log into it.",
-        chip: { kind: "terminal", label: "Terminal" },
+        titleKey: "ingestion.setupCard.installAgentTitle",
+        descriptionKey: "ingestion.setupCard.installAgentMacosDesc",
+        chip: { kind: "terminal", labelKey: "ingestion.setupCard.chipTerminal" },
         required: true,
         completeOn: "copy",
         code: agentCode(install, subs, "bash"),
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "Both daemons start on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams and the unified log lands in the `macos_unified` stream.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyMacosAgentDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
-        pills: ["Unified Log", "System Logs", "CPU", "Memory", "Disk", "Network"],
+        pills: [
+          gt("ingestion.setupCard.pillUnifiedLog"),
+          gt("ingestion.setupCard.pillSystemLogs"),
+          // Universal acronym — identical in every locale.
+          raw("CPU"),
+          gt("ingestion.setupCard.pillMemory"),
+          gt("ingestion.setupCard.pillDisk"),
+          gt("common.network"),
+        ],
       },
     ],
     detect: hostMetricsDetect,

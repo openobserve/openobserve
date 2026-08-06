@@ -23,31 +23,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         dataTest: 'incident-detail-back-btn',
       }"
       :subtitle="t('alerts.incidents.incident')"
+      title-overflow="visible"
       bleed
     >
+      <!-- Incident name — click the title to rename, Enter or blur saves,
+           Escape restores. Replaces a hand-rolled input plus an Edit button and
+           a Save/Cancel pair in #actions: three affordances for one field, and
+           a mode the rest of the app no longer has. -->
       <template #title>
-        <!-- Incident name (inline-editable) -->
-        <input
-          class="max-w-125 min-w-75"
-          v-if="incidentDetails && isEditingTitle"
-          v-model="editableTitle"
-          ref="titleInputRef"
-          :class="[
-            'rounded-default border-2 px-2 py-1 font-bold outline-none',
-            'text-text-link bg-status-info-bg border-text-link',
-          ]"
-        />
-        <span
-          v-else-if="incidentDetails"
+        <OInlineEdit
+          v-if="incidentDetails"
+          :model-value="incidentDetails.title ?? ''"
           data-test="incident-detail-title"
-          :title="incidentDetails.title"
-        >
-          {{ incidentDetails.title }}
-          <OTooltip
-            v-if="incidentDetails && (incidentDetails.title?.length ?? 0) > 35"
-            :content="incidentDetails.title"
-          />
-        </span>
+          :aria-label="t('alerts.incidents.title_field')"
+          :edit-hint="t('alerts.incidents.editIncidentTitleTooltip')"
+          @edit-start="isEditingTitle = true"
+          @commit="saveTitleEdit"
+          @cancel="isEditingTitle = false"
+        />
       </template>
 
       <!-- Status, Severity, Alerts badges — trail immediately after the title
@@ -58,21 +51,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTag type="incidentStatus" :value="incidentDetails.status" />
             <OTooltip
               :content="
-                t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status)
+                raw(t('alerts.incidents.status') + ': ' + getStatusLabel(incidentDetails.status))
               "
             />
           </span>
 
           <span class="inline-flex cursor-default">
             <OTag type="severity" :value="incidentDetails.severity" />
-            <OTooltip :content="t('alerts.incidents.severity') + ': ' + incidentDetails.severity" />
+            <OTooltip
+              :content="raw(t('alerts.incidents.severity') + ': ' + incidentDetails.severity)"
+            />
           </span>
 
           <span class="inline-flex cursor-default">
-            <OTag type="countChip" value="alerts">{{ triggers.length }} Alerts</OTag>
+            <OTag type="countChip" value="alerts"
+              >{{ triggers.length }} {{ t("alerts.incidents.alertCount") }}</OTag
+            >
+            <OTooltip
+              :content="t('alerts.incidents.correlatedAlertsCount', { count: triggers.length })"
+            />
+          </span>
+
+          <span v-if="externalSources.length" class="inline-flex cursor-default">
+            <OTag variant="default-outline" data-test="incident-external-source-badge">
+              <OIcon name="webhook" size="xs" />
+              {{ externalSources.join(", ") }}
+            </OTag>
             <OTooltip
               :content="
-                t('alerts.incidents.alertCount') + ': ' + triggers.length + ' correlated alerts'
+                raw(t('alerts.incidents.externalSourceTooltip') + ': ' + externalSources.join(', '))
               "
             />
           </span>
@@ -80,18 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
-        <!-- Save/Cancel when editing the title -->
-        <template v-if="incidentDetails && isEditingTitle">
-          <OButton variant="outline" size="sm-action" @click="cancelTitleEdit">{{
-            t("alerts.cancel")
-          }}</OButton>
-          <OButton variant="primary" size="sm-action" @click="saveTitleEdit">{{
-            t("alerts.save")
-          }}</OButton>
-        </template>
-
-        <!-- Incident actions otherwise -->
-        <template v-else-if="incidentDetails">
+        <template v-if="incidentDetails">
           <OButton
             v-if="incidentDetails.status === 'open'"
             variant="outline"
@@ -119,12 +115,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OIcon name="refresh" size="sm" />{{ t("alerts.incidents.reopen")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.reopenIncidentTooltip')"
           /></OButton>
-
-          <!-- Edit Title Button -->
-          <OButton variant="outline" size="sm" @click="startTitleEdit"
-            ><OIcon name="edit" size="sm" />{{ t("alerts.edit")
-            }}<OTooltip :delay="500" :content="t('alerts.incidents.editIncidentTitleTooltip')"
-          /></OButton>
         </template>
       </template>
 
@@ -135,14 +125,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <div class="px-page-edge border-border-default flex-shrink-0 border-b">
           <OTabs v-model="activeTab" align="left" class="flex-1" mobile-arrows :breakpoint="0">
-            <OTab name="overview" label="Overview" data-test="incident-overview-tab" />
-            <OTab name="activity" label="Activity" data-test="incident-activity-tab" />
+            <OTab
+              name="overview"
+              :label="t('alerts.insights.tabs.overview')"
+              data-test="incident-overview-tab"
+            />
+            <OTab
+              name="activity"
+              :label="t('alerts.incidents.activityTab')"
+              data-test="incident-activity-tab"
+            />
             <OTab
               name="incidentAnalysis"
               :label="t('alerts.incidents.incidentAnalysis')"
               data-test="incident-analysis-tab"
             />
-            <OTab name="serviceGraph" label="Alert Graph" data-test="incident-alert-graph-tab" />
+            <OTab
+              name="serviceGraph"
+              :label="t('alerts.incidents.alertGraph')"
+              data-test="incident-alert-graph-tab"
+            />
             <OTab name="alertTriggers" data-test="incident-alert-triggers-tab">
               <template #default>
                 <div class="flex items-center gap-1.5">
@@ -191,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Total Alerts
+                        {{ t("alerts.incidents.totalAlerts") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-amber-soft-bg flex h-8 w-8 items-center justify-center"
@@ -239,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Affected Services
+                        {{ t("alerts.incidents.affectedServices") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-purple-soft-bg flex h-8 w-8 items-center justify-center"
@@ -261,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Active Duration
+                        {{ t("alerts.incidents.activeDuration") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-success-soft-bg flex h-8 w-8 items-center justify-center"
@@ -278,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               incidentDetails.first_alert_at,
                               incidentDetails.last_alert_at,
                             )
-                          : "N/A"
+                          : t("common.notAvailable")
                       }}
                     </div>
                   </div>
@@ -290,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Top: Title and Icon -->
                     <div class="flex items-start justify-between">
                       <div :class="'text-text-secondary'" class="text-sm font-medium">
-                        Alert Frequency
+                        {{ t("alerts.incidents.alertFrequency") }}
                       </div>
                       <div
                         class="rounded-default bg-badge-error-soft-bg flex h-8 w-8 items-center justify-center"
@@ -324,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <div
                             class="rounded-default bg-surface-panel text-text-secondary px-2 py-0.5 text-xs font-medium"
                           >
-                            UTC
+                            {{ t("alerts.incidents.utc") }}
                           </div>
                         </div>
 
@@ -342,13 +344,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></div>
                             <div class="flex-1">
                               <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                First Alert Received
+                                {{ t("alerts.incidents.firstAlertReceived") }}
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
                                 {{
                                   incidentDetails?.first_alert_at
                                     ? formatTimestampUTC(incidentDetails.first_alert_at)
-                                    : "N/A"
+                                    : t("common.notAvailable")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{ t("alerts.incidents.initialTrigger") }}</span>
@@ -363,16 +365,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></div>
                             <div class="flex-1">
                               <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                Peak Activity
+                                {{ t("alerts.incidents.peakActivity") }}
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
                                 {{
                                   peakActivity.timestamp
                                     ? formatTimestampUTC(peakActivity.timestamp)
-                                    : "N/A"
+                                    : t("common.notAvailable")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
-                                <span>{{ peakActivity.count }} alerts in 5 mins</span>
+                                <span
+                                  >{{ peakActivity.count }}
+                                  {{ t("alerts.incidents.alertsInFiveMins") }}</span
+                                >
                               </div>
                             </div>
                           </div>
@@ -389,19 +394,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             ></div>
                             <div class="flex-1">
                               <div :class="'text-text-heading'" class="mb-1 text-sm font-medium">
-                                Latest Alert
+                                {{ t("alerts.incidents.latestAlert") }}
                               </div>
                               <div :class="'text-text-secondary'" class="text-xs">
                                 {{
                                   incidentDetails?.last_alert_at
                                     ? formatTimestampUTC(incidentDetails.last_alert_at)
-                                    : "N/A"
+                                    : t("common.notAvailable")
                                 }}
                                 <span :class="'text-text-muted'" class="mx-1.5">|</span>
                                 <span>{{
                                   incidentDetails?.status === "resolved"
-                                    ? "Resolved"
-                                    : "Still ongoing"
+                                    ? t("common.resolved")
+                                    : t("common.stillOngoing")
                                 }}</span>
                               </div>
                             </div>
@@ -415,7 +420,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             size="sm"
                             @click="activeTab = 'activity'"
                             data-test="incident-timeline-show-full-activity"
-                            ><span class="text-xs">Show Full Activity</span></OButton
+                            ><span class="text-xs">{{
+                              t("alerts.incidents.showFullActivity")
+                            }}</span></OButton
                           >
                         </div>
                       </div>
@@ -441,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 font-mono text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.id || "N/A"
+                                incidentDetails?.id || t("common.notAvailable")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_id' ? 'check' : 'content-copy'"
@@ -466,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
                             >
                               <span class="min-w-0 flex-1 truncate">{{
-                                incidentDetails?.title || "N/A"
+                                incidentDetails?.title || t("common.notAvailable")
                               }}</span>
                               <OIcon
                                 :name="copiedField === 'incident_title' ? 'check' : 'content-copy'"
@@ -485,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Correlated By -->
                           <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              Correlated By
+                              {{ t("alerts.incidents.correlatedBy") }}
                             </div>
                             <div
                               class="rounded-default bg-surface-panel border-border-default text-text-body flex min-w-0 items-center gap-2 border px-2.5 py-1 text-xs"
@@ -515,13 +522,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Created At -->
                           <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              Created At
+                              {{ t("alerts.createdAt") }}
                             </div>
                             <div :class="'text-text-body'" class="text-sm">
                               {{
                                 incidentDetails?.created_at
                                   ? formatTimestamp(incidentDetails.created_at)
-                                  : "N/A"
+                                  : t("common.notAvailable")
                               }}
                             </div>
                           </div>
@@ -529,13 +536,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <!-- Updated At -->
                           <div class="grid grid-cols-[7.5rem_1fr] gap-2">
                             <div :class="'text-text-secondary'" class="text-xs font-medium">
-                              Updated At
+                              {{ t("common.updated_at") }}
                             </div>
                             <div :class="'text-text-body'" class="text-sm">
                               {{
                                 incidentDetails?.updated_at
                                   ? formatTimestamp(incidentDetails.updated_at)
-                                  : "N/A"
+                                  : t("common.notAvailable")
                               }}
                             </div>
                           </div>
@@ -550,7 +557,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
                         <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          Alert Activity
+                          {{ t("alerts.incidents.alertActivity") }}
                         </div>
                       </div>
 
@@ -573,7 +580,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
-                        <div :class="'text-text-heading'" class="text-sm font-semibold">Manage</div>
+                        <div :class="'text-text-heading'" class="text-sm font-semibold">
+                          {{ t("alerts.incidents.manage") }}
+                        </div>
                       </div>
 
                       <!-- Content -->
@@ -581,7 +590,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Status Section -->
                         <div class="flex flex-col gap-2">
                           <div :class="'text-text-secondary'" class="text-xs font-semibold">
-                            Status
+                            {{ t("common.status") }}
                           </div>
                           <div class="flex flex-wrap gap-2">
                             <button
@@ -617,7 +626,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <!-- Severity Section -->
                         <div class="flex flex-col gap-2">
                           <div :class="'text-text-secondary'" class="text-xs font-semibold">
-                            Severity
+                            {{ t("alerts.incidents.severity") }}
                           </div>
                           <div class="flex flex-wrap gap-2">
                             <button
@@ -663,7 +672,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Header -->
                       <div class="px-4 pt-2 pb-1">
                         <div :class="'text-text-heading'" class="text-sm font-semibold">
-                          Dimensions
+                          {{ t("alerts.incidents.stableDimensions") }}
                         </div>
                       </div>
 
@@ -740,7 +749,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 {{ index + 1 }}.
                               </span>
                               <div class="min-w-0 flex-1">
-                                <OTooltip v-if="alert.name.length > 30" :content="alert.name" />
+                                <OTooltip
+                                  v-if="alert.name.length > 30"
+                                  :content="raw(alert.name)"
+                                />
                                 <span class="block truncate font-medium">
                                   {{
                                     alert.name.length > 30
@@ -836,7 +848,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <OIcon name="info" size="sm" class="opacity-80" />
                       <span :class="'text-text-secondary'" class="text-sm font-semibold">
-                        Alert Details
+                        {{ t("alerts.incidents.alertDetailsHeader") }}
                       </span>
                     </div>
                     <!-- Content -->
@@ -869,10 +881,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               :class="'text-text-secondary'"
                               class="text-3xs tracking-wide uppercase"
                             >
-                              Alert Name
+                              {{ t("alerts.incidents.alertName") }}
                             </span>
                             <span :class="'text-text-body'" class="text-sm font-medium">
-                              {{ alerts[selectedAlertIndex]?.name || "N/A" }}
+                              {{ alerts[selectedAlertIndex]?.name || t("common.notAvailable") }}
                             </span>
                           </div>
 
@@ -883,11 +895,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="'text-text-secondary'"
                                 class="text-3xs tracking-wide uppercase"
                               >
-                                Stream Type
+                                {{ t("alerts.streamType") }}
                               </span>
                               <OTag
                                 type="streamType"
-                                :value="alerts[selectedAlertIndex]?.stream_type || 'N/A'"
+                                :value="
+                                  alerts[selectedAlertIndex]?.stream_type ||
+                                  t('common.notAvailable')
+                                "
                                 class="w-fit"
                               />
                             </div>
@@ -896,10 +911,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="'text-text-secondary'"
                                 class="text-3xs tracking-wide uppercase"
                               >
-                                Stream Name
+                                {{ t("alerts.stream_name") }}
                               </span>
                               <span :class="'text-text-body'" class="truncate text-sm font-medium">
-                                {{ alerts[selectedAlertIndex]?.stream_name || "N/A" }}
+                                {{
+                                  alerts[selectedAlertIndex]?.stream_name ||
+                                  t("common.notAvailable")
+                                }}
                               </span>
                             </div>
                           </div>
@@ -911,12 +929,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="'text-text-secondary'"
                                 class="text-3xs tracking-wide uppercase"
                               >
-                                Threshold
+                                {{ t("alerts.messages.thresholdMarkLine") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{ alerts[selectedAlertIndex]?.trigger_condition?.operator || "" }}
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.threshold ||
+                                  t("common.notAvailable")
                                 }}
                               </span>
                             </div>
@@ -925,7 +944,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="'text-text-secondary'"
                                 class="text-3xs tracking-wide uppercase"
                               >
-                                Period
+                                {{ t("alerts.incidents.period") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
@@ -944,11 +963,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="'text-text-secondary'"
                                 class="text-3xs tracking-wide uppercase"
                               >
-                                Frequency
+                                {{ t("alerts.incidents.frequency") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.frequency ||
+                                  t("common.notAvailable")
                                 }}
                                 {{
                                   alerts[selectedAlertIndex]?.trigger_condition?.frequency_type ||
@@ -961,13 +981,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 :class="'text-text-secondary'"
                                 class="text-3xs tracking-wide uppercase"
                               >
-                                Silence
+                                {{ t("alerts.incidents.silence") }}
                               </span>
                               <span :class="'text-text-body'" class="text-sm font-medium">
                                 {{
-                                  alerts[selectedAlertIndex]?.trigger_condition?.silence || "N/A"
+                                  alerts[selectedAlertIndex]?.trigger_condition?.silence ||
+                                  t("common.notAvailable")
                                 }}
-                                min
+                                {{ t("common.min") }}
                               </span>
                             </div>
                           </div>
@@ -992,10 +1013,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             >
                               {{
                                 alerts[selectedAlertIndex]?.query_condition?.type === "sql"
-                                  ? "SQL Query"
+                                  ? t("alerts.alertDetails.sqlQuery")
                                   : alerts[selectedAlertIndex]?.query_condition?.type === "promql"
-                                    ? "PromQL Query"
-                                    : "Conditions"
+                                    ? t("alerts.alertDetails.promqlQuery")
+                                    : t("alerts.alertDetails.conditions")
                               }}
                             </span>
                           </div>
@@ -1031,14 +1052,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                              >
-if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.conditions) }}</pre
+                                >{{ t("alerts.incidents.ifPrefix") }} {{
+                                  formatCustomConditions(
+                                    alerts[selectedAlertIndex]?.query_condition?.conditions,
+                                  )
+                                }}</pre
                               >
                             </div>
 
                             <!-- No conditions -->
                             <div v-else :class="'text-text-muted'" class="text-sm italic">
-                              No conditions defined
+                              {{ t("alerts.incidents.noConditionsDefined") }}
                             </div>
                           </div>
                         </div>
@@ -1085,14 +1109,13 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated logs found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedLogs") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
                     class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
-                    The service discovery configuration (disambiguation fields) was changed after
-                    this incident was created.
+                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1100,7 +1123,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton
+                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1143,7 +1166,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">Loading correlated metrics...</div>
+                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedMetrics") }}</div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1169,14 +1192,13 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated metrics found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedMetrics") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
                     class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
-                    The service discovery configuration (disambiguation fields) was changed after
-                    this incident was created.
+                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1184,7 +1206,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton
+                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1245,7 +1267,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     class="mb-4"
                     data-test="incident-telemetry-loading-indicator"
                   />
-                  <div class="text-base">Loading correlated traces...</div>
+                  <div class="text-base">{{ t("alerts.incidents.loadingCorrelatedTraces") }}</div>
                 </div>
 
                 <!-- Error/No Data State -->
@@ -1271,14 +1293,13 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     ]"
                   />
                   <div class="mt-3 text-xl font-semibold">
-                    {{ correlationError || "No correlated traces found" }}
+                    {{ correlationError || t("alerts.incidents.noCorrelatedTraces") }}
                   </div>
                   <div
                     v-if="correlationError && correlationError.includes('disambiguation fields')"
                     class="text-text-secondary mt-2 max-w-125 text-center text-sm"
                   >
-                    The service discovery configuration (disambiguation fields) was changed after
-                    this incident was created.
+                    {{ t("alerts.incidents.disambiguationChangedMessage") }}
                   </div>
                   <OButton
                     v-if="correlationError && !correlationError.includes('disambiguation fields')"
@@ -1286,7 +1307,7 @@ if {{ formatCustomConditions(alerts[selectedAlertIndex]?.query_condition?.condit
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />Retry</OButton
+                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1335,7 +1356,7 @@ import {
   onBeforeUnmount,
   onUnmounted,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
@@ -1368,6 +1389,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -1393,10 +1415,11 @@ export default defineComponent({
     OTooltip,
     OIcon,
     OTag,
+    OInlineEdit,
   },
   emits: ["close", "status-updated", "sendToAiChat"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const { confirm } = useConfirmDialog();
@@ -1408,10 +1431,7 @@ export default defineComponent({
     const copyToClipboard = (text: string | undefined, fieldName: string) => {
       if (!text) return;
 
-      copyToClipboardUtil(text, {
-        successMessage: "Copied to clipboard",
-        errorMessage: "Failed to copy to clipboard",
-      }).then((success) => {
+      copyToClipboardUtil(text, t).then((success) => {
         if (success) {
           copiedField.value = fieldName;
           // Reset the icon after 2 seconds
@@ -1433,8 +1453,6 @@ export default defineComponent({
 
     // Title editing
     const isEditingTitle = ref(false);
-    const editableTitle = ref("");
-    const titleInputRef = ref<HTMLInputElement | null>(null);
     const rcaLoading = ref(false);
     const rcaStreamContent = ref("");
 
@@ -1454,16 +1472,16 @@ export default defineComponent({
 
     // Status and Severity options
     const statusOptions = [
-      { label: "Open", value: "open" },
-      { label: "Acknowledged", value: "acknowledged" },
-      { label: "Resolved", value: "resolved" },
+      { label: t("alerts.incidents.statusOpen"), value: "open" },
+      { label: t("alerts.incidents.statusAcknowledged"), value: "acknowledged" },
+      { label: t("alerts.incidents.statusResolved"), value: "resolved" },
     ];
 
     const severityOptions = [
-      { label: "P1 - Critical", value: "P1" },
-      { label: "P2 - High", value: "P2" },
-      { label: "P3 - Medium", value: "P3" },
-      { label: "P4 - Low", value: "P4" },
+      { label: t("alerts.incidents.severityP1"), value: "P1" },
+      { label: t("alerts.incidents.severityP2"), value: "P2" },
+      { label: t("alerts.incidents.severityP3"), value: "P3" },
+      { label: t("alerts.incidents.severityP4"), value: "P4" },
     ];
 
     // Table of Contents
@@ -1687,7 +1705,7 @@ export default defineComponent({
     });
 
     const alertFrequency = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return "N/A";
+      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
 
       const durationMs =
         (incidentDetails.value.last_alert_at - incidentDetails.value.first_alert_at) / 1000;
@@ -1706,6 +1724,18 @@ export default defineComponent({
         const minutesBetween = Math.floor(durationSeconds / triggers.value.length / 60);
         return `1 Per ${minutesBetween} Mins`;
       }
+    });
+
+    // Distinct external sources (Grafana, Alertmanager, etc.) that fed this
+    // incident — empty when every contributing alert is an internal O2 alert.
+    const externalSources = computed(() => {
+      const sources = new Set<string>();
+      for (const trigger of triggers.value) {
+        if (trigger.alert_kind === "external" && trigger.detected_source) {
+          sources.add(trigger.detected_source);
+        }
+      }
+      return Array.from(sources);
     });
 
     // Helper: Get actual trigger count for a specific alert_id
@@ -1763,7 +1793,7 @@ export default defineComponent({
 
     // Peak Alert Rate - find the highest concentration of alerts
     const peakAlertRate = computed(() => {
-      if (!incidentDetails.value || triggers.value.length === 0) return "N/A";
+      if (!incidentDetails.value || triggers.value.length === 0) return t("common.notAvailable");
 
       // Sort triggers by timestamp
       const sortedTriggers = [...triggers.value].sort(
@@ -2308,7 +2338,7 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
-        triggers.value = (response.data as any).triggers || [];
+        triggers.value = response.data.triggers || [];
         alerts.value = response.data.alerts || [];
 
         // Initialize editable status and severity from incident data
@@ -2333,7 +2363,7 @@ export default defineComponent({
         console.error("Failed to load incident details:", error);
         toast({
           variant: "error",
-          message: "Failed to load incident details",
+          message: t("toastMessages.alerts.failedToLoadIncidentDetails"),
         });
       } finally {
         loading.value = false;
@@ -2492,37 +2522,29 @@ export default defineComponent({
     const resolveIncident = () => updateStatus("resolved");
     const reopenIncident = () => updateStatus("open");
 
-    // Title editing functions
-    const startTitleEdit = () => {
-      if (!incidentDetails.value) return;
-      editableTitle.value = incidentDetails.value.title ?? "";
-      isEditingTitle.value = true;
-      nextTick(() => {
-        titleInputRef.value?.focus();
-        titleInputRef.value?.select();
-      });
-    };
-
+    // Title editing. OInlineEdit owns the open/close and the Escape-restores
+    // behaviour; this only has to persist a committed value. `isEditingTitle`
+    // survives purely so the status/severity chips in #title-trail still step
+    // aside while the input is open.
     const cancelTitleEdit = () => {
       isEditingTitle.value = false;
-      editableTitle.value = "";
     };
 
-    const saveTitleEdit = async () => {
-      if (!incidentDetails.value || !editableTitle.value.trim()) {
-        cancelTitleEdit();
-        return;
-      }
+    const saveTitleEdit = async (value: string) => {
+      isEditingTitle.value = false;
+      const nextTitle = value.trim();
 
-      if (editableTitle.value.trim() === incidentDetails.value.title) {
-        cancelTitleEdit();
+      // Nothing to do for a blank name or an unchanged one. A blank commit
+      // leaves the stored title alone — OInlineEdit re-renders it from
+      // incidentDetails, so the field snaps back on its own.
+      if (!incidentDetails.value || !nextTitle || nextTitle === incidentDetails.value.title) {
         return;
       }
 
       try {
         const org = store.state.selectedOrganization.identifier;
         const response = await incidentsService.updateIncident(org, incidentDetails.value.id, {
-          title: editableTitle.value.trim(),
+          title: nextTitle,
         });
 
         // Update local state with the actual title from the API response
@@ -2579,7 +2601,7 @@ export default defineComponent({
     };
 
     const formatPeriod = (periodInSeconds: number | undefined) => {
-      if (!periodInSeconds) return "N/A";
+      if (!periodInSeconds) return t("common.notAvailable");
 
       // Convert seconds to minutes
       if (periodInSeconds >= 60) {
@@ -2680,7 +2702,9 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: `Incident status updated to ${response.data.status}`,
+          message: t("toastMessages.alerts.incidentStatusUpdatedTo", {
+            status: response.data.status,
+          }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
@@ -2730,7 +2754,7 @@ export default defineComponent({
 
         toast({
           variant: "success",
-          message: `Incident severity updated to ${data.severity}`,
+          message: t("toastMessages.alerts.incidentSeverityUpdatedTo", { severity: data.severity }),
         });
         // Mark data as stale so incident list will refresh
         store.dispatch("incidents/setShouldRefresh", true);
@@ -2741,14 +2765,14 @@ export default defineComponent({
           if (data.analysis_in_flight) {
             toast({
               variant: "info",
-              message: "AI analysis is already running for this incident",
+              message: t("toastMessages.alerts.aiAnalysisIsAlreadyRunningFor"),
             });
           } else {
             const ok = await confirm({
-              title: "Re-run AI Analysis?",
-              message: "Severity has changed. Would you like AI to re-analyze this incident?",
-              confirmLabel: "Re-run AI analysis",
-              cancelLabel: "No thanks",
+              title: t("alerts.incidents.rerunAnalysisTitle"),
+              message: t("alerts.incidents.rerunAnalysisMessage"),
+              confirmLabel: t("alerts.incidents.rerunAnalysisConfirmLabel"),
+              cancelLabel: t("alerts.incidents.rerunAnalysisCancelLabel"),
               persistent: false,
             });
             if (ok) {
@@ -2756,7 +2780,7 @@ export default defineComponent({
                 await incidentsService.triggerRca(org, incidentId, { reanalysis: true });
                 toast({
                   variant: "success",
-                  message: "AI reanalysis started",
+                  message: t("toastMessages.alerts.aiReanalysisStarted"),
                 });
                 await loadDetails(incidentId);
               } catch (e: any) {
@@ -3326,6 +3350,7 @@ export default defineComponent({
     };
 
     return {
+      raw,
       t,
       store,
       loading,
@@ -3369,6 +3394,7 @@ export default defineComponent({
       incidentContextData,
       affectedServicesCount,
       alertFrequency,
+      externalSources,
       getTriggerCountForAlert,
       uniqueAlertsMap,
       uniqueAlertsCount,
@@ -3386,9 +3412,6 @@ export default defineComponent({
       resolveIncident,
       reopenIncident,
       isEditingTitle,
-      editableTitle,
-      titleInputRef,
-      startTitleEdit,
       cancelTitleEdit,
       saveTitleEdit,
       triggerRca,

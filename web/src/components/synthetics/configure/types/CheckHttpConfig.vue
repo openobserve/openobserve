@@ -1,10 +1,25 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 //
 // HTTP request + assertions card. Edits `check.http` and re-emits the whole
 // check — same update:check contract as the other configure sections.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { HttpCheckConfig, ProtocolCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -15,7 +30,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 const props = defineProps<{ check: ProtocolCheck }>();
 const emit = defineEmits<{ "update:check": [value: ProtocolCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const cfg = computed<HttpCheckConfig>(() => props.check.http!);
 
@@ -25,7 +40,7 @@ function update(patch: Partial<HttpCheckConfig>) {
 
 // Server-side whitelist (validate_config)
 const METHODS = ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"];
-const methodOptions = METHODS.map((m) => ({ label: m, value: m }));
+const methodOptions = METHODS.map((m) => ({ label: raw(m), value: m }));
 
 const ASSERTION_FIELDS = ["status_code", "body", "response_time_ms"] as const;
 const fieldOptions = computed(() =>

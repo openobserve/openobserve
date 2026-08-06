@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { reactive, onBeforeMount, nextTick } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep } from "lodash-es";
@@ -38,19 +39,20 @@ import useSearchBar from "@/composables/useLogs/useSearchBar";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import useStreamingSearch from "@/composables/useStreamingSearch";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw } from "@/types/i18n";
 
-const useLogs = () => {
+const useLogs = (t: TranslateFn) => {
   const store = useStore();
 
   let { searchObj, initialQueryPayload, resetFunctions, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
 
   const { getPaginatedData } = usePagination();
 
-  const { buildSearch } = useSearchStream();
+  const { buildSearch } = useSearchStream(t);
 
-  const { getFunctions, getActions, getQueryData } = useSearchBar();
+  const { getFunctions, getActions, getQueryData } = useSearchBar(t);
 
   const { fnParsedSQL, fnUnparsedSQL, addTransformToQuery, isActionsEnabled } = logsUtils();
 
@@ -58,7 +60,7 @@ const useLogs = () => {
     useStreamFields();
 
   const { showErrorNotification } = useNotifications();
-  const { getStreams } = useStreams();
+  const { getStreams } = useStreams(t);
   const { cancelStreamQueryBasedOnRequestId } = useStreamingSearch();
 
   const router = useRouter();
@@ -131,9 +133,9 @@ const useLogs = () => {
           .then(() => {
             toast({
               variant: "success",
-              message: "Job added successfully",
+              message: t("toastMessages.composables.jobAddedSuccessfully"),
               action: {
-                label: "Go To Job Scheduler",
+                label: t("toastMessages.composables.goToJobScheduler"),
                 handler: () => routeToSearchSchedule(),
               },
             });
@@ -143,10 +145,15 @@ const useLogs = () => {
       }
       if (searchObj.meta.jobId == "") {
         searchObj.data.histogram.chartParams.title = getHistogramTitle();
+        searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
       }
     } catch (e: any) {
       searchObj.loading = false;
-      showErrorNotification(notificationMsg.value || "Error occurred during the search operation.");
+      showErrorNotification(
+        raw(
+          notificationMsg.value || t("toastMessages.useLogs.errorOccurredDuringTheSearchOperation"),
+        ),
+      );
       throw e;
       // notificationMsg.value = "";
     }
@@ -163,15 +170,14 @@ const useLogs = () => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const routeToSearchSchedule = () => {
+    // Search Scheduler is now its own route (was an `action=search_scheduler` overlay).
     router.push({
-      query: {
-        action: "search_scheduler",
-        org_identifier: searchObj.organizationIdentifier,
-        type: "search_scheduler_list",
-      },
+      name: "searchScheduler",
+      query: { org_identifier: searchObj.organizationIdentifier },
     });
   };
 
@@ -200,7 +206,9 @@ const useLogs = () => {
         if (searchObj.meta.logsVisualizeToggle == "logs") {
           toast({
             variant: "info",
-            message: `Live mode is enabled. Only top ${searchObj.meta.resultGrid.rowsPerPage} results are shown.`,
+            message: t("toastMessages.composables.liveModeIsEnabledOnlyTop", {
+              count: searchObj.meta.resultGrid.rowsPerPage,
+            }),
           });
         }
       } else {
@@ -495,10 +503,25 @@ const useLogs = () => {
       (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
     );
 
-    // selectedStream array is coerced to its comma-joined string form as key
-    let colOrder = searchObj.data.resultGrid.colOrder[
-      searchObj.data.stream.selectedStream.join(",")
-    ].filter((_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"));
+    // selectedStream array is coerced to its comma-joined string form as key.
+    // Two shapes have to be tolerated:
+    //  • missing — the table only reports an order once the user reorders, so
+    //    "no entry" means "no order".
+    //  • object — a saved view round-trips this array through the API and comes
+    //    back as `{0:"a",1:"b"}`. Calling `.filter` on that throws, and because
+    //    closeColumn()/add-field both start here, EVERY column add/remove then
+    //    dies silently.
+    const storedColOrder =
+      searchObj.data.resultGrid.colOrder[searchObj.data.stream.selectedStream.join(",")];
+    const colOrderList: string[] = Array.isArray(storedColOrder)
+      ? storedColOrder
+      : storedColOrder && typeof storedColOrder === "object"
+        ? (Object.values(storedColOrder) as string[])
+        : [];
+
+    let colOrder = colOrderList.filter(
+      (_field) => _field !== (store?.state?.zoConfig?.timestamp_column || "_timestamp"),
+    );
 
     // Skip reordering when colOrder is empty to prevent unstable sort in Firefox
     if (colOrder.length === 0) {
@@ -738,6 +761,7 @@ const useLogs = () => {
     loadVisualizeData,
     loadPatternsData,
     getHistogramTitle,
+    getHistogramTitleParts,
   };
 };
 

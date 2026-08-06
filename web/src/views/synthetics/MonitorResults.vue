@@ -23,10 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="synthetic-monitor-results-page"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.results.monitors'),
-      to: { name: 'synthetics' },
+      to: backTo,
     }"
     bleed
   >
@@ -48,14 +48,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }"
         :default-relative-time="timeState.relativeTimePeriod ?? ''"
         data-test="synthetic-monitor-results-date-time"
-        class="h-8.5!"
+        class=""
         @on:date-change="onDateChange"
       />
       <OButton
         variant="outline"
         size="sm"
+        icon-left="play-arrow"
+        :loading="isTriggering"
+        data-test="synthetic-monitor-results-trigger-run-btn"
+        class="h-7.5!"
+        @click="triggerRun"
+      >
+        {{ t("synthetics.runs.triggerRun") }}
+      </OButton>
+      <OButton
+        variant="outline"
+        size="sm"
         icon-left="edit"
         data-test="synthetic-monitor-results-edit-btn"
+        class="h-7.5!"
         @click="editMonitor"
       >
         {{ t("synthetics.results.editCheck") }}
@@ -66,6 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         icon-left="refresh"
         :loading="isRefreshing"
         data-test="synthetic-monitor-results-refresh-btn"
+        class="h-7.5!"
         @click="refresh"
       />
     </template>
@@ -77,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :monitor-status="monitorStatus"
         :last-triggered-at="lastTriggeredAt"
         :check-type="checkType"
+        :retries="retries"
         @edit="editMonitor"
         @open-run="openRunDetail"
         @refresh="refresh"
@@ -90,9 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
     v-model:open="drawerOpen"
     side="right"
-    :width="90"
-    :title="monitorName"
-    :subTitle="drawerTimestamp"
+    size="xxl"
+    :width="checkType === 'browser' ? 85 : undefined"
+    :title="raw(monitorName)"
+    :subTitle="raw(drawerTimestamp)"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
@@ -106,8 +121,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ drawerRunStatus.label }}
       </OBadge>
-      <OBadge v-if="drawerUrl" variant="default" size="sm" icon="link" class="max-w-50 truncate">
-        {{ drawerUrl }}
+      <!-- See RunDetail's URL badge: `truncate` must sit on the inner text, not
+           on OBadge's inline-flex root, or the URL is cut with no ellipsis. -->
+      <OBadge
+        v-if="drawerUrl"
+        variant="default"
+        size="sm"
+        icon="link"
+        class="max-w-xs min-w-0"
+        data-test="synthetics-run-drawer-url-badge"
+      >
+        <span class="block min-w-0 truncate">{{ drawerUrl }}</span>
+        <OTooltip side="bottom" :content="raw(drawerUrl)" :max-width="'32rem'" />
       </OBadge>
     </template>
     <RunDetail
@@ -124,25 +149,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
+import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
+import {
+  syntheticsEditRoute,
+  syntheticsFolderName,
+  syntheticsListRoute,
+} from "@/utils/synthetics/routes";
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -152,6 +184,9 @@ const orgIdentifier = computed(() => store.state.selectedOrganization?.identifie
 // and distinguishes "never triggered" from "no runs in this window."
 const lastTriggeredAt = ref(0);
 const checkType = ref("browser");
+/** The check's configured retry count. 0 means nothing can ever be observed as
+ *  flaky, so the flakiness tiles have no answer to give rather than a zero. */
+const retries = ref(0);
 // True once fetchCheck() resolves — the drawer can auto-open from a run/exec
 // query param before that happens, so RunDetail must not trust checkType's
 // "browser" default until it's confirmed.
@@ -164,7 +199,15 @@ const DEFAULT_RELATIVE = "15m";
 
 const monitorId = computed(() => String(route.params.id ?? ""));
 const monitorName = computed(() => String(route.query.name ?? "") || t("synthetics.results.title"));
-const folderName = computed(() => String(route.query.folder ?? ""));
+// `?folder=` carries the folder ID (the server gates RBAC on it); the header
+// wants the name, so resolve it against the folder list Vuex already holds.
+const folderId = computed(() => String(route.query.folder ?? ""));
+const folderName = computed(() =>
+  syntheticsFolderName(
+    store.state.organizationData?.foldersByType?.synthetics ?? [],
+    folderId.value,
+  ),
+);
 const monitorStatus = computed<"healthy" | "degraded" | "critical">(
   () => (route.query.status as any) || "degraded",
 );
@@ -211,7 +254,7 @@ const selectedExecutionId = ref("");
 const drawerRunStatus = ref<{
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
 } | null>(null);
 const drawerUrl = ref("");
 const drawerTimestamp = ref("");
@@ -219,7 +262,7 @@ const drawerTimestamp = ref("");
 function onRunStatusUpdate(status: {
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
   url: string;
   timestamp: string;
 }) {
@@ -341,8 +384,32 @@ function onJumpToWindow(startTime: number, endTime: number) {
   });
 }
 
+/** Ambient params this page was reached with, forwarded to every hop out of it. */
+const navContext = computed(() => ({
+  orgIdentifier: orgIdentifier.value,
+  folderId: folderId.value,
+}));
+
+/** Returns to the list on the folder the user came from, not a reset to Default. */
+const backTo = computed(() => syntheticsListRoute(navContext.value));
+
 function editMonitor() {
-  router.push({ name: "synthetics-edit", params: { id: monitorId.value } });
+  router.push(syntheticsEditRoute(navContext.value, monitorId.value));
+}
+
+/**
+ * Run the check once, now.
+ *
+ * The trigger already existed but only inside MonitorRuns' two empty states, so
+ * it became unreachable the moment a monitor recorded its first run — which is
+ * exactly when someone wants to re-run it after a fix. The call itself stays in
+ * MonitorRuns (it owns the org/folder/monitor ids and the refresh); this is the
+ * header affordance for it.
+ */
+const isTriggering = computed<boolean>(() => !!runsRef.value?.runTriggerLoading);
+
+function triggerRun() {
+  runsRef.value?.triggerRun?.();
 }
 
 function openRunDetail(runId: string, executionId: string) {
@@ -365,6 +432,13 @@ onMounted(() => {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
+  // On a deep link / refresh the folder list is not in the store yet, so the
+  // header subtitle would fall back to the raw folder ID. Cheap and cached.
+  if (!store.state.organizationData?.foldersByType?.synthetics?.length) {
+    getFoldersListByType(store, "synthetics").catch((err) =>
+      console.error("[synthetics] failed to load folders", err),
+    );
+  }
   fetchCheck();
   // Auto-open drawer if query params present
   const runQ = route.query.run;
@@ -382,14 +456,18 @@ onMounted(() => {
 // need-check-data emit (when zero runs). One API call instead of two.
 async function fetchCheck() {
   try {
-    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value);
+    // Folder-scoped RBAC grants resolve through `?folder=`, so it must be sent
+    // here too — RunDetail already did, and the two pages disagreed.
+    const res = await syntheticsService.get(orgIdentifier.value, monitorId.value, folderId.value);
     if (res?.data) {
       lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
       checkType.value = res.data.type ?? "browser";
+      // The flaky tiles are only answerable when the check is allowed to retry.
+      retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
     }
   } catch (err: any) {
     if (err?.response?.status === 404) {
-      router.push({ name: "synthetics" });
+      router.push(syntheticsListRoute(navContext.value));
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return;
     }

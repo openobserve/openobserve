@@ -52,7 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       ref="containerRef"
       class="flex min-w-0 flex-1 items-center gap-3 py-2"
     >
-      <span class="text-2! text-typography-meta m-0 shrink-0">Correlated by:</span>
+      <span class="text-2! text-typography-meta m-0 shrink-0">{{
+        t("correlation.correlatedBy")
+      }}</span>
       <div class="flex min-w-0 items-center gap-2 overflow-hidden">
         <ODimensionChip
           v-for="chip in displayedChips"
@@ -73,7 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`correlation-event-header-overflow-${hiddenChipCount}`"
           >
             <template v-if="hiddenChipCount !== contextChips.length">+</template>{{ hiddenChipCount
-            }}<template v-if="hiddenChipCount === contextChips.length"> Fields</template>
+            }}<template v-if="hiddenChipCount === contextChips.length">
+              {{ t("correlation.fieldsLabel") }}</template
+            >
           </OTag>
           <OTooltip side="top" :disabled="hiddenChipCount === 0">
             <template #content>
@@ -97,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Subject chips (View by) — shown when subjectChips are provided -->
     <div v-if="showSubjectSection" class="flex shrink-0 items-center gap-3">
       <OSeparator vertical class="my-2" />
-      <span class="text-2! text-typography-meta m-0">View by:</span>
+      <span class="text-2! text-typography-meta m-0">{{ t("correlation.viewBy") }}</span>
       <OToggleGroup
         :model-value="activeSubject ?? undefined"
         type="single"
@@ -118,10 +122,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`correlation-event-header-subject-${chip.key}`"
         >
           {{ getSubjectButtonLabel ? getSubjectButtonLabel(chip.key) : chip.label }}
-          <OTooltip :content="`${chip.label} = ${chip.value}`" side="top" />
+          <OTooltip :content="raw(`${chip.label} = ${chip.value}`)" side="top" />
           <template v-if="chip.disabled">
             <OTooltip
-              :content="`No metric streams found for this ${chip.label.toLowerCase()}`"
+              :content="t('correlation.noMetricStreamsFor', { kind: chip.label.toLowerCase() })"
               side="top"
             />
           </template>
@@ -161,12 +165,15 @@ import {
   convertTimeFromMicroToMilli,
   timestampToTimezoneDate,
 } from "@/utils/zincutils";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 type ChipKind = "context" | "subject";
 
 export type DimensionChip = {
   key: string;
-  label: string;
+  label: I18nText;
   value: string;
   kind: ChipKind;
   active: boolean;
@@ -178,7 +185,7 @@ const props = withDefaults(
     sourceEvent?: {
       timestamp?: number | string;
       severity?: string;
-      message?: string;
+      message?: I18nText;
     };
     contextChips?: DimensionChip[];
     subjectChips?: DimensionChip[];

@@ -1,11 +1,26 @@
-// Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <template>
   <ODrawer
     :open="open"
     side="right"
     size="lg"
     :title="t('synthetics.privateLocations.setup.title')"
-    :sub-title="locationName || undefined"
+    :sub-title="raw(locationName || undefined)"
     data-test="synthetics-agent-setup-drawer"
     @update:open="emit('update:open', $event)"
   >
@@ -13,7 +28,7 @@
       <!-- Step 1: deploy -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">1</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "1" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
@@ -25,6 +40,15 @@
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
           <div class="rounded-default border-border-default flex flex-col gap-3 border p-3">
+            <OInput
+              v-if="!locationId"
+              v-model="draftLocation"
+              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
+              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
+              required
+              size="sm"
+              data-test="synthetics-agent-setup-location-input"
+            />
             <div class="flex flex-col gap-1">
               <OInput
                 v-model="draftAgentName"
@@ -37,15 +61,6 @@
                 {{ t("synthetics.privateLocations.setup.agentNameHint") }}
               </p>
             </div>
-            <OInput
-              v-if="!locationId"
-              v-model="draftLocation"
-              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
-              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
-              required
-              size="sm"
-              data-test="synthetics-agent-setup-location-input"
-            />
           </div>
 
           <!-- Which agent to install. The two are different programs, not two
@@ -131,7 +146,7 @@
       <!-- Step 2: wait for the agent to register -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">2</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "2" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
@@ -144,7 +159,7 @@
       <!-- Step 3: assign in checks -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">3</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "3" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>
@@ -159,7 +174,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -189,7 +204,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const platform = ref<string | number>("docker");
 const agentType = ref<string | number>("protocol");

@@ -368,15 +368,18 @@ describe("SettingsIndex.vue", () => {
       expect(keys).toContain("organization");
     });
 
-    it("should include DESTINATIONS & TEMPLATES group with alert destinations", () => {
+    it("should include a Destinations group without the alerting entries", () => {
+      // Notification Destinations and Templates moved to Reliability; only
+      // Pipeline Destinations is still deployment configuration.
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
       const groups = wrapper.vm.sectionGroups;
-      const destGroup = groups.find((g: any) => g.label === "Destinations & Templates");
+      const destGroup = groups.find((g: any) => g.label === "Destinations");
       expect(destGroup).toBeDefined();
       const keys = destGroup.items.map((i: any) => i.key);
-      expect(keys).toContain("alert_destinations");
-      expect(keys).toContain("templates");
+      expect(keys).toContain("pipeline_destinations");
+      expect(keys).not.toContain("alert_destinations");
+      expect(keys).not.toContain("templates");
     });
   });
 

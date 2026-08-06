@@ -154,13 +154,18 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     }
 
     let stream_types = [StreamType::Logs, StreamType::Metrics, StreamType::Traces];
-    let orgs = db::schema::list_organizations_from_cache().await;
+    let grouped = db::schema::list_all_streams_grouped().await;
+    // orgs are derived from the same schema cache as before, so the org count
+    // metric is unchanged
+    let orgs = grouped.keys().cloned().collect::<Vec<_>>();
     metrics::META_NUM_ORGANIZATIONS
         .with_label_values::<&str>(&[])
         .set(orgs.len() as i64);
-    for org_id in &orgs {
+    for (org_id, org_streams) in &grouped {
         for stream_type in stream_types {
-            let streams = db::schema::list_streams_from_cache(org_id, stream_type).await;
+            let Some(streams) = org_streams.get(&stream_type) else {
+                continue;
+            };
             if !streams.is_empty() {
                 metrics::META_NUM_STREAMS
                     .with_label_values::<&str>(&[org_id.as_str(), stream_type.as_str()])
@@ -175,16 +180,11 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     metrics::META_NUM_USERS_TOTAL
         .with_label_values::<&str>(&[])
         .set(users as i64);
+    let org_user_counts = count_org_users();
     for org_id in &orgs {
-        let mut count: i64 = 0;
-        for user in ORG_USERS.iter() {
-            if user.key().starts_with(&format!("{org_id}/")) {
-                count += 1;
-            }
-        }
         metrics::META_NUM_USERS
             .with_label_values(&[org_id.as_str()])
-            .set(count);
+            .set(org_user_counts.get(org_id.as_str()).copied().unwrap_or(0));
     }
 
     metrics::META_NUM_FUNCTIONS.reset();
@@ -209,6 +209,17 @@ async fn update_metadata_metrics() -> Result<(), anyhow::Error> {
     // TODO dashboard
 
     Ok(())
+}
+
+/// Aggregate user counts by org in one pass instead of scanning ORG_USERS per org.
+fn count_org_users() -> HashMap<String, i64> {
+    let mut counts: HashMap<String, i64> = HashMap::new();
+    for user in ORG_USERS.iter() {
+        if let Some((org_id, _)) = user.key().split_once('/') {
+            *counts.entry(org_id.to_string()).or_default() += 1;
+        }
+    }
+    counts
 }
 
 async fn update_storage_metrics() -> Result<(), anyhow::Error> {
@@ -259,6 +270,8 @@ async fn update_parquet_metrics() -> Result<(), anyhow::Error> {
     ingester::collect_wal_parquet_metrics()
         .await
         .map_err(|e| anyhow::anyhow!("Failed to collect parquet metrics: {}", e))?;
+    // and the wal pack backlog gauges (pack files/segments totals)
+    ingester::collect_pack_metrics().await;
     Ok(())
 }
 
@@ -272,4 +285,54 @@ async fn update_parquet_metadata_cache_metrics() -> Result<(), anyhow::Error> {
         .with_label_values::<&str>(&[])
         .set(mem_size as i64);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::user::UserRole;
+    use infra::table::org_users::OrgUserRecord;
+
+    use super::*;
+
+    fn org_user_record(org_id: &str, email: &str) -> OrgUserRecord {
+        OrgUserRecord {
+            email: email.to_string(),
+            org_id: org_id.to_string(),
+            role: UserRole::Admin,
+            token: "".to_string(),
+            rum_token: None,
+            created_at: 0,
+            allow_static_token: false,
+        }
+    }
+
+    #[test]
+    fn test_count_org_users() {
+        // unique org names so the global map can be shared with other tests
+        let entries = [
+            ("count_org_users_a", "u1@example.com"),
+            ("count_org_users_a", "u2@example.com"),
+            ("count_org_users_b", "u1@example.com"),
+        ];
+        for (org_id, email) in entries {
+            ORG_USERS.insert(format!("{org_id}/{email}"), org_user_record(org_id, email));
+        }
+        // a key without a separator must be ignored, not counted or panicked on
+        ORG_USERS.insert(
+            "count_org_users_no_separator".to_string(),
+            org_user_record("count_org_users_no_separator", "u1@example.com"),
+        );
+
+        let counts = count_org_users();
+        assert_eq!(counts.get("count_org_users_a").copied(), Some(2));
+        assert_eq!(counts.get("count_org_users_b").copied(), Some(1));
+        // an org with no users is absent; callers default to 0
+        assert_eq!(counts.get("count_org_users_empty"), None);
+        assert_eq!(counts.get("count_org_users_no_separator"), None);
+
+        for (org_id, email) in entries {
+            ORG_USERS.remove(&format!("{org_id}/{email}"));
+        }
+        ORG_USERS.remove("count_org_users_no_separator");
+    }
 }

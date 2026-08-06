@@ -7,10 +7,11 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface PayloadFormData {
   name: string;
-  description: string;
+  description: I18nText;
   is_real_time: boolean | string;
   trigger_condition: {
     threshold: number | string;
@@ -33,6 +34,9 @@ export interface PayloadFormData {
   row_template?: string;
   row_template_type?: string;
   creates_incident?: boolean;
+  /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
+  priority?: number | string | null;
+  tags?: string[];
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;
@@ -50,6 +54,7 @@ export interface PayloadContext {
 
 export interface SaveAlertContext {
   store: any;
+  t: TranslateFn;
   props: any;
   emit: any;
   router: any;
@@ -119,7 +124,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
-  payload.description = formData.description.trim();
+  payload.description = raw(formData.description.trim());
 
   if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
     payload.query_condition.aggregation = null;
@@ -169,6 +174,68 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
     );
   }
 
+  // Optional WARNING fields (alerts_2.md Feature 1) get the same last-mile
+  // repair: the inputs produce raw strings, and clearing one leaves "".
+  // A configured value must ship numeric (the Rust fields are Option<i64>/
+  // Option<f64>), and a blank must be DELETED — a serialized "" is a 400.
+  const normalizeOptionalNumber = (obj: any, key: string) => {
+    if (!obj || !(key in obj)) return;
+    const v = obj[key];
+    if (v === "" || v === null || v === undefined) {
+      delete obj[key];
+      return;
+    }
+    obj[key] = toNumericValue(v);
+  };
+  normalizeOptionalNumber(payload.trigger_condition, "warning_threshold");
+  normalizeOptionalNumber(payload.query_condition?.aggregation, "warning_value");
+  normalizeOptionalNumber(payload.query_condition, "promql_warning_value");
+
+  // Family exclusivity (D13): a warning left over from another tab/mode must
+  // not ship — the backend rejects warning_threshold on aggregation/PromQL
+  // alerts (their count threshold is coverage, not severity), and
+  // promql_warning_value is meaningless off the promql tab.
+  if (
+    getSelectedTab.value === "promql" ||
+    (isAggregationEnabled.value && getSelectedTab.value === "custom")
+  ) {
+    delete (payload.trigger_condition as any).warning_threshold;
+  }
+  if (getSelectedTab.value !== "promql") {
+    delete (payload.query_condition as any).promql_warning_value;
+  }
+  // Realtime alerts carry no warning family at all (D12) — and the form hides
+  // the fields when realtime is selected, so anything left over from a
+  // scheduled configuration is invisible to the user. The backend rejects it;
+  // stripping here keeps the scheduled→realtime switch saveable.
+  if (payload.is_real_time === true) {
+    delete (payload.trigger_condition as any).warning_threshold;
+    delete (payload.query_condition as any).promql_warning_value;
+    if (payload.query_condition.aggregation) {
+      delete (payload.query_condition.aggregation as any).warning_value;
+    }
+  }
+  // notify_on_warning was removed from the UI — a breached warning always sends
+  // to the destination. Never emit the flag, so the backend applies its default
+  // (`notify_on_warning.unwrap_or(true)` = always notify).
+  delete (payload.trigger_condition as any).notify_on_warning;
+
+  // Feature 2 (PT-1/PT-6). The select yields a string when a user picks a
+  // value, so coerce; an unset priority is DELETED rather than sent as null or
+  // 0, keeping pre-Feature-2 payloads byte-identical (G5).
+  if (payload.priority === null || payload.priority === undefined || payload.priority === "") {
+    delete (payload as any).priority;
+  } else {
+    const n = Number(payload.priority);
+    if (Number.isNaN(n)) delete (payload as any).priority;
+    else payload.priority = n;
+  }
+  // Tags are normalized server-side (that is the authority); here we only drop
+  // the field when empty so an untagged alert adds no key.
+  if (!Array.isArray(payload.tags) || payload.tags.length === 0) {
+    delete (payload as any).tags;
+  }
+
   if (formData.query_condition.vrl_function) {
     payload.query_condition.vrl_function = b64EncodeUnicode(
       formData.query_condition.vrl_function.trim(),
@@ -190,7 +257,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 };
 
 export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
-  const { store, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
+  const { store, t, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
     context;
 
   const payload = cloneDeep(data);
@@ -236,7 +303,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
   try {
     const dismiss = toast({
       variant: "loading",
-      message: "Please wait...",
+      message: t("toastMessages.alerts.pleaseWait"),
       timeout: 0,
     });
 
@@ -249,7 +316,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert updated successfully.",
+        message: t("toastMessages.alerts.alertUpdatedSuccessfully"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -260,7 +327,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert saved successfully.",
+        message: t("toastMessages.alerts.alertSavedSuccessfully"),
       });
     }
     dismiss();

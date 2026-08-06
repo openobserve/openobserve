@@ -231,7 +231,7 @@ describe("Nodes.vue", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QTablePagination: true,
+          Pagination: true,
           NoData: true,
         },
       },

@@ -128,11 +128,16 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
         .collect();
     match crate::organization::list_all_orgs(None).await {
         Ok(orgs) => {
+            // one pass over the schema cache instead of a full scan per org
+            let mut grouped = crate::db::schema::list_all_streams_grouped().await;
             for org in orgs {
-                for stream_name in
-                    crate::db::schema::list_streams_from_cache(&org.identifier, StreamType::Traces)
-                        .await
-                {
+                let Some(streams) = grouped
+                    .get_mut(&org.identifier)
+                    .and_then(|types| types.remove(&StreamType::Traces))
+                else {
+                    continue;
+                };
+                for stream_name in streams {
                     if seen.insert((org.identifier.clone(), stream_name.clone())) {
                         discovered.push(RecentIngestedTraceStream {
                             org_id: org.identifier.clone(),

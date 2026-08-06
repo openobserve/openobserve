@@ -1,7 +1,22 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
 <script setup lang="ts">
-// Copyright 2026 OpenObserve Inc.
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck, SyntheticsDevice } from "@/types/synthetics";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
 import firefoxSvgUrl from "@/assets/images/synthetics/firefox.svg";
@@ -16,7 +31,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function deviceLabelKey(label: string): string {
   const map: Record<string, string> = {
@@ -29,9 +44,9 @@ function deviceLabelKey(label: string): string {
 
 const DEFAULT_BROWSERS = ["chromium", "firefox"];
 const DEFAULT_DEVICES: SyntheticsDevice[] = [
-  { id: "desktop", label: "Desktop", width: 1440, height: 900 },
-  { id: "tablet", label: "Tablet", width: 768, height: 1024 },
-  { id: "mobile", label: "Mobile", width: 375, height: 667 },
+  { id: "desktop", label: t("synthetics.browserDevices.desktop"), width: 1440, height: 900 },
+  { id: "tablet", label: t("synthetics.browserDevices.tablet"), width: 768, height: 1024 },
+  { id: "mobile", label: t("synthetics.browserDevices.mobile"), width: 375, height: 667 },
 ];
 
 const DEVICE_ICONS: Record<string, string> = {

@@ -146,6 +146,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
           </div>
 
+          <!-- Priority & tags (Feature 2, PT-10) -->
+          <div class="flex flex-col gap-4">
+            <div>
+              <div
+                class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
+              >
+                <span>{{ t("alerts.priority") }}</span>
+                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
+              </div>
+              <OFormSelect
+                name="priority"
+                :options="priorityOptions"
+                :searchable="false"
+                clearable
+                width="xs"
+                :placeholder="t('alerts.priorityUnset')"
+                data-test="alert-priority-select"
+              />
+            </div>
+            <div>
+              <div
+                class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
+              >
+                <span>{{ t("alerts.tags") }}</span>
+                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
+              </div>
+              <OFormTagInput
+                name="tags"
+                :placeholder="t('alerts.placeholders.addTag')"
+                data-test="alert-tags-input"
+              />
+            </div>
+          </div>
+
           <!-- Description -->
           <div>
             <div
@@ -224,7 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, inject, type PropType, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { getUUID } from "@/utils/zincutils";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -233,6 +269,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import AlertSettingsHelpDrawer from "@/components/alerts/AlertSettingsHelpDrawer.vue";
@@ -253,6 +291,8 @@ export default defineComponent({
     OFormInput,
     OFormTextarea,
     OFormSelect,
+    OFormTagInput,
+    OTooltip,
     AlertSettingsHelpDrawer,
   },
   props: {
@@ -269,8 +309,8 @@ export default defineComponent({
       default: () => [],
     },
     description: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     rowTemplate: {
       type: String,
@@ -318,12 +358,19 @@ export default defineComponent({
     "update:rowTemplateType",
   ],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     // DESCENDANT step (Rule ③): the AddAlert orchestrator provides
     // FORM_CONTEXT_KEY — this is the ONE form all reads/writes go through.
     const form: any = inject(FORM_CONTEXT_KEY, null);
+
+    // Priority options (PT-1). Value is the INTEGER storage id so the form
+    // holds exactly what the API serializes — the `P3` form is display only.
+    const priorityOptions = [1, 2, 3, 4, 5].map((value) => ({
+      label: raw(`P${value}`),
+      value,
+    }));
 
     // ── Reactive form reads (single source of truth for preview + help
     //    drawer). ────────────────────────────────────────────────────────────
@@ -404,6 +451,8 @@ export default defineComponent({
     };
 
     return {
+      raw,
+      priorityOptions,
       t,
       store,
       variableRows,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // ODataBarCell — the headline "bars like Datadog" cell. Renders
@@ -24,9 +25,9 @@ const props = withDefaults(
     display?: string | number;
     /** Bar tone. Default teal; "warning"/"danger" for threshold columns. */
     variant?: "default" | "warning" | "danger";
-    emptyLabel?: string;
+    emptyLabel?: I18nText;
   }>(),
-  { variant: "default", emptyLabel: "—" },
+  { variant: "default", emptyLabel: raw("—") },
 );
 
 const num = computed<number | null>(() => {

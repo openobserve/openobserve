@@ -30,9 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          header above a centered reading column. -->
     <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
       <OPageHeader
-        :title="activeSectionItem?.label || ''"
+        :title="raw(activeSectionItem?.label || '')"
         :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
-        :subtitle="activeSectionItem?.description || ''"
+        :subtitle="raw(activeSectionItem?.description || '')"
         :icon="activeSectionItem?.icon as any"
         class="border-border-default shrink-0 border-b"
       />
@@ -57,7 +57,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import SectionRail from "@/components/common/SectionRail.vue";
 import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
 import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -74,7 +74,7 @@ export default defineComponent({
     SectionRail,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router: any = useRouter();
@@ -89,7 +89,6 @@ export default defineComponent({
       queryManagement: "queryManagement",
       query_management: "queryManagement",
       domainManagement: "domain_management",
-      alertDestinations: "alert_destinations",
       pipelineDestinations: "pipeline_destinations",
       alertTemplates: "templates",
       modelPricing: "model_pricing",
@@ -174,7 +173,7 @@ export default defineComponent({
     const settingsGroupOrder = [
       "General",
       "Access & Security",
-      "Destinations & Templates",
+      "Destinations",
       "Data & AI",
       "Operations",
       "Synthetics",
@@ -238,15 +237,10 @@ export default defineComponent({
           dataTest: "domain-management-tab",
           group: "Access & Security",
         },
-        {
-          key: "alert_destinations",
-          label: t("alert_destinations.header"),
-          description: t("settings.alertDestinationsDesc"),
-          icon: "location-on",
-          to: { name: "alertDestinations", query: { org_identifier: org } },
-          dataTest: "alert-destinations-tab",
-          group: "Destinations & Templates",
-        },
+        // Notification Destinations and Templates are alerting configuration and
+        // now live under Reliability (/alert-destinations, /alert-templates).
+        // Pipeline Destinations stays here — it belongs to pipelines, not
+        // alerting — so the group is just "Destinations" now.
         {
           key: "pipeline_destinations",
           label: t("pipeline_destinations.header"),
@@ -255,16 +249,7 @@ export default defineComponent({
           to: { name: "pipelineDestinations", query: { org_identifier: org } },
           visible: isEnt,
           dataTest: "pipeline-destinations-tab",
-          group: "Destinations & Templates",
-        },
-        {
-          key: "templates",
-          label: t("alert_templates.header"),
-          description: t("settings.templatesDesc"),
-          icon: "description",
-          to: { name: "alertTemplates", query: { org_identifier: org } },
-          dataTest: "alert-templates-tab",
-          group: "Destinations & Templates",
+          group: "Destinations",
         },
         {
           key: "storageSettings",
@@ -285,7 +270,7 @@ export default defineComponent({
           description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled,
+          visible: (isEnt || isCloud) && !!z.model_pricing_enabled,
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },
@@ -393,10 +378,10 @@ export default defineComponent({
       };
       // Internal group keys stay English (used for bucketing + rank); only the
       // displayed label is translated so sorting/ranking is unaffected.
-      const groupLabels: Record<string, string> = {
+      const groupLabels: Record<string, I18nText> = {
         General: t("settings.groupGeneral"),
         "Access & Security": t("settings.groupAccessSecurity"),
-        "Destinations & Templates": t("settings.groupDestinationsTemplates"),
+        Destinations: t("settings.groupDestinations"),
         "Data & AI": t("settings.groupDataAI"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),
@@ -404,10 +389,11 @@ export default defineComponent({
       };
       return [...buckets.keys()]
         .sort((a, b) => rank(a) - rank(b))
-        .map((label) => ({ label: groupLabels[label] ?? label, items: buckets.get(label)! }));
+        .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
     });
 
     return {
+      raw,
       t,
       store,
       router,

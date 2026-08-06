@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { computed, Ref } from "vue";
 import {
   formatNumber,
@@ -32,7 +34,7 @@ const MAX_LABEL_NAME_LENGTH = 24;
 export interface TreeNode {
   id: string;
   name: string;
-  label?: string;
+  label?: I18nText;
   value: number; // Primary metric (requests/duration)
   errorRate: number;
   children?: TreeNode[];

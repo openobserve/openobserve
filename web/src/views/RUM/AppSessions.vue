@@ -38,6 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :debounce-time="300"
                 :keywords="effectiveKeywords"
                 :suggestions="effectiveSuggestions"
+                :field-value-resolver="resolveFieldValues"
                 @focus="onQueryEditorFocus"
                 @blur="onQueryEditorBlur"
                 @update:query="updateAutoComplete"
@@ -123,7 +124,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :stream-name="rumSessionStreamName"
               stream-type="logs"
               :enable-grouping="true"
-              :query="completeQuery"
+              :query="sessionState.data.editorValue"
+              :base-filter="fieldListBaseFilter"
               :show-count="false"
               @event-emitted="handleSidebarEvent"
             />
@@ -420,7 +422,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import useSqlSuggestions from "@/composables/useSuggestions";
 import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
 import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
@@ -494,7 +496,7 @@ interface SessionInsight {
   count: number;
   target?: string;
   view?: string;
-  message?: string;
+  message?: I18nText;
   rate?: number;
 }
 
@@ -513,7 +515,7 @@ const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
 const { sessionState } = useSession();
 const store = useStore();
 const isLoading = ref<boolean[]>([]);
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -522,14 +524,14 @@ const dateTime = ref({
 });
 const rumSessionStreamName = "_rumdata";
 
-// Computed query that includes session_has_replay filter
-const completeQuery = computed(() => {
-  let whereClause = "session_has_replay IS NOT NULL AND session_id is not null";
-  if (sessionState.data.editorValue.length) {
-    whereClause += " AND (" + sessionState.data.editorValue.trim() + ")";
-  }
-  return whereClause;
-});
+// Non-editable part of the sessions query, kept verbatim in step with the
+// WHERE clause getSessions() builds so the sidebar's value counts describe the
+// same rows the table does. Passed separately from the editor value: `query`
+// drives the sidebar's include/exclude checkbox state, and a clause the user
+// cannot edit would show there as permanently ticked.
+// The health/type/device segments stay out — they filter the fetched rows
+// client-side (see tableRows), not the underlying query.
+const fieldListBaseFilter = "session_has_replay IS NOT NULL";
 
 // Dynamic editor height based on content lines
 const queryEditorHeight = computed(() => {
@@ -568,7 +570,7 @@ const onQueryEditorBlur = async () => {
 };
 
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 // Autosuggestions — field names, operators, filter values
 const {
@@ -577,6 +579,7 @@ const {
   effectiveSuggestions,
   getSuggestions,
   updateFieldKeywords,
+  resolveFieldValues,
 } = useSqlSuggestions();
 
 const updateAutoComplete = (value: string) => {
@@ -638,7 +641,7 @@ const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("rum-s
 const tableColumns = [
   {
     id: "action_play",
-    header: "",
+    header: raw(""),
     accessorKey: "action_play",
     sortable: false,
     size: 56,
@@ -878,7 +881,7 @@ const getSessions = () => {
     streamName: "_rumdata",
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
 
   // Build optional fields based on schema
   let geoFields = "";

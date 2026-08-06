@@ -109,7 +109,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">TTFT</span>
+            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+              t("traces.traceDetailsSidebar.ttft")
+            }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getTTFT }}</span>
           </OTag>
 
@@ -250,7 +252,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs text-badge-orange-ol-text font-semibold"
-              >${{ Number(llmMetrics.cost.total).toFixed(5) }}</span
+              >{{ t("traces.sessionDetail.currencySymbol")
+              }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
         </div>
@@ -509,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #icon-left
                   ><OIcon name="data-object" size="xs" class="shrink-0"
                 /></template>
-                JSON
+                {{ t("common.json") }}
               </OToggleGroupItem>
               <OToggleGroupItem value="table" size="xs" class="h-5! text-xs!">
                 <template #icon-left
@@ -565,19 +568,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
-            <TenstackTable
-              :rows="attributesTableRows"
+            <OTable
+              :data="attributesTableRows"
               :columns="attributesTableColumns"
-              :enable-row-expand="false"
-              :enable-text-highlight="false"
-              :enable-status-bar="false"
               :default-columns="false"
-              :enable-column-reorder="false"
               :row-height="28"
-              :enable-ai-context-button="false"
+              :show-global-filter="false"
+              pagination="none"
             >
-              <template #cell-value="{ item }">
-                <AttributeValueCell :field="item.field" :value="item.value">
+              <template #cell-value="{ row }">
+                <AttributeValueCell :field="row.field" :value="row.value">
                   <template #dropdown="{ field, value: fieldValue }">
                     <ul class="m-0 flex list-none flex-col p-0">
                       <li
@@ -609,7 +609,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </AttributeValueCell>
               </template>
-            </TenstackTable>
+            </OTable>
           </div>
         </OTabPanel>
         <OTabPanel name="events" class="flex h-[30.6rem]! flex-col p-0">
@@ -628,31 +628,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               data-test="trace-details-sidebar-events-table"
             >
-              <TenstackTable
-                :rows="spanDetails.events"
+              <OTable
+                :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
+                row-key="__rowId"
                 :wrap="eventsWrap"
-                :enable-row-expand="true"
-                :enable-text-highlight="false"
-                :enable-status-bar="false"
                 :default-columns="false"
                 :row-height="28"
-                :enable-ai-context-button="false"
-                :hide-view-related-button="true"
-                :hide-expand-field-options="true"
-                @copy="copyContentToClipboard"
-                @update:columnOrder="handleEventsColumnOrder"
-                @update:columnSizes="handleEventsColumnSizes"
+                :show-global-filter="false"
+                pagination="none"
+                expansion="multiple"
+                :enable-column-reorder="true"
+                :enable-column-resize="true"
+                persist-columns
+                table-id="trace-details-events"
               >
-                <template #expanded-row="{ row }">
+                <template #expansion="{ row }">
                   <JsonPreview
                     :value="row"
                     class="py-1.5 pl-1.5"
                     copyButtonClass="left-1! w-fit! sticky!"
                     mode="expanded"
+                    @copy="copyContentToClipboard"
                   />
                 </template>
-              </TenstackTable>
+              </OTable>
             </div>
           </template>
           <OEmptyState
@@ -831,7 +831,7 @@ import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
 import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { computed } from "vue";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
@@ -854,7 +854,7 @@ import {
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
-import TenstackTable from "@/components/TenstackTable.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 import {
   hasTracePreview,
   isLLMTrace,
@@ -945,7 +945,7 @@ export default defineComponent({
     LogsHighLighting,
     JsonPreview,
     LLMContentRenderer,
-    TenstackTable,
+    OTable,
     CorrelatedLogsTable,
     TelemetryCorrelationDashboard: defineAsyncComponent(
       () => import("@/plugins/correlation/TelemetryCorrelationDashboard.vue"),
@@ -975,7 +975,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const serviceDetectionConfig = inject(TRACE_SERVICE_DETECTION_KEY, ref(null));
     const { resolveSpanIdentity } = useSpanServiceDetection(serviceDetectionConfig);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
@@ -1136,7 +1136,6 @@ export default defineComponent({
         header: t("traces.traceDetailsSidebar.value"),
         size: 400,
         meta: {
-          slot: true,
           headerClass: "border-b border-b-card-glass-border",
           cellClass: "border-b-card-glass-border p-0!",
         },
@@ -1268,27 +1267,17 @@ export default defineComponent({
 
     const eventsWrap = ref(false);
 
-    const eventsColOrder = ref<string[]>([]);
-    const eventsColSizes = ref<Record<string, number>>({});
-
-    const handleEventsColumnOrder = (newOrder: string[]) => {
-      eventsColOrder.value = newOrder;
-    };
-
-    const handleEventsColumnSizes = (
-      cssVarSizes: Record<string, number>,
-      colIdMap: Record<string, string>,
-    ) => {
-      // cssVarSizes keys are "--col-{sanitizedId}-size"; use colIdMap to resolve originals
-      const sizes: Record<string, number> = { ...eventsColSizes.value };
-      for (const [sanitizedId, originalId] of Object.entries(colIdMap)) {
-        const cssKey = `--col-${sanitizedId}-size`;
-        if (cssVarSizes[cssKey] !== undefined) {
-          sizes[originalId] = cssVarSizes[cssKey];
-        }
-      }
-      eventsColSizes.value = sizes;
-    };
+    // Keyed by a non-enumerable `__rowId` (the array index): span events can
+    // share, or lack, `_timestamp`, so keying expansion on it would expand
+    // duplicates together. Non-enumerable keeps it out of the JSON preview.
+    const eventsRowsWithKey = computed(() =>
+      (spanDetails.value.events || []).map((e: any, i: number) =>
+        Object.defineProperty({ ...e }, "__rowId", {
+          value: i,
+          enumerable: false,
+        }),
+      ),
+    );
 
     const eventsTableColumns = computed(() => {
       const events = spanDetails.value.events;
@@ -1308,7 +1297,7 @@ export default defineComponent({
           accessorKey: tsCol,
           id: tsCol,
           header: t("traces.traceDetailsSidebar.timestamp"),
-          size: eventsColSizes.value[tsCol] ?? 220,
+          size: 220,
           accessorFn: (row: any) =>
             timestampToTimezoneDate(row[tsCol] / 1000000, store.state.timezone, HUMAN_TZ_FORMAT),
           meta: {
@@ -1325,7 +1314,7 @@ export default defineComponent({
           accessorKey: key,
           id: key,
           header: key,
-          size: eventsColSizes.value[key] ?? 200,
+          size: 200,
           accessorFn: (row: any) => {
             const val = row[key];
             if (val === null || val === undefined) return "";
@@ -1345,18 +1334,8 @@ export default defineComponent({
         });
       });
 
-      // Apply saved column order (only for IDs that still exist in current cols)
-      if (eventsColOrder.value.length) {
-        const colMap = new Map(cols.map((c) => [c.id, c]));
-        const ordered = eventsColOrder.value
-          .filter((id) => colMap.has(id))
-          .map((id) => colMap.get(id)!);
-        // Append any new columns not present in the saved order
-        const orderedIds = new Set(eventsColOrder.value);
-        cols.filter((c) => !orderedIds.has(c.id)).forEach((c) => ordered.push(c));
-        return ordered;
-      }
-
+      // Reorder is owned by the table's own columnOrder state; re-applying it to
+      // the columns prop here would fight it.
       return cols;
     });
 
@@ -1480,7 +1459,7 @@ export default defineComponent({
     });
 
     const copySpanId = () => {
-      copyToClipboard(props.span?.span_id || "", {
+      copyToClipboard(props.span?.span_id || "", t, {
         successMessage: t("traces.traceDetailsSidebar.spanIdCopied"),
       });
     };
@@ -1489,7 +1468,7 @@ export default defineComponent({
       const attributes = props.span?.attributes || {};
       const attributesText = JSON.stringify(attributes, null, 2);
 
-      copyToClipboard(attributesText, {
+      copyToClipboard(attributesText, t, {
         successMessage: t("traces.traceDetailsSidebar.attributesCopied"),
       });
     };
@@ -1830,7 +1809,7 @@ export default defineComponent({
         }
 
         // Copy to clipboard
-        copyToClipboard(textToCopy, {
+        copyToClipboard(textToCopy, t, {
           successMessage: t("traces.traceDetailsSidebar.copiedToClipboard", {
             type: type.charAt(0).toUpperCase() + type.slice(1),
           }),
@@ -1953,7 +1932,7 @@ export default defineComponent({
     );
 
     const copyContentToClipboard = (log: any) => {
-      copyToClipboard(JSON.stringify(log), {
+      copyToClipboard(JSON.stringify(log), t, {
         successMessage: t("traces.traceDetailsSidebar.contentCopied"),
         timeout: 1000,
       });
@@ -1967,8 +1946,7 @@ export default defineComponent({
       eventColumns,
       eventsWrap,
       eventsTableColumns,
-      handleEventsColumnOrder,
-      handleEventsColumnSizes,
+      eventsRowsWithKey,
       pagination,
       spanDetails,
       store,
