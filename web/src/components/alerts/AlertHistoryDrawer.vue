@@ -405,6 +405,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
+import { fetchAlertHistoryPage } from "@/composables/query/queries/alertHistory";
 
 // Composables
 const { t } = useI18nTyped();
@@ -791,12 +792,14 @@ const fetchAlertHistory = async (alertId: string) => {
     } else {
       historyParams.alert_id = alertId;
     }
-    const response = await alertsService.getHistory(
+    // Same cached page query as the Alert History page — paging back to a page
+    // already fetched keeps its rows instead of blanking.
+    const data = await fetchAlertHistoryPage(
       store?.state?.selectedOrganization?.identifier,
       historyParams,
     );
-    alertHistory.value = response.data?.hits || [];
-    resultTotal.value = response.data?.total || 0;
+    alertHistory.value = data?.hits || [];
+    resultTotal.value = data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
     resultTotal.value = 0;

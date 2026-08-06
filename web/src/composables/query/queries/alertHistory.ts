@@ -25,10 +25,12 @@ import { tierOptions } from "../tiers";
 import { queryClient } from "../queryClient";
 
 export interface AlertHistoryQuery {
-  start_time: string;
-  end_time: string;
-  from: string;
-  size: string;
+  // string | number because the two callers build these differently and the
+  // wrapper must not change what either of them sends.
+  start_time: string | number;
+  end_time: string | number;
+  from: string | number;
+  size: string | number;
   alert_id?: string;
   sort_by?: string;
   sort_order?: string;
