@@ -366,6 +366,18 @@ export class LogsPage {
         // Correlation loading and error states
         this.correlationLoadingSpinner = '[data-test="logs-correlation-loading-indicator"]';
         this.correlationErrorMessage = '.tw\\:text-red-500';
+        // Telemetry Correlation dashboard (dialog-mode ODrawer)
+        this.correlationDashboardDrawer = '[data-test="telemetry-correlation-dashboard-drawer"]';
+        // Metric stream sidebar items in correlation dashboard
+        this.metricStreamItem = '[data-test="telemetry-correlation-metric-stream-item"]';
+        // No traces empty state (embedded mode)
+        this.noTracesState = '[data-test="correlation-no-traces-state"]';
+        // No traces empty state (dialog mode)
+        this.noTracesStateDrawer = '[data-test="correlation-no-traces-state-drawer"]';
+        // "View in Traces" button in traces tab header
+        this.viewTracesPageBtn = '[data-test="correlation-view-traces-page"]';
+        // Metric stream selector dialog
+        this.metricSelectorDialog = '[data-test="telemetry-correlation-dashboard-metric-selector-dialog"]';
 
         // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
         // TracesAnalysisDashboard.vue now renders inside <ODrawer data-test="traces-analysis-dashboard-drawer">
@@ -3753,6 +3765,175 @@ export class LogsPage {
         const contextMenu = this.page.locator('[data-test="o-dropdown-content"]:visible');
         await expect(contextMenu).not.toBeVisible({ timeout: 3000 });
         testLogger.info('No context menu visible');
+    }
+
+    // ===== TELEMETRY CORRELATION DASHBOARD METHODS =====
+
+    /**
+     * Verifies the correlation dashboard drawer (dialog mode) is visible.
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationDashboardDrawerVisible() {
+        await expect(this.page.locator(this.correlationDashboardDrawer)).toBeVisible({ timeout: 15000 });
+        testLogger.info('✓ Correlation dashboard drawer is visible (dialog mode)');
+    }
+
+    /**
+     * Verifies the correlation dashboard drawer (dialog mode) is NOT visible.
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationDashboardDrawerNotVisible() {
+        await expect(this.page.locator(this.correlationDashboardDrawer)).not.toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Correlation dashboard drawer is not visible');
+    }
+
+    /**
+     * Verifies metric stream sidebar items are visible in the correlation dashboard.
+     * @returns {Promise<void>}
+     */
+    async expectMetricStreamItemsVisible() {
+        // At least one metric stream item should be visible
+        const items = this.page.locator(this.metricStreamItem);
+        await expect(items.first()).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Metric stream items are visible');
+    }
+
+    /**
+     * Clicks the first metric stream item in the sidebar to toggle it.
+     * @returns {Promise<void>}
+     */
+    async clickFirstMetricStreamItem() {
+        const firstItem = this.page.locator(this.metricStreamItem).first();
+        await firstItem.waitFor({ state: 'visible', timeout: 10000 });
+        await firstItem.click();
+        testLogger.info('Clicked first metric stream item');
+    }
+
+    /**
+     * Clicks the Apply button in the dimension filter bar.
+     * @returns {Promise<void>}
+     */
+    async clickApplyDimensionFilters() {
+        const applyBtn = this.page.locator(this.applyDimensionFilters).or(this.page.locator(this.applyDimensionFiltersEmbedded));
+        const btn = applyBtn.first();
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+        testLogger.info('Clicked Apply Dimension Filters button');
+    }
+
+    /**
+     * Verifies the "No Traces" empty state is visible (embedded mode).
+     * @returns {Promise<void>}
+     */
+    async expectNoTracesEmptyState() {
+        await expect(this.page.locator(this.noTracesState)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ No traces empty state is visible (embedded mode)');
+    }
+
+    /**
+     * Verifies the "No Traces" empty state is visible (dialog mode).
+     * @returns {Promise<void>}
+     */
+    async expectNoTracesEmptyStateDialog() {
+        await expect(this.page.locator(this.noTracesStateDrawer)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ No traces empty state is visible (dialog mode)');
+    }
+
+    /**
+     * Verifies the "View in Traces" button is visible on the traces tab.
+     * @returns {Promise<void>}
+     */
+    async expectViewTracesButtonVisible() {
+        await expect(this.page.locator(this.viewTracesPageBtn)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ View in Traces button is visible');
+    }
+
+    /**
+     * Verifies the metric stream selector dialog is visible.
+     * @returns {Promise<void>}
+     */
+    async expectMetricSelectorDialogVisible() {
+        await expect(this.page.locator(this.metricSelectorDialog)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Metric selector dialog is visible');
+    }
+
+    /**
+     * Checks if the enterprise correlation feature is available.
+     * Used by tests to skip gracefully in OSS mode.
+     * @returns {Promise<boolean>}
+     */
+    async isCorrelationFeatureAvailable() {
+        return this.isViewRelatedButtonVisible();
+    }
+
+    /**
+     * Verifies the Correlated Logs tab is visible in the detail sidebar.
+     * @returns {Promise<void>}
+     */
+    async expectCorrelatedLogsTabVisible() {
+        await expect(this.page.locator(this.correlatedLogsTab)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Correlated Logs tab is visible');
+    }
+
+    /**
+     * Verifies the Correlated Metrics tab is visible in the detail sidebar.
+     * @returns {Promise<void>}
+     */
+    async expectCorrelatedMetricsTabVisible() {
+        await expect(this.page.locator(this.correlatedMetricsTab)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Correlated Metrics tab is visible');
+    }
+
+    /**
+     * Verifies the Correlated Traces tab is visible in the detail sidebar.
+     * @returns {Promise<void>}
+     */
+    async expectCorrelatedTracesTabVisible() {
+        await expect(this.page.locator(this.correlatedTracesTab)).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Correlated Traces tab is visible');
+    }
+
+    /**
+     * Checks if the log-correlation-btn (inline correlation button in JsonPreview) is visible.
+     * @returns {Promise<boolean>}
+     */
+    async isLogCorrelationBtnVisible() {
+        try {
+            await this.page.locator(this.viewRelatedBtn).waitFor({ state: 'visible', timeout: 5000 });
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /**
+     * Clicks the log-correlation-btn to open the dialog-mode correlation dashboard.
+     * @returns {Promise<void>}
+     */
+    async clickLogCorrelationBtn() {
+        const btn = this.page.locator(this.viewRelatedBtn);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        await btn.click();
+        testLogger.info('Clicked log correlation button (dialog mode)');
+    }
+
+    /**
+     * Verifies the log detail dialog is visible.
+     * @returns {Promise<void>}
+     */
+    async expectLogDetailDialogVisible() {
+        await expect(this.page.locator('[data-test="logs-search-result-detail-dialog"]')).toBeVisible({ timeout: 10000 });
+        testLogger.info('✓ Log detail dialog is visible');
+    }
+
+    /**
+     * Verifies the correlation loading spinner is NOT visible.
+     * (Stronger than waitForCorrelationLoaded — asserts hidden, not just waits.)
+     * @returns {Promise<void>}
+     */
+    async expectCorrelationLoadingHidden() {
+        await expect(this.page.locator(this.correlationLoadingSpinner)).not.toBeVisible({ timeout: 5000 });
+        testLogger.info('✓ Correlation loading spinner is hidden');
     }
 
     async clickSavedViewDialogSaveContent() {

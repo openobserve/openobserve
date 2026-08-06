@@ -1,0 +1,3029 @@
+===== COMPLETE LIST OF CHANGED FILES (29 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/management/src/request/service_streams/mod.rs
+src/api/search/src/traces/mod.rs
+src/config/src/meta/correlation.rs
+src/config/src/meta/service_streams.rs
+src/config/src/utils/sql/mod.rs
+src/config/src/utils/sql/where_fragment.rs
+src/infra/src/table/service_streams.rs
+src/super_cluster_queue/src/service_streams.rs
+web/src/components/alerts/IncidentDetailDrawer.vue
+web/src/components/settings/ServiceIdentitySetup.vue
+web/src/composables/useCorrelatedLogs.spec.ts
+web/src/composables/useCorrelatedLogs.ts
+web/src/composables/useMetricsCorrelationDashboard.spec.ts
+web/src/composables/useMetricsCorrelationDashboard.ts
+web/src/locales/languages/en-US.json
+web/src/plugins/correlation/CorrelatedLogsTable.spec.ts
+web/src/plugins/correlation/TelemetryCorrelationDashboard.spec.ts
+web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
+web/src/plugins/logs/DetailTable.vue
+web/src/plugins/logs/SearchResult.vue
+web/src/plugins/traces/TraceDetailsSidebar.vue
+web/src/services/service_streams.ts
+web/src/utils/telemetryCorrelation.spec.ts
+web/src/utils/telemetryCorrelation.ts
+Cargo.lock
+o2_enterprise/src/enterprise/service_streams/meta.rs
+o2_enterprise/src/enterprise/service_streams/processor.rs
+o2_enterprise/src/enterprise/service_streams/storage.rs
+o2_enterprise/src/enterprise/service_streams/stream_merge_policy.rs
+===== END CHANGED FILES =====
+
+diff --git a/src/api/management/src/request/service_streams/mod.rs b/src/api/management/src/request/service_streams/mod.rs
+index f45d121a85f..4b181bda557 100644
+--- a/src/api/management/src/request/service_streams/mod.rs
++++ b/src/api/management/src/request/service_streams/mod.rs
+@@ -418,6 +418,10 @@ pub async fn save_identity_config(
+         }
+     }
+ 
++    // Captured before the write so we can find sets that disappeared or changed shape (F10).
++    #[cfg(feature = "enterprise")]
++    let old_config = db::system_settings::get_service_identity_config(&org_id).await;
++
+     let value = match serde_json::to_value(&body) {
+         Ok(v) => v,
+         Err(e) => return MetaHttpResponse::internal_error(format!("Serialization error: {e}")),
+@@ -426,7 +430,7 @@ pub async fn save_identity_config(
+     let setting = SystemSetting {
+         id: None,
+         scope: SettingScope::Org,
+-        org_id: Some(org_id),
++        org_id: Some(org_id.clone()),
+         user_id: None,
+         setting_key: "service_identity".to_string(),
+         setting_category: Some("service_streams".to_string()),
+@@ -439,7 +443,31 @@ pub async fn save_identity_config(
+     };
+ 
+     match infra::table::system_settings::set(&setting).await {
+-        Ok(_) => MetaHttpResponse::json(serde_json::json!({"message": "saved"})),
++        Ok(_) => {
++            #[cfg(feature = "enterprise")]
++            {
++                // F10: rows filed under removed/changed sets would otherwise match every
++                // request for their service (anchor rule) until the 24h stale job fires.
++                for set_id in config::meta::correlation::obsolete_set_ids(&old_config, &body) {
++                    if let Err(e) =
++                        infra::table::service_streams::delete_by_set_id(&org_id, &set_id).await
++                    {
++                        log::warn!(
++                            "[ServiceStreams] save_identity_config: failed to delete rows for obsolete set '{set_id}' in org '{org_id}': {e}"
++                        );
++                    }
++                }
++                o2_enterprise::enterprise::service_streams::cache::clear_org_cache(&org_id).await;
++                if let Err(e) =
++                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
++                {
++                    log::warn!(
++                        "[ServiceStreams] save_identity_config: failed to emit reload event for org '{org_id}': {e}"
++                    );
++                }
++            }
++            MetaHttpResponse::json(serde_json::json!({"message": "saved"}))
++        }
+         Err(e) => MetaHttpResponse::internal_error(format!("Failed to save config: {e}")),
+     }
+ }
+@@ -490,12 +518,30 @@ pub async fn reset_services(
+         {
+             return MetaHttpResponse::forbidden("Unauthorized Access");
+         }
+-        match infra::table::service_streams::delete_all(&org_id).await {
+-            Ok(deleted_count) => MetaHttpResponse::json(serde_json::json!({
+-                "deleted_count": deleted_count,
+-                "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
+-                "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
+-            })),
++        // Go through the enterprise storage layer so the local cache is cleared and the
++        // reset is replicated to the super-cluster.
++        match o2_enterprise::enterprise::service_streams::storage::ServiceStorage::delete_all(
++            &org_id,
++        )
++        .await
++        {
++            Ok(deleted_count) => {
++                // Org-scope reload: other nodes wholesale-replace their org cache from
++                // the now-empty DB. Without this the pre-reset rows are served forever
++                // (the cache has no TTL) (F6).
++                if let Err(e) =
++                    infra::coordinator::service_streams::emit_reload_event(&org_id).await
++                {
++                    log::warn!(
++                        "[ServiceStreams] _reset: failed to emit reload event for org '{org_id}': {e}"
++                    );
++                }
++                MetaHttpResponse::json(serde_json::json!({
++                    "deleted_count": deleted_count,
++                    "message": format!("Successfully deleted {} discovered service(s) for org '{}'", deleted_count, org_id),
++                    "note": "Services will be automatically re-discovered as new telemetry data arrives. This typically begins within minutes of the next data ingestion."
++                }))
++            }
+             Err(e) => MetaHttpResponse::internal_error(format!("Failed to reset services: {e}")),
+         }
+     }
+diff --git a/src/api/search/src/traces/mod.rs b/src/api/search/src/traces/mod.rs
+index 7632ade9ba3..6d1d2ed42fe 100644
+--- a/src/api/search/src/traces/mod.rs
++++ b/src/api/search/src/traces/mod.rs
+@@ -427,6 +427,14 @@ pub async fn get_latest_traces(
+             );
+         }
+     };
++    // F2: the filter is a raw, user-supplied WHERE fragment. Validate it parses as a
++    // single well-formed boolean expression before splicing, so statement smuggling
++    // and comment-truncated payloads never reach the planner.
++    if !filter.is_empty()
++        && let Err(e) = config::utils::sql::validate_where_fragment(&filter)
++    {
++        return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
++    }
+     let query_sql = if filter.is_empty() {
+         format!("{query_sql} GROUP BY trace_id ORDER BY {sql_order_expr}")
+     } else {
+@@ -979,6 +987,16 @@ pub async fn get_latest_traces_stream(
+         Some(v) => v.to_string(),
+         None => "".to_string(),
+     };
++    // F2: validate the raw filter here, in the HTTP handler, so a bad fragment is a
++    // 400 rather than an error frame mid-stream. This is stricter than the `--`/`;`
++    // stripping done in process_latest_traces_stream (which silently mangles the
++    // fragment instead of rejecting it), and that stripping only ever makes the
++    // spliced string a subset of what is validated here.
++    if !filter.is_empty()
++        && let Err(e) = config::utils::sql::validate_where_fragment(&filter)
++    {
++        return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
++    }
+ 
+     let from = query
+         .get("from")
+diff --git a/src/config/src/meta/correlation.rs b/src/config/src/meta/correlation.rs
+index 3e0ea765027..c6792771576 100644
+--- a/src/config/src/meta/correlation.rs
++++ b/src/config/src/meta/correlation.rs
+@@ -149,8 +149,9 @@ const MAX_TRACKED_ALIASES: usize = 30;
+ ///
+ /// The `id` is the semantic category slug (e.g. "k8s", "aws", "gcp", "azure").
+ /// At processing time the system tries ALL configured sets against each record and
+-/// picks the one whose `distinguish_by` fields yield the most non-empty values
+-/// (best-coverage wins; ties broken by first-in-list).
++/// ranks them by coverage of the record's non-empty dimensions: a fully-covered set
++/// wins first, then the highest covered ratio, then the highest raw count; ties are
++/// broken by declaration order (first-in-list). See `resolve_best_set_by_coverage`.
+ #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema, PartialEq)]
+ pub struct IdentitySet {
+     /// Semantic category slug: "k8s", "aws", "gcp", "azure", or a custom slug.
+@@ -205,8 +206,10 @@ impl IdentitySet {
+ /// Contains 1–5 identity sets. Service name is always derived from the "service"
+ /// semantic group — hardcoded, not configurable.
+ ///
+-/// At processing time each record is matched against ALL sets; the set whose
+-/// `distinguish_by` fields yield the most non-empty values wins (best coverage).
++/// At processing time each record is matched against ALL sets and ranked by
++/// coverage of the record's non-empty dimensions: full coverage > highest ratio >
++/// highest count, ties broken by declaration order. The same ranking is used on the
++/// correlation read path so ingest files records under the set reads will select.
+ /// If no set has any coverage the record is skipped.
+ #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, ToSchema)]
+ pub struct ServiceIdentityConfig {
+@@ -263,9 +266,9 @@ impl ServiceIdentityConfig {
+                 return Err(format!("duplicate set id '{}'", set.id));
+             }
+         }
+-        if self.tracked_alias_ids.is_empty() {
+-            return Err("tracked_alias_ids requires at least 1 alias group ID".into());
+-        }
++        // tracked_alias_ids may be empty: ingest tracking is the UNION of this list and
++        // every set's distinguish_by, and >=1 set is enforced above — sets alone are
++        // a complete config (custom set dims need not be re-listed here).
+         if self.tracked_alias_ids.len() > MAX_TRACKED_ALIASES {
+             return Err(format!(
+                 "tracked_alias_ids cannot exceed {} entries",
+@@ -280,30 +283,88 @@ impl ServiceIdentityConfig {
+ 
+     /// Pick the best-matching identity set for `dims` using best-coverage resolution.
+     ///
+-    /// For each set, counts how many `distinguish_by` fields have non-empty values
+-    /// in `dims`. Returns the set with the highest count. Ties are broken by
+-    /// first-in-list wins. Returns `None` if no set has any coverage (all counts == 0).
++    /// Only non-empty values in `dims` count as available. Ranking is delegated to
++    /// [`resolve_best_set_by_coverage`] — full coverage > highest ratio > highest
++    /// count, ties broken by declaration order. Returns `None` if no set has any
++    /// coverage.
+     pub fn resolve_best_set<'a>(
+         &'a self,
+         dims: &std::collections::HashMap<String, String>,
+     ) -> Option<&'a IdentitySet> {
+-        let mut best: Option<(&IdentitySet, usize)> = None;
+-        for set in &self.sets {
+-            let count = set
+-                .distinguish_by
+-                .iter()
+-                .filter(|k| dims.get(k.as_str()).map(|v| !v.is_empty()).unwrap_or(false))
+-                .count();
+-            if count > 0 {
+-                match best {
+-                    None => best = Some((set, count)),
+-                    Some((_, best_count)) if count > best_count => best = Some((set, count)),
+-                    _ => {}
+-                }
+-            }
++        let available: std::collections::HashSet<&str> = dims
++            .iter()
++            .filter(|(_, v)| !v.is_empty())
++            .map(|(k, _)| k.as_str())
++            .collect();
++        resolve_best_set_by_coverage(&self.sets, &available).map(|(set, _)| set)
++    }
++}
++
++/// Coverage of one identity set against a request's available dimension keys.
++#[derive(Debug, Clone, Copy, PartialEq)]
++pub struct SetCoverage {
++    pub is_full: bool,
++    pub ratio: f64,
++    pub count: usize,
++}
++
++impl SetCoverage {
++    fn rank(&self) -> (bool, f64, usize) {
++        (self.is_full, self.ratio, self.count)
++    }
++}
++
++/// Shared ingest/read ranking: full coverage > highest ratio > highest count;
++/// ties broken by declaration order (strict `>` keeps the earlier set).
++/// Raw-count ranking is WRONG here — a 3/5 partial beating a 2/2 full set files
++/// records under a set the read side will never select (cross-workload pollution).
++pub fn resolve_best_set_by_coverage<'a>(
++    sets: &'a [IdentitySet],
++    available: &std::collections::HashSet<&str>,
++) -> Option<(&'a IdentitySet, SetCoverage)> {
++    let mut best: Option<(&IdentitySet, SetCoverage)> = None;
++    for set in sets {
++        if set.distinguish_by.is_empty() {
++            continue;
++        }
++        let total = set.distinguish_by.len();
++        let count = set
++            .distinguish_by
++            .iter()
++            .filter(|f| available.contains(f.as_str()))
++            .count();
++        if count == 0 {
++            continue;
++        }
++        let cov = SetCoverage {
++            is_full: count == total,
++            ratio: count as f64 / total as f64,
++            count,
++        };
++        match &best {
++            None => best = Some((set, cov)),
++            Some((_, b)) if cov.rank() > b.rank() => best = Some((set, cov)),
++            _ => {}
+         }
+-        best.map(|(set, _)| set)
+     }
++    best
++}
++
++/// Set IDs whose stored service rows are stale after a config change: sets that were
++/// removed, plus sets whose `distinguish_by` changed (their rows' disambiguation was
++/// keyed to the old field list). Rows under these IDs linger and pollute correlation
++/// unions until aged out (F10) — callers should delete them and emit a reload event.
++pub fn obsolete_set_ids(old: &ServiceIdentityConfig, new: &ServiceIdentityConfig) -> Vec<String> {
++    old.sets
++        .iter()
++        .filter(
++            |old_set| match new.sets.iter().find(|s| s.id == old_set.id) {
++                None => true,
++                Some(new_set) => new_set.distinguish_by != old_set.distinguish_by,
++            },
++        )
++        .map(|s| s.id.clone())
++        .collect()
+ }
+ 
+ #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+@@ -497,9 +558,14 @@ mod tests {
+         dims.insert("k8s-namespace".to_string(), "app".to_string());
+         dims.insert("aws-region".to_string(), "us-east-1".to_string());
+ 
+-        // k8s has 2 matches, aws has 1 — k8s wins
++        // F8: k8s is 2/3 (partial), aws is 1/1 (full) — full coverage wins over raw
++        // count, matching the correlation read path's ranking.
+         let best = cfg.resolve_best_set(&dims).unwrap();
+-        assert_eq!(best.id, "k8s");
++        assert_eq!(best.id, "aws");
++
++        // Without the aws dimension, k8s is the only set with any coverage.
++        dims.remove("aws-region");
++        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "k8s");
+     }
+ 
+     #[test]
+@@ -573,6 +639,64 @@ mod tests {
+         assert_eq!(best.id, "k8s");
+     }
+ 
++    #[test]
++    fn test_resolve_best_set_prefers_full_coverage_over_raw_count() {
++        // F8: a fully-covered 2-field set must beat a 3/5 partial set at ingest,
++        // matching the read-side ranking (is_full, ratio, count).
++        let cfg = ServiceIdentityConfig {
++            sets: vec![
++                make_set("big", "Big", &["a", "b", "c", "d", "e"]),
++                make_set("small", "Small", &["x", "y"]),
++            ],
++            tracked_alias_ids: vec!["a".into()],
++            service_optional: false,
++        };
++        let dims: std::collections::HashMap<String, String> = [
++            ("a", "1"),
++            ("b", "1"),
++            ("c", "1"), // big: 3/5 partial
++            ("x", "1"),
++            ("y", "1"), // small: 2/2 full
++        ]
++        .into_iter()
++        .map(|(k, v)| (k.to_string(), v.to_string()))
++        .collect();
++        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "small");
++    }
++
++    #[test]
++    fn test_resolve_best_set_ties_broken_by_declaration_order() {
++        let cfg = ServiceIdentityConfig {
++            sets: vec![
++                make_set("first", "F", &["a"]),
++                make_set("second", "S", &["b"]),
++            ],
++            tracked_alias_ids: vec!["a".into()],
++            service_optional: false,
++        };
++        let dims: std::collections::HashMap<String, String> = [("a", "1"), ("b", "1")]
++            .into_iter()
++            .map(|(k, v)| (k.to_string(), v.to_string()))
++            .collect();
++        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "first");
++    }
++
++    #[test]
++    fn test_resolve_best_set_by_coverage_reports_coverage() {
++        let sets = vec![
++            make_set("k8s", "Kubernetes", &["k8s-cluster", "k8s-namespace"]),
++            make_set("aws", "AWS", &["aws-region"]),
++        ];
++        let available: std::collections::HashSet<&str> =
++            ["k8s-cluster", "aws-region"].into_iter().collect();
++        let (set, cov) = resolve_best_set_by_coverage(&sets, &available).unwrap();
++        // aws is fully covered (1/1); k8s is only 1/2 → aws wins on is_full
++        assert_eq!(set.id, "aws");
++        assert!(cov.is_full);
++        assert_eq!(cov.count, 1);
++        assert_eq!(cov.ratio, 1.0);
++    }
++
+     // ========== IncidentGroupingConfig::validate() Tests ==========
+ 
+     #[test]
+@@ -691,4 +815,80 @@ mod tests {
+     fn test_default_upgrade_window() {
+         assert_eq!(default_upgrade_window(), 30);
+     }
++
++    #[test]
++    fn test_obsolete_set_ids_removed_and_changed() {
++        let mk = |id: &str, fields: &[&str]| IdentitySet {
++            id: id.into(),
++            label: id.into(),
++            distinguish_by: fields.iter().map(|s| s.to_string()).collect(),
++        };
++        let old = ServiceIdentityConfig {
++            sets: vec![
++                mk("k8s", &["k8s-cluster", "k8s-namespace"]),
++                mk("aws", &["aws-region"]),
++                mk("keep", &["environment"]),
++            ],
++            tracked_alias_ids: vec!["environment".into()],
++            service_optional: false,
++        };
++        let new = ServiceIdentityConfig {
++            sets: vec![mk("k8s", &["k8s-cluster"]), mk("keep", &["environment"])],
++            tracked_alias_ids: vec!["environment".into()],
++            service_optional: false,
++        };
++        let mut ids = obsolete_set_ids(&old, &new);
++        ids.sort();
++        // "aws" removed; "k8s" distinguish_by changed; "keep" untouched
++        assert_eq!(ids, vec!["aws".to_string(), "k8s".to_string()]);
++    }
++
++    #[test]
++    fn test_obsolete_set_ids_unchanged_config_is_empty() {
++        let cfg = ServiceIdentityConfig {
++            sets: vec![IdentitySet {
++                id: "k8s".into(),
++                label: "Kubernetes".into(),
++                distinguish_by: vec!["k8s-cluster".into(), "k8s-namespace".into()],
++            }],
++            tracked_alias_ids: vec!["environment".into()],
++            service_optional: false,
++        };
++        assert!(obsolete_set_ids(&cfg, &cfg).is_empty());
++    }
++
++    #[test]
++    fn test_obsolete_set_ids_field_reorder_is_obsolete() {
++        // Order of distinguish_by decides the disambiguation key layout, so a reorder
++        // invalidates stored rows just like a membership change.
++        let mk = |fields: &[&str]| ServiceIdentityConfig {
++            sets: vec![IdentitySet {
++                id: "k8s".into(),
++                label: "Kubernetes".into(),
++                distinguish_by: fields.iter().map(|s| s.to_string()).collect(),
++            }],
++            tracked_alias_ids: vec![],
++            service_optional: false,
++        };
++        let old = mk(&["k8s-cluster", "k8s-namespace"]);
++        let new = mk(&["k8s-namespace", "k8s-cluster"]);
++        assert_eq!(obsolete_set_ids(&old, &new), vec!["k8s".to_string()]);
++    }
++
++    #[test]
++    fn test_validate_allows_empty_tracked_alias_ids_with_sets() {
++        // tracked_ids at ingest are the UNION of tracked_alias_ids and every set's
++        // distinguish_by, and validate() already requires >=1 set — so an empty
++        // tracked_alias_ids list is a fully functional config and must not be rejected.
++        let cfg = ServiceIdentityConfig {
++            sets: vec![IdentitySet {
++                id: "custom".into(),
++                label: "Custom".into(),
++                distinguish_by: vec!["region".into(), "version".into()],
++            }],
++            tracked_alias_ids: vec![],
++            service_optional: false,
++        };
++        assert!(cfg.validate().is_ok());
++    }
+ }
+diff --git a/src/config/src/meta/service_streams.rs b/src/config/src/meta/service_streams.rs
+index bca53c2ff90..3e058a8c456 100644
+--- a/src/config/src/meta/service_streams.rs
++++ b/src/config/src/meta/service_streams.rs
+@@ -44,6 +44,12 @@ pub struct StreamInfo {
+     /// Example: {"namespace": "production", "cluster": "us-east-1"}
+     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+     pub filters: HashMap<String, String>,
++
++    /// Identity dimensions that could not be resolved to a queryable field on
++    /// this stream's schema and were therefore omitted from `filters`.
++    /// Consumers should warn: queries on this stream are wider than the chips imply.
++    #[serde(default, skip_serializing_if = "Vec::is_empty")]
++    pub dropped_dimensions: Vec<String>,
+ }
+ 
+ impl std::hash::Hash for StreamInfo {
+@@ -67,6 +73,7 @@ impl StreamInfo {
+             stream_name,
+             stream_type: StreamType::default(),
+             filters: HashMap::new(),
++            dropped_dimensions: Vec::new(),
+         }
+     }
+ 
+@@ -76,6 +83,7 @@ impl StreamInfo {
+             stream_name,
+             stream_type,
+             filters: HashMap::new(),
++            dropped_dimensions: Vec::new(),
+         }
+     }
+ 
+@@ -85,6 +93,7 @@ impl StreamInfo {
+             stream_name,
+             stream_type: StreamType::default(),
+             filters,
++            dropped_dimensions: Vec::new(),
+         }
+     }
+ 
+@@ -98,6 +107,7 @@ impl StreamInfo {
+             stream_name,
+             stream_type,
+             filters,
++            dropped_dimensions: Vec::new(),
+         }
+     }
+ 
+@@ -452,6 +462,24 @@ impl CardinalityClass {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn test_stream_info_dropped_dimensions_serde() {
++        // Old payloads without the field must deserialize (default = empty)
++        let old: StreamInfo =
++            serde_json::from_str(r#"{"stream_name":"s1","stream_type":"logs"}"#).unwrap();
++        assert!(old.dropped_dimensions.is_empty());
++
++        // Empty vec must be skipped on serialization (backward-compatible wire format)
++        let ser = serde_json::to_string(&old).unwrap();
++        assert!(!ser.contains("dropped_dimensions"));
++
++        // Populated vec round-trips
++        let mut s = StreamInfo::new("s2".to_string());
++        s.dropped_dimensions = vec!["k8s-cluster".to_string()];
++        let round: StreamInfo = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
++        assert_eq!(round.dropped_dimensions, vec!["k8s-cluster".to_string()]);
++    }
++
+     #[test]
+     fn test_stream_info_with_type() {
+         let stream = StreamInfo::with_type("my_stream".to_string(), StreamType::Metrics);
+diff --git a/src/config/src/utils/sql/mod.rs b/src/config/src/utils/sql/mod.rs
+index 22b7299563d..21b2684be40 100644
+--- a/src/config/src/utils/sql/mod.rs
++++ b/src/config/src/utils/sql/mod.rs
+@@ -21,6 +21,7 @@ mod simple_aggregate_query;
+ mod simple_distinct_query;
+ mod timestamp_selected;
+ mod visitors;
++mod where_fragment;
+ 
+ pub use complex_query::{is_complex_query, is_complex_query_stmt};
+ pub use eligible_for_histogram::is_eligible_for_histogram;
+@@ -29,6 +30,7 @@ pub use simple_aggregate_query::is_simple_aggregate_query;
+ pub use simple_distinct_query::is_simple_distinct_query;
+ pub use timestamp_selected::is_timestamp_selected;
+ pub use visitors::TimestampVisitor;
++pub use where_fragment::validate_where_fragment;
+ 
+ pub const AGGREGATE_UDF_LIST: [&str; 17] = [
+     "min",
+diff --git a/src/config/src/utils/sql/where_fragment.rs b/src/config/src/utils/sql/where_fragment.rs
+new file mode 100644
+index 00000000000..d1a78f60297
+--- /dev/null
++++ b/src/config/src/utils/sql/where_fragment.rs
+@@ -0,0 +1,73 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++use sqlparser::{dialect::GenericDialect, parser::Parser};
++
++/// Validate that `filter` is a single well-formed SQL boolean expression suitable
++/// for splicing into a WHERE clause. Rejects empty input, multi-statement payloads,
++/// and fragments that only parse because a comment (`--`, `/*`) swallowed the
++/// closing context. Defense-in-depth for endpoints that accept raw filter fragments
++/// (traces latest/latest_stream) — clients must still escape values.
++///
++/// It intentionally does NOT reject tautologies (`a='x' OR 1=1` is valid SQL); the
++/// client-side escaping is the real fix, this is the backstop for direct API callers.
++pub fn validate_where_fragment(filter: &str) -> Result<(), String> {
++    if filter.trim().is_empty() {
++        return Err("filter must not be empty".to_string());
++    }
++    let probe = format!("SELECT 1 FROM t WHERE ({filter})");
++    let dialect = GenericDialect {};
++    match Parser::parse_sql(&dialect, &probe) {
++        Ok(statements) if statements.len() == 1 => Ok(()),
++        Ok(_) => Err("filter must be a single expression".to_string()),
++        Err(e) => Err(format!("invalid filter expression: {e}")),
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn test_validate_where_fragment() {
++        // Well-formed fragments pass
++        assert!(validate_where_fragment("service_name='api' AND duration > 100").is_ok());
++        assert!(validate_where_fragment("\"k8s_pod_name\" = 'checkout.service'").is_ok());
++        // Statement smuggling / truncation / garbage fail
++        assert!(validate_where_fragment("1=1; DROP TABLE t").is_err());
++        // A trailing comment swallows the wrapper's closing paren -> unclosed paren
++        assert!(validate_where_fragment("a='x' --").is_err());
++        assert!(validate_where_fragment("a='x' /*").is_err());
++        assert!(validate_where_fragment("a='x").is_err()); // unterminated literal
++        assert!(validate_where_fragment("").is_err());
++        assert!(validate_where_fragment("   ").is_err());
++        // Set-operation smuggling is rejected too (the wrapper paren is still open)
++        assert!(validate_where_fragment("a='x' UNION SELECT 1").is_err());
++    }
++
++    #[test]
++    fn test_validate_where_fragment_balanced_breakout_is_accepted() {
++        // Documented limitation: a payload that BALANCES the wrapper paren itself and
++        // comments out the tail still parses as one statement, so it is accepted.
++        // That is intended: the fragment is still a single boolean expression spliced
++        // into one WHERE clause (here a tautology), not a second statement. Tautologies
++        // are deliberately out of scope for this backstop — the client-side escaping
++        // is what prevents them. What this validator guarantees is that no additional
++        // statement and no truncated/garbage SQL reaches the planner.
++        assert!(validate_where_fragment("a='x') OR 1=1 --").is_ok());
++        // ...but the same shape cannot smuggle a second statement:
++        assert!(validate_where_fragment("a='x') ; DROP TABLE t --").is_err());
++    }
++}
+diff --git a/src/infra/src/table/service_streams.rs b/src/infra/src/table/service_streams.rs
+index b0aa984bfb4..7bcabe4f4a0 100644
+--- a/src/infra/src/table/service_streams.rs
++++ b/src/infra/src/table/service_streams.rs
+@@ -178,7 +178,15 @@ fn normalize_json_object(v: serde_json::Value) -> serde_json::Value {
+     }
+ }
+ 
+-pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::Error> {
++/// Upsert a service record.
++///
++/// Returns the `disambiguation` JSON of every orphaned (lower-specificity) row that was
++/// deleted as part of this put, so callers can evict the matching cache keys (F19).
++/// Empty on a plain insert.
++pub async fn put(
++    org_id: &str,
++    mut record: ServiceRecord,
++) -> Result<Vec<serde_json::Value>, errors::Error> {
+     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
+     // are stable regardless of insertion order of the original object.
+     record.disambiguation = normalize_json_object(record.disambiguation);
+@@ -240,7 +248,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
+             &incoming_map,
+             &kept_id,
+         )
+-        .await?;
++        .await
+     } else {
+         // No exact match. Check if an existing row can be upgraded:
+         // A row is upgradeable if its disambiguation is a subset of the incoming one
+@@ -332,7 +340,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
+                 richer_map,
+                 &kept_id,
+             )
+-            .await?;
++            .await
+         } else {
+             let active_model = ActiveModel {
+                 id: Set(record.id),
+@@ -352,14 +360,18 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
+                 .exec(client)
+                 .await
+                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
++
++            // Plain insert: nothing was orphaned.
++            Ok(Vec::new())
+         }
+     }
+-
+-    Ok(())
+ }
+ 
+ /// Delete rows for `service_name` that are strict subsets of `richer_map`, excluding `keep_id`.
+ /// Called after a successful put/upgrade to clean up orphaned lower-specificity rows.
++///
++/// Returns the `disambiguation` JSON of each deleted row so callers can evict the
++/// corresponding cache entries (F19).
+ async fn delete_subset_orphans(
+     client: &sea_orm::DatabaseConnection,
+     org_id: &str,
+@@ -367,7 +379,7 @@ async fn delete_subset_orphans(
+     set_id: &str,
+     richer_map: &std::collections::HashMap<String, String>,
+     keep_id: &str,
+-) -> Result<(), errors::Error> {
++) -> Result<Vec<serde_json::Value>, errors::Error> {
+     let candidates = Entity::find()
+         .filter(Column::OrgId.eq(org_id))
+         .filter(Column::ServiceName.eq(service_name))
+@@ -376,6 +388,7 @@ async fn delete_subset_orphans(
+         .await
+         .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+ 
++    let mut deleted: Vec<serde_json::Value> = Vec::new();
+     for row in candidates {
+         if row.id == keep_id {
+             continue;
+@@ -394,13 +407,15 @@ async fn delete_subset_orphans(
+             .iter()
+             .all(|(k, v)| richer_map.get(k).map(|rv| rv == v).unwrap_or(false));
+         if is_subset && row_map.len() < richer_map.len() {
++            let disambiguation = row.disambiguation.clone();
+             Entity::delete_by_id(row.id)
+                 .exec(client)
+                 .await
+                 .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
++            deleted.push(disambiguation);
+         }
+     }
+-    Ok(())
++    Ok(deleted)
+ }
+ 
+ fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {
+diff --git a/src/super_cluster_queue/src/service_streams.rs b/src/super_cluster_queue/src/service_streams.rs
+index 86a2c047bed..fb802d5a70a 100644
+--- a/src/super_cluster_queue/src/service_streams.rs
++++ b/src/super_cluster_queue/src/service_streams.rs
+@@ -40,7 +40,9 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
+                 record.service_name
+             );
+             let org_id = record.org_id.clone();
+-            service_streams::put(&org_id, *record).await?;
++            // Orphan disambiguations are irrelevant here: the put event below makes this
++            // cluster's nodes reload the org's services wholesale (F19).
++            let _orphans = service_streams::put(&org_id, *record).await?;
+             infra::coordinator::service_streams::emit_put_event(&org_id).await?;
+         }
+         ServiceStreamsMessage::Delete {
+@@ -53,7 +55,9 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
+                 service_key
+             );
+             service_streams::delete_all(&org_id).await?;
+-            infra::coordinator::service_streams::emit_delete_event(&org_id, &service_key).await?;
++            // Org-scope reload: the delete wiped the whole org's rows, so a per-service
++            // delete event would evict only one cache key on this cluster's nodes (F6).
++            infra::coordinator::service_streams::emit_reload_event(&org_id).await?;
+         }
+     }
+     Ok(())
+diff --git a/web/src/components/alerts/IncidentDetailDrawer.vue b/web/src/components/alerts/IncidentDetailDrawer.vue
+index e518e3dc93d..b686999f073 100644
+--- a/web/src/components/alerts/IncidentDetailDrawer.vue
++++ b/web/src/components/alerts/IncidentDetailDrawer.vue
+@@ -1140,6 +1140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     :source-stream="'incidents'"
+                     :source-type="'incidents'"
+                     :available-dimensions="availableDimensions"
++                    :semantic-groups="semanticGroups"
+                     :fts-fields="ftsFields"
+                     :time-range="telemetryTimeRange"
+                     :hide-view-related-button="true"
+@@ -3390,6 +3391,7 @@ export default defineComponent({
+       telemetryTimeRange,
+       actualMatchedDimensions,
+       availableDimensions,
++      semanticGroups,
+       ftsFields,
+       incidentContextData,
+       affectedServicesCount,
+diff --git a/web/src/components/settings/ServiceIdentitySetup.vue b/web/src/components/settings/ServiceIdentitySetup.vue
+index 1bb71bf3d3a..a650c31ea5d 100644
+--- a/web/src/components/settings/ServiceIdentitySetup.vue
++++ b/web/src/components/settings/ServiceIdentitySetup.vue
+@@ -3103,14 +3103,6 @@ async function saveConfig() {
+       return;
+     }
+ 
+-    if (trackedAliasIds.value.length === 0) {
+-      toast({
+-        variant: "warning",
+-        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
+-      });
+-      return;
+-    }
+-
+     // "service" is always tracked implicitly by the backend; strip it to avoid 400.
+     // Also drop orphan ids that no longer correspond to any known group (e.g. the
+     // group was deleted from Field Mappings after being added to tracked aliases).
+diff --git a/web/src/composables/useCorrelatedLogs.spec.ts b/web/src/composables/useCorrelatedLogs.spec.ts
+index 7b623d19d17..552830afe1a 100644
+--- a/web/src/composables/useCorrelatedLogs.spec.ts
++++ b/web/src/composables/useCorrelatedLogs.spec.ts
+@@ -252,37 +252,6 @@ describe("useCorrelatedLogs", () => {
+       expect(composable.currentFilters.value.service).toBe("updated-api");
+       expect(composable.currentFilters.value.region).toBe("us-east");
+     });
+-
+-    it("should remove filter", async () => {
+-      const composable = useCorrelatedLogs(props);
+-
+-      composable.removeFilter("region");
+-      await nextTick();
+-
+-      expect(composable.currentFilters.value.region).toBeUndefined();
+-    });
+-
+-    it("should reset filters to matched dimensions only", async () => {
+-      mockFetchQueryDataWithHttpStream.mockImplementation((_params: any, callbacks: any) => {
+-        callbacks.complete(null);
+-        return Promise.resolve();
+-      });
+-
+-      const composable = useCorrelatedLogs(props);
+-
+-      // Modify filters
+-      composable.updateFilter("service", "modified");
+-      composable.updateFilter("newKey", "newValue");
+-
+-      // Reset - should only keep matched dimensions, not additional ones
+-      composable.resetFilters();
+-      await nextTick();
+-
+-      expect(composable.currentFilters.value).toEqual({
+-        service: "api",
+-        environment: "prod",
+-      });
+-    });
+   });
+ 
+   describe("Dimension Helpers", () => {
+diff --git a/web/src/composables/useCorrelatedLogs.ts b/web/src/composables/useCorrelatedLogs.ts
+index 5c34c78a852..315ce911af2 100644
+--- a/web/src/composables/useCorrelatedLogs.ts
++++ b/web/src/composables/useCorrelatedLogs.ts
+@@ -17,8 +17,13 @@ import type { I18nText } from "@/types/i18n";
+ 
+ import { ref, computed, watch, onUnmounted } from "vue";
+ import { useStore } from "vuex";
+-import type { StreamInfo } from "@/services/service_streams";
++import type { StreamInfo, FieldAlias } from "@/services/service_streams";
+ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
++import {
++  buildSqlCondition,
++  applyFilterOverlay,
++  buildFieldToGroupIdMap,
++} from "@/utils/telemetryCorrelation";
+ import { generateTraceContext } from "@/utils/zincutils";
+ import useHttpStreamingSearch from "@/composables/useStreamingSearch";
+ 
+@@ -42,6 +47,13 @@ export interface CorrelatedLogsProps {
+   sourceStream: string;
+   sourceType: string;
+   availableDimensions?: Record<string, any>;
++  /**
++   * Semantic field groups for the org. Used to resolve a filter edit made on one
++   * stream's field name onto every other correlated stream's alias for the same
++   * semantic group (F35). Without it, edits only apply to streams that spell the
++   * field exactly the same way as the chip.
++   */
++  semanticGroups?: FieldAlias[];
+   ftsFields?: string[];
+   timeRange: TimeRange;
+   hideViewRelatedButton?: boolean;
+@@ -140,26 +152,29 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
+   const buildSQLQueries = (): string[] => {
+     const queries: string[] = [];
+ 
++    // Built once per call: chip keys come from whichever stream sourced them, so
++    // an edit must be resolved onto each stream's own alias for the same group.
++    const fieldToGroupId = buildFieldToGroupIdMap(props.semanticGroups ?? []);
++
+     for (const streamInfo of props.logStreams) {
+       const conditions: string[] = [];
+ 
+-      // Merge stream's base filters with user overrides from currentFilters.
+-      // currentFilters keys are raw field names (same namespace as streamInfo.filters),
+-      // so a key present in both takes the user-modified value.
++      // Merge the stream's base filters with the user's overrides from
++      // currentFilters, matching on exact field name first and falling back to
++      // the shared semantic group (F35).
+       const baseFilters = streamInfo.filters ?? {};
+-      const effectiveFilters: Record<string, string> = { ...baseFilters };
+-      for (const [k, v] of Object.entries(currentFilters.value)) {
+-        if (k in baseFilters) effectiveFilters[k] = v;
+-      }
++      const effectiveFilters = applyFilterOverlay(
++        baseFilters,
++        currentFilters.value,
++        fieldToGroupId,
++      );
+ 
+       for (const [field, value] of Object.entries(effectiveFilters)) {
+         if (value === SELECT_ALL_VALUE) continue;
+         if (field.startsWith("_")) continue;
+         if (value === null || value === undefined || value === "") continue;
+ 
+-        const quotedField = `"${field.replace(/"/g, '""')}"`;
+-        const escapedValue = String(value).replace(/'/g, "''");
+-        conditions.push(`${quotedField} = '${escapedValue}'`);
++        conditions.push(buildSqlCondition(field, String(value)));
+       }
+ 
+       // Always quote stream name to match dashboard behavior
+@@ -331,27 +346,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
+     fetchCorrelatedLogs();
+   };
+ 
+-  /**
+-   * Remove a filter dimension
+-   */
+-  const removeFilter = (key: string) => {
+-    const updatedFilters = { ...currentFilters.value };
+-    delete updatedFilters[key];
+-    currentFilters.value = updatedFilters;
+-
+-    currentPage.value = 1;
+-    fetchCorrelatedLogs();
+-  };
+-
+-  /**
+-   * Reset filters to the initial per-stream filter values from _correlate
+-   */
+-  const resetFilters = () => {
+-    currentFilters.value = { ...props.matchedDimensions };
+-    currentPage.value = 1;
+-    fetchCorrelatedLogs();
+-  };
+-
+   /**
+    * Update time range
+    */
+@@ -446,8 +440,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
+     goToPage,
+     updateFilter,
+     updateFilters,
+-    removeFilter,
+-    resetFilters,
+     updateTimeRange,
+     refresh,
+     isMatchedDimension,
+diff --git a/web/src/composables/useMetricsCorrelationDashboard.spec.ts b/web/src/composables/useMetricsCorrelationDashboard.spec.ts
+index a8652a7b03c..a7cbd469aab 100644
+--- a/web/src/composables/useMetricsCorrelationDashboard.spec.ts
++++ b/web/src/composables/useMetricsCorrelationDashboard.spec.ts
+@@ -72,7 +72,7 @@ describe("useMetricsCorrelationDashboard", () => {
+       expect(panel.queryType).toBe("sql");
+       expect(panel.queries).toHaveLength(1);
+       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
+-      expect(panel.queries[0].query).toContain("service = 'api'");
++      expect(panel.queries[0].query).toContain("\"service\" = 'api'");
+       expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
+     });
+ 
+@@ -99,7 +99,7 @@ describe("useMetricsCorrelationDashboard", () => {
+       const query = dashboard.tabs[0].panels[0].queries[0].query;
+ 
+       // Single quotes should be escaped
+-      expect(query).toContain("description = 'it''s a test'");
++      expect(query).toContain("\"description\" = 'it''s a test'");
+     });
+ 
+     it("should position panels in 3-column grid", () => {
+@@ -272,8 +272,8 @@ describe("useMetricsCorrelationDashboard", () => {
+       // Should only use matched dimension values from API filters
+       const query = dashboard!.tabs[0].panels[0].queries[0].query;
+       expect(query).toContain('FROM "default"');
+-      expect(query).toContain("service_name = 'api'");
+-      expect(query).toContain("env = 'prod'");
++      expect(query).toContain("\"service_name\" = 'api'");
++      expect(query).toContain("\"env\" = 'prod'");
+       expect(query).not.toContain("host = 'server01'"); // Not in API filters
+     });
+ 
+@@ -351,7 +351,7 @@ describe("useMetricsCorrelationDashboard", () => {
+ 
+       const query = dashboard!.tabs[0].panels[0].queries[0].query;
+       // Should only include service_name (string, non-internal) in WHERE clause
+-      expect(query).toContain("service_name = 'api'");
++      expect(query).toContain("\"service_name\" = 'api'");
+       expect(query).not.toContain("port");
+       expect(query).not.toContain("enabled");
+       // _timestamp appears in ORDER BY, not in WHERE clause (which is correct)
+@@ -387,8 +387,9 @@ describe("useMetricsCorrelationDashboard", () => {
+       // Fields with hyphens should be quoted
+       expect(query).toContain("\"k8s-cluster\" = 'prod'");
+       expect(query).toContain("\"k8s-namespace\" = 'default'");
+-      // Regular field names should not be quoted
+-      expect(query).toContain("service = 'api'");
++      // Regular field names are quoted too — every identifier goes through
++      // quoteSqlIdentifier so escaping can never be forgotten (F2/F38)
++      expect(query).toContain("\"service\" = 'api'");
+     });
+ 
+     it("should set table_dynamic_columns for logs panel", () => {
+@@ -527,4 +528,58 @@ describe("useMetricsCorrelationDashboard", () => {
+       expect(dashboard.defaultDatetimeDuration.endTime).toBe(1234567990000000);
+     });
+   });
++
++  describe("subject overrides (F31)", () => {
++    const semanticGroups = [
++      {
++        id: "k8s-namespace",
++        fields: ["k8s_namespace_name", "service_k8s_namespace_name"],
++      },
++    ] as MetricsCorrelationConfig["semanticGroups"];
++
++    const buildConfig = (
++      overrides: Partial<MetricsCorrelationConfig>,
++    ): MetricsCorrelationConfig => ({
++      serviceName: "api",
++      matchedDimensions: { "k8s-namespace": "staging" },
++      metricStreams: [],
++      orgIdentifier: "test-org",
++      timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
++      semanticGroups,
++      ...overrides,
++    });
++
++    it("replaces the stream's own alias rather than ANDing both aliases", () => {
++      const metricStreams: StreamInfo[] = [
++        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
++      ];
++
++      const dashboard = composable.generateDashboard(
++        metricStreams,
++        buildConfig({
++          metricSchemas: {
++            cpu: { schema: [{ name: "k8s_namespace_name" }, { name: "value" }] },
++          },
++        }),
++      );
++
++      const query = dashboard.tabs[0].panels[0].queries[0].query;
++      expect(query).toContain(`"k8s_namespace_name" = 'staging'`);
++      expect(query).not.toContain("service_k8s_namespace_name");
++    });
++
++    it("does not guess a field name when the stream schema is unavailable", () => {
++      const metricStreams: StreamInfo[] = [
++        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
++      ];
++
++      // No metricSchemas entry -> schema unknown. Guessing an alias here used to
++      // emit a WHERE on a nonexistent column and kill the panel.
++      const dashboard = composable.generateDashboard(metricStreams, buildConfig({}));
++
++      const query = dashboard.tabs[0].panels[0].queries[0].query;
++      expect(query).toContain(`"service_k8s_namespace_name" = 'prod'`);
++      expect(query).not.toContain("'staging'");
++    });
++  });
+ });
+diff --git a/web/src/composables/useMetricsCorrelationDashboard.ts b/web/src/composables/useMetricsCorrelationDashboard.ts
+index 5d072a36440..fe78d545647 100644
+--- a/web/src/composables/useMetricsCorrelationDashboard.ts
++++ b/web/src/composables/useMetricsCorrelationDashboard.ts
+@@ -15,6 +15,11 @@
+ 
+ import type { StreamInfo, FieldAlias } from "@/services/service_streams";
+ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
++import {
++  buildFieldToGroupIdMap,
++  buildSqlCondition,
++  mergeSubjectOverrides,
++} from "@/utils/telemetryCorrelation";
+ 
+ export interface MetricsCorrelationConfig {
+   serviceName: string;
+@@ -135,20 +140,26 @@ export function useMetricsCorrelationDashboard() {
+     for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
+       if (!value || value === SELECT_ALL_VALUE) continue;
+       const group = semanticGroups.find((g) => g.id === semanticId);
+-      if (!group) continue; // not a semantic ID key — skip (raw field names handled below)
+-      // Find the first alias field that appears in this stream's schema.
+-      // Fallback when schema is unavailable: prefer the field whose name matches
+-      // the group ID (dashes → underscores), e.g. "k8s-node-name" → "k8s_node_name".
+-      const groupIdAsField = semanticId.replace(/-/g, "_");
+-      const fallback = group.fields.find((f) => f === groupIdAsField) ?? group.fields[0];
+-      const hit = streamSchema.size > 0 ? group.fields.find((f) => streamSchema.has(f)) : fallback;
++      if (!group) continue; // not a semantic ID key — raw field names handled below
++      // F31: only override when the stream schema is loaded AND contains the field.
++      // Guessing a field name here produced `WHERE guessed = 'x' AND real = 'x'`
++      // (nonexistent guess → "No field named …" kills the panel).
++      if (streamSchema.size === 0) continue;
++      const hit = group.fields.find((f) => streamSchema.has(f));
+       if (hit) subjectOverrides[hit] = value;
+     }
+ 
+     // Build WHERE clause from stream filters merged with active subject overrides.
++    // Overrides REPLACE the stream's own alias of the same semantic group (F31) —
++    // a plain spread would AND two aliases of one concept together and match nothing.
+     // Quote field names that contain special characters (hyphens, dots, etc.)
+     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
+-    const effectiveFilters = { ...(stream.filters ?? {}), ...subjectOverrides };
++    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
++    const effectiveFilters = mergeSubjectOverrides(
++      stream.filters ?? {},
++      subjectOverrides,
++      fieldToGroupId,
++    );
+ 
+     const whereConditions = Object.entries(effectiveFilters)
+       .filter(([, value]) => {
+@@ -159,9 +170,7 @@ export function useMetricsCorrelationDashboard() {
+         return !skip;
+       })
+       .map(([field, value]) => {
+-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
+-        const escapedValue = value.replace(/'/g, "''");
+-        return `${quotedField} = '${escapedValue}'`;
++        return buildSqlCondition(field, value);
+       })
+       .join(" AND ");
+ 
+@@ -349,9 +358,7 @@ ORDER BY x_axis_1`;
+         return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
+       })
+       .map(([field, value]) => {
+-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
+-        const escapedValue = value.replace(/'/g, "''");
+-        return `${quotedField} = '${escapedValue}'`;
++        return buildSqlCondition(field, value);
+       })
+       .join(" AND ");
+ 
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 84494f7334e..1d5b7f287a1 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -7328,7 +7328,7 @@
+       "noFieldsConfiguredYet": "No fields configured yet",
+       "workloadDetection": "Workload Detection",
+       "workloadDetectedUsingFields": "Workload detected using fields",
+-      "workloadTrackedHelp": "Only these field alias groups are used for workload detection and recommendations. Fields not in this list will not influence service discovery results. Cannot be empty.",
++      "workloadTrackedHelp": "Only these field alias groups are used for workload detection and recommendations. Fields not in this list will not influence service discovery results. Optional — dimensions listed in identity sets are always tracked.",
+       "goToFieldAliases": "Go to Field Aliases",
+       "toConfigureFieldMappings": "to configure individual field mappings.",
+       "selectAliasGroup": "Select alias group",
+@@ -7355,7 +7355,6 @@
+       "uniqueValuesDetected": "{n} unique values detected",
+       "locations": "locations",
+       "recommendedConfigApplied": "Recommended configuration applied. Click \"Save Configuration\" to save.",
+-      "selectAtLeastOneTrackedAlias": "Select at least one tracked alias group.",
+       "cardinalityClassLabel": " ({cardinality} cardinality)",
+       "fieldCardinalityTooltip": "{count} unique values{classLabel} — fewer values = better for grouping"
+     },
+diff --git a/web/src/plugins/correlation/CorrelatedLogsTable.spec.ts b/web/src/plugins/correlation/CorrelatedLogsTable.spec.ts
+index 9186152b8e9..0ae79222a9c 100644
+--- a/web/src/plugins/correlation/CorrelatedLogsTable.spec.ts
++++ b/web/src/plugins/correlation/CorrelatedLogsTable.spec.ts
+@@ -39,7 +39,6 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
+     fetchCorrelatedLogs: vi.fn(),
+     updateFilter: vi.fn(),
+     updateFilters: vi.fn(),
+-    resetFilters: vi.fn(),
+     refresh: vi.fn(),
+     isMatchedDimension: vi.fn(() => false),
+     isAdditionalDimension: vi.fn(() => false),
+diff --git a/web/src/plugins/correlation/TelemetryCorrelationDashboard.spec.ts b/web/src/plugins/correlation/TelemetryCorrelationDashboard.spec.ts
+index 982fe049bc7..75f2f3994f2 100644
+--- a/web/src/plugins/correlation/TelemetryCorrelationDashboard.spec.ts
++++ b/web/src/plugins/correlation/TelemetryCorrelationDashboard.spec.ts
+@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+ import { mount, flushPromises } from "@vue/test-utils";
+ import { createI18n } from "vue-i18n";
+ import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
++import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+ import store from "@/test/unit/helpers/store";
+ import { nextTick } from "vue";
+ 
+@@ -757,8 +758,30 @@ describe("TelemetryCorrelationDashboard.vue", () => {
+       await wrapper.vm.fetchTracesByDimensions();
+ 
+       const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+-      expect(callArg.queryReq.filter).toContain("service='api'");
+-      expect(callArg.queryReq.filter).toContain("env='prod'");
++      // Identifiers and values are escaped via buildSqlCondition (F2/F38)
++      expect(callArg.queryReq.filter).toContain("\"service\" = 'api'");
++      expect(callArg.queryReq.filter).toContain("\"env\" = 'prod'");
++    });
++
++    it("should escape single quotes in trace filter values", async () => {
++      mockFetchQueryDataWithHttpStream.mockImplementation((_payload: any, handlers: any) => {
++        handlers.complete();
++      });
++
++      wrapper = createWrapper({
++        traceStreams: [
++          {
++            stream_name: "traces",
++            stream_type: "traces",
++            filters: { service: "a' OR 1=1 --" },
++          },
++        ],
++      });
++
++      await wrapper.vm.fetchTracesByDimensions();
++
++      const callArg = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
++      expect(callArg.queryReq.filter).toBe("\"service\" = 'a'' OR 1=1 --'");
+     });
+ 
+     it("should accumulate and return hits from streaming data callback", async () => {
+diff --git a/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue b/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
+index 00b79905a66..2f4476cc281 100644
+--- a/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
++++ b/web/src/plugins/correlation/TelemetryCorrelationDashboard.vue
+@@ -1070,6 +1070,11 @@ import {
+ import type { StreamInfo } from "@/services/service_streams";
+ import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
+ import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
++import {
++  buildSqlCondition,
++  buildFieldToGroupIdMap,
++  applyDimensionEditsToFilters,
++} from "@/utils/telemetryCorrelation";
+ import streamService from "@/services/stream";
+ import searchService from "@/services/search";
+ import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
+@@ -2103,35 +2108,22 @@ const applyDimensionChanges = () => {
+   // Copy pending to active
+   activeDimensions.value = { ...pendingDimensions.value };
+ 
+-  // Build field_name -> dimension_id mapping from semantic groups
+-  // This is the same approach as applyUnstableDimensionDefaults
+-  const fieldToDimensionId = new Map<string, string>();
+-  for (const group of semanticGroups.value) {
+-    for (const field of group.fields) {
+-      fieldToDimensionId.set(field, group.id);
+-    }
+-  }
+-
+-  // Update metric stream filters with new dimension values
+-  // Use semantic groups to map filter field names to dimension IDs
+-  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
+-    const updatedFilters = { ...(stream.filters ?? {}) };
+-
+-    // For each filter in the stream, find its semantic dimension ID
+-    // and update with the new value from activeDimensions
+-    for (const [filterKey] of Object.entries(stream.filters ?? {})) {
+-      const dimensionId = fieldToDimensionId.get(filterKey);
+-      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
+-        const newValue = activeDimensions.value[dimensionId];
+-        updatedFilters[filterKey] = newValue;
+-      }
+-    }
+-
+-    return {
+-      ...stream,
+-      filters: updatedFilters,
+-    };
+-  });
++  // Build field_name -> dimension_id mapping from semantic groups.
++  // Uses the shared builder so lookups are case-insensitive and honour the
++  // backend's declaration-order priority when a field appears in two groups.
++  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
++
++  // Update metric stream filters with new dimension values.
++  // activeDimensions is raw-field-keyed in the dialog path and
++  // semantic-ID-keyed in the drawer path — the helper accepts both (F36).
++  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => ({
++    ...stream,
++    filters: applyDimensionEditsToFilters(
++      stream.filters ?? {},
++      activeDimensions.value,
++      fieldToDimensionId,
++    ),
++  }));
+ 
+   // Note: For logs, the filters are built from config.matchedDimensions in the composable
+   // which we're already updating via activeDimensions
+@@ -2739,7 +2731,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
+   const filterParts: string[] = [];
+   if (traceStreamInfo.filters) {
+     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
+-      filterParts.push(`${fieldName}='${value}'`);
++      filterParts.push(buildSqlCondition(fieldName, value));
+     }
+   }
+   const filter = filterParts.join(" AND ");
+@@ -2863,7 +2855,7 @@ const openTracesPage = () => {
+ 
+   if (traceStreamInfo?.filters) {
+     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
+-      filterParts.push(`${fieldName}='${value}'`);
++      filterParts.push(buildSqlCondition(fieldName, value));
+     }
+   }
+ 
+diff --git a/web/src/plugins/logs/DetailTable.vue b/web/src/plugins/logs/DetailTable.vue
+index af0845ed0ae..0279a2b952d 100644
+--- a/web/src/plugins/logs/DetailTable.vue
++++ b/web/src/plugins/logs/DetailTable.vue
+@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :source-stream="correlationProps.sourceStream"
+             :source-type="correlationProps.sourceType"
+             :available-dimensions="correlationProps.availableDimensions"
++            :semantic-groups="correlationProps.semanticGroups"
+             :fts-fields="correlationProps.ftsFields"
+             :time-range="correlationProps.timeRange"
+             :hide-view-related-button="true"
+diff --git a/web/src/plugins/logs/SearchResult.vue b/web/src/plugins/logs/SearchResult.vue
+index 24f91bd5cb5..b9010b8c6c6 100644
+--- a/web/src/plugins/logs/SearchResult.vue
++++ b/web/src/plugins/logs/SearchResult.vue
+@@ -1770,6 +1770,9 @@ export default defineComponent({
+           sourceType: "logs",
+           // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
+           availableDimensions: { ...logFilters, ...context.fields },
++          // Lets filter edits resolve across streams that alias the same
++          // semantic group under different field names (F35).
++          semanticGroups: semanticGroups.value,
+           ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
+           timeRange: {
+             startTime: startTimeMicros,
+diff --git a/web/src/plugins/traces/TraceDetailsSidebar.vue b/web/src/plugins/traces/TraceDetailsSidebar.vue
+index 6086ba5c26a..2da02ed3943 100644
+--- a/web/src/plugins/traces/TraceDetailsSidebar.vue
++++ b/web/src/plugins/traces/TraceDetailsSidebar.vue
+@@ -744,6 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :source-stream="correlationProps.sourceStream"
+             :source-type="correlationProps.sourceType"
+             :available-dimensions="correlationProps.availableDimensions"
++            :semantic-groups="correlationProps.semanticGroups"
+             :fts-fields="correlationProps.ftsFields"
+             :time-range="correlationProps.timeRange"
+             :hide-view-related-button="true"
+@@ -1766,6 +1767,9 @@ export default defineComponent({
+             sourceType: "traces",
+             // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
+             availableDimensions: { ...logFilters, ...context.fields },
++            // Lets filter edits resolve across streams that alias the same
++            // semantic group under different field names (F35).
++            semanticGroups: semanticGroups.value,
+             ftsFields: [],
+             timeRange: {
+               startTime: spanStartUs - bufferUs,
+diff --git a/web/src/services/service_streams.ts b/web/src/services/service_streams.ts
+index b5489175bd4..1e04b0f96a7 100644
+--- a/web/src/services/service_streams.ts
++++ b/web/src/services/service_streams.ts
+@@ -50,6 +50,8 @@ export interface StreamInfo {
+   stream_name: string;
+   stream_type: string;
+   filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
++  /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
++  dropped_dimensions?: string[];
+ }
+ 
+ export interface RelatedStreams {
+diff --git a/web/src/utils/telemetryCorrelation.spec.ts b/web/src/utils/telemetryCorrelation.spec.ts
+index b771a86df93..3c15bd3a353 100644
+--- a/web/src/utils/telemetryCorrelation.spec.ts
++++ b/web/src/utils/telemetryCorrelation.spec.ts
+@@ -14,7 +14,16 @@
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+ import { describe, it, expect, beforeEach, vi } from "vitest";
+-import { filterDimensionsForCorrelation, buildFieldToGroupIdMap } from "./telemetryCorrelation";
++import {
++  filterDimensionsForCorrelation,
++  buildFieldToGroupIdMap,
++  quoteSqlIdentifier,
++  quoteSqlLiteral,
++  buildSqlCondition,
++  applyFilterOverlay,
++  applyDimensionEditsToFilters,
++  mergeSubjectOverrides,
++} from "./telemetryCorrelation";
+ import type { ServiceIdentityConfig, FieldAlias } from "@/services/service_streams";
+ 
+ describe("telemetryCorrelation", () => {
+@@ -297,4 +306,234 @@ describe("telemetryCorrelation", () => {
+       });
+     });
+   });
++
++  describe("sql escaping helpers", () => {
++    it("quotes identifiers and doubles embedded double quotes", () => {
++      expect(quoteSqlIdentifier("k8s_pod_name")).toBe('"k8s_pod_name"');
++      expect(quoteSqlIdentifier('bad"field')).toBe('"bad""field"');
++    });
++
++    it("quotes literals and doubles embedded single quotes", () => {
++      expect(quoteSqlLiteral("prod")).toBe("'prod'");
++      expect(quoteSqlLiteral("a' OR 1=1 --")).toBe("'a'' OR 1=1 --'");
++    });
++
++    it("builds a fully escaped condition", () => {
++      expect(buildSqlCondition("svc", "a'b")).toBe("\"svc\" = 'a''b'");
++    });
++
++    it("always quotes identifiers, including ones with special characters", () => {
++      expect(buildSqlCondition("k8s-pod.name", "web-1")).toBe("\"k8s-pod.name\" = 'web-1'");
++    });
++
++    it("coerces non-string inputs before escaping", () => {
++      expect(quoteSqlLiteral(42 as unknown as string)).toBe("'42'");
++      expect(quoteSqlIdentifier(7 as unknown as string)).toBe('"7"');
++    });
++  });
++
++  describe("applyFilterOverlay", () => {
++    const groups = new Map<string, string>([
++      ["k8s_namespace_name", "k8s-namespace"],
++      ["service_k8s_namespace_name", "k8s-namespace"],
++    ]);
++
++    it("applies exact-key overrides", () => {
++      expect(
++        applyFilterOverlay({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
++      ).toEqual({ k8s_namespace_name: "b" });
++    });
++
++    it("resolves an override to the stream's own alias for the same group (F35)", () => {
++      // Chip key came from stream A ("k8s_namespace_name"); stream B uses the other alias.
++      expect(
++        applyFilterOverlay(
++          { service_k8s_namespace_name: "a" },
++          { k8s_namespace_name: "b" },
++          groups,
++        ),
++      ).toEqual({ service_k8s_namespace_name: "b" });
++    });
++
++    it("ignores overrides with no group and no matching base key", () => {
++      expect(applyFilterOverlay({ x: "1" }, { unrelated: "z" }, groups)).toEqual({ x: "1" });
++    });
++
++    it("ignores a grouped override when the stream has no field in that group", () => {
++      expect(applyFilterOverlay({ x: "1" }, { k8s_namespace_name: "b" }, groups)).toEqual({
++        x: "1",
++      });
++    });
++
++    it("resolves group aliases case-insensitively", () => {
++      expect(
++        applyFilterOverlay(
++          { SERVICE_K8S_NAMESPACE_NAME: "a" },
++          { K8S_NAMESPACE_NAME: "b" },
++          groups,
++        ),
++      ).toEqual({ SERVICE_K8S_NAMESPACE_NAME: "b" });
++    });
++
++    it("prefers the exact key when the base has both the exact key and a group sibling", () => {
++      expect(
++        applyFilterOverlay(
++          { k8s_namespace_name: "a", service_k8s_namespace_name: "a2" },
++          { k8s_namespace_name: "b" },
++          groups,
++        ),
++      ).toEqual({ k8s_namespace_name: "b", service_k8s_namespace_name: "a2" });
++    });
++
++    it("returns a copy and does not mutate the base filters", () => {
++      const base = { k8s_namespace_name: "a" };
++      const result = applyFilterOverlay(base, { k8s_namespace_name: "b" }, groups);
++      expect(base).toEqual({ k8s_namespace_name: "a" });
++      expect(result).not.toBe(base);
++    });
++
++    it("passes base filters through untouched with an empty group map", () => {
++      expect(applyFilterOverlay({ a: "1" }, { a: "2", b: "3" }, new Map())).toEqual({ a: "2" });
++    });
++  });
++
++  describe("applyDimensionEditsToFilters", () => {
++    const f2d = new Map<string, string>([
++      ["k8s_namespace_name", "k8s-namespace"],
++      ["service_k8s_namespace_name", "k8s-namespace"],
++    ]);
++
++    it("applies semantic-ID-keyed edits (IncidentDetailDrawer path)", () => {
++      expect(
++        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { "k8s-namespace": "b" }, f2d),
++      ).toEqual({ k8s_namespace_name: "b" });
++    });
++
++    it("applies raw-field-keyed edits (SearchResult dialog path — F36)", () => {
++      expect(
++        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, f2d),
++      ).toEqual({ k8s_namespace_name: "b" });
++    });
++
++    it("resolves a raw-field-keyed edit to the stream's own alias for the same group", () => {
++      // The dimension bar was seeded from a log stream's field name; the metric
++      // stream spells the same concept differently.
++      expect(
++        applyDimensionEditsToFilters(
++          { service_k8s_namespace_name: "a" },
++          { k8s_namespace_name: "b" },
++          f2d,
++        ),
++      ).toEqual({ service_k8s_namespace_name: "b" });
++    });
++
++    it("prefers the raw-field edit over the semantic-ID edit for the same filter", () => {
++      expect(
++        applyDimensionEditsToFilters(
++          { k8s_namespace_name: "a" },
++          { k8s_namespace_name: "raw", "k8s-namespace": "semantic" },
++          f2d,
++        ),
++      ).toEqual({ k8s_namespace_name: "raw" });
++    });
++
++    it("leaves filters without an edit untouched", () => {
++      expect(applyDimensionEditsToFilters({ x: "1" }, { "k8s-namespace": "b" }, f2d)).toEqual({
++        x: "1",
++      });
++    });
++
++    it("resolves filter keys case-insensitively", () => {
++      expect(
++        applyDimensionEditsToFilters({ K8S_NAMESPACE_NAME: "a" }, { "k8s-namespace": "b" }, f2d),
++      ).toEqual({ K8S_NAMESPACE_NAME: "b" });
++    });
++
++    it("keeps an empty-string edit (clearing a value is a real edit)", () => {
++      expect(
++        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { k8s_namespace_name: "" }, f2d),
++      ).toEqual({ k8s_namespace_name: "" });
++    });
++
++    it("never adds a filter key the stream does not already have", () => {
++      expect(
++        applyDimensionEditsToFilters({ x: "1" }, { k8s_namespace_name: "b", other: "c" }, f2d),
++      ).toEqual({ x: "1" });
++    });
++
++    it("returns a copy and does not mutate the input filters", () => {
++      const filters = { k8s_namespace_name: "a" };
++      const result = applyDimensionEditsToFilters(filters, { "k8s-namespace": "b" }, f2d);
++      expect(filters).toEqual({ k8s_namespace_name: "a" });
++      expect(result).not.toBe(filters);
++    });
++  });
++
++  describe("mergeSubjectOverrides", () => {
++    const groups = new Map<string, string>([
++      ["k8s_namespace_name", "k8s-namespace"],
++      ["service_k8s_namespace_name", "k8s-namespace"],
++      ["k8s_pod_name", "k8s-pod"],
++    ]);
++
++    it("replaces the same-group backend key instead of adding a duplicate (F31)", () => {
++      expect(
++        mergeSubjectOverrides(
++          { service_k8s_namespace_name: "prod" }, // backend-resolved key
++          { k8s_namespace_name: "staging" }, // schema-resolved override, different alias
++          groups,
++        ),
++      ).toEqual({ k8s_namespace_name: "staging" }); // ONE condition, not two
++    });
++
++    it("overwrites in place when keys match", () => {
++      expect(
++        mergeSubjectOverrides({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
++      ).toEqual({ k8s_namespace_name: "b" });
++    });
++
++    it("adds an override whose group is not present in the filters", () => {
++      expect(
++        mergeSubjectOverrides({ k8s_pod_name: "p" }, { k8s_namespace_name: "n" }, groups),
++      ).toEqual({ k8s_pod_name: "p", k8s_namespace_name: "n" });
++    });
++
++    it("leaves filters of other groups untouched while replacing one group", () => {
++      expect(
++        mergeSubjectOverrides(
++          { service_k8s_namespace_name: "prod", k8s_pod_name: "p" },
++          { k8s_namespace_name: "staging" },
++          groups,
++        ),
++      ).toEqual({ k8s_pod_name: "p", k8s_namespace_name: "staging" });
++    });
++
++    it("matches the existing filter key case-insensitively", () => {
++      expect(
++        mergeSubjectOverrides(
++          { SERVICE_K8S_NAMESPACE_NAME: "prod" },
++          { k8s_namespace_name: "staging" },
++          groups,
++        ),
++      ).toEqual({ k8s_namespace_name: "staging" });
++    });
++
++    it("adds an ungrouped override without disturbing existing filters", () => {
++      expect(mergeSubjectOverrides({ a: "1" }, { unknown_field: "2" }, groups)).toEqual({
++        a: "1",
++        unknown_field: "2",
++      });
++    });
++
++    it("returns a copy and does not mutate the input filters", () => {
++      const filters = { service_k8s_namespace_name: "prod" };
++      const result = mergeSubjectOverrides(filters, { k8s_namespace_name: "staging" }, groups);
++      expect(filters).toEqual({ service_k8s_namespace_name: "prod" });
++      expect(result).not.toBe(filters);
++    });
++
++    it("passes filters through untouched with no overrides", () => {
++      expect(mergeSubjectOverrides({ a: "1" }, {}, groups)).toEqual({ a: "1" });
++    });
++  });
+ });
+diff --git a/web/src/utils/telemetryCorrelation.ts b/web/src/utils/telemetryCorrelation.ts
+index 7f7b7d6c2d4..a8c9454eb67 100644
+--- a/web/src/utils/telemetryCorrelation.ts
++++ b/web/src/utils/telemetryCorrelation.ts
+@@ -111,6 +111,135 @@ export function buildFieldToGroupIdMap(semanticGroups: FieldAlias[]): Map<string
+   return map;
+ }
+ 
++/**
++ * Overlay user filter edits onto ONE stream's base filters (F35).
++ *
++ * Chip keys are raw field names harvested from a single stream, but every
++ * correlated stream carries its own alias for the same semantic group (e.g.
++ * a log stream's `k8s_namespace_name` vs a trace stream's
++ * `service_k8s_namespace_name`). Requiring literal key identity silently drops
++ * the user's edit for every stream that spells the field differently, so the
++ * override is resolved through the semantic group when the exact key is absent.
++ *
++ * Precedence: an exact key match always wins; only then do we fall back to the
++ * group. Overrides that match neither are dropped — adding them would emit a
++ * WHERE condition on a column the stream does not have.
++ *
++ * @param baseFilters - the stream's own filters, keyed by its raw field names
++ * @param overrides - user-edited values, keyed by whichever stream's field names the chips came from
++ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
++ */
++export function applyFilterOverlay(
++  baseFilters: Record<string, string>,
++  overrides: Record<string, string>,
++  fieldToGroupId: Map<string, string>,
++): Record<string, string> {
++  const effective: Record<string, string> = { ...baseFilters };
++
++  for (const [key, value] of Object.entries(overrides)) {
++    if (key in baseFilters) {
++      effective[key] = value;
++      continue;
++    }
++
++    const groupId = fieldToGroupId.get(key.toLowerCase());
++    if (!groupId) continue;
++
++    const target = Object.keys(baseFilters).find(
++      (baseKey) => fieldToGroupId.get(baseKey.toLowerCase()) === groupId,
++    );
++    if (target) effective[target] = value;
++  }
++
++  return effective;
++}
++
++/**
++ * Apply dimension-bar edits to ONE stream's filters (F36).
++ *
++ * `activeDimensions` is raw-field-keyed when the bar was seeded from stream
++ * filters (SearchResult / TraceDetailsSidebar dialog path) and
++ * semantic-ID-keyed when seeded from `matched_dimensions`
++ * (IncidentDetailDrawer path) — the component cannot tell which, so look up
++ * BOTH key spaces, raw field first.
++ *
++ * Only existing filter keys are updated: adding a key would emit a WHERE
++ * condition on a column the stream does not have.
++ *
++ * @param filters - the stream's own filters, keyed by its raw field names
++ * @param activeDimensions - edited values, keyed by raw field name OR semantic group ID
++ * @param fieldToDimensionId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
++ */
++export function applyDimensionEditsToFilters(
++  filters: Record<string, string>,
++  activeDimensions: Record<string, string>,
++  fieldToDimensionId: Map<string, string>,
++): Record<string, string> {
++  const updated: Record<string, string> = { ...filters };
++
++  for (const filterKey of Object.keys(filters)) {
++    const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
++
++    // Raw-field key wins over the semantic-ID key. When the bar was seeded from
++    // a different stream's alias, fall back to any edit whose key resolves to
++    // the same semantic group.
++    let newValue = activeDimensions[filterKey];
++    if (newValue === undefined && dimensionId !== undefined) {
++      newValue = activeDimensions[dimensionId];
++    }
++    if (newValue === undefined && dimensionId !== undefined) {
++      const aliasKey = Object.keys(activeDimensions).find(
++        (key) => fieldToDimensionId.get(key.toLowerCase()) === dimensionId,
++      );
++      if (aliasKey !== undefined) newValue = activeDimensions[aliasKey];
++    }
++
++    if (newValue !== undefined) {
++      updated[filterKey] = newValue;
++    }
++  }
++
++  return updated;
++}
++
++/**
++ * Merge schema-verified subject overrides into ONE stream's filters (F31).
++ *
++ * The backend resolves a stream's filters using its own alias for a semantic
++ * group; the subject override is resolved against the stream schema and may
++ * land on a different alias of the SAME group. A plain spread therefore UNIONS
++ * the two aliases into `WHERE old_alias = 'prod' AND new_alias = 'staging'`,
++ * which matches nothing. Replace the same-group key instead of adding to it.
++ *
++ * An override whose group has no counterpart in `filters` is added — it was
++ * resolved against the stream schema, so the column is known to exist.
++ *
++ * @param filters - the stream's own filters, keyed by its raw field names
++ * @param overrides - schema-verified field name -> value
++ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
++ */
++export function mergeSubjectOverrides(
++  filters: Record<string, string>,
++  overrides: Record<string, string>,
++  fieldToGroupId: Map<string, string>,
++): Record<string, string> {
++  const effective: Record<string, string> = { ...filters };
++
++  for (const [hit, value] of Object.entries(overrides)) {
++    const groupId = fieldToGroupId.get(hit.toLowerCase());
++    const existingKey = Object.keys(effective).find(
++      (key) =>
++        key === hit || (groupId !== undefined && fieldToGroupId.get(key.toLowerCase()) === groupId),
++    );
++    if (existingKey !== undefined && existingKey !== hit) {
++      delete effective[existingKey];
++    }
++    effective[hit] = value;
++  }
++
++  return effective;
++}
++
+ /**
+  * Filter dimensions to only include fields that are actually used for disambiguation
+  *
+@@ -167,6 +296,23 @@ export function filterDimensionsForCorrelation(
+   return filtered;
+ }
+ 
++/**
++ * SQL escaping for correlation query builders. Values originate from
++ * telemetry labels (user-controlled data) — every builder MUST route
++ * field/value interpolation through these helpers (F2).
++ */
++export function quoteSqlIdentifier(field: string): string {
++  return `"${String(field).replace(/"/g, '""')}"`;
++}
++
++export function quoteSqlLiteral(value: string): string {
++  return `'${String(value).replace(/'/g, "''")}'`;
++}
++
++export function buildSqlCondition(field: string, value: string): string {
++  return `${quoteSqlIdentifier(field)} = ${quoteSqlLiteral(value)}`;
++}
++
+ /**
+  * Build WHERE clause conditions using exact field names from StreamInfo.filters
+  *
+@@ -181,9 +327,7 @@ function buildExactDimensionConditions(filters: Record<string, string>): string[
+     if (value === SELECT_ALL_VALUE) {
+       continue;
+     }
+-    // Escape single quotes in value
+-    const escapedValue = value.replace(/'/g, "''");
+-    conditions.push(`${fieldName} = '${escapedValue}'`);
++    conditions.push(buildSqlCondition(fieldName, value));
+   }
+ 
+   return conditions;
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2368 (combined for full feature context) =====
+
+diff --git a/Cargo.lock b/Cargo.lock
+index 4719e58db..33ed47df0 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -8718,6 +8718,7 @@ dependencies = [
+  "hyper-util",
+  "js-sys",
+  "log",
++ "mime_guess",
+  "percent-encoding",
+  "pin-project-lite",
+  "quinn",
+diff --git a/o2_enterprise/src/enterprise/service_streams/meta.rs b/o2_enterprise/src/enterprise/service_streams/meta.rs
+index ccac2b40c..588371eda 100644
+--- a/o2_enterprise/src/enterprise/service_streams/meta.rs
++++ b/o2_enterprise/src/enterprise/service_streams/meta.rs
+@@ -199,15 +199,30 @@ impl ServiceMetadata {
+         }
+     }
+ 
+-    /// Merge another service metadata into this one (union of streams)
++    /// Merge another service metadata into this one (union of streams, dimensions
++    /// and field mappings).
+     ///
+     /// Uses stream merge policy to prevent unbounded stream growth.
++    /// `all_dimensions` / `field_name_mapping` are unioned first-writer-wins: `self`
++    /// keeps its value on key collisions, `other`'s unique keys are added (F12).
+     pub fn merge(&mut self, other: &ServiceMetadata) {
+         // Merge streams using policy to prevent explosion
+         let policy = super::stream_merge_policy::StreamMergePolicy::default();
+         self.streams =
+             super::stream_merge_policy::merge_streams(&self.streams, &other.streams, &policy);
+ 
++        // F12: union — never drop the other record's dimension/field data
++        for (k, v) in &other.all_dimensions {
++            self.all_dimensions
++                .entry(k.clone())
++                .or_insert_with(|| v.clone());
++        }
++        for (k, v) in &other.field_name_mapping {
++            self.field_name_mapping
++                .entry(k.clone())
++                .or_insert_with(|| v.clone());
++        }
++
+         // Update timestamp
+         self.last_seen = self.last_seen.max(other.last_seen);
+     }
+@@ -371,4 +386,38 @@ mod tests {
+             CardinalityClass::VeryHigh
+         );
+     }
++
++    #[test]
++    fn test_merge_unions_dimensions_and_field_mapping() {
++        // F12: merge must not drop the other side's all_dimensions/field_name_mapping —
++        // whichever record arrives first must not dictate the stored analytics/filter data.
++        let mut a = ServiceMetadata::new("svc".to_string());
++        a.all_dimensions
++            .insert("k8s-cluster".to_string(), "c1".to_string());
++        a.field_name_mapping
++            .insert("k8s-cluster".to_string(), "k8s_cluster".to_string());
++        let mut b = ServiceMetadata::new("svc".to_string());
++        b.all_dimensions
++            .insert("environment".to_string(), "prod".to_string());
++        b.all_dimensions
++            .insert("k8s-cluster".to_string(), "SHOULD-NOT-WIN".to_string());
++        b.field_name_mapping
++            .insert("environment".to_string(), "environment".to_string());
++
++        a.merge(&b);
++
++        // Union: b's unique keys arrive; a's existing keys win collisions
++        // (first-writer-wins, consistent with discovery_field_mapping's entry().or_insert
++        // in storage.rs)
++        assert_eq!(a.all_dimensions.get("environment").unwrap(), "prod");
++        assert_eq!(a.all_dimensions.get("k8s-cluster").unwrap(), "c1");
++        assert_eq!(
++            a.field_name_mapping.get("environment").unwrap(),
++            "environment"
++        );
++        assert_eq!(
++            a.field_name_mapping.get("k8s-cluster").unwrap(),
++            "k8s_cluster"
++        );
++    }
+ }
+diff --git a/o2_enterprise/src/enterprise/service_streams/processor.rs b/o2_enterprise/src/enterprise/service_streams/processor.rs
+index 62cc4707d..93b30f92d 100644
+--- a/o2_enterprise/src/enterprise/service_streams/processor.rs
++++ b/o2_enterprise/src/enterprise/service_streams/processor.rs
+@@ -51,6 +51,11 @@ pub struct StreamProcessor {
+     /// Derived from identity_config.tracked_alias_ids.
+     /// When empty, all groups are extracted (should not happen in practice).
+     tracked_ids: std::collections::HashSet<String>,
++
++    /// Same membership as `tracked_ids` (minus `service`) but ordered by ORG config:
++    /// `tracked_alias_ids` in config order, then each set's `distinguish_by` in config
++    /// order, deduped. Drives the fallback service name — see `resolve_service_name`.
++    ordered_tracked_ids: Vec<String>,
+ }
+ 
+ /// Result of processing a record
+@@ -84,19 +89,57 @@ impl StreamProcessor {
+         let semantic_lookup = SemanticLookup::build(&semantic_groups);
+ 
+         // Derive tracked_ids from the org-specific identity_config.
+-        // If empty (e.g. default_config()), fall back to the env var directly.
+-        let tracked_ids: std::collections::HashSet<String> =
+-            if !identity_config.tracked_alias_ids.is_empty() {
+-                identity_config.tracked_alias_ids.iter().cloned().collect()
+-            } else {
+-                crate::enterprise::common::config::get_config()
+-                    .service_streams
+-                    .tracked_alias_ids
+-                    .split(',')
+-                    .map(|s| s.trim().to_string())
+-                    .filter(|s| !s.is_empty())
+-                    .collect()
+-            };
++        //
++        // tracked_alias_ids is guidance, not a contract: read-time correlation resolves
++        // identity sets from the dimensions extracted here, so every set's distinguish_by
++        // fields must be captured too — a set saved without its fields in tracked_alias_ids
++        // would otherwise produce rows (set_id="default", empty disambiguation) that
++        // correlation can never match.
++        //
++        // If both sources are empty (e.g. default_config()), fall back to the env var.
++        let mut tracked_ids: std::collections::HashSet<String> =
++            identity_config.tracked_alias_ids.iter().cloned().collect();
++        tracked_ids.extend(
++            identity_config
++                .sets
++                .iter()
++                .flat_map(|set| set.distinguish_by.iter().cloned()),
++        );
++        if tracked_ids.is_empty() {
++            tracked_ids = crate::enterprise::common::config::get_config()
++                .service_streams
++                .tracked_alias_ids
++                .split(',')
++                .map(|s| s.trim().to_string())
++                .filter(|s| !s.is_empty())
++                .collect();
++        }
++
++        // F7: fallback service naming walks ORG config order (tracked_alias_ids, then
++        // each set's distinguish_by), not the env var — org-configured ids absent from
++        // the env default (e.g. "environment") must be able to contribute, and the
++        // name must not silently change when the env var is reordered.
++        let mut ordered_tracked_ids: Vec<String> = Vec::new();
++        let mut seen_ordered = std::collections::HashSet::new();
++        for id in identity_config.tracked_alias_ids.iter().chain(
++            identity_config
++                .sets
++                .iter()
++                .flat_map(|set| set.distinguish_by.iter()),
++        ) {
++            if id != "service" && seen_ordered.insert(id.clone()) {
++                ordered_tracked_ids.push(id.clone());
++            }
++        }
++        if ordered_tracked_ids.is_empty() {
++            ordered_tracked_ids = crate::enterprise::common::config::get_config()
++                .service_streams
++                .tracked_alias_ids
++                .split(',')
++                .map(|s| s.trim().to_string())
++                .filter(|s| !s.is_empty() && s != "service")
++                .collect();
++        }
+ 
+         log::debug!(
+             "[StreamProcessor] Created processor for org '{}' with {} semantic groups ({} field mappings), {} tracked alias IDs",
+@@ -112,6 +155,7 @@ impl StreamProcessor {
+             semantic_lookup,
+             identity_config,
+             tracked_ids,
++            ordered_tracked_ids,
+         }
+     }
+ 
+@@ -372,32 +416,25 @@ impl StreamProcessor {
+         (dimensions, field_name_mapping)
+     }
+ 
+-    /// Resolve service name from extracted dimensions.
++    /// Derive a service identity for records with no `service` dimension.
+     ///
+-    /// Returns the value from the "service" semantic group if present.
+-    /// Otherwise walks `tracked_ids` in the order given by the env var config and joins
+-    /// all matched dimension values with "/". Falls back to the stream name.
++    /// Returns the value from the "service" semantic group if present. Otherwise walks
++    /// `ordered_tracked_ids` (ORG config order — see `new()`) and joins all matched
++    /// dimension values with "/". Falls back to the stream name.
+     ///
+-    /// `tracked_ids` must be the same set used during extraction so the fallback only
+-    /// references keys that were actually extracted.
++    /// `ordered_tracked_ids` has the same membership as the `tracked_ids` set used during
++    /// extraction (minus `service`), so the fallback only references keys that could
++    /// actually have been extracted.
+     fn resolve_service_name(
+         dimensions: &HashMap<String, String>,
+         stream_name: &str,
+-        tracked_ids: &std::collections::HashSet<String>,
++        ordered_tracked_ids: &[String],
+     ) -> String {
+         if let Some(name) = dimensions.get("service") {
+             return name.clone();
+         }
+-        // Walk the env var order so the fallback name is deterministic and human-readable.
+-        // Only consider IDs that are also present in tracked_ids (i.e. were actually extracted).
+-        let tracked_alias_ids = crate::enterprise::common::config::get_config()
+-            .service_streams
+-            .tracked_alias_ids
+-            .clone();
+-        let parts: Vec<&str> = tracked_alias_ids
+-            .split(',')
+-            .map(|s| s.trim())
+-            .filter(|s| !s.is_empty() && *s != "service" && tracked_ids.contains(*s))
++        let parts: Vec<&str> = ordered_tracked_ids
++            .iter()
+             .filter_map(|id| dimensions.get(id).map(|v| v.as_str()))
+             .collect();
+         if parts.is_empty() {
+@@ -474,7 +511,8 @@ impl StreamProcessor {
+         HashMap<String, String>,
+         HashMap<String, String>,
+     )> {
+-        let service_name = Self::resolve_service_name(&dimensions, stream_name, &self.tracked_ids);
++        let service_name =
++            Self::resolve_service_name(&dimensions, stream_name, &self.ordered_tracked_ids);
+ 
+         let (set_id, disambiguation) = match self.identity_config.resolve_best_set(&dimensions) {
+             Some(best_set) => {
+@@ -538,7 +576,8 @@ impl StreamProcessor {
+             dimensions.keys().collect::<Vec<_>>()
+         );
+ 
+-        let service_name = Self::resolve_service_name(&dimensions, stream_name, &self.tracked_ids);
++        let service_name =
++            Self::resolve_service_name(&dimensions, stream_name, &self.ordered_tracked_ids);
+ 
+         let (set_id, disambiguation) = match self.identity_config.resolve_best_set(&dimensions) {
+             Some(best_set) => {
+@@ -898,7 +937,10 @@ mod tests {
+     }
+ 
+     #[tokio::test]
+-    async fn test_process_record_without_service_falls_back_to_stream_name() {
++    async fn test_process_record_without_service_uses_org_tracked_dims() {
++        // F7: no "service" group field present. The org tracks environment+host (neither is
++        // in the env default), so the fallback name is built from those, in org config
++        // order — previously this silently degraded to the stream name.
+         let processor = create_test_processor();
+ 
+         let record = json_to_hashmap(json!({
+@@ -912,9 +954,27 @@ mod tests {
+             .await
+             .unwrap();
+ 
+-        // No "service" group field present; falls back to stream name
+         let service = result.service.unwrap();
+-        assert_eq!(service.service_name, "test_stream");
++        assert_eq!(service.service_name, "production/server01");
++    }
++
++    #[tokio::test]
++    async fn test_process_record_partial_tracked_dims_names_from_what_matched() {
++        // Only "environment" of the org's two tracked ids is present — the name is built
++        // from the matched subset, not padded and not degraded to the stream name.
++        let processor = create_test_processor();
++
++        let record = json_to_hashmap(json!({
++            "environment": "production",
++            "message": "Request processed"
++        }));
++
++        let result = processor
++            .process_record("test_stream", &record)
++            .await
++            .unwrap();
++
++        assert_eq!(result.service.unwrap().service_name, "production");
+     }
+ 
+     #[tokio::test]
+@@ -1015,4 +1075,121 @@ mod tests {
+             "Should extract k8s-cluster from k8s_cluster"
+         );
+     }
++
++    #[tokio::test]
++    async fn test_distinguish_by_extracted_even_when_not_in_tracked_alias_ids() {
++        // tracked_alias_ids is guidance — discovery must still extract every identity
++        // set's distinguish_by fields, otherwise correlation can never match the rows
++        // this processor writes (read-time set resolution demands those dimensions).
++        let processor = StreamProcessor::new(
++            "test_org_untracked_distinguish_by".to_string(),
++            vec![
++                FieldAlias::new("service", "Service", &["service"]),
++                FieldAlias::new("environment", "Environment", &["environment"]),
++                FieldAlias::new("host", "Host", &["host"]),
++                FieldAlias::new("k8s-cluster", "K8s Cluster", &["k8s_cluster"]),
++            ],
++            ServiceIdentityConfig {
++                sets: vec![config::meta::correlation::IdentitySet {
++                    id: "custom-1".to_string(),
++                    label: "custom-1".to_string(),
++                    distinguish_by: vec!["environment".to_string(), "host".to_string()],
++                }],
++                tracked_alias_ids: vec!["k8s-cluster".to_string()],
++                ..Default::default()
++            },
++        );
++
++        let record = json_to_hashmap(json!({
++            "service": "api-gateway",
++            "environment": "local",
++            "host": "dev-laptop"
++        }));
++
++        let result = processor.process_record("default", &record).await.unwrap();
++        let service = result.service.unwrap();
++        assert_eq!(service.set_id, "custom-1");
++        assert_eq!(service.disambiguation.get("environment").unwrap(), "local");
++        assert_eq!(service.disambiguation.get("host").unwrap(), "dev-laptop");
++    }
++
++    #[test]
++    fn test_resolve_service_name_uses_org_config_order() {
++        // F7: org tracks "environment" (absent from the env default) — it must drive
++        // the fallback name instead of falling through to the stream name.
++        let mut dims = HashMap::new();
++        dims.insert("environment".to_string(), "prod".to_string());
++        dims.insert("k8s-cluster".to_string(), "c1".to_string());
++        let ordered = vec!["environment".to_string(), "k8s-cluster".to_string()];
++        let name = StreamProcessor::resolve_service_name(&dims, "node_cpu_seconds", &ordered);
++        assert_eq!(name, "prod/c1");
++    }
++
++    #[test]
++    fn test_resolve_service_name_stream_name_fallback_when_no_dims() {
++        let dims = HashMap::new();
++        let ordered = vec!["environment".to_string()];
++        let name = StreamProcessor::resolve_service_name(&dims, "node_cpu_seconds", &ordered);
++        assert_eq!(name, "node_cpu_seconds");
++    }
++
++    #[test]
++    fn test_ordered_tracked_ids_follows_org_config_order_and_excludes_service() {
++        // tracked_alias_ids first (in config order), then each set's distinguish_by,
++        // deduped, with "service" excluded.
++        let processor = StreamProcessor::new(
++            "test_org_ordered".to_string(),
++            vec![],
++            ServiceIdentityConfig {
++                sets: vec![config::meta::correlation::IdentitySet {
++                    id: "custom-1".to_string(),
++                    label: "custom-1".to_string(),
++                    distinguish_by: vec![
++                        "environment".to_string(),
++                        "host".to_string(),
++                        "service".to_string(),
++                    ],
++                }],
++                tracked_alias_ids: vec![
++                    "k8s-cluster".to_string(),
++                    "service".to_string(),
++                    "environment".to_string(),
++                ],
++                ..Default::default()
++            },
++        );
++
++        assert_eq!(
++            processor.ordered_tracked_ids,
++            vec![
++                "k8s-cluster".to_string(),
++                "environment".to_string(),
++                "host".to_string(),
++            ]
++        );
++    }
++
++    #[test]
++    fn test_ordered_tracked_ids_falls_back_to_env_when_org_config_empty() {
++        // Both org sources empty → env var order, "service" filtered out.
++        let processor = StreamProcessor::new(
++            "test_org_ordered_env".to_string(),
++            vec![],
++            ServiceIdentityConfig {
++                sets: vec![],
++                tracked_alias_ids: vec![],
++                ..Default::default()
++            },
++        );
++
++        let expected: Vec<String> = crate::enterprise::common::config::get_config()
++            .service_streams
++            .tracked_alias_ids
++            .split(',')
++            .map(|s| s.trim().to_string())
++            .filter(|s| !s.is_empty() && s != "service")
++            .collect();
++        assert!(!expected.is_empty());
++        assert_eq!(processor.ordered_tracked_ids, expected);
++    }
+ }
+diff --git a/o2_enterprise/src/enterprise/service_streams/storage.rs b/o2_enterprise/src/enterprise/service_streams/storage.rs
+index 04407378c..2ed46c253 100644
+--- a/o2_enterprise/src/enterprise/service_streams/storage.rs
++++ b/o2_enterprise/src/enterprise/service_streams/storage.rs
+@@ -181,6 +181,18 @@ pub async fn get_available_groups(
+     available_groups
+ }
+ 
++/// A dimension value in both its match form and its display/query form.
++///
++/// `normalized` (lowercased, trimmed, suffix-stripped) is ONLY for matching against
++/// stored rows — stored disambiguation values are normalized identically at ingest.
++/// `raw` (trimmed original) is what emitted SQL filters must carry: stream data
++/// retains original case/suffixes, and a lowercased predicate returns zero rows (F1/F4).
++#[derive(Debug, Clone, PartialEq)]
++pub struct NormalizedValue {
++    pub normalized: String,
++    pub raw: String,
++}
++
+ /// Storage service for service discovery metadata
+ pub struct ServiceStorage;
+ 
+@@ -265,8 +277,8 @@ impl ServiceStorage {
+             record.set_id,
+             record.disambiguation,
+         );
+-        match infra::table::service_streams::put(org_id, record.clone()).await {
+-            Ok(()) => {}
++        let orphans = match infra::table::service_streams::put(org_id, record.clone()).await {
++            Ok(orphans) => orphans,
+             Err(e) => {
+                 log::error!(
+                     "[ServiceStreams] put FAILED: org={org_id} service={} error={e:?}",
+@@ -274,6 +286,21 @@ impl ServiceStorage {
+                 );
+                 return Err(anyhow::anyhow!("Failed to store service: {}", e));
+             }
++        };
++
++        // F19: the DB layer deleted lower-specificity orphan rows; evict their cache keys
++        // locally (remote nodes reload wholesale via the flusher's put event).
++        for disambiguation in &orphans {
++            let map: HashMap<String, String> = disambiguation
++                .as_object()
++                .map(|m| {
++                    m.iter()
++                        .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
++                        .collect()
++                })
++                .unwrap_or_default();
++            let key = ServiceKey::new(record.service_name.clone(), record.set_id.clone(), map);
++            cache::remove_service_cache(org_id, &key).await;
+         }
+ 
+         if crate::enterprise::common::config::get_config()
+@@ -402,16 +429,31 @@ impl ServiceStorage {
+         Ok(())
+     }
+ 
+-    /// Delete all services for an organization (dedicated service_streams table)
+-    pub async fn delete_all(org_id: &str) -> Result<(), anyhow::Error> {
+-        infra::table::service_streams::delete_all(org_id)
++    /// Delete all services for an organization (dedicated service_streams table).
++    /// Returns the number of deleted rows, clears the local org cache and
++    /// replicates the reset to the super-cluster.
++    ///
++    /// Callers must additionally emit an org-scope coordinator reload event so
++    /// OTHER nodes drop their caches — the cache has no TTL (F6).
++    pub async fn delete_all(org_id: &str) -> Result<u64, anyhow::Error> {
++        let deleted = infra::table::service_streams::delete_all(org_id)
+             .await
+             .map_err(|e| anyhow::anyhow!("Failed to delete all services: {}", e))?;
+ 
+         // Clear cache for the org
+         cache::clear_org_cache(org_id).await;
+ 
+-        Ok(())
++        if crate::enterprise::common::config::get_config()
++            .super_cluster
++            .enabled
++            && let Err(e) =
++                crate::enterprise::super_cluster::queue::service_streams_delete(org_id, "_all")
++                    .await
++        {
++            log::error!("[service_streams] Failed to replicate reset to super-cluster: {e}");
++        }
++
++        Ok(deleted)
+     }
+ 
+     /// Lookup service by stream name and dimensions
+@@ -921,7 +963,7 @@ impl ServiceStorage {
+         _org_id: &str,
+         input_dimensions: &HashMap<String, String>,
+         semantic_groups: &[FieldAlias],
+-    ) -> Result<HashMap<String, String>, anyhow::Error> {
++    ) -> Result<HashMap<String, NormalizedValue>, anyhow::Error> {
+         use std::collections::HashSet;
+ 
+         log::debug!("[NORMALIZE] Input dimensions: {input_dimensions:?}");
+@@ -948,17 +990,24 @@ impl ServiceStorage {
+                     value
+                 );
+ 
++                let raw_value = value.trim().to_string();
+                 let final_value = value.to_lowercase().trim().to_string();
+                 let transformed_value =
+                     Self::apply_semantic_transformations(&group.id, &final_value);
+ 
+-                normalized.insert(group.id.clone(), transformed_value);
++                normalized.insert(
++                    group.id.clone(),
++                    NormalizedValue {
++                        normalized: transformed_value,
++                        raw: raw_value,
++                    },
++                );
+                 processed_groups.insert(group.id.clone());
+ 
+                 log::debug!(
+                     "[NORMALIZE] Direct match: '{}' = '{}'",
+                     group.id,
+-                    normalized.get(&group.id).unwrap()
++                    normalized.get(&group.id).unwrap().normalized
+                 );
+ 
+                 continue; // Move to next group
+@@ -976,6 +1025,7 @@ impl ServiceStorage {
+                         value
+                     );
+ 
++                    let raw_value = value.trim().to_string();
+                     let final_value = value.to_lowercase().trim().to_string();
+                     let transformed_value =
+                         Self::apply_semantic_transformations(&group.id, &final_value);
+@@ -994,14 +1044,20 @@ impl ServiceStorage {
+                     // accurate matching. We need them to find the right service record.
+                     // Cardinality blocking should only happen during ingestion, not during lookup.
+ 
+-                    normalized.insert(group.id.clone(), transformed_value);
++                    normalized.insert(
++                        group.id.clone(),
++                        NormalizedValue {
++                            normalized: transformed_value,
++                            raw: raw_value,
++                        },
++                    );
+                     processed_groups.insert(group.id.clone());
+ 
+                     log::debug!(
+                         "[NORMALIZE] Mapped '{}' -> '{}' = '{}'",
+                         field_name,
+                         group.id,
+-                        normalized.get(&group.id).unwrap()
++                        normalized.get(&group.id).unwrap().normalized
+                     );
+ 
+                     break; // First match wins
+@@ -1487,7 +1543,7 @@ pub async fn correlate(
+         .map(|group| group.id.clone())
+         .collect();
+ 
+-    let valid_normalized_dims: std::collections::HashMap<String, String> = normalized_dims
++    let valid_normalized_dims: std::collections::HashMap<String, NormalizedValue> = normalized_dims
+         .into_iter()
+         .filter(|(key, _)| semantic_group_ids.contains(key))
+         .collect();
+@@ -1507,51 +1563,23 @@ pub async fn correlate(
+         // This prevents a partial-match set from beating a fully-matched smaller set,
+         // which would cause cross-workload stream pollution (e.g. kubernetes set winning
+         // over aws set when only aws dims are present).
+-        let mut best_set: Option<&_> = None;
+-        // (is_full_coverage, ratio, count) — higher tuple = better
+-        let mut best_rank: (bool, f64, usize) = (false, 0.0, 0);
+-
+-        for set in &identity_config.sets {
+-            if set.distinguish_by.is_empty() {
+-                continue;
+-            }
+-
+-            let total = set.distinguish_by.len();
+-            // Count how many distinguish_by fields are present in available dimensions
+-            let coverage = set
+-                .distinguish_by
+-                .iter()
+-                .filter(|field| valid_normalized_dims.contains_key(*field))
+-                .count();
+-
+-            let is_full = coverage == total;
+-            let ratio = coverage as f64 / total as f64;
+-            let rank = (is_full, ratio, coverage);
+-
+-            log::debug!(
+-                "[CORRELATE_V2] Identity set '{}' coverage {}/{} (ratio={:.2}, full={})",
+-                set.id,
+-                coverage,
+-                total,
+-                ratio,
+-                is_full,
+-            );
+-
+-            if rank > best_rank {
+-                best_rank = rank;
+-                best_set = Some(set);
+-            }
+-        }
+-
+-        if let Some(set) = best_set {
+-            let (is_full, ratio, coverage) = best_rank;
++        //
++        // F8: the ranking lives in OSS `config::meta::correlation` so the ingest path
++        // (`ServiceIdentityConfig::resolve_best_set`) files records under exactly the
++        // set this read path will select.
++        let available: std::collections::HashSet<&str> =
++            valid_normalized_dims.keys().map(|k| k.as_str()).collect();
++        if let Some((set, cov)) = config::meta::correlation::resolve_best_set_by_coverage(
++            &identity_config.sets,
++            &available,
++        ) {
+             log::debug!(
+                 "[CORRELATE_V2] Selected identity set '{}' coverage {}/{} (ratio={:.2}, full={})",
+                 set.id,
+-                coverage,
++                cov.count,
+                 set.distinguish_by.len(),
+-                ratio,
+-                is_full,
++                cov.ratio,
++                cov.is_full,
+             );
+             (set.distinguish_by.clone(), Some(set.id.clone()))
+         } else if !identity_config.tracked_alias_ids.is_empty() {
+@@ -1585,10 +1613,19 @@ pub async fn correlate(
+     // opted into service-name-agnostic correlation, an incoming `service` label must not
+     // narrow the candidate set, otherwise traces emitted under a different service_name on
+     // the same infrastructure would be excluded.
++    // The cache lookup / anchor uses the NORMALIZED form (stored service names are
++    // normalized identically at ingest); the response echoes the caller's RAW form (F1).
+     let service_name_opt = if identity_config.service_optional {
+         None
+     } else {
+-        valid_normalized_dims.get("service").cloned()
++        valid_normalized_dims
++            .get("service")
++            .map(|v| v.normalized.clone())
++    };
++    let service_raw = if identity_config.service_optional {
++        None
++    } else {
++        valid_normalized_dims.get("service").map(|v| v.raw.clone())
+     };
+ 
+     log::debug!(
+@@ -1652,12 +1689,30 @@ pub async fn correlate(
+     //   - Cross-workload isolation: an AWS span with {aws-region} has no shared keys with a k8s row
+     //     that has {k8s-cluster, k8s-namespace} — no conflict but also no positive overlap —
+     //     correctly rejected.
++    // In the default path candidates were already filtered to the exact service name, so
++    // the service identity itself is a positive match signal (the anchor). In the
++    // service_optional path there is no service filter (service_name_opt is forced to
++    // None above), so the anchor is absent and positive overlap stays mandatory —
++    // otherwise empty-disambiguation rows would match every request in the org.
++    let service_anchored = service_name_opt.is_some();
++
++    // F11: the anchor is only a valid positive signal when there is genuinely nothing
++    // to disambiguate on — either the row was discovered with no workload dimensions,
++    // or the request carries no values for any selected field. When BOTH sides have
++    // disambiguation data but share zero keys, absence-of-conflict is not evidence:
++    // reject rather than union mutually-exclusive workloads (prod-us ∪ prod-eu).
++    let request_has_selected_values = selected_fields
++        .iter()
++        .any(|k| valid_normalized_dims.contains_key(k));
++
+     let matched: Vec<&_> = all_records
+         .iter()
+         .filter(|row| {
+             let has_conflict = selected_fields.iter().any(|key| {
+                 let row_val = row.disambiguation.get(key).map(|s| s.as_str());
+-                let input_val = valid_normalized_dims.get(key).map(|s| s.as_str());
++                let input_val = valid_normalized_dims
++                    .get(key)
++                    .map(|v| v.normalized.as_str());
+                 matches!((input_val, row_val), (Some(a), Some(b)) if a != b)
+             });
+ 
+@@ -1665,14 +1720,25 @@ pub async fn correlate(
+                 return false;
+             }
+ 
+-            // Require at least one field where both sides agree.
+-            // This prevents empty-disambiguation rows (set_id="default") from matching
+-            // purely by having no conflict — they must share at least one positive signal.
+-            selected_fields.iter().any(|key| {
++            // A field where both sides agree is a positive signal.
++            let has_overlap = selected_fields.iter().any(|key| {
+                 let row_val = row.disambiguation.get(key).map(|s| s.as_str());
+-                let input_val = valid_normalized_dims.get(key).map(|s| s.as_str());
++                let input_val = valid_normalized_dims
++                    .get(key)
++                    .map(|v| v.normalized.as_str());
+                 matches!((input_val, row_val), (Some(a), Some(b)) if a == b)
+-            })
++            });
++
++            // Accept on overlap, or on the exact service-name anchor when neither side
++            // supplies a shared distinguish_by value — e.g. rows discovered with no
++            // workload dimensions (disambiguation = {}), or requests from telemetry
++            // lacking infrastructure labels. Rejecting those made correlation
++            // impossible for orgs whose data simply has no workload dimensions.
++            // The anchor does NOT apply when both sides carry disambiguation data but
++            // share no keys (F11) — that is a disjoint-workload row, not a match.
++            has_overlap
++                || (service_anchored
++                    && (row.disambiguation.is_empty() || !request_has_selected_values))
+         })
+         .collect();
+ 
+@@ -1736,8 +1802,12 @@ pub async fn correlate(
+         .chain(selected_fields.iter().map(|s| s.as_str()))
+         .collect();
+ 
+-    // Helper: resolve actual field names for identity dims in a stream's schema
+-    let resolve_filters = |stream_name: &str, stream_type: &str| -> HashMap<String, String> {
++    // Helper: resolve actual field names for identity dims in a stream's schema.
++    // Returns (filters, dropped_group_ids) — the second element names the identity
++    // dimensions that had no queryable field on this stream (F14).
++    let resolve_filters = |stream_name: &str,
++                           stream_type: &str|
++     -> (HashMap<String, String>, Vec<String>) {
+         let cache_key = format!("{org_id}/{stream_type}/{stream_name}");
+         // When the stream has a User Defined Schema (UDS) configured
+         // (`defined_schema_fields` non-empty in stream settings), queries can only
+@@ -1766,6 +1836,7 @@ pub async fn correlate(
+             .unwrap_or_default();
+ 
+         let mut filters = HashMap::new();
++        let mut dropped: Vec<String> = Vec::new();
+         for (group_id, value) in valid_normalized_dims
+             .iter()
+             .filter(|(k, _)| identity_keys.contains(k.as_str()))
+@@ -1810,49 +1881,56 @@ pub async fn correlate(
+             };
+ 
+             if let Some(field_name) = selected_field {
+-                filters.insert(field_name, value.clone());
++                // F1/F4: emit the RAW value — stream data retains original case and
++                // suffixes, so a lowercased/suffix-stripped predicate returns zero rows.
++                filters.insert(field_name, value.raw.clone());
++            } else {
++                // F14: no queryable field for this dimension on this stream —
++                // record the drop so the FE can warn instead of silently widening.
++                dropped.push(group_id.clone());
+             }
+-            // No fallback — if no valid field found, skip this dimension
+         }
+-        filters
++        (filters, dropped)
++    };
++
++    // F14: attach the per-stream dropped identity dimensions alongside the filters.
++    // `dropped` is sorted so the response is stable across HashMap iteration orders.
++    let build_stream_info = |name: String, stream_type: StreamType, type_str: &str| -> StreamInfo {
++        let (filters, mut dropped) = resolve_filters(&name, type_str);
++        dropped.sort();
++        let mut info = StreamInfo::with_type_and_filters(name, stream_type, filters);
++        info.dropped_dimensions = dropped;
++        info
+     };
+ 
+     let related_streams = RelatedStreams {
+         logs: logs
+             .into_iter()
+-            .map(|n| {
+-                let filters = resolve_filters(&n, "logs");
+-                StreamInfo::with_type_and_filters(n, StreamType::Logs, filters)
+-            })
++            .map(|n| build_stream_info(n, StreamType::Logs, "logs"))
+             .collect(),
+         traces: traces
+             .into_iter()
+-            .map(|n| {
+-                let filters = resolve_filters(&n, "traces");
+-                StreamInfo::with_type_and_filters(n, StreamType::Traces, filters)
+-            })
++            .map(|n| build_stream_info(n, StreamType::Traces, "traces"))
+             .collect(),
+         metrics: metrics
+             .into_iter()
+-            .map(|n| {
+-                let filters = resolve_filters(&n, "metrics");
+-                StreamInfo::with_type_and_filters(n, StreamType::Metrics, filters)
+-            })
++            .map(|n| build_stream_info(n, StreamType::Metrics, "metrics"))
+             .collect(),
+     };
+ 
+     // Filter dimensions by selected fields + service.
+     // "service" is always included so the UI can build a service-scoped query on shared streams.
++    // F1: echo the caller's RAW values so the FE builds queries against real stream data.
+     let filtered_dims: HashMap<String, String> = valid_normalized_dims
+         .iter()
+         .filter(|(key, _)| selected_fields.contains(key) || key.as_str() == "service")
+-        .map(|(k, v)| (k.clone(), v.clone()))
++        .map(|(k, v)| (k.clone(), v.raw.clone()))
+         .collect();
+ 
+     // Prefer the service name from the input dimensions; otherwise (service_optional path) fall
+     // back to the matched record's stored service name. `matched` is non-empty here because the
+     // empty case returned early above.
+-    let response_service_name = match service_name_opt {
++    let response_service_name = match service_raw {
+         Some(name) => name,
+         None => matched[0].service_name.clone(),
+     };
+@@ -1941,7 +2019,22 @@ pub async fn upsert_service(
+         last_seen,
+     };
+ 
+-    infra::table::service_streams::put(org_id, record).await?;
++    let orphans = infra::table::service_streams::put(org_id, record).await?;
++
++    // F19: evict the local cache keys of the orphan rows the put deleted.
++    for disambiguation in &orphans {
++        let map: HashMap<String, String> = disambiguation
++            .as_object()
++            .map(|m| {
++                m.iter()
++                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
++                    .collect()
++            })
++            .unwrap_or_default();
++        let key = ServiceKey::new(service_name.to_string(), set_id.to_string(), map);
++        cache::remove_service_cache(org_id, &key).await;
++    }
++
+     Ok(())
+ }
+ 
+@@ -2156,6 +2249,7 @@ mod tests {
+             stream_name: stream_name.to_string(),
+             stream_type: stream_type_enum,
+             filters: dims.clone(),
++            dropped_dimensions: Vec::new(),
+         };
+ 
+         let mut streams = super::super::meta::ServiceStreams {
+@@ -3640,15 +3734,15 @@ mod tests {
+         println!("[TEST] Normalized: {normalized:?}");
+ 
+         // hostname should be mapped to "host"
+-        assert_eq!(normalized.get("host"), Some(&"srv01".to_string()));
++        assert_eq!(normalized.get("host").unwrap().normalized, "srv01");
+ 
+         // service_name should be mapped to "service"
+-        assert_eq!(normalized.get("service"), Some(&"openobserve".to_string()));
++        assert_eq!(normalized.get("service").unwrap().normalized, "openobserve");
+ 
+         // k8s_cluster should be mapped to "k8s-cluster" semantic group ID
+         assert_eq!(
+-            normalized.get("k8s-cluster"),
+-            Some(&"introspection".to_string())
++            normalized.get("k8s-cluster").unwrap().normalized,
++            "introspection"
+         );
+ 
+         // Original field names should NOT be in normalized output
+@@ -3680,13 +3774,13 @@ mod tests {
+         // First match should win (service.fields are checked in order)
+         // Since both "service" and "app" map to "service" semantic group,
+         // the first one encountered should win
+-        assert_eq!(normalized.get("service"), Some(&"api".to_string()));
++        assert_eq!(normalized.get("service").unwrap().normalized, "api");
+ 
+         // Should only have one "service" dimension, not two
+         assert_eq!(
+             normalized
+                 .values()
+-                .filter(|v| *v == "api" || *v == "web")
++                .filter(|v| v.normalized == "api" || v.normalized == "web")
+                 .count(),
+             1
+         );
+@@ -3712,8 +3806,8 @@ mod tests {
+         println!("[TEST] Normalized: {normalized:?}");
+ 
+         // Values should be lowercased and trimmed
+-        assert_eq!(normalized.get("service"), Some(&"openobserve".to_string()));
+-        assert_eq!(normalized.get("host"), Some(&"srv01".to_string()));
++        assert_eq!(normalized.get("service").unwrap().normalized, "openobserve");
++        assert_eq!(normalized.get("host").unwrap().normalized, "srv01");
+     }
+ 
+     #[tokio::test]
+@@ -3735,7 +3829,7 @@ mod tests {
+         println!("[TEST] Normalized: {normalized:?}");
+ 
+         // .service suffix should be removed
+-        assert_eq!(normalized.get("service"), Some(&"nginx".to_string()));
++        assert_eq!(normalized.get("service").unwrap().normalized, "nginx");
+     }
+ 
+     #[tokio::test]
+@@ -3761,12 +3855,12 @@ mod tests {
+         println!("[TEST] Normalized: {normalized:?}");
+ 
+         // k8s_labels_app should be mapped to "service"
+-        assert_eq!(normalized.get("service"), Some(&"frontend".to_string()));
++        assert_eq!(normalized.get("service").unwrap().normalized, "frontend");
+ 
+         // k8s_namespace should be mapped to "k8s-namespace" semantic group ID
+         assert_eq!(
+-            normalized.get("k8s-namespace"),
+-            Some(&"production".to_string())
++            normalized.get("k8s-namespace").unwrap().normalized,
++            "production"
+         );
+     }
+ 
+@@ -3808,14 +3902,14 @@ mod tests {
+ 
+         // Check that key dimensions are normalized
+         // Input field names map to semantic group IDs in output
+-        assert_eq!(normalized.get("service"), Some(&"openobserve".to_string()));
++        assert_eq!(normalized.get("service").unwrap().normalized, "openobserve");
+         assert_eq!(
+-            normalized.get("k8s-cluster"),
+-            Some(&"introspection".to_string())
++            normalized.get("k8s-cluster").unwrap().normalized,
++            "introspection"
+         );
+         assert_eq!(
+-            normalized.get("k8s-namespace"),
+-            Some(&"openobserve".to_string())
++            normalized.get("k8s-namespace").unwrap().normalized,
++            "openobserve"
+         );
+ 
+         // High cardinality dimensions like k8s-pod might be blocked
+@@ -3824,6 +3918,30 @@ mod tests {
+         assert!(!normalized.is_empty());
+     }
+ 
++    #[tokio::test]
++    async fn test_normalize_carries_raw_value_alongside_normalized() {
++        use config::meta::correlation::FieldAlias;
++
++        let groups = vec![
++            FieldAlias::new("host", "Host", &["host_name"]),
++            FieldAlias::new("k8s-pod-name", "Pod", &["k8s_pod_name"]),
++        ];
++        let mut input = HashMap::new();
++        input.insert("host_name".to_string(), "Chaitanyas-MBP".to_string());
++        input.insert("k8s_pod_name".to_string(), "checkout.service".to_string());
++
++        let out = ServiceStorage::normalize_dimensions_for_correlation("org1", &input, &groups)
++            .await
++            .unwrap();
++
++        // Matching key stays normalized (lowercase, suffix-stripped)
++        assert_eq!(out.get("host").unwrap().normalized, "chaitanyas-mbp");
++        assert_eq!(out.get("k8s-pod-name").unwrap().normalized, "checkout");
++        // Raw preserves case and suffix — this is what must reach emitted SQL filters
++        assert_eq!(out.get("host").unwrap().raw, "Chaitanyas-MBP");
++        assert_eq!(out.get("k8s-pod-name").unwrap().raw, "checkout.service");
++    }
++
+     #[tokio::test]
+     async fn test_get_available_groups_deduplication() {
+         use config::meta::correlation::FieldAlias;
+@@ -3886,4 +4004,230 @@ mod tests {
+             group_ids_enriched
+         );
+     }
++
++    // -----------------------------------------------------------------------
++    // Service-anchored correlation: rows discovered without workload dimensions
++    // -----------------------------------------------------------------------
++
++    fn service_anchor_semantic_groups() -> Vec<FieldAlias> {
++        vec![
++            FieldAlias::new("service", "Service", &["service", "service_name"]),
++            FieldAlias::new(
++                "environment",
++                "Environment",
++                &["environment", "deployment_environment"],
++            ),
++            FieldAlias::new("host", "Host", &["host", "host_name"]),
++            FieldAlias::new("k8s-cluster", "K8s Cluster", &["k8s_cluster"]),
++        ]
++    }
++
++    fn service_anchor_identity_config() -> config::meta::correlation::ServiceIdentityConfig {
++        config::meta::correlation::ServiceIdentityConfig {
++            sets: vec![config::meta::correlation::IdentitySet {
++                id: "custom-1".to_string(),
++                label: "custom-1".to_string(),
++                distinguish_by: vec!["environment".to_string(), "host".to_string()],
++            }],
++            // Guidance list points at a dimension this org's data never carries.
++            tracked_alias_ids: vec!["k8s-cluster".to_string()],
++            ..Default::default()
++        }
++    }
++
++    #[tokio::test]
++    async fn test_correlate_matches_empty_disambiguation_row_by_service_name() {
++        let org = "test_org_service_anchor_match";
++
++        // Row discovered before any workload dimension was captured (set_id="default").
++        let mut svc = create_service("gainwell-api-gateway", vec![], "default", "logs");
++        svc.streams.traces.insert(StreamInfo {
++            stream_name: "default".to_string(),
++            stream_type: config::meta::stream::StreamType::Traces,
++            filters: HashMap::new(),
++            dropped_dimensions: Vec::new(),
++        });
++        svc.streams.metrics.insert(StreamInfo {
++            stream_name: "gainwell_requests".to_string(),
++            stream_type: config::meta::stream::StreamType::Metrics,
++            filters: HashMap::new(),
++            dropped_dimensions: Vec::new(),
++        });
++        assert!(svc.disambiguation.is_empty());
++
++        let mut services = HashMap::new();
++        services.insert("row".to_string(), svc);
++        super::super::cache::update_services_cache(org, &services).await;
++
++        // Caller sends the service name in its real (mixed) case; the stored row's
++        // service_name is lowercase — the cache lookup uses the normalized form, so the
++        // match still succeeds and only the echo is raw (F1).
++        let mut input = HashMap::new();
++        input.insert(
++            "service_name".to_string(),
++            "Gainwell-API-Gateway".to_string(),
++        );
++        input.insert("deployment_environment".to_string(), "local".to_string());
++        input.insert("host_name".to_string(), "Chaitanyas-MBP".to_string());
++
++        let resp = correlate(
++            org,
++            &input,
++            &service_anchor_identity_config(),
++            &service_anchor_semantic_groups(),
++        )
++        .await
++        .unwrap()
++        .expect("exact service-name match must correlate when the row has no workload dims");
++
++        // F1: the response echoes the caller's raw value, not the lowercased match key.
++        assert_eq!(resp.service_name, "Gainwell-API-Gateway");
++        assert_eq!(
++            resp.matched_dimensions.get("service").unwrap(),
++            "Gainwell-API-Gateway"
++        );
++        assert_eq!(
++            resp.matched_dimensions.get("host").unwrap(),
++            "Chaitanyas-MBP"
++        );
++        let logs: Vec<&str> = resp
++            .related_streams
++            .logs
++            .iter()
++            .map(|s| s.stream_name.as_str())
++            .collect();
++        assert!(logs.contains(&"default"));
++        let metrics: Vec<&str> = resp
++            .related_streams
++            .metrics
++            .iter()
++            .map(|s| s.stream_name.as_str())
++            .collect();
++        assert!(metrics.contains(&"gainwell_requests"));
++        let traces: Vec<&str> = resp
++            .related_streams
++            .traces
++            .iter()
++            .map(|s| s.stream_name.as_str())
++            .collect();
++        assert!(traces.contains(&"default"));
++
++        // F14: with no schema cached for the stream, every identity dimension is
++        // unresolvable — filters must be empty AND dropped_dimensions must name them,
++        // so the FE can warn that the query is wider than the chips imply.
++        let stream = resp
++            .related_streams
++            .logs
++            .iter()
++            .find(|s| s.stream_name == "default")
++            .expect("log stream present");
++        assert!(stream.filters.is_empty());
++        let mut dropped = stream.dropped_dimensions.clone();
++        dropped.sort();
++        assert_eq!(
++            dropped,
++            vec![
++                "environment".to_string(),
++                "host".to_string(),
++                "service".to_string()
++            ]
++        );
++    }
++
++    #[tokio::test]
++    async fn test_correlate_conflict_still_rejects_despite_service_match() {
++        let org = "test_org_service_anchor_conflict";
++
++        let svc = create_service("api", vec![("environment", "prod")], "default", "logs");
++        let mut services = HashMap::new();
++        services.insert("row".to_string(), svc);
++        super::super::cache::update_services_cache(org, &services).await;
++
++        let mut input = HashMap::new();
++        input.insert("service_name".to_string(), "api".to_string());
++        input.insert("deployment_environment".to_string(), "staging".to_string());
++
++        let resp = correlate(
++            org,
++            &input,
++            &service_anchor_identity_config(),
++            &service_anchor_semantic_groups(),
++        )
++        .await
++        .unwrap();
++
++        assert!(
++            resp.is_none(),
++            "a genuine distinguish_by conflict must reject even with a service-name match"
++        );
++    }
++
++    #[tokio::test]
++    async fn test_correlate_service_optional_still_requires_overlap() {
++        let org = "test_org_service_optional_guard";
++
++        let svc = create_service("api", vec![], "default", "logs");
++        let mut services = HashMap::new();
++        services.insert("row".to_string(), svc);
++        super::super::cache::update_services_cache(org, &services).await;
++
++        let mut config = service_anchor_identity_config();
++        config.service_optional = true;
++
++        // No service dimension in the request: candidates are every org service, so
++        // the positive-overlap guard must hold — empty rows cannot match everything.
++        let mut input = HashMap::new();
++        input.insert("deployment_environment".to_string(), "local".to_string());
++        input.insert("host_name".to_string(), "dev-laptop".to_string());
++
++        let resp = correlate(org, &input, &config, &service_anchor_semantic_groups())
++            .await
++            .unwrap();
++
++        assert!(
++            resp.is_none(),
++            "service_optional path must still require a positive distinguish_by overlap"
++        );
++    }
++
++    #[tokio::test]
++    async fn test_correlate_rejects_disjoint_disambiguation_keys() {
++        // F11: row "payments" is disambiguated ONLY by {environment: prod-eu}; the request
++        // carries service + a k8s-cluster value (an infra dim the row knows nothing about).
++        // Old anchor rule: no conflict (disjoint keys) + service anchor → the row matched,
++        // unioning prod-eu streams into a prod-us request. The narrowed rule rejects it:
++        // the request DOES carry values for selected fields and the row's disambiguation is
++        // non-empty, so absence-of-conflict is not evidence of a match.
++        let org = "test_org_service_anchor_disjoint";
++
++        let svc = create_service(
++            "payments",
++            vec![("environment", "prod-eu")],
++            "eu_logs",
++            "logs",
++        );
++        let mut services = HashMap::new();
++        services.insert("row".to_string(), svc);
++        super::super::cache::update_services_cache(org, &services).await;
++
++        let mut config = service_anchor_identity_config();
++        config.sets = vec![config::meta::correlation::IdentitySet {
++            id: "custom-1".to_string(),
++            label: "custom-1".to_string(),
++            distinguish_by: vec!["environment".to_string(), "k8s-cluster".to_string()],
++        }];
++
++        let mut input = HashMap::new();
++        input.insert("service_name".to_string(), "payments".to_string());
++        input.insert("k8s_cluster".to_string(), "us-east".to_string());
++
++        let resp = correlate(org, &input, &config, &service_anchor_semantic_groups())
++            .await
++            .unwrap();
++
++        assert!(
++            resp.is_none(),
++            "disjoint-key row must not match a valued request"
++        );
++    }
+ }
+diff --git a/o2_enterprise/src/enterprise/service_streams/stream_merge_policy.rs b/o2_enterprise/src/enterprise/service_streams/stream_merge_policy.rs
+index 0f0da081c..9bc121b84 100644
+--- a/o2_enterprise/src/enterprise/service_streams/stream_merge_policy.rs
++++ b/o2_enterprise/src/enterprise/service_streams/stream_merge_policy.rs
+@@ -220,6 +220,7 @@ mod tests {
+                 .into_iter()
+                 .map(|(k, v)| (k.to_string(), v.to_string()))
+                 .collect(),
++            dropped_dimensions: Vec::new(),
+         }
+     }
+ 

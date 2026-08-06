@@ -1,0 +1,13 @@
+[
+  { "title": "TC-01: should show correlation tabs in log detail sidebar", "action": "new", "verifies": "Correlated Logs, Metrics, and Traces tabs are visible in the log detail sidebar" },
+  { "title": "TC-02: should open correlation dashboard from log detail sidebar in embedded-tabs mode", "action": "new", "verifies": "Clicking a correlation tab in the detail sidebar loads embedded correlation content" },
+  { "title": "TC-03: should open correlation dashboard dialog from log search inline button", "action": "new", "verifies": "Clicking the log-correlation-btn opens the dialog-mode ODrawer with dimension filter bar" },
+  { "title": "TC-04: should switch between correlation tabs in dialog mode", "action": "new", "verifies": "Switching between Logs, Metrics, and Traces tabs renders each panel's content" },
+  { "title": "TC-05: should toggle metric stream selection and update dashboard panels", "action": "new", "verifies": "Checking a metric stream in the sidebar toggles dashboard panels" },
+  { "title": "TC-06: should apply dimension filter changes in dialog mode", "action": "new", "verifies": "Clicking Apply in the dimension filter bar re-fetches the dashboard" },
+  { "title": "TC-07: should show and resolve correlation loading state", "action": "new", "verifies": "The loading spinner appears briefly and resolves to content or empty state" },
+  { "title": "TC-08: should display no-traces empty state when no correlated traces exist", "action": "new", "verifies": "The Traces tab renders either an empty state, view button, or trace content without errors" },
+  { "title": "TC-09: should close and reopen correlation dashboard dialog", "action": "new", "verifies": "Closing the ODrawer and reopening it works without stale state or duplicate fetches" },
+  { "title": "TC-10: should preserve loaded data when switching tabs without refetching", "action": "new", "verifies": "Returning to a previously-loaded tab shows cached data without a new loading spinner" },
+  { "title": "TC-11: should render correlation dashboard without errors in OSS mode", "action": "new", "verifies": "Correlation UI degrades gracefully in OSS builds without uncaught JS errors" }
+]

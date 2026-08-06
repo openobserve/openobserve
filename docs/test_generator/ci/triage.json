@@ -1,0 +1,36 @@
+{
+  "feature_slug": "telemetry-correlation",
+  "feature_title": "Telemetry Correlation & Service Streams",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "telemetryCorrelation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/telemetryCorrelation.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/plugins/correlation/TelemetryCorrelationDashboard.vue",
+    "web/src/composables/useCorrelatedLogs.ts",
+    "web/src/composables/useMetricsCorrelationDashboard.ts",
+    "web/src/utils/telemetryCorrelation.ts",
+    "web/src/components/settings/ServiceIdentitySetup.vue",
+    "web/src/plugins/logs/DetailTable.vue",
+    "web/src/plugins/logs/SearchResult.vue",
+    "web/src/plugins/traces/TraceDetailsSidebar.vue",
+    "web/src/components/alerts/IncidentDetailDrawer.vue",
+    "web/src/services/service_streams.ts",
+    "src/config/src/meta/correlation.rs",
+    "src/api/management/src/request/service_streams/mod.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed_files.txt list shows both OSS paths (src/, web/src/) and enterprise paths (o2_enterprise/src/enterprise/service_streams/meta.rs, processor.rs, storage.rs, stream_merge_policy.rs). The enterprise files add the storage layer, processor with org-config-aware service naming, and stream merge policy — all enterprise-gated functionality. The OSS side provides the shared correlation model (correlation.rs), SQL validation, the management API handler, and all the frontend UI. Since both repos are touched in a linked sister PR, edition is 'both'.",
+    "skip": "Not skipped. The trigger comment and feature hint are both empty, and no 'tests-added' label or skip instruction was provided. The diff contains user-facing UI changes across 10+ Vue/TS files, so the change is not docs-only or CI-only.",
+    "e2e": "E2E is warranted. The diff modifies the TelemetryCorrelationDashboard.vue (the main correlation UI), correlated logs filtering logic (useCorrelatedLogs.ts with new semantic group resolution and SQL escaping), metrics correlation dashboard generation (useMetricsCorrelationDashboard.ts with subject overrides and merge logic), the shared telemetryCorrelation.ts utility (new SQL escape helpers, filter overlay, dimension edit application), and four consumer views (DetailTable, SearchResult, TraceDetailsSidebar, IncidentDetailDrawer) that all thread through a new semanticGroups prop. The ServiceIdentitySetup.vue also drops its 'at least one tracked alias' validation guard. These are all user-exercisable behaviors that need verification: filter edits resolving across streams with different field aliases, the dimension bar applying edits, SQL escaping preventing injection, and the service identity config accepting empty tracked alias lists.",
+    "area": "The bulk of the UI changes live under web/src/plugins/correlation/ (TelemetryCorrelationDashboard.vue) and web/src/composables/ (useCorrelatedLogs.ts, useMetricsCorrelationDashboard.ts). A disabled sibling E2E spec (correlationSettings.spec.js) already exists under GeneralTests in the enterprise ci-matrix overlay, and the enterprise repo's playwright tests directory has no dedicated Correlation shard. GeneralTests is the closest existing home.",
+    "group": "GeneralTests is the playwright matrix shard that already contains the disabled correlationSettings.spec.js and is designed to carry cross-cutting or general-purpose specs that don't fit a single stream-type-specific shard. The ci-matrix enterprise overlay appends to GeneralTests, so a new correlation spec belongs there.",
+    "existing_tests": "No Playwright E2E specs in the diff. The changed *.spec.ts files (useCorrelatedLogs.spec.ts, useMetricsCorrelationDashboard.spec.ts, CorrelatedLogsTable.spec.ts, TelemetryCorrelationDashboard.spec.ts, telemetryCorrelation.spec.ts) are all Vitest unit tests under web/src/ — they test individual composables and utilities in isolation and do not exercise end-to-end browser flows. They are not E2E coverage for the new feature."
+  }
+}

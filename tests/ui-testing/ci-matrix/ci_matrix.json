@@ -27,7 +27,8 @@
       "shared-components-form-validation.spec.js",
       "onboarding-form-validation.spec.js",
       "rum-form-validation.spec.js",
-      "login-form-validation.spec.js"
+      "login-form-validation.spec.js",
+      "telemetryCorrelation.spec.js"
     ],
     "disabled": []
   },

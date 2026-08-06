@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/telemetryCorrelation.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/correlationSettings.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-incident-correlation.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "correlationSettings.spec.js covers the Settings page (Configuration, Discovered Services, Alert Correlation tabs) — it tests the admin/setup surface. alerts-incident-correlation.spec.js covers incident lifecycle and telemetry tabs inside an incident detail drawer — incident-specific. service-graph.spec.js has one P1 test for metrics correlation from the service graph node panel — traces/service-graph specific. None of these cover the primary user workflow: opening the telemetry correlation dashboard from log search results (either via the inline correlation button or via the log detail sidebar's embedded correlation tabs). This new spec fills that gap by testing the TelemetryCorrelationDashboard in both dialog and embedded-tabs modes, including tab switching, metric stream selection, dimension filters, and empty/error states. The spec is a new file because the correlationSettings.spec.js covers a different feature surface (admin configuration) and adding runtime dashboard tests there would create a Frankenstein spec. Needs registration in ci_matrix.json under the GeneralTests shard."
+}
