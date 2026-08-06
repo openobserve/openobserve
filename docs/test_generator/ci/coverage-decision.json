@@ -1,0 +1,11 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesSearch.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "traceDetails.spec.js already covers Workflow 1 (header View Logs button → /logs) at lines 146-212. The gap is Workflow 2 (span sidebar View Logs button → /logs), which is a distinct path through TraceDetailsSidebar. Appending a new test() to the existing spec reuses the same beforeEach setup (navigate, select stream, select time range, run search, click trace result) and the same page object (tracesPage.js), avoiding duplication. The service-graph entry point (Workflow 3) is enterprise-gated and not in OSS scope for this run. Correlated Logs/Metrics tabs are UNWIRED in OSS (gated behind config.isEnterprise === 'true'); they receive fixme placeholders only."
+}

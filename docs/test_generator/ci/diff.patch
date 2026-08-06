@@ -1,0 +1,292 @@
+===== COMPLETE LIST OF CHANGED FILES (6 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/locales/languages/en-US.json
+web/src/plugins/traces/ServiceGraphNodeSidePanel.spec.ts
+web/src/plugins/traces/ServiceGraphNodeSidePanel.vue
+web/src/plugins/traces/TraceDetails.vue
+web/src/plugins/traces/TraceDetailsSidebar.spec.ts
+web/src/plugins/traces/TraceDetailsSidebar.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 35c8785e13b..39cc36cc060 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -7467,6 +7467,7 @@
+     "RedMetrics": "RED Metrics",
+     "loadingStream": "Loading Stream...",
+     "noLogsAvailableForService": "No Logs available for this service",
++    "noCorrelatedLogsFound": "No correlated logs found for this span",
+     "noData": {
+       "title": "Start sending traces to OpenObserve",
+       "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
+diff --git a/web/src/plugins/traces/ServiceGraphNodeSidePanel.spec.ts b/web/src/plugins/traces/ServiceGraphNodeSidePanel.spec.ts
+index 10a8fa8f48c..be3f8e2f7c4 100644
+--- a/web/src/plugins/traces/ServiceGraphNodeSidePanel.spec.ts
++++ b/web/src/plugins/traces/ServiceGraphNodeSidePanel.spec.ts
+@@ -771,12 +771,31 @@ describe("ServiceGraphNodeSidePanel", () => {
+           path: "/logs",
+           query: expect.objectContaining({
+             stream_type: "logs",
+-            stream_value: "k8s-logs",
++            // `stream` (not `stream_value`) — restoreUrlQueryParams only reads `stream`,
++            // and `type` routes the Logs page through its trace-explorer restore branch.
++            stream: "k8s-logs",
++            type: "trace_explorer",
+           }),
+         }),
+       );
+     });
+ 
++    it("should clear the logs isInitialized flag so the URL params win over the previous session", async () => {
++      const dispatchSpy = vi.spyOn(store, "dispatch");
++
++      const viewRelatedLogsBtn = wrapper.find(
++        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
++      );
++      await viewRelatedLogsBtn.trigger("click");
++      await flushPromises();
++
++      // Without this the Logs page restores its stored session and silently drops
++      // the stream, time range and filter carried in the pushed URL.
++      expect(dispatchSpy).toHaveBeenCalledWith("logs/setIsInitialized", false);
++
++      dispatchSpy.mockRestore();
++    });
++
+     it("should NOT show a warning notification when a valid log stream is found", async () => {
+       const viewRelatedLogsBtn = wrapper.find(
+         '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+diff --git a/web/src/plugins/traces/ServiceGraphNodeSidePanel.vue b/web/src/plugins/traces/ServiceGraphNodeSidePanel.vue
+index 19002f7cdfc..2ef25a9214b 100644
+--- a/web/src/plugins/traces/ServiceGraphNodeSidePanel.vue
++++ b/web/src/plugins/traces/ServiceGraphNodeSidePanel.vue
+@@ -2399,12 +2399,21 @@ export default defineComponent({
+         sql_mode: "false",
+         query: b64EncodeUnicode(filterQuery),
+         org_identifier: org,
++        // The Logs route is keep-alive, so a repeat visit only runs onActivated —
++        // which restores the URL params solely on the trace-explorer branch.
++        type: "trace_explorer",
+       };
+ 
+       if (streamName) {
+-        queryParams.stream_value = streamName;
++        queryParams.stream = streamName;
+       }
+ 
++      // The Logs page keeps `isInitialized` in the store across unmounts, and while
++      // it is set it restores the previous session from the store instead of reading
++      // these params — dropping the stream, time range and filter. Clearing it makes
++      // the URL the source of truth, same as the trace-details "View Logs" button.
++      store.dispatch("logs/setIsInitialized", false);
++
+       router.push({
+         path: "/logs",
+         query: queryParams,
+diff --git a/web/src/plugins/traces/TraceDetails.vue b/web/src/plugins/traces/TraceDetails.vue
+index a5c2527b87d..48c9bbb51c2 100644
+--- a/web/src/plugins/traces/TraceDetails.vue
++++ b/web/src/plugins/traces/TraceDetails.vue
+@@ -2707,8 +2707,15 @@ export default defineComponent({
+       updateSelectedSpan(spanId);
+ 
+       const correlationData = searchObj.data.traceDetails.correlationProps;
+-      if (correlationData) {
++      if (correlationData?.logStreams?.length) {
+         navigateToCorrelatedLogs(correlationData);
++      } else {
++        // The sidebar owns the correlation lookup; when it produced nothing there
++        // is no log stream to open, so tell the user rather than doing nothing.
++        toast({
++          variant: "warning",
++          message: t("traces.noCorrelatedLogsFound"),
++        });
+       }
+     };
+ 
+diff --git a/web/src/plugins/traces/TraceDetailsSidebar.spec.ts b/web/src/plugins/traces/TraceDetailsSidebar.spec.ts
+index d4410453899..d1f094bed40 100644
+--- a/web/src/plugins/traces/TraceDetailsSidebar.spec.ts
++++ b/web/src/plugins/traces/TraceDetailsSidebar.spec.ts
+@@ -23,11 +23,17 @@ const {
+   mockBuildQueryDetails,
+   mockNavigateToLogs,
+   mockNavigateToCorrelatedLogs,
++  mockToast,
+ } = vi.hoisted(() => ({
+   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
+   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
+   mockNavigateToLogs: vi.fn(),
+   mockNavigateToCorrelatedLogs: vi.fn(),
++  mockToast: vi.fn(),
++}));
++
++vi.mock("@/lib/feedback/Toast/useToast", () => ({
++  toast: mockToast,
+ }));
+ 
+ vi.mock("@/utils/traces/convertTraceData", () => ({
+@@ -439,16 +445,24 @@ describe("TraceDetailsSidebar", async () => {
+       });
+     });
+ 
+-    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
++    describe("when isEnterprise is true but no correlation was found", () => {
+       beforeEach(() => {
+         config.isEnterprise = "true";
+-        // correlationProps is null — correlation data hasn't been loaded yet
++        // Remount with a streamName so loadCorrelation() runs the real lookup
++        // instead of bailing out on a missing stream. findRelatedTelemetry is
++        // mocked to resolve null, i.e. the lookup succeeds with nothing correlated.
++        viewLogsWrapper.unmount();
++        viewLogsWrapper = mountSidebar({
++          parentMode: "standalone",
++          streamName: "default",
++        });
+         viewLogsWrapper.vm.correlationProps = null;
++        mockToast.mockClear();
+         dispatchSpy = vi.spyOn(mockStore, "dispatch").mockResolvedValue(undefined);
+         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
+       });
+ 
+-      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
++      it("should toast a warning instead of navigating when nothing is correlated", async () => {
+         const viewLogsBtn = viewLogsWrapper.find(
+           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+         );
+@@ -457,11 +471,16 @@ describe("TraceDetailsSidebar", async () => {
+         await viewLogsBtn.trigger("click");
+         await flushPromises();
+ 
+-        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
+-        expect(mockNavigateToLogs).toHaveBeenCalled();
++        expect(mockToast).toHaveBeenCalledWith(
++          expect.objectContaining({
++            variant: "warning",
++            message: "No correlated logs found for this span",
++          }),
++        );
++        expect(pushSpy).not.toHaveBeenCalled();
+       });
+ 
+-      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
++      it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {
+         const viewLogsBtn = viewLogsWrapper.find(
+           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+         );
+@@ -470,6 +489,26 @@ describe("TraceDetailsSidebar", async () => {
+ 
+         expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+       });
++
++      it("should toast the lookup failure reason when correlation could not be loaded", async () => {
++        // No streamName — loadCorrelation() bails out and records why.
++        viewLogsWrapper.unmount();
++        viewLogsWrapper = mountSidebar({ parentMode: "standalone" });
++        mockToast.mockClear();
++
++        const viewLogsBtn = viewLogsWrapper.find(
++          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
++        );
++        await viewLogsBtn.trigger("click");
++        await flushPromises();
++
++        expect(mockToast).toHaveBeenCalledWith(
++          expect.objectContaining({
++            variant: "warning",
++            message: "Missing span or stream name",
++          }),
++        );
++      });
+     });
+ 
+     describe("when isEnterprise is false (non-enterprise branch)", () => {
+diff --git a/web/src/plugins/traces/TraceDetailsSidebar.vue b/web/src/plugins/traces/TraceDetailsSidebar.vue
+index 9f76c66f28d..6086ba5c26a 100644
+--- a/web/src/plugins/traces/TraceDetailsSidebar.vue
++++ b/web/src/plugins/traces/TraceDetailsSidebar.vue
+@@ -831,7 +831,7 @@ import { toggleFullscreen as domToggleFullScreen } from "@/utils/dom";
+ import { defineComponent, onBeforeMount, ref, watch, type Ref, type PropType, inject } from "vue";
+ import { useStore } from "vuex";
+ import useTheme from "@/composables/useTheme";
+-import { useI18nTyped } from "@/types/i18n";
++import { useI18nTyped, raw } from "@/types/i18n";
+ import { computed } from "vue";
+ import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
+ import useTraces from "@/composables/useTraces";
+@@ -1439,9 +1439,23 @@ export default defineComponent({
+       },
+     );
+ 
+-    const viewSpanLogs = () => {
+-      if (config.isEnterprise === "true" && correlationProps.value) {
+-        navigateToCorrelatedLogs(correlationProps.value);
++    const viewSpanLogs = async () => {
++      if (config.isEnterprise === "true") {
++        await loadCorrelation();
++        if (correlationProps.value?.logStreams?.length) {
++          navigateToCorrelatedLogs(correlationProps.value);
++        } else {
++          // Nothing correlated to this span — say so instead of navigating to an
++          // empty Logs page. A failed lookup reports its own reason; a successful
++          // lookup that found nothing gets the plain "no correlated logs" wording.
++          toast({
++            variant: "warning",
++            message:
++              correlationFailed.value && correlationError.value
++                ? raw(correlationError.value)
++                : t("traces.noCorrelatedLogsFound"),
++          });
++        }
+       } else {
+         const queryDetails = buildQueryDetails(props.span);
+         navigateToLogs(queryDetails);
+@@ -1539,6 +1553,9 @@ export default defineComponent({
+     // Correlation state
+     const correlationLoading = ref(false);
+     const correlationError = ref<string | null>(null);
++    // True when the lookup itself failed (request error, missing span/stream) as
++    // opposed to succeeding with nothing correlated — the two need different wording.
++    const correlationFailed = ref(false);
+     const correlationProps = ref<any>(null);
+     const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
+ 
+@@ -1635,17 +1652,20 @@ export default defineComponent({
+       // Gate correlation feature behind enterprise check to avoid 403 errors
+       if (config.isEnterprise !== "true") {
+         correlationError.value = t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
++        correlationFailed.value = true;
+         return;
+       }
+ 
+       if (!props.span || !props.streamName) {
+         console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
+         correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
++        correlationFailed.value = true;
+         return;
+       }
+ 
+       correlationLoading.value = true;
+       correlationError.value = null;
++      correlationFailed.value = false;
+ 
+       try {
+         try {
+@@ -1758,6 +1778,7 @@ export default defineComponent({
+       } catch (err: any) {
+         console.error("[TraceDetailsSidebar] Correlation failed:", err);
+         correlationError.value = err.message || t("correlation.failedToLoad");
++        correlationFailed.value = true;
+       } finally {
+         correlationLoading.value = false;
+       }
+@@ -1769,6 +1790,7 @@ export default defineComponent({
+       () => {
+         correlationProps.value = null;
+         correlationError.value = null;
++        correlationFailed.value = false;
+ 
+         // Load correlation proactively so View Logs button has data
+         if (props.serviceStreamsEnabled) {

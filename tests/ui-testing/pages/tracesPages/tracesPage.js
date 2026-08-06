@@ -61,6 +61,12 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsSidebarHeader = '[data-test="trace-details-sidebar-header"]';
+    this.traceDetailsSidebarHeaderToolbar = '[data-test="trace-details-sidebar-header-toolbar"]';
+    this.traceDetailsSidebarHeaderToolbarViewLogsBtn = '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]';
+    this.traceDetailsSidebarHeaderCloseBtn = '[data-test="trace-details-sidebar-header-close-btn"]';
+    this.traceDetailsSidebarHeaderToolbarService = '[data-test="trace-details-sidebar-header-toolbar-service"]';
+    this.traceDetailsSidebarHeaderToolbarSpanId = '[data-test="trace-details-sidebar-header-toolbar-span-id"]';
 
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
@@ -2474,6 +2480,87 @@ export class TracesPage {
    */
   getQueryEditorLocator() {
     return this.page.locator(this.queryEditor);
+  }
+
+  // ===== SPAN DETAIL SIDEBAR METHODS =====
+  // Source: web/src/plugins/traces/TraceDetailsSidebar.vue
+
+  /**
+   * Check if the span detail sidebar is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarVisible() {
+    return await this.page.locator(this.traceDetailsSidebar).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the sidebar View Logs button is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarViewLogsButtonVisible() {
+    return await this.page.locator(this.traceDetailsSidebarHeaderToolbarViewLogsBtn).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the sidebar View Logs button is enabled
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarViewLogsButtonEnabled() {
+    const button = this.page.locator(this.traceDetailsSidebarHeaderToolbarViewLogsBtn);
+    if (await button.isVisible({ timeout: 5000 }).catch(() => false)) {
+      return !(await button.isDisabled());
+    }
+    return false;
+  }
+
+  /**
+   * Click the sidebar View Logs button
+   */
+  async clickSidebarViewLogsButton() {
+    await this.page.locator(this.traceDetailsSidebarHeaderToolbarViewLogsBtn).click();
+  }
+
+  /**
+   * Close the span detail sidebar
+   */
+  async closeSidebar() {
+    const closeBtn = this.page.locator(this.traceDetailsSidebarHeaderCloseBtn);
+    if (await closeBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await closeBtn.click();
+      await this.page.locator(this.traceDetailsSidebar).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    }
+  }
+
+  /**
+   * Check if the sidebar header is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarHeaderVisible() {
+    return await this.page.locator(this.traceDetailsSidebarHeader).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the sidebar header toolbar is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarHeaderToolbarVisible() {
+    return await this.page.locator(this.traceDetailsSidebarHeaderToolbar).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the sidebar service badge is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarServiceTagVisible() {
+    return await this.page.locator(this.traceDetailsSidebarHeaderToolbarService).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the sidebar span ID badge is visible
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarSpanIdTagVisible() {
+    return await this.page.locator(this.traceDetailsSidebarHeaderToolbarSpanId).isVisible({ timeout: 5000 }).catch(() => false);
   }
 
 }
