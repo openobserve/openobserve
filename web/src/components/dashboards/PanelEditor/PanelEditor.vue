@@ -874,8 +874,7 @@ const chartAreaStyle = computed(() => {
   return {
     // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
     height: "calc(100vh - var(--navbar-height) - 464px)",
-    // eslint-disable-next-line local/no-hardcoded-px -- zero length: 0px is the absence of a size, so there is nothing for rem to scale
-    marginTop: "0px",
+    marginTop: "0",
   };
 });
 

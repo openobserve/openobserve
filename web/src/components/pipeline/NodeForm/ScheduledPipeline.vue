@@ -429,26 +429,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 class="threshould-input"
                                 data-test="scheduled-pipeline-threshold-operator-select"
                               >
-                                <!-- eslint-disable local/no-hardcoded-px -- 1px border on the operator select: a border width — optical, not layout; it must not thicken with the option text -->
                                 <OFormSelect
                                   name="trigger_condition.operator"
                                   :options="triggerOperators"
-                                  style="
-                                    width: 5.5rem;
-                                    border: 1px solid var(--color-border-subtle);
-                                  "
+                                  class="w-22! border border-(--color-border-subtle)"
                                 />
-                                <!-- eslint-enable local/no-hardcoded-px -->
                               </div>
-                              <!-- eslint-disable local/no-hardcoded-px -- 1px border on the threshold value field abutting the select: a border width — optical, not layout; it must not thicken with the input text -->
                               <div
-                                class="flex items-center"
-                                style="
-                                  border: 1px solid var(--color-border-subtle);
-                                  border-left: none;
-                                "
+                                class="flex items-center border border-l-0 border-(--color-border-subtle)"
                               >
-                                <!-- eslint-enable local/no-hardcoded-px -->
                                 <div
                                   style="width: 5.5625rem; margin-left: 0 !important"
                                   class="silence-notification-input"

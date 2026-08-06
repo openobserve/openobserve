@@ -204,15 +204,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click:secondary="showForm = false"
     >
       <template #header-left>
-        <!-- eslint-disable local/no-hardcoded-px -- 1.5px ring around the circular back button: a border width — optical, not layout; it must not thicken with the icon inside -->
         <div
           data-test="add-action-back-btn"
-          class="flex cursor-pointer items-center justify-center"
-          style="border: 1.5px solid; border-radius: 50%; width: 1.375rem; height: 1.375rem"
+          class="flex size-5.5 cursor-pointer items-center justify-center rounded-full border border-current"
           :title="t('common.goBack')"
           @click="showForm = false"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           <OIcon name="arrow-back-ios-new" size="xs" />
         </div>
       </template>

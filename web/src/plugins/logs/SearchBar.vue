@@ -1284,16 +1284,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :style="editorFullscreenStyle"
     >
       <!-- Expand / collapse button — always top-right of the full editor area -->
-      <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
       <OButton
         :icon-left="isFocused ? 'fullscreen-exit' : 'fullscreen'"
         data-test="logs-query-editor-full_screen-btn"
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default absolute! top-[0.1875rem] right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
       >
-        <!-- eslint-enable local/no-hardcoded-px -->
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
       <div class="flex h-full w-full min-w-0 flex-col">

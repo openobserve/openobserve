@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="rounded-default">
-    <!-- eslint-disable-next-line local/no-hardcoded-px -- zero length: 0px is an unscalable zero, identical in every unit -->
-    <div class="w-full text-center" style="font-size: var(--text-3xl); margin: 2.5rem 0px">
+    <div class="my-10 w-full text-center text-(length:--text-3xl)">
       {{ t("billing.memberSubscription.title") }}
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>

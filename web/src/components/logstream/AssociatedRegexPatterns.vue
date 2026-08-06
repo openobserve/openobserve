@@ -337,12 +337,10 @@
                         :placeholder="t('regex_patterns.output_string_placeholder')"
                         :rows="5"
                       />
-                      <!-- eslint-disable local/no-hardcoded-px -- 1px sides/bottom rules on the empty test-output box: border widths — optical, not layout; they must not thicken with the hint text -->
                       <div
                         v-else
-                        class="bg-surface-base flex h-27.75 flex-col items-center justify-center [border-bottom:1px_solid_var(--color-border-default)] [border-left:1px_solid_var(--color-border-default)] [border-right:1px_solid_var(--color-border-default)]"
+                        class="bg-surface-base border-border-default flex h-27.75 flex-col items-center justify-center border-r border-b border-l"
                       >
-                        <!-- eslint-enable local/no-hardcoded-px -->
                         <div v-if="!testLoading && outputString.length === 0">
                           <OIcon name="lightbulb" size="md" class="text-icon-color" />
                           <span class="text-text-secondary text-center text-xs font-[400]">

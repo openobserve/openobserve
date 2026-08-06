@@ -25,8 +25,7 @@
           :key="argIndex + '-' + arg.type"
           class="flex w-full flex-col"
         >
-          <!-- eslint-disable-next-line local/no-hardcoded-px -- zero-length fallback margin; a zero offset has no scale to convert -->
-          <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0px' }">
+          <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0' }">
             <div class="relative mr-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div

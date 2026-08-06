@@ -42,12 +42,10 @@ Usage:
     />
 
     <!-- Load more button and info -->
-    <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
     <div
       v-if="shouldShowLoadMore"
-      class="mt-2 flex items-center gap-3 pt-2 [border-top:1px_solid_var(--color-card-glass-border)]"
+      class="border-card-glass-border mt-2 flex items-center gap-3 border-t pt-2"
     >
-      <!-- eslint-enable local/no-hardcoded-px -->
       <OButton
         :data-test="`load-more-btn-${fieldKey}`"
         variant="outline"

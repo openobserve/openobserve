@@ -95,14 +95,11 @@
             />
 
             <!-- Vertical cursor line -->
-            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-if="cursorVisible"
-              class="pointer-events-none absolute top-0 bottom-0 z-10"
-              style="width: 1px; background: rgba(80, 80, 80, 0.6)"
+              class="pointer-events-none absolute top-0 bottom-0 z-10 w-px bg-[rgba(80,80,80,0.6)]"
               :style="{ left: cursorX + 'px' }"
             ></div>
-            <!-- eslint-enable local/no-hardcoded-px -->
           </div>
         </div>
       </div>

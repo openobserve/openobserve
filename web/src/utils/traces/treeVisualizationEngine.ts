@@ -399,10 +399,8 @@ export function createTreeVisualizationEngine() {
       // Make visible but positioned off-screen to measure dimensions
       tooltipEl.style.visibility = "hidden";
       tooltipEl.style.display = "block";
-      // eslint-disable-next-line local/no-hardcoded-px -- zero-length origin reset before off-screen measurement; a zero offset has no scale to convert
-      tooltipEl.style.left = "0px";
-      // eslint-disable-next-line local/no-hardcoded-px -- zero-length origin reset before off-screen measurement; a zero offset has no scale to convert
-      tooltipEl.style.top = "0px";
+      tooltipEl.style.left = "0";
+      tooltipEl.style.top = "0";
 
       // Now we can get accurate dimensions
       const tooltipWidth = tooltipEl.offsetWidth;
