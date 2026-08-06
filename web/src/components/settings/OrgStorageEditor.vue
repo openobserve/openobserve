@@ -434,8 +434,8 @@ function blankFormValues(provider: string): OrgStorageEditorForm {
 
 // Dynamic defaults (region from cloud/store, provider projected from the card
 // grid) → a typed computed.
-const orgStorageEditorDefaults = computed(
-  (): OrgStorageEditorForm => blankFormValues(selectedProvider.value),
+const orgStorageEditorDefaults = computed((): OrgStorageEditorForm =>
+  blankFormValues(selectedProvider.value),
 );
 
 const cloudProviders = computed(() => {

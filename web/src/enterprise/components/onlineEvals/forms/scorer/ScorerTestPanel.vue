@@ -143,8 +143,7 @@
             </summary>
             <pre
               class="text-text-secondary text-2xs m-0 mt-1.5 font-mono font-normal break-words whitespace-pre-wrap"
-              >{{ rawResponseText }}</pre
-            >
+              >{{ rawResponseText }}</pre>
           </details>
         </template>
 

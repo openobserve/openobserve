@@ -87,8 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <pre
               class="thread-tool-body__pre bg-surface-base border-border-default text-text-body border"
-              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre
-            >
+              >{{ formatToolPayload(getInputRaw(tool) || tool.tool_args) }}</pre>
           </div>
           <div class="thread-tool-body__section">
             <div class="thread-tool-body__label text-text-secondary">
@@ -103,8 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 formatToolPayload(getOutputRaw(tool)) ||
                 tool.status_message ||
                 t("traces.threadToolCalls.empty")
-              }}</pre
-            >
+              }}</pre>
           </div>
         </div>
       </div>

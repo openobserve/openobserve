@@ -185,8 +185,7 @@
               <!-- Hard cap the filter condition height; longer conditions scroll. -->
               <pre
                 class="text-compact text-text-body m-0 max-h-50 overflow-x-auto overflow-y-auto px-3.5 py-2.5 font-mono leading-[1.6] whitespace-pre-wrap"
-                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre
-              >
+                >{{ filterText || t("onlineEvals.job.detail.filterEmpty") }}</pre>
             </div>
           </section>
 

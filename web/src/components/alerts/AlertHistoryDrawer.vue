@@ -287,8 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <pre
                   class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
-                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre
-                >
+                  >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre>
               </div>
             </template>
 
@@ -351,8 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             })
                           : t("alerts.alertDetails.noCondition")
                       : t("alerts.alertDetails.noCondition")
-                  }}</pre
-                >
+                  }}</pre>
               </div>
             </template>
 

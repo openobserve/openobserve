@@ -1650,8 +1650,7 @@ const subjectMatchCounts = computed<Record<string, number>>(() => {
       if (seen.has(stream.stream_name)) continue;
       seen.add(stream.stream_name);
       const schema = cachedSchemas[stream.stream_name]?.schema as
-        | Array<{ name: string }>
-        | undefined;
+        Array<{ name: string }> | undefined;
       if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
         if (schema.some((c) => subjectFieldAliases.has(c.name))) matchCount++;
       } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {

@@ -246,14 +246,12 @@ const saveGroupChanges = () => {
     remove_roles: Array.from(removedRoles.value) as string[],
   };
 
-  if (
-    !(
-      payload.add_users.length ||
-      payload.remove_users.length ||
-      payload.add_roles.length ||
-      payload.remove_roles.length
-    )
-  ) {
+  if (!(
+    payload.add_users.length ||
+    payload.remove_users.length ||
+    payload.add_roles.length ||
+    payload.remove_roles.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editGroup.noUpdates"),

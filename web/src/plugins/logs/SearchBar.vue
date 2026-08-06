@@ -2293,13 +2293,11 @@ export default defineComponent({
     // The dialog body unmounts on close + remounts on open; the form is created
     // here (owner pattern), so re-seed it to "create" mode on open. The
     // OFormToggleGroup changes the mode within the open session.
-    const savedFunctionDefaults = computed(
-      (): SavedFunctionForm => ({
-        isSavedFunctionAction: "create",
-        savedFunctionName: "",
-        savedFunctionSelectedName: "",
-      }),
-    );
+    const savedFunctionDefaults = computed((): SavedFunctionForm => ({
+      isSavedFunctionAction: "create",
+      savedFunctionName: "",
+      savedFunctionSelectedName: "",
+    }));
 
     // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
     // body needs the create/update mode to drive a v-if. We create the form here
@@ -2414,13 +2412,11 @@ export default defineComponent({
     // savedViewSchema).
     const savedViewFormRef = ref<any>(null);
     const savedViewSchema = makeSavedViewSchema(t);
-    const savedViewDefaults = computed(
-      (): SavedViewForm => ({
-        isSavedViewAction: isSavedViewAction.value,
-        savedViewName: "",
-        savedViewSelectedName: "",
-      }),
-    );
+    const savedViewDefaults = computed((): SavedViewForm => ({
+      isSavedViewAction: isSavedViewAction.value,
+      savedViewName: "",
+      savedViewSelectedName: "",
+    }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");

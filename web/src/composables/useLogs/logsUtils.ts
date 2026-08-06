@@ -487,8 +487,7 @@ export const logsUtils = () => {
     } else {
       // else preserve existing visualization data from the current URL
       const existingEncodedConfig = router.currentRoute.value?.query?.visualization_data as
-        | string
-        | undefined;
+        string | undefined;
       if (existingEncodedConfig) {
         query["visualization_data"] = existingEncodedConfig;
       }
@@ -507,8 +506,7 @@ export const logsUtils = () => {
     } else {
       // else preserve existing build data from the current URL
       const existingEncodedBuildConfig = router.currentRoute.value?.query?.build_data as
-        | string
-        | undefined;
+        string | undefined;
       if (existingEncodedBuildConfig) {
         query["build_data"] = existingEncodedBuildConfig;
       }

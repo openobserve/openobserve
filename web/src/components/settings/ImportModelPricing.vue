@@ -122,8 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <pre
                   class="creators-message max-w-full whitespace-pre-wrap"
                   style="word-wrap: break-word; overflow-wrap: break-word; word-break: break-word"
-                  >{{ val.message }}</pre
-                >
+                  >{{ val.message }}</pre>
               </div>
             </div>
           </div>
