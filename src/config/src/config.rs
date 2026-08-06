@@ -1014,6 +1014,42 @@ pub struct Search {
         help = "Toggle tantivy result cache."
     )]
     pub inverted_index_result_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
+        default = 10000,
+        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entries: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
+        default = 20480, // bytes, default is 20KB
+        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
+    )]
+    pub inverted_index_result_cache_max_entry_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory
+        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
+        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
+    )]
+    pub bloom_footer_cache_max_size: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
+        default = 35,
+        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
+    )]
+    pub inverted_index_skip_threshold: usize,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
+        default = 1000,
+        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
+    )]
+    pub inverted_index_topn_max_group_num: usize,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
     #[env_config(
@@ -2120,42 +2156,6 @@ pub struct Limit {
     pub enrichment_table_max_size: usize,
     #[env_config(name = "ZO_SHORT_URL_RETENTION_DAYS", default = 30)] // days
     pub short_url_retention_days: i64,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRIES",
-        default = 10000,
-        help = "Maximum number of entries in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entries: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_MAX_ENTRY_SIZE",
-        default = 20480, // bytes, default is 20KB
-        help = "Maximum size of a single entry in the inverted index result cache. Higher values increase memory usage but may improve query performance."
-    )]
-    pub inverted_index_result_cache_max_entry_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 5% of total memory
-        help = "Maximum memory size in MB for the footer cache. Higher values allow caching more file footers but increase memory usage."
-    )]
-    pub inverted_index_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_BLOOM_FOOTER_CACHE_MAX_SIZE",
-        default = 0, // MB, default is 1% of total memory, clamped to [32, 256] MB
-        help = "Maximum memory size in MB for the bloom-filter footer cache. The cache holds the suffix bytes of each `.bf` (footer + tail of body) so subsequent prune calls skip the suffix-range GET. `.bf` body bytes are not cached here — they go through the regular file_data cache."
-    )]
-    pub bloom_footer_cache_max_size: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
-        default = 35,
-        help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
-    )]
-    pub inverted_index_skip_threshold: usize,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_TOPN_MAX_GROUP_NUM",
-        default = 1000,
-        help = "For top-n group by queries, a file with up to N distinct groups returns all of them, making its contribution to the merged result exact. Files with more groups keep only the limit-derived top-k and the merged top-n becomes approximate; raise to trade speed for accuracy."
-    )]
-    pub inverted_index_topn_max_group_num: usize,
     #[env_config(
         name = "ZO_INVERTED_INDEX_MIN_TOKEN_LENGTH",
         default = 2,
@@ -3544,23 +3544,23 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.query_default_limit = 1000;
     }
 
-    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
-        cfg.limit.inverted_index_footer_cache_max_size =
+    if cfg.search.inverted_index_footer_cache_max_size == 0 {
+        cfg.search.inverted_index_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.search.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
-    if cfg.limit.bloom_footer_cache_max_size == 0 {
+    if cfg.search.bloom_footer_cache_max_size == 0 {
         // 1% of total mem, clamped to [32, 256] MB. Bloom footers are an
         // order of magnitude smaller than tantivy footers (footer payload
         // ≈ 24 B per file × 3 fields + per-field header ≈ 7.5 KB per
         // `.bf`), so the cache holds 4-32 K entries at this size.
-        cfg.limit.bloom_footer_cache_max_size =
+        cfg.search.bloom_footer_cache_max_size =
             ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
                 * (SIZE_IN_MB as usize);
     } else {
-        cfg.limit.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
+        cfg.search.bloom_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
 
     if cfg.limit.datafusion_file_stat_cache_max_size == 0 {
@@ -3935,14 +3935,14 @@ fn check_nats_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_inverted_index_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    if cfg.limit.inverted_index_result_cache_max_entries == 0 {
-        cfg.limit.inverted_index_result_cache_max_entries = 10000;
+    if cfg.search.inverted_index_result_cache_max_entries == 0 {
+        cfg.search.inverted_index_result_cache_max_entries = 10000;
     }
-    if cfg.limit.inverted_index_result_cache_max_entry_size == 0 {
-        cfg.limit.inverted_index_result_cache_max_entry_size = 20480;
+    if cfg.search.inverted_index_result_cache_max_entry_size == 0 {
+        cfg.search.inverted_index_result_cache_max_entry_size = 20480;
     }
-    if cfg.limit.inverted_index_skip_threshold == 0 {
-        cfg.limit.inverted_index_skip_threshold = 35;
+    if cfg.search.inverted_index_skip_threshold == 0 {
+        cfg.search.inverted_index_skip_threshold = 35;
     }
     if cfg.limit.inverted_index_min_token_length == 0 {
         cfg.limit.inverted_index_min_token_length = 2;
@@ -4379,15 +4379,15 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_defaults() {
         let mut cfg = Config::default();
-        cfg.limit.inverted_index_result_cache_max_entries = 0;
-        cfg.limit.inverted_index_result_cache_max_entry_size = 0;
-        cfg.limit.inverted_index_skip_threshold = 0;
+        cfg.search.inverted_index_result_cache_max_entries = 0;
+        cfg.search.inverted_index_result_cache_max_entry_size = 0;
+        cfg.search.inverted_index_skip_threshold = 0;
         cfg.limit.inverted_index_min_token_length = 0;
         cfg.limit.inverted_index_max_token_length = 0;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 10000);
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entry_size, 20480);
-        assert_eq!(cfg.limit.inverted_index_skip_threshold, 35);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 10000);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entry_size, 20480);
+        assert_eq!(cfg.search.inverted_index_skip_threshold, 35);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 2);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 64);
     }
@@ -4395,11 +4395,11 @@ mod tests {
     #[test]
     fn test_check_inverted_index_config_preserves_existing() {
         let mut cfg = Config::default();
-        cfg.limit.inverted_index_result_cache_max_entries = 5000;
+        cfg.search.inverted_index_result_cache_max_entries = 5000;
         cfg.limit.inverted_index_min_token_length = 3;
         cfg.limit.inverted_index_max_token_length = 32;
         check_inverted_index_config(&mut cfg).unwrap();
-        assert_eq!(cfg.limit.inverted_index_result_cache_max_entries, 5000);
+        assert_eq!(cfg.search.inverted_index_result_cache_max_entries, 5000);
         assert_eq!(cfg.limit.inverted_index_min_token_length, 3);
         assert_eq!(cfg.limit.inverted_index_max_token_length, 32);
     }

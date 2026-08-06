@@ -600,7 +600,7 @@ async fn search_tantivy_index(
 
     if !cache_key.is_empty()
         && !has_skipped_conditions
-        && result.get_memory_size() < cfg.limit.inverted_index_result_cache_max_entry_size
+        && result.get_memory_size() < cfg.search.inverted_index_result_cache_max_entry_size
     {
         let entry = get_cache_entry(result.clone());
         tantivy_result_cache::GLOBAL_CACHE.put(cache_key, entry);
@@ -621,7 +621,7 @@ fn guard_matched_rows(
     if matched == 0 || parquet_file.meta.records == 0 {
         return Ok(Some(TantivyResult::NoMatch));
     }
-    let skip_threshold = get_config().limit.inverted_index_skip_threshold;
+    let skip_threshold = get_config().search.inverted_index_skip_threshold;
     let row_ids_percent = matched as f64 / parquet_file.meta.records as f64 * 100.0;
     if skip_threshold > 0 && row_ids_percent > skip_threshold as f64 {
         log::info!(
