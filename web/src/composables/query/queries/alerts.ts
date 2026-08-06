@@ -27,6 +27,7 @@
 import alertsService from "@/services/alerts";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk } from "../queryKeys";
+import { createDetailQuery } from "../createDetailQuery";
 
 const PAGE_SIZE = 1000;
 
@@ -49,5 +50,11 @@ export const alertsListQuery = createOrgListQuery<any, [folderId: string, query?
       )
     ).data?.list ?? [],
   tier: "ENTITY_LIST",
+  root: (org) => qk.alerts.root(org),
+});
+
+export const alertDetailQuery = createDetailQuery<[alertId: string]>({
+  key: (org, id) => qk.alerts.detail(org, id),
+  fetch: async (org, id) => (await alertsService.get_by_alert_id(org, id)).data,
   root: (org) => qk.alerts.root(org),
 });

@@ -21,6 +21,8 @@
 import dashboardService from "@/services/dashboards";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk } from "../queryKeys";
+import { annotationService } from "@/services/dashboard_annotations";
+import { createDetailQuery } from "../createDetailQuery";
 
 const PAGE_SIZE = 1000;
 
@@ -41,5 +43,15 @@ export const dashboardsByFolderQuery = createOrgListQuery<any, [folderId: string
       )
     ).data?.dashboards ?? [],
   tier: "ENTITY_LIST",
+  root: (org) => qk.dashboards.root(org),
+});
+
+export const dashboardAnnotationsQuery = createDetailQuery<[dashboardId: string, params: unknown]>({
+  key: (org, dashboardId, params) => qk.dashboards.annotations(org, dashboardId, params),
+  // `?? null` because a query result may not be undefined — TanStack rejects it.
+  // All three "no annotations" shapes (missing .data, null, undefined) therefore
+  // normalise to null, which is what two of them already returned.
+  fetch: async (org, dashboardId, params) =>
+    (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
   root: (org) => qk.dashboards.root(org),
 });

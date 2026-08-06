@@ -38,6 +38,7 @@ import {
   invalidateDestinations,
 } from "@/composables/query/queries/alertMeta";
 import { alertsListQuery } from "@/composables/query/queries/alerts";
+import { alertDetailQuery } from "@/composables/query/queries/alerts";
 import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
@@ -80,6 +81,7 @@ export default defineComponent({
       // Drop the cached alerts (list and any search) so AlertList refetches on
       // mount instead of rendering the pre-save rows.
       alertsListQuery.invalidateList(store.state.selectedOrganization.identifier);
+      alertDetailQuery.invalidate(store.state.selectedOrganization.identifier);
 
       // Navigate back to alert list after successful save
       router.push({

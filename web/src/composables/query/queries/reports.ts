@@ -24,6 +24,7 @@
 import reportsService from "@/services/reports";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk, stableFilters } from "../queryKeys";
+import { createDetailQuery } from "../createDetailQuery";
 
 export interface ReportListFilters {
   /** undefined = search across every folder. */
@@ -48,5 +49,11 @@ export const reportsQuery = createOrgListQuery<any, [filters: ReportListFilters]
       )
     ).data ?? [],
   tier: "ENTITY_LIST",
+  root: (org) => qk.reports.root(org),
+});
+
+export const reportDetailQuery = createDetailQuery<[reportId: string]>({
+  key: (org, id) => qk.reports.detail(org, id),
+  fetch: async (org, id) => (await reportsService.getReportById(org, id)).data,
   root: (org) => qk.reports.root(org),
 });

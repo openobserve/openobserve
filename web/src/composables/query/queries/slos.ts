@@ -23,10 +23,17 @@
 import slosService from "@/services/slos";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk } from "../queryKeys";
+import { createDetailQuery } from "../createDetailQuery";
 
 export const slosQuery = createOrgListQuery<any, [folder?: string]>({
   key: (org, folder) => qk.slos.list(org, folder),
   fetch: async (org, folder) => (await slosService.list(org, folder)).data?.list ?? [],
   tier: "ENTITY_LIST",
+  root: (org) => qk.slos.root(org),
+});
+
+export const sloDetailQuery = createDetailQuery<[sloId: string]>({
+  key: (org, id) => qk.slos.detail(org, id),
+  fetch: async (org, id) => (await slosService.get(org, id)).data,
   root: (org) => qk.slos.root(org),
 });

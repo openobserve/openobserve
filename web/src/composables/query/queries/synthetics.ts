@@ -23,6 +23,7 @@
 import syntheticsService from "@/services/synthetics";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk } from "../queryKeys";
+import { createDetailQuery } from "../createDetailQuery";
 
 export const syntheticsMonitorsQuery = createOrgListQuery<any, [folderId?: string]>({
   key: (org, folderId) => qk.synthetics.monitors(org, folderId),
@@ -34,5 +35,11 @@ export const syntheticsMonitorsQuery = createOrgListQuery<any, [folderId?: strin
     return data?.checks ?? data?.monitors ?? [];
   },
   tier: "ENTITY_LIST",
+  root: (org) => qk.synthetics.root(org),
+});
+
+export const monitorDetailQuery = createDetailQuery<[id: string, folderId?: string]>({
+  key: (org, id, folderId) => [...qk.synthetics.root(org), "detail", id, folderId ?? ""] as const,
+  fetch: async (org, id, folderId) => (await syntheticsService.get(org, id, folderId)).data,
   root: (org) => qk.synthetics.root(org),
 });

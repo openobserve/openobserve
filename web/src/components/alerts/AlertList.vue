@@ -790,6 +790,7 @@ import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { fetchDestinations } from "@/composables/query/queries/alertMeta";
 import { alertsListQuery } from "@/composables/query/queries/alerts";
+import { alertDetailQuery } from "@/composables/query/queries/alerts";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1603,12 +1604,15 @@ export default defineComponent({
         timeout: 0,
       });
       try {
-        const res = await alertsService.get_by_alert_id(
+        // Cached for the editor-open path only. The read-modify-write in
+        // WorkflowLinkAlertsDialog deliberately still goes straight to the
+        // service — a stale alert there would overwrite someone else's edit.
+        const data = await alertDetailQuery.fetch(
           store.state.selectedOrganization.identifier,
           id,
         );
         dismiss();
-        return res.data;
+        return data;
       } catch (error) {
         dismiss();
         throw error;

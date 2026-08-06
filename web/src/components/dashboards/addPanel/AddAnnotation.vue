@@ -92,6 +92,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { addAnnotationSchema } from "./AddAnnotation.schema";
 import type { AddAnnotationForm } from "./AddAnnotation.schema";
+import { dashboardAnnotationsQuery } from "@/composables/query/queries/dashboards";
 
 interface AnnotationData {
   annotation_id: string | null;
@@ -234,6 +235,7 @@ const handleSave = async () => {
           tags: annotationData.value.tags,
         };
         const annotationId = annotationData.value.annotation_id ?? "";
+        dashboardAnnotationsQuery.invalidate(organization);
         const response = await annotationService.update_timed_annotations(
           organization,
           props.dashboardId,
@@ -250,6 +252,7 @@ const handleSave = async () => {
     } else {
       try {
         // create annotation
+        dashboardAnnotationsQuery.invalidate(organization);
         const response = await annotationService.create_timed_annotations(
           organization,
           props.dashboardId,
@@ -276,6 +279,7 @@ const confirmDelete = async () => {
   // Delete is reachable only for a persisted annotation, so `annotation_id` is a string.
   const annotationId = annotationData.value.annotation_id ?? "";
   await annotationService.delete_timed_annotations(organization, props.dashboardId, [annotationId]);
+  dashboardAnnotationsQuery.invalidate(organization);
 
   handleClose();
 };

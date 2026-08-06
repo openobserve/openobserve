@@ -26,6 +26,7 @@ import aiToolsetsService from "@/services/ai_toolsets";
 import modelPricingService from "@/services/model_pricing";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk } from "../queryKeys";
+import { createDetailQuery } from "../createDetailQuery";
 
 // These endpoints paginate, but the page wants the whole list — one big page.
 const ALL = 100000;
@@ -54,4 +55,10 @@ export const modelPricingQuery = createOrgListQuery<any>({
   key: (org) => qk.settings.modelPricing(org),
   fetch: async (org) => (await modelPricingService.list(org)).data ?? [],
   tier: "ORG_CONFIG",
+});
+
+export const cipherKeyDetailQuery = createDetailQuery<[name: string]>({
+  key: (org, name) => [...qk.settings.cipherKeys(org), "detail", name] as const,
+  fetch: async (org, name) => (await CipherKeysService.get_by_name(org, name)).data,
+  root: (org) => qk.settings.cipherKeys(org),
 });

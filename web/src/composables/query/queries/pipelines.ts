@@ -23,10 +23,17 @@
 import pipelineService from "@/services/pipelines";
 import { createOrgListQuery } from "../createOrgListQuery";
 import { qk } from "../queryKeys";
+import { createDetailQuery } from "../createDetailQuery";
 
 export const pipelinesQuery = createOrgListQuery<any>({
   key: (org) => qk.pipelines.list(org),
   fetch: async (org) => (await pipelineService.getPipelines(org)).data?.list ?? [],
   tier: "ENTITY_LIST",
+  root: (org) => qk.pipelines.root(org),
+});
+
+export const pipelineDetailQuery = createDetailQuery<[name: string]>({
+  key: (org, name) => qk.pipelines.detail(org, name),
+  fetch: async (org, name) => (await pipelineService.getPipeline({ name, org_identifier: org })).data,
   root: (org) => qk.pipelines.root(org),
 });
