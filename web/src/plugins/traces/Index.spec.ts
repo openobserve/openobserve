@@ -2560,6 +2560,5 @@ describe("Index.vue (Main Traces Page)", () => {
       // Stream must remain unchanged — the cancel did not apply the pending change
       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
     });
-
   });
 });

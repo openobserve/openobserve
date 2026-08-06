@@ -215,14 +215,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             shortcut-id="tracesCopyUrl"
           />
         </div>
-
       </div>
       <!-- /toolbarRightRef wrapper -->
     </div>
-    <div
-      v-if="searchObj.meta.showQuery"
-      class="border-border-default flex min-h-0 flex-1 border-b"
-    >
+    <div v-if="searchObj.meta.showQuery" class="border-border-default flex min-h-0 flex-1 border-b">
       <div class="relative flex h-full w-full flex-col overflow-hidden">
         <CodeQueryEditor
           ref="queryEditorRef"
