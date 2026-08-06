@@ -82,7 +82,7 @@ impl PhysicalOptimizerRule for FollowerIndexOptimizerRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        if !config::get_config().common.inverted_index_enabled {
+        if !config::get_config().search.inverted_index_enabled {
             return Ok(plan);
         }
 
@@ -202,7 +202,7 @@ impl PhysicalOptimizerRule for LeaderIndexOptimizerRule {
         plan: Arc<dyn ExecutionPlan>,
         _config: &ConfigOptions,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        if !config::get_config().common.inverted_index_enabled {
+        if !config::get_config().search.inverted_index_enabled {
             return Ok(plan);
         }
 

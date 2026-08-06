@@ -652,5 +652,4 @@ datafusion-pruning = { git = "https://github.com/openobserve/datafusion", rev = 
 datafusion-session = { git = "https://github.com/openobserve/datafusion", rev = "869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b" }
 datafusion-sql = { git = "https://github.com/openobserve/datafusion", rev = "869ec1a70482e1a26c4ac2fde3e9fd5545c33d7b" }
 object_store = { git = "https://github.com/openobserve/arrow-rs-object-store", branch = "openobserve-v0.13.2" }
-proc-macro-error2 = { git = "https://github.com/hengfeiyang/proc-macro-error-2", branch = "main" }
 tantivy = { git = "https://github.com/openobserve/tantivy", branch = "perf/openobserve" }
