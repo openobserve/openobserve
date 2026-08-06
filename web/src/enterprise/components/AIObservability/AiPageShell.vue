@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </template>
 
-    <template #subnav><slot name="subnav" /></template>
+    <template v-if="$slots.subnav" #subnav><slot name="subnav" /></template>
     <slot />
   </OPageLayout>
 </template>
