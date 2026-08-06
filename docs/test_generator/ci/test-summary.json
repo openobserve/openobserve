@@ -1,0 +1,21 @@
+[
+  { "title": "E2E: Content template author-once renders per-channel via UI + fires to both destination shapes", "action": "append", "verifies": "End-to-end content template creation, preview panel, severity show_when, per-channel payload rendering (Slack Block Kit + Webhook envelope), and render_format override" },
+  { "title": "P0.1: should create a template in Custom mode with HTTP type and JSON body", "action": "append", "verifies": "Custom mode template creation with HTTP type, JSON body, and API persistence verification" },
+  { "title": "P0.2: should create a template in Custom mode with Email type and Markdown body", "action": "append", "verifies": "Custom mode template creation with Email type, Markdown body, email title field, and API persistence" },
+  { "title": "P0.3: should delete a custom template with confirm dialog", "action": "append", "verifies": "Single delete flow with confirm dialog, success toast, and API removal verification" },
+  { "title": "P1.1: should add a link row in Content mode and see it in the preview", "action": "append", "verifies": "Content mode optional disclosure, link row addition (label+URL), and preview panel rendering the link" },
+  { "title": "P1.2: should toggle matched rows on and configure max/format", "action": "append", "verifies": "Content mode matched rows toggle, max rows and format inputs, preview card after configuration" },
+  { "title": "P1.3: should add a channel title override and save", "action": "append", "verifies": "Content mode channel title override addition, table visibility, and save persistence" },
+  { "title": "P1.4: should toggle chart placeholder on and off in preview", "action": "append", "verifies": "Chart toggle shows/hides chart placeholder in preview panel in real time" },
+  { "title": "P1.5: should switch preview channel and see different renderings", "action": "append", "verifies": "Preview channel switching (slack→email→webhook) re-renders visual card and raw JSON" },
+  { "title": "P1.6: should Test Send a template to a selected destination", "action": "append", "verifies": "Test Send flow: destination selection, confirm dialog, toast response (success or rate-limit error)" },
+  { "title": "P1.7: should expand variable guide and see sample templates", "action": "append", "verifies": "Variable guide collapsible expansion, sample template visibility (Slack and Alert Manager), copy button" },
+  { "title": "P1.8: should export a template as JSON file download", "action": "append", "verifies": "Export button triggers JSON file download containing template data" },
+  { "title": "P2.1: should bulk-delete multiple custom templates", "action": "append", "verifies": "Bulk delete flow: select-all checkbox, bulk delete bar, confirm dialog, API removal verification" },
+  { "title": "P2.2: should show legacy banner on custom template edit and migrate to content mode", "action": "append", "verifies": "Legacy migration banner appears on custom template edit, start content version switches to content mode" },
+  { "title": "P2.3: should show markdown lint hint for malformed list marker", "action": "append", "verifies": "Markdown body lint hint appears for malformed list markers (-word without space) and disappears when fixed" },
+  { "title": "P2.4: should use markdown toolbar buttons to wrap selected text", "action": "append", "verifies": "Markdown toolbar bold button wraps selected text in ** markers" },
+  { "title": "P2.5: should insert a variable chip at cursor position", "action": "append", "verifies": "Variable chip button inserts {alert_name} token at cursor in body editor" },
+  { "title": "P2.6: should show empty state when search finds no templates", "action": "append", "verifies": "Empty state (OEmptyState) renders when search query matches no templates" },
+  { "title": "P2.7: should refresh the template list without errors", "action": "append", "verifies": "Refresh button re-fetches template list and table remains visible" }
+]

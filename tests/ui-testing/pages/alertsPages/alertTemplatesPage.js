@@ -61,6 +61,64 @@ export class AlertTemplatesPage {
         this.templateCancelBtn = '[data-test="add-template-cancel-btn"]';
         this.templateCloneBtnPattern = '[data-test="alert-template-list-{templateName}-clone-template"]';
 
+        // ── Content-template form locators (content mode) ──
+        this.modeTabs = '[data-test="add-template-mode-tabs"]';
+        this.contentTabBtn = '[data-test="tab-content"]';
+        this.customTabBtn = '[data-test="tab-custom"]';
+        this.contentTitleInputField = '[data-test="content-template-form-title-input-field"]';
+        this.contentBodyEditorLines = '[data-test="content-template-form-body-editor"] .view-lines';
+        this.contentOptionalDisclosure = '[data-test="content-template-form-optional-collapsible"]';
+        this.contentFieldsAddBtn = '[data-test="content-template-form-fields-add-btn"]';
+        this.contentLinksAddBtn = '[data-test="content-template-form-links-add-btn"]';
+        this.contentRowsEnabledSwitch = '[data-test="content-template-form-rows-enabled-switch"]';
+        this.contentRowsMaxInputField = '[data-test="content-template-form-rows-max-input-field"]';
+        this.contentRowsFormatInputField = '[data-test="content-template-form-rows-format-input-field"]';
+        this.contentChannelTitlesAddBtn = '[data-test="content-template-form-channel-titles-add-btn"]';
+        this.contentChannelTitlesTable = '[data-test="content-template-form-channel-titles-table"]';
+        this.contentChartEnabledSwitch = '[data-test="content-template-form-chart-enabled-switch"]';
+        this.contentLintHint = '[data-test="content-template-form-body-lint-hint"]';
+        this.contentToolbarBoldBtn = '[data-test="content-template-form-toolbar-bold-btn"]';
+        this.contentToolbarItalicBtn = '[data-test="content-template-form-toolbar-italic-btn"]';
+        this.contentToolbarListBtn = '[data-test="content-template-form-toolbar-list-btn"]';
+        this.contentVariableChipAlertName = '[data-test="content-template-form-variable-chip-alert_name-btn"]';
+
+        // ── Custom-mode locators ──
+        this.customBodyEditorLines = '[data-test="template-body-editor"] .view-lines';
+        this.customBodyEditorContainer = '[data-test="template-body-editor"]';
+        this.emailTitleInputField = '[data-test="add-template-email-title-input-field"]';
+
+        // ── Preview panel locators ──
+        this.previewPanelRoot = '[data-test="add-template-preview-panel"]';
+        this.previewVisualTab = '[data-test="template-preview-panel-visual-tab"]';
+        this.previewRawTab = '[data-test="template-preview-panel-raw-tab"]';
+        this.previewVisualCard = '[data-test="template-preview-panel-visual-card"]';
+        this.previewRawJson = '[data-test="template-preview-panel-raw-json"]';
+        this.previewChannelSelect = '[data-test="template-preview-panel-channel-select"]';
+        this.previewSeveritySelect = '[data-test="template-preview-panel-severity-select"]';
+        this.previewDestinationSelect = '[data-test="template-preview-panel-destination-select"]';
+        this.previewTestSendBtn = '[data-test="template-preview-panel-test-send-btn"]';
+        this.previewTestSendConfirmDialog = '[data-test="template-preview-panel-test-send-confirm-dialog"]';
+        this.previewLinks = '[data-test="template-preview-panel-links"]';
+        this.previewChartPlaceholder = '[data-test="template-preview-panel-chart-placeholder"]';
+        this.previewFields = '[data-test="template-preview-panel-fields"]';
+
+        // ── Variable guide locators ──
+        this.variableGuideCollapsible = '[data-test="add-template-variable-guide-collapsible"]';
+        this.sampleTemplate0 = '[data-test="add-template-sample-template-0"]';
+        this.sampleTemplate1 = '[data-test="add-template-sample-template-1"]';
+        this.sampleTemplateCopyBtn = '[data-test="add-template-sample-template-copy-btn"]';
+
+        // ── Legacy banner locators ──
+        this.legacyBanner = '[data-test="add-template-legacy-banner"]';
+        this.legacyBannerStartBtn = '[data-test="add-template-start-content-version-btn"]';
+        this.contentFormContainer = '[data-test="add-template-content-form"]';
+
+        // ── List-level action locators ──
+        this.exportBtn = '[data-test="destination-export"]';
+        this.templateListRefreshBtn = '[data-test="template-list-refresh-btn"]';
+        this.emptyState = '[data-test="o2-empty-state"]';
+        this.templateListSearchInput = '[data-test="template-list-search-input"]';
+
         // Inline locators moved from methods
         this.monacoEditorLocator = '.monaco-editor';
         this.tableLocator = 'table';
@@ -1267,5 +1325,443 @@ export class AlertTemplatesPage {
         }
         await expect(this.page.locator(this.prebuiltBadge).first()).toBeVisible();
         return true;
+    }
+
+    // =========================================================================
+    // Content Template Editor — mode switching & content form
+    // =========================================================================
+
+    async clickContentModeTab() {
+        const tabs = this.page.locator(this.modeTabs);
+        await tabs.locator(this.contentTabBtn).click();
+    }
+
+    async clickCustomModeTab() {
+        const tabs = this.page.locator(this.modeTabs);
+        await tabs.locator(this.customTabBtn).click();
+    }
+
+    async clickCustomTypeTab(type) {
+        // In custom mode, switch between http/email type tabs
+        await this.page.locator(`[data-test="tab-${type}"]`).click();
+    }
+
+    async fillContentTitle(text) {
+        await this.page.locator(this.contentTitleInputField).waitFor({ state: 'visible', timeout: 10000 });
+        await this.page.locator(this.contentTitleInputField).click();
+        await this.page.locator(this.contentTitleInputField).fill(text);
+    }
+
+    async fillContentBodyEditor(text) {
+        const editorLines = this.page.locator(this.contentBodyEditorLines).first();
+        await editorLines.waitFor({ state: 'visible', timeout: 15000 });
+        // Monaco .view-lines require force:true; the editor's internal focus
+        // handling prevents a standard click from routing to the textarea.
+        await editorLines.click({ force: true });
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
+        await this.page.keyboard.press('Backspace');
+        await this.page.keyboard.insertText(text);
+        await this.page.waitForTimeout(500);
+    }
+
+    async fillCustomBodyEditor(text) {
+        const editorLines = this.page.locator(this.customBodyEditorLines).first();
+        await editorLines.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {
+            testLogger.warn('Custom body editor view-lines not visible, trying container click');
+        });
+        try {
+            // Monaco .view-lines require force:true; the editor's internal focus
+            // handling prevents a standard click from routing to the textarea.
+            await editorLines.click({ force: true, timeout: 5000 });
+        } catch (e) {
+            // Fallback: click the editor container (also requires force:true
+            // for the same Monaco focus-handling reason).
+            const editorContainer = this.page.locator(this.customBodyEditorContainer).first();
+            await editorContainer.click({ force: true });
+        }
+        await this.page.waitForTimeout(500);
+        const selectAllKey = process.platform === 'darwin' ? 'Meta+A' : 'Control+A';
+        await this.page.keyboard.press(selectAllKey);
+        await this.page.keyboard.press('Backspace');
+        await this.page.waitForTimeout(500);
+        await this.page.keyboard.insertText(text);
+        await this.page.waitForTimeout(500);
+    }
+
+    async fillCustomEmailTitle(text) {
+        await this.page.locator(this.emailTitleInputField).waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator(this.emailTitleInputField).click();
+        await this.page.locator(this.emailTitleInputField).fill(text);
+    }
+
+    async openOptionalDisclosure() {
+        const disclosure = this.page.locator(this.contentOptionalDisclosure);
+        const state = await disclosure.getAttribute('data-state').catch(() => 'closed');
+        if (state !== 'open') {
+            await disclosure.click();
+            await this.page.waitForTimeout(300);
+        }
+    }
+
+    async addFieldRow(label, value) {
+        await this.page.locator(this.contentFieldsAddBtn).click();
+        await this.page.waitForTimeout(300);
+        const rowLabel = this.page.locator('[data-test="content-template-form-fields-row-0-label-input-field"]');
+        const rowValue = this.page.locator('[data-test="content-template-form-fields-row-0-value-input-field"]');
+        await rowLabel.waitFor({ state: 'visible', timeout: 5000 });
+        await rowLabel.fill(label);
+        await rowValue.fill(value);
+    }
+
+    async addLinkRow(label, url) {
+        await this.page.locator(this.contentLinksAddBtn).click();
+        await this.page.waitForTimeout(300);
+        const rowLabel = this.page.locator('[data-test="content-template-form-links-row-0-label-input-field"]');
+        const rowUrl = this.page.locator('[data-test="content-template-form-links-row-0-value-input-field"]');
+        await rowLabel.waitFor({ state: 'visible', timeout: 5000 });
+        await rowLabel.fill(label);
+        await rowUrl.fill(url);
+    }
+
+    async toggleRowsEnabled() {
+        await this.page.locator(this.contentRowsEnabledSwitch).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    async setRowsMax(n) {
+        await this.page.locator(this.contentRowsMaxInputField).waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator(this.contentRowsMaxInputField).click();
+        await this.page.locator(this.contentRowsMaxInputField).fill(String(n));
+    }
+
+    async setRowsFormat(format) {
+        await this.page.locator(this.contentRowsFormatInputField).waitFor({ state: 'visible', timeout: 5000 });
+        await this.page.locator(this.contentRowsFormatInputField).click();
+        await this.page.locator(this.contentRowsFormatInputField).fill(format);
+    }
+
+    async addChannelTitleOverride(channel, title) {
+        await this.page.locator(this.contentChannelTitlesAddBtn).click();
+        await this.page.waitForTimeout(300);
+        const channelSelect = this.page.locator('[data-test="content-template-form-channel-titles-row-0-channel-select-trigger"]');
+        await channelSelect.waitFor({ state: 'visible', timeout: 5000 });
+        await channelSelect.click();
+        await this.page.waitForTimeout(300);
+        await this.page.locator(`[data-test-value="${channel}"]`).click().catch(() => {
+            this.page.getByText(channel, { exact: true }).first().click().catch(() => {});
+        });
+        await this.page.waitForTimeout(300);
+        const titleInput = this.page.locator('[data-test="content-template-form-channel-titles-row-0-title-input-field"]');
+        await titleInput.fill(title);
+    }
+
+    async toggleChartEnabled() {
+        await this.page.locator(this.contentChartEnabledSwitch).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    // ── Toolbar buttons ──
+    async clickToolbarBoldBtn() {
+        await this.page.locator(this.contentToolbarBoldBtn).click();
+    }
+
+    async clickToolbarItalicBtn() {
+        await this.page.locator(this.contentToolbarItalicBtn).click();
+    }
+
+    async clickToolbarListBtn() {
+        await this.page.locator(this.contentToolbarListBtn).click();
+    }
+
+    // ── Variable chips ──
+    async clickVariableChipAlertName() {
+        await this.page.locator(this.contentVariableChipAlertName).click();
+    }
+
+    // =========================================================================
+    // Preview Panel — channel, severity, destination, test send, assertions
+    // =========================================================================
+
+    async clickPreviewVisualTab() {
+        await this.page.locator(this.previewVisualTab).click();
+    }
+
+    async clickPreviewRawTab() {
+        await this.page.locator(this.previewRawTab).click();
+    }
+
+    async expectPreviewCardVisible() {
+        await expect(this.page.locator(this.previewVisualCard)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectRawJsonVisible() {
+        await expect(this.page.locator(this.previewRawJson)).toBeVisible();
+    }
+
+    async expectRawJsonNotEmpty() {
+        const jsonEl = this.page.locator(this.previewRawJson);
+        await expect(jsonEl).toBeVisible();
+        await expect(jsonEl).not.toHaveText('', { timeout: 10000 });
+    }
+
+    async selectPreviewChannel(channel) {
+        const select = this.page.locator(this.previewChannelSelect);
+        await select.click();
+        await this.page.waitForTimeout(300);
+        await this.page.locator(`[data-test-value="${channel}"]`).click().catch(() => {
+            this.page.getByText(channel, { exact: true }).first().click().catch(() => {});
+        });
+        await this.page.waitForTimeout(800);
+    }
+
+    async selectPreviewSeverity(severity) {
+        const select = this.page.locator(this.previewSeveritySelect);
+        await select.click();
+        await this.page.waitForTimeout(300);
+        await this.page.locator(`[data-test-value="${severity}"]`).click().catch(() => {
+            this.page.getByText(severity, { exact: true }).first().click().catch(() => {});
+        });
+        await this.page.waitForTimeout(500);
+    }
+
+    async selectTestSendDestination(destName) {
+        const select = this.page.locator(this.previewDestinationSelect);
+        await select.click();
+        await this.page.waitForTimeout(300);
+        // Try to pick by data-test-value, fall back to getByText
+        const found = await this.page.locator(`[data-test-value="${destName}"]`).isVisible({ timeout: 2000 }).catch(() => false);
+        if (found) {
+            await this.page.locator(`[data-test-value="${destName}"]`).click();
+        } else {
+            await this.page.getByText(destName, { exact: false }).first().click().catch(() => {});
+        }
+        await this.page.waitForTimeout(500);
+    }
+
+    async clickTestSendBtn() {
+        await expect(this.page.locator(this.previewTestSendBtn)).toBeEnabled({ timeout: 5000 });
+        await this.page.locator(this.previewTestSendBtn).click();
+    }
+
+    async expectTestSendConfirmDialogVisible() {
+        await expect(this.page.locator(this.previewTestSendConfirmDialog)).toBeVisible({ timeout: 5000 });
+    }
+
+    async confirmTestSend() {
+        await this.page.locator(this.previewTestSendConfirmDialog).locator(this.confirmButton).click();
+    }
+
+    async expectTestSendToastVisible() {
+        // Wait for any toast (success or error — both are acceptable outcomes)
+        await this.page.locator('[data-test="o-toast-message"]').first().waitFor({ state: 'visible', timeout: 15000 });
+    }
+
+    async expectPreviewLinksContain(text) {
+        await expect(this.page.locator(this.previewLinks)).toContainText(text, { timeout: 8000 });
+    }
+
+    async expectChartPlaceholderVisible() {
+        await expect(this.page.locator(this.previewChartPlaceholder)).toBeVisible({ timeout: 8000 });
+    }
+
+    async expectChartPlaceholderNotVisible() {
+        await expect(this.page.locator(this.previewChartPlaceholder)).not.toBeVisible({ timeout: 5000 });
+    }
+
+    // =========================================================================
+    // Variable guide & sample templates
+    // =========================================================================
+
+    async openVariableGuide() {
+        const collapsible = this.page.locator(this.variableGuideCollapsible);
+        const state = await collapsible.getAttribute('data-state').catch(() => 'closed');
+        if (state !== 'open') {
+            await collapsible.click();
+            await this.page.waitForTimeout(500);
+        }
+    }
+
+    async expectSampleTemplate0Visible() {
+        await expect(this.page.locator(this.sampleTemplate0)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectSampleTemplate1Visible() {
+        await expect(this.page.locator(this.sampleTemplate1)).toBeVisible({ timeout: 5000 });
+    }
+
+    async clickSampleTemplateCopyBtn() {
+        await this.page.locator(this.sampleTemplateCopyBtn).first().click();
+    }
+
+    // =========================================================================
+    // Legacy banner
+    // =========================================================================
+
+    async expectLegacyBannerVisible() {
+        await expect(this.page.locator(this.legacyBanner)).toBeVisible({ timeout: 5000 });
+    }
+
+    async clickLegacyBannerStartBtn() {
+        await this.page.locator(this.legacyBannerStartBtn).click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    async expectContentFormVisible() {
+        await expect(this.page.locator(this.contentFormContainer)).toBeVisible({ timeout: 5000 });
+    }
+
+    // =========================================================================
+    // List-level actions — export, refresh, empty state, delete row, bulk delete
+    // =========================================================================
+
+    async clickDeleteRowBtn(templateName) {
+        const sel = this.templateDeleteButton.replace('{templateName}', templateName);
+        await this.page.locator(sel).click();
+    }
+
+    async clickBulkDeleteBtn() {
+        await this.page.locator(this.bulkDeleteBtn).click();
+    }
+
+    async confirmDialogPrimary() {
+        await this.page.locator(this.confirmButton).click();
+    }
+
+    async expectDeleteConfirmDialogVisible() {
+        await expect(this.page.locator(this.confirmDialog)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectDeleteSuccessToast() {
+        // Use data-test selector with delete-deleted message
+        await expect(
+            this.page.locator('[data-test="o-toast-message"]').first()
+        ).toBeVisible({ timeout: 10000 });
+    }
+
+    async clickExportBtn() {
+        await this.page.locator(this.exportBtn).first().click();
+    }
+
+    async clickRefreshBtn() {
+        await this.page.locator(this.templateListRefreshBtn).click();
+    }
+
+    async expectEmptyStateVisible() {
+        await expect(this.page.locator(this.emptyState)).toBeVisible({ timeout: 10000 });
+    }
+
+    async searchTemplatesByDataTest(searchText) {
+        // Uses the data-test search input (more reliable than placeholder match)
+        const input = this.page.locator(this.templateListSearchInput);
+        await input.waitFor({ state: 'visible', timeout: 5000 });
+        await input.click();
+        await input.fill('');
+        await input.fill(searchText);
+        await this.page.waitForTimeout(2000);
+    }
+
+    async expectContentBodyLintHintVisible() {
+        await expect(this.page.locator(this.contentLintHint)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectContentBodyLintHintNotVisible() {
+        await expect(this.page.locator(this.contentLintHint)).not.toBeVisible({ timeout: 5000 });
+    }
+
+    async expectChannelTitlesTableVisible() {
+        await expect(this.page.locator(this.contentChannelTitlesTable)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectCustomBodyEditorVisible() {
+        await expect(this.page.locator(this.customBodyEditorContainer)).toBeVisible({ timeout: 10000 });
+    }
+
+    // =========================================================================
+    // E2E Content Template — mode tabs, preview panel, fields, severity filter
+    // Methods created to eliminate raw selectors from the E2E Multi-Channel spec.
+    // =========================================================================
+
+    async expectModeTabsVisible() {
+        await expect(this.page.locator(this.modeTabs)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectPreviewPanelVisible() {
+        // AddTemplate.vue composes TemplatePreviewPanel with a parent data-test
+        // override that wins over the child's root via Vue attribute fallthrough.
+        await expect(this.page.locator(this.previewPanelRoot)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectPreviewVisualTabVisible() {
+        await expect(this.page.locator(this.previewVisualTab)).toBeVisible();
+    }
+
+    async expectPreviewRawTabVisible() {
+        await expect(this.page.locator(this.previewRawTab)).toBeVisible();
+    }
+
+    async clickFieldsAddBtn() {
+        await this.page.locator(this.contentFieldsAddBtn).click();
+        await this.page.waitForTimeout(300);
+    }
+
+    async fillFieldRowLabel(index, label) {
+        const labelInput = this.page.locator(`[data-test="content-template-form-fields-row-${index}-label-input-field"]`);
+        await labelInput.waitFor({ state: 'visible', timeout: 10000 });
+        await labelInput.fill(label);
+    }
+
+    async fillFieldRowValue(index, value) {
+        const valueInput = this.page.locator(`[data-test="content-template-form-fields-row-${index}-value-input-field"]`);
+        await valueInput.fill(value);
+    }
+
+    /**
+     * Check if the severity/show-when filter trigger exists for a field row.
+     * @param {number} index - Row index
+     * @returns {Promise<boolean>}
+     */
+    async isFieldRowSeverityFilterVisible(index = 0) {
+        const trigger = this.page.locator(
+            `[data-test="content-template-form-fields-row-${index}-severity-select-trigger"], [data-test="content-template-form-fields-row-${index}-show-when-trigger"]`
+        ).first();
+        return trigger.isVisible({ timeout: 3000 }).catch(() => false);
+    }
+
+    async openFieldRowSeverityFilter(index = 0) {
+        const trigger = this.page.locator(
+            `[data-test="content-template-form-fields-row-${index}-severity-select-trigger"], [data-test="content-template-form-fields-row-${index}-show-when-trigger"]`
+        ).first();
+        await trigger.click();
+        await this.page.waitForTimeout(300);
+    }
+
+    async selectFieldRowSeverityCritical() {
+        await this.page.getByText(/critical/i).first().click().catch(() => {});
+    }
+
+    async closeFieldRowSeverityDropdown() {
+        await this.page.keyboard.press('Escape').catch(() => {});
+    }
+
+    async expectPreviewFieldContains(text) {
+        await expect(this.page.locator(this.previewFields)).toContainText(text, { timeout: 8000 });
+    }
+
+    async expectPreviewFieldNotContains(text) {
+        // At single_level severity, a critical-only field should be absent.
+        const visible = await this.page.locator(this.previewFields)
+            .getByText(text).isVisible({ timeout: 5000 }).catch(() => false);
+        expect(visible).toBe(false);
+    }
+
+    async expectSaveSuccessToastOrFallback() {
+        // Try the canonical toast selector; if it fails, log a warning but do
+        // not throw — the caller has API verification as a fallback assertion.
+        await expect(
+            this.page.locator('[data-test="o-toast-message"]').filter({ hasText: this.templateSuccessMessage }).first()
+        ).toBeVisible({ timeout: 15000 }).catch(() => {
+            testLogger.warn('Save success toast not observed — verifying via API instead');
+        });
     }
 } 

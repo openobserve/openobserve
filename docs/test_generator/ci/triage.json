@@ -1,0 +1,36 @@
+{
+  "feature_slug": "alert-content-templates",
+  "feature_title": "Alert Content Templates",
+  "area": "Alerts",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-content-templates.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/AddTemplate.vue",
+    "web/src/components/alerts/AddTemplate.schema.ts",
+    "web/src/components/alerts/TemplateList.vue",
+    "web/src/components/alerts/AlertSettingsHelpDrawer.vue",
+    "web/src/components/alerts/template-content/ContentTemplateForm.vue",
+    "web/src/components/alerts/template-content/ContentFieldsEditor.vue",
+    "web/src/components/alerts/template-content/TemplatePreviewPanel.vue",
+    "web/src/components/alerts/template-content/contentSpec.ts",
+    "web/src/components/CodeQueryEditor.vue",
+    "web/src/services/alert_templates.ts",
+    "web/src/services/alert_destination.ts",
+    "web/src/ts/interfaces/alert.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Both. The vast majority of changed paths are under `src/` and `web/src/` (OSS source tree) for the alert content templates feature — backend handlers, notification rendering, chart rendering, database migrations, and frontend Vue components. However, `o2_openfga/src/meta/route_permissions.rs` is an enterprise-owned path (OpenFGA authorization layer), and `Cargo.toml.openobserve` is enterprise build configuration. No enterprise-only UI paths are changed; the feature lands in the OSS web layer but the PR spans both repos.",
+    "skip": "Not skipped. The diff has extensive user-facing UI changes — new Vue components for alert content template creation and editing (AddTemplate, ContentTemplateForm, ContentFieldsEditor, TemplatePreviewPanel, TemplateList). No explicit opt-out label or skip comment is present. This warrants full E2E validation.",
+    "e2e": "E2E is warranted. The PR introduces a new 'Content Templates' feature in the Alerts area — users can now create, edit, preview, and apply content templates with structured field editors. The web/src changes include new form components, schema validation, tag input enhancements, and template list UI. A developer-authored E2E spec (`alerts-content-templates.spec.js`) already exists in the diff and will be enhanced by the Architect.",
+    "area": "Alerts. All frontend changes live under `web/src/components/alerts/` and the E2E spec is in `tests/ui-testing/playwright-tests/Alerts/`. The existing CI matrix has an 'Alerts' shard with sibling specs like `alerts-advanced.spec.js` and `alerts-e2e-flow.spec.js`.",
+    "group": "Alerts. The existing CI matrix shard (testfolder `Alerts`, actual_folder `Alerts`) runs all alert specs together in the `ci_matrix.json` base manifest. The new `alerts-content-templates.spec.js` belongs in this same shard alongside `alerts-advanced.spec.js`, `alerts-e2e-flow.spec.js`, etc.",
+    "existing_tests": "One Playwright E2E spec is in the diff: `tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js`. This is a new developer-authored test covering the content templates feature. The diff also includes many Vitest/unit spec files under `web/src/components/alerts/` (e.g., `AddTemplate.spec.ts`, `ContentTemplateForm.spec.ts`) — but Vitest and Rust unit tests are NOT E2E coverage and do not count toward `existing_tests_in_diff`. Only the Playwright spec qualifies."
+  }
+}

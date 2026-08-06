@@ -1,0 +1,11 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-content-templates.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-template-prebuilt-guard.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-help-drawer.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "alerts-content-templates.spec.js already covers the core E2E multi-channel rendering path (content template creation, preview panel, destination binding, alert firing, wire-payload assertions, render_format override). alerts-template-prebuilt-guard.spec.js covers list-level UI (tabs, badges, edit/clone CRUD, validation). alerts-help-drawer.spec.js covers the help drawer. Gaps remain for: custom mode creation, content-mode optional sections (links/rows/channel-titles/chart), delete/bulk-delete flows, test send, variable guide, export, and legacy banner migration. These are content-template-specific and belong in the content-templates spec via append."
+}
