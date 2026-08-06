@@ -96,7 +96,7 @@ const ConfirmDialogStub = {
 // without pulling in the real ODialog.
 const ExtensionSetupDialogStub = {
   props: ["open", "connected", "action"],
-  emits: ["update:open", "continue"],
+  emits: ["update:open", "continue", "verify"],
   template: '<div v-if="open" class="extension-setup-dialog-stub" :data-action="action" />',
 };
 
@@ -215,6 +215,16 @@ describe("BrowserJourney recording", () => {
     await wrapper.findComponent(ExtensionSetupDialogStub).vm.$emit("continue");
 
     expect(wrapper.emitted("replay")).toBeTruthy();
+  });
+
+  // The parent owns the connection state, so the dialog's re-verify request
+  // (incognito toggle reloads the extension → stale bridge) is forwarded up.
+  it("should forward the setup dialog's verify as verify-extension", async () => {
+    wrapper = mountJourney({ extensionReady: false });
+
+    await wrapper.findComponent(ExtensionSetupDialogStub).vm.$emit("verify");
+
+    expect(wrapper.emitted("verify-extension")).toHaveLength(1);
   });
 
   it("should start recording and render streamed live steps", async () => {
@@ -1099,5 +1109,173 @@ describe("BrowserJourney — stopping a replay", () => {
     // The player may still be unwinding, so editing a step would race it.
     wrapper = mountWithDots({ replayPhase: "stopping" });
     expect(wrapper.find('[data-test="synthetics-journey-add-step-btn"]').exists()).toBe(false);
+  });
+});
+
+// An incognito-classified failure — replay preflight (blocked-reason prop) or a
+// recording-start refusal (recorder.error) — means "Allow in Incognito" is off.
+// The setup dialog's incognito task IS the walkthrough, so the view reopens it
+// (revoking the attestation the failure just disproved) instead of a wall of text.
+describe("BrowserJourney — incognito preflight failure", () => {
+  let wrapper: VueWrapper;
+  let revokeSpy: ReturnType<typeof vi.fn>;
+
+  // The extension's actual refusal message — classification keys on "incognito".
+  const INCOGNITO_RECORD_ERROR =
+    'Recording needs incognito access. Open chrome://extensions, find "OpenObserve Synthetics Recorder", and turn on "Allow in incognito" — recordings always run in a separate incognito window.';
+
+  // The template ref resolves to this stub, so revokeIncognitoAck must exist on
+  // its instance for the watcher's call to be observable (options-API methods
+  // are exposed on the vm).
+  const RevokableSetupDialogStub = {
+    props: ["open", "connected", "action"],
+    emits: ["update:open", "continue"],
+    methods: {
+      revokeIncognitoAck() {
+        revokeSpy();
+      },
+    },
+    template: '<div v-if="open" class="extension-setup-dialog-stub" :data-action="action" />',
+  };
+
+  // The shared OButtonStub leaves `onClick` in $attrs (no declared emits), so a
+  // click fires the handler twice — declaring the emit keeps it to one, which
+  // the exactly-once assertions below depend on.
+  const SingleEmitButtonStub = {
+    emits: ["click"],
+    template: '<button v-bind="$attrs" @click="$emit(\'click\')"><slot /></button>',
+  };
+
+  function mountBlockable(props: Record<string, unknown> = {}) {
+    return mount(BrowserJourney, {
+      props: { modelValue: [], ...props },
+      global: {
+        stubs: {
+          ...STUBS,
+          OButton: SingleEmitButtonStub,
+          ExtensionSetupDialog: RevokableSetupDialogStub,
+        },
+      },
+    }) as VueWrapper;
+  }
+
+  /** Drive a recording-start refusal through the real bridge transport. */
+  async function failRecordingWith(w: VueWrapper, message: string) {
+    await w.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+    respondToLastCommand({ success: false, error: message });
+    await flushPromises();
+  }
+
+  beforeEach(() => {
+    revokeSpy = vi.fn();
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("should revoke the attestation and open the setup dialog on replay when blocked", async () => {
+    wrapper = mountBlockable({ blockedReason: null });
+    expect(wrapper.find(".extension-setup-dialog-stub").exists()).toBe(false);
+
+    await wrapper.setProps({ blockedReason: "incognito" });
+
+    expect(revokeSpy).toHaveBeenCalledTimes(1);
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("replay");
+  });
+
+  it("should not touch the dialog for other blocked reasons", async () => {
+    wrapper = mountBlockable({ blockedReason: null });
+
+    await wrapper.setProps({ blockedReason: "in-progress" });
+
+    expect(revokeSpy).not.toHaveBeenCalled();
+    expect(wrapper.find(".extension-setup-dialog-stub").exists()).toBe(false);
+  });
+
+  it("should reopen the setup dialog from the warning card's setup button", async () => {
+    wrapper = mountBlockable({ blockedReason: "incognito" });
+
+    await wrapper.find('[data-test="synthetics-journey-incognito-setup-btn"]').trigger("click");
+
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("replay");
+  });
+
+  it("should emit replay from the warning card's Retry", async () => {
+    wrapper = mountBlockable({ blockedReason: "incognito" });
+
+    await wrapper.find('[data-test="synthetics-journey-incognito-retry-btn"]').trigger("click");
+
+    expect(wrapper.emitted("replay")).toHaveLength(1);
+  });
+
+  it("should emit clear-results from the warning card's Dismiss", async () => {
+    wrapper = mountBlockable({ blockedReason: "incognito" });
+
+    await wrapper.find('[data-test="synthetics-journey-incognito-dismiss-btn"]').trigger("click");
+
+    expect(wrapper.emitted("clear-results")).toHaveLength(1);
+    expect(wrapper.emitted("replay")).toBeFalsy();
+  });
+
+  it("should treat an incognito recording refusal like the replay preflight", async () => {
+    wrapper = mountBlockable({ extensionReady: true });
+
+    await failRecordingWith(wrapper, INCOGNITO_RECORD_ERROR);
+
+    expect(revokeSpy).toHaveBeenCalledTimes(1);
+    const dialog = wrapper.find(".extension-setup-dialog-stub");
+    expect(dialog.exists()).toBe(true);
+    expect(dialog.attributes("data-action")).toBe("record");
+    expect(wrapper.find('[data-test="synthetics-journey-incognito-warning"]').exists()).toBe(true);
+    // The card and dialog replace the raw banner for the one cause with a fix.
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
+  });
+
+  it("should keep the raw banner for recording errors that are not incognito", async () => {
+    wrapper = mountBlockable({ extensionReady: true });
+
+    await failRecordingWith(wrapper, "Failed to start recording.");
+
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(true);
+    expect(revokeSpy).not.toHaveBeenCalled();
+    expect(wrapper.find(".extension-setup-dialog-stub").exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-incognito-warning"]').exists()).toBe(false);
+  });
+
+  it("should restart the recording (not replay) from Retry when recording was refused", async () => {
+    wrapper = mountBlockable({ extensionReady: true });
+    await failRecordingWith(wrapper, INCOGNITO_RECORD_ERROR);
+    postMessageSpy.mockClear();
+
+    await wrapper.find('[data-test="synthetics-journey-incognito-retry-btn"]').trigger("click");
+
+    // startRecording opens with a synchronous bridge probe — its signature.
+    expect(
+      postMessageSpy.mock.calls.some((c) => (c[0] as { ch?: string })?.ch === "oo-bridge-probe"),
+    ).toBe(true);
+    expect(wrapper.emitted("replay")).toBeFalsy();
+  });
+
+  it("should clear the recorder error (not results) from Dismiss when recording was refused", async () => {
+    wrapper = mountBlockable({ extensionReady: true });
+    await failRecordingWith(wrapper, INCOGNITO_RECORD_ERROR);
+
+    await wrapper.find('[data-test="synthetics-journey-incognito-dismiss-btn"]').trigger("click");
+
+    expect(wrapper.emitted("clear-results")).toBeFalsy();
+    // Error gone: the card collapses and the raw banner does not take its place.
+    expect(wrapper.find('[data-test="synthetics-journey-incognito-warning"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="synthetics-journey-record-error"]').exists()).toBe(false);
   });
 });

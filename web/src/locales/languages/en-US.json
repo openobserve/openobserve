@@ -10561,7 +10561,7 @@
       "loading": "Loading check…",
       "nameHint": "Auto-filled from the page -- edit if you like.",
       "newBrowserCheck": "New browser check",
-      "setupConnectAlt": "or click {name} in the {icon} {menu} menu",
+      "setupConnectAlt": "click {name} in the {icon} {menu} menu or",
       "setupConnectDescription": "One quick refresh lets the recorder attach to this page.",
       "setupConnectDone": "Connected",
       "setupConnectRefreshCta": "Refresh this page",
@@ -10790,7 +10790,6 @@
       "noSteps": "No steps yet",
       "filterClearedForErrors": "Filter cleared so the steps that need fixing are visible.",
       "filterClearedForNewStep": "Filter cleared so the new step is visible.",
-      "openExtensions": "Open chrome://extensions",
       "preflightDescription": "The recorder extension stopped before running the first step. Its report is below.",
       "preflightTitle": "Replay couldn't start",
       "replayInProgressDescription": "Another replay is still running in the recorder extension. Wait for it to finish, or reload the extension, then try again.",
@@ -10831,12 +10830,8 @@
       "timeoutLabel": "Timeout (ms)",
       "timeoutPlaceholder": "30000",
       "valueFallback": "Value",
-      "waitingForActions": "Waiting for actions in the browser…",
-      "incognitoStep1Full": "Open chrome://extensions",
-      "incognitoStep2Full": "Find the {name} extension",
-      "incognitoStep3Full": "Click {button}",
-      "incognitoStep4Full": "Enable {setting}",
-      "incognitoStep5Full": "Return here and click {button}"
+      "showSetupSteps": "Show setup steps",
+      "waitingForActions": "Waiting for actions in the browser…"
     },
     "labels": {
       "copyOf": "Copy of {name}",

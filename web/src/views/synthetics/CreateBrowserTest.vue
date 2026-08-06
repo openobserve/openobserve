@@ -41,7 +41,7 @@ import {
   makeBrowserCheckGateSchema,
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
-import { CHROME_UI_LABELS } from "@/constants/synthetics";
+import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
@@ -173,6 +173,32 @@ async function probeExtension() {
   }
   return extensionInstalled.value;
 }
+
+/**
+ * Toggling "Allow in Incognito" RELOADS the extension, orphaning this tab's
+ * bridge — the old content script's chrome.* APIs die and it answers nothing
+ * (see the takeover handshake in the extension's content script). So a
+ * connection proven before the toggle proves nothing after it: invalidate and
+ * re-probe, keeping the checklist's connect task open until a fresh probe
+ * passes. Only the connection is in doubt — the install fact is latched first
+ * so task 1 does not regress. Recovery paths if the probe finds the bridge
+ * dead: the toolbar-icon click or page refresh the connect task suggests.
+ */
+function reverifyExtension() {
+  if (extensionReady.value) installAck.value = true;
+  extensionReady.value = false;
+  probeExtension()
+    .then((ok) => {
+      if (ok) extensionReady.value = true;
+    })
+    .catch(() => {
+      /* bridge orphaned — the connect task guides recovery */
+    });
+}
+
+watch(incognitoAllowed, (val, old) => {
+  if (val && !old) reverifyExtension();
+});
 
 // Server-driven lists fetched once here and threaded down to CheckConfigure.
 const locations = ref<SyntheticsLocation[]>([]);
@@ -327,16 +353,15 @@ function onLoadRetry(actionId?: string) {
 
 onMounted(() => {
   // Warm detection so an already-installed extension lets Record skip setup.
-  probeExtension()
+  const warmProbe = probeExtension()
     .then((installed) => {
       if (installed) {
         extensionInstalled.value = true;
         extensionReady.value = true;
       }
+      return installed;
     })
-    .catch(() => {
-      /* extension messaging unavailable — handled in setup screen */
-    });
+    .catch(() => false /* extension messaging unavailable — handled in setup screen */);
 
   // Auto-detect when the content script is injected on demand (toolbar icon click
   // after mid-session install). The content script sends 'oo-bridge-ready' when
@@ -357,6 +382,36 @@ onMounted(() => {
     const folderQuery = route.query.folder;
     if (typeof folderQuery === "string" && folderQuery) {
       check.value = { ...check.value, folder: folderQuery };
+    }
+
+    // Restore the gate fields written to the query on entering the setup
+    // phase, so its "refresh this page" step doesn't restart the wizard.
+    // The attestation checkboxes deliberately reset — install re-verifies
+    // through live detection, incognito is re-confirmed with one click.
+    const urlQuery = route.query.url;
+    const nameQuery = route.query.name;
+    if (typeof urlQuery === "string" && urlQuery) startUrl.value = urlQuery;
+    if (typeof nameQuery === "string" && nameQuery) checkName.value = nameQuery;
+    if (route.query[SETUP_QUERY_PARAM] === "1" && isGateUrlValid.value) {
+      commitGate();
+      phase.value = "extension-setup";
+    } else if (
+      typeof urlQuery === "string" &&
+      urlQuery &&
+      typeof nameQuery === "string" &&
+      nameQuery &&
+      isGateUrlValid.value
+    ) {
+      // Both gate fields arrived via the query (the setup flow's refresh, or a
+      // prefilled deep link): once the warm probe confirms the extension, the
+      // gate has nothing left to ask — skip it. The phase guard keeps a slow
+      // probe from yanking the author out of a gate they started editing past.
+      warmProbe.then((installed) => {
+        if (installed && phase.value === "gate") {
+          commitGate();
+          phase.value = "editor";
+        }
+      });
     }
   }
 });
@@ -449,6 +504,16 @@ async function onRecordClick() {
     autoRecord.value = true;
     phase.value = "editor";
   } else {
+    // Mirror the gate fields into the query so the setup flow's own
+    // "refresh this page" step restores them and returns to this phase.
+    router.replace({
+      query: {
+        ...route.query,
+        url: startUrl.value.trim(),
+        name: checkName.value.trim() || undefined,
+        [SETUP_QUERY_PARAM]: "1",
+      },
+    });
     phase.value = "extension-setup";
   }
 }
@@ -991,6 +1056,7 @@ function onClearResults() {
               :field-issues="journeyFieldIssues"
               class="h-full!"
               @replay="onReplay"
+              @verify-extension="reverifyExtension"
               @replay-up-to="onReplayUpTo"
               @stop-replay="onStopReplay"
               @clear-results="onClearResults"
