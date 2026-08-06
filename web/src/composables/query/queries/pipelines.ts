@@ -34,6 +34,7 @@ export const pipelinesQuery = createOrgListQuery<any>({
 
 export const pipelineDetailQuery = createDetailQuery<[name: string]>({
   key: (org, name) => qk.pipelines.detail(org, name),
-  fetch: async (org, name) => (await pipelineService.getPipeline({ name, org_identifier: org })).data,
+  fetch: async (org, name) =>
+    (await pipelineService.getPipeline({ name, org_identifier: org })).data,
   root: (org) => qk.pipelines.root(org),
 });

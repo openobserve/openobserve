@@ -43,7 +43,7 @@ describe("query key factory", () => {
     expect(keys.length).toBeGreaterThan(50);
   });
 
-  it("should root every key at [\"org\", <scope>]", () => {
+  it('should root every key at ["org", <scope>]', () => {
     for (const [path, key] of keys) {
       expect(key[0], `${path} does not start with "org"`).toBe("org");
       expect(typeof key[1], `${path} has a non-string org segment`).toBe("string");

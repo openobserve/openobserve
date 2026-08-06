@@ -522,14 +522,8 @@ async function loadMonitors(folderId?: string, force = false) {
           ? undefined
           : activeFolderId.value;
     const list = force
-      ? await syntheticsMonitorsQuery.refetchList(
-          orgIdentifier.value,
-          targetFolder,
-        )
-      : await syntheticsMonitorsQuery.fetchList(
-          orgIdentifier.value,
-          targetFolder,
-        );
+      ? await syntheticsMonitorsQuery.refetchList(orgIdentifier.value, targetFolder)
+      : await syntheticsMonitorsQuery.fetchList(orgIdentifier.value, targetFolder);
     monitors.value = list.map(mapMonitor);
   } finally {
     loading.value = false;

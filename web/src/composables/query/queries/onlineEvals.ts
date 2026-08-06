@@ -29,7 +29,11 @@ import { queryClient } from "../queryClient";
 
 const root = (org: string) => [...qk.org(org), "onlineEvals"] as const;
 
-const make = <T>(name: string, tier: "ORG_CONFIG" | "ENTITY_LIST", fn: (org: string) => Promise<T>) => {
+const make = <T>(
+  name: string,
+  tier: "ORG_CONFIG" | "ENTITY_LIST",
+  fn: (org: string) => Promise<T>,
+) => {
   const options = (org: string) => ({
     queryKey: [...root(org), name] as const,
     queryFn: () => fn(org),
@@ -51,7 +55,9 @@ export const scoreConfigsQuery = make("scoreConfigs", "ENTITY_LIST", (org) =>
 export const scorersQuery = make("scorers", "ENTITY_LIST", (org) =>
   onlineEvalsService.scorers.list(org),
 );
-export const evalJobsQuery = make("jobs", "ENTITY_LIST", (org) => onlineEvalsService.jobs.list(org));
+export const evalJobsQuery = make("jobs", "ENTITY_LIST", (org) =>
+  onlineEvalsService.jobs.list(org),
+);
 
 /** One prefix covers all four — any write here can affect more than one list. */
 export const invalidateOnlineEvals = (org: string) =>

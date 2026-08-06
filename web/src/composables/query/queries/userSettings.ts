@@ -42,11 +42,8 @@ const settingQueryOptions = (org: string, key: string, userId?: string) => ({
   ...tierOptions("ORG_CONFIG"),
 });
 
-export const fetchSetting = <T = unknown>(
-  org: string,
-  key: string,
-  userId?: string,
-): Promise<T> => queryClient.fetchQuery(settingQueryOptions(org, key, userId)) as Promise<T>;
+export const fetchSetting = <T = unknown>(org: string, key: string, userId?: string): Promise<T> =>
+  queryClient.fetchQuery(settingQueryOptions(org, key, userId)) as Promise<T>;
 
 export const refetchSetting = <T = unknown>(
   org: string,

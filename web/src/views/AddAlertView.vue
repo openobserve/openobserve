@@ -33,10 +33,7 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  fetchDestinations,
-  invalidateDestinations,
-} from "@/composables/query/queries/alertMeta";
+import { fetchDestinations, invalidateDestinations } from "@/composables/query/queries/alertMeta";
 import { alertsListQuery } from "@/composables/query/queries/alerts";
 import { alertDetailQuery } from "@/composables/query/queries/alerts";
 import { useI18nTyped } from "@/types/i18n";

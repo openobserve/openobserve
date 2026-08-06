@@ -1607,10 +1607,7 @@ export default defineComponent({
         // Cached for the editor-open path only. The read-modify-write in
         // WorkflowLinkAlertsDialog deliberately still goes straight to the
         // service — a stale alert there would overwrite someone else's edit.
-        const data = await alertDetailQuery.fetch(
-          store.state.selectedOrganization.identifier,
-          id,
-        );
+        const data = await alertDetailQuery.fetch(store.state.selectedOrganization.identifier, id);
         dismiss();
         return data;
       } catch (error) {

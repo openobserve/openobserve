@@ -30,8 +30,7 @@ export const syntheticsMonitorsQuery = createOrgListQuery<any, [folderId?: strin
   // The API field was renamed `monitors` -> `checks`. Both are read so a
   // bundle and a server on opposite sides of that rename still render.
   fetch: async (org, folderId) => {
-    const data = (await syntheticsService.listByFolderId(org, folderId))
-      .data as any;
+    const data = (await syntheticsService.listByFolderId(org, folderId)).data as any;
     return data?.checks ?? data?.monitors ?? [];
   },
   tier: "ENTITY_LIST",

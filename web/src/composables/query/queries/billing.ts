@@ -46,17 +46,21 @@ const make = (name: string, fn: (org: string) => Promise<any>) => {
   };
 };
 
-export const subscriptionQuery = make("subscription", async (org) =>
-  (await BillingService.list_subscription(org)).data,
+export const subscriptionQuery = make(
+  "subscription",
+  async (org) => (await BillingService.list_subscription(org)).data,
 );
-export const invoiceHistoryQuery = make("invoices", async (org) =>
-  (await BillingService.list_invoice_history(org)).data,
+export const invoiceHistoryQuery = make(
+  "invoices",
+  async (org) => (await BillingService.list_invoice_history(org)).data,
 );
-export const aiUsageQuery = make("aiUsage", async (org) =>
-  (await BillingService.get_ai_usage(org)).data,
+export const aiUsageQuery = make(
+  "aiUsage",
+  async (org) => (await BillingService.get_ai_usage(org)).data,
 );
-export const billingGroupMembersQuery = make("groupMembers", async (org) =>
-  (await BillingService.list_billing_group_members(org)).data,
+export const billingGroupMembersQuery = make(
+  "groupMembers",
+  async (org) => (await BillingService.list_billing_group_members(org)).data,
 );
 
 /** Any subscription or membership change invalidates the whole billing prefix. */

@@ -1039,7 +1039,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
     }
 
     invalidateDestinations(store.state.selectedOrganization.identifier);
-        emit("get:destinations");
+    emit("get:destinations");
     emit("cancel:hideform");
   } catch (error) {
     console.error("Failed to save prebuilt destination:", error);

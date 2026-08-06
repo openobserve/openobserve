@@ -30,10 +30,7 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { parseSearchError } from "@/utils/query/searchError";
-import {
-  PANEL_KEY_IGNORED_PATHS,
-  normalizeVariablesForCache,
-} from "@/composables/query/panelKey";
+import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
 
 /**
  * debounce time in milliseconds for panel data loader

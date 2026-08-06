@@ -63,8 +63,7 @@ let _db: IDBDatabase | null = null;
 let _openPromise: Promise<IDBDatabase> | null = null;
 
 /** True when IndexedDB is usable (absent in jsdom and some private modes). */
-export const isIdbAvailable = (): boolean =>
-  typeof indexedDB !== "undefined" && indexedDB !== null;
+export const isIdbAvailable = (): boolean => typeof indexedDB !== "undefined" && indexedDB !== null;
 
 export const openCacheDB = (): Promise<IDBDatabase> => {
   if (_db) return Promise.resolve(_db);
@@ -294,9 +293,7 @@ export const cacheEvictExpired = async (): Promise<number> => {
 };
 
 /** LRU trim — evicts the least-recently-written records above `maxRecords`. */
-export const cacheTrimToMax = async (
-  maxRecords: number = DEFAULT_MAX_RECORDS,
-): Promise<number> => {
+export const cacheTrimToMax = async (maxRecords: number = DEFAULT_MAX_RECORDS): Promise<number> => {
   try {
     const db = await openCacheDB();
     return await new Promise<number>((resolve) => {

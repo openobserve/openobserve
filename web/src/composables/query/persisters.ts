@@ -121,8 +121,7 @@ export const idbPersister = experimental_createQueryPersister<unknown>({
  * the persister keys storage by the query hash, so this string is the exact
  * prefix of every persisted entry belonging to that org.
  */
-const orgStoragePrefix = (prefix: string, org: string) =>
-  `${prefix}-["org",${JSON.stringify(org)}`;
+const orgStoragePrefix = (prefix: string, org: string) => `${prefix}-["org",${JSON.stringify(org)}`;
 
 const removeLocalByPrefix = (prefix: string): void => {
   if (!safeLocalStorage) return;

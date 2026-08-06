@@ -225,9 +225,11 @@ const applyRoleUserCounts = () => {
 // an "added" event means the server has something new to show.
 const setupRoles = async (force = false) => {
   loading.value = true;
-  await (force
-    ? refetchRoles(store.state.selectedOrganization.identifier)
-    : fetchRoles(store.state.selectedOrganization.identifier))
+  await (
+    force
+      ? refetchRoles(store.state.selectedOrganization.identifier)
+      : fetchRoles(store.state.selectedOrganization.identifier)
+  )
     .then((res: any) => {
       rolesState.roles = res.map((role: string) => ({
         role_name: role,

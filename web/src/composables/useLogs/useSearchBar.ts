@@ -37,10 +37,7 @@ import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
-import {
-  fetchSavedViews,
-  refetchSavedViews,
-} from "@/composables/query/queries/savedViews";
+import { fetchSavedViews, refetchSavedViews } from "@/composables/query/queries/savedViews";
 
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);

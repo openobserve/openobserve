@@ -35,7 +35,8 @@ const SECRET = tierOptions("ENTITY_LIST", { persist: "none" });
 
 const ingestionTokensOptions = (org: string) => ({
   queryKey: [...qk.organizations.root(org), "ingestionTokens"] as const,
-  queryFn: async (): Promise<any> => (await organizationsService.list_org_ingestion_tokens(org)).data,
+  queryFn: async (): Promise<any> =>
+    (await organizationsService.list_org_ingestion_tokens(org)).data,
   ...SECRET,
 });
 

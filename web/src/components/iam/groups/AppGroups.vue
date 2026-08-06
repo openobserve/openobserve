@@ -282,9 +282,11 @@ const loading = ref(false);
 // an "added" event means the server has something new to show.
 const setupGroups = async (force = false) => {
   loading.value = true;
-  await (force
-    ? refetchGroups(store.state.selectedOrganization.identifier)
-    : fetchGroups(store.state.selectedOrganization.identifier))
+  await (
+    force
+      ? refetchGroups(store.state.selectedOrganization.identifier)
+      : fetchGroups(store.state.selectedOrganization.identifier)
+  )
     .then((res: any) => {
       groupsState.groups = res.map((group: string) => ({
         group_name: group,

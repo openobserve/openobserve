@@ -34,7 +34,8 @@ const groupsOptions = (org: string) => ({
   ...tierOptions("ENTITY_LIST"),
 });
 
-export const fetchGroups = (org: string): Promise<any> => queryClient.fetchQuery(groupsOptions(org));
+export const fetchGroups = (org: string): Promise<any> =>
+  queryClient.fetchQuery(groupsOptions(org));
 
 export const refetchGroups = (org: string): Promise<any> =>
   queryClient.fetchQuery({ ...groupsOptions(org), staleTime: 0 });

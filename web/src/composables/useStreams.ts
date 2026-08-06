@@ -18,10 +18,7 @@ import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  fetchStreamNameList,
-  invalidateStreams,
-} from "@/composables/query/queries/streams";
+import { fetchStreamNameList, invalidateStreams } from "@/composables/query/queries/streams";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
 const useStreams = (t: TranslateFn) => {

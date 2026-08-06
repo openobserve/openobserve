@@ -47,6 +47,30 @@ export const stableFilters = <T extends Record<string, unknown>>(filters: T): T 
   return out as T;
 };
 
+/**
+ * Round a relative time range to a bucket so it can be part of a cache key.
+ *
+ * A range computed from `Date.now()` is different on every mount, so a key
+ * containing the raw timestamps can never hit — which is what made tab switches
+ * on the Home page re-request everything. Bucketing to 60s means remounting
+ * inside that minute reuses the key, while a real range change still forks it.
+ *
+ * The request still carries the caller's exact timestamps; only the key is
+ * rounded.
+ */
+export const quantizeRange = (
+  startTime: number,
+  endTime: number,
+  bucketMs = 60_000,
+): { start: number; end: number } => {
+  // Micro-second epochs are the norm in this app; detect and scale the bucket.
+  const bucket = String(Math.trunc(endTime)).length > 14 ? bucketMs * 1000 : bucketMs;
+  return {
+    start: Math.floor(startTime / bucket) * bucket,
+    end: Math.floor(endTime / bucket) * bucket,
+  };
+};
+
 export interface ServerTableParams {
   page: number;
   pageSize: number;
@@ -105,8 +129,7 @@ export const qk = {
 
   alerts: {
     root: (o: OrgId) => [...org(o), "alerts"] as const,
-    listByFolder: (o: OrgId, folderId: string) =>
-      [...org(o), "alerts", "list", folderId] as const,
+    listByFolder: (o: OrgId, folderId: string) => [...org(o), "alerts", "list", folderId] as const,
     search: (o: OrgId, folderId: string, f: Record<string, unknown>) =>
       [...org(o), "alerts", "search", folderId, stableFilters(f)] as const,
     detail: (o: OrgId, alertId: string) => [...org(o), "alerts", "detail", alertId] as const,
@@ -145,8 +168,7 @@ export const qk = {
 
   reports: {
     root: (o: OrgId) => [...org(o), "reports"] as const,
-    listByFolder: (o: OrgId, folderId: string) =>
-      [...org(o), "reports", "list", folderId] as const,
+    listByFolder: (o: OrgId, folderId: string) => [...org(o), "reports", "list", folderId] as const,
     detail: (o: OrgId, name: string) => [...org(o), "reports", "detail", name] as const,
   },
 

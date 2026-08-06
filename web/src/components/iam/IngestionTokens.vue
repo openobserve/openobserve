@@ -247,7 +247,10 @@ import organizationsService from "@/services/organizations";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import { fetchIngestionTokens, invalidateIngestionTokens } from "@/composables/query/queries/tokens";
+import {
+  fetchIngestionTokens,
+  invalidateIngestionTokens,
+} from "@/composables/query/queries/tokens";
 
 interface Token {
   name: string;
