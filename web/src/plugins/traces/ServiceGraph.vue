@@ -23,8 +23,8 @@
           :content="t('traces.serviceGraph.noStreamsDetected')"
         />
       </div>
-      <!-- Search input -->
-      <div data-test="service-graph-search-input">
+      <!-- Search input (hidden when a parent renders it in its own toolbar). -->
+      <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
           class="w-56!"
@@ -438,6 +438,13 @@ export default defineComponent({
     },
     // Hide the built-in stream dropdown when the parent owns selection.
     hideStreamSelector: {
+      type: Boolean,
+      default: false,
+    },
+    // Same idea as `hideStreamSelector`: the standalone Service Graph page
+    // renders the search box in its own subnav row beside the stream picker,
+    // so the built-in one must not render twice.
+    hideSearchInput: {
       type: Boolean,
       default: false,
     },
@@ -1865,8 +1872,20 @@ export default defineComponent({
       loadServiceGraph();
     });
 
-    // Public API for parent pages (e.g. Agent Graph page's header refresh).
-    expose({ refresh: loadServiceGraph, loading, lastRunAt });
+    // Public API for parent pages (e.g. Agent Graph page's header refresh, and
+    // the standalone Service Graph page, whose subnav-row stream picker calls
+    // `onStreamFilterChange` — it owns its own stream list because `expose()`
+    // unwraps refs, which would hand the parent a non-reactive snapshot).
+    expose({
+      refresh: loadServiceGraph,
+      loading,
+      lastRunAt,
+      onStreamFilterChange,
+      setSearchFilter: (v: string) => {
+        searchFilter.value = v;
+        applyFilters();
+      },
+    });
 
     return {
       raw,

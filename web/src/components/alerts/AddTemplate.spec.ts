@@ -684,3 +684,72 @@ describe("AddTemplate - variable guide collapses when switching to content mode"
     expect(w.html()).not.toContain('data-state="open"');
   });
 });
+
+// P0 regression (o2-enterprise#2364): on an EXISTING custom template, the two
+// mode tabs share the single form `body` field. Switching to the Template tab
+// overwrote it with the serialized EMPTY spec (Template tab blank), and
+// switching back left that empty-spec JSON in the editor (raw payload "reset")
+// — original payload destroyed, and Save would persist the empty spec.
+describe("AddTemplate - existing custom template survives a mode-tab round trip", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const LEGACY_BODY = '{"text":"{alert_name} fired on {stream_name}"}';
+
+  async function mountExistingCustom() {
+    return mountComp({
+      template: {
+        name: "custom-template",
+        body: LEGACY_BODY,
+        type: "http",
+        title: "",
+        kind: "custom",
+      },
+    });
+  }
+
+  async function selectMode(wrapper: any, mode: "content" | "custom") {
+    const modeTabs = wrapper.findAllComponents({ name: "AppTabs" });
+    await modeTabs[0].vm.$emit("update:activeTab", mode);
+    await flushPromises();
+  }
+
+  it("restores the original raw payload when switching Template → Raw payload", async () => {
+    const w = await mountExistingCustom();
+
+    await selectMode(w, "content");
+    await selectMode(w, "custom");
+
+    expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
+  });
+
+  it("restores raw-mode EDITS (not just the saved body) across the round trip", async () => {
+    const w = await mountExistingCustom();
+    getForm(w).setFieldValue("body", '{"text":"edited draft"}');
+    await flushPromises();
+
+    await selectMode(w, "content");
+    await selectMode(w, "custom");
+
+    expect(getForm(w).state.values.body).toBe('{"text":"edited draft"}');
+  });
+
+  it("prefills the Template tab from detected {vars} instead of opening blank", async () => {
+    const w = await mountExistingCustom();
+
+    await selectMode(w, "content");
+
+    const spec = (w.vm as any).contentSpec;
+    expect(spec.body).toContain("{alert_name}");
+    expect(spec.body).toContain("{stream_name}");
+  });
+
+  it("'start a content version' then Raw payload restores the original body too", async () => {
+    const w = await mountExistingCustom();
+
+    await w.find('[data-test="add-template-start-content-version-btn"]').trigger("click");
+    await flushPromises();
+    await selectMode(w, "custom");
+
+    expect(getForm(w).state.values.body).toBe(LEGACY_BODY);
+  });
+});
