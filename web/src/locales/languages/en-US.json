@@ -7328,7 +7328,7 @@
       "noFieldsConfiguredYet": "No fields configured yet",
       "workloadDetection": "Workload Detection",
       "workloadDetectedUsingFields": "Workload detected using fields",
-      "workloadTrackedHelp": "Only these field alias groups are used for workload detection and recommendations. Fields not in this list will not influence service discovery results. Cannot be empty.",
+      "workloadTrackedHelp": "Only these field alias groups are used for workload detection and recommendations. Fields not in this list will not influence service discovery results. Optional — dimensions listed in identity sets are always tracked.",
       "goToFieldAliases": "Go to Field Aliases",
       "toConfigureFieldMappings": "to configure individual field mappings.",
       "selectAliasGroup": "Select alias group",
@@ -7355,7 +7355,6 @@
       "uniqueValuesDetected": "{n} unique values detected",
       "locations": "locations",
       "recommendedConfigApplied": "Recommended configuration applied. Click \"Save Configuration\" to save.",
-      "selectAtLeastOneTrackedAlias": "Select at least one tracked alias group.",
       "cardinalityClassLabel": " ({cardinality} cardinality)",
       "fieldCardinalityTooltip": "{count} unique values{classLabel} — fewer values = better for grouping"
     },
