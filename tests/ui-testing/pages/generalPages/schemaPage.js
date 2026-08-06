@@ -124,10 +124,10 @@ class SchemaPage {
         // The first <span> inside the chip is the timezone label.
         this.schemaTimelineTimezoneLabel = this.schemaTimelineChip.locator('span').first();
 
-        // The div containing the doc_time range text (contains the → arrow span)
-        this.schemaTimelineDocTimeRange = this.schemaTimelineChip.locator('div').filter({
-            hasText: /\u2192/,
-        });
+        // The div containing the doc_time range text (innermost text div with
+        // class text-text-body — avoids strict mode violation from nested divs
+        // that also contain the → character via descendant text).
+        this.schemaTimelineDocTimeRange = this.schemaTimelineChip.locator('div.text-text-body');
 
         // Tab selectors within the schema drawer
         this.schemaSettingsTab = page.locator('[data-test="schema-settings-tab"]');
