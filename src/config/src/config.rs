@@ -994,12 +994,59 @@ pub struct Route {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Search {
-    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
-    pub feature_query_exclude_all: bool,
+    #[env_config(
+        name = "ZO_ENABLE_INVERTED_INDEX",
+        default = true,
+        help = "Toggle inverted index generation."
+    )]
+    pub inverted_index_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_REMOVE_FILTER_WITH_INDEX", default = true)]
     pub feature_query_remove_filter_with_index: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
+        default = true,
+        help = "Toggle inverted index count optimizer."
+    )]
+    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(
+        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
+        default = false,
+        help = "Toggle tantivy result cache."
+    )]
+    pub inverted_index_result_cache_enabled: bool,
     #[env_config(name = "ZO_FEATURE_QUERY_STREAMING_AGGS", default = true)]
     pub feature_query_streaming_aggs: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable pushdown filter"
+    )]
+    pub feature_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
+        default = false,
+        help = "Enable pushdown filter for metrics queries"
+    )]
+    pub feature_metrics_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
+        default = true,
+        help = "Enable dynamic pushdown filter"
+    )]
+    pub feature_dynamic_pushdown_filter_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
+        default = true,
+        help = "Enable single node optimize(used for debug, not document)"
+    )]
+    pub feature_single_node_optimize_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
+        default = true,
+        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
+    )]
+    pub feature_partial_reduce_enabled: bool,
+
     #[env_config(name = "ZO_FEATURE_JOIN_MATCH_ONE_ENABLED", default = false)]
     pub feature_join_match_one_enabled: bool,
     #[env_config(
@@ -1032,70 +1079,18 @@ pub struct Search {
         help = "Enable enrichment table broadcast join"
     )]
     pub feature_enrichment_broadcast_join_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable pushdown filter"
-    )]
-    pub feature_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_METRICS_PUSHDOWN_FILTER_ENABLED",
-        default = false,
-        help = "Enable pushdown filter for metrics queries"
-    )]
-    pub feature_metrics_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
-        default = true,
-        help = "Enable dynamic pushdown filter"
-    )]
-    pub feature_dynamic_pushdown_filter_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_SINGLE_NODE_OPTIMIZE_ENABLED",
-        default = true,
-        help = "Enable single node optimize(used for debug, not document)"
-    )]
-    pub feature_single_node_optimize_enabled: bool,
-    #[env_config(
-        name = "ZO_FEATURE_PARTIAL_REDUCE_ENABLED",
-        default = true,
-        help = "Enable partial reduce aggregation to reduce data transfer to the leader"
-    )]
-    pub feature_partial_reduce_enabled: bool,
-    #[env_config(
-        name = "ZO_ENABLE_INVERTED_INDEX",
-        default = true,
-        help = "Toggle inverted index generation."
-    )]
-    pub inverted_index_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_RESULT_CACHE_ENABLED",
-        default = false,
-        help = "Toggle tantivy result cache."
-    )]
-    pub inverted_index_result_cache_enabled: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_OLD_FORMAT",
-        default = false,
-        help = "Use old format for inverted index, it will generate same stream name for index."
-    )]
-    pub inverted_index_old_format: bool,
-    #[env_config(
-        name = "ZO_INVERTED_INDEX_COUNT_OPTIMIZER_ENABLED",
-        default = true,
-        help = "Toggle inverted index count optimizer."
-    )]
-    pub inverted_index_count_optimizer_enabled: bool,
+    #[env_config(name = "ZO_FEATURE_QUERY_EXCLUDE_ALL", default = true)]
+    pub feature_query_exclude_all: bool,
     #[env_config(name = "ZO_AGGREGATION_TOPK_ENABLED", default = true)]
     pub aggregation_topk_enabled: bool,
     #[env_config(
-        name = "ZO_DF_USE_AGG_TOPK_HEAP",
+        name = "ZO_AGGREGATION_TOPK_HEAP_ENABLED",
         default = true,
         help = "Use the heap implementation for eligible aggregate TopK plans"
     )]
     pub use_agg_topk_heap: bool,
     #[env_config(
-        name = "ZO_DF_TOPK_HEAP_MAX_LIMIT",
+        name = "ZO_AGGREGATION_TOPK_HEAP_MAX_LIMIT",
         default = 500,
         help = "Maximum aggregate TopK limit that uses the heap implementation"
     )]
