@@ -8363,7 +8363,6 @@
   },
   "correlation": {
     "unstableDimensionNote": "Unstable dimension - changes on pod restart. Default: All values.",
-    "droppedDimensionsWarning": "Some filters could not be applied to every stream ({dims}) — results may include data outside the selected scope.",
     "streamsSelectedCount": "{selected} of {total} selected",
     "importSemanticGroupsTitle": "Import Semantic Groups",
     "importSemanticGroupsSubtitle": "Upload JSON file to import semantic field groups",
