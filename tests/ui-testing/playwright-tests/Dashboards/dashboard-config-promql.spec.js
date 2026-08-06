@@ -777,7 +777,10 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.enableSparkline();
     expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
 
-    // Track ALL network activity (not just the expected pattern) so a mismatch
+    // Record URLs/status only. Never read the body of the PromQL response: it is
+    // a live SSE stream that the page is still consuming, and pulling it through
+    // Playwright competes with the page's own reader. Metadata is enough for the
+    // assertions below, and describePanelRender()/console capture cover diagnosis.
     const allCalls = [];
     const isPromQLQuery = (url) => url.includes("/prometheus/api/v1/query");
     const onResponse = (res) => {
@@ -786,27 +789,25 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     };
     page.on("response", onResponse);
 
+    // One Apply, then wait on the panel's own completion signal rather than on a
+    // network event — the Apply button stays disabled until every chunk lands.
     await pm.dashboardPanelActions.applyDashboardBtn();
-    const promqlResponse = await page
-      .waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 20000 })
-      .catch((e) => {
-        testLogger.warn("query_range response wait:", e.message);
-        return null;
-      });
-    const promqlBody = promqlResponse ? await promqlResponse.text().catch(() => "<unreadable>") : null;
+    const settled = await waitForPanelRenderSettled(page, pm);
     page.off("response", onResponse);
 
-    const rawBodyDiag = `promql response body: ${promqlBody?.slice(0, 1000)}`;
-    expect(promqlResponse, `captured /api/ calls: ${JSON.stringify(allCalls)}`).not.toBeNull();
-    testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
-
-    // The captured response resolves on the FIRST query_range; the panel keeps
-    // streaming chunks after it, so settle before asserting on the rendered DOM.
-    const settled = await waitForPanelRenderSettled(page, pm);
+    const callsDiag = `captured /api/ calls: ${JSON.stringify(allCalls)}`;
     expect(
       settled,
       `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
     ).toBe(true);
+
+    // What the test name promises: one range query, and no histogram companion
+    // fetch (that one is the SQL metric sparkline path, which PromQL must not use
+    // — its trend comes from the matrix values already in the response).
+    const promqlCalls = allCalls.filter((c) => isPromQLQuery(c.url));
+    expect(promqlCalls.length, callsDiag).toBe(1);
+    expect(allCalls.filter((c) => c.url.includes("is_ui_histogram")).length, callsDiag).toBe(0);
+    testLogger.info("PromQL sparkline Apply fired exactly 1 query_range (no histogram)");
 
     // Metric renders as SVG; the sparkline trend draws at least one path.
     const chart = page.locator('[data-test="chart-renderer"]');
@@ -816,11 +817,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       errorMessage.waitFor({ state: "visible", timeout: 15000 }),
     ]).catch(() => {});
     const errText = await errorMessage.textContent().catch(() => null);
-    expect(errText, `chart-renderer did not appear; panel error. ${rawBodyDiag}`).toBeNull();
+    expect(errText, `chart-renderer did not appear; panel error. ${callsDiag}`).toBeNull();
     await expect(chart).toBeVisible();
     // The panel must have results before the trend can exist — assert that first
     // so a load-path failure doesn't masquerade as a rendering failure.
-    await expect(page.locator('[data-test="no-data"]'), rawBodyDiag).toBeHidden();
+    await expect(page.locator('[data-test="no-data"]'), callsDiag).toBeHidden();
     const svgPathAppeared = await chart
       .locator("svg path")
       .first()
@@ -829,7 +830,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       .catch(() => false);
     expect(
       svgPathAppeared,
-      `no sparkline <path> rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}. ${rawBodyDiag}`,
+      `no sparkline <path> rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}. ${callsDiag}`,
     ).toBe(true);
     expect(await chart.locator("svg path").count()).toBeGreaterThan(0);
     testLogger.info("PromQL sparkline trend rendered on the metric SVG");
@@ -859,32 +860,25 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
     testLogger.info("Between-range value mapping configured on PromQL metric panel");
 
+    // Status only — never read a response body here. The PromQL response is a
+    // live SSE stream the page is still consuming; pulling it through Playwright
+    // competes with the page's own reader. See the sparkline test above.
     const failedCalls = [];
-    const isPromQLQuery = (url) => url.includes("/prometheus/api/v1/query");
-    const onResponse = async (res) => {
+    const onResponse = (res) => {
       const url = res.url();
       if (url.includes("/api/") && res.status() >= 400) {
-        const body = await res.text().catch(() => "<unreadable>");
-        failedCalls.push({ url, status: res.status(), body: body.slice(0, 500) });
+        failedCalls.push({ url, status: res.status() });
       }
     };
     page.on("response", onResponse);
 
+    // One Apply, then wait on the panel's own completion signal — the Apply
+    // button stays disabled until every streamed chunk has landed.
     await pm.dashboardPanelActions.applyDashboardBtn();
-    const promqlResponse = await page
-      .waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 20000 })
-      .catch((e) => {
-        testLogger.warn("query_range response wait:", e.message);
-        return null;
-      });
-    const promqlBody = promqlResponse ? await promqlResponse.text().catch(() => "<unreadable>") : null;
+    const settled = await waitForPanelRenderSettled(page, pm);
     page.off("response", onResponse);
 
-    const rawBodyDiag = `promql response body: ${promqlBody?.slice(0, 1000)}`;
-
-    // The captured response resolves on the FIRST query_range; the panel keeps
-    // streaming chunks after it, so settle before asserting on the rendered DOM.
-    const settled = await waitForPanelRenderSettled(page, pm);
+    const callsDiag = `failed calls: ${JSON.stringify(failedCalls)}`;
     expect(
       settled,
       `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
@@ -898,11 +892,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       errorMessage.waitFor({ state: "visible", timeout: 15000 }),
     ]).catch(() => {});
     const errText = await errorMessage.textContent().catch(() => null);
-    expect(errText, `chart-renderer did not appear; panel error. Failed calls: ${JSON.stringify(failedCalls)}. ${rawBodyDiag}`).toBeNull();
+    expect(errText, `chart-renderer did not appear; panel error. ${callsDiag}`).toBeNull();
     await expect(chart).toBeVisible();
     // A value has to exist before a mapping can replace it — assert that first so
     // a load-path failure doesn't masquerade as a value-mapping failure.
-    await expect(page.locator('[data-test="no-data"]'), rawBodyDiag).toBeHidden();
+    await expect(page.locator('[data-test="no-data"]'), callsDiag).toBeHidden();
     const mappedTextAppeared = await chart
       .getByText("PROMQL_MAPPED")
       .first()
@@ -911,7 +905,7 @@ test.describe("ConfigPanel — PromQL Settings", () => {
       .catch(() => false);
     expect(
       mappedTextAppeared,
-      `mapped text not rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}. ${rawBodyDiag}`,
+      `mapped text not rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}. ${callsDiag}`,
     ).toBe(true);
     await expect(chart).toContainText("PROMQL_MAPPED");
     testLogger.info("Mapped text reflected in the PromQL metric chart");
