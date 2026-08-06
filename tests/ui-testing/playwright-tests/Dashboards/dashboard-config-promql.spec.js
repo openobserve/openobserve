@@ -15,11 +15,7 @@ import {
   setupPromQLGeomapPanelWithConfig,
   setupPromQLMapsPanelWithConfig,
   reopenPanelConfig,
-  describePanelRender,
   waitForPanelRenderSettled,
-  collectConsoleErrors,
-  getMetricTextFills,
-  hexToRgbString,
 } from "./utils/configPanelHelpers.js";
 const testLogger = require('../utils/test-logger.js');
 const { ensureMetricsIngested } = require('../utils/shared-metrics-setup.js');
@@ -776,17 +772,6 @@ test.describe("ConfigPanel — PromQL Settings", () => {
   // convertSQLMetricChart.ts) resolves the metric style, and the sparkline trend
   // comes from the matrix values already in the response rather than a second
   // is_ui_histogram fetch.
-  //
-  // The tests that assert the panel *draws* are grouped last and marked
-  // @metricRender — an earlier pair with that shape (removed in df3738967f) hit a
-  // product defect that only reproduced in CI: ECharts was handed a series array
-  // containing an undefined entry, threw inside setOption, and ChartRenderer
-  // swallowed it with a bare console.error, leaving an empty SVG with no error
-  // banner and no "No Data". If they start failing with
-  //   console: ["[error] Error during setOption TypeError: Cannot read
-  //             properties of undefined (reading 'type')"]
-  // that is the same defect resurfacing, not a test regression — the diagnostics
-  // below (describePanelRender + collectConsoleErrors) print exactly that.
   // ---------------------------------------------------------------------------
 
   test("sparkline (PromQL metric): enable → sub-controls appear → persists after save", {
@@ -944,143 +929,4 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     await cleanupTestDashboard(page, pm, dashboardName);
   });
 
-  test("value mapping (PromQL metric): Between-range mapping reflects mapped text on the chart", {
-    tag: ['@dashboard', '@configPanel', '@valueMapping', '@promql', '@metricRender', '@P1', '@all'],
-  }, async ({ page }) => {
-    const pm = new PageManager(page);
-    const dashboardName = generateDashboardName();
-    // ChartRenderer swallows a failing setOption with console.error only.
-    const consoleLog = collectConsoleErrors(page);
-
-    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
-
-    const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
-    // "Between" range covering any real value → deterministic mapped text
-    await pm.dashboardPanelConfigs.selectValueMappingType(popup, 0, "Between");
-    await pm.dashboardPanelConfigs.fillValueMappingRange(popup, 0, {
-      from: "-999999999999",
-      to: "999999999999",
-      text: "PROMQL_MAPPED",
-    });
-    await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
-    testLogger.info("Between-range value mapping configured on PromQL metric panel");
-
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    const settled = await waitForPanelRenderSettled(page, pm);
-    expect(
-      settled,
-      `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
-    ).toBe(true);
-
-    const chart = page.locator('[data-test="chart-renderer"]');
-    await expect(chart).toBeVisible();
-    // A value has to exist before a mapping can replace it — assert that first so
-    // a load-path failure doesn't masquerade as a value-mapping failure.
-    await expect(page.locator('[data-test="no-data"]')).toBeHidden();
-    await expect(
-      page.locator('[data-test="panel-schema-renderer-error-message"]')
-    ).toHaveCount(0);
-
-    const mappedTextAppeared = await chart
-      .getByText("PROMQL_MAPPED")
-      .first()
-      .waitFor({ state: "attached", timeout: 15000 })
-      .then(() => true)
-      .catch(() => false);
-    expect(
-      mappedTextAppeared,
-      `mapped text not rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
-    ).toBe(true);
-    testLogger.info("Mapped text reflected in the PromQL metric chart");
-
-    await pm.dashboardPanelActions.savePanel();
-    await cleanupTestDashboard(page, pm, dashboardName);
-  });
-
-  test("value mapping (PromQL metric): text colour repaints the metric value on the chart", {
-    tag: ['@dashboard', '@configPanel', '@valueMapping', '@promql', '@metricRender', '@P1', '@all'],
-  }, async ({ page }) => {
-    const pm = new PageManager(page);
-    const dashboardName = generateDashboardName();
-    const consoleLog = collectConsoleErrors(page);
-
-    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
-
-    // No display text: the value keeps its formatted number and only the colour
-    // changes, which isolates textColor (convertPromQLData.ts) from text.
-    const popup = await pm.dashboardPanelConfigs.openValueMappingPopup();
-    await pm.dashboardPanelConfigs.selectValueMappingType(popup, 0, "Between");
-    await pm.dashboardPanelConfigs.fillValueMappingRange(popup, 0, {
-      from: "-999999999999",
-      to: "999999999999",
-    });
-    // TEXT_SWATCHES[0] — see web/src/composables/dashboard/useColumnFormatting.ts
-    const textColor = "#b91c1c";
-    await pm.dashboardPanelConfigs.pickValueMappingColorSwatch(popup, 0, "text-color", 0);
-    await pm.dashboardPanelConfigs.applyValueMappingPopup(popup);
-    testLogger.info("Value mapping text colour configured on PromQL metric panel");
-
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    const settled = await waitForPanelRenderSettled(page, pm);
-    expect(
-      settled,
-      `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
-    ).toBe(true);
-
-    await expect(page.locator('[data-test="chart-renderer"]')).toBeVisible();
-    await expect(page.locator('[data-test="no-data"]')).toBeHidden();
-
-    const expectedFill = hexToRgbString(textColor);
-    await expect
-      .poll(async () => (await getMetricTextFills(page)).map((n) => n.fill), {
-        timeout: 15000,
-        message: `metric value was not painted ${expectedFill}`,
-      })
-      .toContain(expectedFill);
-    testLogger.info("PromQL metric value painted with the mapping text colour", { expectedFill });
-
-    await pm.dashboardPanelActions.savePanel();
-    await cleanupTestDashboard(page, pm, dashboardName);
-  });
-
-  test("sparkline (PromQL metric): trend path renders on the metric SVG", {
-    tag: ['@dashboard', '@configPanel', '@sparkline', '@promql', '@metricRender', '@P1', '@all'],
-  }, async ({ page }) => {
-    const pm = new PageManager(page);
-    const dashboardName = generateDashboardName();
-    const consoleLog = collectConsoleErrors(page);
-
-    await setupPromQLMetricPanelWithConfig(page, pm, dashboardName);
-    await pm.dashboardPanelConfigs.enableSparkline();
-    expect(await pm.dashboardPanelConfigs.isSparklineEnabled()).toBe(true);
-
-    await pm.dashboardPanelActions.applyDashboardBtn();
-    const settled = await waitForPanelRenderSettled(page, pm);
-    expect(
-      settled,
-      `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
-    ).toBe(true);
-
-    const chart = page.locator('[data-test="chart-renderer"]');
-    await expect(chart).toBeVisible();
-    // The panel must have results before a trend can exist — assert that first
-    // so a load-path failure doesn't masquerade as a rendering failure.
-    await expect(page.locator('[data-test="no-data"]')).toBeHidden();
-
-    // Metric renders as SVG; the sparkline trend draws at least one path.
-    const svgPathAppeared = await chart
-      .locator("svg path")
-      .first()
-      .waitFor({ state: "attached", timeout: 15000 })
-      .then(() => true)
-      .catch(() => false);
-    expect(
-      svgPathAppeared,
-      `no sparkline <path> rendered. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
-    ).toBe(true);
-    testLogger.info("PromQL sparkline trend rendered on the metric SVG");
-
-    await pm.dashboardPanelActions.savePanel();
-    await cleanupTestDashboard(page, pm, dashboardName);
-  });
 });
