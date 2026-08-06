@@ -842,6 +842,7 @@ function onClearResults() {
           <OButton
             variant="primary"
             :disabled="!isGateUrlValid"
+            :loading="checkingExtension"
             data-test="synthetics-create-record-btn"
             @click="onRecordClick"
           >
