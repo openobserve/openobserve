@@ -31,8 +31,8 @@ use openobserve_api_management::request::cloud;
 #[cfg(feature = "profiling")]
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
-    alerts, authz, dashboards, folders, kv, model_pricing, organization, service_accounts,
-    short_url, slos, sourcemaps, status, stream, users,
+    alerts, announcements, authz, dashboards, folders, kv, model_pricing, organization,
+    service_accounts, short_url, slos, sourcemaps, status, stream, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -741,6 +741,10 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/settings/v2/{key}", get(organization::system_settings::get_setting).delete(organization::system_settings::delete_org_setting))
         .route("/{org_id}/settings/v2/user/{user_id}", post(organization::system_settings::set_user_setting))
         .route("/{org_id}/settings/v2/user/{user_id}/{key}", delete(organization::system_settings::delete_user_setting))
+
+        // Announcement banners: read by every org, authored on the meta org
+        .route("/{org_id}/announcements", get(announcements::get_announcements))
+        .route("/{org_id}/announcements/config", get(announcements::get_announcements_config).put(announcements::set_announcements_config))
 
         // Org info
         .route("/{org_id}/summary", get(organization::org::org_summary))

@@ -2120,6 +2120,28 @@
     },
     "summaryOtherRoles": "+{count} more roles"
   },
+  "announcements": {
+    "dismiss": "Dismiss",
+    "dismissAriaLabel": "Dismiss announcement",
+    "settings": {
+      "label": "Announcement Banners",
+      "description": "Publish a notice across every organization",
+      "configure": "Configure",
+      "help": "Banners appear at the top of the app for every organization you target. Only \"message\" is required — leave the list empty to remove every banner. Timestamps must include a UTC offset, for example \"2026-08-12T02:00:00Z\". You can keep \"//\" comments in the configuration; they are stripped before it is published.",
+      "editorLabel": "Configuration",
+      "previewLabel": "Preview",
+      "previewEmpty": "No banner will be shown.",
+      "reset": "Discard changes",
+      "save": "Publish",
+      "saved": "Announcement banners updated",
+      "saveFailed": "Could not save the announcement banners",
+      "loadFailed": "Could not load the announcement banners",
+      "invalidJson": "The configuration is not valid JSON.",
+      "loading": "Loading the current configuration…",
+      "exampleLabel": "Example",
+      "insertExample": "Insert example"
+    }
+  },
   "ticket": {
     "noDataErrorMsg": "No data available",
     "noOrganizationSelected": "No Organization Selected",

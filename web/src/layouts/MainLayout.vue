@@ -30,12 +30,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     ]"
   >
     <header class="o2-app-header shrink-0" :class="store.state.printMode === true ? 'hidden' : ''">
-      <!-- Webinar announcement bar: shown above toolbar for cloud users -->
-      <div
-        v-if="config.isCloud === 'true'"
-        class="bg-button-primary text-button-primary-foreground text-center"
-      >
-        <WebinarBanner variant="header" />
+      <!-- Every bar that sits above the toolbar, in one measured wrapper so
+           `--navbar-height` accounts for whichever of them is actually showing.
+           The wrapper always renders — an unconditional ref keeps the observer
+           attached even when nothing is on screen yet. -->
+      <div ref="announcementBarRef">
+        <!-- Webinar announcement bar: shown above toolbar for cloud users -->
+        <div
+          v-if="config.isCloud === 'true'"
+          class="bg-button-primary text-button-primary-foreground text-center"
+        >
+          <WebinarBanner variant="header" />
+        </div>
+
+        <!-- Operator-authored announcement bars (enterprise) -->
+        <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -181,6 +190,7 @@ import {
   KeepAlive,
   computed,
   onMounted,
+  onUnmounted,
   watch,
   markRaw,
   nextTick,
@@ -212,6 +222,7 @@ import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
+import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -231,6 +242,7 @@ export default defineComponent({
   components: {
     AppHeader,
     WebinarBanner,
+    AnnouncementBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,
@@ -569,14 +581,38 @@ export default defineComponent({
       }
     });
 
-    watch(
-      () => store.state.isWebinarBannerVisible,
-      (visible) => {
-        const navbarHeight = visible ? "calc(2.5rem + 1.688rem)" : "2.5rem";
-        document.documentElement.style.setProperty("--navbar-height", navbarHeight);
-      },
-      { immediate: true },
-    );
+    // Measured rather than assumed. The strip now holds two independent bars
+    // (the cloud webinar promo and any number of operator-authored banners),
+    // each of which wraps its own text, so no fixed value can describe it — the
+    // old `isWebinarBannerVisible` two-value calc only ever fit one bar of one
+    // line. WebinarBanner still dispatches that flag; nothing reads it for
+    // height any more.
+    const announcementBarRef = ref<HTMLElement | null>(null);
+    let announcementBarObserver: ResizeObserver | null = null;
+
+    const setNavbarHeight = (barHeightPx: number) => {
+      const barHeightRem = barHeightPx / 16;
+      document.documentElement.style.setProperty(
+        "--navbar-height",
+        `${2.5 + barHeightRem}rem`,
+      );
+    };
+
+    onMounted(() => {
+      setNavbarHeight(announcementBarRef.value?.offsetHeight ?? 0);
+
+      if (announcementBarRef.value && typeof ResizeObserver !== "undefined") {
+        announcementBarObserver = new ResizeObserver(([entry]) => {
+          setNavbarHeight(entry.contentRect.height);
+        });
+        announcementBarObserver.observe(announcementBarRef.value);
+      }
+    });
+
+    onUnmounted(() => {
+      announcementBarObserver?.disconnect();
+      announcementBarObserver = null;
+    });
 
     onMounted(async () => {
       filterMenus();
@@ -1311,6 +1347,7 @@ export default defineComponent({
       router,
       store,
       config,
+      announcementBarRef,
       langList,
       selectedLanguage,
       linksList,
