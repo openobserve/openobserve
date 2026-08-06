@@ -19,6 +19,7 @@ import { ref, computed, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import type { StreamInfo } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { buildSqlCondition } from "@/utils/telemetryCorrelation";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
 
@@ -157,9 +158,7 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
         if (field.startsWith("_")) continue;
         if (value === null || value === undefined || value === "") continue;
 
-        const quotedField = `"${field.replace(/"/g, '""')}"`;
-        const escapedValue = String(value).replace(/'/g, "''");
-        conditions.push(`${quotedField} = '${escapedValue}'`);
+        conditions.push(buildSqlCondition(field, String(value)));
       }
 
       // Always quote stream name to match dashboard behavior

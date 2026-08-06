@@ -14,7 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { filterDimensionsForCorrelation, buildFieldToGroupIdMap } from "./telemetryCorrelation";
+import {
+  filterDimensionsForCorrelation,
+  buildFieldToGroupIdMap,
+  quoteSqlIdentifier,
+  quoteSqlLiteral,
+  buildSqlCondition,
+} from "./telemetryCorrelation";
 import type { ServiceIdentityConfig, FieldAlias } from "@/services/service_streams";
 
 describe("telemetryCorrelation", () => {
@@ -295,6 +301,31 @@ describe("telemetryCorrelation", () => {
         service: "my-service",
         "k8s-cluster": "prod-cluster",
       });
+    });
+  });
+
+  describe("sql escaping helpers", () => {
+    it("quotes identifiers and doubles embedded double quotes", () => {
+      expect(quoteSqlIdentifier("k8s_pod_name")).toBe('"k8s_pod_name"');
+      expect(quoteSqlIdentifier('bad"field')).toBe('"bad""field"');
+    });
+
+    it("quotes literals and doubles embedded single quotes", () => {
+      expect(quoteSqlLiteral("prod")).toBe("'prod'");
+      expect(quoteSqlLiteral("a' OR 1=1 --")).toBe("'a'' OR 1=1 --'");
+    });
+
+    it("builds a fully escaped condition", () => {
+      expect(buildSqlCondition("svc", "a'b")).toBe("\"svc\" = 'a''b'");
+    });
+
+    it("always quotes identifiers, including ones with special characters", () => {
+      expect(buildSqlCondition("k8s-pod.name", "web-1")).toBe("\"k8s-pod.name\" = 'web-1'");
+    });
+
+    it("coerces non-string inputs before escaping", () => {
+      expect(quoteSqlLiteral(42 as unknown as string)).toBe("'42'");
+      expect(quoteSqlIdentifier(7 as unknown as string)).toBe('"7"');
     });
   });
 });

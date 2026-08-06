@@ -72,7 +72,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panel.queryType).toBe("sql");
       expect(panel.queries).toHaveLength(1);
       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
-      expect(panel.queries[0].query).toContain("service = 'api'");
+      expect(panel.queries[0].query).toContain("\"service\" = 'api'");
       expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
     });
 
@@ -99,7 +99,7 @@ describe("useMetricsCorrelationDashboard", () => {
       const query = dashboard.tabs[0].panels[0].queries[0].query;
 
       // Single quotes should be escaped
-      expect(query).toContain("description = 'it''s a test'");
+      expect(query).toContain("\"description\" = 'it''s a test'");
     });
 
     it("should position panels in 3-column grid", () => {
@@ -272,8 +272,8 @@ describe("useMetricsCorrelationDashboard", () => {
       // Should only use matched dimension values from API filters
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "default"');
-      expect(query).toContain("service_name = 'api'");
-      expect(query).toContain("env = 'prod'");
+      expect(query).toContain("\"service_name\" = 'api'");
+      expect(query).toContain("\"env\" = 'prod'");
       expect(query).not.toContain("host = 'server01'"); // Not in API filters
     });
 
@@ -351,7 +351,7 @@ describe("useMetricsCorrelationDashboard", () => {
 
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       // Should only include service_name (string, non-internal) in WHERE clause
-      expect(query).toContain("service_name = 'api'");
+      expect(query).toContain("\"service_name\" = 'api'");
       expect(query).not.toContain("port");
       expect(query).not.toContain("enabled");
       // _timestamp appears in ORDER BY, not in WHERE clause (which is correct)
@@ -387,8 +387,9 @@ describe("useMetricsCorrelationDashboard", () => {
       // Fields with hyphens should be quoted
       expect(query).toContain("\"k8s-cluster\" = 'prod'");
       expect(query).toContain("\"k8s-namespace\" = 'default'");
-      // Regular field names should not be quoted
-      expect(query).toContain("service = 'api'");
+      // Regular field names are quoted too — every identifier goes through
+      // quoteSqlIdentifier so escaping can never be forgotten (F2/F38)
+      expect(query).toContain("\"service\" = 'api'");
     });
 
     it("should set table_dynamic_columns for logs panel", () => {

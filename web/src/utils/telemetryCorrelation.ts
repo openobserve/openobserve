@@ -168,6 +168,23 @@ export function filterDimensionsForCorrelation(
 }
 
 /**
+ * SQL escaping for correlation query builders. Values originate from
+ * telemetry labels (user-controlled data) — every builder MUST route
+ * field/value interpolation through these helpers (F2).
+ */
+export function quoteSqlIdentifier(field: string): string {
+  return `"${String(field).replace(/"/g, '""')}"`;
+}
+
+export function quoteSqlLiteral(value: string): string {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+export function buildSqlCondition(field: string, value: string): string {
+  return `${quoteSqlIdentifier(field)} = ${quoteSqlLiteral(value)}`;
+}
+
+/**
  * Build WHERE clause conditions using exact field names from StreamInfo.filters
  *
  * Uses the exact field names returned by the _correlate API instead of semantic variations.
@@ -181,9 +198,7 @@ function buildExactDimensionConditions(filters: Record<string, string>): string[
     if (value === SELECT_ALL_VALUE) {
       continue;
     }
-    // Escape single quotes in value
-    const escapedValue = value.replace(/'/g, "''");
-    conditions.push(`${fieldName} = '${escapedValue}'`);
+    conditions.push(buildSqlCondition(fieldName, value));
   }
 
   return conditions;

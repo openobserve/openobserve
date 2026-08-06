@@ -1070,6 +1070,7 @@ import {
 import type { StreamInfo } from "@/services/service_streams";
 import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { buildSqlCondition } from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
@@ -2739,7 +2740,7 @@ const fetchTracesByDimensions = (): Promise<any[]> => {
   const filterParts: string[] = [];
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
   const filter = filterParts.join(" AND ");
@@ -2863,7 +2864,7 @@ const openTracesPage = () => {
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
 

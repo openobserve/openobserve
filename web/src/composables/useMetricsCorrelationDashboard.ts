@@ -15,6 +15,7 @@
 
 import type { StreamInfo, FieldAlias } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { buildSqlCondition } from "@/utils/telemetryCorrelation";
 
 export interface MetricsCorrelationConfig {
   serviceName: string;
@@ -159,9 +160,7 @@ export function useMetricsCorrelationDashboard() {
         return !skip;
       })
       .map(([field, value]) => {
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
-        const escapedValue = value.replace(/'/g, "''");
-        return `${quotedField} = '${escapedValue}'`;
+        return buildSqlCondition(field, value);
       })
       .join(" AND ");
 
@@ -349,9 +348,7 @@ ORDER BY x_axis_1`;
         return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field.replace(/"/g, '""')}"` : field;
-        const escapedValue = value.replace(/'/g, "''");
-        return `${quotedField} = '${escapedValue}'`;
+        return buildSqlCondition(field, value);
       })
       .join(" AND ");
 
