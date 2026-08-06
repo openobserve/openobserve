@@ -168,9 +168,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
       <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
-        <!-- The results dock (T4) wraps the canvas: once a Test run produces a
-             result it docks the shared results panel beside the canvas (bottom or
-             right, flippable) instead of overlaying it in a drawer. -->
+        <!-- The results dock (T4) is a LAYOUT WRAPPER around the canvas: with no
+             Test result it renders the canvas full-size; once a run produces a
+             result it splits the space (canvas on top, results panel docked below,
+             draggable divider) so the graph stays visible — instead of the old
+             overlay drawer. The canvas is the dock's slot so the dock can place it
+             in the splitter's top pane. -->
         <WorkflowResultsDock>
           <WorkflowCanvas />
         </WorkflowResultsDock>
