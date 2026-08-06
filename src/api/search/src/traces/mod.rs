@@ -427,6 +427,14 @@ pub async fn get_latest_traces(
             );
         }
     };
+    // F2: the filter is a raw, user-supplied WHERE fragment. Validate it parses as a
+    // single well-formed boolean expression before splicing, so statement smuggling
+    // and comment-truncated payloads never reach the planner.
+    if !filter.is_empty()
+        && let Err(e) = config::utils::sql::validate_where_fragment(&filter)
+    {
+        return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
+    }
     let query_sql = if filter.is_empty() {
         format!("{query_sql} GROUP BY trace_id ORDER BY {sql_order_expr}")
     } else {
@@ -979,6 +987,16 @@ pub async fn get_latest_traces_stream(
         Some(v) => v.to_string(),
         None => "".to_string(),
     };
+    // F2: validate the raw filter here, in the HTTP handler, so a bad fragment is a
+    // 400 rather than an error frame mid-stream. This is stricter than the `--`/`;`
+    // stripping done in process_latest_traces_stream (which silently mangles the
+    // fragment instead of rejecting it), and that stripping only ever makes the
+    // spliced string a subset of what is validated here.
+    if !filter.is_empty()
+        && let Err(e) = config::utils::sql::validate_where_fragment(&filter)
+    {
+        return MetaHttpResponse::bad_request(format!("invalid filter: {e}"));
+    }
 
     let from = query
         .get("from")
