@@ -265,6 +265,11 @@ test.describe("Synthetics Extension Setup testcases", () => {
       await pm.syntheticsPage.clickBuildManually();
       await pm.syntheticsPage.waitForEditorPhase();
 
+      // The Replay button is disabled when there are zero steps
+      // (BrowserJourney: :disabled="readonly || modelValue.length === 0").
+      // Add a blank step so the button becomes clickable.
+      await pm.syntheticsPage.clickJourneyAddStepBtn();
+
       // Click Replay in the journey toolbar
       await pm.syntheticsPage.clickJourneyReplayBtn();
 

@@ -17,7 +17,11 @@ class SyntheticsPage {
     this.page = page;
 
     // ── Gate phase locators ──
+    // OInput wrapper (for visibility checks)
     this.urlInput = '[data-test="synthetics-create-url-input"]';
+    // Inner <input> inside OInput (for fill/clear — OInput adds -field suffix)
+    this.urlInputField = '[data-test="synthetics-create-url-input-field"]';
+    // OInput wrapper (for visibility checks)
     this.nameInput = '[data-test="synthetics-create-name-input"]';
     this.recordBtn = '[data-test="synthetics-create-record-btn"]';
     this.buildBtn = '[data-test="synthetics-create-build-btn"]';
@@ -54,16 +58,21 @@ class SyntheticsPage {
 
   /** Type a value into the starting URL input. */
   async enterStartUrl(url) {
-    await this.page.locator(this.urlInput).fill(url);
-    // Blur to trigger validation by clicking the name input
-    await this.page.locator(this.nameInput).click();
+    // OInput wraps a real <input> whose data-test ends with "-field"
+    await this.page.locator(this.urlInputField).fill(url);
+    // Trigger blur-based validation (fill already dispatches events,
+    // but explicit blur ensures @blur="validateGateUrl" fires)
+    await this.page.locator(this.urlInputField).blur();
     testLogger.info(`Entered start URL: ${url}`);
   }
 
   /** Clear the URL input. */
   async clearUrlInput() {
-    await this.page.locator(this.urlInput).clear();
-    await this.page.locator(this.nameInput).click();
+    // clear() on the native input dispatches input event → triggers
+    // @update:model-value → clearUrlError(). Do NOT blur — that would
+    // trigger validateGateUrl, which re-errors on the empty string
+    // (the zod schema requires min:1).
+    await this.page.locator(this.urlInputField).clear();
     testLogger.info("Cleared URL input");
   }
 
@@ -107,24 +116,17 @@ class SyntheticsPage {
 
   /** Expect the URL error message to be visible (invalid URL entered). */
   async expectUrlErrorVisible() {
-    // The URL validation error renders as the error-message slot of OInput
-    // or a sibling text. Look for a red/destructive text element near the input.
-    const errorLocator = this.page.locator(
-      '[data-test="synthetics-create-url-input"] ~ .text-status-destructive, ' +
-      '[data-test="synthetics-create-url-input"] + * .text-status-destructive, ' +
-      '.text-status-destructive'
-    ).first();
-    await expect(errorLocator).toBeVisible({ timeout: 5000 });
+    // OInput renders the error message as a span with data-test="...-error"
+    // and class text-input-error-text (not text-status-destructive).
+    await expect(
+      this.page.locator('[data-test="synthetics-create-url-input-error"]')
+    ).toBeVisible({ timeout: 5000 });
     testLogger.info("URL error message is visible");
   }
 
   /** Expect the URL error message to be absent. */
   async expectUrlErrorNotVisible() {
-    const errorLocator = this.page.locator(
-      '[data-test="synthetics-create-url-input"] ~ .text-status-destructive, ' +
-      '[data-test="synthetics-create-url-input"] + * .text-status-destructive, ' +
-      '.text-status-destructive'
-    );
+    const errorLocator = this.page.locator('[data-test="synthetics-create-url-input-error"]');
     await expect(errorLocator).toHaveCount(0);
     testLogger.info("URL error message is not visible");
   }
@@ -227,6 +229,12 @@ class SyntheticsPage {
   async clickJourneyRecordBtn() {
     await this.page.locator(this.journeyRecordBtn).click();
     testLogger.info("Clicked Journey Record button");
+  }
+
+  /** Click the "Add Step" button to create an empty step (enables Replay). */
+  async clickJourneyAddStepBtn() {
+    await this.page.locator(this.journeyAddStepBtn).click();
+    testLogger.info("Clicked Add Step button");
   }
 
   /** Click the Replay button in the journey toolbar. */
