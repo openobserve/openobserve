@@ -1,0 +1,7 @@
+{
+  "group": "Logs-Features",
+  "spec_filename": "timezoneDisplay.spec.js",
+  "create_group": false,
+  "browser": "chrome",
+  "_note": "Registered via ci_matrix.json (Logs-Features group). The generate_matrix job builds the playwright.yml matrix from ci_matrix.json — this registration file is informational only for the deterministic CI pipeline step."
+}

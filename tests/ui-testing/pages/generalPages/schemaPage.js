@@ -107,6 +107,33 @@ class SchemaPage {
         this.schemaElementCountLocator = page.locator('[data-test*="schema"]');
 
         // =========================================================
+        // Timeline chip locators (schema.vue #header-right slot)
+        // NEEDS SELECTOR — no data-test attributes exist on timeline
+        // chip elements yet. Fallback locators scoped to the schema
+        // drawer use structural relationships (img + span presence).
+        // =========================================================
+        // Chip wrapper: the div inside schema-drawer that contains
+        // an img (timeline icon) and is NOT the close-button area.
+        this.schemaTimelineChip = page.locator('[data-test="schema-drawer"] div').filter({
+            has: page.locator('img'),
+        }).filter({
+            hasNot: page.locator('[data-test="o-drawer-close-btn"]'),
+        }).first();
+
+        // Timezone label span (e.g. "UTC", "America/New_York")
+        // The first <span> inside the chip is the timezone label.
+        this.schemaTimelineTimezoneLabel = this.schemaTimelineChip.locator('span').first();
+
+        // The div containing the doc_time range text (contains the → arrow span)
+        this.schemaTimelineDocTimeRange = this.schemaTimelineChip.locator('div').filter({
+            hasText: /\u2192/,
+        });
+
+        // Tab selectors within the schema drawer
+        this.schemaSettingsTab = page.locator('[data-test="schema-settings-tab"]');
+        this.schemaConfigurationTab = page.locator('[data-test="schema-configuration-tab"]');
+
+        // =========================================================
         // Legacy schemaLocators map preserved for any callers that
         // still reference it via PageManager — values stay aligned
         // with the hoisted locators above so behaviour is identical.
@@ -810,6 +837,73 @@ class SchemaPage {
             });
             throw error;
         }
+    }
+
+    // =========================================================
+    // Timeline chip interaction methods
+    // =========================================================
+
+    // Wait for the schema drawer to become visible
+    async waitForSchemaDrawerVisible() {
+        await this.schemaDrawer.waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    // Wait for the timeline chip to appear inside the schema drawer
+    async waitForTimelineChipVisible() {
+        // First ensure the drawer is visible and schema has loaded (spinner gone)
+        await this.schemaDrawer.waitFor({ state: 'visible', timeout: 30000 });
+        // The timeline chip only renders when indexData.name is set (after getSchema() API)
+        await this.schemaTimelineChip.waitFor({ state: 'visible', timeout: 30000 });
+    }
+
+    // Expect the timeline chip to be visible
+    async expectTimelineChipVisible() {
+        await expect(this.schemaTimelineChip).toBeVisible({ timeout: 15000 });
+    }
+
+    // Get the text content of the timezone label span
+    async getTimezoneLabelText() {
+        const text = await this.schemaTimelineTimezoneLabel.textContent();
+        return (text || '').trim();
+    }
+
+    // Get the text content of the doc_time range (min → max)
+    async getDocTimeRangeText() {
+        const text = await this.schemaTimelineDocTimeRange.textContent();
+        return (text || '').trim();
+    }
+
+    // Assert the timezone label is non-empty
+    async expectTimezoneLabelNonEmpty() {
+        await expect(this.schemaTimelineTimezoneLabel).toBeVisible({ timeout: 15000 });
+        const text = await this.schemaTimelineTimezoneLabel.textContent();
+        expect(text).toBeTruthy();
+        expect(text.trim().length).toBeGreaterThan(0);
+    }
+
+    // Assert the doc_time range is a formatted date (not raw epoch)
+    async expectDocTimeRangeFormatted() {
+        await expect(this.schemaTimelineDocTimeRange).toBeVisible({ timeout: 15000 });
+        const text = await this.schemaTimelineDocTimeRange.textContent();
+        expect(text).toBeTruthy();
+        // Should NOT contain epoch date (1970-01-01) — stream has ingested data
+        expect(text).not.toContain('1970-01-01');
+        // Should contain a formatted timestamp pattern like YYYY-MM-DD
+        expect(text).toMatch(/\d{4}-\d{2}-\d{2}/);
+    }
+
+    // Click the Schema Settings tab
+    async clickSchemaSettingsTab() {
+        await this.schemaSettingsTab.waitFor({ state: 'visible', timeout: 10000 });
+        await this.schemaSettingsTab.click();
+        await this.page.waitForLoadState('domcontentloaded');
+    }
+
+    // Click the Configuration tab
+    async clickSchemaConfigurationTab() {
+        await this.schemaConfigurationTab.waitFor({ state: 'visible', timeout: 10000 });
+        await this.schemaConfigurationTab.click();
+        await this.page.waitForLoadState('domcontentloaded');
     }
 
     // Verification methods for POM compliance

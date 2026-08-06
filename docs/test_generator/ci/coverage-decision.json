@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/timezoneDisplay.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/region.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/searchJobInspector.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logstable.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "No existing spec covers the timeline chip + timezone display in the schema drawer opened from the Streams page. The region.spec.js test covers timezone selection on the Logs page (DateTime component), and searchJobInspector.spec.js covers time range badges in the search job inspector — neither touches the schema drawer timeline chip. A new spec under Logs/ is the correct fit; Playwright auto-discovers all specs under testDir, so no .yml registration is needed."
+}
