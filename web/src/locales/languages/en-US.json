@@ -7583,6 +7583,7 @@
     "RedMetrics": "RED Metrics",
     "loadingStream": "Loading Stream...",
     "noLogsAvailableForService": "No Logs available for this service",
+    "noCorrelatedLogsFound": "No correlated logs found for this span",
     "noData": {
       "title": "Start sending traces to OpenObserve",
       "description": "No trace streams found in this organization yet. Instrument your services and traces will appear here automatically.",
