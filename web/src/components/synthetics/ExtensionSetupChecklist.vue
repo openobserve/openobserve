@@ -43,8 +43,7 @@ const CHROME_UI_LABELS = {
 } as const;
 
 function openWebStore() {
-  const url =
-    store.state.zoConfig?.synthetics_recorder_extension_url || CHROME_WEB_STORE_URL;
+  const url = store.state.zoConfig?.synthetics_recorder_extension_url || CHROME_WEB_STORE_URL;
   window.open(url, "_blank", "noopener");
 }
 </script>
