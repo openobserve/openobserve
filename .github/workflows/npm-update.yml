@@ -139,7 +139,19 @@ jobs:
               -m "- Regenerated package-lock.json" \
               -m "🤖 Automated update by GitHub Actions"
 
-            git push origin "$BRANCH_NAME"
+            # The branch name is date-stamped, so a second run on the same day
+            # (a re-run, or a manual dispatch after the scheduled one) finds the
+            # earlier run's branch already on the remote. This branch is entirely
+            # machine-owned and rebuilt from main every run, so replacing it is
+            # correct — a plain push would just fail non-fast-forward.
+            if git ls-remote --exit-code --heads origin "$BRANCH_NAME" > /dev/null 2>&1; then
+              echo "Branch $BRANCH_NAME already exists on the remote — replacing it"
+              git fetch origin "+refs/heads/$BRANCH_NAME:refs/remotes/origin/$BRANCH_NAME"
+              git push --force-with-lease origin "$BRANCH_NAME"
+            else
+              git push origin "$BRANCH_NAME"
+            fi
+
             echo "changes_committed=true" >> $GITHUB_ENV
           fi
 
@@ -149,13 +161,27 @@ jobs:
           # Same PAT as the checkout — the PR author is whoever owns this token.
           GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
-          PR_URL=$(gh pr create \
-            --title "chore(deps): update web npm dependencies ($(date +%Y-%m-%d))" \
-            --body-file "$RUNNER_TEMP/pr_body.md" \
-            --base main \
-            --head "$BRANCH_NAME")
+          TITLE="chore(deps): update web npm dependencies ($(date +%Y-%m-%d))"
 
-          echo "Opened $PR_URL"
+          # If an earlier run today already opened a PR for this branch, the
+          # force-push above updated it in place — `gh pr create` would fail with
+          # "a pull request for branch ... already exists". Refresh it instead.
+          PR_URL=$(gh pr list --head "$BRANCH_NAME" --state open \
+            --json url --jq '.[0].url // empty')
+
+          if [ -n "$PR_URL" ]; then
+            gh pr edit "$PR_URL" \
+              --title "$TITLE" \
+              --body-file "$RUNNER_TEMP/pr_body.md"
+            echo "Refreshed existing $PR_URL"
+          else
+            PR_URL=$(gh pr create \
+              --title "$TITLE" \
+              --body-file "$RUNNER_TEMP/pr_body.md" \
+              --base main \
+              --head "$BRANCH_NAME")
+            echo "Opened $PR_URL"
+          fi
 
           # Labels and assignee are applied separately and best-effort. Passing
           # them to `gh pr create` makes a single bad value abort the whole
