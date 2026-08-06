@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
 import TelemetryCorrelationDashboard from "./TelemetryCorrelationDashboard.vue";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
@@ -150,6 +151,8 @@ const mockTranslations = {
   "correlation.tracesFromService": "Traces from {service}",
   "correlation.viewInTraces": "View in Traces",
   "correlation.selectMetrics": "Select Metrics",
+  "correlation.droppedDimensionsWarning":
+    "Some filters could not be applied to every stream ({dims}) — results may include data outside the selected scope.",
   "common.logs": "Logs",
   "common.apply": "Apply",
   "common.refresh": "Refresh",
@@ -946,6 +949,63 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       await nextTick();
 
       expect(wrapper.vm.showMetricSelector).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // droppedDimensions banner (F14)
+  // -------------------------------------------------------------------------
+  describe("droppedDimensions banner (F14)", () => {
+    const bannerSelector = "[data-test='correlation-dropped-dimensions-warning']";
+
+    it("should not render the banner when no stream has dropped_dimensions", () => {
+      wrapper = createWrapper();
+      expect(wrapper.find(bannerSelector).exists()).toBe(false);
+      expect(wrapper.vm.droppedDimensions).toEqual([]);
+    });
+
+    it("should dedupe and sort dropped semantic IDs across log/metric/trace streams", () => {
+      wrapper = createWrapper({
+        logStreams: [
+          {
+            stream_name: "default",
+            stream_type: "logs",
+            dropped_dimensions: ["k8s-cluster", "environment"],
+          },
+        ],
+        traceStreams: [
+          {
+            stream_name: "traces",
+            stream_type: "traces",
+            dropped_dimensions: ["k8s-cluster"],
+          },
+        ],
+      });
+      // semanticGroups mock is empty -> raw IDs are the fallback labels
+      expect(wrapper.vm.droppedDimensions).toEqual(["environment", "k8s-cluster"]);
+      const banner = wrapper.find(bannerSelector);
+      expect(banner.exists()).toBe(true);
+      expect(banner.text()).toContain("environment, k8s-cluster");
+    });
+
+    it("should resolve semantic group IDs to display labels, falling back to raw IDs", () => {
+      (useServiceCorrelation as any).mockReturnValueOnce({
+        semanticGroups: {
+          value: [{ id: "k8s-cluster", display: "K8s Cluster", fields: [] }],
+        },
+        loadSemanticGroups: vi.fn(),
+      });
+      wrapper = createWrapper({
+        logStreams: [
+          {
+            stream_name: "default",
+            stream_type: "logs",
+            dropped_dimensions: ["k8s-cluster", "environment"],
+          },
+        ],
+      });
+      expect(wrapper.vm.droppedDimensions).toEqual(["K8s Cluster", "environment"]);
+      expect(wrapper.find(bannerSelector).text()).toContain("K8s Cluster, environment");
     });
   });
 });

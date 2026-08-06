@@ -81,6 +81,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :get-subject-button-label="getSubjectButtonLabel"
     />
 
+    <!-- F14: warn that some streams' queries are wider than the chips imply -->
+    <div
+      v-if="droppedDimensions.length"
+      class="border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-default mx-4 mt-2 flex items-center gap-2 border px-4 py-2 text-sm"
+      data-test="correlation-dropped-dimensions-warning"
+    >
+      <OIcon name="warning" size="sm" class="shrink-0" />
+      <span>
+        {{ t("correlation.droppedDimensionsWarning", { dims: droppedDimensions.join(", ") }) }}
+      </span>
+    </div>
+
     <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
     <div class="px-page-edge">
       <OTabs v-if="!isEmbeddedTabs" v-model="activeTab" dense bordered align="left">
@@ -536,6 +548,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       overflow-mode="responsive"
       :get-subject-button-label="getSubjectButtonLabel"
     />
+
+    <!-- F14: warn that some streams' queries are wider than the chips imply -->
+    <div
+      v-if="droppedDimensions.length"
+      class="border-status-warning-text bg-status-warning-bg text-status-warning-text rounded-default mx-4 my-2 flex items-center gap-2 border px-4 py-2 text-sm"
+      data-test="correlation-dropped-dimensions-warning"
+    >
+      <OIcon name="warning" size="sm" class="shrink-0" />
+      <span>
+        {{ t("correlation.droppedDimensionsWarning", { dims: droppedDimensions.join(", ") }) }}
+      </span>
+    </div>
 
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
     <OCard
@@ -1256,6 +1280,25 @@ const sortedTraceStreams = computed<StreamInfo[]>(() =>
     ),
   ),
 );
+
+// F14: dimensions the backend dropped from at least one stream's filters
+// (no queryable schema field) — those streams' queries are WIDER than the
+// chips imply. Values are semantic group IDs; resolve each to its
+// human-readable display label, falling back to the raw ID if no group matches.
+const droppedDimensions = computed<string[]>(() => {
+  const dropped = new Set<string>();
+  const streams: Array<{ dropped_dimensions?: string[] }> = [
+    ...(props.logStreams ?? []),
+    ...(props.metricStreams ?? []),
+    ...(props.traceStreams ?? []),
+  ];
+  for (const s of streams) {
+    for (const d of s.dropped_dimensions ?? []) dropped.add(d);
+  }
+  return Array.from(dropped)
+    .map((id) => semanticGroups.value.find((g) => g.id === id)?.display ?? id)
+    .sort();
+});
 
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === "embedded-tabs");
