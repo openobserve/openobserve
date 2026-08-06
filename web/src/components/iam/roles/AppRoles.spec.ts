@@ -27,6 +27,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import { queryClient } from "@/composables/query/queryClient";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app-roles-test");

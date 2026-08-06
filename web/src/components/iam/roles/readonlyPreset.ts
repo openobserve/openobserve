@@ -8,6 +8,7 @@
 // created role is immediately usable for querying instead of silently empty.
 
 import { getResources, updateRole } from "@/services/iam";
+import { fetchResources } from "@/composables/query/queries/iam";
 
 export interface RolePermission {
   object: string;
@@ -61,8 +62,8 @@ export const seedReadonlyRolePermissions = async (
   orgId: string,
   isMetaOrg: boolean,
 ): Promise<number> => {
-  const res = await getResources(orgId);
-  const add = buildReadonlyPermissions(res.data ?? [], orgId, isMetaOrg);
+  const res = await fetchResources(orgId);
+  const add = buildReadonlyPermissions(res ?? [], orgId, isMetaOrg);
   if (!add.length) return 0;
   await updateRole({
     role_id: roleName,

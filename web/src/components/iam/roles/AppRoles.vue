@@ -99,6 +99,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { fetchRoles, refetchRoles } from "@/composables/query/queries/iam";
+import { invalidateRoles } from "@/composables/query/queries/iam";
 
 const { t } = useI18nTyped();
 
@@ -150,7 +152,7 @@ const addRole = () => {
 // through so EditRole can seed the starting permissions.
 const onRoleAdded = (payload: { role_name: string; startFrom?: string }) => {
   if (!payload?.role_name) {
-    setupRoles();
+    setupRoles(true);
     return;
   }
 
@@ -219,11 +221,15 @@ const applyRoleUserCounts = () => {
   updateTable();
 };
 
-const setupRoles = async () => {
+// `force` for every reload that follows a write or an explicit refresh —
+// an "added" event means the server has something new to show.
+const setupRoles = async (force = false) => {
   loading.value = true;
-  await getRoles(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      rolesState.roles = res.data.map((role: string) => ({
+  await (force
+    ? refetchRoles(store.state.selectedOrganization.identifier)
+    : fetchRoles(store.state.selectedOrganization.identifier))
+    .then((res: any) => {
+      rolesState.roles = res.map((role: string) => ({
         role_name: role,
         user_count: null,
       }));
@@ -242,13 +248,14 @@ const setupRoles = async () => {
 };
 
 const deleteUserRole = (role: any) => {
+  invalidateRoles(store.state.selectedOrganization.identifier);
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
         message: t("iam.appRoles.roleDeletedSuccess"),
         variant: "success",
       });
-      setupRoles();
+      setupRoles(true);
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
@@ -323,6 +330,7 @@ const bulkDeleteUserRoles = async () => {
   bulkDeleteLoading.value = true;
 
   try {
+    invalidateRoles(store.state.selectedOrganization.identifier);
     const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
       ids: roleNames,
     });
@@ -353,7 +361,7 @@ const bulkDeleteUserRoles = async () => {
       });
     }
 
-    await setupRoles();
+    await setupRoles(true);
     selectedRoleNames.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
@@ -381,7 +389,7 @@ useShortcuts([
   {
     id: "iamRolesRefresh",
     handler: () => {
-      if (!isInputFocused()) setupRoles();
+      if (!isInputFocused()) setupRoles(true);
     },
   },
   {

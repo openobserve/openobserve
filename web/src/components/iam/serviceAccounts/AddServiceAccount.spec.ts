@@ -58,6 +58,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 import AddServiceAccount from "./AddServiceAccount.vue";
 import service_accounts from "@/services/service_accounts";
 import { updateRole, updateGroup, getResources } from "@/services/iam";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   buildServiceAccountEmail,
   serviceAccountDisplayName,
@@ -394,6 +395,8 @@ describe("AddServiceAccount", () => {
           { key: "hidden", visible: false },
         ],
       } as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       vi.mocked(updateRole).mockResolvedValue({ data: {} } as any);
 
       await wrapper.vm.onRoleAdded({
@@ -419,6 +422,8 @@ describe("AddServiceAccount", () => {
 
     it("warns instead of claiming success when the seeding yields zero grants", async () => {
       vi.mocked(getResources).mockResolvedValue({ data: [] } as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.onRoleAdded({
         role_name: "viewer_role",

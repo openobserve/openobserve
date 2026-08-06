@@ -103,6 +103,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { fetchRoles } from "@/composables/query/queries/iam";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -218,9 +219,9 @@ const updateUserTable = async (value: string) => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  const data: any = await getRoles(store.state.selectedOrganization.identifier);
+  const data: any = await fetchRoles(store.state.selectedOrganization.identifier);
 
-  users.value = cloneDeep(data.data).map((role: any) => {
+  users.value = cloneDeep(data).map((role: any) => {
     return {
       role_name: role,
       isInGroup: groupUsersMap.value.has(role),

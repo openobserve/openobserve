@@ -427,6 +427,7 @@ import useRateLimiter from "@/composables/useRateLimiter";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { fetchRoles } from "@/composables/query/queries/iam";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -903,8 +904,8 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await getRoles(selectedOrganization.value?.value);
-        rolesLimitRows.value = response.data.map((role: any) => ({
+        const response = await fetchRoles(selectedOrganization.value?.value);
+        rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),
           list: 10,

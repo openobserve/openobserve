@@ -74,6 +74,7 @@ import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
+import { invalidateRoles } from "@/composables/query/queries/iam";
 
 const { t } = useI18nTyped();
 const props = defineProps({
@@ -127,6 +128,7 @@ const saveRole = async (value: AddRoleForm) => {
   const name = value.name.trim();
   try {
     await createRole(name, store.state.selectedOrganization.identifier);
+    invalidateRoles(store.state.selectedOrganization.identifier);
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({

@@ -19,6 +19,7 @@ import AppGroups from "@/components/iam/groups/AppGroups.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("@/services/iam", () => ({
   getGroups: vi.fn(),
@@ -110,6 +111,8 @@ describe("AppGroups Component", () => {
     vi.mocked(getGroups).mockResolvedValue(
       createMockAxiosResponse(["admin", "developers", "users"]) as any,
     );
+    // Drop the cached read so this override is the one that runs.
+    queryClient.clear();
 
     // Update the mock groups state
     mockGroupsState.groups = [
@@ -176,6 +179,8 @@ describe("AppGroups Component", () => {
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.setupGroups();
       await flushPromises();
@@ -267,6 +272,8 @@ describe("AppGroups Component", () => {
       vi.mocked(getGroups).mockResolvedValue(
         createMockAxiosResponse(["admin", "developers", "users"]) as any,
       );
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       mockGroupsState.groups = [
         { group_name: "admin" },
         { group_name: "developers" },
@@ -337,6 +344,8 @@ describe("AppGroups Component", () => {
       routerPushSpy.mockClear();
       vi.mocked(getGroups).mockClear();
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse([]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
       await wrapper.vm.onGroupAdded({});
       expect(routerPushSpy).not.toHaveBeenCalled();
       expect(getGroups).toHaveBeenCalled();
@@ -459,6 +468,8 @@ describe("AppGroups Component", () => {
     it("loads groups on component mount", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse(["group1", "group2"]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       mount(AppGroups, {
         global: {
@@ -476,6 +487,8 @@ describe("AppGroups Component", () => {
       const { getGroups } = await import("@/services/iam");
       const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
       vi.mocked(getGroups).mockRejectedValue(new Error("Network error"));
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.setupGroups();
 
@@ -525,6 +538,8 @@ describe("AppGroups Component", () => {
     it("handles empty groups list", async () => {
       const { getGroups } = await import("@/services/iam");
       vi.mocked(getGroups).mockResolvedValue(createMockAxiosResponse([]) as any);
+      // Drop the cached read so this override is the one that runs.
+      queryClient.clear();
 
       await wrapper.vm.setupGroups();
       await flushPromises();

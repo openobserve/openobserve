@@ -288,6 +288,8 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
 import { fetchDestinations, fetchTemplates } from "@/composables/query/queries/alertMeta";
+import { fetchResources } from "@/composables/query/queries/iam";
+import { invalidateRolePermissions } from "@/composables/query/queries/iam";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -468,9 +470,9 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  getResources(store.state.selectedOrganization.identifier)
-    .then(async (res) => {
-      permissionsState.resources = res.data
+  fetchResources(store.state.selectedOrganization.identifier)
+    .then(async (res: any) => {
+      permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
 
@@ -2234,6 +2236,7 @@ const saveRole = () => {
     return;
   }
 
+  invalidateRolePermissions(store.state.selectedOrganization.identifier);
   updateRole({
     role_id: editingRole.value,
     org_identifier: store.state.selectedOrganization.identifier,

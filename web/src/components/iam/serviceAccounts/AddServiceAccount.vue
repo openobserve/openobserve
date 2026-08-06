@@ -117,6 +117,7 @@ import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPres
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
+import { fetchRoles, fetchGroups } from "@/composables/query/queries/iam";
 import {
   makeAddServiceAccountSchema,
   maxServiceAccountNameLength,
@@ -201,17 +202,18 @@ export default defineComponent({
       if (!showAccessPickers.value) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
-          getRoles(orgId.value),
-          getGroups(orgId.value),
+          fetchRoles(orgId.value),
+          fetchGroups(orgId.value),
         ]);
-        roleOptions.value = (rolesRes.data ?? []).map((role: string) => ({
-          label: role,
-          value: role,
-        }));
-        groupOptions.value = (groupsRes.data ?? []).map((group: string) => ({
-          label: group,
-          value: group,
-        }));
+        // Merged, not replaced: a role created inline while this load is still
+        // in flight would otherwise be wiped from the picker when it lands.
+        const merge = (existing: any[], names: string[]) => {
+          const fromServer = names.map((name: string) => ({ label: name, value: name }));
+          const seen = new Set(fromServer.map((o) => o.value));
+          return [...fromServer, ...existing.filter((o: any) => !seen.has(o.value))];
+        };
+        roleOptions.value = merge(roleOptions.value, rolesRes ?? []);
+        groupOptions.value = merge(groupOptions.value, groupsRes ?? []);
       } catch (err) {
         console.error("Failed to load roles/groups for service account form", err);
       }

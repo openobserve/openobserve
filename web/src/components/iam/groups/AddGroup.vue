@@ -57,6 +57,7 @@ import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
+import { invalidateGroups } from "@/composables/query/queries/iam";
 
 const { t } = useI18nTyped();
 const props = defineProps({
@@ -99,6 +100,7 @@ const saveGroup = async (value: AddGroupForm) => {
   const name = value.name.trim();
   try {
     const res = await createGroup(name, store.state.selectedOrganization.identifier);
+    invalidateGroups(store.state.selectedOrganization.identifier);
     emits("added:group", { group_name: name, data: res.data });
     emits("update:open", false);
 
