@@ -34,25 +34,51 @@ jobs:
 
       - name: Create update branch
         run: |
-          BRANCH_NAME="automated/npm-update-$(date +%Y%m%d)"
+          BRANCH_NAME="chore/npm-update-$(date +%Y%m%d)"
           git checkout -b "$BRANCH_NAME"
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
-      - name: Check for outdated packages
+      - name: Install current dependencies
+        run: |
+          cd web
+          # Install from the lockfile first so `npm outdated`/ncu report accurate
+          # "current" versions, and so the toolchain exists for the later checks.
+          npm ci
+
+      - name: Check for available updates
         id: check_updates
         run: |
           cd web
-          echo "Checking for outdated packages..."
-          npm outdated --json > outdated.json || true
 
-          if [ -s outdated.json ] && [ "$(cat outdated.json)" != "{}" ]; then
+          # Snapshot the pre-update manifest so the PR body can show old → new.
+          cp package.json "$RUNNER_TEMP/package.json.before"
+
+          # IMPORTANT: --target minor keeps upgrades inside the current major.
+          # Unrestricted major bumps break the build toolchain (e.g. typescript
+          # 5.x -> 7.x drops the `./lib/tsc` export that vue-tsc still requires).
+          # Major upgrades stay a deliberate, manual decision.
+          npx --yes npm-check-updates --target minor --peer --jsonUpgraded \
+            > "$RUNNER_TEMP/upgrades.json"
+
+          if ! jq -e 'type == "object"' "$RUNNER_TEMP/upgrades.json" > /dev/null; then
+            echo "npm-check-updates did not return valid JSON:"
+            cat "$RUNNER_TEMP/upgrades.json"
+            exit 1
+          fi
+
+          if [ "$(jq 'length' "$RUNNER_TEMP/upgrades.json")" -gt 0 ]; then
             echo "has_updates=true" >> $GITHUB_OUTPUT
-            echo "Found outdated packages:"
-            cat outdated.json | jq '.'
+            echo "Packages to upgrade:"
+            jq '.' "$RUNNER_TEMP/upgrades.json"
           else
             echo "has_updates=false" >> $GITHUB_OUTPUT
-            echo "No outdated packages found"
+            echo "No in-major updates available"
           fi
+
+          # Informational only: majors deliberately held back, surfaced in the PR
+          # body so reviewers know what still needs a manual upgrade.
+          npx --yes npm-check-updates --target latest --jsonUpgraded \
+            > "$RUNNER_TEMP/majors.json" || echo '{}' > "$RUNNER_TEMP/majors.json"
 
       - name: Update dependencies
         if: steps.check_updates.outputs.has_updates == 'true'
@@ -60,14 +86,10 @@ jobs:
           cd web
           echo "Updating dependencies..."
 
-          # Update all dependencies to their latest versions
-          # This will update both package.json and package-lock.json
-          npm update --save
+          # Apply the same in-major upgrades that were just reported.
+          npx --yes npm-check-updates -u --target minor --peer
 
-          # Also check for major version updates and update them
-          npx npm-check-updates -u
-
-          # Install to ensure package-lock.json is updated
+          # Resolve the new ranges and regenerate package-lock.json
           npm install
 
           echo "Dependencies updated successfully"
@@ -99,16 +121,29 @@ jobs:
         if: steps.check_updates.outputs.has_updates == 'true'
         id: summary
         run: |
-          cd web
+          # Map of package -> previous range, from the pre-update manifest.
+          BEFORE=$(jq -c '(.dependencies // {}) + (.devDependencies // {})' \
+            "$RUNNER_TEMP/package.json.before")
 
-          # Get the list of updated packages
-          UPDATED_PACKAGES=$(cat outdated.json | jq -r 'to_entries[] | "- **\(.key)**: \(.value.current) → \(.value.latest)"')
+          UPDATED_PACKAGES=$(jq -r --argjson before "$BEFORE" \
+            'to_entries[] | "- **\(.key)**: \($before[.key] // "n/a") → \(.value)"' \
+            "$RUNNER_TEMP/upgrades.json")
 
-          # Create PR body
-          cat > /tmp/pr_body.md <<EOF
+          # Drop entries whose "latest" is the same version the minor pass already
+          # applied — those are not held back.
+          HELD_BACK=$(jq -r --argjson before "$BEFORE" \
+            --slurpfile minor "$RUNNER_TEMP/upgrades.json" \
+            'to_entries[] | select($minor[0][.key] != .value)
+             | "- **\(.key)**: \($before[.key] // "n/a") → \(.value)"' \
+            "$RUNNER_TEMP/majors.json")
+          if [ -z "$HELD_BACK" ]; then
+            HELD_BACK="_None — every dependency is on its latest major._"
+          fi
+
+          cat > "$RUNNER_TEMP/pr_body.md" <<EOF
           ## 📦 Weekly NPM Dependencies Update
 
-          This automated PR updates npm packages to their latest versions.
+          This automated PR updates \`web/\` npm packages within their current major versions.
 
           ### Updated Packages
 
@@ -120,9 +155,16 @@ jobs:
           - ✅ Unit tests passed
           - ✅ Build successful
 
+          ### Major Upgrades Available (not applied)
+
+          Majors are intentionally excluded — they routinely break the build toolchain
+          (e.g. \`typescript\` 7.x drops the \`./lib/tsc\` export that \`vue-tsc\` requires).
+          Upgrade these deliberately in a dedicated PR:
+
+          $HELD_BACK
+
           ### Notes
 
-          - All dependencies have been updated to their latest compatible versions
           - \`package-lock.json\` has been regenerated
           - All tests passed successfully
 
@@ -138,24 +180,22 @@ jobs:
       - name: Commit changes
         if: steps.check_updates.outputs.has_updates == 'true'
         run: |
-          cd web
-
-          # Check if there are changes to commit
-          if [[ -n $(git status --porcelain) ]]; then
-            git add package.json package-lock.json
-            git commit -m "chore: update npm dependencies ($(date +%Y-%m-%d))
-
-            - Updated packages to their latest versions
-            - Regenerated package-lock.json
-            - All tests passing
-
-            🤖 Automated update by GitHub Actions"
+          # Scope the check to the manifest files so stray build artifacts never
+          # trigger an empty dependency PR.
+          if git diff --quiet -- web/package.json web/package-lock.json; then
+            echo "No dependency changes to commit"
+            echo "changes_committed=false" >> $GITHUB_ENV
+          else
+            git add web/package.json web/package-lock.json
+            git commit \
+              -m "chore(deps): update web npm dependencies ($(date +%Y-%m-%d))" \
+              -m "- Updated packages to their latest in-major versions" \
+              -m "- Regenerated package-lock.json" \
+              -m "- Type check, unit tests and build all passing" \
+              -m "🤖 Automated update by GitHub Actions"
 
             git push origin "$BRANCH_NAME"
             echo "changes_committed=true" >> $GITHUB_ENV
-          else
-            echo "No changes to commit"
-            echo "changes_committed=false" >> $GITHUB_ENV
           fi
 
       - name: Create Pull Request
@@ -164,8 +204,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh pr create \
-            --title "chore: Weekly NPM dependencies update ($(date +%Y-%m-%d))" \
-            --body-file /tmp/pr_body.md \
+            --title "chore(deps): update web npm dependencies ($(date +%Y-%m-%d))" \
+            --body-file "$RUNNER_TEMP/pr_body.md" \
             --base main \
             --head "$BRANCH_NAME" \
             --label "dependencies" \
@@ -174,4 +214,4 @@ jobs:
       - name: No updates needed
         if: steps.check_updates.outputs.has_updates == 'false'
         run: |
-          echo "✅ All npm packages are up to date. No PR needed."
+          echo "✅ All npm packages are up to date within their current majors. No PR needed."
