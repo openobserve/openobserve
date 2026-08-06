@@ -229,8 +229,7 @@ export function mergeSubjectOverrides(
     const groupId = fieldToGroupId.get(hit.toLowerCase());
     const existingKey = Object.keys(effective).find(
       (key) =>
-        key === hit ||
-        (groupId !== undefined && fieldToGroupId.get(key.toLowerCase()) === groupId),
+        key === hit || (groupId !== undefined && fieldToGroupId.get(key.toLowerCase()) === groupId),
     );
     if (existingKey !== undefined && existingKey !== hit) {
       delete effective[existingKey];

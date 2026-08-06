@@ -949,5 +949,4 @@ describe("TelemetryCorrelationDashboard.vue", () => {
       expect(wrapper.vm.showMetricSelector).toBe(false);
     });
   });
-
 });

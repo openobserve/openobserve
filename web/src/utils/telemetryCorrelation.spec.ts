@@ -347,7 +347,11 @@ describe("telemetryCorrelation", () => {
     it("resolves an override to the stream's own alias for the same group (F35)", () => {
       // Chip key came from stream A ("k8s_namespace_name"); stream B uses the other alias.
       expect(
-        applyFilterOverlay({ service_k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
+        applyFilterOverlay(
+          { service_k8s_namespace_name: "a" },
+          { k8s_namespace_name: "b" },
+          groups,
+        ),
       ).toEqual({ service_k8s_namespace_name: "b" });
     });
 
@@ -407,11 +411,7 @@ describe("telemetryCorrelation", () => {
 
     it("applies raw-field-keyed edits (SearchResult dialog path — F36)", () => {
       expect(
-        applyDimensionEditsToFilters(
-          { k8s_namespace_name: "a" },
-          { k8s_namespace_name: "b" },
-          f2d,
-        ),
+        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, f2d),
       ).toEqual({ k8s_namespace_name: "b" });
     });
 
@@ -493,9 +493,9 @@ describe("telemetryCorrelation", () => {
     });
 
     it("adds an override whose group is not present in the filters", () => {
-      expect(mergeSubjectOverrides({ k8s_pod_name: "p" }, { k8s_namespace_name: "n" }, groups)).toEqual(
-        { k8s_pod_name: "p", k8s_namespace_name: "n" },
-      );
+      expect(
+        mergeSubjectOverrides({ k8s_pod_name: "p" }, { k8s_namespace_name: "n" }, groups),
+      ).toEqual({ k8s_pod_name: "p", k8s_namespace_name: "n" });
     });
 
     it("leaves filters of other groups untouched while replacing one group", () => {

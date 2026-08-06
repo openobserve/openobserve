@@ -252,7 +252,6 @@ describe("useCorrelatedLogs", () => {
       expect(composable.currentFilters.value.service).toBe("updated-api");
       expect(composable.currentFilters.value.region).toBe("us-east");
     });
-
   });
 
   describe("Dimension Helpers", () => {
