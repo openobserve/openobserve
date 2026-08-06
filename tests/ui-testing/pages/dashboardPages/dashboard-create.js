@@ -134,20 +134,43 @@ export default class DashboardCreate {
 
   //back to dashboard list
   async backToDashboardList() {
-    await this.backBtn.waitFor({ state: "visible", timeout: 50000 });
-    await this.backBtn.click();
+    // "Back" is not one hop from everywhere. The panel editor and the
+    // dashboard view both render data-test="dashboard-back-btn", but
+    // AddPanel.vue's goBack() pushes /dashboards/view while ViewDashboard.vue's
+    // goBackToDashboardList() pushes /dashboards — so reaching the list from
+    // the editor genuinely takes TWO clicks. On top of that, a click issued
+    // mid page-transition can land on a header that is being torn down and
+    // silently no-op. Click, re-check the URL, and repeat with a fresh locator
+    // lookup until we're on the list.
+    const LIST_URL = /\/dashboards(?:\?|$)/;
+    const maxClicks = 4;
+    let lastError;
 
-    // Verify the click actually navigated to the list. Both the panel-editor
-    // and the dashboard-view page render an element with the same
-    // data-test="dashboard-back-btn", so a click that lands on a stale
-    // instance mid page-transition can silently no-op instead of throwing —
-    // retry once with a fresh locator lookup before giving up.
-    try {
-      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 8000 });
-    } catch (e) {
-      await this.page.locator('[data-test="dashboard-back-btn"]').click();
-      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 15000 });
+    for (let attempt = 1; attempt <= maxClicks; attempt++) {
+      if (LIST_URL.test(this.page.url())) return;
+
+      const backBtn = this.page.locator('[data-test="dashboard-back-btn"]');
+      try {
+        await backBtn.waitFor({ state: "visible", timeout: 20000 });
+        await backBtn.click({ timeout: 10000 });
+      } catch (e) {
+        // Header may be remounting between the editor and view pages — fall
+        // through to the URL check and try again with a fresh lookup.
+        lastError = e;
+      }
+
+      try {
+        await this.page.waitForURL(LIST_URL, { timeout: 8000 });
+        return;
+      } catch (e) {
+        lastError = e;
+      }
     }
+
+    if (LIST_URL.test(this.page.url())) return;
+    throw new Error(
+      `backToDashboardList: still at ${this.page.url()} after ${maxClicks} back clicks. Last error: ${lastError?.message}`
+    );
   }
 
   //wait for back button to be visible (no click)

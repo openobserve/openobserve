@@ -249,7 +249,13 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {}) 
   await pm.dashboardCreate.createDashboard(dashboardName);
 
   if (waitForAddPanelBtn) {
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 10000 });
+    // createDashboard() returns as soon as /dashboards/view is reachable and the
+    // header's back button has mounted, but the empty-state add-panel button
+    // lives in RenderDashboardCharts (v-if="!panels.length"), which only renders
+    // once the dashboard GET and variables init have finished. Under parallel CI
+    // load that lands well after the header, so this wait needs the same budget
+    // as the other post-navigation waits here rather than a tight 10s.
+    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 30000 });
   }
 
   testLogger.info('Test dashboard setup complete', { dashboardName });
