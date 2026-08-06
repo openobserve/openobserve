@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -30,6 +31,7 @@ defineProps<{
 const incognitoDone = defineModel<boolean>("incognitoDone", { default: false });
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
@@ -41,7 +43,9 @@ const CHROME_UI_LABELS = {
 } as const;
 
 function openWebStore() {
-  window.open(CHROME_WEB_STORE_URL, "_blank", "noopener");
+  const url =
+    store.state.zoConfig?.synthetics_recorder_extension_url || CHROME_WEB_STORE_URL;
+  window.open(url, "_blank", "noopener");
 }
 </script>
 

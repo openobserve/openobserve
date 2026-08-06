@@ -21,6 +21,7 @@ vi.mock("vue-i18n", () => ({
 }));
 
 import { CHROME_WEB_STORE_URL } from "@/constants/synthetics";
+import store from "@/test/unit/helpers/store";
 import ExtensionSetupChecklist from "./ExtensionSetupChecklist.vue";
 
 // Stubs emit native-component click so parent @click handlers fire.
@@ -43,7 +44,7 @@ const STUBS = {
 function mountChecklist(props: Record<string, unknown> = {}) {
   return mount(ExtensionSetupChecklist, {
     props,
-    global: { stubs: STUBS },
+    global: { plugins: [store], stubs: STUBS },
   }) as VueWrapper;
 }
 
@@ -66,6 +67,17 @@ describe("ExtensionSetupChecklist", () => {
     await wrapper.find('[data-test="synthetics-setup-install-btn"]').trigger("click");
 
     expect(openSpy).toHaveBeenCalledWith(CHROME_WEB_STORE_URL, "_blank", "noopener");
+  });
+
+  it("should prefer the /config extension URL over the built-in fallback", async () => {
+    const configUrl = "https://chromewebstore.google.com/detail/custom-build";
+    store.state.zoConfig.synthetics_recorder_extension_url = configUrl;
+    wrapper = mountChecklist();
+
+    await wrapper.find('[data-test="synthetics-setup-install-btn"]').trigger("click");
+
+    expect(openSpy).toHaveBeenCalledWith(configUrl, "_blank", "noopener");
+    delete store.state.zoConfig.synthetics_recorder_extension_url;
   });
 
   it("should emit update:incognitoDone when the incognito switch is toggled on", async () => {

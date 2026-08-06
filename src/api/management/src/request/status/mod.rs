@@ -206,6 +206,10 @@ struct ConfigResponse<'a> {
     online_evals_enabled: bool,
     anomaly_detection_enabled: bool,
     synthetics_enabled: bool,
+    /// Chrome Web Store URL of the OpenObserve Recorder extension
+    /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
+    /// links its install button here.
+    synthetics_recorder_extension_url: String,
     /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
     /// answer 501 while it is off, so the UI uses this to hide the menu entry
     /// rather than offer a page that cannot work.
@@ -370,6 +374,8 @@ pub async fn zo_config() -> impl IntoResponse {
     let anomaly_detection_enabled = enterprise_value!(false, !o2cfg.anomaly_detection.disabled);
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     let synthetics_enabled = enterprise_value!(false, o2cfg.synthetics.enabled);
+    let synthetics_recorder_extension_url =
+        enterprise_value!("", &o2cfg.synthetics.recorder_extension_url);
 
     #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
     let build_type = "cloud";
@@ -483,6 +489,7 @@ pub async fn zo_config() -> impl IntoResponse {
         online_evals_enabled,
         anomaly_detection_enabled,
         synthetics_enabled,
+        synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         slo_enabled: cfg.slo.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
