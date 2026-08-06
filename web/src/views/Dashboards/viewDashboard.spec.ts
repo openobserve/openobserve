@@ -109,10 +109,13 @@ vi.mock("vue-router", () => ({
     go: vi.fn(),
     back: mockRouterBack,
     forward: vi.fn(),
+    // Returns the unregister function the real afterEach hands back.
+    afterEach: vi.fn(() => vi.fn()),
     options: { history: { state: mockHistoryState } },
     resolve: vi.fn().mockReturnValue({ href: "/test" }),
     currentRoute: {
       value: {
+        name: "viewDashboard",
         params: { dashboardId: "test-dashboard-1", folderId: "default" },
         query: {
           dashboard: "test-dashboard-1",
@@ -123,10 +126,12 @@ vi.mock("vue-router", () => ({
     },
   }),
   useRoute: () => ({
+    name: "viewDashboard",
     params: { dashboardId: "test-dashboard-1", folderId: "default" },
     query: { dashboard: "test-dashboard-1", folder: "default", tab: "tab-1" },
     path: "/dashboard/test-dashboard-1",
   }),
+  onBeforeRouteLeave: vi.fn(),
 }));
 
 // Export router mocks for use in tests
@@ -230,6 +235,7 @@ vi.mock("moment-timezone", () => ({
   })),
 }));
 
+import { onBeforeRouteLeave } from "vue-router";
 import ViewDashboard from "@/views/Dashboards/ViewDashboard.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -556,6 +562,28 @@ describe("ViewDashboard", () => {
           org_identifier: "test-org",
         },
       });
+    });
+
+    it("stops syncing the URL once a navigation away from the dashboard has started", async () => {
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // A refresh-interval change normally syncs the dashboard's query params.
+      wrapper.vm.refreshInterval = 60;
+      await flushPromises();
+      expect(global.mockRouterReplace).toHaveBeenCalled();
+
+      // Leaving (create-alert from a panel, go-to-logs, drilldown) is a push to
+      // a lazy-loaded route: a replace() started before it settles cancels it,
+      // and the user's click silently does nothing.
+      const leaveGuard = vi.mocked(onBeforeRouteLeave).mock.calls[0][0];
+      leaveGuard({}, {}, () => {});
+      global.mockRouterReplace.mockClear();
+
+      wrapper.vm.refreshInterval = 120;
+      await flushPromises();
+
+      expect(global.mockRouterReplace).not.toHaveBeenCalled();
     });
 
     it("should navigate to add panel when addPanelData is called", async () => {

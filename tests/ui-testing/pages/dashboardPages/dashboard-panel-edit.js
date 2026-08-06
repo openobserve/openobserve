@@ -220,6 +220,48 @@ export default class DashboardPanel {
     await this.alertContextMenuBelow.dispatchEvent("click");
   }
 
+  // Pick a threshold from the alert context menu and land on the alert form.
+  //
+  // Leaving a dashboard is a lazy-loaded route push, and the dashboard view
+  // syncs its own query params while that push is in flight — a sync that wins
+  // the race cancels the navigation and the click looks like it did nothing.
+  // Reopening the menu and picking again is cheaper than losing the whole test,
+  // and a navigation to somewhere unexpected fails fast with the actual URL
+  // instead of a bare 15s timeout.
+  async createAlertFromContextMenu(
+    condition,
+    urlPattern = /.*alerts\/add.*prefill=panel.*/,
+    attempts = 3
+  ) {
+    const select =
+      condition === "above"
+        ? () => this.selectAlertAboveThreshold()
+        : () => this.selectAlertBelowThreshold();
+
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      await select();
+
+      const navigated = await this.page
+        .waitForURL(urlPattern, { timeout: 8000 })
+        .then(() => true)
+        .catch(() => false);
+      if (navigated) return;
+
+      if (!this.page.url().includes("/dashboards/view")) {
+        throw new Error(
+          `Alert creation left the dashboard but landed on an unexpected URL: ${this.page.url()}`
+        );
+      }
+
+      // Still on the dashboard — reopen the context menu and try again.
+      await this.rightClickChartForAlert();
+    }
+
+    // Out of attempts: assert once more so the failure carries Playwright's
+    // own diagnostics rather than a hand-rolled message.
+    await this.page.waitForURL(urlPattern, { timeout: 10000 });
+  }
+
   //open Query inspector
 
   async openQueryInspector(panelName) {

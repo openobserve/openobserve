@@ -165,13 +165,8 @@ test.describe("Dashboard Create Alert testcases", () => {
       await expect(belowOption).toBeVisible({ timeout: 5000 });
       await expect(belowOption).toContainText("Create Alert with threshold below");
 
-      // Click "above threshold" option and wait for navigation simultaneously
-      await Promise.all([
-        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
-          timeout: 15000,
-        }),
-        pm.dashboardPanelEdit.selectAlertAboveThreshold(),
-      ]);
+      // Click "above threshold" and land on the alert form
+      await pm.dashboardPanelEdit.createAlertFromContextMenu("above");
 
       const currentUrl = page.url();
       expect(currentUrl).toContain("prefill=panel");
@@ -248,13 +243,8 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Verify context menu appears
       await pm.dashboardPanelEdit.expectAlertContextMenuVisible();
 
-      // Click "below threshold" option and wait for navigation simultaneously
-      await Promise.all([
-        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
-          timeout: 15000,
-        }),
-        pm.dashboardPanelEdit.selectAlertBelowThreshold(),
-      ]);
+      // Click "below threshold" and land on the alert form
+      await pm.dashboardPanelEdit.createAlertFromContextMenu("below");
 
       const currentUrl = page.url();
       expect(currentUrl).toContain("prefill=panel");

@@ -317,7 +317,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ShareButton from "@/components/common/ShareButton.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import { useRouter } from "vue-router";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
@@ -685,6 +685,33 @@ export default defineComponent({
     // Prevents the var-* watcher from re-triggering when the app itself syncs
     // variable params to the URL (e.g., after a normal dropdown change).
     const isInternalUrlUpdate = ref(false);
+
+    // Guard flag: true from the moment a navigation AWAY from the dashboard
+    // starts until it settles.
+    //
+    // Leaving is not instant — the destination's route component is lazy-loaded
+    // (create-alert from a panel, go-to-logs, drilldown), so the push is still
+    // in flight for as long as that chunk takes. Any router.replace() started in
+    // that window cancels it, and the user's click silently does nothing. Worse,
+    // a sync that lands just after arrival rewrites the DESTINATION's query with
+    // dashboard params, dropping what it was navigated with (e.g. prefill=panel).
+    // So: once we are leaving, this view stops writing the URL.
+    const isLeavingDashboard = ref(false);
+
+    // Captured rather than hardcoded so renaming the route can't silently turn
+    // the guard below into "never sync".
+    const dashboardRouteName = route.name;
+
+    onBeforeRouteLeave(() => {
+      isLeavingDashboard.value = true;
+    });
+
+    // afterEach fires for aborted/failed navigations too, so a leave that never
+    // completes restores URL syncing instead of wedging it off forever.
+    const stopNavigationWatch = router.afterEach(() => {
+      isLeavingDashboard.value = false;
+    });
+    onUnmounted(() => stopNavigationWatch());
 
     const loadDashboard = async (onlyIfRequired = false) => {
       // check if drilldown or soft-refresh request
@@ -1349,6 +1376,14 @@ export default defineComponent({
 
     // Helper function to update URL with current state
     const updateUrlWithCurrentState = () => {
+      // Never write the dashboard's query onto a URL that is no longer ours.
+      // Most callers reach here through `await nextTick()` inside a watcher, so
+      // the navigation state can have moved on since the change that triggered
+      // them — see isLeavingDashboard.
+      if (isLeavingDashboard.value || router.currentRoute.value.name !== dashboardRouteName) {
+        return;
+      }
+
       isInternalUrlUpdate.value = true;
       try {
         // Build variable params - prefer manager if available, otherwise use route.query
