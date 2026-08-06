@@ -15,6 +15,12 @@
 
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
+import {
+  fetchSetting,
+  invalidateSetting,
+  primeSetting,
+  refetchSetting,
+} from "@/composables/query/queries/userSettings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
 
@@ -41,12 +47,18 @@ export function useFavoriteDashboards() {
   const isFavorite = (dashboardId: string) =>
     favorites.value.some((f) => f.dashboardId === dashboardId);
 
-  const load = async (org: string, userId: string) => {
+  /**
+   * Cached read — this runs on nearly every Dashboards mount, and the result
+   * survives a reload so the favourites rail paints immediately. `force` is for
+   * the rare caller that must see the server's copy.
+   */
+  const load = async (org: string, userId: string, force = false) => {
     if (!org || !userId) return;
     isLoading.value = true;
     try {
-      const res = await settings.getSetting(org, SETTING_KEY, userId);
-      const val = res?.data?.setting_value;
+      const val = force
+        ? await refetchSetting(org, SETTING_KEY, userId)
+        : await fetchSetting(org, SETTING_KEY, userId);
       favorites.value = Array.isArray(val) ? val.filter((f: any) => f && f.dashboardId) : [];
     } catch {
       // Missing setting / 404 → no favorites yet for this user.
@@ -69,6 +81,7 @@ export function useFavoriteDashboards() {
       : [...prev, d]; // optimistic
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
+      primeSetting(org, SETTING_KEY, favorites.value, userId);
     } catch (e: any) {
       favorites.value = prev; // revert
       toast({
@@ -93,7 +106,11 @@ export function useFavoriteDashboards() {
     favorites.value = next;
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
+      primeSetting(org, SETTING_KEY, favorites.value, userId);
     } catch {
+      // The cached copy is now behind the screen; drop it so the next load
+      // reconciles from the server.
+      invalidateSetting(org, SETTING_KEY, userId);
       // Best-effort cleanup that trails a successful delete — leave the local
       // list pruned so the row disappears now, and let the next load() reconcile
       // rather than resurrecting a row for a dashboard that is already gone.

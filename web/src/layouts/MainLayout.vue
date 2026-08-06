@@ -217,6 +217,7 @@ import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries } from "@/composables/query/queryClient";
 import { fetchConfig } from "@/composables/query/queries/config";
+import { fetchOrgSettings } from "@/composables/query/queries/orgMeta";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
@@ -1093,9 +1094,11 @@ export default defineComponent({
 
       try {
         //get organizations settings
-        const orgSettings: any = await organizations.get_organization_settings(
-          store.state?.selectedOrganization?.identifier,
-        );
+        // Cached: MainLayout re-reads this on every org switch, and the
+        // settings pages read it again on mount.
+        const orgSettings: any = {
+          data: await fetchOrgSettings(store.state?.selectedOrganization?.identifier),
+        };
 
         //set settings in store
         //scrape interval will be in number

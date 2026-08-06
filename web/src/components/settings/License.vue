@@ -485,6 +485,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
+import { fetchLicense } from "@/composables/query/queries/orgMeta";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -543,8 +544,7 @@ export default defineComponent({
     const loadLicenseData = async () => {
       try {
         loading.value = true;
-        const response = await licenseServer.get_license();
-        licenseData.value = response.data;
+        licenseData.value = await fetchLicense();
         checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);

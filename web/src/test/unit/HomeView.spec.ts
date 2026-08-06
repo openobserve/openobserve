@@ -460,7 +460,11 @@ describe("HomeView org home dashboard tab", () => {
     wrapper.vm.activeHomeTab = "dash:B:abc";
     await flushPromises();
     // load(org) re-reads the authoritative setting via getSetting(org, key).
-    expect(settingsService.getSetting).toHaveBeenCalledWith("test-org", "home_dashboard");
+    expect(settingsService.getSetting).toHaveBeenCalledWith(
+      "test-org",
+      "home_dashboard",
+      undefined,
+    );
   });
 
   it("does NOT toast when the pin is closed deliberately via the ×", async () => {

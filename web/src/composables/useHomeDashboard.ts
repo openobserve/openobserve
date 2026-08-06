@@ -15,6 +15,11 @@
 
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
+import {
+  fetchSetting,
+  primeSetting,
+  refetchSetting,
+} from "@/composables/query/queries/userSettings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type I18nText } from "@/types/i18n";
 
@@ -34,12 +39,14 @@ const isLoading = ref(false);
 export function useHomeDashboard() {
   const isHome = (dashboardId: string) => homeDashboard.value?.dashboardId === dashboardId;
 
-  const load = async (org: string) => {
+  /** Cached read — see useFavoriteDashboards.load for the same rationale. */
+  const load = async (org: string, force = false) => {
     if (!org) return;
     isLoading.value = true;
     try {
-      const res = await settings.getSetting(org, SETTING_KEY);
-      const val = res?.data?.setting_value;
+      const val: any = force
+        ? await refetchSetting(org, SETTING_KEY)
+        : await fetchSetting(org, SETTING_KEY);
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
@@ -60,6 +67,7 @@ export function useHomeDashboard() {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
+      primeSetting(org, SETTING_KEY, d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({ variant: "error", message: raw(errMessage(e, "set")) });
@@ -72,6 +80,7 @@ export function useHomeDashboard() {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
+      primeSetting(org, SETTING_KEY, null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the

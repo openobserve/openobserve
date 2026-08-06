@@ -40,7 +40,8 @@ describe("useHomeDashboard", () => {
     (settings.getSetting as any).mockResolvedValue({ data: { setting_value: D } });
     const { load, homeDashboard } = useHomeDashboard();
     await load("org1");
-    expect(settings.getSetting).toHaveBeenCalledWith("org1", "home_dashboard");
+    // userId is passed through as undefined — the home pin is org-scoped.
+    expect(settings.getSetting).toHaveBeenCalledWith("org1", "home_dashboard", undefined);
     expect(homeDashboard.value).toEqual(D);
   });
 

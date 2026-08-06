@@ -197,6 +197,13 @@ export const qk = {
 
   settings: {
     root: (o: OrgId) => [...org(o), "settings"] as const,
+    /**
+     * One resolved setting. `userId` is part of the key because user-scoped
+     * settings (favorites) resolve differently per user, and two users share a
+     * browser profile.
+     */
+    setting: (o: OrgId, key: string, userId?: string) =>
+      [...org(o), "settings", "setting", key, userId ?? "__org__"] as const,
     nodes: (o: OrgId) => [...org(o), "settings", "nodes"] as const,
     cipherKeys: (o: OrgId) => [...org(o), "settings", "cipherKeys"] as const,
     regexPatterns: (o: OrgId) => [...org(o), "settings", "regexPatterns"] as const,

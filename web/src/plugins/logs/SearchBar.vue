@@ -1987,6 +1987,7 @@ import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
 import { sortSavedViews } from "./savedViewsSort";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
+import { invalidateSavedViews } from "@/composables/query/queries/savedViews";
 
 const defaultValue: any = () => {
   return {
@@ -3984,6 +3985,7 @@ export default defineComponent({
         savedviewsService
           .delete(store.state.selectedOrganization.identifier, deleteViewID.value)
           .then((res) => {
+            invalidateSavedViews(store.state.selectedOrganization.identifier);
             //remove it from localstorage as well
             const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
             delete localStoredSavedViews[deleteViewID.value];
@@ -4088,6 +4090,7 @@ export default defineComponent({
         return savedviewsService
           .post(store.state.selectedOrganization.identifier, viewObj)
           .then((res) => {
+            invalidateSavedViews(store.state.selectedOrganization.identifier);
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               if (Object.prototype.hasOwnProperty.call(searchObj.data, "savedViews") === false) {
@@ -4145,6 +4148,7 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
+            invalidateSavedViews(store.state.selectedOrganization.identifier);
             dismiss();
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);

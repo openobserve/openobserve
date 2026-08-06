@@ -19,7 +19,6 @@ import type { TranslateFn } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import useStreams from "@/composables/useStreams";
-import savedviewsService from "@/services/saved_views";
 import searchService from "@/services/search";
 
 import { arraysMatch } from "@/utils/zincutils";
@@ -38,6 +37,10 @@ import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
+import {
+  fetchSavedViews,
+  refetchSavedViews,
+} from "@/composables/query/queries/savedViews";
 
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
@@ -108,14 +111,16 @@ export const useSearchBar = (t: TranslateFn) => {
     }
   };
 
-  const getSavedViews = async () => {
+  // `force` for the reloads that follow a create/update/delete; a plain call on
+  // Logs entry is a cache hit.
+  const getSavedViews = async (force = false) => {
     try {
       searchObj.loadingSavedView = true;
-      savedviewsService
-        .get(store.state.selectedOrganization.identifier)
-        .then((res) => {
+      const org = store.state.selectedOrganization.identifier;
+      (force ? refetchSavedViews(org) : fetchSavedViews(org))
+        .then((views: any[]) => {
           searchObj.loadingSavedView = false;
-          searchObj.data.savedViews = res.data.views;
+          searchObj.data.savedViews = views;
         })
         .catch((err) => {
           searchObj.loadingSavedView = false;

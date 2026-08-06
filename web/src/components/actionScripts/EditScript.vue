@@ -437,6 +437,7 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeEditScriptSchema, type EditScriptForm } from "./EditScript.schema";
+import { invalidateActions } from "@/composables/query/queries/actions";
 
 defineProps({
   report: {
@@ -833,6 +834,7 @@ const saveActionScript = async (value: EditScriptForm) => {
 
   return updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
+      invalidateActions(store.state.selectedOrganization.identifier);
       toast({
         variant: "success",
         message: isEditingActionScript.value

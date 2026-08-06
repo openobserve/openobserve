@@ -64,7 +64,8 @@ describe("useFavoriteDashboards", () => {
     (settings.getSetting as any).mockResolvedValue({
       data: { setting_value: { not: "an array" } },
     });
-    await load("org1", "me@example.com");
+    // Forced: the first load above cached the setting for this org+user.
+    await load("org1", "me@example.com", true);
     expect(favorites.value).toEqual([]);
   });
 
