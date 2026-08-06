@@ -121,6 +121,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import { fetchTraceDag } from "@/composables/query/queries/traces";
 
 export interface SpanNode {
   span_id: string;
@@ -404,14 +405,13 @@ export default defineComponent({
         error.value = null;
 
         const org = store.state.selectedOrganization.identifier;
-        const response = await searchService.getTraceDAG(
+        dagData.value = await fetchTraceDag(
           org,
           props.streamName,
           props.traceId,
           props.startTime,
           props.endTime,
         );
-        dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
         error.value =
