@@ -5,32 +5,42 @@ OpenAI-compatible API.
 
 ## Overview
 
-This system automatically translates the English locale file (`en-US.json`) into multiple languages **during the build process**. It intelligently preserves existing translations and only translates new keys, making it safe to run repeatedly.
+This system automatically translates the English locale file (`en-US.json`) into multiple languages. It intelligently preserves existing translations and only translates new keys, making it safe to run repeatedly.
 
 ## 🚀 How It Works
 
-**Automatic workflow triggered by `en-US.json` changes:**
+**Automatic workflow triggered when `en-US.json` lands on `main`:**
 
-1. **Developer updates `en-US.json`** and pushes to any branch (main, develop, feature branches)
-2. **GitHub Action detects the change** and automatically triggers
+1. **Developer updates `en-US.json`** and merges the change to `main`
+2. **GitHub Actions detects it** via the workflow's `paths:` filter — pushes that don't touch `en-US.json` never start a run at all
 3. **Translation script runs** using DeepSeek to update all language files
-4. **Changes are committed** back to the same branch automatically
+4. **A PR is opened** (`chore/update-translations`), auto-approved and set to auto-merge
 5. **Build workflows use updated files** - all subsequent builds have fresh translations
 
 This means **translations are always up-to-date** without any manual intervention!
 
 ## Supported Languages
 
-- 🇹🇷 Turkish (tr)
-- 🇨🇳 Chinese (zh)
-- 🇫🇷 French (fr)
-- 🇪🇸 Spanish (es)
-- 🇩🇪 German (de)
-- 🇮🇹 Italian (it)
-- 🇵🇹 Portuguese (pt)
-- 🇯🇵 Japanese (ja)
-- 🇰🇷 Korean (ko)
-- 🇳🇱 Dutch (nl)
+The list lives in `LANGUAGE_NAMES` in `translator.py` — that dict is the single
+source of truth for both the locale codes and the language names used in the prompt.
+
+- 🇹🇷 Turkish (tr-TR)
+- 🇨🇳 Simplified Chinese (zh-CN)
+- 🇹🇼 Traditional Chinese (zh-TW)
+- 🇫🇷 French (fr-FR)
+- 🇪🇸 Spanish (es-ES)
+- 🇩🇪 German (de-DE)
+- 🇮🇹 Italian (it-IT)
+- 🇵🇹 Portuguese (pt-PT)
+- 🇯🇵 Japanese (ja-JP)
+- 🇰🇷 Korean (ko-KR)
+- 🇳🇱 Dutch (nl-NL)
+- 🇷🇺 Russian (ru-RU)
+- 🇵🇱 Polish (pl-PL)
+- 🇻🇳 Vietnamese (vi-VN)
+
+RTL languages (Arabic, Persian) are deliberately excluded until the web app has
+`dir="rtl"` support — see the note in `translator.py`.
 
 ## How It Works
 
@@ -69,6 +79,7 @@ export DEEPSEEK_API_KEY=your_api_key
 export DEEPSEEK_MODEL=deepseek-v4-flash        # model id
 export DEEPSEEK_BASE_URL=https://api.deepseek.com
 export TRANSLATION_BATCH_SIZE=50               # strings per API call
+export TRANSLATION_CONCURRENCY=4               # batches in flight per locale (1 = serial)
 ```
 
 ### Running Translations
@@ -95,13 +106,26 @@ python3 main.py fr-FR es-ES de-DE
 
 The workflow (`.github/workflows/update-translations.yml`) automatically runs when:
 
-- **Trigger**: Any push that modifies `web/src/locales/languages/en-US.json`
-- **Branches**: **All branches** (`**`)
+- **Trigger**: A push to `main` that modifies `web/src/locales/languages/en-US.json`
+- **Branches**: **`main` only** (plus manual `workflow_dispatch`)
 - **Action**:
   1. Runs Python translation script
   2. Updates all language JSON files
-  3. Commits changes back to the same branch
-  4. Subsequent builds use the updated files
+  3. Opens PR `chore/update-translations`, approves it, enables auto-merge
+  4. Subsequent builds use the updated files once that PR merges
+
+### Run lifecycle guarantees
+
+Two properties of the workflow matter when you are reading a run:
+
+- **Runs are never cancelled by a newer push.** The concurrency group uses
+  `cancel-in-progress: false`, so at most one run works at a time and at most one
+  waits. A queued run checks out the branch *tip*, so it picks up whatever its
+  predecessor already merged instead of redoing it.
+- **Partial progress is always shipped.** Locale files are written atomically, one
+  locale at a time, and the PR steps run under `if: always()`. A run that fails
+  validation on some strings — or is cancelled manually — still opens a PR with the
+  locales it finished. Anything unfinished simply stays pending for the next run.
 
 ### Setup Requirements
 
@@ -123,33 +147,32 @@ error if this secret is missing.
 
 ```mermaid
 graph TD
-    A[Push Code to Branch] --> B[Update Translations Workflow]
-    B --> C{en-US.json Changed?}
-    C -->|Yes| D[Run Translation Script]
-    C -->|No| E[Skip Translation]
-    D --> F[Commit Updated Languages]
-    E --> G[Mark Complete]
-    F --> G
-    G --> H[Build Workflows Start]
-    H --> I[Build with Latest Translations]
+    A[Push to main] --> C{en-US.json in the diff?}
+    C -->|No| E[No run is created at all]
+    C -->|Yes| D[Run translation script]
+    D --> F{Any new/changed keys<br/>vs .translation_state.json?}
+    F -->|No| G[Done - already up to date]
+    F -->|Yes| H[Translate pending keys only]
+    H --> I[Open/update PR chore/update-translations]
+    I --> J[Auto-approve + auto-merge]
+    J --> K[Build workflows use latest translations]
 ```
 
 **Workflow Execution Order:**
 
-1. **Push code** → `update-translations.yml` runs
-2. Checks if `en-US.json` changed
-   - If YES: Translates and commits back to branch
-   - If NO: Skips (fast, ~10 seconds)
-3. **If translations were committed** → New push event
-4. **Build workflows trigger** on the new commit → Use updated translations
+1. **Merge to `main`** → GitHub's `paths:` filter decides whether a run is created
+2. Script reconciles `en-US.json` against `.translation_state.json`
+   - New / changed keys: translated
+   - Everything else: kept, never re-sent to the API
+3. **If any file changed** → PR opened, approved, auto-merged
+4. **Build workflows** pick up the translations once that PR lands
 
 **Key Features:**
-- ✅ **Always runs** - Checks every push for en-US.json changes
-- ✅ **Smart detection** - Only translates if en-US.json actually changed
-- ✅ **Non-blocking** - Quick skip if no translation needed
-- ✅ **Auto-commit** - Updates committed back to same branch
-- ✅ **Natural flow** - Translation commit triggers builds automatically
-- ✅ **Works everywhere** - All branches (main, develop, feature branches)
+- ✅ **Cheap trigger** - a push without `en-US.json` changes creates no run at all
+- ✅ **Smart detection** - only new or modified keys are translated
+- ✅ **Never re-billed per branch** - runs on `main` only, so each string is translated once, when it lands
+- ✅ **Crash/cancel safe** - completed locales are still shipped in a PR
+- ✅ **Reviewable** - lands as a normal PR rather than a direct push to a protected branch
 
 ### Manual Workflow Trigger
 
@@ -159,7 +182,11 @@ You can also run translations manually:
 2. Select **Update Translations** workflow
 3. Click **Run workflow**
 4. (Optional) Specify specific languages: `fr-FR es-ES de-DE`
-5. Translations will be committed to the current branch
+5. Translations are opened as a PR against the branch you ran it from
+
+> Note: a subset run (specific languages) intentionally does **not** advance
+> `.translation_state.json` — see [Change detection](#change-detection-translation_statejson).
+> Use it to unblock or backfill one language; run all languages to persist state.
 
 ## File Structure
 
@@ -181,40 +208,44 @@ web/src/locales/languages/
 ├── pt-PT.json           # Portuguese translations
 ├── ja-JP.json           # Japanese translations
 ├── ko-KR.json           # Korean translations
-└── nl-NL.json           # Dutch translations
+├── nl-NL.json           # Dutch translations
+├── zh-TW.json           # Traditional Chinese translations
+├── ru-RU.json           # Russian translations
+├── pl-PL.json           # Polish translations
+└── vi-VN.json           # Vietnamese translations
 ```
 
 ## Adding New Languages
 
-1. Add language code to `get_supported_languages()` in `translator.py`
-2. Update the README to reflect the new language
-3. Run the translation script
+1. Add the locale code and language name to `LANGUAGE_NAMES` in `translator.py`
+   (`get_supported_languages()` is derived from it)
+2. Wire the locale into the web app's locale registry (`web/src/locales/`)
+3. Update the README to reflect the new language
+4. Run the translation script
 
 ## Troubleshooting
 
-### Workflow Not Detecting en-US.json Changes
+### No Run Was Created for My en-US.json Change
 
-**Symptom:** You changed `en-US.json` but workflow says "en-US.json not modified"
+**Symptom:** You changed `en-US.json` but no **Update Translations** run appears.
 
-**Solution 1 - Check workflow logs:**
-1. Go to **Actions** → **Update Translations** → Click the run
-2. Look at "Check if en-US.json was modified" step
-3. It shows debug info: event type, before/after SHAs, and changed files
+The trigger is a `paths:` filter on **pushes to `main`** — GitHub evaluates it
+before any job exists, so a non-matching push produces no run at all (this is
+intended: it is what stops feature branches from re-translating the same strings).
 
-**Solution 2 - Debug detection:**
+Check, in order:
+
 ```bash
-# Locally check what git sees
-git show --name-only --pretty="" HEAD
-# Should show web/src/locales/languages/en-US.json
+# 1. Is your change actually on main yet? The workflow does not run on branches.
+git log origin/main --oneline -1 -- web/src/locales/languages/en-US.json
 
-# Check last push
-git diff HEAD~1 --name-only
+# 2. Did the merged commit really touch the source file?
+git show --name-only --pretty="" <sha> | grep en-US.json
 ```
 
-**Root cause:** The detection uses `git diff` to compare commits. If:
-- Multiple commits in one push → Uses `github.event.before` and `github.sha`
-- First commit on branch → Uses `git show HEAD`
-- Manual trigger → Uses `git show HEAD`
+If the file is on `main` and a run exists but produced no PR, the keys were already
+recorded in `.translation_state.json` — nothing was pending. Confirm with a local
+run: `python3 main.py` prints `Translating: <locale> (N strings pending)`.
 
 ### API Key Error
 ```
@@ -238,11 +269,12 @@ ModuleNotFoundError: No module named 'openai'
 
 **Symptom:** Build doesn't have the latest translations
 
-**Solution:** Check if translation workflow ran and committed:
-1. Go to **Actions** → Find the **Update Translations** run
-2. Check if it detected en-US.json changes and committed translations
-3. If translations were committed, the commit should trigger a new build
-4. The new build will have updated translations
+**Solution:** Translations reach `main` through a PR, not a direct push — so check
+that the PR actually merged:
+1. Go to **Actions** → find the latest **Update Translations** run → read its Summary
+2. If it opened a PR, check that `chore/update-translations` merged (auto-merge can
+   stall on a failing required check, leaving the translations sitting in the PR)
+3. Builds started before that PR merged will still carry the old strings
 
 ## Workflow Example
 
@@ -267,7 +299,7 @@ ModuleNotFoundError: No module named 'openai'
 3. **Workflow automatically (on `main` only):**
    - Triggers because `web/src/locales/languages/en-US.json` changed
    - Runs translation script
-   - Translates only the **new or modified** keys to all 10 languages
+   - Translates only the **new or modified** keys to all 14 languages
    - Commits updated `fr-FR.json`, `es-ES.json`, etc. plus `.translation_state.json`
 
 4. **Build workflows:**
@@ -288,8 +320,14 @@ English source each translated value was derived from. On every run the script:
 - **Keeps** already-translated text whose source is unchanged — it is never re-sent to
   the API, and English is never "translated" to English.
 - **Prunes** keys that were removed from `en-US.json`.
-- **Bootstraps** safely: the first run after this file is introduced adopts existing
-  translations as-is (no costly full re-translation, no overwriting manual fixes).
+- **Bootstraps** safely: a key that already has a translation but no recorded hash is
+  adopted as-is (no costly full re-translation, no overwriting manual fixes). This is
+  also what lets a partially-completed run heal: once its locale files merge, those
+  new keys are adopted rather than translated again.
+
+State is only rewritten on a **full run** (every supported language), because a key's
+hash is recorded only when the translation is present in *every* locale. A subset run
+(`python3 main.py fr-FR`) translates correctly but deliberately leaves state untouched.
 
 Commit `.translation_state.json` together with the translation files — it is the
 source of truth that keeps subsequent runs incremental.
@@ -304,16 +342,18 @@ source of truth that keeps subsequent runs incremental.
 
 ## Cost Considerations
 
-Translation is billed per token by DeepSeek. The whole `en-US.json` is ~205k
-characters (~8,300 strings); a full 10-language rebuild is a one-time cost, and
-day-to-day runs only translate the handful of new/changed keys per `en-US.json`
-merge.
+Translation is billed per token by DeepSeek. The whole `en-US.json` is ~10,700
+strings; a full 14-language rebuild is a one-time cost, and day-to-day runs only
+translate the handful of new/changed keys per `en-US.json` merge.
 
 ### Cost Optimization:
 - ✅ Only **new or modified** keys are translated (unchanged text is never re-sent)
 - ✅ Strings are sent in **batches** (`TRANSLATION_BATCH_SIZE`, default 50) to cut request overhead
 - ✅ Runs on **`main` only**, and only when `en-US.json` changes (no per-branch re-billing)
-- ✅ Superseded runs are cancelled (`concurrency` with `cancel-in-progress`)
+- ✅ Batches run **concurrently** (`TRANSLATION_CONCURRENCY`, default 4) so a run finishes
+  and records its state instead of being overtaken by the next merge
+- ✅ Runs are **never cancelled mid-flight**, and partial progress is committed — work
+  already paid for is never discarded
 - ✅ Failed API calls / placeholder-mismatched outputs are retried next run, not silently kept
 
 ## Alternative Translation Services

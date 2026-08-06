@@ -35,10 +35,8 @@ jobs:
 
       - name: Configure Git
         run: |
-          # Commit as Bhargav rather than the bot, so the commit and the PR share
+          # Commit as one of the user rather than the bot, so the commit and the PR share
           # one author and the PR shows up under his own filters.
-          git config user.name "Bhargav"
-          git config user.email "551527+bjp232004@users.noreply.github.com"
 
       - name: Create update branch
         run: |
