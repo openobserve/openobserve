@@ -789,7 +789,7 @@ describe("AddDashboardFromGitHub Component", () => {
       ];
       await wrapper.vm.$nextTick();
       const drawer = wrapper.find('[data-test-stub="o-drawer"]');
-      expect(drawer.attributes("data-primary-label")).toBe("Add 1 dashboard(s)");
+      expect(drawer.attributes("data-primary-label")).toBe("Add 1 dashboard");
     });
 
     it("should disable the ODrawer primary button when no dashboards selected", async () => {

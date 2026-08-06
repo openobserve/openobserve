@@ -109,7 +109,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </div>
             <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
-              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }} credits used
+              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+              {{ t("billing.creditsUsedLabel") }}
             </div>
             <div
               v-if="aiUsage.mode === 'exhausted'"
@@ -168,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -349,7 +350,7 @@ export default defineComponent({
           // Only show subscribe prompt for Stripe orgs without subscription
           toast({
             variant: "warning",
-            message: "Please subscribe to one of the plan.",
+            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
             timeout: 5000,
           });
 
@@ -377,7 +378,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const frmPayment = ref();

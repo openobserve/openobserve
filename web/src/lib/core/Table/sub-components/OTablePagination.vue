@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useSlots, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const slots = useSlots();
 
 const props = withDefaults(
@@ -24,13 +24,13 @@ const props = withDefaults(
     isFirstPage: boolean;
     isLastPage: boolean;
     position?: "top" | "bottom";
-    title?: string;
+    title?: I18nText;
     /** When true, replace count + range text with skeleton bars */
     loading?: boolean;
   }>(),
   {
     position: "bottom",
-    title: "",
+    title: raw(""),
     totalCountExact: true,
   },
 );
@@ -57,7 +57,7 @@ const pageSizeSelectOptions = computed(() => {
     if (idx === -1) opts.push(props.pageSize);
     else opts.splice(idx, 0, props.pageSize);
   }
-  return opts.map((n) => ({ label: String(n), value: n }));
+  return opts.map((n) => ({ label: raw(String(n)), value: n }));
 });
 </script>
 

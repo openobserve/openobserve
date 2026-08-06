@@ -108,14 +108,19 @@ describe("ExternalAlertSourcesList", () => {
     const { copyToClipboard } = await import("@/utils/clipboard");
     const wrapper = await mountAndSettle();
     await (wrapper.vm as any).copyUrlFor(DEFAULT_SOURCE);
-    expect(copyToClipboard).toHaveBeenCalledWith(`http://localhost:5080${DEFAULT_SOURCE.url}`);
+    // copyToClipboard takes `t` so its toasts are translated.
+    expect(copyToClipboard).toHaveBeenCalledWith(
+      `http://localhost:5080${DEFAULT_SOURCE.url}`,
+      expect.any(Function),
+    );
   });
 
   it("copies just the bare token via copyToClipboard, not the full URL", async () => {
     const { copyToClipboard } = await import("@/utils/clipboard");
     const wrapper = await mountAndSettle();
     await (wrapper.vm as any).copyTokenFor(DEFAULT_SOURCE);
-    expect(copyToClipboard).toHaveBeenCalledWith(DEFAULT_SOURCE.token);
+    // copyToClipboard takes `t` so its toasts are translated.
+    expect(copyToClipboard).toHaveBeenCalledWith(DEFAULT_SOURCE.token, expect.any(Function));
   });
 
   it("shows 'not_connected' status when no senders exist", async () => {
@@ -278,6 +283,7 @@ describe("ExternalAlertSourcesList", () => {
     });
     expect(copyToClipboard).toHaveBeenCalledWith(
       "http://localhost:5080/api/v2/myorg/incidents/events/o2iat_staging1234efgh5678",
+      expect.any(Function),
     );
   });
 

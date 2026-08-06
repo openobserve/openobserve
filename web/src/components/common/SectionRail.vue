@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import { useRouter, type RouteLocationRaw } from "vue-router";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
@@ -92,7 +93,7 @@ const props = defineProps<{
   /** Currently-active section key (highlighted). */
   activeKey?: string;
   /** Optional small heading shown above the groups (e.g. the module name). */
-  title?: string;
+  title?: I18nText;
 }>();
 
 // Drop hidden items/empty groups (each item may carry a `visible` flag).

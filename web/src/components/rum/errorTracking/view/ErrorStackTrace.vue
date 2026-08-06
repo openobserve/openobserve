@@ -81,11 +81,11 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { ref } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 defineProps({
   error_stack: {

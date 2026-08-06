@@ -24,6 +24,7 @@
 // (e.g. id === "import" vs id === "create"). Copy lives in i18n
 // (en.json → emptyState.*), NOT inline, so it stays translatable.
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { I18nKey } from "@/types/i18n";
 
 import type { IllustrationName } from "./illustrations";
 
@@ -35,9 +36,9 @@ export interface EmptyStateAction {
   /** Icon shown in the card. `(string & {})` admits dynamic names while keeping autocomplete. */
   icon: IconName | (string & {});
   /** i18n key for the card title. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** i18n key for the card description (optional). */
-  descriptionKey?: string;
+  descriptionKey?: I18nKey;
   /** Identifier emitted with the `action` event so call sites can route. */
   id: string;
 }
@@ -46,9 +47,9 @@ export interface EmptyStatePreset {
   illustration: IllustrationName;
   variant: EmptyStateVariant;
   /** i18n key for the heading. */
-  titleKey: string;
+  titleKey: I18nKey;
   /** i18n key for the supporting line (optional). */
-  descriptionKey?: string;
+  descriptionKey?: I18nKey;
   /** Action cards (icon + title + description). Rendered as QuickStart cards. */
   actions?: EmptyStateAction[];
 }

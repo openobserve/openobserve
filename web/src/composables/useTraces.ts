@@ -18,6 +18,7 @@ import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
+import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
 import { buildFieldToGroupIdMap } from "@/utils/telemetryCorrelation";
@@ -302,7 +303,10 @@ const useTraces = () => {
     return query;
   }
 
-  const copyTracesUrl = (customTimeRange: { from: string; to: string } | null = null) => {
+  const copyTracesUrl = (
+    t: TranslateFn,
+    customTimeRange: { from: string; to: string } | null = null,
+  ) => {
     const queryParams = getUrlQueryParams(true);
 
     if (customTimeRange) {
@@ -322,9 +326,9 @@ const useTraces = () => {
       shareURL += "?" + queryString;
     }
 
-    copyToClipboard(shareURL, {
-      successMessage: "Link Copied Successfully!",
-      errorMessage: "Error while copy link.",
+    copyToClipboard(shareURL, t, {
+      successMessage: t("search.linkCopiedSuccessfully"),
+      errorMessage: t("toastMessages.views.errorWhileCopyLink"),
       timeout: 5000,
     });
   };

@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -255,7 +255,7 @@ const emit = defineEmits<{
   (e: "created", fn: any): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const loading = ref(false);

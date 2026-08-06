@@ -11,6 +11,7 @@ import { OTableTreeContextKey } from "../composables/useTableTree";
 import { OTableCellActionsKey } from "../OTable.types";
 import { PIVOT_TABLE_TOTAL_COLUMN_WIDTH } from "@/utils/dashboard/constants";
 import { copyToClipboard } from "@/utils/clipboard";
+import { useI18nTyped } from "@/types/i18n";
 
 const slots = useSlots();
 
@@ -24,7 +25,7 @@ async function handleCopy(event: MouseEvent) {
   // Copy what the user sees: the formatted display value (dashboard format fns
   // handle units, timestamps and no_value_replacement), not the raw cell value.
   const value = String(displayValue.value ?? "");
-  const success = await copyToClipboard(value, { silent: true });
+  const success = await copyToClipboard(value, t, { silent: true });
   if (success) {
     copied.value = true;
     if (copyTimer) clearTimeout(copyTimer);
@@ -272,6 +273,8 @@ function handleClick() {
   });
 }
 
+const { t } = useI18nTyped();
+
 // Right-click. Emitted as plain values (not the TanStack cell) so a consumer's
 // context menu keeps rendering correctly even after the virtualizer recycles
 // the row underneath it. The event is NOT prevented — the consumer decides
@@ -430,7 +433,7 @@ function onCellActionsLeave() {
           :data-copied="copied ? 'true' : undefined"
           class="h-4! min-h-0! w-4! shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100"
           :class="align === 'right' ? 'order-first mr-1' : 'ml-1'"
-          :title="copied ? 'Copied!' : 'Copy'"
+          :title="copied ? t('common.copiedExclaim') : t('common.copy')"
           @click="handleCopy"
         >
           <OIcon :name="copied ? 'check' : 'content-copy'" size="sm" />

@@ -99,6 +99,7 @@ const mockLogsUtils = {
 
 const mockHistogram = {
   getHistogramTitle: vi.fn(() => "Histogram"),
+  getHistogramTitleParts: vi.fn(() => null),
   generateHistogramData: vi.fn(),
   resetHistogramWithError: vi.fn(),
 };

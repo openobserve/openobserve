@@ -84,7 +84,7 @@
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -102,7 +102,7 @@ import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
 
 const props = defineProps<{ alert: any }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const chartData = ref<any>(null);

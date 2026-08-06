@@ -37,6 +37,8 @@
 
 // ─── Public types ─────────────────────────────────────────────────────────────
 
+import type { I18nText } from "@/types/i18n";
+
 export interface SqlErrorRange {
   startLine: number;
   endLine: number;
@@ -1003,7 +1005,7 @@ function extractSemanticError(text: string): { field: string; message: string } 
  */
 export async function rangesFromServerError(params: {
   code?: number;
-  message?: string;
+  message?: I18nText;
   errorDetail?: string;
   sqlMode: boolean;
   query?: string;
