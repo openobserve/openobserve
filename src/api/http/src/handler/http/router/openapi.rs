@@ -60,6 +60,9 @@ use crate::{
         openobserve_api_management::request::organization::system_settings::set_user_setting,
         openobserve_api_management::request::organization::system_settings::delete_org_setting,
         openobserve_api_management::request::organization::system_settings::delete_user_setting,
+        openobserve_api_management::request::announcements::get_announcements,
+        openobserve_api_management::request::announcements::get_announcements_config,
+        openobserve_api_management::request::announcements::set_announcements_config,
         stream::list,
         stream::schema,
         stream::create,
@@ -514,6 +517,7 @@ use crate::{
         (name = "Patterns", description = "Log pattern extraction operations (enterprise)"),
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
+        (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",
