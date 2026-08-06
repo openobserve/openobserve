@@ -15,12 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Queues — the second slice of the AI Observability "Annotate" section. A queue
-  is a stateful review to-do list (bound Score Configs + target dataset + a
-  feeding filter). Frontend-first: reads llm-queues.service.ts, which serves
-  mock fixtures until the backend API lands (VITE_LLM_ANNOTATION_MOCK). The
-  Review action (and a row click) opens the Queue Detail route; the actual review
-  workbench launches from there in a later slice.
+  Queues — stateful review to-do lists with pinned Score Config versions and an
+  optional target Dataset. The Review action (and a row click) opens the Queue
+  Workbench directly.
 -->
 <template>
   <OPageLayout
@@ -127,9 +124,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex min-w-0 flex-col gap-1">
             <div class="flex items-center justify-between gap-2 text-xs tabular-nums">
               <span class="text-text-secondary">
-                {{ t("aiObservability.queues.reviewedCount", { reviewed: row.reviewedCount, total: row.totalCount }) }}
+                {{
+                  t("aiObservability.queues.reviewedCount", {
+                    reviewed: row.reviewedCount,
+                    total: row.totalCount,
+                  })
+                }}
               </span>
-              <span :class="isCleared(row) ? 'text-status-success-text font-semibold' : 'text-text-body font-semibold'">
+              <span
+                :class="
+                  isCleared(row)
+                    ? 'text-status-success-text font-semibold'
+                    : 'text-text-body font-semibold'
+                "
+              >
                 {{ percent(row) }}%
               </span>
             </div>
@@ -147,7 +155,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <template #cell-actions="{ row }">
           <div class="flex justify-end">
-            <OTag v-if="isCleared(row)" variant="success-soft" icon="check-circle" data-test="ai-queues-cleared">
+            <OTag
+              v-if="isCleared(row)"
+              variant="success-soft"
+              icon="check-circle"
+              data-test="ai-queues-cleared"
+            >
               {{ t("aiObservability.queues.cleared") }}
             </OTag>
             <OButton
@@ -194,229 +207,130 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="ai-queues-create-description"
           />
 
-        <!-- Score Configs (required) — bind one or more, pin each to a version -->
-        <div class="flex flex-col gap-2">
-          <span class="inline-flex items-center gap-1">
-            <span
-              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
-            >
-              {{ t("aiObservability.queues.create.scoreConfigsLabel")
-              }}<span aria-hidden="true"> *</span>
-            </span>
-            <OIcon name="info-outline" size="sm" class="text-text-secondary">
-              <OTooltip
-                :content="t('aiObservability.queues.create.scoreConfigsHint')"
-                max-width="20rem"
-              />
-            </OIcon>
-          </span>
-
-          <div
-            v-if="!formValues.scoreConfigs.length"
-            class="border-border-default rounded-default text-text-secondary flex items-center justify-center border border-dashed px-3 py-6 text-center text-xs"
-            data-test="ai-queues-create-configs-empty"
-          >
-            {{ t("aiObservability.queues.create.scoreConfigsEmpty") }}
-          </div>
-          <div v-else class="flex flex-col gap-2">
-            <div
-              v-for="(cfg, i) in formValues.scoreConfigs"
-              :key="cfg.scoreConfigId"
-              class="border-status-info-text rounded-default bg-status-info-bg text-text-body flex items-center gap-2.5 border px-3 py-2 text-xs"
-              :data-test="`ai-queues-create-config-${cfg.scoreConfigId}`"
-            >
-              <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
-              <strong class="min-w-0 flex-1 truncate font-mono">{{ cfg.name }}</strong>
-              <OTag type="evalDataType" :value="cfg.dataType" class="shrink-0" />
-              <OIcon name="keep-outline" size="sm" class="text-text-secondary shrink-0">
-                <OTooltip :content="t('aiObservability.queues.create.pin')" />
-              </OIcon>
-              <OSelect
-                :model-value="cfg.version"
-                :options="versionOptions(cfg.scoreConfigId)"
-                label-key="label"
-                value-key="value"
-                width="xs"
-                :searchable="false"
-                class="shrink-0"
-                data-test="ai-queues-create-config-version"
-                @update:model-value="(v: unknown) => setConfigVersion(i, Number(v))"
-              />
-              <OButton
-                variant="ghost"
-                size="icon-sm"
-                icon-left="close"
-                :aria-label="t('common.remove')"
-                data-test="ai-queues-create-config-remove"
-                @click="removeConfig(i)"
-              />
-            </div>
-          </div>
-
-          <OSelect
-            v-if="availableConfigs.length"
-            :model-value="addConfigModel"
-            :options="availableConfigOptions"
-            label-key="label"
-            value-key="value"
-            multiple
-            :placeholder="t('aiObservability.queues.create.addScoreConfig')"
-            class="w-full"
-            data-test="ai-queues-create-add-config"
-            @update:model-value="onAddConfig"
-          />
-          <span
-            v-else-if="!configOptions.length"
-            class="text-text-secondary text-2xs"
-            data-test="ai-queues-create-no-configs"
-          >
-            {{ t("aiObservability.queues.create.noScoreConfigs") }}
-          </span>
-          <span
-            v-else
-            class="text-text-secondary text-2xs"
-            data-test="ai-queues-create-all-configs-added"
-          >
-            {{ t("aiObservability.queues.create.allScoreConfigsAdded") }}
-          </span>
-
-          <span
-            v-if="scoreConfigsError"
-            class="text-status-error-text text-2xs"
-            data-test="ai-queues-create-configs-error"
-          >
-            {{ scoreConfigsError }}
-          </span>
-        </div>
-
-        <!-- Target dataset (optional) -->
-        <div class="flex flex-col gap-1.5">
-          <span class="inline-flex items-center gap-1">
-            <span
-              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
-            >
-              {{ t("aiObservability.queues.create.targetDatasetLabel") }}
-            </span>
-            <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
-            <OIcon name="info-outline" size="sm" class="text-text-secondary">
-              <OTooltip
-                :content="t('aiObservability.queues.create.targetDatasetHint')"
-                max-width="20rem"
-              />
-            </OIcon>
-          </span>
-          <OSelect
-            :model-value="formValues.targetDatasetId"
-            :options="datasetOptions"
-            label-key="label"
-            value-key="value"
-            :placeholder="t('aiObservability.queues.create.targetDatasetNone')"
-            clearable
-            class="w-full"
-            data-test="ai-queues-create-target-dataset"
-            @update:model-value="setTargetDataset"
-          />
-        </div>
-
-        <!-- Auto-routing (optional) — enqueue objects whose scores match rules -->
-        <div class="flex flex-col gap-2">
-          <span class="inline-flex items-center gap-1">
-            <span
-              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
-            >
-              {{ t("aiObservability.queues.create.autoRoutingLabel") }}
-            </span>
-            <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
-            <OIcon name="info-outline" size="sm" class="text-text-secondary">
-              <OTooltip
-                :content="t('aiObservability.queues.create.autoRoutingHint')"
-                max-width="20rem"
-              />
-            </OIcon>
-          </span>
-
-          <div
-            v-if="!formValues.autoRouting.conditions.length"
-            class="border-border-default rounded-default text-text-secondary flex items-center justify-center border border-dashed px-3 py-5 text-center text-xs"
-            data-test="ai-queues-create-auto-routing-empty"
-          >
-            {{ t("aiObservability.queues.create.autoRoutingEmpty") }}
-          </div>
-          <div v-else class="flex flex-col gap-2">
-            <template v-for="(cond, i) in formValues.autoRouting.conditions" :key="i">
-              <div
-                v-if="i > 0"
-                class="text-text-secondary text-2xs font-semibold tracking-wide"
-                data-test="ai-queues-create-condition-and"
+          <!-- Score Configs (required) — bind one or more, pin each to a version -->
+          <div class="flex flex-col gap-2">
+            <span class="inline-flex items-center gap-1">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
               >
-                {{ t("aiObservability.queues.create.conditionAnd") }}
-              </div>
-              <div class="flex items-center gap-2" data-test="ai-queues-create-condition">
-                <div class="min-w-0 flex-1">
-                  <OSelect
-                    :model-value="cond.scoreConfigId"
-                    :options="configSelectOptions"
-                    label-key="label"
-                    value-key="value"
-                    :placeholder="t('aiObservability.queues.create.conditionScorePlaceholder')"
-                    data-test="ai-queues-create-condition-score"
-                    @update:model-value="(v: unknown) => onConditionConfigChange(i, String(v))"
-                  />
-                </div>
-                <OTag type="evalDataType" :value="conditionType(cond)" class="shrink-0" />
+                {{ t("aiObservability.queues.create.scoreConfigsLabel")
+                }}<span aria-hidden="true"> *</span>
+              </span>
+              <OIcon name="info-outline" size="sm" class="text-text-secondary">
+                <OTooltip
+                  :content="t('aiObservability.queues.create.scoreConfigsHint')"
+                  max-width="20rem"
+                />
+              </OIcon>
+            </span>
+
+            <div
+              v-if="!formValues.scoreConfigs.length"
+              class="border-border-default rounded-default text-text-secondary flex items-center justify-center border border-dashed px-3 py-6 text-center text-xs"
+              data-test="ai-queues-create-configs-empty"
+            >
+              {{ t("aiObservability.queues.create.scoreConfigsEmpty") }}
+            </div>
+            <div v-else class="flex flex-col gap-2">
+              <div
+                v-for="(cfg, i) in formValues.scoreConfigs"
+                :key="cfg.scoreConfigId"
+                class="border-status-info-text rounded-default bg-status-info-bg text-text-body flex items-center gap-2.5 border px-3 py-2 text-xs"
+                :data-test="`ai-queues-create-config-${cfg.scoreConfigId}`"
+              >
+                <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
+                <strong class="min-w-0 flex-1 truncate font-mono">{{ cfg.name }}</strong>
+                <OTag type="evalDataType" :value="cfg.dataType" class="shrink-0" />
+                <OIcon name="keep-outline" size="sm" class="text-text-secondary shrink-0">
+                  <OTooltip :content="t('aiObservability.queues.create.pin')" />
+                </OIcon>
                 <OSelect
-                  :model-value="cond.operator"
-                  :options="operatorOptions(cond)"
+                  :model-value="cfg.version"
+                  :options="versionOptions(cfg.scoreConfigId)"
                   label-key="label"
                   value-key="value"
                   width="xs"
+                  :searchable="false"
                   class="shrink-0"
-                  data-test="ai-queues-create-condition-operator"
-                  @update:model-value="(v: unknown) => updateCondition(i, { operator: String(v) })"
-                />
-                <OInput
-                  v-if="conditionType(cond) === 'numeric'"
-                  :model-value="cond.value"
-                  type="number"
-                  width="xs"
-                  :placeholder="t('aiObservability.queues.create.conditionValuePlaceholder')"
-                  class="shrink-0"
-                  data-test="ai-queues-create-condition-value"
-                  @update:model-value="(v: string | number) => updateCondition(i, { value: Number(v) })"
-                />
-                <OSelect
-                  v-else
-                  :model-value="cond.value"
-                  :options="valueOptions(cond)"
-                  label-key="label"
-                  value-key="value"
-                  width="xs"
-                  class="shrink-0"
-                  data-test="ai-queues-create-condition-value"
-                  @update:model-value="(v: unknown) => updateCondition(i, { value: String(v) })"
+                  data-test="ai-queues-create-config-version"
+                  @update:model-value="(v: unknown) => setConfigVersion(i, Number(v))"
                 />
                 <OButton
                   variant="ghost"
                   size="icon-sm"
                   icon-left="close"
                   :aria-label="t('common.remove')"
-                  data-test="ai-queues-create-condition-remove"
-                  @click="removeCondition(i)"
+                  data-test="ai-queues-create-config-remove"
+                  @click="removeConfig(i)"
                 />
               </div>
-            </template>
+            </div>
+
+            <OSelect
+              v-if="availableConfigs.length"
+              :model-value="addConfigModel"
+              :options="availableConfigOptions"
+              label-key="label"
+              value-key="value"
+              multiple
+              :placeholder="t('aiObservability.queues.create.addScoreConfig')"
+              class="w-full"
+              data-test="ai-queues-create-add-config"
+              @update:model-value="onAddConfig"
+            />
+            <span
+              v-else-if="!configOptions.length"
+              class="text-text-secondary text-2xs"
+              data-test="ai-queues-create-no-configs"
+            >
+              {{ t("aiObservability.queues.create.noScoreConfigs") }}
+            </span>
+            <span
+              v-else
+              class="text-text-secondary text-2xs"
+              data-test="ai-queues-create-all-configs-added"
+            >
+              {{ t("aiObservability.queues.create.allScoreConfigsAdded") }}
+            </span>
+
+            <span
+              v-if="scoreConfigsError"
+              class="text-status-error-text text-2xs"
+              data-test="ai-queues-create-configs-error"
+            >
+              {{ scoreConfigsError }}
+            </span>
           </div>
 
-          <OButton
-            variant="outline"
-            size="sm"
-            icon-left="add"
-            :disabled="!configSelectOptions.length"
-            data-test="ai-queues-create-add-condition"
-            @click="addCondition"
-          >
-            {{ t("aiObservability.queues.create.addCondition") }}
-          </OButton>
+          <!-- Target dataset (optional) -->
+          <div class="flex flex-col gap-1.5">
+            <span class="inline-flex items-center gap-1">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >
+                {{ t("aiObservability.queues.create.targetDatasetLabel") }}
+              </span>
+              <span class="text-text-secondary text-2xs font-normal">{{
+                t("common.optional")
+              }}</span>
+              <OIcon name="info-outline" size="sm" class="text-text-secondary">
+                <OTooltip
+                  :content="t('aiObservability.queues.create.targetDatasetHint')"
+                  max-width="20rem"
+                />
+              </OIcon>
+            </span>
+            <OSelect
+              :model-value="formValues.targetDatasetId"
+              :options="datasetOptions"
+              label-key="label"
+              value-key="value"
+              :placeholder="t('aiObservability.queues.create.targetDatasetNone')"
+              clearable
+              class="w-full"
+              data-test="ai-queues-create-target-dataset"
+              @update:model-value="setTargetDataset"
+            />
           </div>
         </div>
       </OForm>
@@ -437,7 +351,6 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -455,16 +368,9 @@ import llmQueuesService, {
   type LlmQueue,
   type LlmQueueBinding,
   type LlmScoreConfigOption,
-  type AutoRouteOperator,
-  type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
-import {
-  makeQueueFormSchema,
-  type QueueForm,
-  type QueueBoundConfig,
-  type QueueCondition,
-} from "./QueueForm.schema";
+import { makeQueueFormSchema, type QueueForm, type QueueBoundConfig } from "./QueueForm.schema";
 
 defineOptions({ name: "AIQueuesPage" });
 
@@ -570,7 +476,42 @@ async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
   try {
-    queues.value = await llmQueuesService.list(orgId.value);
+    const [queueRows, itemRows, datasets, configs] = await Promise.all([
+      llmQueuesService.list(orgId.value),
+      llmQueuesService.listItems(orgId.value),
+      llmDatasetsService.list(orgId.value),
+      llmQueuesService.listScoreConfigOptions(orgId.value),
+    ]);
+    const progressByQueue = new Map<string, { reviewed: number; total: number }>();
+    for (const item of itemRows) {
+      const progress = progressByQueue.get(item.queueId) ?? { reviewed: 0, total: 0 };
+      progress.total += 1;
+      if (item.status === "reviewed") progress.reviewed += 1;
+      progressByQueue.set(item.queueId, progress);
+    }
+    const datasetNames = new Map(datasets.map((dataset) => [dataset.id, dataset.name]));
+    const latestVersions = new Map(configs.map((config) => [config.id, config.latestVersion]));
+
+    queues.value = queueRows.map((queue) => {
+      const progress = progressByQueue.get(queue.id) ?? { reviewed: 0, total: 0 };
+      return {
+        ...queue,
+        targetDatasetName: queue.targetDatasetId
+          ? (datasetNames.get(queue.targetDatasetId) ?? null)
+          : null,
+        reviewedCount: progress.reviewed,
+        totalCount: progress.total,
+        scoreConfigs: queue.scoreConfigs.map((config) => ({
+          ...config,
+          latestVersion: latestVersions.get(config.scoreConfigId),
+        })),
+      };
+    });
+    configOptions.value = configs;
+    datasetOptions.value = datasets.map((dataset) => ({
+      label: dataset.name,
+      value: dataset.id,
+    }));
     lastRunAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.loadError") });
@@ -587,7 +528,7 @@ function openDetail(row: LlmQueue) {
 
 // ── Create drawer (useOForm + Zod — mirrors ScoreConfigDialog) ──
 // This component OWNS <OForm>: name/description are name-bound OForm* inputs; the
-// bespoke controls (score-config bindings, target dataset, auto-routing) bridge
+// bespoke controls (score-config bindings and target dataset) bridge
 // into the one form via `form.setFieldValue` and read back through `formValues`.
 const createOpen = ref(false);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
@@ -598,7 +539,6 @@ const emptyForm = (): QueueForm => ({
   description: "",
   scoreConfigs: [],
   targetDatasetId: "",
-  autoRouting: { matchMode: "all", conditions: [] },
 });
 
 const form = useOForm<QueueForm>({
@@ -617,9 +557,6 @@ const scoreConfigsError = form.useStore((s: any) =>
 
 function setScoreConfigs(next: QueueBoundConfig[]) {
   form.setFieldValue("scoreConfigs", next);
-}
-function setAutoRouting(next: QueueForm["autoRouting"]) {
-  form.setFieldValue("autoRouting", next);
 }
 function setTargetDataset(v: unknown) {
   form.setFieldValue("targetDatasetId", v == null ? "" : String(v));
@@ -648,65 +585,16 @@ function onAddConfig(v: unknown) {
   addConfigModel.value = [];
 }
 
-// Conditions can only route on the Score Configs the queue actually scores on,
-// so the dropdown is the bound set — not the whole catalog.
-const configSelectOptions = computed(() =>
-  formValues.value.scoreConfigs.map((c) => ({ label: c.name, value: c.scoreConfigId })),
-);
-
 function configForId(id: string): LlmScoreConfigOption | undefined {
   return configOptions.value.find((o) => o.id === id);
-}
-
-// Auto-routing condition builder — the operator + value adapt to the selected
-// Score Config's data type: numeric → comparisons + number input; categorical →
-// is / is-not + a category dropdown; boolean → is + true/false.
-function conditionType(cond: QueueCondition): ScoreConfigDataType {
-  return configForId(cond.scoreConfigId)?.dataType ?? "numeric";
-}
-
-const NUMERIC_OPERATORS = [
-  { label: "<", value: "<" },
-  { label: "≤", value: "<=" },
-  { label: ">", value: ">" },
-  { label: "≥", value: ">=" },
-  { label: "=", value: "==" },
-  { label: "≠", value: "!=" },
-];
-
-function operatorOptions(cond: QueueCondition) {
-  if (conditionType(cond) === "numeric") return NUMERIC_OPERATORS;
-  return [
-    { label: t("aiObservability.queues.create.operatorIs"), value: "==" },
-    { label: t("aiObservability.queues.create.operatorIsNot"), value: "!=" },
-  ];
-}
-
-function valueOptions(cond: QueueCondition) {
-  if (conditionType(cond) === "boolean") {
-    return [
-      { label: "true", value: "true" },
-      { label: "false", value: "false" },
-    ];
-  }
-  return (configForId(cond.scoreConfigId)?.categories ?? []).map((c) => ({ label: c, value: c }));
-}
-
-function defaultsForType(cfg: LlmScoreConfigOption | undefined): {
-  operator: string;
-  value: number | string;
-} {
-  const type = cfg?.dataType ?? "numeric";
-  if (type === "numeric") return { operator: "<", value: 0 };
-  if (type === "boolean") return { operator: "==", value: "true" };
-  return { operator: "==", value: cfg?.categories?.[0] ?? "" };
 }
 
 function versionOptions(configId: string) {
   const cfg = configForId(configId);
   const latest = cfg?.latestVersion;
   return (cfg?.versions ?? [1]).map((v) => ({
-    label: v === latest ? t("aiObservability.queues.create.versionLatest", { version: v }) : `v${v}`,
+    label:
+      v === latest ? t("aiObservability.queues.create.versionLatest", { version: v }) : `v${v}`,
     value: v,
   }));
 }
@@ -720,17 +608,7 @@ function addConfig(opt: LlmScoreConfigOption) {
 }
 
 function removeConfig(index: number) {
-  const removed = formValues.value.scoreConfigs[index];
   setScoreConfigs(formValues.value.scoreConfigs.filter((_, i) => i !== index));
-  // Drop any auto-routing conditions that referenced the now-unbound config.
-  if (removed) {
-    setAutoRouting({
-      ...formValues.value.autoRouting,
-      conditions: formValues.value.autoRouting.conditions.filter(
-        (c) => c.scoreConfigId !== removed.scoreConfigId,
-      ),
-    });
-  }
 }
 
 function setConfigVersion(index: number, version: number) {
@@ -739,81 +617,23 @@ function setConfigVersion(index: number, version: number) {
   );
 }
 
-// ── Auto-routing conditions ──
-function updateCondition(index: number, patch: Partial<QueueCondition>) {
-  setAutoRouting({
-    ...formValues.value.autoRouting,
-    conditions: formValues.value.autoRouting.conditions.map((c, i) =>
-      i === index ? { ...c, ...patch } : c,
-    ),
-  });
-}
-
-function addCondition() {
-  const bound = formValues.value.scoreConfigs[0];
-  const d = defaultsForType(bound ? configForId(bound.scoreConfigId) : undefined);
-  setAutoRouting({
-    ...formValues.value.autoRouting,
-    conditions: [
-      ...formValues.value.autoRouting.conditions,
-      { scoreConfigId: bound?.scoreConfigId ?? "", operator: d.operator, value: d.value },
-    ],
-  });
-}
-
-// Re-picking the Score Config resets operator + value to that type's defaults.
-function onConditionConfigChange(index: number, newId: string) {
-  const d = defaultsForType(configForId(newId));
-  updateCondition(index, { scoreConfigId: newId, operator: d.operator, value: d.value });
-}
-
-function removeCondition(index: number) {
-  setAutoRouting({
-    ...formValues.value.autoRouting,
-    conditions: formValues.value.autoRouting.conditions.filter((_, i) => i !== index),
-  });
-}
-
 async function openCreate() {
   form.reset();
   createOpen.value = true;
-  if (!orgId.value) return;
-  const [configs, datasets] = await Promise.all([
-    llmQueuesService.listScoreConfigOptions(orgId.value),
-    llmDatasetsService.list(orgId.value),
-  ]);
-  configOptions.value = configs;
-  // No explicit "None" row — an empty select IS review-only. The placeholder
-  // communicates that, and `clearable` lets the user return to it.
-  datasetOptions.value = datasets.map((d) => ({ label: d.name, value: d.id }));
 }
 
 // Runs only after the Zod schema passes (name required; ≥1 Score Config).
 async function save(values: QueueForm) {
   if (!orgId.value) return;
-  const targetName = datasetOptions.value.find((o) => o.value === values.targetDatasetId)?.label;
-  // Drop half-filled condition rows (no score dimension picked).
-  const routingConditions = values.autoRouting.conditions.filter((c) => c.scoreConfigId);
   try {
     await llmQueuesService.create(orgId.value, {
       name: values.name.trim(),
       description: values.description.trim() || null,
       targetDatasetId: values.targetDatasetId || null,
-      targetDatasetName: values.targetDatasetId ? (targetName ?? null) : null,
       scoreConfigs: values.scoreConfigs.map((c) => ({
         scoreConfigId: c.scoreConfigId,
         version: c.version,
       })),
-      autoRouting: routingConditions.length
-        ? {
-            matchMode: values.autoRouting.matchMode,
-            conditions: routingConditions.map((c) => ({
-              scoreConfigId: c.scoreConfigId,
-              operator: c.operator as AutoRouteOperator,
-              value: c.value,
-            })),
-          }
-        : null,
     });
     toast({ variant: "success", message: t("aiObservability.queues.create.success") });
     createOpen.value = false;
