@@ -19,6 +19,38 @@ import testLogger from "../utils/test-logger.js";
 const randomDashboardName =
   "Dashboard_Alert_" + Math.random().toString(36).slice(2, 11);
 
+export const ALERT_FORM_URL = /.*alerts\/add.*prefill=panel.*/;
+
+// Wait for the alert form, and on failure say what the browser is ACTUALLY
+// showing. A bare waitForURL timeout cannot tell apart the three ways this
+// flow breaks — the navigation never committed (still on the dashboard), it
+// committed and something rewrote the query (on the form, no prefill), or it
+// was redirected (alerts list) — and they need different fixes.
+export async function waitForAlertForm(page, timeout = 15000) {
+  try {
+    await page.waitForURL(ALERT_FORM_URL, { timeout });
+  } catch {
+    const where = await page.evaluate(() => ({
+      url: location.href,
+      onAlertForm: !!document.querySelector('[data-test="add-alert-name-input"]'),
+      onDashboard: !!document.querySelector(
+        '[data-test="dashboard-panel-container"]'
+      ),
+      onAlertList: !!document.querySelector(
+        '[data-test="alert-list-add-alert-btn"]'
+      ),
+    }));
+
+    throw new Error(
+      `Never reached the alert form (${timeout}ms).\n` +
+        `  url:         ${where.url}\n` +
+        `  onAlertForm: ${where.onAlertForm}\n` +
+        `  onDashboard: ${where.onDashboard}\n` +
+        `  onAlertList: ${where.onAlertList}`
+    );
+  }
+}
+
 test.describe("Dashboard Create Alert testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
@@ -75,9 +107,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
       // Verify navigation to the alert form, flagged as a panel prefill
-      await page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
-        timeout: 15000,
-      });
+      await waitForAlertForm(page);
 
       // The prefill marker is in the URL; the payload deliberately is not.
       const currentUrl = page.url();
@@ -396,9 +426,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
       // Verify navigation to pre-filled alert creation page
-      await page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
-        timeout: 15000,
-      });
+      await waitForAlertForm(page);
 
       // Get the pre-filled alert name
       const alertNameInput = page.locator(

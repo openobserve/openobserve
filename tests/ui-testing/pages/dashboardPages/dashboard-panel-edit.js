@@ -257,9 +257,28 @@ export default class DashboardPanel {
       await this.rightClickChartForAlert();
     }
 
-    // Out of attempts: assert once more so the failure carries Playwright's
-    // own diagnostics rather than a hand-rolled message.
-    await this.page.waitForURL(urlPattern, { timeout: 10000 });
+    // Out of attempts: report what the browser is actually showing. The three
+    // ways this breaks — navigation never committed, committed then the query
+    // was rewritten, redirected elsewhere — are indistinguishable from a bare
+    // waitForURL timeout and need different fixes.
+    const where = await this.page.evaluate(() => ({
+      url: location.href,
+      onAlertForm: !!document.querySelector('[data-test="add-alert-name-input"]'),
+      onDashboard: !!document.querySelector(
+        '[data-test="dashboard-panel-container"]'
+      ),
+      onAlertList: !!document.querySelector(
+        '[data-test="alert-list-add-alert-btn"]'
+      ),
+    }));
+
+    throw new Error(
+      `Alert context menu never reached the alert form after ${attempts} attempts.\n` +
+        `  url:         ${where.url}\n` +
+        `  onAlertForm: ${where.onAlertForm}\n` +
+        `  onDashboard: ${where.onDashboard}\n` +
+        `  onAlertList: ${where.onAlertList}`
+    );
   }
 
   //open Query inspector
