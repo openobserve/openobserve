@@ -29,6 +29,7 @@ pub mod policy;
 pub mod response;
 pub mod rotation;
 pub mod subject;
+pub mod team;
 
 pub use level::{EscalationLevel, LevelError};
 pub use policy::{
@@ -40,3 +41,4 @@ pub use rotation::{
     RotationError, resolve_level, resolve_on_call,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
+pub use team::{Schedule, Team, TeamError, TeamMember};
