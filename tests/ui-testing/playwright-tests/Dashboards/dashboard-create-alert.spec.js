@@ -15,38 +15,24 @@ import {
 } from "./utils/dashCreation.js";
 import { waitForStreamComplete } from "../utils/streaming-helpers.js";
 import testLogger from "../utils/test-logger.js";
+import {
+  attachDiagnostics,
+  describePage,
+} from "../utils/page-diagnostics.js";
 
 const randomDashboardName =
   "Dashboard_Alert_" + Math.random().toString(36).slice(2, 11);
 
 export const ALERT_FORM_URL = /.*alerts\/add.*prefill=panel.*/;
 
-// Wait for the alert form, and on failure say what the browser is ACTUALLY
-// showing. A bare waitForURL timeout cannot tell apart the three ways this
-// flow breaks — the navigation never committed (still on the dashboard), it
-// committed and something rewrote the query (on the form, no prefill), or it
-// was redirected (alerts list) — and they need different fixes.
+// Wait for the alert form, and on failure report how the app declined: the
+// toast it raised, the errors it threw, and every URL it passed through.
 export async function waitForAlertForm(page, timeout = 15000) {
   try {
     await page.waitForURL(ALERT_FORM_URL, { timeout });
   } catch {
-    const where = await page.evaluate(() => ({
-      url: location.href,
-      onAlertForm: !!document.querySelector('[data-test="add-alert-name-input"]'),
-      onDashboard: !!document.querySelector(
-        '[data-test="dashboard-panel-container"]'
-      ),
-      onAlertList: !!document.querySelector(
-        '[data-test="alert-list-add-alert-btn"]'
-      ),
-    }));
-
     throw new Error(
-      `Never reached the alert form (${timeout}ms).\n` +
-        `  url:         ${where.url}\n` +
-        `  onAlertForm: ${where.onAlertForm}\n` +
-        `  onDashboard: ${where.onDashboard}\n` +
-        `  onAlertList: ${where.onAlertList}`
+      `Never reached the alert form (${timeout}ms).\n${await describePage(page)}`
     );
   }
 }
@@ -55,6 +41,9 @@ test.describe("Dashboard Create Alert testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
   test.beforeEach(async ({ page }) => {
+    // Before any interaction — page errors and SPA navigations are only
+    // observable while they happen.
+    attachDiagnostics(page);
     await navigateToBase(page);
     await ingestion(page);
   });

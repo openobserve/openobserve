@@ -1,6 +1,7 @@
 //dashboard panel edit page
 // Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs, Create alert from panel
 import { expect } from '@playwright/test';
+import { describePage } from '../../playwright-tests/utils/page-diagnostics.js';
 
 export default class DashboardPanel {
   constructor(page) {
@@ -257,27 +258,12 @@ export default class DashboardPanel {
       await this.rightClickChartForAlert();
     }
 
-    // Out of attempts: report what the browser is actually showing. The three
-    // ways this breaks — navigation never committed, committed then the query
-    // was rewritten, redirected elsewhere — are indistinguishable from a bare
-    // waitForURL timeout and need different fixes.
-    const where = await this.page.evaluate(() => ({
-      url: location.href,
-      onAlertForm: !!document.querySelector('[data-test="add-alert-name-input"]'),
-      onDashboard: !!document.querySelector(
-        '[data-test="dashboard-panel-container"]'
-      ),
-      onAlertList: !!document.querySelector(
-        '[data-test="alert-list-add-alert-btn"]'
-      ),
-    }));
-
+    // Out of attempts: report how the app declined — the toast it raised, the
+    // errors it threw, every URL it passed through, and the panel's saved
+    // stream (empty means both entry points refuse by design).
     throw new Error(
       `Alert context menu never reached the alert form after ${attempts} attempts.\n` +
-        `  url:         ${where.url}\n` +
-        `  onAlertForm: ${where.onAlertForm}\n` +
-        `  onDashboard: ${where.onDashboard}\n` +
-        `  onAlertList: ${where.onAlertList}`
+        `${await describePage(this.page)}`
     );
   }
 
