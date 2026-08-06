@@ -22,6 +22,7 @@ import {
   buildSqlCondition,
   applyFilterOverlay,
   applyDimensionEditsToFilters,
+  mergeSubjectOverrides,
 } from "./telemetryCorrelation";
 import type { ServiceIdentityConfig, FieldAlias } from "@/services/service_streams";
 
@@ -465,6 +466,74 @@ describe("telemetryCorrelation", () => {
       const result = applyDimensionEditsToFilters(filters, { "k8s-namespace": "b" }, f2d);
       expect(filters).toEqual({ k8s_namespace_name: "a" });
       expect(result).not.toBe(filters);
+    });
+  });
+
+  describe("mergeSubjectOverrides", () => {
+    const groups = new Map<string, string>([
+      ["k8s_namespace_name", "k8s-namespace"],
+      ["service_k8s_namespace_name", "k8s-namespace"],
+      ["k8s_pod_name", "k8s-pod"],
+    ]);
+
+    it("replaces the same-group backend key instead of adding a duplicate (F31)", () => {
+      expect(
+        mergeSubjectOverrides(
+          { service_k8s_namespace_name: "prod" }, // backend-resolved key
+          { k8s_namespace_name: "staging" }, // schema-resolved override, different alias
+          groups,
+        ),
+      ).toEqual({ k8s_namespace_name: "staging" }); // ONE condition, not two
+    });
+
+    it("overwrites in place when keys match", () => {
+      expect(
+        mergeSubjectOverrides({ k8s_namespace_name: "a" }, { k8s_namespace_name: "b" }, groups),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("adds an override whose group is not present in the filters", () => {
+      expect(mergeSubjectOverrides({ k8s_pod_name: "p" }, { k8s_namespace_name: "n" }, groups)).toEqual(
+        { k8s_pod_name: "p", k8s_namespace_name: "n" },
+      );
+    });
+
+    it("leaves filters of other groups untouched while replacing one group", () => {
+      expect(
+        mergeSubjectOverrides(
+          { service_k8s_namespace_name: "prod", k8s_pod_name: "p" },
+          { k8s_namespace_name: "staging" },
+          groups,
+        ),
+      ).toEqual({ k8s_pod_name: "p", k8s_namespace_name: "staging" });
+    });
+
+    it("matches the existing filter key case-insensitively", () => {
+      expect(
+        mergeSubjectOverrides(
+          { SERVICE_K8S_NAMESPACE_NAME: "prod" },
+          { k8s_namespace_name: "staging" },
+          groups,
+        ),
+      ).toEqual({ k8s_namespace_name: "staging" });
+    });
+
+    it("adds an ungrouped override without disturbing existing filters", () => {
+      expect(mergeSubjectOverrides({ a: "1" }, { unknown_field: "2" }, groups)).toEqual({
+        a: "1",
+        unknown_field: "2",
+      });
+    });
+
+    it("returns a copy and does not mutate the input filters", () => {
+      const filters = { service_k8s_namespace_name: "prod" };
+      const result = mergeSubjectOverrides(filters, { k8s_namespace_name: "staging" }, groups);
+      expect(filters).toEqual({ service_k8s_namespace_name: "prod" });
+      expect(result).not.toBe(filters);
+    });
+
+    it("passes filters through untouched with no overrides", () => {
+      expect(mergeSubjectOverrides({ a: "1" }, {}, groups)).toEqual({ a: "1" });
     });
   });
 });

@@ -203,6 +203,45 @@ export function applyDimensionEditsToFilters(
 }
 
 /**
+ * Merge schema-verified subject overrides into ONE stream's filters (F31).
+ *
+ * The backend resolves a stream's filters using its own alias for a semantic
+ * group; the subject override is resolved against the stream schema and may
+ * land on a different alias of the SAME group. A plain spread therefore UNIONS
+ * the two aliases into `WHERE old_alias = 'prod' AND new_alias = 'staging'`,
+ * which matches nothing. Replace the same-group key instead of adding to it.
+ *
+ * An override whose group has no counterpart in `filters` is added — it was
+ * resolved against the stream schema, so the column is known to exist.
+ *
+ * @param filters - the stream's own filters, keyed by its raw field names
+ * @param overrides - schema-verified field name -> value
+ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function mergeSubjectOverrides(
+  filters: Record<string, string>,
+  overrides: Record<string, string>,
+  fieldToGroupId: Map<string, string>,
+): Record<string, string> {
+  const effective: Record<string, string> = { ...filters };
+
+  for (const [hit, value] of Object.entries(overrides)) {
+    const groupId = fieldToGroupId.get(hit.toLowerCase());
+    const existingKey = Object.keys(effective).find(
+      (key) =>
+        key === hit ||
+        (groupId !== undefined && fieldToGroupId.get(key.toLowerCase()) === groupId),
+    );
+    if (existingKey !== undefined && existingKey !== hit) {
+      delete effective[existingKey];
+    }
+    effective[hit] = value;
+  }
+
+  return effective;
+}
+
+/**
  * Filter dimensions to only include fields that are actually used for disambiguation
  *
  * This implements the same logic as the backend to determine which dimensions are relevant

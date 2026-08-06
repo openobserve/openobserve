@@ -528,4 +528,58 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(dashboard.defaultDatetimeDuration.endTime).toBe(1234567990000000);
     });
   });
+
+  describe("subject overrides (F31)", () => {
+    const semanticGroups = [
+      {
+        id: "k8s-namespace",
+        fields: ["k8s_namespace_name", "service_k8s_namespace_name"],
+      },
+    ] as MetricsCorrelationConfig["semanticGroups"];
+
+    const buildConfig = (
+      overrides: Partial<MetricsCorrelationConfig>,
+    ): MetricsCorrelationConfig => ({
+      serviceName: "api",
+      matchedDimensions: { "k8s-namespace": "staging" },
+      metricStreams: [],
+      orgIdentifier: "test-org",
+      timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      semanticGroups,
+      ...overrides,
+    });
+
+    it("replaces the stream's own alias rather than ANDing both aliases", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
+      ];
+
+      const dashboard = composable.generateDashboard(
+        metricStreams,
+        buildConfig({
+          metricSchemas: {
+            cpu: { schema: [{ name: "k8s_namespace_name" }, { name: "value" }] },
+          },
+        }),
+      );
+
+      const query = dashboard.tabs[0].panels[0].queries[0].query;
+      expect(query).toContain(`"k8s_namespace_name" = 'staging'`);
+      expect(query).not.toContain("service_k8s_namespace_name");
+    });
+
+    it("does not guess a field name when the stream schema is unavailable", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
+      ];
+
+      // No metricSchemas entry -> schema unknown. Guessing an alias here used to
+      // emit a WHERE on a nonexistent column and kill the panel.
+      const dashboard = composable.generateDashboard(metricStreams, buildConfig({}));
+
+      const query = dashboard.tabs[0].panels[0].queries[0].query;
+      expect(query).toContain(`"service_k8s_namespace_name" = 'prod'`);
+      expect(query).not.toContain("'staging'");
+    });
+  });
 });
