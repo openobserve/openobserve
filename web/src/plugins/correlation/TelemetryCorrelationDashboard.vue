@@ -1070,7 +1070,11 @@ import {
 import type { StreamInfo } from "@/services/service_streams";
 import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
-import { buildSqlCondition } from "@/utils/telemetryCorrelation";
+import {
+  buildSqlCondition,
+  buildFieldToGroupIdMap,
+  applyDimensionEditsToFilters,
+} from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
 import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
@@ -2104,35 +2108,22 @@ const applyDimensionChanges = () => {
   // Copy pending to active
   activeDimensions.value = { ...pendingDimensions.value };
 
-  // Build field_name -> dimension_id mapping from semantic groups
-  // This is the same approach as applyUnstableDimensionDefaults
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Build field_name -> dimension_id mapping from semantic groups.
+  // Uses the shared builder so lookups are case-insensitive and honour the
+  // backend's declaration-order priority when a field appears in two groups.
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
-  // Update metric stream filters with new dimension values
-  // Use semantic groups to map filter field names to dimension IDs
-  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...(stream.filters ?? {}) };
-
-    // For each filter in the stream, find its semantic dimension ID
-    // and update with the new value from activeDimensions
-    for (const [filterKey] of Object.entries(stream.filters ?? {})) {
-      const dimensionId = fieldToDimensionId.get(filterKey);
-      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
-        const newValue = activeDimensions.value[dimensionId];
-        updatedFilters[filterKey] = newValue;
-      }
-    }
-
-    return {
-      ...stream,
-      filters: updatedFilters,
-    };
-  });
+  // Update metric stream filters with new dimension values.
+  // activeDimensions is raw-field-keyed in the dialog path and
+  // semantic-ID-keyed in the drawer path — the helper accepts both (F36).
+  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => ({
+    ...stream,
+    filters: applyDimensionEditsToFilters(
+      stream.filters ?? {},
+      activeDimensions.value,
+      fieldToDimensionId,
+    ),
+  }));
 
   // Note: For logs, the filters are built from config.matchedDimensions in the composable
   // which we're already updating via activeDimensions

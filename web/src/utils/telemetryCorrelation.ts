@@ -155,6 +155,54 @@ export function applyFilterOverlay(
 }
 
 /**
+ * Apply dimension-bar edits to ONE stream's filters (F36).
+ *
+ * `activeDimensions` is raw-field-keyed when the bar was seeded from stream
+ * filters (SearchResult / TraceDetailsSidebar dialog path) and
+ * semantic-ID-keyed when seeded from `matched_dimensions`
+ * (IncidentDetailDrawer path) — the component cannot tell which, so look up
+ * BOTH key spaces, raw field first.
+ *
+ * Only existing filter keys are updated: adding a key would emit a WHERE
+ * condition on a column the stream does not have.
+ *
+ * @param filters - the stream's own filters, keyed by its raw field names
+ * @param activeDimensions - edited values, keyed by raw field name OR semantic group ID
+ * @param fieldToDimensionId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function applyDimensionEditsToFilters(
+  filters: Record<string, string>,
+  activeDimensions: Record<string, string>,
+  fieldToDimensionId: Map<string, string>,
+): Record<string, string> {
+  const updated: Record<string, string> = { ...filters };
+
+  for (const filterKey of Object.keys(filters)) {
+    const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
+
+    // Raw-field key wins over the semantic-ID key. When the bar was seeded from
+    // a different stream's alias, fall back to any edit whose key resolves to
+    // the same semantic group.
+    let newValue = activeDimensions[filterKey];
+    if (newValue === undefined && dimensionId !== undefined) {
+      newValue = activeDimensions[dimensionId];
+    }
+    if (newValue === undefined && dimensionId !== undefined) {
+      const aliasKey = Object.keys(activeDimensions).find(
+        (key) => fieldToDimensionId.get(key.toLowerCase()) === dimensionId,
+      );
+      if (aliasKey !== undefined) newValue = activeDimensions[aliasKey];
+    }
+
+    if (newValue !== undefined) {
+      updated[filterKey] = newValue;
+    }
+  }
+
+  return updated;
+}
+
+/**
  * Filter dimensions to only include fields that are actually used for disambiguation
  *
  * This implements the same logic as the backend to determine which dimensions are relevant

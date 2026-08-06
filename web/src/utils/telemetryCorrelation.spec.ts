@@ -21,6 +21,7 @@ import {
   quoteSqlLiteral,
   buildSqlCondition,
   applyFilterOverlay,
+  applyDimensionEditsToFilters,
 } from "./telemetryCorrelation";
 import type { ServiceIdentityConfig, FieldAlias } from "@/services/service_streams";
 
@@ -388,6 +389,82 @@ describe("telemetryCorrelation", () => {
 
     it("passes base filters through untouched with an empty group map", () => {
       expect(applyFilterOverlay({ a: "1" }, { a: "2", b: "3" }, new Map())).toEqual({ a: "2" });
+    });
+  });
+
+  describe("applyDimensionEditsToFilters", () => {
+    const f2d = new Map<string, string>([
+      ["k8s_namespace_name", "k8s-namespace"],
+      ["service_k8s_namespace_name", "k8s-namespace"],
+    ]);
+
+    it("applies semantic-ID-keyed edits (IncidentDetailDrawer path)", () => {
+      expect(
+        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { "k8s-namespace": "b" }, f2d),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("applies raw-field-keyed edits (SearchResult dialog path — F36)", () => {
+      expect(
+        applyDimensionEditsToFilters(
+          { k8s_namespace_name: "a" },
+          { k8s_namespace_name: "b" },
+          f2d,
+        ),
+      ).toEqual({ k8s_namespace_name: "b" });
+    });
+
+    it("resolves a raw-field-keyed edit to the stream's own alias for the same group", () => {
+      // The dimension bar was seeded from a log stream's field name; the metric
+      // stream spells the same concept differently.
+      expect(
+        applyDimensionEditsToFilters(
+          { service_k8s_namespace_name: "a" },
+          { k8s_namespace_name: "b" },
+          f2d,
+        ),
+      ).toEqual({ service_k8s_namespace_name: "b" });
+    });
+
+    it("prefers the raw-field edit over the semantic-ID edit for the same filter", () => {
+      expect(
+        applyDimensionEditsToFilters(
+          { k8s_namespace_name: "a" },
+          { k8s_namespace_name: "raw", "k8s-namespace": "semantic" },
+          f2d,
+        ),
+      ).toEqual({ k8s_namespace_name: "raw" });
+    });
+
+    it("leaves filters without an edit untouched", () => {
+      expect(applyDimensionEditsToFilters({ x: "1" }, { "k8s-namespace": "b" }, f2d)).toEqual({
+        x: "1",
+      });
+    });
+
+    it("resolves filter keys case-insensitively", () => {
+      expect(
+        applyDimensionEditsToFilters({ K8S_NAMESPACE_NAME: "a" }, { "k8s-namespace": "b" }, f2d),
+      ).toEqual({ K8S_NAMESPACE_NAME: "b" });
+    });
+
+    it("keeps an empty-string edit (clearing a value is a real edit)", () => {
+      expect(
+        applyDimensionEditsToFilters({ k8s_namespace_name: "a" }, { k8s_namespace_name: "" }, f2d),
+      ).toEqual({ k8s_namespace_name: "" });
+    });
+
+    it("never adds a filter key the stream does not already have", () => {
+      expect(
+        applyDimensionEditsToFilters({ x: "1" }, { k8s_namespace_name: "b", other: "c" }, f2d),
+      ).toEqual({ x: "1" });
+    });
+
+    it("returns a copy and does not mutate the input filters", () => {
+      const filters = { k8s_namespace_name: "a" };
+      const result = applyDimensionEditsToFilters(filters, { "k8s-namespace": "b" }, f2d);
+      expect(filters).toEqual({ k8s_namespace_name: "a" });
+      expect(result).not.toBe(filters);
     });
   });
 });
