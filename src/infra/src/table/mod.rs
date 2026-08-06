@@ -45,6 +45,7 @@ pub mod incident_integrations;
 pub mod kv_store;
 mod migration;
 pub mod model_pricing;
+pub mod oncall_teams;
 pub mod online_eval_jobs;
 pub mod org_ai_toolsets;
 pub mod org_cleanup_tasks;
