@@ -82,10 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            it's managed from the list, same as pipelines. -->
 
       <template #actions>
-        <!-- History (Runs) — only meaningful for a saved workflow. Navigates to
-             the dedicated read-only Runs inspection view (separate surface). -->
+        <!-- History (Runs) — only meaningful for a published, saved workflow.
+             Drafts have no run history by design, so it's hidden for them. -->
         <OButton
-          v-if="workflowObj.isEditWorkflow"
+          v-if="workflowObj.isEditWorkflow && !workflowObj.currentSelectedWorkflow.isDraft"
           variant="outline"
           size="sm-action"
           data-test="workflow-editor-history"

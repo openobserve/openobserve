@@ -42,19 +42,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         ? t('workflow.deleteNode')
         : undefined
     "
+    neutral-button-variant="outline-destructive"
     @click:primary="onSave"
     @click:secondary="onCancel"
     @click:neutral="onDelete"
     data-test="workflow-node-drawer"
   >
-    <div :class="workflowObj.dialog.expand ? 'h-full min-h-0' : 'p-4'">
-      <!-- Rename (T2) + comment (T3) — the config panel is where a step gets a
-           meaningful name and a note, mirroring how the header edits the workflow
-           name (OInlineEdit). Hidden in the full-width inline editor (expand). -->
-      <div
-        v-if="!workflowObj.dialog.expand"
-        class="border-border-default mb-4 flex flex-col gap-2 border-b pb-4"
-      >
+    <!-- The drawer TITLE is the editable step name (T2) — rename right at the top,
+         with the node type as the subtitle so the kind stays clear. Replaces the
+         static type title; no separate "Name This Step" field below. -->
+    <template #header>
+      <div class="min-w-0">
         <OInlineEdit
           :model-value="nodeName"
           data-test="workflows-node-rename-input"
@@ -63,23 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:model-value="onNameLive"
           @commit="onNameCommit"
         />
-        <span class="text-text-secondary text-xs">{{ typeBreadcrumb }}</span>
-        <div class="mt-1 flex flex-col gap-1">
-          <label class="text-text-secondary text-xs font-medium">
-            {{ t("workflow.node.commentLabel") }}
-          </label>
-          <OTextarea
-            :model-value="nodeComment"
-            data-test="workflows-node-comment-input"
-            :placeholder="t('workflow.node.commentPlaceholder')"
-            :rows="2"
-            size="sm"
-            @update:model-value="onCommentLive"
-            @blur="onCommentBlur"
-          />
-        </div>
+        <div class="text-text-secondary mt-0.5 truncate text-xs">{{ typeBreadcrumb }}</div>
       </div>
+    </template>
 
+    <div :class="workflowObj.dialog.expand ? 'h-full min-h-0' : 'p-4'">
       <!-- Per-node-type body. Each exposes submit() returning the data payload
            (or null to block Save). Types without a form yet fall back to the
            placeholder below. -->
@@ -92,6 +78,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-sm">
           {{ t("workflow.node.configComingSoon", { node: title }) }}
         </div>
+      </div>
+
+      <!-- Comment (T3) — an optional free-text note, kept at the BOTTOM so the
+           node's own config leads. Hidden in the full-width inline editor. -->
+      <div v-if="!workflowObj.dialog.expand" class="mt-4 flex flex-col gap-1">
+        <label class="text-text-secondary text-xs font-medium">
+          {{ t("workflow.node.commentLabel") }}
+        </label>
+        <OTextarea
+          :model-value="nodeComment"
+          data-test="workflows-node-comment-input"
+          :placeholder="t('workflow.node.commentPlaceholder')"
+          :rows="2"
+          size="sm"
+          @update:model-value="onCommentLive"
+          @blur="onCommentBlur"
+        />
       </div>
     </div>
   </ODrawer>

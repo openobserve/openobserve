@@ -403,9 +403,14 @@ const editWorkflow = (row: any) => {
 
 // Row click → the dedicated read-only Runs view (viewing runs is the common
 // case; editing is the explicit pencil action). Hydrate from the row so the
-// canvas renders immediately — no async re-fetch.
+// canvas renders immediately — no async re-fetch. DRAFTS have no run history by
+// design, so a draft row opens straight in the editor instead.
 const openRuns = (row: any) => {
   if (!row?.id) return;
+  if (row.is_draft) {
+    editWorkflow(row);
+    return;
+  }
   hydrateWorkflow(row);
   router.push({
     name: "workflowRuns",
