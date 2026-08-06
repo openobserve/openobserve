@@ -16,6 +16,15 @@
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, ref } from "vue";
+import { createRouter, createMemoryHistory } from "vue-router";
+
+// A bare router rather than the app's: the component only needs useRouter() to
+// resolve, and importing the real route table drags every routed view into this
+// spec's module graph (tripling its import time).
+const router = createRouter({
+  history: createMemoryHistory(),
+  routes: [{ path: "/", name: "home", component: { template: "<div />" } }],
+});
 
 // Mock all the heavy dependencies
 vi.mock("@/composables/dashboard/usePanelDataLoader", () => ({
@@ -213,7 +222,7 @@ describe("PanelSchemaRenderer", () => {
         ...props,
       },
       global: {
-        plugins: [i18n, store],
+        plugins: [i18n, store, router],
         provide: {
           hoveredSeriesState: { value: null },
           variablesAndPanelsDataLoadingState: {
@@ -2013,6 +2022,65 @@ describe("PanelSchemaRenderer", () => {
       expect(wrapper.vm.contextMenuVisible).toBe(true);
       expect(wrapper.vm.contextMenuPosition).toEqual({ x: 150, y: 250 });
       expect(wrapper.vm.contextMenuValue).toBe(75);
+    });
+
+    it("routes to the alert form when a threshold is picked from the menu", async () => {
+      // The whole chain the dashboard-create-alert e2e walks: chart right-click
+      // → teleported menu → prefill built from the panel → alert form. Only the
+      // menu-opening half was covered before, so a break anywhere after the
+      // click showed up as a 15s e2e timeout instead of a failed unit test.
+      const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+      store.state.selectedOrganization = { identifier: "test-org" };
+
+      wrapper = createWrapper({
+        allowAlertCreation: true,
+        panelSchema: {
+          ...defaultProps.panelSchema,
+          title: "alert-ctx-panel",
+          queries: [
+            {
+              query: 'SELECT count(kubernetes_container_name) as "y_axis_1" FROM "e2e_automate"',
+              customQuery: false,
+              fields: {
+                stream: "e2e_automate",
+                stream_type: "logs",
+                x: [],
+                y: [
+                  {
+                    alias: "y_axis_1",
+                    column: "kubernetes_container_name",
+                    aggregationFunction: "count",
+                  },
+                ],
+                filter: [],
+              },
+            },
+          ],
+        },
+      });
+
+      wrapper.vm.onChartDomContextMenu({ x: 100, y: 200, value: 42 });
+      // The menu is an async component behind a teleport — it needs a real tick
+      // to resolve before its items exist in the document.
+      await vi.waitFor(() =>
+        expect(document.querySelector('[data-test="alert-context-menu-above"]')).toBeTruthy(),
+      );
+
+      document
+        .querySelector('[data-test="alert-context-menu-above"]')!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushPromises();
+
+      expect(push).toHaveBeenCalledWith({
+        name: "addAlert",
+        query: {
+          org_identifier: "test-org",
+          folder: "default",
+          prefill: "panel",
+        },
+      });
+
+      push.mockRestore();
     });
 
     it("should hide context menu", () => {
