@@ -350,6 +350,23 @@ pub fn resolve_best_set_by_coverage<'a>(
     best
 }
 
+/// Set IDs whose stored service rows are stale after a config change: sets that were
+/// removed, plus sets whose `distinguish_by` changed (their rows' disambiguation was
+/// keyed to the old field list). Rows under these IDs linger and pollute correlation
+/// unions until aged out (F10) — callers should delete them and emit a reload event.
+pub fn obsolete_set_ids(old: &ServiceIdentityConfig, new: &ServiceIdentityConfig) -> Vec<String> {
+    old.sets
+        .iter()
+        .filter(
+            |old_set| match new.sets.iter().find(|s| s.id == old_set.id) {
+                None => true,
+                Some(new_set) => new_set.distinguish_by != old_set.distinguish_by,
+            },
+        )
+        .map(|s| s.id.clone())
+        .collect()
+}
+
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct IncidentGroupingConfig {
     pub group_by: Vec<String>,
@@ -797,5 +814,64 @@ mod tests {
     #[test]
     fn test_default_upgrade_window() {
         assert_eq!(default_upgrade_window(), 30);
+    }
+
+    #[test]
+    fn test_obsolete_set_ids_removed_and_changed() {
+        let mk = |id: &str, fields: &[&str]| IdentitySet {
+            id: id.into(),
+            label: id.into(),
+            distinguish_by: fields.iter().map(|s| s.to_string()).collect(),
+        };
+        let old = ServiceIdentityConfig {
+            sets: vec![
+                mk("k8s", &["k8s-cluster", "k8s-namespace"]),
+                mk("aws", &["aws-region"]),
+                mk("keep", &["environment"]),
+            ],
+            tracked_alias_ids: vec!["environment".into()],
+            service_optional: false,
+        };
+        let new = ServiceIdentityConfig {
+            sets: vec![mk("k8s", &["k8s-cluster"]), mk("keep", &["environment"])],
+            tracked_alias_ids: vec!["environment".into()],
+            service_optional: false,
+        };
+        let mut ids = obsolete_set_ids(&old, &new);
+        ids.sort();
+        // "aws" removed; "k8s" distinguish_by changed; "keep" untouched
+        assert_eq!(ids, vec!["aws".to_string(), "k8s".to_string()]);
+    }
+
+    #[test]
+    fn test_obsolete_set_ids_unchanged_config_is_empty() {
+        let cfg = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".into(),
+                label: "Kubernetes".into(),
+                distinguish_by: vec!["k8s-cluster".into(), "k8s-namespace".into()],
+            }],
+            tracked_alias_ids: vec!["environment".into()],
+            service_optional: false,
+        };
+        assert!(obsolete_set_ids(&cfg, &cfg).is_empty());
+    }
+
+    #[test]
+    fn test_obsolete_set_ids_field_reorder_is_obsolete() {
+        // Order of distinguish_by decides the disambiguation key layout, so a reorder
+        // invalidates stored rows just like a membership change.
+        let mk = |fields: &[&str]| ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".into(),
+                label: "Kubernetes".into(),
+                distinguish_by: fields.iter().map(|s| s.to_string()).collect(),
+            }],
+            tracked_alias_ids: vec![],
+            service_optional: false,
+        };
+        let old = mk(&["k8s-cluster", "k8s-namespace"]);
+        let new = mk(&["k8s-namespace", "k8s-cluster"]);
+        assert_eq!(obsolete_set_ids(&old, &new), vec!["k8s".to_string()]);
     }
 }
