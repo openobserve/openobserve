@@ -557,7 +557,9 @@ jobs:
             exit 0
           fi
           echo "::group::Uploading to Kinora ($KINORA_PROJECT)"
-          if OUT=$(npx --yes @kinora/cli upload playwright-results/report.json \
+          # Cap a hung upload at 5 min (SIGTERM, then SIGKILL after 30s) so a stalled
+          # Kinora endpoint fails fast instead of burning the whole 20-min job budget.
+          if OUT=$(timeout -k 30 300 npx --yes @kinora/cli upload playwright-results/report.json \
                      --project "$KINORA_PROJECT" \
                      --git-repo-url "https://github.com/${{ github.repository }}" 2>&1); then
             echo "$OUT"
