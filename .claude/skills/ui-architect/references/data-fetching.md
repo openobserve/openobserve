@@ -351,6 +351,12 @@ above.
 
 ---
 
+## Before you push
+
+`npm run lint` and `npm run format:check` are **different gates**. ESLint's
+prettier rule does not cover everything CI checks, so a scripted or bulk edit
+can pass lint and still fail `format:check`. Run both, plus `type-check`.
+
 ## Testing
 
 - `setupTests.ts` already clears the query client **and** purges persisted
