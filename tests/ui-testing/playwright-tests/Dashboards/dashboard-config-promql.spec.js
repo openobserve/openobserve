@@ -789,6 +789,12 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     };
     page.on("response", onResponse);
 
+    // Armed before the click — applyDashboardBtn awaits internally, and the
+    // response can arrive inside that await.
+    const promqlResponsePromise = page
+      .waitForResponse((res) => isPromQLQuery(res.url()), { timeout: 20000 })
+      .catch(() => null);
+
     // One Apply, then wait on the panel's own completion signal rather than on a
     // network event — the Apply button stays disabled until every chunk lands.
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -796,6 +802,17 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     page.off("response", onResponse);
 
     const callsDiag = `captured /api/ calls: ${JSON.stringify(allCalls)}`;
+
+    // The metric converter only handles resultType "matrix"; the backend is not
+    // expected to return vector here. Read the body only now — after the panel
+    // has settled and the stream is complete — so this never races the page's
+    // own consumption of it.
+    const promqlResponse = await promqlResponsePromise;
+    const promqlBody = promqlResponse ? await promqlResponse.text().catch(() => "") : "";
+    expect(promqlBody, `promql response was not captured. ${callsDiag}`).toContain("promql_response");
+    expect(promqlBody, `expected a matrix result. ${callsDiag}`).toContain('"resultType":"matrix"');
+    expect(promqlBody, `unexpected vector result — the metric panel cannot render it. ${callsDiag}`)
+      .not.toContain('"resultType":"vector"');
     expect(
       settled,
       `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,
@@ -872,6 +889,11 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     };
     page.on("response", onResponse);
 
+    // Armed before the click — see the sparkline test above.
+    const promqlResponsePromise = page
+      .waitForResponse((res) => res.url().includes("/prometheus/api/v1/query"), { timeout: 20000 })
+      .catch(() => null);
+
     // One Apply, then wait on the panel's own completion signal — the Apply
     // button stays disabled until every streamed chunk has landed.
     await pm.dashboardPanelActions.applyDashboardBtn();
@@ -879,6 +901,15 @@ test.describe("ConfigPanel — PromQL Settings", () => {
     page.off("response", onResponse);
 
     const callsDiag = `failed calls: ${JSON.stringify(failedCalls)}`;
+
+    // Same contract as the sparkline test: the metric converter only handles
+    // "matrix". Body is read after the panel settled, so the stream is done.
+    const promqlResponse = await promqlResponsePromise;
+    const promqlBody = promqlResponse ? await promqlResponse.text().catch(() => "") : "";
+    expect(promqlBody, `promql response was not captured. ${callsDiag}`).toContain("promql_response");
+    expect(promqlBody, `expected a matrix result. ${callsDiag}`).toContain('"resultType":"matrix"');
+    expect(promqlBody, `unexpected vector result — the metric panel cannot render it. ${callsDiag}`)
+      .not.toContain('"resultType":"vector"');
     expect(
       settled,
       `panel never finished loading. ${await describePanelRender(page)}. ${consoleLog.describe()}`,

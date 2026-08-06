@@ -410,6 +410,11 @@ export async function describePanelRender(page) {
           document.querySelector('[data-test="panel-schema-renderer-error-message"]')?.textContent?.trim() ?? null,
         stillLoading: !!cancelBtn || (!!applyBtn && applyBtn.disabled === true),
         applyPresent: !!applyBtn,
+        // The copy overlay is driven by the metric series' own _metricText, so
+        // it is a DOM-visible proxy for "the converter produced a real series".
+        // Present + empty SVG => the series exists and ECharts failed to draw it.
+        // Absent + empty SVG => no usable series was produced at all.
+        metricOverlay: !!document.querySelector('[data-test="dashboard-metric-copy-overlay"]'),
         canvas: el ? el.querySelectorAll("canvas").length : 0,
         svg: el ? el.querySelectorAll("svg").length : 0,
         svgPaths: el ? el.querySelectorAll("svg path").length : 0,
@@ -432,13 +437,17 @@ export async function describePanelRender(page) {
  */
 export function collectConsoleErrors(page) {
   const messages = [];
+  // Keep enough of the text for a full stack: the frames after the first are
+  // what identify which option array ECharts choked on, and a short slice cuts
+  // them off exactly where they start being useful.
+  const CAP = 1200;
   page.on("console", (msg) => {
     if (msg.type() === "error" || msg.type() === "warning") {
-      messages.push(`[${msg.type()}] ${msg.text()}`.slice(0, 300));
+      messages.push(`[${msg.type()}] ${msg.text()}`.slice(0, CAP));
     }
   });
   page.on("pageerror", (err) => {
-    messages.push(`[pageerror] ${err.message}`.slice(0, 300));
+    messages.push(`[pageerror] ${err.message}\n${err.stack ?? ""}`.slice(0, CAP));
   });
   return {
     messages,
