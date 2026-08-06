@@ -266,9 +266,9 @@ impl ServiceIdentityConfig {
                 return Err(format!("duplicate set id '{}'", set.id));
             }
         }
-        if self.tracked_alias_ids.is_empty() {
-            return Err("tracked_alias_ids requires at least 1 alias group ID".into());
-        }
+        // tracked_alias_ids may be empty: ingest tracking is the UNION of this list and
+        // every set's distinguish_by, and >=1 set is enforced above — sets alone are
+        // a complete config (custom set dims need not be re-listed here).
         if self.tracked_alias_ids.len() > MAX_TRACKED_ALIASES {
             return Err(format!(
                 "tracked_alias_ids cannot exceed {} entries",
@@ -873,5 +873,22 @@ mod tests {
         let old = mk(&["k8s-cluster", "k8s-namespace"]);
         let new = mk(&["k8s-namespace", "k8s-cluster"]);
         assert_eq!(obsolete_set_ids(&old, &new), vec!["k8s".to_string()]);
+    }
+
+    #[test]
+    fn test_validate_allows_empty_tracked_alias_ids_with_sets() {
+        // tracked_ids at ingest are the UNION of tracked_alias_ids and every set's
+        // distinguish_by, and validate() already requires >=1 set — so an empty
+        // tracked_alias_ids list is a fully functional config and must not be rejected.
+        let cfg = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "custom".into(),
+                label: "Custom".into(),
+                distinguish_by: vec!["region".into(), "version".into()],
+            }],
+            tracked_alias_ids: vec![],
+            service_optional: false,
+        };
+        assert!(cfg.validate().is_ok());
     }
 }
