@@ -172,11 +172,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="add-variable-drawer-overlay bg-overlay-scrim fixed top-0 right-0 bottom-0 left-0 z-6000 flex justify-end"
       @click.self="handleCloseAddVariable"
     >
-      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
       <div
-        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-[-2px_0_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-sm"
       >
-        <!-- eslint-enable local/no-hardcoded-px -->
         <AddSettingVariable
           @save="handleSaveVariable"
           @close="handleCloseAddVariable"

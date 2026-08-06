@@ -192,14 +192,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <div class="px-page-edge">
                   <div class="grid grid-cols-6 gap-2.5">
-                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this KPI card's hover elevation shadow with text makes it bloom -->
                     <div
                       v-for="card in kpiCards"
                       :key="card.key"
-                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]"
+                      class="card-container rounded-default bg-surface-base border-border-default flex flex-col gap-1 border px-2 pt-2.5 pb-2.5 transition-shadow duration-200 hover:shadow-sm"
                       :data-test="`monitor-runs-kpi-${card.key}`"
                     >
-                      <!-- eslint-enable local/no-hardcoded-px -->
                       <div class="flex flex-col gap-1">
                         <div class="kpi-label text-2xs text-text-muted font-semibold">
                           {{ card.label }}

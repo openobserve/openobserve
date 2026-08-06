@@ -521,7 +521,6 @@ watch(internalOpen, (open) => {
         <!-- overflow-x-hidden prevents horizontal scrollbar when content is wider than dialog -->
         <!-- full-size: flex-1 so the body fills the remaining viewport height; content manages its own scroll -->
         <!-- non-full: no flex-1 — panel height = content height (capped at max-h), footer flows below body -->
-        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling these scroll-shadow insets with text makes elevation bloom -->
         <div
           ref="bodyRef"
           :class="[
@@ -529,15 +528,14 @@ watch(internalOpen, (open) => {
             isFullSize ? 'flex-1 overflow-hidden p-0' : 'overflow-y-auto',
             !isFullSize && 'px-dialog-content-px py-dialog-content-py',
             'text-dialog-content-text',
-            !isFullSize && canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            !isFullSize && canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            !isFullSize && canScrollUp && 'shadow-scroll-top',
+            !isFullSize && canScrollDown && 'shadow-scroll-bottom',
             !isFullSize &&
               canScrollUp &&
               canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+              'shadow-scroll-both',
           ]"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           <slot />
         </div>
 

@@ -61,11 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mx-auto max-w-100">
           <!-- Create New Org -->
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this hover shadow with text makes elevation bloom -->
           <OCard
-            class="rounded-default mb-4 transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+            class="rounded-default mb-4 transition-all duration-200 hover:shadow-md"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <OCardSection role="body">
               <div class="text-xl font-semibold">
                 {{ t("billing.azureMarketplace.createNewOrg") }}
@@ -101,12 +99,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OCard>
 
           <!-- Link to Existing Org (only show orgs without billing) -->
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this hover shadow with text makes elevation bloom -->
           <OCard
             v-if="eligibleOrganizations.length > 0"
-            class="rounded-default transition-all duration-200 hover:shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+            class="rounded-default transition-all duration-200 hover:shadow-md"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <OCardSection role="body">
               <div class="text-xl font-semibold">
                 {{ t("billing.azureMarketplace.linkToExisting") }}

@@ -103,13 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Edge-deletion help hint — shown on edge click (same affordance as the
        pipeline canvas). Auto-hides after a few seconds; never shown on the
        read-only Runs canvas where edges can't be removed. -->
-  <!-- eslint-disable local/no-hardcoded-px -- box-shadow offset and blur — optical effects, not layout; scaling them with text makes the elevation bloom -->
   <div
     v-if="showEdgeHelpNotification"
     data-test="workflow-edge-delete-hint"
-    class="bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    class="bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
   >
-    <!-- eslint-enable local/no-hardcoded-px -->
     <OIcon name="info" class="mr-1" size="sm" />
     {{ t("workflow.edgeDeleteHint") }}
   </div>

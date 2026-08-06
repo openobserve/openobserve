@@ -1079,8 +1079,7 @@ function cacheInputDenominator(d: SessionDetail): number {
 // Errors uses a variant (red when > 50% error rate); every other tile is neutral.
 function kpiCardClass(variant?: "danger"): string {
   const base =
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling this hover elevation shadow with text makes it bloom
-    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]";
+    "flex flex-col justify-center gap-1 px-3.5 py-2.5 rounded-default border transition-shadow hover:shadow-sm";
   if (variant === "danger")
     return `${base} bg-[color-mix(in_srgb,var(--color-error-500)_5%,var(--color-surface-base))] border-[color-mix(in_srgb,var(--color-error-500)_35%,var(--color-border-default))]`;
   return `${base} bg-surface-base border-border-default`;

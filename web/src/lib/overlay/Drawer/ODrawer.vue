@@ -462,21 +462,19 @@ watch(internalOpen, (open) => {
 
         <!-- ── Content (scrollable body) ───────────────────── -->
         <!-- flex-1 + min-h-0: body fills remaining height so the footer always sticks to the bottom -->
-        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling these scroll-shadow insets with text makes elevation bloom -->
         <div
           ref="bodyRef"
           :class="[
             'min-h-0 flex-1 overflow-x-hidden overflow-y-auto',
             'text-dialog-content-text',
             bodyPaddingClass,
-            canScrollUp && '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1)]',
-            canScrollDown && '[box-shadow:inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+            canScrollUp && 'shadow-scroll-top',
+            canScrollDown && 'shadow-scroll-bottom',
             canScrollUp &&
               canScrollDown &&
-              '[box-shadow:inset_0_8px_6px_-6px_rgba(0,0,0,0.1),inset_0_-8px_6px_-6px_rgba(0,0,0,0.1)]',
+              'shadow-scroll-both',
           ]"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           <template v-if="!props.lazy || internalOpen">
             <slot />
           </template>

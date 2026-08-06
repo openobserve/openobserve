@@ -32,15 +32,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-show="showScrollToBottom" class="pointer-events-none absolute right-5 bottom-5 z-1000">
-      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this drop shadow with text makes elevation bloom -->
       <OButton
         variant="ghost"
         size="icon-sm"
-        class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-[0_2px_8px_rgba(0,0,0,0.2)] backdrop-blur-sm"
+        class="!border-accent !text-accent !bg-surface-overlay pointer-events-auto !border-2 shadow-sm backdrop-blur-sm"
         data-test="anomaly-summary-scroll-btn"
         @click="scrollToBottom"
       >
-        <!-- eslint-enable local/no-hardcoded-px -->
         <OIcon name="arrow-downward" size="sm" />
         <OTooltip :content="t('alerts.anomaly.scrollToBottom')" side="top" align="center" />
       </OButton>

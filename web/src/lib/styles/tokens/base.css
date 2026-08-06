@@ -398,12 +398,16 @@
   --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
 
   /* --- Shadow scale — hairline-border philosophy ---
-     Only md/lg render real elevation (overlays: dialogs, menus). Cards use a
+     Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a
      1px border, not a drop shadow — a flat surface needs NO shadow class. */
-  /* eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom */
-  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 6px -2px rgb(0 0 0 / 0.06);
-  /* eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom */
-  --shadow-lg: 0 12px 24px -4px rgb(0 0 0 / 0.1), 0 4px 8px -4px rgb(0 0 0 / 0.06);
+  --shadow-sm-c1: rgb(0 0 0 / 0.1);
+  --shadow-sm-c2: rgb(0 0 0 / 0.06);
+  --shadow-md-c1: rgb(0 0 0 / 0.08);
+  --shadow-md-c2: rgb(0 0 0 / 0.06);
+  --shadow-lg-c1: rgb(0 0 0 / 0.1);
+  --shadow-lg-c2: rgb(0 0 0 / 0.06);
+  --shadow-scroll-c: rgb(0 0 0 / 0.1);
+  --shadow-glow-c: rgb(0 0 0 / 0.6);
 }
 
 /* ============================================================

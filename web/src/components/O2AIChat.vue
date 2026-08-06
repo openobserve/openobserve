@@ -1,10 +1,8 @@
 ﻿<template>
-  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
   <div
-    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden shadow-md shadow-hover-shadow"
     :class="[{ 'chat-open': isOpen }]"
   >
-    <!-- eslint-enable local/no-hardcoded-px -->
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
       <div
         class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-end justify-between border-b px-3 pt-0 pb-1"
@@ -267,11 +265,10 @@
               </div>
             </div>
           </div>
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message rounded-default border-border-default border p-3 [box-shadow:0_1px_2px_color-mix(in_srgb,var(--color-text-heading)_10%,transparent)]"
+            class="message rounded-default border-border-default border p-3 shadow-md shadow-text-heading/10"
             :class="[
               message.role,
               message.role === 'user'
@@ -280,7 +277,6 @@
               { 'error-message': message.content.startsWith('Error:') },
             ]"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <div class="message-content flex w-full items-start gap-1.5">
               <div
                 v-if="message.role === 'user'"
@@ -889,11 +885,9 @@
                       class="log-entry-details mt-2.5"
                       @click.stop
                     >
-                      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                       <div
-                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] dark:[box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
                       >
-                        <!-- eslint-enable local/no-hardcoded-px -->
                         <OButton
                           variant="ghost"
                           size="icon-xs-circle"
@@ -1018,14 +1012,12 @@
                       :key="'img-' + imgIndex"
                       class="message-image-item"
                     >
-                      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                       <img
                         :src="'data:' + img.mimeType + ';base64,' + img.data"
                         :alt="img.filename"
-                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-md"
                         @click="openImagePreview(img)"
                       />
-                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OTooltip :content="raw(img.filename)" />
                     </div>
                   </div>
@@ -1197,14 +1189,12 @@
           v-show="showScrollToBottom"
           class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
         >
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
           <OButton
             variant="ghost"
             size="icon-sm"
-            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_20%,transparent)] [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_30%,transparent)] active:scale-100"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
             @click="scrollToBottomSmooth"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <OIcon name="arrow-downward" size="sm" />
             <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
           </OButton>
@@ -1212,12 +1202,10 @@
       </div>
 
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
-      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 [box-shadow:0_2px_8px_color-mix(in_srgb,var(--color-black)_8%,transparent)] [background:var(--color-chat-bubble-user)]"
+        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 shadow-sm [background:var(--color-chat-bubble-user)]"
       >
-        <!-- eslint-enable local/no-hardcoded-px -->
         <!-- Show tool call if active -->
         <div
           v-if="activeToolCall"
@@ -1260,15 +1248,13 @@
           @change="handleImageSelect"
         />
 
-        <!-- eslint-disable local/no-hardcoded-px -- focus ring painted as a box-shadow — an optical effect, not layout; scaling it with text makes the ring bloom -->
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:[box-shadow:0_0_0_2px_var(--color-accent)]"
+          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2 focus-within:ring-accent"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           <!-- Image preview strip -->
           <div
             v-if="pendingImages.length > 0"
@@ -1365,29 +1351,25 @@
 
             <div class="flex items-center gap-2">
               <!-- Send button - shown when not loading -->
-              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
               <OButton
                 v-if="!isLoading"
                 :disabled="!inputMessage.trim() && pendingImages.length === 0"
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button bg-(image:--color-gradient-ai)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
+                class="send-button bg-(image:--color-gradient-ai)! shadow-lg! shadow-ai-accent/30! [transition:all_0.3s_ease]!"
               >
-                <!-- eslint-enable local/no-hardcoded-px -->
                 <OIcon name="send" size="sm" />
               </OButton>
 
               <!-- Stop button - shown when loading/streaming -->
-              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
               <OButton
                 v-if="isLoading"
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-(image:--color-gradient-danger)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-[0_6px_20px_0_color-mix(in_srgb,var(--color-status-negative)_40%,transparent)]! active:translate-y-0! active:shadow-[0_2px_10px_0_color-mix(in_srgb,var(--color-status-negative)_30%,transparent)]!"
+                class="stop-button bg-(image:--color-gradient-danger)! shadow-lg! shadow-status-negative/30! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-lg! hover:shadow-status-negative/40! active:translate-y-0! active:shadow-md! active:shadow-status-negative/30!"
               >
-                <!-- eslint-enable local/no-hardcoded-px -->
                 <OIcon name="stop" size="sm" />
               </OButton>
             </div>

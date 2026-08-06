@@ -89,12 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this content-card elevation shadow with text makes it bloom -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
             :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <div
               v-if="isLoading"
               :key="store.state.selectedOrganization?.identifier"

@@ -91,17 +91,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template v-for="(stackTrace, traceIndex) in translatedStackTrace" :key="traceIndex">
         <!-- Error message -->
-        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
         <div
           v-if="stackTrace.error"
-          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] [box-shadow:0_1px_2px_rgba(0,0,0,0.05)]"
+          class="error-header rounded-t-default -mb-px border border-solid !px-4 px-3 !py-2.5 py-2 text-sm font-bold font-semibold [letter-spacing:0.01em] shadow-sm"
           :style="{
             'background-color': errorHeaderBackground,
             color: errorHeaderColor,
             'border-color': borderColor,
           }"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           {{ stackTrace.error }}
         </div>
 
@@ -109,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- eslint-disable local/no-hardcoded-px -- 1px frame borders plus a box-shadow offset and blur — optical effects, not layout; scaling them with text thickens the rule and makes elevation bloom -->
         <div
           v-if="stackTrace.stack.length > 0"
-          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="stack-frame-wrapper rounded-b-default mt-0 overflow-hidden shadow-sm"
           :style="{
             'border-top': `1px solid ${borderColor}`,
             'border-bottom': `1px solid ${borderColor}`,
@@ -164,12 +162,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Source code snippet with syntax highlighting -->
-            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
             <div
-              class="source-code-box rounded-default h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+              class="source-code-box rounded-default h-50 overflow-hidden border border-solid shadow-sm"
               :style="{ 'border-color': borderColor }"
             >
-              <!-- eslint-enable local/no-hardcoded-px -->
               <CodeQueryEditor
                 :ref="(el: any) => setEditorRef(traceIndex, 0, el)"
                 :editor-id="`source-frame-${traceIndex}-0`"
@@ -186,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- eslint-disable local/no-hardcoded-px -- 1px bottom/side borders plus a box-shadow offset and blur — optical effects, not layout; the collapsed panel must not gain weight with its text -->
         <div
           v-if="stackTrace.stack.length > 1"
-          class="remaining-frames rounded-b-default [box-shadow:0_1px_3px_rgba(0,0,0,0.08)]"
+          class="remaining-frames rounded-b-default shadow-sm"
           :style="{
             'border-bottom': `1px solid ${borderColor}`,
             'border-left': `1px solid ${borderColor}`,
@@ -268,12 +264,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
 
-                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
-                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid [box-shadow:0_2px_6px_rgba(0,0,0,0.1)]"
+                  class="source-code-box rounded-default ml-4 h-50 overflow-hidden border border-solid shadow-sm"
                   :style="{ 'border-color': borderColor }"
                 >
-                  <!-- eslint-enable local/no-hardcoded-px -->
                   <CodeQueryEditor
                     :ref="(el: any) => setEditorRef(traceIndex, frameIndex + 1, el)"
                     :editor-id="`source-frame-${traceIndex}-${frameIndex + 1}`"

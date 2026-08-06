@@ -94,9 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
                 <div
                   data-test="enterprise-upgrade-offer-badge"
-                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_4px_16px_rgba(34,197,94,0.4)] backdrop-blur-[10px]"
+                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-success-500/40 backdrop-blur-[10px]"
                   :class="{
-                    'bg-[rgba(255,255,255,0.2)]! shadow-[0_4px_12px_rgba(0,0,0,0.15)]!':
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!':
                       dialogConfig.isLicensed,
                   }"
                 >
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 @click="handlePrimaryButtonClick"
                 data-test="enterprise-upgrade-download-btn"
-                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] text-[var(--color-theme-accent)]! shadow-[0_4px_16px_rgba(0,0,0,0.15)] transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:[transform:translateY(-1px)_scale(0.98)]"
+                class="rounded-default! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] text-[var(--color-theme-accent)]! shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
               >
                 <!-- eslint-enable local/no-hardcoded-px -->
                 {{ dialogConfig.primaryButtonText }}

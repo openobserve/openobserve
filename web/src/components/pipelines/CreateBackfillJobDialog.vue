@@ -62,12 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Advanced Options -->
-        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling this glow/ring shadow with text makes it bloom -->
         <div
-          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border flex flex-col overflow-hidden border shadow-[0_0_5px_1px_var(--color-hover-shadow)] transition-all"
+          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border flex flex-col overflow-hidden border shadow-md shadow-hover-shadow transition-all"
           data-test="advanced-options-section"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           <div
             class="section-header border-border-default rounded-t-default hover:bg-interactive-hover-bg active:bg-interactive-hover-bg flex shrink-0 cursor-pointer items-center justify-between border-b px-4 py-3 transition-all select-none"
             @click="showAdvanced = !showAdvanced"

@@ -1,12 +1,10 @@
 <template>
   <div v-if="visible" class="confirmation-overlay mb-2 w-full">
-    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
     <div
-      class="confirmation-dialog rounded-default bg-surface-base border-border-default flex w-full flex-col gap-3.5 border-2 px-4 pt-4 pb-3.5 shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.3)]"
+      class="confirmation-dialog rounded-default bg-surface-base border-border-default flex w-full flex-col gap-3.5 border-2 px-4 pt-4 pb-3.5 shadow-sm dark:shadow-sm"
       @keydown="handleDialogKeydown"
       @click="handleDialogClick"
     >
-      <!-- eslint-enable local/no-hardcoded-px -->
       <div class="confirmation-header flex items-start gap-3">
         <OIcon
           name="help-outline"

@@ -173,14 +173,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
       <div
-        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
-        <!-- eslint-enable local/no-hardcoded-px -->
         <template v-for="(drilldown, index) in drilldownArray" :key="JSON.stringify(drilldown)">
           <OSeparator
             v-if="

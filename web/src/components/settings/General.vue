@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customLightColor }"
                 >
                   <OIcon
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
-                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-[0_1px_3px_color-mix(in_srgb,var(--color-black)_20%,transparent)]"
+                  class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customDarkColor }"
                 >
                   <OIcon

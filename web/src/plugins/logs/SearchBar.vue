@@ -911,7 +911,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t("search.cancel") }}</OButton
                 >
                 <!-- Main action button: "Ask AI" when NL detected + AI bar not open, otherwise "Run Query" -->
-                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
@@ -932,7 +931,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md hover:shadow-button-primary/70',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -941,7 +940,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : handleRunQueryFn()
                   "
                 >
-                  <!-- eslint-enable local/no-hardcoded-px -->
                   {{
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? t("search.generateQuery")
@@ -951,7 +949,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
-                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                     <OButton
                       variant="ghost"
                       size="icon-xs"
@@ -961,12 +958,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-md hover:shadow-button-primary/70'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
-                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
@@ -1000,7 +996,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >{{ t("search.cancel") }}</OButton
                 >
                 <!-- Main action button -->
-                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                 <OButton
                   v-else
                   data-test="logs-search-bar-visualize-refresh-btn"
@@ -1022,7 +1017,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md hover:shadow-button-primary/70',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -1031,7 +1026,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       : handleRunQueryFn()
                   "
                 >
-                  <!-- eslint-enable local/no-hardcoded-px -->
                   {{
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? t("search.generateQuery")
@@ -1041,7 +1035,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSeparator class="h-[1.875rem]! w-px" vertical />
                 <ODropdown align="end" side="bottom">
                   <template #trigger>
-                    <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                     <OButton
                       variant="ghost"
                       size="icon-xs"
@@ -1051,12 +1044,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-md hover:shadow-button-primary/70'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
                     >
-                      <!-- eslint-enable local/no-hardcoded-px -->
                       <OIcon name="arrow-drop-down" size="sm" />
                     </OButton>
                   </template>
@@ -1113,7 +1105,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >{{ t("search.cancel") }}</OButton
               >
               <!-- Main action button: "Ask AI" when NL detected but AI bar not open, otherwise "Run Query" -->
-              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
               <OButton
                 v-else
                 data-test="logs-search-bar-refresh-btn"
@@ -1129,7 +1120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md hover:shadow-button-primary/70',
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
@@ -1150,7 +1141,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     !searchObj.data.stream.selectedStream.length)
                 "
               >
-                <!-- eslint-enable local/no-hardcoded-px -->
                 <OTooltip
                   v-if="
                     searchObj.meta.liveMode &&
@@ -1183,7 +1173,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
                 <template #trigger>
-                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — a hover glow's blur radius must not scale with text -->
                   <OButton
                     variant="ghost"
                     size="icon-xs"
@@ -1197,14 +1186,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (searchObj.loading == true || searchObj.loadingHistogram == true))
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:shadow-md hover:shadow-button-primary/70'
                           : '',
                       store.state.zoConfig.auto_query_enabled
                         ? 'rounded-e-default! rounded-s-none!'
                         : 'rounded-default',
                     ]"
                   >
-                    <!-- eslint-enable local/no-hardcoded-px -->
                     <OIcon name="arrow-drop-down" size="sm" />
                   </OButton>
                 </template>

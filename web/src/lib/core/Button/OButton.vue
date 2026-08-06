@@ -153,8 +153,7 @@ const variantClasses: Record<NonNullable<ButtonProps["variant"]>, string> = {
   // AI-themed gradient — purple→pink gradient background, white text
   "ai-gradient": [
     "bg-[image:var(--color-gradient-ai)] text-white border-0",
-    // eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow), not layout — scaling it with text makes elevation bloom
-    "enabled:hover:shadow-[0_4px_12px_rgba(139,92,246,0.4)]",
+    "enabled:hover:shadow-md enabled:hover:shadow-ai-accent/40",
     "enabled:active:opacity-90",
     "focus-visible:ring-3 focus-visible:ring-ai-accent",
     "disabled:opacity-40",

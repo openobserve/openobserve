@@ -84,11 +84,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
       <!-- AI Credits card -->
       <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
-        <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
         <div
-          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-[0_1px_3px_rgba(0,0,0,0.1)]"
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-sm"
         >
-          <!-- eslint-enable local/no-hardcoded-px -->
           <div
             class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
           >

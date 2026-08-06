@@ -27,12 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Edge deletion help notification -->
-    <!-- eslint-disable local/no-hardcoded-px -- optical effect (box-shadow), not layout — scaling it with text makes elevation bloom -->
     <div
       v-if="showEdgeHelpNotification"
-      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+      class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
-      <!-- eslint-enable local/no-hardcoded-px -->
       <OIcon name="info" class="mr-1" size="sm" />
       {{ t("pipeline.edgeDeleteHint") }}
     </div>

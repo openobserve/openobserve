@@ -13,13 +13,12 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
   <div
     class="grid w-full [grid-template-columns:repeat(4,minmax(0,1fr))] gap-3.5 max-[64rem]:[grid-template-columns:repeat(2,minmax(0,1fr))] max-[40rem]:[grid-template-columns:1fr]"
   >
-    <!-- eslint-disable local/no-hardcoded-px -- optical effect (box-shadow), not layout — scaling it with text makes elevation bloom -->
     <OCard
       v-for="card in CAPABILITY_CARDS"
       :key="card.id"
       role="button"
       tabindex="0"
-      class="capability-card group/card border-border-default rounded-default bg-card-bg relative isolate min-h-33 cursor-pointer overflow-hidden border px-4 py-4 pb-[1.125rem] transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:-translate-y-[0.1875rem] hover:border-[rgba(var(--accent),0.5)] hover:shadow-[0_1px_2px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(var(--accent),0.35)] focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:shadow-[0_0_0_2px_rgba(var(--accent),0.45)] focus-visible:outline-none"
+      class="capability-card group/card border-border-default rounded-default bg-card-bg relative isolate min-h-33 cursor-pointer overflow-hidden border px-4 py-4 pb-[1.125rem] transition-[border-color,box-shadow,translate,background] duration-200 ease-[ease] [--accent:123,97,255] [--card-tint:linear-gradient(155deg,rgba(var(--accent),0.1)_0%,rgba(var(--accent),0.02)_40%,transparent_70%)] hover:-translate-y-[0.1875rem] hover:border-[rgba(var(--accent),0.5)] hover:shadow-lg hover:shadow-[color:rgba(var(--accent),0.35)] focus-visible:border-[rgba(var(--accent),0.7)] focus-visible:ring-2 focus-visible:ring-[rgba(var(--accent),0.45)] focus-visible:outline-none"
       :class="{
         '[--accent:123,97,255]': card.id === 'query',
         '[--accent:245,158,11]': card.id === 'incident',
@@ -30,19 +29,16 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       @keydown.enter.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
       @keydown.space.prevent="emit('select', t(`aiAssistant.capabilities.${card.id}.prompt`))"
     >
-      <!-- eslint-enable local/no-hardcoded-px -->
       <!-- eslint-disable local/no-hardcoded-px -- optical effect (blur radius), not layout — scaling it with text makes the glow bloom -->
       <span
         class="capability-card__glow [-inset-px] rounded-default pointer-events-none absolute z-[-1] bg-[linear-gradient(135deg,rgba(var(--accent),0.45),rgba(var(--accent),0.05)_60%)] opacity-0 blur-[8px] transition-opacity duration-[250ms] ease-[ease] group-hover/card:opacity-100"
         aria-hidden="true"
       ></span>
       <!-- eslint-enable local/no-hardcoded-px -->
-      <!-- eslint-disable local/no-hardcoded-px -- optical effect (inset box-shadow ring), not layout — scaling it with text makes the ring bloom -->
       <div
-        class="capability-card__icon rounded-default relative z-1 mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center shadow-[inset_0_0_0_1px_rgba(var(--accent),0.18)]"
+        class="capability-card__icon rounded-default relative z-1 mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center ring-1 ring-inset ring-[rgba(var(--accent),0.18)]"
         :class="card.iconBgClass"
       >
-        <!-- eslint-enable local/no-hardcoded-px -->
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />
       </div>
       <div

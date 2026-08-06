@@ -65,21 +65,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OCardSection class="max-h-[calc(100vh-100px)] overflow-y-auto px-2 py-2">
       <ul class="m-0 flex list-none flex-col gap-2 p-0">
         <li v-for="theme in predefinedThemes" :key="theme.id">
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — focus ring and inset selection ring widths must not scale with text -->
           <button
             type="button"
             :data-test="`predefined-themes-apply-btn-${mode}-${themeNameSlug(theme.name)}`"
-            class="rounded-default flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            class="rounded-default flex w-full cursor-pointer items-center border px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
             :class="
               isThemeApplied(theme, mode)
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset ring-accent'
                 : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
             "
             :aria-pressed="isThemeApplied(theme, mode)"
             :aria-label="t('common.applyTheme', { name: themeDisplayName(theme.name) })"
             @click="applyTheme(theme, mode)"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <span
               class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
               :style="swatchStyle(theme[mode])"
@@ -103,21 +101,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Custom Color — clicking the row opens the color picker -->
         <li>
-          <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — focus ring and inset selection ring widths must not scale with text -->
           <button
             type="button"
             :data-test="`predefined-themes-card-${mode}-custom-color`"
-            class="rounded-default flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:shadow-[0_0_0_2px_color-mix(in_srgb,var(--color-accent)_40%,transparent)] focus-visible:outline-none"
+            class="rounded-default flex w-full cursor-pointer items-center border border-dashed px-3 py-2 transition-[border-color,background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:outline-none"
             :class="
               isCustomThemeApplied(mode)
-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] shadow-[inset_0_0_0_1px_var(--color-accent)]'
+                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_8%,var(--color-card-glass-bg))] ring-1 ring-inset ring-accent'
                 : 'border-card-glass-border bg-card-glass-bg hover:border-accent hover:bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-glass-bg))]'
             "
             :aria-pressed="isCustomThemeApplied(mode)"
             :aria-label="t('components.predefinedThemes.customThemeColorAriaLabel')"
             @click="openColorPicker(mode)"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             <span
               :data-test="`predefined-themes-custom-color-preview-${mode}`"
               class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
