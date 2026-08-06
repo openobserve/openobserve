@@ -102,6 +102,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Undo (T1) + Tidy up (T9) — editor-only affordances (hidden on the
              read-only Runs canvas). Undo is the ONLY history button; redo is
              keyboard-only (Ctrl/Cmd+Shift+Z). -->
+        <!-- Bare currentColor <svg> (like the palette toggle above) so they match
+             Vue Flow's own control icons and adapt to light/dark — an OIcon here
+             kept its own colour and vanished on the dark canvas. -->
         <ControlButton
           v-if="!readOnly"
           data-test="workflows-canvas-undo"
@@ -109,7 +112,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('workflow.canvas.undo')"
           @click="onUndo"
         >
-          <OIcon name="restart-alt" size="sm" />
+          <!-- Undo — curved arrow. -->
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
+            />
+          </svg>
         </ControlButton>
         <ControlButton
           v-if="!readOnly"
@@ -117,7 +125,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="t('workflow.canvas.tidyUp')"
           @click="onTidy"
         >
-          <OIcon name="account-tree" size="sm" />
+          <!-- Tidy up — magic wand / auto-arrange (Material auto_fix_high). -->
+          <svg viewBox="0 0 24 24">
+            <path
+              d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7l2.5-1.4zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14l-2.5 1.4zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5L22 2zm-7.63 5.29a.9959.9959 0 0 0-1.41 0L1.29 18.96a.9959.9959 0 0 0 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"
+            />
+          </svg>
         </ControlButton>
       </template>
     </Controls>
@@ -188,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // workflow canvases cannot drift. Intentionally global: the selectors target
 // VueFlow's own markup, which never carries a scoped data-attribute.
 import "@/components/flow/flow-canvas.css";
-import { ref, computed, nextTick, onMounted, onBeforeUnmount } from "vue";
+import { ref, computed, nextTick, watch, onMounted, onBeforeUnmount } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
 import { Background } from "@vue-flow/background";
 import { Controls, ControlButton } from "@vue-flow/controls";
@@ -341,12 +354,20 @@ const needsTrigger = computed(
 
 // Center the trigger horizontally once nodes have measured dimensions — keep
 // its Y (near the top) so the steps flow down. Runs once per editor mount.
+// EXCEPTION: if a Test result is already present, the canvas has just remounted
+// into the reduced area above the results dock — frame ALL nodes instead so the
+// user still sees the whole graph.
 let centered = false;
 onNodesInitialized(() => {
   if (centered) return;
   const nodes = workflowObj.currentSelectedWorkflow.nodes;
   const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!trigger) return;
+  if (workflowObj.testRun.result) {
+    fitView({ padding: 0.2 });
+    centered = true;
+    return;
+  }
   const nodeW = findNode(trigger.id)?.dimensions?.width;
   const paneW = dimensions.value?.width;
   if (!nodeW || !paneW) return; // dimensions not ready yet — try next init
@@ -358,6 +379,16 @@ onNodesInitialized(() => {
   });
   centered = true;
 });
+
+// Whenever a run produces a result (the dock opens / re-runs), frame all nodes so
+// the reduced canvas still shows the whole graph. Guarded on !readOnly so the Runs
+// inspection canvas isn't reframed on every history load.
+watch(
+  () => !!workflowObj.testRun.result,
+  (has) => {
+    if (has && !readOnly.value) nextTick(() => fitView({ padding: 0.2 }));
+  },
+);
 
 defineExpose({ vueFlowRef });
 </script>

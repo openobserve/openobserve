@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <FunctionPicker
     ref="picker"
     :initial-name="savedData.name || ''"
-    :initial-after-flatten="savedData.after_flatten ?? true"
+    :initial-after-flatten="savedData.after_flatten ?? false"
     :sample-events="sampleEvents"
     language="javascript"
     :default-code="JS_DEFAULT_CODE"

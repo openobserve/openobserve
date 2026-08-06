@@ -2354,6 +2354,7 @@
       "title": "Step Results",
       "collapse": "Collapse",
       "expand": "Expand",
+      "close": "Clear & Close Results",
       "nodesTitle": "Steps",
       "empty": "Run A Test To See Step Results Here."
     }

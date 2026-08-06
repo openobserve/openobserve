@@ -44,7 +44,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <template #after>
       <div class="flex h-full min-h-0 flex-col">
-        <WorkflowResultsDockHeader :collapsed="collapsed" @toggle-collapse="toggleCollapse" />
+        <WorkflowResultsDockHeader
+          :collapsed="collapsed"
+          @toggle-collapse="toggleCollapse"
+          @close="closeResults"
+        />
         <div class="bg-surface-base min-h-0 flex-1"><WorkflowResultsPanel /></div>
       </div>
     </template>
@@ -58,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import WorkflowResultsPanel from "./WorkflowResultsPanel.vue";
@@ -78,8 +82,35 @@ const canvasPct = ref(readNum(LS_HEIGHT, 55));
 
 const hasResult = computed(() => !!workflowObj.testRun.result);
 
+// A fresh Test run (or Replay) produces a new result — always OPEN the dock
+// expanded so the user sees the step results, even if it was collapsed before.
+watch(
+  () => workflowObj.testRun.result,
+  (result) => {
+    if (result) collapsed.value = false;
+  },
+);
+
+// Clicking a node's ✓/✗ badge re-assigns resultDrawer to a fresh object. Watch the
+// object REFERENCE (not `.show`, which is often already true) so every badge click
+// fires — and expand the dock if it's collapsed, so the click reveals the result.
+watch(
+  () => workflowObj.testRun.resultDrawer,
+  (rd) => {
+    if (rd?.show) collapsed.value = false;
+  },
+);
+
 const toggleCollapse = () => {
   collapsed.value = !collapsed.value;
+};
+// Clear the test result (hides the dock via hasResult) and dismiss the per-node
+// selection — also clears the ✓/✗ badges + active highlight on the canvas. Reset
+// collapse so the next run opens expanded.
+const closeResults = () => {
+  workflowObj.testRun.result = null;
+  workflowObj.testRun.resultDrawer = { show: false, nodeId: "" };
+  collapsed.value = false;
 };
 const onResize = (v: number) => {
   canvasPct.value = v;

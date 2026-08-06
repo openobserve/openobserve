@@ -39,6 +39,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           side="top"
         />
       </OButton>
+      <!-- Clear the test result and dismiss the dock (also clears canvas badges). -->
+      <OButton
+        variant="ghost"
+        size="icon"
+        data-test="workflows-results-close"
+        @click="emit('close')"
+      >
+        <OIcon name="close" size="sm" />
+        <OTooltip :content="t('workflow.results.close')" side="top" />
+      </OButton>
     </div>
   </div>
 </template>
@@ -50,6 +60,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 defineProps<{ collapsed: boolean }>();
-const emit = defineEmits<{ (e: "toggle-collapse"): void }>();
+const emit = defineEmits<{ (e: "toggle-collapse"): void; (e: "close"): void }>();
 const { t } = useI18n();
 </script>

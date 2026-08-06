@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :has-input="meta?.ioType !== 'input'"
     :has-output="meta?.ioType !== 'output'"
     :data-test="`workflow-node-${data?.node_type}`"
-    :class="{ 'opacity-45': isDisabled, 'wf-result-active': isActiveResult }"
+    :class="{ 'wf-node-disabled': isDisabled, 'wf-result-active': isActiveResult }"
     @click="onClick"
     @mouseenter="handleNodeHover"
     @mouseleave="handleNodeLeave"
@@ -88,7 +88,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="ghost"
           size="icon"
-          class="rounded-default! bg-surface-overlay/95! border-border-default! text-text-secondary! h-5! w-5! min-w-5! border! p-0!"
+          class="rounded-default! bg-surface-overlay/95! h-5! w-5! min-w-5! border! p-0!"
+          :class="
+            isDisabled
+              ? 'border-status-positive! text-status-positive!'
+              : 'border-status-warning-text! text-status-warning-text!'
+          "
           :data-test="`workflows-node-disable-toggle`"
           @click.stop="onToggleDisabled"
         >

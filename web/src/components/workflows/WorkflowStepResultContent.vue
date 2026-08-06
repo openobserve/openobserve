@@ -28,16 +28,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex h-full min-h-0 flex-col gap-3">
-    <!-- status — reflects this node's actual test result (Errored / Passed /
-         No Records), same as its canvas badge. -->
-    <div class="flex items-center justify-end">
-      <OBadge :variant="statusVariant" size="sm" data-test="workflow-step-result-status">
-        {{ t(`workflow.test.stepResult.status.${stepStatus}`) }}
-      </OBadge>
-    </div>
-
     <!-- Input | Output, side by side (fullscreenable as one unit).
-         flex-1 + min-h-0 so it fills the body down to the action row. -->
+         flex-1 + min-h-0 so it fills the body down to the action row.
+         The run status badge sits inline after the "Output" heading (below)
+         rather than on its own line, to save vertical space in the dock. -->
     <div
       ref="ioContainerRef"
       data-test="workflow-step-io-container"
@@ -115,7 +109,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Output -->
       <div class="flex h-full w-1/2 min-w-0 flex-col">
         <div class="text-text-body mb-2 flex items-center justify-between text-sm font-bold">
-          <div>{{ t("workflow.test.stepResult.output") }}</div>
+          <div class="flex items-center gap-2">
+            <span>{{ t("workflow.test.stepResult.output") }}</span>
+            <!-- Run status (Passed / Errored / No Records) — inline after the
+                 heading, same source as the node's canvas badge. -->
+            <OBadge :variant="statusVariant" size="sm" data-test="workflow-step-result-status">
+              {{ t(`workflow.test.stepResult.status.${stepStatus}`) }}
+            </OBadge>
+          </div>
           <div class="flex items-center gap-1">
             <OTooltip :content="useOutputTooltip" :delay="300" side="top">
               <OButton
