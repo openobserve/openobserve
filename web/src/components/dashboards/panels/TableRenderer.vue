@@ -80,6 +80,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span v-else>{{ formatCellValue(value, column, row) }}</span>
       </template>
 
+      <!-- Explorer cells: hover highlight + click to open log drawer.
+           Only registered when explorerColumns is non-empty (explorable=true). -->
+      <template
+        v-for="col in explorerColumns"
+        :key="`explorer-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <span
+          v-if="isCellExplorable(value)"
+          class="group/cell relative inline-flex items-center gap-1 cursor-pointer rounded-default px-0.5 -mx-0.5 hover:bg-surface-subtle-hover transition-colors"
+          :title="t('panel.logExplorer.filterHint')"
+          @click.stop="$emit('cell-click', col.field ?? col.id, value, row)"
+        >
+          <span class="truncate">{{ formatCellValue(value, column, row) }}</span>
+          <OIcon
+            name="filter-alt"
+            size="xs"
+            class="text-text-tertiary opacity-0 group-hover/cell:opacity-100 shrink-0 transition-opacity"
+          />
+        </span>
+        <span v-else>{{ formatCellValue(value, column, row) }}</span>
+      </template>
+
       <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
            so mirror the chart panels' "No Data" treatment here. -->
       <template #empty>
@@ -130,6 +153,7 @@ import { defineComponent, ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import JsonFieldRenderer from "@/components/dashboards/panels/JsonFieldRenderer.vue";
 import { TABLE_ROWS_PER_PAGE_DEFAULT_VALUE } from "@/utils/dashboard/constants";
@@ -143,6 +167,7 @@ export default defineComponent({
   components: {
     OTable,
     OEmptyState,
+    OIcon,
     TablePaginationControls,
     JsonFieldRenderer,
   },
@@ -178,7 +203,7 @@ export default defineComponent({
       default: false,
     },
   },
-  emits: ["row-click"],
+  emits: ["row-click", "cell-click"],
   setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();
@@ -284,6 +309,25 @@ export default defineComponent({
     const formatCellValue = (value: any, column: any, row: any): any => {
       const format = column?.meta?.format as ((value: any, row: any) => any) | undefined;
       return format ? format(value, row) : value;
+    };
+
+    // Columns that get the hover-to-explore treatment: everything that isn't
+    // already rendered by the JSON or link slot handlers.
+    const explorerColumns = computed(() => {
+      const jsonIds = new Set((jsonFieldColumns.value as any[]).map((c: any) => c.id));
+      const linkIds = new Set((linkFieldColumns.value as any[]).map((c: any) => c.id));
+      return (otableColumns.value as any[]).filter(
+        (c: any) => !jsonIds.has(c.id) && !linkIds.has(c.id),
+      );
+    });
+
+    // A cell value is explorable if it's a non-empty scalar that makes sense
+    // as an equality filter: skip nulls, empty strings, blobs (>200 chars),
+    // and bare large integers that are almost certainly Unix timestamps.
+    const isCellExplorable = (value: unknown): boolean => {
+      if (value === null || value === undefined || value === "") return false;
+      if (typeof value === "number" && value > 1e12) return false;
+      return String(value).length <= 200;
     };
 
     /**
@@ -496,6 +540,8 @@ export default defineComponent({
       pivotRowColumns,
       jsonFieldColumns,
       linkFieldColumns,
+      explorerColumns,
+      isCellExplorable,
       getHttpUrl,
       formatCellValue,
       cellStyleFn,
