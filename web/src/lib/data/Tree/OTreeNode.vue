@@ -144,23 +144,23 @@ function onTickChange(newVal: CheckboxModelValue) {
         The parent's chevron (size-4 = 16px) is centered at +8px from the
         parent flex start, so relative to the connector span start:
           chevronCenterX = 8px - 20px = -12px = -0.75rem
-        Accounting for the 1.5px border center (subtract 0.75px):
-          left = calc(-0.75rem - 0.75px)
+        Accounting for the 1px border center (subtract 0.5px):
+          left = calc(-0.75rem - 0.5px)
         Arm width from that X to the right edge of the connector span (1rem):
-          width = 1rem - (-0.75rem - 0.75px) = calc(1.75rem + 0.75px)
+          width = 1rem - (-0.75rem - 0.5px) = calc(1.75rem + 0.5px)
         The negative left overflows into the ul's padding area which is
         NOT clipped by overflow:hidden (clips to padding box, not content box).
       -->
       <span v-else class="relative w-4 shrink-0 self-stretch opacity-35" aria-hidden="true">
-        <!-- Elbow connector. The 0.75px offsets are half the 1.5px hairline, so
+        <!-- Elbow connector. The 0.5px offsets are half the 1px hairline, so
              the stroke lands on the same physical line as the sibling connectors.
-             `- -0.75px` is deliberate and means `+ 0.75px`: Tailwind's candidate
+             `- -0.5px` is deliberate and means `+ 0.5px`: Tailwind's candidate
              scanner drops any class containing a literal `+`, so `w-[calc(…+…)]`
              silently compiles to NOTHING. Subtracting a negative is the only form
              that survives extraction. Verified against the compiled stylesheet. -->
         <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
         <span
-          class="rounded-bl-default absolute top-0 left-[calc(-0.75rem_-_0.75px)] h-[calc(50%_-_-0.75px)] w-[calc(1.75rem_-_-0.75px)] border-b-[1.5px] border-l-[1.5px]"
+          class="rounded-bl-default absolute top-0 left-[calc(-0.75rem_-_0.5px)] h-[calc(50%_-_-0.5px)] w-[calc(1.75rem_-_-0.5px)] border-b border-l"
         />
         <!-- eslint-enable local/no-hardcoded-px -->
       </span>

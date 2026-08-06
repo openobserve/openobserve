@@ -156,27 +156,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-body font-semibold">{{ ed.support }}</span>
             </div>
           </div>
-          <!-- eslint-disable local/no-hardcoded-px -- 1.5px CTA button border — a border width, optical not layout; it must not thicken with the label text -->
           <a
             v-if="ed.ctaUrl"
             :href="ed.ctaUrl"
             target="_blank"
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="action"
-            class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
+            class="rounded-default text-accent hover:border-accent block w-full cursor-pointer border border-solid border-[color-mix(in_srgb,var(--color-accent)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent)_10%,var(--color-card-glass-bg))] px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200 hover:bg-[color-mix(in_srgb,var(--color-accent)_18%,var(--color-card-glass-bg))]"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             {{ ed.ctaLabel }}
           </a>
-          <!-- eslint-disable local/no-hardcoded-px -- 1.5px border on the current-plan button — a border width, optical not layout; it must match the CTA outline at any text size -->
           <button
             v-else
             data-test="feature-comparison-table-cta-btn"
             data-test-cta="current"
-            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border-[1.5px] border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
+            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
             disabled
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             {{ ed.ctaLabel }}
           </button>
         </div>

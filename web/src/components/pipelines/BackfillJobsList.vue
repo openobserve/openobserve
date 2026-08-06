@@ -283,11 +283,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div>
           <div class="text-text-label mb-2 text-xs">{{ t("pipeline.errorMessageLabel") }}</div>
-          <!-- eslint-disable local/no-hardcoded-px -- 3px left accent stripe on the error message: a border width — optical, not layout; it must not thicken with the message text -->
           <div
-            class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-[3px] p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
+            class="rounded-default bg-banner-error-soft-bg border-l-status-negative text-compact text-banner-error-soft-text border-l-3 p-3 font-mono leading-[1.6] wrap-break-word whitespace-pre-wrap"
           >
-            <!-- eslint-enable local/no-hardcoded-px -->
             {{ errorDialogData.error }}
           </div>
         </div>
