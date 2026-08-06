@@ -32,7 +32,7 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   enterpriseMeta: (c) => c.isEnterprise && c.isMeta,
   cloudMeta: (c) => c.isCloud && c.isMeta,
   storage: (c) => c.isEnterprise && (!c.isCloud || c.orgStorage),
-  modelPricing: (c) => c.modelPricing,
+  modelPricing: (c) => (c.isEnterprise || c.isCloud) && c.modelPricing,
   correlation: (c) => c.isEnterprise && c.serviceStreams,
   llmProviders: (c) => (c.isEnterprise || c.isCloud) && c.onlineEvals,
   // IAM (isEnt = enterprise OR cloud)

@@ -1,0 +1,351 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * Capability-based panel gating for the static RUM Performance dashboards.
+ *
+ * The Performance tabs render fixed dashboard JSON whose panels hardcode columns against
+ * the shared `_rumdata` stream. Some of those columns exist only under the browser SDK
+ * (Web Vitals) and some only under the mobile SDKs (frame rates, crashes) — naming a
+ * column the stream does not have fails the WHOLE panel query, so a mobile-only user
+ * would see raw SQL errors on browser panels (and vice versa).
+ *
+ * This filter drops any panel that references a column absent from the stream schema,
+ * then reflows the survivors into a tidy grid. It is a strict no-op when nothing is
+ * dropped, so the browser-only experience renders byte-for-byte as before.
+ *
+ * See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+ */
+
+/**
+ * Column count of the grid the RUM Performance dashboards actually render on.
+ *
+ * `convertDashboardSchemaVersion` migrates every dashboard to a 192-column layout
+ * (12 → 48 → 192) and `RenderDashboardCharts` lays out on `column: 192`. Reflow MUST
+ * pack survivors into that same grid: an earlier value of 12 here clamped each real
+ * `w=48` tile down to 12 and put one per row, which is what made the mobile-only
+ * Overview render as a single narrow, stacked column instead of a full-width row.
+ *
+ * Exposed and overridable per call so the reflow-packing unit tests can exercise the
+ * algorithm with readable small-grid fixtures.
+ */
+export const DASHBOARD_GRID_COLUMNS = 192;
+
+/**
+ * Columns referenced by the Performance dashboards that are NOT guaranteed to exist for
+ * every SDK. A panel referencing any of these is kept only if the column is actually in
+ * the stream schema; otherwise the panel would error and is dropped.
+ *
+ * Guaranteed-common columns (service, env, version, session_id, error_id, error_handling,
+ * type, _timestamp) are intentionally NOT listed — panels using only those always survive.
+ */
+export const CAPABILITY_GATED_FIELDS: string[] = [
+  // Browser-only Web Vitals / navigation timings
+  "view_largest_contentful_paint",
+  "view_interaction_to_next_paint",
+  "view_cumulative_layout_shift",
+  "view_first_contentful_paint",
+  "view_first_byte",
+  "view_loading_time",
+  "view_dom_complete",
+  "view_dom_content_loaded",
+  "view_dom_interactive",
+  "view_load_event",
+  // Page URL — present for browser and for mobile apps that set it, absent otherwise
+  "view_url",
+  // Network / resource timing — present when the app instruments network calls
+  "resource_url",
+  "resource_duration",
+  "resource_size",
+  "resource_status_code",
+  "resource_method",
+  // Mobile-only vitals / stability (used by the Phase 2 mobile dashboards)
+  "view_slow_frames_rate",
+  "view_freeze_rate",
+  "view_frozen_frame_count",
+  "view_refresh_rate_average",
+  "view_refresh_rate_min",
+  "view_is_slow_rendered",
+  "view_memory_max",
+  "view_memory_average",
+  "view_cpu_ticks_count",
+  "view_cpu_ticks_per_second",
+  "error_is_crash",
+  "error_category",
+  // Flattened from `error.freeze.duration` — the ANR / app-hang duration. NOT `freeze_duration`:
+  // `_` is a word character, so a `\bfreeze_duration\b` matcher never fires inside
+  // `error_freeze_duration` and the panel would sail through the gate and error.
+  "error_freeze_duration",
+  "error_time_since_app_start",
+  "vital_app_launch_metric",
+  "vital_startup_type",
+  "vital_duration",
+];
+
+// Word-boundary matchers, built once. `\b` is fine here because every gated field is a
+// plain snake_case identifier.
+const fieldMatchers: ReadonlyArray<readonly [string, RegExp]> = CAPABILITY_GATED_FIELDS.map(
+  (field) => [field, new RegExp(`\\b${field}\\b`)] as const,
+);
+
+export interface DashboardPanelLayout {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  i: number | string;
+}
+
+export interface DashboardPanel {
+  layout: DashboardPanelLayout;
+  queries?: Array<{ query?: string }>;
+  [key: string]: unknown;
+}
+
+export interface RumDashboardTab {
+  panels?: DashboardPanel[];
+  [key: string]: unknown;
+}
+
+export interface RumDashboard {
+  panels?: DashboardPanel[];
+  /** v8+ dashboards nest panels under tabs rather than a flat top-level `panels[]`. */
+  tabs?: RumDashboardTab[];
+  [key: string]: unknown;
+}
+
+export interface FilterResult {
+  dashboard: RumDashboard;
+  droppedCount: number;
+  keptCount: number;
+}
+
+/**
+ * Panel-level capability hints, authored directly in the RUM dashboard JSON.
+ *
+ * Field gating alone can't answer two questions:
+ *   1. A section-header panel carries no SQL, so nothing ties it to a platform — without a
+ *      hint, a "Mobile app health" heading would survive on a browser-only stream.
+ *   2. Schema presence is forever: an org that ingested mobile for one afternoon in March
+ *      keeps those columns, so field gating would still show empty mobile tiles in July.
+ *      `o2Platform` is resolved against what actually has data in the selected range
+ *      (`useRumPlatforms`), which is the whole point of the source probe.
+ */
+export const PANEL_PLATFORM_KEY = "o2Platform";
+
+/**
+ * Keep the panel only if at least ONE of these columns is in the schema. Lets a header
+ * disappear together with the section it labels — a mobile stream from an app that has
+ * never crashed has no `error_is_crash` column, so its stability tiles are gated out and
+ * the heading must go with them.
+ */
+export const PANEL_REQUIRES_ANY_FIELD_KEY = "o2RequiresAnyField";
+
+export type RumPlatformKind = "browser" | "mobile";
+
+/** Which platforms actually have data — the shape `useRumPlatforms` resolves. */
+export interface PlatformAvailability {
+  hasBrowser: boolean;
+  hasMobile: boolean;
+}
+
+export interface FilterOptions {
+  /** Column count of the grid to repack into. Defaults to `DASHBOARD_GRID_COLUMNS`. */
+  gridWidth?: number;
+  /**
+   * Platform availability for the selected time range. When null/undefined, platform
+   * hints are ignored entirely and only field gating applies — which is what the tabs
+   * that don't probe (Vitals, Errors, API) get, unchanged.
+   */
+  platforms?: PlatformAvailability | null;
+}
+
+/** The concatenated SQL of every query on a panel. */
+const panelSql = (panel: DashboardPanel): string =>
+  (panel?.queries ?? []).map((q) => q?.query ?? "").join("\n");
+
+/**
+ * True when the panel references a capability-gated column that is NOT in the schema —
+ * i.e. running it would fail with "column not found".
+ */
+const panelReferencesAbsentField = (panel: DashboardPanel, presentFields: Set<string>): boolean => {
+  const sql = panelSql(panel);
+  if (!sql) return false;
+  return fieldMatchers.some(([field, matcher]) => !presentFields.has(field) && matcher.test(sql));
+};
+
+/** The panel's declared platform, or null when it is platform-agnostic. */
+const panelPlatform = (panel: DashboardPanel): RumPlatformKind | null => {
+  const value = panel?.[PANEL_PLATFORM_KEY];
+  return value === "browser" || value === "mobile" ? value : null;
+};
+
+/** True when the panel is tagged for a platform that has no data in range. */
+const panelPlatformUnavailable = (
+  panel: DashboardPanel,
+  platforms: PlatformAvailability | null | undefined,
+): boolean => {
+  if (!platforms) return false;
+  const platform = panelPlatform(panel);
+  if (!platform) return false;
+  return platform === "mobile" ? !platforms.hasMobile : !platforms.hasBrowser;
+};
+
+/** True when the panel declares required columns and the schema has none of them. */
+const panelRequiredFieldsMissing = (
+  panel: DashboardPanel,
+  presentFields: Set<string> | null | undefined,
+): boolean => {
+  if (!presentFields) return false;
+  const required = panel?.[PANEL_REQUIRES_ANY_FIELD_KEY];
+  if (!Array.isArray(required) || required.length === 0) return false;
+  return !required.some((field) => typeof field === "string" && presentFields.has(field));
+};
+
+/**
+ * Repack panels into a tidy 12-col grid, preserving each panel's width/height and its
+ * original reading order (top-to-bottom, left-to-right). Used only after panels are
+ * removed, so gaps left by dropped panels don't remain in the layout.
+ */
+const reflowPanels = (
+  panels: DashboardPanel[],
+  gridWidth: number = DASHBOARD_GRID_COLUMNS,
+): DashboardPanel[] => {
+  const ordered = [...panels].sort((a, b) => a.layout.y - b.layout.y || a.layout.x - b.layout.x);
+
+  let cursorX = 0;
+  let rowY = 0;
+  let rowHeight = 0;
+
+  return ordered.map((panel) => {
+    const w = Math.min(panel.layout.w, gridWidth);
+    if (cursorX + w > gridWidth) {
+      rowY += rowHeight;
+      cursorX = 0;
+      rowHeight = 0;
+    }
+    const layout: DashboardPanelLayout = {
+      ...panel.layout,
+      x: cursorX,
+      y: rowY,
+      w,
+    };
+    cursorX += w;
+    rowHeight = Math.max(rowHeight, panel.layout.h);
+    return { ...panel, layout };
+  });
+};
+
+/** Total panel count across whichever container the dashboard uses. */
+const totalPanelCount = (dashboard: RumDashboard): number => {
+  if (Array.isArray(dashboard?.panels) && dashboard.panels.length) {
+    return dashboard.panels.length;
+  }
+  if (Array.isArray(dashboard?.tabs)) {
+    return dashboard.tabs.reduce((sum, tab) => sum + (tab?.panels?.length ?? 0), 0);
+  }
+  return dashboard?.panels?.length ?? 0;
+};
+
+/**
+ * Remove panels whose queries reference columns absent from the stream schema, then
+ * reflow the survivors. Handles both dashboard shapes:
+ *
+ *   - flat `panels[]` (v2 / legacy / unit fixtures);
+ *   - `tabs[].panels` (v8+, which `convertDashboardSchemaVersion` always produces — the
+ *     shape the Performance tabs actually feed in). Reading only the flat `panels[]` here
+ *     silently saw ZERO panels for a converted dashboard, so `keptCount` was always 0 and
+ *     the tab showed its empty state for every persona once the schema resolved.
+ *
+ * A panel is dropped when ANY of these hold:
+ *   - its SQL references a capability-gated column absent from the schema;
+ *   - it declares `o2Platform` for a platform with no data in range (needs `options.platforms`);
+ *   - it declares `o2RequiresAnyField` and the schema has none of those columns.
+ *
+ * @param dashboard      A RUM dashboard in either shape.
+ * @param presentFields  The set of column names in the `_rumdata` schema. When null or
+ *                       empty (schema not yet known) field gating is skipped, so a browser
+ *                       user is never degraded by an unresolved schema.
+ * @param options        Grid width to repack into, and platform availability for the range.
+ * @returns The (possibly filtered) dashboard plus counts. When nothing is dropped, the
+ *          SAME dashboard reference is returned so rendering is identical.
+ */
+export const filterDashboardBySchema = (
+  dashboard: RumDashboard,
+  presentFields: Set<string> | null | undefined,
+  options: FilterOptions = {},
+): FilterResult => {
+  const { gridWidth = DASHBOARD_GRID_COLUMNS, platforms = null } = options;
+  const fields = presentFields && presentFields.size > 0 ? presentFields : null;
+
+  // Nothing to gate on at all → don't touch anything (non-regression for the common
+  // browser path, where an unresolved schema must still render the full dashboard).
+  if (!fields && !platforms) {
+    return { dashboard, droppedCount: 0, keptCount: totalPanelCount(dashboard) };
+  }
+
+  const keep = (panel: DashboardPanel) =>
+    !panelPlatformUnavailable(panel, platforms) &&
+    !panelRequiredFieldsMissing(panel, fields) &&
+    !(fields && panelReferencesAbsentField(panel, fields));
+
+  // v8+ shape: filter each tab's panels in place, aggregate counts across tabs.
+  const usesTabs = Array.isArray(dashboard?.tabs) && !dashboard.panels?.length;
+  if (usesTabs) {
+    let droppedCount = 0;
+    let keptCount = 0;
+    const tabs = (dashboard.tabs ?? []).map((tab) => {
+      const panels = tab?.panels ?? [];
+      const kept = panels.filter(keep);
+      droppedCount += panels.length - kept.length;
+      keptCount += kept.length;
+      // Only rebuild a tab whose panels actually changed, so untouched tabs keep identity.
+      return kept.length === panels.length
+        ? tab
+        : { ...tab, panels: reflowPanels(kept, gridWidth) };
+    });
+
+    if (droppedCount === 0) return { dashboard, droppedCount: 0, keptCount };
+    return { dashboard: { ...dashboard, tabs }, droppedCount, keptCount };
+  }
+
+  // Flat shape.
+  const panels = dashboard?.panels ?? [];
+  const kept = panels.filter(keep);
+  const droppedCount = panels.length - kept.length;
+
+  if (droppedCount === 0) {
+    return { dashboard, droppedCount: 0, keptCount: kept.length };
+  }
+
+  return {
+    dashboard: { ...dashboard, panels: reflowPanels(kept, gridWidth) },
+    droppedCount,
+    keptCount: kept.length,
+  };
+};
+
+/**
+ * Build the present-field Set from the `_rumdata` schema map held in `performanceState`
+ * (`{ [fieldName]: field }`). Returns null when the schema isn't loaded, which callers
+ * pass straight through to `filterDashboardBySchema` to get the no-op behavior.
+ */
+export const presentFieldsFromSchemaMap = (
+  schemaMap: Record<string, unknown> | null | undefined,
+): Set<string> | null => {
+  if (!schemaMap) return null;
+  const names = Object.keys(schemaMap);
+  return names.length ? new Set(names) : null;
+};

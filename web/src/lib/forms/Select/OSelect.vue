@@ -1369,12 +1369,15 @@ const fieldWidthClass = computed(() => {
                 <slot name="before-options" />
 
                 <!-- Virtual scroll container — keyboard nav handled by handleDropdownKeydown
-                   on the ListboxFilter input above. Items are index-highlighted reactively. -->
+                   on the ListboxFilter input above. Items are index-highlighted reactively.
+                   max-h-72 matches the popover's own 18rem cap exactly, so this inner limit
+                   is never the binding constraint (max-h-60 used to clip a 9-option list
+                   48px short of the space the popover actually had). -->
                 <div
                   ref="listboxScrollEl"
                   :class="[
                     'overflow-auto',
-                    multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : 'max-h-60',
+                    multiple && rowClickSingleSelect ? 'min-h-24 flex-1' : 'max-h-72',
                   ]"
                 >
                   <div

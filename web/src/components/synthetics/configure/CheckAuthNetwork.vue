@@ -242,7 +242,7 @@ function removeCookie(index: number) {
                 class="gap-1.5"
                 @click="updateVariable(index, 'secure', !variable.secure)"
               >
-                <OSwitch v-model="variable.secure" size="md" />
+                <OSwitch :model-value="variable.secure" size="md" />
                 <OIcon name="lock" size="sm" />
                 <OTooltip
                   :content="

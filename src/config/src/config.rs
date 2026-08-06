@@ -52,7 +52,7 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 64;
+pub const DB_SCHEMA_VERSION: u64 = 65;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -808,6 +808,12 @@ pub struct Auth {
     pub cookie_secure_only: bool,
     #[env_config(name = "ZO_EXT_AUTH_SALT", default = "openobserve")]
     pub ext_auth_salt: String,
+    #[env_config(
+        name = "ZO_ALERT_CHART_SIGNING_KEY",
+        default = "",
+        help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
+    )]
+    pub alert_chart_signing_key: String,
     #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
     pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
@@ -1881,6 +1887,18 @@ pub struct Limit {
         help = "Time range in minutes for alert preview. If set to 0 (default), uses the alert's period value. If greater than 0, overrides period for preview."
     )]
     pub alert_preview_timerange_minutes: i64,
+    #[env_config(
+        name = "ZO_ALERT_TEST_SEND_PER_MINUTE",
+        default = 6,
+        help = "Per-user cap on alert-destination test-sends per minute. A test-send posts a real [TEST]-marked message to a real destination, so this bounds accidental or scripted spam of someone's channel/inbox. The cap is enforced PER PROCESS (in-memory, not cluster-shared) — a multi-node deployment's effective cap is N times this value, where N is the node count. 0 = unlimited."
+    )]
+    pub alert_test_send_per_minute: u32,
+    #[env_config(
+        name = "ZO_ALERT_CHART_ENABLED",
+        default = true,
+        help = "Global switch for chart images in alert notifications (per-template opt-in still required via the content template's chart toggle)."
+    )]
+    pub alert_chart_enabled: bool,
     #[env_config(name = "ZO_REPORT_SCHEDULE_TIMEOUT", default = 300)] // seconds
     pub report_schedule_timeout: i64,
     #[env_config(name = "ZO_DERIVED_STREAM_SCHEDULE_INTERVAL", default = 300)] // seconds

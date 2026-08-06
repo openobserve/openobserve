@@ -1278,14 +1278,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     /** The caller's `previewsEpoch`; see `requestPreview`. */
     epoch: number,
   ): Promise<boolean> => {
+    const identity = cacheIdentity(resolved.queries, step);
     let cached: any = null;
     try {
-      cached = await cacheFor(card).getPanelCache();
+      // The identity is part of the storage key, so it must be the same value
+      // `savePanelCache` wrote under; the isEqual below still verifies it.
+      cached = await cacheFor(card).getPanelCache(identity);
     } catch {
       return false;
     }
     if (!cached?.value) return false;
-    if (!isEqual(cached.key, cacheIdentity(resolved.queries, step))) return false;
+    if (!isEqual(cached.key, identity)) return false;
     // IndexedDB answered after the grid moved on. Painting now would restore the
     // previous org's — or the previous window's — chart into a map that was
     // deliberately emptied.

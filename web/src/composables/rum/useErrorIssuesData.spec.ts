@@ -225,23 +225,100 @@ describe("useErrorIssuesData", () => {
       expect(searchService.search).toHaveBeenCalledTimes(6);
     });
 
-    it("does not make a trends call when issues array is empty", async () => {
+    it("skips the chart/KPI/deploy fan-out and makes only the issues search when the issues list is empty", async () => {
+      // Arrange — issues list resolves empty; stage 2 (chart/kpis/denominators/deploys)
+      // must never fire since there are no rows for it to describe.
+      vi.mocked(searchService.search).mockResolvedValueOnce(makeHitsResponse([]));
+
+      const { fetchAll, issues, isLoadingChart, isLoadingKpis } = useErrorIssuesData(t);
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — only the issues search fires; the aggregate fan-out is skipped.
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(issues.value).toEqual([]);
+      expect(isLoadingChart.value).toBe(false);
+      expect(isLoadingKpis.value).toBe(false);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Zero-event rows (the GROUP BY-less aggregate shape)
+  // ─────────────────────────────────────────────────────────────────────────
+  describe("when the issues search returns a zero-event aggregate row", () => {
+    // A stream carrying none of error_type/error_message/error_handling makes
+    // buildIssuesSql drop GROUP BY, and a bare aggregate SELECT returns one row even
+    // when nothing matches: COUNT(*) = 0, every other column NULL.
+    const EMPTY_WINDOW_AGGREGATE_HIT = {
+      zo_sql_timestamp: null,
+      first_seen: null,
+      events: 0,
+      users_affected: null,
+      sessions_affected: null,
+      latest_error_id: null,
+    };
+
+    it("shows no issues when the only row reports zero events", async () => {
       // Arrange
+      vi.mocked(searchService.search).mockResolvedValueOnce(
+        makeHitsResponse([EMPTY_WINDOW_AGGREGATE_HIT]),
+      );
+
+      const { fetchAll, issues } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — the phantom row must not reach the table
+      expect(issues.value).toEqual([]);
+    });
+
+    it("skips the chart/KPI/deploy fan-out when the only row reports zero events", async () => {
+      // Arrange
+      vi.mocked(searchService.search).mockResolvedValueOnce(
+        makeHitsResponse([EMPTY_WINDOW_AGGREGATE_HIT]),
+      );
+
+      const { fetchAll, isLoadingChart, isLoadingKpis } = useErrorIssuesData();
+
+      // Act
+      await fetchAll(DEFAULT_PARAMS);
+      await flushPromises();
+
+      // Assert — an empty window is an empty window, whichever shape reported it
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(isLoadingChart.value).toBe(false);
+      expect(isLoadingKpis.value).toBe(false);
+    });
+
+    it("keeps a single aggregate row that reports real events", async () => {
+      // Arrange — same GROUP BY-less shape, but the window DOES have errors, so the
+      // one row legitimately represents them and must survive the filter.
+      const populatedAggregateHit = {
+        ...EMPTY_WINDOW_AGGREGATE_HIT,
+        zo_sql_timestamp: WINDOW_END_US,
+        first_seen: WINDOW_START_US,
+        events: 17,
+      };
       vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeHitsResponse([])) // issues — empty
+        .mockResolvedValueOnce(makeHitsResponse([populatedAggregateHit]))
         .mockResolvedValueOnce(makeHitsResponse(MOCK_HISTOGRAM_HITS))
         .mockResolvedValueOnce(makeHitsResponse([MOCK_KPI_HIT]))
         .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT]))
         .mockResolvedValueOnce(makeHitsResponse(MOCK_DEPLOY_HITS_AT_EDGE));
 
-      const { fetchAll } = useErrorIssuesData(t);
+      const { fetchAll, issues } = useErrorIssuesData();
 
       // Act
       await fetchAll(DEFAULT_PARAMS);
       await flushPromises();
 
       // Assert
-      expect(searchService.search).toHaveBeenCalledTimes(5);
+      expect(issues.value).toHaveLength(1);
+      expect(issues.value[0].events).toBe(17);
     });
   });
 
@@ -1067,47 +1144,53 @@ describe("useErrorIssuesData", () => {
   // ─────────────────────────────────────────────────────────────────────────
   describe("race condition (stale run guard)", () => {
     it("second fetchAll supersedes first — only second run's data is committed", async () => {
-      // Run A: deferred issues, rest resolve immediately.
-      let resolveRunA!: (v: any) => void;
-      const runAIssues = new Promise<any>((r) => (resolveRunA = r));
+      // With staging, fetchAll fires only ONE search (the issues list) before
+      // suspending on it — so mocks can no longer be queued positionally (run A's
+      // 5 calls then run B's 5 calls): run A fires just its issues call and then
+      // awaits it, so run B's issues call would consume the wrong positional mock.
+      // Instead, key each response off the SQL text so it's correct regardless of
+      // how the two runs' searches interleave.
+      let resolveRunAIssues!: (v: any) => void;
+      const runAIssuesPromise = new Promise<any>((resolve) => {
+        resolveRunAIssues = resolve;
+      });
+      let issuesCallCount = 0;
 
-      // We'll queue: run A (5 calls) then run B (5 calls).
-      vi.mocked(searchService.search)
-        // Run A — issues deferred, others immediate
-        .mockReturnValueOnce(runAIssues) // A-1 issues
-        .mockResolvedValueOnce(makeHitsResponse(MOCK_HISTOGRAM_HITS)) // A-2 chart
-        .mockResolvedValueOnce(makeHitsResponse([MOCK_KPI_HIT])) // A-3 kpis
-        .mockResolvedValueOnce(makeHitsResponse([MOCK_DENOMINATOR_HIT])) // A-4 denom
-        .mockResolvedValueOnce(makeHitsResponse([])) // A-5 deploys
-        // Run B — all immediate, single issue different from A
-        .mockResolvedValueOnce(
-          makeHitsResponse([
-            {
-              ...MOCK_ISSUE_HITS[1],
-              error_message: "RUN_B_ONLY_MSG",
-            },
-          ]),
-        ) // B-1 issues
-        .mockResolvedValueOnce(makeHitsResponse([])) // B-2 chart
-        .mockResolvedValueOnce(makeHitsResponse([])) // B-3 kpis
-        .mockResolvedValueOnce(makeHitsResponse([])) // B-4 denom
-        .mockResolvedValueOnce(makeHitsResponse([])); // B-5 deploys
+      vi.mocked(searchService.search).mockImplementation((request: any) => {
+        const sql = request.query.query.sql as string;
+        // Only buildIssuesSql selects `zo_sql_timestamp` — a stable way to
+        // distinguish the issues-list query from the stage-2 aggregate queries.
+        if (sql.includes("zo_sql_timestamp")) {
+          issuesCallCount += 1;
+          // First issues call is run A's — deferred until run B has started.
+          if (issuesCallCount === 1) return runAIssuesPromise;
+          // Second issues call is run B's — a single distinctive issue, resolved
+          // immediately.
+          return Promise.resolve(
+            makeHitsResponse([{ ...MOCK_ISSUE_HITS[1], error_message: "RUN_B_ONLY_MSG" }]),
+          );
+        }
+        // Stage-2 aggregates (histogram/kpis/denominators/deploys) and the deploy
+        // lookback are irrelevant to this test — resolve empty for all of them.
+        return Promise.resolve(makeHitsResponse([]));
+      });
 
       const { fetchAll, issues } = useErrorIssuesData(t);
 
-      // Start run A (issues deferred).
+      // Start run A (its issues search is deferred).
       const fetchA = fetchAll(DEFAULT_PARAMS);
       // Start run B immediately — this increments runId, so A's results will be stale.
       const fetchB = fetchAll(DEFAULT_PARAMS);
 
-      // Resolve run A's deferred promise after run B has started.
-      resolveRunA(makeHitsResponse(MOCK_ISSUE_HITS));
+      // Resolve run A's deferred issues search after run B has already started.
+      resolveRunAIssues(makeHitsResponse(MOCK_ISSUE_HITS));
 
       await fetchA;
       await fetchB;
       await flushPromises();
 
-      // Only run B's data should be committed.
+      // Only run B's data should be committed — run A's late result is discarded
+      // by the stale-run guard.
       expect(issues.value).toHaveLength(1);
       expect(issues.value[0].error_message).toBe("RUN_B_ONLY_MSG");
     });
