@@ -16,119 +16,162 @@
 import http from "@/services/http";
 
 // ─── LLM Annotation · Queues ────────────────────────────────────────────────
-// A queue is a stateful review to-do list: it binds one or more Score Configs,
-// a target dataset, and a filter that feeds it. This service mirrors the
-// `llm_annotation_queues` / `_queue_bindings` / `_queue_items` schema landed on
-// the backend branch; the list view consumes ONLY the normalized shape below.
 
-/** One bound Score Config version (from `llm_annotation_queue_bindings`). */
+/** The dimension type a Score Config scores on. */
+export type ScoreConfigDataType = "numeric" | "categorical" | "boolean";
+
+/** One bound, immutable Score Config version. */
 export interface LlmQueueBinding {
+  /** Physical Score Config row ID required by the review API. */
+  rowId: string;
   /** Logical Score Config identity (stable across versions). */
   scoreConfigId: string;
   name: string;
-  /** The exact bound version. */
   version: number;
-  /** Latest available version — drives the "vN available" upgrade hint. */
+  dataType: ScoreConfigDataType;
+  /** Latest available version, populated by the queue overview page. */
   latestVersion?: number;
 }
 
-/** Comparison operator for an auto-routing condition. */
-export type AutoRouteOperator = "<" | "<=" | ">" | ">=" | "==" | "!=";
-
-/** One auto-routing rule: an object's score on `scoreConfigId` vs `value`.
- *  `value` is a number for numeric configs, else the category / boolean string. */
-export interface AutoRouteCondition {
-  scoreConfigId: string;
-  operator: AutoRouteOperator;
-  value: number | string;
-}
-
-/** Auto-routing — enqueue objects whose scores match these conditions. */
-export interface AutoRouting {
-  /** Whether ALL conditions must match, or ANY. */
-  matchMode: "all" | "any";
-  conditions: AutoRouteCondition[];
-}
-
-/** One review queue (normalized). Mirrors `llm_annotation_queues`. */
+/** One review queue, normalized for the UI. */
 export interface LlmQueue {
   id: string;
   orgId?: string;
   name: string;
   description: string | null;
-  /** Target dataset the reviewed items feed into. */
   targetDatasetId: string | null;
-  /** Resolved dataset name for display (TODO(BE): join server-side). */
+  /** Resolved by the queue overview from the visible Dataset catalog. */
   targetDatasetName: string | null;
-  /** Server-owned subset of session | trace | span the queue accepts. */
   allowedRefTypes: string[];
-  /** Bound Score Config versions (from `_queue_bindings`). */
   scoreConfigs: LlmQueueBinding[];
-  /** Reviewed / total item counts (aggregated from `_queue_items.status`). */
+  /** Derived from active Queue Items by the queue overview. */
   reviewedCount: number;
   totalCount: number;
-  /** Auto-routing rules that feed this queue (null = fed manually). */
-  autoRouting?: AutoRouting | null;
   createdBy?: string;
   createdAt?: number;
   updatedBy?: string;
   updatedAt?: number;
 }
 
-/** The dimension type a Score Config scores on. */
-export type ScoreConfigDataType = "numeric" | "categorical" | "boolean";
+export interface LlmScoreConfigVersionDetails {
+  rowId: string;
+  categories?: string[];
+  numericRange?: { min: number; max: number };
+  healthyThreshold?: Record<string, unknown>;
+}
 
-/** A Score Config available to bind, with its selectable versions. */
+/** A Score Config available to bind, with all selectable versions. */
 export interface LlmScoreConfigOption {
   id: string;
   name: string;
   dataType: ScoreConfigDataType;
-  /** Allowed values when `dataType` is "categorical". */
   categories?: string[];
   versions: number[];
   latestVersion: number;
+  versionDetails: Record<number, LlmScoreConfigVersionDetails>;
 }
 
-/** A single item in a queue's review pool. Mirrors `llm_annotation_queue_items`.
- *  Per the Phase-2.5 spec, status is `pending` | `reviewed` ONLY — there is no
- *  "in review" state (the all-or-nothing submit rule eliminates it); `archived`
- *  is orthogonal (via `archivedAt`). */
 export type LlmQueueItemStatus = "pending" | "reviewed";
 export type QueueRefType = "session" | "trace" | "span";
 
 export interface LlmQueueItem {
   id: string;
   queueId: string;
+  queueName: string | null;
   refType: QueueRefType;
   refId: string;
   refTraceId: string | null;
+  /** Lower bound for trace hydration and Score lookup, in microseconds. */
+  refTraceStartTime: number;
   status: LlmQueueItemStatus;
   reviewedAt: number | null;
   archivedAt: number | null;
   createdAt: number;
+  updatedAt: number;
 }
 
-/** Create/update payload. Only user-authored fields; the rest are server-owned. */
+export interface LlmQueueMachineScore {
+  id: string;
+  name: string;
+  value: number | string | boolean | null;
+  dataType: ScoreConfigDataType;
+  sourceType: string;
+  sourceStream: string | null;
+  reasoning: string | null;
+  timestamp: number;
+}
+
+export interface LlmQueueItemDetail {
+  item: LlmQueueItem;
+  sourceStream: string;
+  content: {
+    input: unknown | null;
+    output: unknown | null;
+    trace: Record<string, unknown>[];
+  };
+  machineScores: LlmQueueMachineScore[];
+}
+
+export interface LlmQueueReviewScore {
+  name: string;
+  value: number | string | boolean | null;
+}
+
+export interface LlmQueueReview {
+  submissionId: string;
+  reviewer: string | null;
+  comments: string | null;
+  /** Score event timestamp, in microseconds. */
+  submittedAt: number;
+  scores: LlmQueueReviewScore[];
+}
+
+export interface LlmQueueReviewPayload {
+  submissionId: string;
+  sourceStream: string;
+  scores: { scoreConfigRowId: string; value: number | string | boolean }[];
+  comments?: string | null;
+}
+
+export interface LlmQueueReviewResult {
+  annotationId: string;
+  scoreIds: string[];
+  annotatedAt: number;
+}
+
+/** Create payload. Only fields accepted by the backend are represented. */
 export interface LlmQueuePayload {
   name: string;
   description?: string | null;
   targetDatasetId?: string | null;
-  /** Display convenience for the mock; the backend resolves this server-side. */
-  targetDatasetName?: string | null;
-  /** Bound Score Config versions (id + pinned version). */
   scoreConfigs?: { scoreConfigId: string; version: number }[];
-  /** Auto-routing rules (null/omitted = fed manually). */
-  autoRouting?: AutoRouting | null;
 }
 
 const base = (org: string) => `/api/${org}/annotation_queues`;
 
-// (entityId@version) → score-config ROW id. Populated by listScoreConfigOptions
-// and read by create() to send `scoreConfigRowIds` (what the API binds by).
+// (entityId@version) -> immutable score-config row ID. Populated by the
+// catalog request and consumed by create().
 const rowIdIndex = new Map<string, string>();
 
-/** Fold the API's snake_case (or already-camel) row into the normalized shape. */
-function normalize(q: any): LlmQueue {
+function unwrapList(data: any, key = "list"): any[] {
+  if (Array.isArray(data)) return data;
+  return Array.isArray(data?.[key]) ? data[key] : [];
+}
+
+function normalizedScoreValue(score: any): number | string | boolean | null {
+  return (
+    score.value_numeric ??
+    score.valueNumeric ??
+    score.value_categorical ??
+    score.valueCategorical ??
+    score.value_boolean ??
+    score.valueBoolean ??
+    null
+  );
+}
+
+/** Fold a queue API row into the normalized shape. */
+function normalizeQueue(q: any): LlmQueue {
   return {
     id: q.id,
     orgId: q.org_id ?? q.orgId,
@@ -140,17 +183,22 @@ function normalize(q: any): LlmQueue {
       ? (q.allowed_ref_types ?? q.allowedRefTypes)
       : [],
     scoreConfigs: Array.isArray(q.score_configs ?? q.scoreConfigs)
-      ? (q.score_configs ?? q.scoreConfigs).map((b: any) => ({
-          // Real binding = PinnedScoreConfigResponseBody{rowId, entityId, name, version, dataType}.
-          scoreConfigId: b.entity_id ?? b.entityId ?? b.score_config_id ?? b.scoreConfigId,
-          name: b.name,
-          version: b.version ?? 1,
-          latestVersion: b.latest_version ?? b.latestVersion,
+      ? (q.score_configs ?? q.scoreConfigs).map((binding: any) => ({
+          rowId: binding.row_id ?? binding.rowId ?? "",
+          scoreConfigId:
+            binding.entity_id ??
+            binding.entityId ??
+            binding.score_config_id ??
+            binding.scoreConfigId ??
+            "",
+          name: binding.name ?? "",
+          version: Number(binding.version ?? 1),
+          dataType: (binding.data_type ?? binding.dataType ?? "numeric") as ScoreConfigDataType,
+          latestVersion: binding.latest_version ?? binding.latestVersion,
         }))
       : [],
     reviewedCount: q.reviewed_count ?? q.reviewedCount ?? 0,
     totalCount: q.total_count ?? q.totalCount ?? 0,
-    autoRouting: q.auto_routing ?? q.autoRouting ?? null,
     createdBy: q.created_by ?? q.createdBy,
     createdAt: q.created_at ?? q.createdAt,
     updatedBy: q.updated_by ?? q.updatedBy,
@@ -158,103 +206,200 @@ function normalize(q: any): LlmQueue {
   };
 }
 
+function normalizeItem(item: any): LlmQueueItem {
+  return {
+    id: item.id,
+    queueId: item.queue_id ?? item.queueId,
+    queueName: item.queue_name ?? item.queueName ?? null,
+    refType: (item.ref_type ?? item.refType) as QueueRefType,
+    refId: item.ref_id ?? item.refId,
+    refTraceId: item.ref_trace_id ?? item.refTraceId ?? null,
+    refTraceStartTime: Number(item.ref_trace_start_time ?? item.refTraceStartTime ?? 0),
+    status: (item.status ?? "pending") as LlmQueueItemStatus,
+    reviewedAt: item.reviewed_at ?? item.reviewedAt ?? null,
+    archivedAt: item.archived_at ?? item.archivedAt ?? null,
+    createdAt: Number(item.created_at ?? item.createdAt ?? 0),
+    updatedAt: Number(item.updated_at ?? item.updatedAt ?? 0),
+  };
+}
 
-const withLatency = <T>(value: T): Promise<T> =>
-  new Promise((resolve) => setTimeout(() => resolve(value), 250));
+function normalizeMachineScore(score: any): LlmQueueMachineScore {
+  return {
+    id: score.id,
+    name: score.name ?? "",
+    value: normalizedScoreValue(score),
+    dataType: (score.data_type ?? score.dataType ?? "numeric") as ScoreConfigDataType,
+    sourceType: score.source_type ?? score.sourceType ?? "",
+    sourceStream: score.source_stream ?? score.sourceStream ?? null,
+    reasoning: score.reasoning ?? null,
+    timestamp: Number(score.timestamp ?? score._timestamp ?? 0),
+  };
+}
+
+function normalizeItemDetail(detail: any): LlmQueueItemDetail {
+  const content = detail.content ?? {};
+  return {
+    item: normalizeItem(detail.item ?? {}),
+    sourceStream: detail.source_stream ?? detail.sourceStream ?? "",
+    content: {
+      input: content.input ?? null,
+      output: content.output ?? null,
+      trace: Array.isArray(content.trace) ? content.trace : [],
+    },
+    machineScores: unwrapList(detail.machine_scores ?? detail.machineScores).map(
+      normalizeMachineScore,
+    ),
+  };
+}
+
+function normalizeReview(review: any): LlmQueueReview {
+  const scores = Array.isArray(review.scores) ? review.scores : [];
+  return {
+    submissionId: review.submission_id ?? review.submissionId ?? "",
+    reviewer: review.reviewer ?? null,
+    comments: review.comments ?? null,
+    submittedAt: Number(review.submitted_at ?? review.submittedAt ?? 0),
+    scores: scores.map((score: any) => ({
+      name: score.name ?? "",
+      value: normalizedScoreValue(score),
+    })),
+  };
+}
+
+function versionDetails(row: any): LlmScoreConfigVersionDetails {
+  const numericRange = row.numeric_range ?? row.numericRange;
+  const min = Number(numericRange?.min);
+  const max = Number(numericRange?.max);
+  return {
+    rowId: row.id,
+    categories: Array.isArray(row.categories) ? row.categories.map(String) : undefined,
+    numericRange:
+      Number.isFinite(min) && Number.isFinite(max) && min < max ? { min, max } : undefined,
+    healthyThreshold: row.healthy_threshold ?? row.healthyThreshold ?? undefined,
+  };
+}
 
 const llmQueuesService = {
-  // Queue list/get/create bound to the real API. The response has no progress
-  // counts (reviewedCount/totalCount) — normalize defaults them to 0 (TODO(BE)).
   async list(orgId: string): Promise<LlmQueue[]> {
     const res = await http().get(base(orgId));
-    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    return rows.map(normalize);
+    return unwrapList(res.data).map(normalizeQueue);
   },
 
   /**
-   * Score Configs available to bind in the create form. The API returns one flat
-   * row per (entity, version); we group by logical entity id and remember each
-   * version's ROW id (`scoreConfigRowIds` is what create/update actually send).
+   * The list endpoint returns only the latest active Score Config rows. Fetch
+   * each logical config's versions endpoint so the queue form can pin any
+   * immutable version and submit its physical row ID.
    */
   async listScoreConfigOptions(orgId: string): Promise<LlmScoreConfigOption[]> {
-    const res = await http().get(`/api/${orgId}/score_configs`);
-    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    rowIdIndex.clear();
-    const byEntity = new Map<string, LlmScoreConfigOption>();
-    for (const r of rows) {
-      const entityId = r.entity_id ?? r.entityId ?? r.id;
-      const version = r.version ?? 1;
-      rowIdIndex.set(`${entityId}@${version}`, r.id);
-      const cats = Array.isArray(r.categories) ? r.categories : undefined;
-      let opt = byEntity.get(entityId);
-      if (!opt) {
-        opt = {
-          id: entityId,
-          name: r.name,
-          dataType: (r.data_type ?? r.dataType ?? "numeric") as ScoreConfigDataType,
-          categories: cats,
-          versions: [],
-          latestVersion: version,
-        };
-        byEntity.set(entityId, opt);
-      }
-      opt.versions.push(version);
-      if (version > opt.latestVersion) opt.latestVersion = version;
+    const latestResponse = await http().get(`/api/${orgId}/score_configs`);
+    const latestRows = unwrapList(latestResponse.data);
+    const latestByEntity = new Map<string, any>();
+    for (const row of latestRows) {
+      const entityId = String(row.entity_id ?? row.entityId ?? row.id ?? "");
+      if (entityId) latestByEntity.set(entityId, row);
     }
-    const options = [...byEntity.values()];
-    options.forEach((o) => o.versions.sort((a, b) => a - b));
-    return options;
+
+    rowIdIndex.clear();
+    const options = await Promise.all(
+      [...latestByEntity.entries()].map(async ([entityId, latestRow]) => {
+        const versionsResponse = await http().get(
+          `/api/${orgId}/score_configs/${encodeURIComponent(entityId)}/versions`,
+        );
+        const rows = unwrapList(versionsResponse.data, "versions");
+        const allRows = rows.length ? rows : [latestRow];
+        const uniqueRows = [...new Map(allRows.map((row: any) => [row.id, row])).values()];
+        uniqueRows.sort((a: any, b: any) => Number(a.version) - Number(b.version));
+
+        const details: Record<number, LlmScoreConfigVersionDetails> = {};
+        for (const row of uniqueRows) {
+          const version = Number(row.version ?? 1);
+          details[version] = versionDetails(row);
+          rowIdIndex.set(`${entityId}@${version}`, row.id);
+        }
+
+        const latestVersion = Math.max(...uniqueRows.map((row: any) => Number(row.version ?? 1)));
+        const displayRow =
+          uniqueRows.find((row: any) => Number(row.version ?? 1) === latestVersion) ?? latestRow;
+        return {
+          id: entityId,
+          name: displayRow.name ?? latestRow.name ?? "",
+          dataType: (displayRow.data_type ??
+            displayRow.dataType ??
+            latestRow.data_type ??
+            latestRow.dataType ??
+            "numeric") as ScoreConfigDataType,
+          categories: details[latestVersion]?.categories,
+          versions: uniqueRows.map((row: any) => Number(row.version ?? 1)),
+          latestVersion,
+          versionDetails: details,
+        };
+      }),
+    );
+    return options.sort((a, b) => a.name.localeCompare(b.name));
   },
 
   async get(orgId: string, queueId: string): Promise<LlmQueue | null> {
     const res = await http().get(`${base(orgId)}/${queueId}`);
-    return res.data ? normalize(res.data) : null;
+    return res.data ? normalizeQueue(res.data) : null;
   },
 
-  /**
-   * The queue's review pool. KEPT ON MOCK: the backend items endpoint is global
-   * (no queue_id filter) and the review-submit path isn't wired yet, so the
-   * Workbench runs on a self-contained mock pool (TODO(BE)).
-   */
-  async listItems(_orgId: string, queueId: string): Promise<LlmQueueItem[]> {
-    const total = 47;
-    const reviewedCount = 8;
-    const pendingCount = total - reviewedCount;
-    const hex = (n: number, len: number) => n.toString(16).padStart(len, "0");
-    const items: LlmQueueItem[] = Array.from({ length: total }, (_, i) => {
-      const reviewed = i >= pendingCount; // last `reviewedCount` are reviewed
-      return {
-        id: `${queueId}_item_${i + 1}`,
-        queueId,
-        refType: "trace" as QueueRefType,
-        refId: `trace-${hex(i + 1, 6)}`,
-        refTraceId: `trace-${hex(i + 1, 8)}`,
-        status: reviewed ? "reviewed" : "pending",
-        reviewedAt: reviewed ? Date.now() - (total - i) * 3_600_000 : null,
-        archivedAt: null,
-        createdAt: Date.now() - (total - i) * 7_200_000,
-      };
-    });
-    return withLatency(items);
+  /** List active Queue Items, optionally restricted to one Queue. */
+  async listItems(orgId: string, queueId?: string): Promise<LlmQueueItem[]> {
+    const url = `${base(orgId)}/items`;
+    const res = queueId
+      ? await http().get(url, { params: { queue_id: queueId } })
+      : await http().get(url);
+    return unwrapList(res.data)
+      .map(normalizeItem)
+      .filter((item) => item.archivedAt === null);
   },
 
-  /**
-   * Create a queue. The API binds Score Configs by their pinned-version ROW ids;
-   * we resolve `{scoreConfigId(entityId), version}` → rowId via the cache
-   * populated by listScoreConfigOptions (the create form always loads it first).
-   * autoRouting/targetDatasetName are UI-only and dropped (deny_unknown_fields).
-   */
+  async getItemDetail(
+    orgId: string,
+    queueId: string,
+    queueItemId: string,
+  ): Promise<LlmQueueItemDetail> {
+    const res = await http().get(`${base(orgId)}/${queueId}/items/${queueItemId}`);
+    return normalizeItemDetail(res.data);
+  },
+
+  async listReviews(
+    orgId: string,
+    queueId: string,
+    queueItemId: string,
+  ): Promise<LlmQueueReview[]> {
+    const res = await http().get(`${base(orgId)}/${queueId}/items/${queueItemId}/reviews`);
+    return unwrapList(res.data).map(normalizeReview);
+  },
+
+  async submitReview(
+    orgId: string,
+    queueId: string,
+    queueItemId: string,
+    payload: LlmQueueReviewPayload,
+  ): Promise<LlmQueueReviewResult> {
+    const res = await http().post(
+      `${base(orgId)}/${queueId}/items/${queueItemId}/reviews`,
+      payload,
+    );
+    return res.data;
+  },
+
   async create(orgId: string, payload: LlmQueuePayload): Promise<LlmQueue> {
-    const scoreConfigRowIds = (payload.scoreConfigs ?? [])
-      .map((c) => rowIdIndex.get(`${c.scoreConfigId}@${c.version}`))
-      .filter((id): id is string => Boolean(id));
+    const requestedConfigs = payload.scoreConfigs ?? [];
+    const scoreConfigRowIds = requestedConfigs.map((config) =>
+      rowIdIndex.get(`${config.scoreConfigId}@${config.version}`),
+    );
+    if (scoreConfigRowIds.some((id) => !id)) {
+      throw new Error("A selected Score Config version is no longer available");
+    }
     const res = await http().post(base(orgId), {
       name: payload.name,
       description: payload.description ?? null,
       targetDatasetId: payload.targetDatasetId ?? null,
-      scoreConfigRowIds,
+      scoreConfigRowIds: scoreConfigRowIds as string[],
     });
-    return normalize(res.data);
+    return normalizeQueue(res.data);
   },
 };
 
