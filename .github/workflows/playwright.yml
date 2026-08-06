@@ -49,7 +49,6 @@ env:
   # Allow alert destinations to target localhost so the test validation stream
   # (http://localhost:5080/api/.../..._json) is not blocked by the SSRF guard.
   ZO_SSRF_ALLOW_LOOPBACK: true
-  ZO_MODEL_PRICING_ENABLED: true
 
 jobs:
   check_changes:
