@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            in OTooltip even when enabled is harmless — `disabled` on OTooltip
            itself suppresses the bubble in that case. -->
       <OTooltip
-        :content="dateDisabledTooltip ?? ''"
+        :content="raw(dateDisabledTooltip ?? '')"
         :disabled="!dateDisabled || !dateDisabledTooltip"
       >
         <DateTime
@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { ref } from "vue";
 import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
@@ -102,9 +103,9 @@ defineProps<{
       each page's existing data-test values unchanged. */
   dataTest: string;
   /** Resolved page title (each page passes its own t(...) value). */
-  title: string;
+  title: I18nText;
   /** Resolved page subtitle. */
-  subtitle: string;
+  subtitle: I18nText;
   /** OPageHeader icon name. */
   icon: IconName;
   /** Shared AI date-range state (useAiDateRange().state) bound to the picker. */
@@ -119,7 +120,7 @@ defineProps<{
   dateDisabled?: boolean;
   /** Tooltip explaining WHY the picker is disabled. Only shown when
       `dateDisabled` is true. */
-  dateDisabledTooltip?: string;
+  dateDisabledTooltip?: I18nText;
 }>();
 
 defineEmits<{

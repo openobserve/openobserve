@@ -124,9 +124,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
     await pm.serviceGraphPage.navigateToServiceGraphUrl();
     testLogger.info('Navigated to service graph');
 
-    // Verify URL contains service-graph tab parameter
-    await expect(page).toHaveURL(/tab=service-graph/);
-    testLogger.info('URL contains tab=service-graph');
+    // Service Graph is its own route now (not a ?tab= on the traces page)
+    await expect(page).toHaveURL(/\/traces\/service-graph/);
+    testLogger.info('URL is the /traces/service-graph route');
 
     // Verify chart container is visible
     await pm.serviceGraphPage.expectServiceGraphPageVisible();

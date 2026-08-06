@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import type {
@@ -25,7 +25,7 @@ import type {
   StepResult,
 } from "@/composables/synthetics/syntheticResultsSchema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   execution: RunLocationResult | null;
@@ -102,7 +102,7 @@ function fmtDuration(ms: number) {
               <span
                 class="material-symbols-outlined text-text-muted text-base normal-case not-italic"
               >
-                {{ DEVICE_ICON[execution.device] ?? "devices" }}
+                {{ DEVICE_ICON[execution.device] ?? raw("devices") }}
               </span>
               <span class="text-text-heading font-semibold capitalize">
                 {{ execution.browserEngine }} · {{ execution.device.replace(/_/g, " ") }}

@@ -201,9 +201,9 @@ mod tests {
         assert_eq!(job.total_bytes_fetched, 0);
         assert_eq!(job.total_records_processed, 0);
         assert_eq!(job.retry_count, 0);
-        assert_eq!(job.append_data, false);
+        assert!(!job.append_data);
         assert_eq!(job.last_byte_position, 0);
-        assert_eq!(job.supports_range, false);
+        assert!(!job.supports_range);
     }
 
     #[test]
@@ -300,7 +300,7 @@ mod tests {
             "url".to_string(),
             true,
         );
-        assert_eq!(job.append_data, true);
+        assert!(job.append_data);
     }
 
     #[test]

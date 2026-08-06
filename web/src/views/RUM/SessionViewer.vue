@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     class="qp-2"
-    :title="sessionDetails.id || t('rum.sessionReplay')"
+    :title="sessionDetails.id ? raw(sessionDetails.id) : t('rum.sessionReplay')"
     :back="{
       label: t('rum.sessionReplay'),
       onClick: () => router.back(),
@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="person" size="sm" />
-          {{ sessionDetails.user_email || "Unknown User" }}
+          {{ sessionDetails.user_email || t("common.unknownUser") }}
         </div>
         <div class="flex items-center gap-1.5 truncate text-xs">
           <OIcon name="location-on" size="sm" />
@@ -50,7 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-if="frustrationCount > 0"
           class="flex items-center truncate text-xs"
-          :title="`${frustrationCount} frustration signal${frustrationCount > 1 ? 's' : ''} detected`"
+          :title="
+            t('rum.frustrationSignalsDetected', { count: frustrationCount }, frustrationCount)
+          "
           data-test="session-viewer-frustration-summary"
         >
           <OIcon
@@ -62,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="text-severity-warning-color font-semibold"
             data-test="frustration-summary-text"
-            >{{ frustrationCount }} Frustration{{ frustrationCount > 1 ? "s" : "" }}</span
+            >{{ t("rum.frustration", { count: frustrationCount }, frustrationCount) }}</span
           >
         </div>
       </div>
@@ -82,6 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="isMobileReplay"
             :segments="segments"
             :events="segmentEvents"
+            :is-loading="segmentsLoading"
             class="h-full"
           />
           <VideoPlayer
@@ -129,7 +132,7 @@ import { cloneDeep } from "lodash-es";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useQuery from "@/composables/useQuery";
 import useSessionsReplay from "@/composables/useSessionReplay";
@@ -160,11 +163,17 @@ const sessionId = ref("1");
 const currentTime = ref(0);
 const router = useRouter();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isLoading = ref<boolean[]>([]);
 const { buildQueryPayload } = useQuery();
 const segments = ref<any[]>([]);
 const segmentEvents = ref<any[]>([]);
+// Dedicated to the replay-segment fetch, initialised true so the mobile player shows a
+// loading state from first paint. The shared isLoading counter can't be used here: it
+// dips back to 0 in the gap between getSession() resolving and getSessionSegments()
+// starting, which is exactly the moment the mobile player mounts — that dip is what let
+// the "No session replay available" empty state flash before the segments arrived.
+const segmentsLoading = ref(true);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -283,7 +292,7 @@ const getSessionDetails = () => {
     browser: sessionState.data.selectedSession?.browser,
     os: sessionState.data.selectedSession?.os,
     ip: sessionState.data.selectedSession?.ip,
-    user_email: sessionState.data.selectedSession?.user_email || "Unknown User",
+    user_email: sessionState.data.selectedSession?.user_email || t("common.unknownUser"),
     city: sessionState.data.selectedSession?.city || "Unknown",
     country: sessionState.data.selectedSession?.country || "Unknown",
     id: sessionState.data.selectedSession?.session_id,
@@ -348,7 +357,12 @@ const getSession = () => {
 };
 
 const getSessionSegments = () => {
-  if (!sessionState.data.selectedSession) return;
+  if (!sessionState.data.selectedSession) {
+    // No session to fetch a replay for — resolve the loading state so the player can fall
+    // through to its empty message instead of spinning forever.
+    segmentsLoading.value = false;
+    return;
+  }
 
   const queryPayload: any = {
     from: 0,
@@ -363,7 +377,7 @@ const getSessionSegments = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -401,7 +415,12 @@ const getSessionSegments = () => {
     .catch((error) => {
       console.error("Failed to fetch session events:", error);
     })
-    .finally(() => isLoading.value.pop());
+    .finally(() => {
+      isLoading.value.pop();
+      // Segment fetch settled: the mobile player can now decide between the replay and the
+      // empty state without a premature "No session replay available" flash.
+      segmentsLoading.value = false;
+    });
 };
 
 const getSessionEvents = () => {
@@ -418,7 +437,7 @@ const getSessionEvents = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and (type='error' or type='action' or type='view') order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -473,7 +492,7 @@ const getSessionErrorLogs = () => {
     parsedQuery: null,
   };
 
-  const req = buildQueryPayload(queryPayload);
+  const req = buildQueryPayload(queryPayload, t);
   req.query.sql = `select * from "_rumlog" where session_id='${sessionId.value}' and status='error' order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
@@ -569,7 +588,13 @@ const handleViewEvent = (event: any) => {
   //     " error " +
   //     event.event.custom.error.stack;
   // }
-  _event.name = event?.view_loading_type + " : " + event?.view_url || "--";
+  // Browser view events carry `view_loading_type` (initial_load / route_change)
+  // and show as "type : url". Mobile SDK views have no loading_type, so fall back
+  // to the human view name (e.g. "ProductDetail") and only then the url — avoids
+  // the "undefined : <url>" label for mobile sessions.
+  _event.name = event?.view_loading_type
+    ? event.view_loading_type + " : " + event?.view_url
+    : event?.view_name || event?.view_url || "--";
   return _event;
 };
 

@@ -18,6 +18,8 @@
 // comes from ./osAgent; this file holds the PowerShell command and the
 // Windows-specific collection list.
 
+import { gt, raw } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 import type { CardSubstitutions, RichCardContent } from "../types";
 import {
@@ -39,34 +41,32 @@ export default function windowsCard(subs: CardSubstitutions): RichCardContent {
   return {
     provider: {
       name: "Windows",
-      tagline:
-        "Install the OpenObserve agent on any Windows host — Event Log, performance counters and host metrics.",
+      tagline: gt("ingestion.setupCard.taglineWindows"),
       logo: getImageURL("images/common/windows.svg"),
       tone: "#0078d4",
       runtime: "Host",
       setupTime: "~1 min",
-      metaBadges: ["Logs", "Metrics"],
+      metaBadges: [gt("common.logs"), gt("common.metrics")],
     },
     steps: [
       {
         id: "install",
-        title: "Install the Agent",
-        description:
-          "Run this in **PowerShell as Administrator**. Pick **AWS EC2** to additionally pick up instance metadata and use the instance's Name tag as the host identifier.",
-        chip: { kind: "terminal", label: "PowerShell" },
+        titleKey: "ingestion.setupCard.installAgentTitle",
+        descriptionKey: "ingestion.setupCard.installAgentWindowsDesc",
+        chip: { kind: "terminal", label: raw("PowerShell") },
         required: true,
         completeOn: "copy",
         variants: [
           {
             id: "generic",
-            label: "Generic Windows",
+            labelKey: "ingestion.setupCard.genericWindowsVariant",
             icon: icon.windows,
             code: agentCode(install(""), subs, "powershell"),
             note: "Any Windows server or VM.",
           },
           {
             id: "ec2",
-            label: "AWS EC2",
+            label: raw("AWS EC2"),
             icon: icon.ec2,
             code: agentCode(install("/ec2"), subs, "powershell"),
             note: EC2_IAM_NOTE,
@@ -75,19 +75,20 @@ export default function windowsCard(subs: CardSubstitutions): RichCardContent {
       },
       {
         id: "verify",
-        title: "Verify Data in OpenObserve",
-        description:
-          "The agent starts on install. Give it a few seconds, then hit Test — host metrics arrive as `system_*` streams.",
-        chip: { kind: "traces", label: "Metrics" },
+        titleKey: "ingestion.setupCard.verifyDataTitle",
+        descriptionKey: "ingestion.setupCard.verifyWindowsAgentDesc",
+        chip: { kind: "traces", labelKey: "ingestion.setupCard.chipMetrics" },
         completeOn: "detect",
         detectionAnchor: true,
+        // The four Windows Event Log channels, which the Event Viewer itself
+        // localises — so they are translated rather than raw() tokens.
         pills: [
-          "Application",
-          "Security",
-          "Setup",
-          "System",
-          "Performance Counters",
-          "Host Metrics",
+          gt("ingestion.setupCard.pillApplication"),
+          gt("ingestion.setupCard.pillSecurity"),
+          gt("ingestion.setupCard.pillSetup"),
+          gt("ingestion.setupCard.pillSystem"),
+          gt("ingestion.setupCard.pillPerformanceCounters"),
+          gt("ingestion.setupCard.pillHostMetrics"),
         ],
       },
     ],

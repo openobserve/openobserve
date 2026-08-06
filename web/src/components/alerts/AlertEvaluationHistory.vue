@@ -123,7 +123,10 @@
     </template>
 
     <template #cell-error="{ row }">
-      <span class="text-compact">{{ row.error || "—" }}</span>
+      <OTooltip v-if="row.error" :content="row.error">
+        <span class="text-compact">{{ row.error }}</span>
+      </OTooltip>
+      <span v-else class="text-compact">—</span>
     </template>
 
     <template #empty>
@@ -140,7 +143,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -157,7 +160,7 @@ import { conditionSummary } from "@/utils/alerts/runOutcome";
 
 const props = defineProps<{ alertId: string }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const history = ref<any[]>([]);

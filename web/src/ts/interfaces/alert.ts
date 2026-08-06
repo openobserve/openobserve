@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 export interface Condition {
   column: string;
   ignore_case: null | boolean;
@@ -42,7 +44,7 @@ export interface Alert {
   is_real_time: boolean;
   enabled: boolean;
   context_attributes: { [key: string]: string };
-  description: string;
+  description: I18nText;
   uuid?: string;
   deduplication?: {
     enabled: boolean;
@@ -66,7 +68,7 @@ export interface AlertListItem {
   stream_type: string;
   enabled: boolean;
   alert_type: string;
-  description: string;
+  description: I18nText;
   uuid?: string;
 }
 
@@ -80,7 +82,12 @@ export interface Template {
   // delete actions for them and the backend will refuse mutations.
   isPrebuilt?: boolean;
   type: "http" | "email";
-  title?: string;
+  title?: I18nText;
+  // Distinguishes a structured "content" template (built via the fields/links/
+  // rows editor, body is a serialized ContentSpec JSON string) from a
+  // "custom" raw-payload template (body is an arbitrary user string). Absent
+  // on templates created before this field existed — treat as "custom".
+  kind?: "content" | "custom";
 }
 
 // Template object which is modified in frontend to display in table and form

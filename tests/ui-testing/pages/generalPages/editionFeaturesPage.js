@@ -15,11 +15,9 @@ export const ENTERPRISE_FEATURES = [
   { name: 'Role Based Access Control', slug: 'rbac', beta: false, ha: true, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/role-based-access-control/' },
   { name: 'Federated Search / Supercluster', slug: 'fed_search', beta: false, ha: true, expectedPath: '/docs/user-guide/data-exploration/federated-search/' },
   { name: 'Query Management', slug: 'query_mgmt', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/query-management/' },
-  { name: 'Workload Management', slug: 'workload_mgmt', beta: false, ha: false, expectedPath: '/docs/' },
   { name: 'Audit Trail', slug: 'audit_trail', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/audit-trail/' },
   { name: 'Sensitive Data Redaction', slug: 'data_redact', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/management/sensitive-data-redaction/' },
   { name: 'Pipeline Remote Destinations', slug: 'pipeline_remote', beta: false, ha: false, expectedPath: '/docs/user-guide/data-processing/pipelines/remote-destination/' },
-  { name: 'Query Optimizer / Aggregation Cache', slug: 'query_opt', beta: false, ha: false, expectedPath: '/docs/' },
   { name: 'Incident Management', slug: 'incident_mgmt', beta: true, ha: true, expectedPath: '/docs/user-guide/analytics/incidents/' },
   // sre_agent: o2.ws redirect resolves to /docs/administration/deployment/sre-agent-setup-guide/
   // but that page issues a client-side redirect to /docs/enterprise-setup/sre-agent/ — assert
@@ -29,9 +27,7 @@ export const ENTERPRISE_FEATURES = [
   { name: 'Anomaly Detection', slug: 'anomaly_detect', beta: true, ha: false, expectedPath: '/docs/user-guide/analytics/alerts/anomaly-detection/' },
   { name: 'Metrics Auto Downsampling', slug: 'metrics_downsample', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/metrics/downsampling-metrics/' },
   { name: 'Log Patterns', slug: 'log_patterns', beta: false, ha: false, expectedPath: '/blog/log-patterns-automatic-pattern-extraction-faster-analysis/' },
-  { name: 'MCP Server', slug: 'mcp_server', beta: false, ha: true, expectedPath: '/docs/integration/ai/mcp/' },
   { name: 'Rate Limiting', slug: 'rate_limit', beta: false, ha: false, expectedPath: '/docs/user-guide/account-administration/identity-and-access-management/quotas/how-quotas-work/' },
-  { name: 'Broadcast Join', slug: 'broadcast_join', beta: false, ha: true, expectedPath: '/docs/user-guide/advanced/query-tuning/broadcast-join/' },
   { name: 'Logs, Metrics & Traces Correlation', slug: 'telemetry_corr', beta: false, ha: false, expectedPath: '/docs/' },
   { name: 'Service Graph', slug: 'service_maps', beta: false, ha: false, expectedPath: '/docs/user-guide/data-exploration/traces/service-graph/' },
 ];

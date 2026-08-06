@@ -44,6 +44,12 @@ const template = {
   get_system_templates: ({ org_identifier }: any) => {
     return http().get(`/api/${org_identifier}/alerts/templates/system/prebuilt`);
   },
+  // Renders a template against sample/preview data server-side. Seam for a
+  // future live-preview panel (Task 13 scope excludes building that UI) — no
+  // caller yet.
+  preview: ({ org_identifier, data }: any) => {
+    return http().post(`/api/${org_identifier}/alerts/templates/preview`, data);
+  },
 };
 
 export default template;

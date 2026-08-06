@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               unit="us"
               mode="absolute"
               :timezone="store.state.timezone"
-              empty-label="—"
+              :empty-label="raw('—')"
             />
           </template>
 
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -177,7 +177,7 @@ const emit = defineEmits<{
   (e: "select-run", runId: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const loading = ref(false);
@@ -343,13 +343,14 @@ const openRun = (row: any) => {
   emit("select-run", row.run_id);
 };
 
-// Fetch on mount and whenever the workflow changes.
+// Refetch when the workflow changes. The INITIAL fetch is NOT triggered here — the
+// DateTime picker emits `@on:date-change` on mount (→ updateDateTime → fetchHistory)
+// with the actual displayed range, so an `immediate` watch would double-fetch.
 watch(
   () => props.workflowId,
-  (id) => {
-    if (id) fetchHistory();
+  (id, prev) => {
+    if (id && id !== prev) fetchHistory();
   },
-  { immediate: true },
 );
 
 defineExpose({ fetchHistory });

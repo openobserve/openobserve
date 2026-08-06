@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`pattern-card-${index}-badge-${badge.key}`"
         >
           {{ badge.label }}
-          <OTooltip :content="badge.desc" />
+          <OTooltip :content="raw(badge.desc)" />
         </span>
         <span
           v-if="pattern.is_anomaly"
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`pattern-card-${index}-anomaly-badge`"
         >
           {{ t("search.anomalyLabel") }}
-          <OTooltip :content="anomalyExplanationText" max-width="22rem" />
+          <OTooltip :content="raw(anomalyExplanationText)" max-width="22rem" />
         </span>
       </div>
 
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import PatternVolumeCell from "./PatternVolumeCell.vue";
 import {
@@ -181,7 +181,7 @@ defineEmits<{
   (e: "click", pattern: any, index: number): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
 const templateTokens = computed(() =>

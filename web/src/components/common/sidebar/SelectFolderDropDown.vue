@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-xs-sq"
         class="h-8! w-8!"
         :data-test="`${type}-folder-move-new-add`"
-        title="Add Folder"
+        :title="t('common.addFolder')"
         :disabled="disableDropdown"
         @mousedown.prevent
         @click="
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, onActivated, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddFolder from "./AddFolder.vue";
 import { useRoute } from "vue-router";
@@ -142,7 +142,7 @@ export default defineComponent({
 
     //dropdown selected folder index (holds primitive folderId string)
     const selectedFolder = ref<string>(getInitialFolderId());
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;

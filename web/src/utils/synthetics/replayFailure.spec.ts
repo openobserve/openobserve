@@ -36,6 +36,21 @@ describe("classifyPreflightFailure", () => {
   });
 
   /**
+   * `incognito crxApplication is already started` comes from playwright-crx when a
+   * previous incognito session still holds the slot — nothing to do with the
+   * "Allow in incognito" permission. It contains the word "incognito", so the
+   * generic substring test claimed it and rendered the chrome://extensions
+   * walkthrough: the author was told to switch on a setting that was already on,
+   * and Retry threw the same error every time. The specific case must win.
+   */
+  it("should NOT send the author to chrome://extensions when the slot is held", () => {
+    expect(classifyPreflightFailure("incognito crxApplication is already started")).toBe(
+      "in-progress",
+    );
+    expect(classifyPreflightFailure("crxApplication is already started")).toBe("in-progress");
+  });
+
+  /**
    * The reported bug: adding a step by hand and hitting Replay reported
    * "Can't open the Incognito window".
    *

@@ -307,7 +307,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-md"
               :title="t('serviceAccounts.copyToken')"
               @click.stop="
-                copyToClipboard(serviceToken, {
+                copyToClipboard(serviceToken, t, {
                   successMessage: t('serviceAccounts.toast.tokenCopied'),
                   timeout: 5000,
                 })
@@ -453,7 +453,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import AddServiceAccount from "./AddServiceAccount.vue";
 import {
@@ -511,7 +511,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
     const resultTotal = ref<number>(0);
     const confirmDelete = ref<boolean>(false);
@@ -993,14 +993,14 @@ export default defineComponent({
         } else if (successful.length > 0 && unsuccessful.length > 0) {
           toast({
             message: t("serviceAccounts.toast.bulkDeletePartial", {
-              successful: successful.length,
+              count: successful.length,
               failed: unsuccessful.length,
             }),
             variant: "warning",
           });
         } else if (unsuccessful.length > 0) {
           toast({
-            message: t("serviceAccounts.toast.bulkDeleteFailed", { failed: unsuccessful.length }),
+            message: t("serviceAccounts.toast.bulkDeleteFailed", { count: unsuccessful.length }),
             variant: "error",
           });
         }

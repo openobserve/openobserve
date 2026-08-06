@@ -16,8 +16,11 @@ export class TracesPage {
     // Source: web/src/plugins/traces/SearchBar.vue
     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
-    this.serviceMapsToggle = '[data-test="traces-service-graph-toggle"]';
-    this.servicesCatalogToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
+    // Service Graph and Services are their own routes now, reached from the
+    // Traces rail tile's hover flyout — not tabs on the Traces page.
+    this.tracesRailTile = '[data-test="nav-group-traces"]';
+    this.serviceMapsNavItem = '[data-test="nav-group-item-serviceGraph"]';
+    this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
 
     // Search Bar - Controls
     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
@@ -225,6 +228,28 @@ export class TracesPage {
     const wrapper = this.page.locator(this.streamSelect);
     await wrapper.waitFor({ state: 'visible', timeout: 10000 });
 
+    // The wrapper renders immediately, but its options arrive with the async
+    // stream-list fetch. Opening the popover before then finds an empty list,
+    // every retry below misses, and selection silently no-ops — which surfaces
+    // later as "Select Stream First" and zero query results. Wait for the
+    // option to exist in the DOM first.
+    const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
+    await this.page
+      .locator(optionReady)
+      .first()
+      .waitFor({ state: 'attached', timeout: 15000 })
+      .catch(async () => {
+        // Options are only mounted while the popover is open — open it, wait,
+        // then leave it open for the selection logic below.
+        const t = wrapper.locator('button[type="button"]').first();
+        await t.click({ force: false }).catch(() => {});
+        await this.page
+          .locator(optionReady)
+          .first()
+          .waitFor({ state: 'attached', timeout: 15000 })
+          .catch(() => {});
+      });
+
     // Check the popover-trigger button's aria-expanded state — already
     // selected streams will reflect in the trigger button text.
     const trigger = wrapper.locator('button[type="button"]').first();
@@ -233,11 +258,13 @@ export class TracesPage {
     if (currentText && currentText.includes(streamName)) {
       return;
     }
-    await trigger.click({ force: false });
-
-    // Wait for the popover (OSelect forwards the data-test slug + `-popover`).
+    // Only open the popover if it isn't already (the readiness wait above may
+    // have opened it) — an unconditional click would toggle it shut.
     const popover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
-    await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    if (!(await popover.isVisible({ timeout: 500 }).catch(() => false))) {
+      await trigger.click({ force: false });
+      await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    }
 
     // Try clicking the matching option directly by data-test-value. Retry
     // up to 3 times — OSelect uses virtualised ListboxItem rendering which
@@ -364,7 +391,9 @@ export class TracesPage {
   }
 
   async switchToServiceMaps() {
-    await this.page.locator(this.serviceMapsToggle).click();
+    await this.page.locator(this.tracesRailTile).hover();
+    await this.page.locator(this.serviceMapsNavItem).click();
+    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 }).catch(() => {});
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
@@ -1311,11 +1340,15 @@ export class TracesPage {
   }
 
   /**
-   * Check if service maps toggle is visible
+   * Check if the Service Graph entry is reachable from the Traces rail flyout.
    * @returns {Promise<boolean>}
    */
   async isServiceMapsToggleVisible() {
-    return await this.page.locator(this.serviceMapsToggle).isVisible({ timeout: 5000 }).catch(() => false);
+    await this.page.locator(this.tracesRailTile).hover().catch(() => {});
+    return await this.page
+      .locator(this.serviceMapsNavItem)
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
   }
 
   /**

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
@@ -57,6 +57,19 @@ const props = defineProps<{
   blockedReason?: BlockedReason | null;
   /** The extension's own error text, rendered verbatim for `preflight`. */
   blockedDetail?: string;
+  /**
+   * Save-time zod issues for this journey, owned by the parent.
+   *
+   * A prop rather than the method call this used to be. OStepper is a wizard, so
+   * this component is unmounted whenever the Journey step is not the active one —
+   * and in create mode the only Save button lives on the Configure step. The
+   * parent's `journeyRef` is null there, so the imperative push was swallowed by
+   * `?.` and the author got the toast and nothing else. Switching tabs first does
+   * not fix it either: the ref is still null in that tick, and a component mounted
+   * afterwards starts with an empty map. As a prop the issues simply wait, and the
+   * row opens whenever the journey next renders.
+   */
+  fieldIssues?: readonly { path: PropertyKey[]; message: string }[];
 }>();
 
 const emit = defineEmits<{
@@ -257,7 +270,7 @@ const multiSelectEnabled = computed(
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
@@ -291,8 +304,60 @@ const firstStepError = ref(false);
  */
 const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
 
+/**
+ * Steps carrying at least one schema-level field error.
+ *
+ * `validateJourneySteps` enforces two rules of its own, but they are not the only
+ * ones that block a save: `stepNameRequired`, `retiredAction`, the navigate URL,
+ * `typeTextRequired` and `expectedRequired` all live in the zod schema and reach
+ * this component through `setStepFieldErrors` alone. Row highlighting and
+ * auto-expand read this so those rules behave like the two local ones instead of
+ * being announced by a toast and then shown nowhere.
+ *
+ * `clearFieldError` can leave a step with an empty record, so emptiness is
+ * checked rather than mere presence of the key.
+ */
+const fieldErrorStepIds = computed(
+  () =>
+    new Set(
+      [...stepFieldErrors.value.entries()]
+        .filter(([, fields]) => Object.keys(fields).length > 0)
+        .map(([id]) => id),
+    ),
+);
+
+/**
+ * Open every errored row and bring the first of them into view.
+ *
+ * Journey order, not issue order: "the first error" has to mean the first one the
+ * author would reach scrolling down, or the scroll lands on an arbitrary row. A
+ * filter is cleared for the same reason `revealStep` clears it — a row the filter
+ * excludes is not rendered at all, so expanding it puts nothing on screen.
+ */
+function revealErroredSteps(stepIds: Iterable<string>) {
+  const wanted = new Set(stepIds);
+  if (wanted.size === 0) return;
+  const ordered = props.modelValue.filter((s) => wanted.has(s.id)).map((s) => s.id);
+  if (ordered.length === 0) return;
+  if (filterQuery.value.trim()) {
+    filterQuery.value = "";
+    toast({ variant: "info", message: t("synthetics.journey.filterClearedForErrors") });
+  }
+  expandedStepIds.value = [...new Set([...expandedStepIds.value, ...ordered])];
+  scrollToStep(ordered[0]);
+}
+
+/** Scroll to a step's expansion anchor, scoped to this journey's root. */
+function scrollToStep(stepId: string) {
+  nextTick(() => {
+    journeyRootRef.value
+      ?.querySelector(`[data-test="synthetics-journey-step-anchor-${stepId}"]`)
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
+}
+
 /** Record zod issues whose path points at a journey step field. */
-function setStepFieldErrors(issues: { path: PropertyKey[]; message: string }[]) {
+function applyStepFieldErrors(issues: readonly { path: PropertyKey[]; message: string }[]) {
   const next = new Map<string, Record<string, string>>();
   for (const issue of issues) {
     if (issue.path[0] !== "journey" || typeof issue.path[1] !== "number") continue;
@@ -304,7 +369,21 @@ function setStepFieldErrors(issues: { path: PropertyKey[]; message: string }[]) 
     next.set(step.id, { ...(next.get(step.id) ?? {}), [field]: issue.message });
   }
   stepFieldErrors.value = next;
+  // This is the schema's only channel into the journey, so it owns the expansion
+  // the way validateJourneySteps owns it for its own two rules. Without this the
+  // save's toast named fields that sat inside a collapsed row.
+  revealErroredSteps(next.keys());
 }
+
+// `immediate` is the whole point: this component is mounted long after the save
+// that produced the issues, so applying them only on CHANGE would miss every
+// create-mode failure. An empty list clears — a save that succeeds must not leave
+// the previous failure's messages on screen.
+watch(
+  () => props.fieldIssues,
+  (issues) => applyStepFieldErrors(issues ?? []),
+  { immediate: true },
+);
 
 function fieldError(stepId: string, field: string): string {
   return stepFieldErrors.value.get(stepId)?.[field] ?? "";
@@ -335,9 +414,7 @@ function validateJourneySteps(): boolean {
   // Auto-expand errored steps so the inline error is visible
   const erroredIds = [...selErrs];
   if (firstStepError.value && first) erroredIds.push(first.id);
-  if (erroredIds.length > 0) {
-    expandedStepIds.value = [...new Set([...expandedStepIds.value, ...erroredIds])];
-  }
+  revealErroredSteps(erroredIds);
 
   const valid = !firstStepError.value && selErrs.size === 0;
   if (!valid) {
@@ -378,11 +455,10 @@ defineExpose({
   deleteSelectedSteps,
   stopActiveRecording,
   stopActiveReplay,
+  // Still imperative: both callers (Continue-to-Configure, the replay gate) run
+  // while the Journey step IS the active one, so the ref is live. Save-time zod
+  // issues cannot use this channel — see the `fieldIssues` prop.
   validateStepSelectors: validateJourneySteps,
-  // The parent view owns the zod parse, so it pushes the resulting issues back
-  // down here to be rendered against the fields they name. `fieldError` stays
-  // internal — the template is its only caller.
-  setStepFieldErrors,
 });
 
 function startRecording() {
@@ -592,16 +668,10 @@ function revealStep(stepId: string) {
     expandedStepIds.value = [...expandedStepIds.value, stepId];
   }
   flashStepId.value = stepId;
-  nextTick(() => {
-    // The anchor lives inside the row's expansion, which the line above just
-    // opened — so it exists by now, and it is keyed by step id rather than by
-    // row position. Scoped to this journey's root so a second journey on the
-    // page cannot be scrolled instead.
-    // `block: "nearest"` leaves an already-visible row where it is.
-    journeyRootRef.value
-      ?.querySelector(`[data-test="synthetics-journey-step-anchor-${stepId}"]`)
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  });
+  // The anchor lives inside the row's expansion, which the line above just
+  // opened — so it exists by the time scrollToStep's nextTick runs, and it is
+  // keyed by step id rather than by row position.
+  scrollToStep(stepId);
   window.clearTimeout(flashTimer);
   flashTimer = window.setTimeout(() => {
     if (flashStepId.value === stepId) flashStepId.value = null;
@@ -621,7 +691,11 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
   const first = props.modelValue[0];
   const hasFirstStepErr = firstStepError.value && first?.id === row.id;
   const hasSelectorErr = selectorErrors.value.has(row.id);
-  if (hasFirstStepErr || hasSelectorErr) return "var(--color-status-error-text)";
+  // Schema-level errors count too, or "fix the highlighted fields" would name a
+  // row that carries no highlight — every rule except these two local ones
+  // reaches the journey only as a field error.
+  const hasFieldErr = fieldErrorStepIds.value.has(row.id);
+  if (hasFirstStepErr || hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
   // Transient "this is the one you just added". Lowest priority on purpose — an
   // error on the same row is the more important thing to show, and the flash
   // clears itself a moment later anyway.
@@ -636,8 +710,20 @@ function getRowStatusColor(row: BrowserStep): string | undefined {
 function handleStepReplace(row: BrowserStep, next: BrowserStep) {
   const idx = findIndex(row);
   if (idx < 0) return;
+  const prev = props.modelValue[idx];
   const steps = [...props.modelValue];
   steps[idx] = next;
+  // A message that outlives the edit fixing it is worse than no message: the
+  // field stays red while the author looks at correct input, and since a field
+  // error now force-expands its row, a stale one keeps re-opening a row that is
+  // already right. `action` and `selector` have their own edited events; the
+  // editor emits none for name/value/expected, so the changed field is derived
+  // from the replacement step it hands back.
+  if (next.name !== prev.name) clearFieldError(row.id, "name");
+  if (next.value !== prev.value) clearFieldError(row.id, "value");
+  if (next.assertion?.expected !== prev.assertion?.expected) {
+    clearFieldError(row.id, "assertion.expected");
+  }
   emit("update:modelValue", steps);
 }
 
@@ -1075,7 +1161,9 @@ function openChromeExtensions() {
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-text-muted text-xs">{{ capturedSteps.length }} steps</span>
+        <span class="text-text-muted text-xs"
+          >{{ capturedSteps.length }} {{ t("synthetics.table.stepsSuffix") }}</span
+        >
       </div>
 
       <JourneySteps
@@ -1194,11 +1282,11 @@ function openChromeExtensions() {
           :action-error-message="
             (firstStepError && props.modelValue[0]?.id === row.id
               ? t('synthetics.validation.firstStepMustNavigate')
-              : '') || fieldError(row.id, 'action')
+              : raw('')) || fieldError(row.id, 'action')
           "
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : '') ||
+            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : raw('')) ||
             fieldError(row.id, 'selector')
           "
           :value-error-message="fieldError(row.id, 'value')"

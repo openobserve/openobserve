@@ -19,6 +19,7 @@ function mountStepper(
     animated?: boolean;
     expanded?: boolean;
     stepCount?: number;
+    hideHeader?: boolean;
   } = {},
 ) {
   const {
@@ -28,6 +29,7 @@ function mountStepper(
     animated = false, // disable animations in tests to avoid async waits
     expanded = false,
     stepCount = 2,
+    hideHeader = false,
   } = options;
 
   const Wrapper = defineComponent({
@@ -41,7 +43,18 @@ function mountStepper(
       const done1 = computed(() => active.value > 1);
       const done2 = computed(() => active.value > 2);
       const done3 = computed(() => active.value > 3);
-      return { active, orientation, navigable, animated, expanded, stepCount, done1, done2, done3 };
+      return {
+        active,
+        orientation,
+        navigable,
+        animated,
+        expanded,
+        stepCount,
+        hideHeader,
+        done1,
+        done2,
+        done3,
+      };
     },
     template: `
       <OStepper
@@ -50,6 +63,7 @@ function mountStepper(
         :navigable="navigable"
         :animated="animated"
         :expanded="expanded"
+        :hide-header="hideHeader"
       >
         <OStep :name="1" title="First" :done="done1">Step 1 content</OStep>
         <OStep v-if="stepCount >= 2" :name="2" title="Second" :done="done2">Step 2 content</OStep>
@@ -151,6 +165,21 @@ describe("OStepper", () => {
   });
 
   // --- Orientation ---
+
+  it("hideHeader removes the header bar but still renders the active step content", async () => {
+    const wrapper = mountStepper({ modelValue: 2, hideHeader: true });
+    await wrapper.vm.$nextTick();
+    // Header (role="list") is gone...
+    expect(wrapper.find('[role="list"]').exists()).toBe(false);
+    // ...but the active step's panel still renders.
+    expect(wrapper.text()).toContain("Step 2 content");
+  });
+
+  it("renders the header by default (hideHeader off)", async () => {
+    const wrapper = mountStepper({ modelValue: 1 });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[role="list"]').exists()).toBe(true);
+  });
 
   it("does not render the horizontal header list in vertical orientation", async () => {
     const wrapper = mountStepper({ orientation: "vertical", modelValue: 1 });

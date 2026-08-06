@@ -542,6 +542,56 @@ describe("CreateDestinationForm", () => {
   });
 
   // ─────────────────────────────────────────────────────────────────────────────
+  describe("forcedType (skip step 1, locked type, no going back)", () => {
+    it("opens directly on step 2, locked to the forced type", () => {
+      const w = createWrapper({ forcedType: "custom" });
+      expect(w.vm.step).toBe(2);
+      expect(w.vm.destinationType).toBe("custom");
+      w.unmount();
+    });
+
+    it("seeds the create defaults for the forced type", () => {
+      const w = createWrapper({ forcedType: "custom" });
+      const v = w.vm.form.state.values;
+      expect(v.destination_type).toBe("custom");
+      expect(v.method).toBe("post");
+      expect(v.output_format).toBe("json");
+      expect(v.url_endpoint).toBe("");
+      expect(v.headers).toEqual([{ key: "", value: "" }]);
+      w.unmount();
+    });
+
+    it("hides the Back button (there's no step 1 to return to)", () => {
+      const w = createWrapper({ forcedType: "custom" });
+      expect(w.find('[data-test="step3-back-btn"]').exists()).toBe(false);
+      w.unmount();
+    });
+
+    it("hides the stepper header (single-step flow)", () => {
+      const forced = createWrapper({ forcedType: "custom" });
+      expect(forced.findComponent({ name: "OStepper" }).props("hideHeader")).toBe(true);
+      forced.unmount();
+      // ...and the default (no forcedType) keeps the header.
+      expect(wrapper.findComponent({ name: "OStepper" }).props("hideHeader")).toBe(false);
+    });
+
+    it("resetForm keeps it on step 2 when the type is forced", async () => {
+      const w = createWrapper({ forcedType: "custom" });
+      w.vm.resetForm();
+      await nextTick();
+      expect(w.vm.step).toBe(2);
+      expect(w.vm.form.state.values.destination_type).toBe("custom");
+      w.unmount();
+    });
+
+    it("without forcedType, the Back button and step 1 remain (unchanged default)", () => {
+      // default wrapper has no forcedType
+      expect(wrapper.vm.step).toBe(1);
+      expect(wrapper.find('[data-test="destination-type-card-openobserve"]').exists()).toBe(true);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
   describe("canProceedStep2 Validation", () => {
     it("is true for valid openobserve form data", async () => {
       setFormField(wrapper, "destination_type", "openobserve");

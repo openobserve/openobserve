@@ -1462,8 +1462,10 @@ mod tests {
         assert!(settings.index_fields_updated_at.is_empty());
 
         // the map survives a serialize -> parse round trip
-        let mut settings = StreamSettings::default();
-        settings.index_updated_at = 100;
+        let mut settings = StreamSettings {
+            index_updated_at: 100,
+            ..Default::default()
+        };
         settings
             .index_fields_updated_at
             .insert("trace_id".to_string(), 200);
@@ -2075,7 +2077,6 @@ mod tests {
             doc_time_min: 1000,
             doc_time_max: 2000,
             created_at: 100,
-            ..Default::default()
         };
         let b = StreamStats {
             file_num: 2,
@@ -2086,7 +2087,6 @@ mod tests {
             doc_time_min: 500,
             doc_time_max: 3000,
             created_at: 50,
-            ..Default::default()
         };
         a.merge(&b);
         assert_eq!(a.file_num, 5);

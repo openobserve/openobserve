@@ -17,22 +17,6 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import PipelineFlow from "./PipelineFlow.vue";
 import { nextTick } from "vue";
-import { createI18n } from "vue-i18n";
-
-// Create i18n instance
-const i18n = createI18n({
-  legacy: false,
-  locale: "en",
-  messages: {
-    en: {
-      pipeline: {
-        unsavedChanges: "You have unsaved changes",
-        emptyCanvas: "Drag and drop nodes from the sidebar to start building your pipeline",
-        dropHere: "Drop here",
-      },
-    },
-  },
-});
 
 // Mock dependencies
 vi.mock("@/utils/zincutils", () => ({
@@ -227,7 +211,7 @@ describe("PipelineFlow.vue", () => {
   const mountComponent = () => {
     return mount(PipelineFlow, {
       global: {
-        plugins: [i18n],
+        plugins: [],
         stubs: {
           OIcon: OIconStub,
         },
@@ -287,7 +271,7 @@ describe("PipelineFlow.vue", () => {
     wrapper = mountComponent();
     const startNode = wrapper.find('[data-test="pipeline-flow-start-node"]');
     expect(startNode.exists()).toBe(true);
-    expect(startNode.text()).toBe("pipeline.chooseSource");
+    expect(startNode.text()).toBe("Choose a Source");
   });
 
   // Test 9: Empty canvas text is hidden when nodes exist

@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     size="lg"
     :title="t('synthetics.privateLocations.setup.title')"
-    :sub-title="locationName || undefined"
+    :sub-title="raw(locationName || undefined)"
     data-test="synthetics-agent-setup-drawer"
     @update:open="emit('update:open', $event)"
   >
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 1: deploy -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">1</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "1" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step1Title") }}
           </span>
@@ -40,6 +40,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Composer: location inputs + platform tabs + composed command -->
         <template v-if="canCompose">
           <div class="rounded-default border-border-default flex flex-col gap-3 border p-3">
+            <OInput
+              v-if="!locationId"
+              v-model="draftLocation"
+              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
+              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
+              required
+              size="sm"
+              data-test="synthetics-agent-setup-location-input"
+            />
             <div class="flex flex-col gap-1">
               <OInput
                 v-model="draftAgentName"
@@ -52,15 +61,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("synthetics.privateLocations.setup.agentNameHint") }}
               </p>
             </div>
-            <OInput
-              v-if="!locationId"
-              v-model="draftLocation"
-              :label="t('synthetics.privateLocations.setup.locationNameLabel')"
-              :placeholder="t('synthetics.privateLocations.setup.locationNamePlaceholder')"
-              required
-              size="sm"
-              data-test="synthetics-agent-setup-location-input"
-            />
           </div>
 
           <!-- Which agent to install. The two are different programs, not two
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 2: wait for the agent to register -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">2</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "2" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step2Title") }}
           </span>
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Step 3: assign in checks -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
-          <OTag variant="primary-soft" size="sm" shape="pill">3</OTag>
+          <OTag variant="primary-soft" size="sm" shape="pill">{{ "3" }}</OTag>
           <span class="text-text-heading font-medium">
             {{ t("synthetics.privateLocations.setup.step3Title") }}
           </span>
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -204,7 +204,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ (e: "update:open", open: boolean): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const platform = ref<string | number>("docker");
 const agentType = ref<string | number>("protocol");

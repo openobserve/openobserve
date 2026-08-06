@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
-        label="Prometheus"
+        :label="t('ingestion.metrics.prometheus')"
       />
       <ORouteTab
         name="vmagent"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
-        label="vmagent"
+        :label="t('ingestion.metrics.vmagent')"
       />
       <ORouteTab
         name="nightingale"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/nightingale.svg')"
-        label="Nightingale"
+        :label="t('ingestion.metrics.nightingale')"
       />
       <ORouteTab
         name="categraf"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/categraf.png')"
-        label="Categraf"
+        :label="t('ingestion.metrics.categraf')"
       />
       <ORouteTab
         name="otelCollector"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        label="OTEL Collector"
+        :label="t('ingestion.metrics.otelCollector')"
       />
       <ORouteTab
         name="telegraf"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
-        label="Telegraf"
+        :label="t('ingestion.metrics.telegraf')"
       />
       <ORouteTab
         name="cloudwatchMetrics"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
-        label="AWS CloudWatch Metrics"
+        :label="t('ingestion.metrics.awsCloudwatchMetrics')"
       />
     </template>
 
@@ -120,7 +120,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -146,7 +146,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const rowData: any = ref({});
@@ -198,9 +198,9 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {

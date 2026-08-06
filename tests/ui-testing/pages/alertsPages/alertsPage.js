@@ -1076,14 +1076,38 @@ export class AlertsPage {
             await this.navigateToAlertsPage();
         }
 
-        // Use specific folder-item selector to avoid matching unrelated text
-        const folderItem = this.page.locator(`div.folder-item:has-text("${folderName}")`).first();
-        const folderVisible = await folderItem.isVisible({ timeout: 5000 }).catch(() => false);
-        if (folderVisible) {
-            await folderItem.click();
+        // The folder list is reka OTabs. The clickable element is the [role="tab"] TabsTrigger
+        // that wraps the folder-name cell (data-test="dashboard-folder-tab-name-<name>"); it is
+        // the element that carries data-state="active" AND, via OTabs' v-model, drives
+        // activeFolderId — the folder the "New alert" wizard writes the alert into.
+        //
+        // Two bugs made the old approach silently switch to the wrong folder:
+        //   1. It clicked the inner .folder-item <div>, not the tab. The list is virtualized/
+        //      animated, so a force-click can land mid-reflow and never flip the reka tab.
+        //   2. It then gated only on the alert table OR empty-state being visible. The DEFAULT
+        //      folder's table is already on screen, so that gate is a FALSE success: the method
+        //      returned while still on "default", and any alert created next landed in "default"
+        //      instead of the intended folder (target folder then reads empty at export/move,
+        //      timing out the row wait). Trace confirmed POST /alerts?folder=default here.
+        // Fix: click the tab itself and gate on it actually becoming active before returning.
+        const folderTab = this.page.locator(
+            `[role="tab"]:has([data-test="dashboard-folder-tab-name-${folderName}"])`
+        ).first();
+        const tabVisible = await folderTab.isVisible({ timeout: 10000 }).catch(() => false);
+        if (tabVisible) {
+            // Force-click past the reflow, retrying, until the tab reports data-state="active".
+            // Re-clicking each iteration self-heals a click that landed mid-animation; the
+            // active-state assertion is the real completion signal (activeFolderId switched).
+            await expect(async () => {
+                if ((await folderTab.getAttribute('data-state')) !== 'active') {
+                    await folderTab.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+                    await folderTab.click({ force: true, timeout: 5000 });
+                }
+                await expect(folderTab).toHaveAttribute('data-state', 'active', { timeout: 3000 });
+            }).toPass({ timeout: 30000 });
         } else {
-            // Fallback to generic text selector
-            await this.page.getByText(folderName).first().click();
+            // Fallback to generic text selector for any legacy markup, then still verify below.
+            await this.page.getByText(folderName).first().click({ force: true });
         }
         try {
             await Promise.race([
@@ -2372,6 +2396,12 @@ export class AlertsPage {
     async exportAlerts() {
         const headerCheckbox = this.page.locator(this.locators.alertListHeaderCheckbox).first();
         await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
+        // Wait for at least one alert ROW to render before select-all. After navigating to a
+        // folder the OTable can still be loading; clicking select-all over a not-yet-populated
+        // table selects nothing, so the selection-gated Export button never appears (the 30s
+        // toPass timeout in CI). OTable renders rows as [data-test^="o2-table-row-"].
+        await this.page.locator('[data-test^="o2-table-row-"]').first()
+            .waitFor({ state: 'visible', timeout: 15000 });
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
 
@@ -2389,7 +2419,19 @@ export class AlertsPage {
             };
         });
 
-        await this.page.locator(this.locators.alertExportButton).click();
+        // The Export button is disabled until at least one alert is selected. The select-all
+        // click above can race the row render (nothing ends up selected), so the button never
+        // becomes actionable and a plain click 45s-timed-out. Ensure the selection took and the
+        // button is ready (re-selecting if needed) before clicking.
+        const exportBtn = this.page.locator(this.locators.alertExportButton);
+        await expect(async () => {
+            if (!(await exportBtn.isEnabled().catch(() => false))) {
+                await headerCheckbox.click().catch(() => {});
+            }
+            await expect(exportBtn).toBeVisible({ timeout: 3000 });
+            await expect(exportBtn).toBeEnabled({ timeout: 3000 });
+        }).toPass({ timeout: 30000 });
+        await exportBtn.click();
         await expect(this.page.locator('[data-test-variant="success"] [data-test="o-toast-message"]').filter({ hasText: 'Successfully exported' })).toBeVisible({ timeout: 60000 });
         testLogger.info('Export success notification visible');
 

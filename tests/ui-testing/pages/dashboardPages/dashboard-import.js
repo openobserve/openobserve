@@ -315,7 +315,7 @@ export default class DashboardImport {
     }
   }
 
-  // Assert the "File(s) Failed to Import" toast AND the per-file rejected
+  // Assert the "{n} File(s) Failed to Import" toast AND the per-file rejected
   // span both contain expected text. The per-file rejected span is rendered
   // by Vue on the next tick after the toast notification — wait for the
   // wrapper container before asserting its child text.

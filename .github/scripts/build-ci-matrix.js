@@ -104,11 +104,18 @@ for (const s of include) {
 
 // Emit ONLY the fields the CI matrix consumes — disabled/_comment/notes are stripped,
 // so turned-off specs never reach `npx playwright test`.
+//
+// quick_mode_enabled is always emitted (defaulting to "false") so every shard
+// carries the key: the workflow feeds it to ZO_QUICK_MODE_ENABLED when starting
+// that shard's OpenObserve process. The flag is read once at server start, so it
+// cannot vary per test — a shard is the smallest unit that can change it.
 const matrix = include.map((s) => ({
   testfolder: s.testfolder,
   actual_folder: s.actual_folder,
   browser: s.browser || "chrome",
   run_files: s.run_files,
+  quick_mode_enabled:
+    s.quick_mode_enabled === true || s.quick_mode_enabled === "true" ? "true" : "false",
 }));
 
 process.stdout.write(JSON.stringify({ include: matrix }));

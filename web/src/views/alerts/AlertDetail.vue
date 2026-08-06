@@ -28,9 +28,9 @@
 -->
 <template>
   <OPageLayout
-    :title="notFound ? t('alerts.groups.notFoundTitle') : alert?.name || alertId"
+    :title="notFound ? t('alerts.groups.notFoundTitle') : raw(alert?.name || alertId)"
     icon="notifications"
-    :subtitle="notFound ? '' : subtitle"
+    :subtitle="notFound ? raw('') : subtitle"
     :back="backTarget"
     title-data-test="alerts-alertdetail-title"
     bleed
@@ -255,7 +255,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -282,7 +282,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import alertsService from "@/services/alerts";
 import type { AlertGroup, AlertGroupsResponse, AlertGroupTransition } from "@/ts/interfaces/alert";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -349,19 +349,19 @@ const backTarget = computed(() => ({
 }));
 
 const subtitle = computed(() => {
-  if (!alert.value) return "";
+  if (!alert.value) return raw("");
   const groupBy = aggregation.value?.group_by || [];
   const parts = [alert.value.stream_name].filter(Boolean);
   if (groupBy.length) {
     parts.push(t("alerts.groups.groupedBy", { columns: groupBy.join(", ") }));
   }
-  return parts.join(" · ");
+  return raw(parts.join(" · "));
 });
 
 /** Render a count that may be a lower bound with the `≥` the marker demands. */
 const withBound = (value?: number, isLowerBound?: boolean) => {
-  if (value === undefined || value === null) return "—";
-  return isLowerBound ? `≥${value}` : String(value);
+  if (value === undefined || value === null) return raw("—");
+  return raw(isLowerBound ? `≥${value}` : String(value));
 };
 
 // The Groups tab carries the firing count as a badge (per the mock). Colour

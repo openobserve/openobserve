@@ -971,6 +971,24 @@ pub static META_NUM_ALERTS: Lazy<IntGaugeVec> = Lazy::new(|| {
 });
 
 // Alert deduplication metrics
+// Alert notification chart events. Single low-cardinality `event` label —
+// deliberately NO organization/alert labels: signature failures carry
+// attacker-controlled request data, which must never become label values.
+// Events: rendered_fetch, cache_hit, rendered_send, bad_signature, expired,
+// malformed, over_capacity, send_rate_capped.
+pub static ALERT_CHART_EVENTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "alert_chart_events_total",
+            "Alert notification chart pipeline events (renders, cache hits, rejected fetches)",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["event"],
+    )
+    .expect("Metric created")
+});
+
 pub static ALERT_DEDUP_SUPPRESSED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -2306,6 +2324,11 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(META_NUM_DASHBOARDS.clone()))
         .expect("Metric registered");
 
+    // alert notification chart metrics
+    registry
+        .register(Box::new(ALERT_CHART_EVENTS_TOTAL.clone()))
+        .expect("Metric registered");
+
     // alert deduplication metrics
     registry
         .register(Box::new(ALERT_DEDUP_SUPPRESSED_TOTAL.clone()))
@@ -2799,6 +2822,7 @@ mod tests {
 
     #[test]
     fn test_statics_alert_dedup_and_grouping() {
+        let _ = ALERT_CHART_EVENTS_TOTAL.clone();
         let _ = ALERT_DEDUP_SUPPRESSED_TOTAL.clone();
         let _ = ALERT_DEDUP_PASSED_TOTAL.clone();
         let _ = ALERT_DEDUP_ERRORS_TOTAL.clone();

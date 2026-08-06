@@ -77,6 +77,7 @@ const mockTranslations = {
   "search.showHideColumns": "Show/Hide Columns",
   "correlation.logs.filtersLabel": "Filters",
   "correlation.logs.unstableDimension": "Unstable Dimension",
+  "correlation.logs.allValues": "All Values",
   "common.apply": "Apply",
 };
 

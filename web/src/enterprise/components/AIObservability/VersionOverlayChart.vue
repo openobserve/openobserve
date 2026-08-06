@@ -158,7 +158,7 @@ export function buildInjectedRows(
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
 
 const props = withDefaults(
@@ -177,7 +177,7 @@ const props = withDefaults(
   { xUnit: "hours", versionA: "", versionB: "" },
 );
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Show the real version the user picked ("1.4.0"), not a generic "Version A".
 const labelA = computed(() => props.versionA || t("aiObservability.overlayChart.seriesA"));

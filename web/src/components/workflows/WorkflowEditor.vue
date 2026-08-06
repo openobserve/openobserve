@@ -198,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -232,7 +232,7 @@ import workflowService from "@/services/workflows";
 // Emitted after a successful save so the parent WorkflowsList refreshes its rows.
 const emit = defineEmits<{ (e: "saved"): void }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
 
@@ -250,7 +250,7 @@ const {
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
-} = useWorkflowCanvas();
+} = useWorkflowCanvas(t);
 
 // Docked palette items, grouped into sections (Transform / Destination) to
 // mirror the pipeline sidebar. The trigger is pre-placed and not addable, so

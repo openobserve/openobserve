@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }}<span class="text-text-muted">/{{ (row as any).agents_total ?? 0 }}</span></span
           >
           <span v-if="(row as any).version" class="text-text-muted truncate text-xs"
-            >v{{ (row as any).version }}</span
+            >{{ t("synthetics.versionPrefix") }}{{ (row as any).version }}</span
           >
         </div>
       </template>
@@ -163,7 +163,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -173,6 +174,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { SyntheticLocation } from "@/types/synthetics";
 import { formatTimeAgoUs } from "@/utils/synthetics/format";
+import { syntheticsPrivateLocationRoute } from "@/utils/synthetics/routes";
 
 const props = defineProps<{
   locations: SyntheticLocation[];
@@ -184,8 +186,9 @@ const emit = defineEmits<{
   (e: "delete", row: SyntheticLocation): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
+const store = useStore();
 const search = ref("");
 
 const filteredLocations = computed(() => {
@@ -298,7 +301,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: "",
+    header: raw(""),
     accessorKey: "id",
     size: 90,
     minSize: 90,
@@ -308,6 +311,11 @@ const columns = computed<OTableColumnDef[]>(() => [
 ]);
 
 const openDetail = (row: SyntheticLocation) => {
-  router.push({ name: "synthetic-private-location", params: { id: row.id } });
+  router.push(
+    syntheticsPrivateLocationRoute(
+      { orgIdentifier: store.state.selectedOrganization?.identifier },
+      row.id,
+    ),
+  );
 };
 </script>

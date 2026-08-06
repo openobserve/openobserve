@@ -514,9 +514,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #cell-tcp="{ row }">
-              {{ row.tcp_conns }} (E:{{ row.tcp_conns_established }}, C:{{
-                row.tcp_conns_close_wait
-              }}, T:{{ row.tcp_conns_time_wait }})
+              {{ row.tcp_conns }}{{ t("nodes.tcpEstablishedPrefix") }}{{ row.tcp_conns_established
+              }}{{ t("nodes.tcpCloseWaitPrefix") }}{{ row.tcp_conns_close_wait
+              }}{{ t("nodes.tcpTimeWaitPrefix") }}{{ row.tcp_conns_time_wait }})
             </template>
 
             <!-- Utilisation: a token-backed proportion bar that turns amber at 70%
@@ -556,7 +556,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, reactive, ref, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -606,7 +606,7 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const sectionOpen = reactive({
       region: false,

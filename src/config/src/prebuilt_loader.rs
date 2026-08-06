@@ -20,12 +20,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::meta::destinations::{
     Destination, DestinationType, Email, Endpoint, HTTPOutputFormat, HTTPType, Module, Template,
-    TemplateType,
+    TemplateKind, TemplateType,
 };
 
 /// Configuration structure for prebuilt destinations loaded from JSON
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PrebuiltDestinationsConfig {
+    /// Monotonic revision of the shipped prebuilt definitions. Bumped whenever a
+    /// shipped body/type is corrected; gates the startup reseed (design §6.3).
+    #[serde(default)]
+    pub revision: u32,
     pub destinations: Vec<PrebuiltDestinationConfig>,
 }
 
@@ -154,6 +158,11 @@ pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
     None
 }
 
+/// Get the revision number of the prebuilt configuration
+pub fn get_prebuilt_revision() -> u32 {
+    load_prebuilt_config().revision
+}
+
 /// Convert TemplateConfig to Template
 fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template {
     let template_type = if dest_type == "email" {
@@ -174,6 +183,7 @@ fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template
         is_default: false,
         template_type,
         body: config.body.clone(),
+        kind: TemplateKind::default(),
     }
 }
 
@@ -182,6 +192,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
     // Return built-in configuration with templates embedded
     // This ensures the system works even if the JSON file is missing
     PrebuiltDestinationsConfig {
+        revision: 1,
         destinations: vec![
             PrebuiltDestinationConfig {
                 id: "slack".to_string(),
@@ -717,6 +728,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn builtin_prebuilt_config_is_revised_and_clean() {
+        let cfg = load_builtin_config();
+        assert!(cfg.revision >= 1, "builtin config must carry revision >= 1");
+        for d in &cfg.destinations {
+            assert!(
+                !d.template.body.contains("{alert_time}"),
+                "dangling {{alert_time}} in builtin body: {}",
+                d.id
+            );
+        }
+    }
+
+    #[test]
+    fn shipped_prebuilt_json_is_revised_and_clean() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/prebuilt-destinations.json"
+        );
+        let raw = std::fs::read_to_string(path).unwrap();
+        let cfg: PrebuiltDestinationsConfig = serde_json::from_str(&raw).unwrap();
+        assert!(cfg.revision >= 1);
+        for d in &cfg.destinations {
+            assert!(
+                !d.template.body.contains("{alert_time}"),
+                "dangling in JSON body: {}",
+                d.id
+            );
+        }
+    }
+
+    #[test]
     fn test_load_prebuilt_destinations() {
         let destinations = load_prebuilt_destinations();
         assert!(
@@ -794,17 +836,17 @@ mod tests {
         fs::write(config_path, test_config).unwrap();
 
         // Temporarily replace the main config path
-        if let Ok(config_str) = fs::read_to_string(config_path) {
-            if let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str) {
-                let destinations: Vec<Destination> = config
-                    .destinations
-                    .into_iter()
-                    .filter_map(|dest| convert_to_destination(dest).ok())
-                    .collect();
+        if let Ok(config_str) = fs::read_to_string(config_path)
+            && let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str)
+        {
+            let destinations: Vec<Destination> = config
+                .destinations
+                .into_iter()
+                .filter_map(|dest| convert_to_destination(dest).ok())
+                .collect();
 
-                assert_eq!(destinations.len(), 1);
-                assert_eq!(destinations[0].name, "Test Destination");
-            }
+            assert_eq!(destinations.len(), 1);
+            assert_eq!(destinations[0].name, "Test Destination");
         }
 
         // Clean up

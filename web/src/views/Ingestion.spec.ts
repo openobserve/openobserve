@@ -669,7 +669,7 @@ describe("Ingestion", () => {
       await wrapper.vm.copyToClipboardFn(mockContent);
       await flushPromises();
 
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,
@@ -695,7 +695,7 @@ describe("Ingestion", () => {
       await flushPromises();
 
       // Verify that copyToClipboard was called
-      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", {
+      expect(copyToClipboard).toHaveBeenCalledWith("test content to copy", expect.any(Function), {
         successMessage: "Content Copied Successfully!",
         errorMessage: "Error while copy content.",
         timeout: 5000,

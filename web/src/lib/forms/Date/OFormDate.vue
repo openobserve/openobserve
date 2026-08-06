@@ -5,9 +5,15 @@ import { inject } from "vue";
 import ODate from "./ODate.vue";
 import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
 import { firstFieldError } from "../Form/fieldError";
+import { raw, type I18nText } from "@/types/i18n";
 import type { FormDateProps } from "./OFormDate.types";
 
 defineOptions({ inheritAttrs: false });
+
+const errorText = (errors: readonly unknown[] | undefined): I18nText | undefined => {
+  const message = firstFieldError(errors);
+  return message ? raw(message) : undefined;
+};
 
 const props = defineProps<FormDateProps>();
 
@@ -38,7 +44,7 @@ if (import.meta.env.DEV && !form) {
         :model-value="field.state.value"
         :error="field.state.meta.errors.length > 0"
         :error-message="
-          field.state.meta.errors.length > 0 ? firstFieldError(field.state.meta.errors) : undefined
+          field.state.meta.errors.length > 0 ? errorText(field.state.meta.errors) : undefined
         "
         @update:model-value="field.handleChange"
         @blur="field.handleBlur"
