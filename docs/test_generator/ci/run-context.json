@@ -1,0 +1,23 @@
+{
+  "feature_slug": "traces-standalone-views",
+  "feature_title": "Traces Service Graph & Services as Standalone Routes",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "service-graph.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/views/ServiceGraphView.vue",
+    "web/src/plugins/traces/views/ServicesCatalogView.vue",
+    "web/src/plugins/traces/Index.vue",
+    "web/src/plugins/traces/SearchBar.vue",
+    "web/src/plugins/traces/viewTracesHandoff.ts",
+    "web/src/lib/core/Navbar/navGroups.ts",
+    "web/src/composables/shared/router.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

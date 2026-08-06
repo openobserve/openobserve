@@ -1,0 +1,10 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/service-catalog.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/service-catalog.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The existing service-catalog.spec.js (16 tests) already exercises the catalog through the new standalone URL (/traces/services) via its updated page-object navigate() method. The service-graph.spec.js (12 tests, @enterprise-gated) does the same for the service-graph route. What's missing: explicit OPageLayout header verification, left-rail flyout navigation, OSS redirect for service-graph, and URL time-range hydration. Adding 4 focused tests to service-catalog.spec.js fills these gaps without duplicating existing catalog CRUD tests. The service-graph page-header test belongs in the enterprise-gated spec and is noted in the plan for the Engineer to add there."
+}

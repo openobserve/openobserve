@@ -1,0 +1,27 @@
+[
+  {
+    "title": "P0: Services standalone page renders with OPageLayout header, DateTime, and Refresh",
+    "action": "append",
+    "verifies": "the standalone /traces/services route renders the OPageLayout shell with page title, DateTime picker, and Refresh button — not the old tabbed layout"
+  },
+  {
+    "title": "P0: OSS — navigating to /traces/service-graph redirects to /traces",
+    "action": "append",
+    "verifies": "the OSS route guard at router.ts:282 redirects /traces/service-graph to /traces, preserving query params"
+  },
+  {
+    "title": "P1: Navigate to Services via left-rail flyout",
+    "action": "append",
+    "verifies": "the user-facing discovery path — hover Traces rail, click Services in subnav flyout, arrive at /traces/services with OPageLayout rendered"
+  },
+  {
+    "title": "P1: URL time range hydration — DateTime reflects ?period=7d param",
+    "action": "append",
+    "verifies": "the ?period=7d query param is read by applyUrlTimeRange() on mount and the DateTime picker label reflects the 7-day period"
+  },
+  {
+    "title": "P2: OSS — Service Graph nav item NOT visible in flyout",
+    "action": "append",
+    "verifies": "the enterprise gate on the nav flyout hides the Service Graph item in OSS builds — Services is visible, Service Graph is not"
+  }
+]

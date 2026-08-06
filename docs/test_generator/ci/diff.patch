@@ -1,0 +1,2742 @@
+===== COMPLETE LIST OF CHANGED FILES (20 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/pages/tracesPages/serviceGraphPage.js
+tests/ui-testing/pages/tracesPages/servicesCatalogPage.js
+tests/ui-testing/pages/tracesPages/tracesPage.js
+tests/ui-testing/playwright-tests/Traces/service-graph.spec.js
+tests/ui-testing/playwright-tests/utils/enhanced-baseFixtures.js
+web/src/composables/shared/router.ts
+web/src/lib/core/Navbar/navGroups.spec.ts
+web/src/lib/core/Navbar/navGroups.ts
+web/src/locales/languages/en-US.json
+web/src/plugins/traces/Index.spec.ts
+web/src/plugins/traces/Index.vue
+web/src/plugins/traces/SearchBar.spec.ts
+web/src/plugins/traces/SearchBar.vue
+web/src/plugins/traces/ServiceGraph.vue
+web/src/plugins/traces/ServicesCatalog.vue
+web/src/plugins/traces/viewTracesHandoff.spec.ts
+web/src/plugins/traces/viewTracesHandoff.ts
+web/src/plugins/traces/views/ServiceGraphView.vue
+web/src/plugins/traces/views/ServicesCatalogView.vue
+web/src/plugins/traces/views/useServiceViewTimeRange.ts
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/pages/tracesPages/serviceGraphPage.js b/tests/ui-testing/pages/tracesPages/serviceGraphPage.js
+index 1175fd70fb9..6ce89dafb27 100644
+--- a/tests/ui-testing/pages/tracesPages/serviceGraphPage.js
++++ b/tests/ui-testing/pages/tracesPages/serviceGraphPage.js
+@@ -9,14 +9,17 @@ export class ServiceGraphPage {
+     this.page = page;
+ 
+     // ===== NAVIGATION =====
+-    this.serviceGraphToggle = '[data-test="traces-service-graph-toggle"]';
++    // Service Graph is its own route (/traces/service-graph), reached from the
++    // Traces rail tile's hover flyout — it is no longer a tab on the Traces page.
++    this.tracesRailTile = '[data-test="nav-group-traces"]';
++    this.serviceGraphFlyoutItem = '[data-test="nav-group-item-serviceGraph"]';
+ 
+     // ===== MAIN COMPONENT (ServiceGraph.vue) =====
+     this.dateTimePicker = '[data-test="service-graph-date-time-picker"]';
+     this.refreshButton = '[data-test="service-graph-refresh-btn"]';
+     this.chartContainer = '[data-test="service-graph-chart"]';
+ 
+-    // ===== VIEW TOGGLE BUTTONS (SearchBar.vue — button with .selected class) =====
++    // ===== VIEW TOGGLE BUTTONS (page header #subnav — button with .selected class) =====
+     this.graphViewTab = '[data-test="service-graph-graph-view-btn"]';
+     this.treeViewTab = '[data-test="service-graph-tree-view-btn"]';
+ 
+@@ -69,8 +72,9 @@ export class ServiceGraphPage {
+   // ===== NAVIGATION =====
+ 
+   async navigateToServiceGraph() {
+-    await this.page.locator(this.serviceGraphToggle).click();
+-    await this.page.waitForURL(/tab=service-graph/, { timeout: 10000 });
++    await this.page.locator(this.tracesRailTile).hover();
++    await this.page.locator(this.serviceGraphFlyoutItem).click();
++    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 });
+   }
+ 
+   /**
+@@ -92,9 +96,9 @@ export class ServiceGraphPage {
+     // Query a WIDE window (default 6h), not the page default of "Past 15 Minutes". The service
+     // graph is derived by a backend daemon that runs on a delay after trace ingestion, so with
+     // the 15m default the just-ingested topology often falls outside the window and the chart
+-    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The tab
++    // renders "No service graph data" (no chart element) — the alpha1 failure mode. The route
+     // honours the `period` URL param (verified: label shows "Past 6 Hours").
+-    const url = `${baseUrl}/web/traces?tab=service-graph&period=${period}&org_identifier=${org}`;
++    const url = `${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=${period}`;
+     await this.page.goto(url);
+     await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+   }
+diff --git a/tests/ui-testing/pages/tracesPages/servicesCatalogPage.js b/tests/ui-testing/pages/tracesPages/servicesCatalogPage.js
+index 43b02cf6d03..a81cc90cf2d 100644
+--- a/tests/ui-testing/pages/tracesPages/servicesCatalogPage.js
++++ b/tests/ui-testing/pages/tracesPages/servicesCatalogPage.js
+@@ -88,11 +88,11 @@ export class ServicesCatalogPage {
+     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
+ 
+     // =====================================================================
+-    // Service-catalog tab (in traces module)
++    // Navigation — Services is its own route (/traces/services), reached from
++    // the Traces rail tile's hover flyout (no longer a tab on the Traces page)
+     // =====================================================================
+-    this.servicesCatalogTabBtn = page.locator(
+-      '[data-test="traces-search-mode-services-catalog-btn"]',
+-    );
++    this.tracesRailTile = page.locator('[data-test="nav-group-traces"]');
++    this.servicesCatalogNavItem = page.locator('[data-test="nav-group-item-servicesCatalog"]');
+ 
+     // =====================================================================
+     // Factory locators — runtime-bound (allowed by POM strict policy)
+@@ -154,37 +154,22 @@ export class ServicesCatalogPage {
+   async navigate(period = '24h') {
+     const org = process.env['ORGNAME'] || 'default';
+     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+-    // Use the trailing-slash form `/web/traces/` — without it some dev servers
+-    // route the request to the SPA fallback and drop query params before the
+-    // Vue router can read them. The trailing-slash form is what Vue Router
+-    // canonicalises to and what the index.vue page reads from on mount.
+     await this.page.goto(
+-      `${baseUrl}/web/traces/?tab=services-catalog&org_identifier=${org}&period=${period}`,
++      `${baseUrl}/web/traces/services?org_identifier=${org}&period=${period}`,
+       { timeout: 60000 },
+     );
+     // Use load instead of networkidle — networkidle hangs on SPAs with websockets
+     await this.page.waitForLoadState('load', { timeout: 15000 });
+-    // Ensure the services-catalog tab is the active one. If the URL param was
+-    // dropped (e.g. due to a router replace during mount), click the tab button
+-    // explicitly. This is defensive — keeps the tab activation deterministic.
+-    const filterVisible = await this.filterInputField
+-      .waitFor({ state: 'attached', timeout: 8000 })
+-      .then(() => true)
+-      .catch(() => false);
+-    if (!filterVisible) {
+-      // Fallback: click the services-catalog tab button explicitly.
+-      await this.servicesCatalogTabBtn
+-        .waitFor({ state: 'visible', timeout: 8000 })
+-        .catch(() => {});
+-      await this.servicesCatalogTabBtn.click().catch(() => {});
+-      await this.filterInputField
+-        .waitFor({ state: 'attached', timeout: 15000 })
+-        .catch(() => {});
+-    }
++    await this.filterInputField
++      .waitFor({ state: 'attached', timeout: 15000 })
++      .catch(() => {});
+   }
+ 
++  /** Navigate to Services via the left-rail flyout (the discovery path a user takes). */
+   async clickServiceCatalogTab() {
+-    await this.servicesCatalogTabBtn.click();
++    await this.tracesRailTile.hover();
++    await this.servicesCatalogNavItem.click();
++    await this.page.waitForURL(/\/traces\/services/, { timeout: 10000 });
+     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+   }
+ 
+diff --git a/tests/ui-testing/pages/tracesPages/tracesPage.js b/tests/ui-testing/pages/tracesPages/tracesPage.js
+index 0dd550048ff..30d292fae3d 100644
+--- a/tests/ui-testing/pages/tracesPages/tracesPage.js
++++ b/tests/ui-testing/pages/tracesPages/tracesPage.js
+@@ -16,8 +16,11 @@ export class TracesPage {
+     // Source: web/src/plugins/traces/SearchBar.vue
+     this.searchToggle = '[data-test="traces-search-mode-traces-btn"]';
+     this.spansToggle = '[data-test="traces-search-mode-spans-btn"]';
+-    this.serviceMapsToggle = '[data-test="traces-service-graph-toggle"]';
+-    this.servicesCatalogToggle = '[data-test="traces-search-mode-services-catalog-btn"]';
++    // Service Graph and Services are their own routes now, reached from the
++    // Traces rail tile's hover flyout — not tabs on the Traces page.
++    this.tracesRailTile = '[data-test="nav-group-traces"]';
++    this.serviceMapsNavItem = '[data-test="nav-group-item-serviceGraph"]';
++    this.servicesCatalogNavItem = '[data-test="nav-group-item-servicesCatalog"]';
+ 
+     // Search Bar - Controls
+     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
+@@ -225,6 +228,28 @@ export class TracesPage {
+     const wrapper = this.page.locator(this.streamSelect);
+     await wrapper.waitFor({ state: 'visible', timeout: 10000 });
+ 
++    // The wrapper renders immediately, but its options arrive with the async
++    // stream-list fetch. Opening the popover before then finds an empty list,
++    // every retry below misses, and selection silently no-ops — which surfaces
++    // later as "Select Stream First" and zero query results. Wait for the
++    // option to exist in the DOM first.
++    const optionReady = `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`;
++    await this.page
++      .locator(optionReady)
++      .first()
++      .waitFor({ state: 'attached', timeout: 15000 })
++      .catch(async () => {
++        // Options are only mounted while the popover is open — open it, wait,
++        // then leave it open for the selection logic below.
++        const t = wrapper.locator('button[type="button"]').first();
++        await t.click({ force: false }).catch(() => {});
++        await this.page
++          .locator(optionReady)
++          .first()
++          .waitFor({ state: 'attached', timeout: 15000 })
++          .catch(() => {});
++      });
++
+     // Check the popover-trigger button's aria-expanded state — already
+     // selected streams will reflect in the trigger button text.
+     const trigger = wrapper.locator('button[type="button"]').first();
+@@ -233,11 +258,13 @@ export class TracesPage {
+     if (currentText && currentText.includes(streamName)) {
+       return;
+     }
+-    await trigger.click({ force: false });
+-
+-    // Wait for the popover (OSelect forwards the data-test slug + `-popover`).
++    // Only open the popover if it isn't already (the readiness wait above may
++    // have opened it) — an unconditional click would toggle it shut.
+     const popover = this.page.locator('[data-test="log-search-index-list-select-stream-popover"]');
+-    await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
++    if (!(await popover.isVisible({ timeout: 500 }).catch(() => false))) {
++      await trigger.click({ force: false });
++      await popover.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
++    }
+ 
+     // Try clicking the matching option directly by data-test-value. Retry
+     // up to 3 times — OSelect uses virtualised ListboxItem rendering which
+@@ -364,7 +391,9 @@ export class TracesPage {
+   }
+ 
+   async switchToServiceMaps() {
+-    await this.page.locator(this.serviceMapsToggle).click();
++    await this.page.locator(this.tracesRailTile).hover();
++    await this.page.locator(this.serviceMapsNavItem).click();
++    await this.page.waitForURL(/\/traces\/service-graph/, { timeout: 10000 }).catch(() => {});
+     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+   }
+ 
+@@ -1311,11 +1340,15 @@ export class TracesPage {
+   }
+ 
+   /**
+-   * Check if service maps toggle is visible
++   * Check if the Service Graph entry is reachable from the Traces rail flyout.
+    * @returns {Promise<boolean>}
+    */
+   async isServiceMapsToggleVisible() {
+-    return await this.page.locator(this.serviceMapsToggle).isVisible({ timeout: 5000 }).catch(() => false);
++    await this.page.locator(this.tracesRailTile).hover().catch(() => {});
++    return await this.page
++      .locator(this.serviceMapsNavItem)
++      .isVisible({ timeout: 5000 })
++      .catch(() => false);
+   }
+ 
+   /**
+diff --git a/tests/ui-testing/playwright-tests/Traces/service-graph.spec.js b/tests/ui-testing/playwright-tests/Traces/service-graph.spec.js
+index b186d86cc90..d01a38d0289 100644
+--- a/tests/ui-testing/playwright-tests/Traces/service-graph.spec.js
++++ b/tests/ui-testing/playwright-tests/Traces/service-graph.spec.js
+@@ -124,9 +124,9 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
+     await pm.serviceGraphPage.navigateToServiceGraphUrl();
+     testLogger.info('Navigated to service graph');
+ 
+-    // Verify URL contains service-graph tab parameter
+-    await expect(page).toHaveURL(/tab=service-graph/);
+-    testLogger.info('URL contains tab=service-graph');
++    // Service Graph is its own route now (not a ?tab= on the traces page)
++    await expect(page).toHaveURL(/\/traces\/service-graph/);
++    testLogger.info('URL is the /traces/service-graph route');
+ 
+     // Verify chart container is visible
+     await pm.serviceGraphPage.expectServiceGraphPageVisible();
+diff --git a/tests/ui-testing/playwright-tests/utils/enhanced-baseFixtures.js b/tests/ui-testing/playwright-tests/utils/enhanced-baseFixtures.js
+index f69a7c9cb9b..2025ed818b7 100644
+--- a/tests/ui-testing/playwright-tests/utils/enhanced-baseFixtures.js
++++ b/tests/ui-testing/playwright-tests/utils/enhanced-baseFixtures.js
+@@ -112,9 +112,13 @@ const expect = test.expect;
+ async function verifyAuthentication(page) {
+   try {
+     // Increase timeout for authentication verification, especially important for first test in suite
+-    await page.waitHelpers.waitForElementVisible('[data-test="menu-link-\\/-item"]', {
++    // Verify against the nav rail container rather than a specific item. The
++    // Home tile's `menu-link-/-item` no longer renders on the current rail
++    // (only Slack/Help still use that pattern), so keying auth off it made
++    // every suite fail setup even when login had succeeded.
++    await page.waitHelpers.waitForElementVisible('[data-test="navbar-main-nav"]', {
+       timeout: 15000,
+-      description: 'home menu link (auth verification)'
++      description: 'main nav rail (auth verification)'
+     });
+     return true;
+   } catch (error) {
+@@ -169,7 +173,7 @@ async function navigateToBase(page) {
+     testLogger.error('User not authenticated - global setup might have failed (re-auth also failed or unavailable)');
+     throw new Error('User not authenticated. Global setup might have failed.');
+   }
+-
++  
+   testLogger.info('Successfully navigated to base URL with authentication');
+ }
+ 
+diff --git a/web/src/composables/shared/router.ts b/web/src/composables/shared/router.ts
+index b2e23aff356..3dc508a8b04 100644
+--- a/web/src/composables/shared/router.ts
++++ b/web/src/composables/shared/router.ts
+@@ -39,6 +39,8 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
+ 
+ const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
+ const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
++const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
++const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
+ 
+ const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
+ const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
+@@ -266,6 +268,36 @@ const useRoutes = () => {
+         routeGuard(to, from, next);
+       },
+     },
++    {
++      path: "traces/service-graph",
++      name: "serviceGraph",
++      component: ServiceGraphView,
++      meta: {
++        keepAlive: true,
++        title: "Service Graph",
++      },
++      beforeEnter(to: any, from: any, next: any) {
++        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
++        // build lands on Traces rather than an empty page.
++        if (config.isEnterprise !== "true") {
++          next({ name: "traces", query: to.query });
++          return;
++        }
++        routeGuard(to, from, next);
++      },
++    },
++    {
++      path: "traces/services",
++      name: "servicesCatalog",
++      component: ServicesCatalogView,
++      meta: {
++        keepAlive: true,
++        title: "Services",
++      },
++      beforeEnter(to: any, from: any, next: any) {
++        routeGuard(to, from, next);
++      },
++    },
+     {
+       path: "traces/trace-details",
+       name: "traceDetails",
+diff --git a/web/src/lib/core/Navbar/navGroups.spec.ts b/web/src/lib/core/Navbar/navGroups.spec.ts
+index 9fe9f957e77..5f3167d071e 100644
+--- a/web/src/lib/core/Navbar/navGroups.spec.ts
++++ b/web/src/lib/core/Navbar/navGroups.spec.ts
+@@ -38,12 +38,13 @@ describe("groupNavLinks", () => {
+       link("settings"),
+     ];
+     // Output mirrors the input order exactly (no reordering). Only alertList
+-    // changes shape — it collapses into the Reliability tile in its own slot.
++    // changes shape — it collapses into the Reliability tile in its own slot —
++    // and traces, which keeps its slot but gains its NAV_SUBNAV flyout.
+     expect(keysOf(groupNavLinks(input))).toEqual([
+       "link:home",
+       "link:logs",
+       "link:metrics",
+-      "link:traces",
++      "linkGroup:traces",
+       "link:rum",
+       "link:dashboards",
+       "linkGroup:reliability",
+@@ -309,7 +310,8 @@ describe("groupNavLinks", () => {
+     ]);
+     // None of them carry a hover submenu anymore.
+     expect(entries.some((e) => e.type === "linkGroup")).toBe(false);
+-    expect(NAV_SUBNAV).toEqual({});
++    // Traces is the only top-level link with a subnav flyout.
++    expect(Object.keys(NAV_SUBNAV)).toEqual(["traces"]);
+   });
+ 
+   it("keeps unknown/new items as plain links in place", () => {
+diff --git a/web/src/lib/core/Navbar/navGroups.ts b/web/src/lib/core/Navbar/navGroups.ts
+index 9f1f25cb36f..b1e0fbd9c75 100644
+--- a/web/src/lib/core/Navbar/navGroups.ts
++++ b/web/src/lib/core/Navbar/navGroups.ts
+@@ -211,12 +211,28 @@ export const NAV_GROUPS: NavGroupDef[] = [
+  * Top-level links that ALSO reveal their own in-page section nav on hover,
+  * keyed by the top-level item's `name`.
+  *
+- * Currently empty: AI / IAM / Management are intentionally plain links (no rail
+- * submenu) — their in-page SectionRail is the place to switch sections. Re-add
+- * an entry here (mirroring the page's SectionRail) to restore a hover flyout.
+- * The `gate` machinery (GATE_PREDICATES) remains available for any future entry.
++ * AI / IAM / Management are intentionally plain links (no rail submenu) — their
++ * in-page SectionRail is the place to switch sections. Re-add an entry here
++ * (mirroring the page's SectionRail) to restore a hover flyout.
++ *
++ * Traces: each child is its own route. Spans is deliberately absent — it is a
++ * view-granularity toggle inside the Traces search page (it shares the
++ * query/stream/time context), not a destination. Service Graph carries the
++ * `enterprise` gate its route guard applies, so the rail never offers a link
++ * that would redirect straight back to Traces.
+  */
+-export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
++export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
++  traces: [
++    { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
++    {
++      titleKey: "menu.serviceGraph",
++      icon: "share",
++      name: "serviceGraph",
++      gate: "enterprise",
++    },
++    { titleKey: "menu.services", icon: "menu-book", name: "servicesCatalog" },
++  ],
++};
+ 
+ /**
+  * Transform the flat `linksList` into rail entries, PRESERVING the input order
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 036e3aa1b76..7c918f82e49 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -1023,6 +1023,8 @@
+     "index": "Streams",
+     "search": "Logs",
+     "traces": "Traces",
++    "serviceGraph": "Service Graph",
++    "services": "Services",
+     "aiObservability": "AI",
+     "aiAssistant": "AI Assistant",
+     "signOut": "Sign Out",
+@@ -7811,6 +7813,8 @@
+     "spansTab": "Spans",
+     "tracesTab": "Traces",
+     "serviceGraphTab": "Service Graph",
++    "serviceGraphSubtitle": "See how your services call each other — dependencies, throughput, and error rates",
++    "servicesCatalogSubtitle": "Every service sending traces, with latency, throughput, and error rate",
+     "treeView": "Tree View",
+     "graphView": "Graph View",
+     "layoutHorizontal": "Horizontal",
+diff --git a/web/src/plugins/traces/Index.spec.ts b/web/src/plugins/traces/Index.spec.ts
+index 8fcfc7f1191..973461e6f51 100644
+--- a/web/src/plugins/traces/Index.spec.ts
++++ b/web/src/plugins/traces/Index.spec.ts
+@@ -404,27 +404,6 @@ describe("Index.vue (Main Traces Page)", () => {
+       expect(wrapper.find("#tracePage").exists()).toBe(true);
+     });
+ 
+-    it("should initialize with search tab active by default", async () => {
+-      wrapper = mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-
+-      await flushPromises();
+-
+-      expect(wrapper.vm.activeTab).toBe("search");
+-    });
+-
+     it("should load stream list on mount", async () => {
+       wrapper = mount(Index, {
+         attachTo: node,
+@@ -454,37 +433,6 @@ describe("Index.vue (Main Traces Page)", () => {
+   });
+ 
+   describe("Tab Navigation", () => {
+-    it("should switch to service-graph tab on enterprise", async () => {
+-      routerCurrentRouteSpy.mockReturnValue({
+-        value: {
+-          query: { tab: "service-graph" },
+-          name: "traces",
+-          path: "/traces",
+-        },
+-      } as any);
+-
+-      wrapper = mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-
+-      await flushPromises();
+-
+-      // onBeforeMount sets searchMode from URL; activeTab computed reflects it
+-      expect(mockSearchObj.meta.searchMode).toBe("service-graph");
+-      expect(wrapper.vm.activeTab).toBe("service-graph");
+-    });
+-
+     it("should update URL with tab=service-graph when searchMode changes to service-graph", async () => {
+       wrapper = mount(Index, {
+         attachTo: node,
+@@ -1138,376 +1086,6 @@ describe("Index.vue (Main Traces Page)", () => {
+     });
+   });
+ 
+-  describe("Service Graph Integration", () => {
+-    it("should set searchMode to traces when viewing traces from service graph", async () => {
+-      // Start in service-graph mode
+-      mockSearchObj.meta.searchMode = "service-graph";
+-
+-      wrapper = mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-
+-      await flushPromises();
+-
+-      const serviceGraphData = {
+-        stream: "default",
+-        serviceName: "test-service",
+-        mode: "spans" as const,
+-        timeRange: {
+-          startTime: 1755853746625720,
+-          endTime: 1755853746725720,
+-        },
+-      };
+-
+-      wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
+-      await flushPromises();
+-
+-      // handleServiceGraphViewTraces sets searchMode from data.mode
+-      expect(mockSearchObj.meta.searchMode).toBe("spans");
+-      expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+-      expect(mockSearchObj.data.editorValue).toContain("test-service");
+-    });
+-
+-    it("should escape single quotes in service name filter", async () => {
+-      wrapper = mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-
+-      await flushPromises();
+-
+-      const serviceGraphData = {
+-        stream: "default",
+-        serviceName: "test'service",
+-        timeRange: {
+-          startTime: 1755853746625720,
+-          endTime: 1755853746725720,
+-        },
+-      };
+-
+-      wrapper.vm.handleServiceGraphViewTraces(serviceGraphData);
+-      await flushPromises();
+-
+-      // SQL-style escaping uses double quotes: test'service becomes test''service
+-      expect(mockSearchObj.data.editorValue).toContain("test''service");
+-    });
+-
+-    it("should not write searchObj.data.query on view-traces (no duplicate trigger)", async () => {
+-      // The redirect used to set searchObj.data.query, which tripped a query
+-      // watcher in addition to its own runQueryFn() → duplicate search. The
+-      // watcher and that write are removed; only editorValue is set now.
+-      mockSearchObj.data.query = "";
+-
+-      wrapper = mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "checkout",
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("checkout");
+-      expect(mockSearchObj.data.query).toBe("");
+-    });
+-
+-    function mountIndexComponent() {
+-      return mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-    }
+-
+-    it("should include operationName in filter query when provided", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        operationName: "GET /api/health",
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND operation_name = 'GET /api/health'");
+-    });
+-
+-    it("should include nodeName in filter query when provided", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        nodeName: "node-1",
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND service_k8s_node_name = 'node-1'");
+-    });
+-
+-    it("should include podName in filter query when provided", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        podName: "pod-abc",
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND service_k8s_pod_name = 'pod-abc'");
+-    });
+-
+-    it("should append span_status = 'ERROR' when errorsOnly is true", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        errorsOnly: true,
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND span_status = 'ERROR'");
+-    });
+-
+-    it("should include minDurationMicros in filter when greater than zero", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        minDurationMicros: 5000,
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND duration >= 5000");
+-    });
+-
+-    it("should include maxDurationMicros in filter when greater than zero", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        maxDurationMicros: 20000,
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND duration <= 20000");
+-    });
+-
+-    it("should combine all optional filter fields when all are provided", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        operationName: "POST /ingest",
+-        nodeName: "node-2",
+-        podName: "pod-xyz",
+-        errorsOnly: true,
+-        minDurationMicros: 1000,
+-        maxDurationMicros: 9000,
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      const query = mockSearchObj.data.editorValue;
+-      expect(query).toContain("service_name = 'svc'");
+-      expect(query).toContain("AND operation_name = 'POST /ingest'");
+-      expect(query).toContain("AND service_k8s_node_name = 'node-2'");
+-      expect(query).toContain("AND service_k8s_pod_name = 'pod-xyz'");
+-      expect(query).toContain("AND span_status = 'ERROR'");
+-      expect(query).toContain("AND duration >= 1000");
+-      expect(query).toContain("AND duration <= 9000");
+-    });
+-
+-    it("should omit optional fields from filter when they are not provided", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      const query = mockSearchObj.data.editorValue;
+-      expect(query).toBe("service_name = 'svc'");
+-      expect(query).not.toContain("operation_name");
+-      expect(query).not.toContain("service_k8s_node_name");
+-      expect(query).not.toContain("service_k8s_pod_name");
+-      expect(query).not.toContain("span_status");
+-      expect(query).not.toContain("duration");
+-    });
+-
+-    it("should not include duration filters when minDurationMicros and maxDurationMicros are zero", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        minDurationMicros: 0,
+-        maxDurationMicros: 0,
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).not.toContain("duration");
+-    });
+-
+-    it("should set searchMode from data.mode when navigating via handleServiceGraphViewTraces", async () => {
+-      mockSearchObj.meta.searchMode = "service-graph";
+-
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        mode: "traces",
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.meta.searchMode).toBe("traces");
+-    });
+-
+-    it("should append resourceFilter to query when data.resourceFilter is provided", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        mode: "spans",
+-        resourceFilter: { field: "service.name", value: "my-service" },
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND service.name = 'my-service'");
+-    });
+-
+-    it("should escape single quotes in resourceFilter value", async () => {
+-      wrapper = mountIndexComponent();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServiceGraphViewTraces({
+-        stream: "default",
+-        serviceName: "svc",
+-        mode: "spans",
+-        resourceFilter: { field: "service.name", value: "it's here" },
+-        timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
+-      });
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toContain("AND service.name = 'it''s here'");
+-    });
+-
+-    it("should call loadServiceGraph on serviceGraphRef when service-graph-refresh event fires from SearchBar", async () => {
+-      const mockLoadServiceGraph = vi.fn();
+-
+-      // Start in service-graph mode so the ServiceGraph stub is rendered
+-      mockSearchObj.meta.searchMode = "service-graph";
+-
+-      wrapper = mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": {
+-              name: "search-bar",
+-              template: "<div />",
+-              emits: ["service-graph-refresh"],
+-            },
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": {
+-              name: "service-graph",
+-              template: "<div />",
+-              setup() {
+-                return { loadServiceGraph: mockLoadServiceGraph };
+-              },
+-            },
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-
+-      await flushPromises();
+-
+-      const searchBarEl = wrapper.findComponent({ name: "search-bar" });
+-      expect(searchBarEl.exists()).toBe(true);
+-      await searchBarEl.vm.$emit("service-graph-refresh");
+-      await flushPromises();
+-
+-      expect(mockLoadServiceGraph).toHaveBeenCalledTimes(1);
+-    });
+-  });
+-
+   describe("Splitter Behavior", () => {
+     it("should dispatch resize event when splitter is updated", async () => {
+       const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
+@@ -2207,14 +1785,6 @@ describe("Index.vue (Main Traces Page)", () => {
+       });
+     }
+ 
+-    it("should restore tab=services-catalog from URL params", async () => {
+-      mockSearchObj.meta.searchMode = "services-catalog";
+-      wrapper = mountWithServicesCatalogStub();
+-      await flushPromises();
+-
+-      expect(wrapper.vm.activeTab).toBe("services-catalog");
+-    });
+-
+     it("should set searchMode and early-return without resetting sortBy when switching to services-catalog", async () => {
+       // Set a non-default sortBy to prove it was not reset
+       mockSearchObj.meta.resultGrid.sortBy = "operation_name";
+@@ -2232,71 +1802,6 @@ describe("Index.vue (Main Traces Page)", () => {
+     });
+   });
+ 
+-  describe("Services Catalog — handleServicesCatalogViewTraces", () => {
+-    function mountWithServicesCatalogStub() {
+-      return mount(Index, {
+-        attachTo: node,
+-        global: {
+-          plugins: [i18n, router],
+-          provide: { store: store },
+-          stubs: {
+-            "search-bar": true,
+-            "index-list": true,
+-            "search-result": true,
+-            "service-graph": true,
+-            "services-catalog": true,
+-            SanitizedHtmlRenderer: true,
+-          },
+-        },
+-      });
+-    }
+-
+-    it("should set editorValue with service_name filter when viewing traces from services catalog", async () => {
+-      wrapper = mountWithServicesCatalogStub();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServicesCatalogViewTraces("my-service");
+-      await flushPromises();
+-
+-      expect(mockSearchObj.data.editorValue).toBe("service_name = 'my-service'");
+-    });
+-
+-    it("should set searchMode to 'traces' when handling services catalog view traces", async () => {
+-      mockSearchObj.meta.searchMode = "services-catalog";
+-
+-      wrapper = mountWithServicesCatalogStub();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServicesCatalogViewTraces("test-svc");
+-      await flushPromises();
+-
+-      expect(mockSearchObj.meta.searchMode).toBe("traces");
+-    });
+-
+-    it("should escape single quotes in service name when building filter", async () => {
+-      wrapper = mountWithServicesCatalogStub();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServicesCatalogViewTraces("test's-service");
+-      await flushPromises();
+-
+-      // escapeSingleQuotes uses SQL-style escaping: ' → ''
+-      expect(mockSearchObj.data.editorValue).toBe("service_name = 'test''s-service'");
+-    });
+-
+-    it("should set sqlMode to false when handling services catalog view traces", async () => {
+-      mockSearchObj.meta.sqlMode = true;
+-
+-      wrapper = mountWithServicesCatalogStub();
+-      await flushPromises();
+-
+-      wrapper.vm.handleServicesCatalogViewTraces("test-svc");
+-      await flushPromises();
+-
+-      expect(mockSearchObj.meta.sqlMode).toBe(false);
+-    });
+-  });
+-
+   describe("parseSpanKindWhereClause integration", () => {
+     // Shared mount factory — keeps stub config in one place.
+     function mountIndexStubbed() {
+@@ -3055,41 +2560,5 @@ describe("Index.vue (Main Traces Page)", () => {
+       // Stream must remain unchanged — the cancel did not apply the pending change
+       expect(mockSearchObj.data.stream.selectedStream.value).toBe("default");
+     });
+-
+-    it("should trigger onChildStreamChangeRequest when service-graph emits request:stream-change", async () => {
+-      mockSearchObj.data.editorValue = "duration >= 500";
+-
+-      wrapper = mountIndexStubbed();
+-      await flushPromises();
+-
+-      const serviceGraphEl = wrapper.findComponent({ name: "service-graph" });
+-      expect(serviceGraphEl.exists()).toBe(true);
+-
+-      await serviceGraphEl.vm.$emit("request:stream-change", "graph-stream");
+-      await flushPromises();
+-
+-      // Non-empty editorValue → dialog must be shown
+-      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+-      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("graph-stream");
+-    });
+-
+-    it("should trigger onChildStreamChangeRequest when services-catalog emits request:stream-change", async () => {
+-      mockSearchObj.data.editorValue = "span_status = 'ERROR'";
+-      mockSearchObj.meta.searchMode = "services-catalog";
+-
+-      wrapper = mountIndexStubbed();
+-      await flushPromises();
+-
+-      const servicesCatalogEl = wrapper.findComponent({
+-        name: "services-catalog",
+-      });
+-      expect(servicesCatalogEl.exists()).toBe(true);
+-
+-      await servicesCatalogEl.vm.$emit("request:stream-change", "catalog-stream");
+-      await flushPromises();
+-
+-      expect(wrapper.vm.streamChangeDialog.show).toBe(true);
+-      expect(wrapper.vm.streamChangeDialog.pendingStream).toBe("catalog-stream");
+-    });
+   });
+ });
+diff --git a/web/src/plugins/traces/Index.vue b/web/src/plugins/traces/Index.vue
+index 2f6363968cd..07f6edbfb1b 100644
+--- a/web/src/plugins/traces/Index.vue
++++ b/web/src/plugins/traces/Index.vue
+@@ -23,23 +23,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   >
+     <div id="tracesSecondLevel" class="h-full">
+       <OSplitter
+-        :class="[
+-          'traces-horizontal-splitter h-full',
+-          activeTab === 'service-graph' || activeTab === 'services-catalog'
+-            ? 'hide-splitter-separator'
+-            : '',
+-        ]"
++        class="traces-horizontal-splitter h-full"
+         v-model="splitterModel"
+-        :disable="activeTab === 'service-graph' || activeTab === 'services-catalog'"
+         :horizontal="true"
+         unit="px"
+         :limits="[85, 400]"
+         :separatorStyle="{ height: '9px', marginTop: '-5px', marginBottom: '-5px', zIndex: '10' }"
+-        :before-class="
+-          activeTab === 'service-graph' || activeTab === 'services-catalog'
+-            ? 'z-auto overflow-visible max-h-[3.125rem]!'
+-            : 'z-auto overflow-visible'
+-        "
++        before-class="z-auto overflow-visible"
+         @update:model-value="onSplitterUpdate"
+       >
+         <template v-slot:before>
+@@ -53,50 +43,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               ref="searchBarRef"
+               :fieldValues="fieldValues"
+               :isLoading="searchObj.loading"
+-              :activeTab="activeTab"
+               class="bg-card-glass-bg"
+               @searchdata="searchData"
+               @onChangeTimezone="refreshTimezone"
+-              @update:activeTab="activeTab = $event"
+               @error-only-toggled="onErrorOnlyToggled"
+               @filters-reset="onFiltersReset"
+               @cancel-query="cancelSearch"
+               @update:searchMode="onSearchModeChange"
+-              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
+-              @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
+             />
+           </div>
+         </template>
+         <template v-slot:after>
+           <div class="h-full overflow-hidden">
+-            <!-- Service Graph Tab Content -->
++            <!-- Search results (Spans / Traces) -->
+             <div
+-              v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
+-              class="h-full overflow-hidden"
+-            >
+-              <ServiceGraph
+-                ref="serviceGraphRef"
+-                class="h-full"
+-                @view-traces="handleServiceGraphViewTraces"
+-                @request:stream-change="onChildStreamChangeRequest"
+-                @jump-to-stream-data="onJumpToPanelStreamData"
+-              />
+-            </div>
+-
+-            <!-- Services Catalog Tab Content -->
+-            <div v-if="activeTab === 'services-catalog'" class="h-full overflow-hidden">
+-              <ServicesCatalog
+-                ref="servicesCatalogRef"
+-                class="h-full"
+-                @view-traces="handleServicesCatalogViewTraces"
+-                @request:stream-change="onChildStreamChangeRequest"
+-                @jump-to-stream-data="onJumpToPanelStreamData"
+-              />
+-            </div>
+-
+-            <!-- Search Tab Content -->
+-            <div
+-              v-if="activeTab === 'search'"
+               id="tracesThirdLevel"
+               class="traces-search-result-container relative-position h-full"
+             >
+@@ -313,7 +273,6 @@ import {
+   b64DecodeUnicode,
+   formatTimeWithSuffix,
+   timestampToTimezoneDate,
+-  escapeSingleQuotes,
+   getUUID,
+   generateTraceContext,
+ } from "@/utils/zincutils";
+@@ -365,15 +324,7 @@ const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
+ const SanitizedHtmlRenderer = defineAsyncComponent(
+   () => import("@/components/SanitizedHtmlRenderer.vue"),
+ );
+-const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
+-const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
+-
+ const store = useStore();
+-const activeTab = computed(() => {
+-  if (searchObj.meta.searchMode === "service-graph") return "service-graph";
+-  if (searchObj.meta.searchMode === "services-catalog") return "services-catalog";
+-  return "search";
+-});
+ const router = useRouter();
+ const { t } = useI18nTyped();
+ // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
+@@ -408,8 +359,6 @@ correlationFilters.watchQuery();
+ let refreshIntervalID = 0;
+ const searchResultRef = ref(null);
+ const searchBarRef = ref(null);
+-const serviceGraphRef = ref<any>(null);
+-const servicesCatalogRef = ref<any>(null);
+ const splitterModel = ref(90);
+ const fieldValues = ref({});
+ const { showErrorNotification } = useNotifications();
+@@ -1479,6 +1428,9 @@ onBeforeMount(async () => {
+   }
+   setupContextProvider();
+   restoreUrlQueryParams();
++  // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
++  // carries a prebuilt filter; apply it before the first query runs.
++  applyHandoffFilter();
+   await loadTracesParser();
+   if (!searchObj.loading) {
+     await loadPageData();
+@@ -1513,6 +1465,18 @@ onActivated(async () => {
+     restoreUrlQueryParams();
+     await loadPageData();
+   }
++
++  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
++  // a handoff navigation re-activates it without remounting. Apply the incoming
++  // stream/time/filter and run the query.
++  if (typeof params.filter === "string" && params.filter) {
++    restoreUrlQueryParams();
++    if (applyHandoffFilter()) {
++      await loadPageData();
++      await nextTick();
++      runQueryFn();
++    }
++  }
+ });
+ 
+ const runQueryFn = () => {
+@@ -1545,14 +1509,10 @@ function restoreUrlQueryParams() {
+     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
+   }
+ 
++  // Service Graph / Services Catalog are their own routes now; the only tab
++  // values this page still owns are its two search granularities.
+   const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
+-  if (
+-    tab !== undefined &&
+-    (["service-graph", "traces", "spans", "services-catalog"] as const).includes(
+-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
+-    )
+-  ) {
+-    if (tab === "service-graph" && config.isEnterprise !== "true") return;
++  if (tab === "traces" || tab === "spans") {
+     searchObj.meta.searchMode = tab as TraceSearchMode;
+   }
+ 
+@@ -1640,10 +1600,9 @@ const onErrorOnlyToggled = (value: boolean) => {
+   }
+ };
+ 
+-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
+-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "services-catalog") => {
++// Handler for the Spans / Traces granularity toggle
++const onSearchModeChange = (mode: "traces" | "spans") => {
+   searchObj.meta.searchMode = mode;
+-  if (mode === "service-graph" || mode === "services-catalog") return;
+   if (
+     mode === "traces" &&
+     searchObj.meta.resultGrid.sortBy !== "start_time" &&
+@@ -1950,8 +1909,6 @@ const searchData = () => {
+     return;
+   }
+ 
+-  if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
+-
+   // Clear brush selections when running query
+   // The filters are now part of the query, so brush selections should be cleared
+   searchObj.meta.metricsRangeFilters.clear();
+@@ -2106,99 +2063,24 @@ watch(
+ // handler (filter add/remove, manual date change, redirect, metrics brush), not
+ // by watching `searchObj.data.query`.
+ 
+-// Handler for service graph view traces event
+-const handleServiceGraphViewTraces = (data: any) => {
+-  // Switch to search tab
+-  searchObj.meta.searchMode = data.mode;
+-
+-  // Set the selected stream in dropdown
+-  if (data.stream) {
+-    searchObj.data.stream.selectedStream = {
+-      label: data.stream,
+-      value: data.stream,
+-    };
+-  }
+-
+-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
+-  if (data.serviceName) {
+-    const escapedServiceName = escapeSingleQuotes(data.serviceName);
+-    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
+-    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
+-    if (data.operationName) {
+-      const escapedOpName = escapeSingleQuotes(data.operationName);
+-      filterQuery += ` AND operation_name = '${escapedOpName}'`;
+-    }
+-    if (data.nodeName) {
+-      const escapedNodeName = escapeSingleQuotes(data.nodeName);
+-      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
+-    }
+-    if (data.podName) {
+-      const escapedPodName = escapeSingleQuotes(data.podName);
+-      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
+-    }
+-    if (data.callerService) {
+-      const escapedCaller = escapeSingleQuotes(data.callerService);
+-      filterQuery += ` AND service_name = '${escapedCaller}'`;
+-    }
+-    if (data.resourceFilter?.value) {
+-      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
+-      if (data.resourceFilter.fields?.length) {
+-        // Fallback chain: (field1 = 'val' OR field2 = 'val')
+-        const clauses = data.resourceFilter.fields
+-          .map((f: string) => `${f} = '${escapedValue}'`)
+-          .join(" OR ");
+-        filterQuery += ` AND (${clauses})`;
+-      } else if (data.resourceFilter.field) {
+-        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
+-      }
+-    }
+-    if (data.errorsOnly) {
+-      filterQuery += ` AND span_status = 'ERROR'`;
+-    }
+-    if (data.minDurationMicros && data.minDurationMicros > 0) {
+-      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
+-    }
+-    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
+-      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
+-    }
+-    searchObj.data.editorValue = filterQuery;
+-    searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+-  }
+-
+-  // Set the time range
+-  if (data.timeRange) {
+-    searchObj.data.datetime = {
+-      startTime: data.timeRange.startTime,
+-      endTime: data.timeRange.endTime,
+-      relativeTimePeriod: null,
+-      type: "absolute",
+-    };
+-  }
+-
+-  // Run the query
+-  nextTick(() => {
+-    runQueryFn();
+-  });
+-};
+-
+ /**
+- * Handler for the services catalog `view-traces` event.
++ * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
+  *
+- * Normalizes the payload (which may be a plain service name string for backward
+- * compatibility, or a full object with `serviceName`, `serviceType`,
+- * `resourceFilter`, etc.) and delegates to {@link handleServiceGraphViewTraces}
+- * to populate the search bar and run the filtered traces query.
++ * Those views navigate here with the filter, stream, mode and time range as
++ * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
++ * mutating the shared search state from inside a sibling tab. Applying them
++ * here keeps the handoff URL bookmarkable and reload-safe.
+  *
+- * @param data - Service name string (legacy) or structured filter object.
+- *               Structured objects may include `serviceName`, `serviceType`,
+- *               `operationName`, `nodeName`, `podName`, `callerService`,
+- *               `resourceFilter`, `errorsOnly`, `minDurationMicros`,
+- *               `maxDurationMicros`, `mode`, and `stream`.
++ * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
++ * this only adds the prebuilt filter and re-runs the query.
+  */
+-const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
+-  // Normalize plain string to object then delegate to the full handler
+-  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
+-  handleServiceGraphViewTraces(payload);
++const applyHandoffFilter = (): boolean => {
++  const filter = router.currentRoute.value.query.filter;
++  if (typeof filter !== "string" || !filter) return false;
++
++  searchObj.data.editorValue = filter;
++  searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
++  return true;
+ };
+ 
+ // watch(updateSelectedColumns, () => {
+diff --git a/web/src/plugins/traces/SearchBar.spec.ts b/web/src/plugins/traces/SearchBar.spec.ts
+index 014e5574868..bd6e15c8038 100644
+--- a/web/src/plugins/traces/SearchBar.spec.ts
++++ b/web/src/plugins/traces/SearchBar.spec.ts
+@@ -391,93 +391,20 @@ describe("SearchBar", () => {
+       wrapper = mountSearchBar();
+       await flushPromises();
+ 
+-      // OToggleGroup replaces the old .button-group.logs-visualize-toggle div
++      // OToggleGroup replaces the old .button-group.logs-visualize-toggle div.
++      // Only the two search granularities remain — Service Graph and Services
++      // Catalog are their own routes now, reached from the left-rail flyout.
+       expect(wrapper.find(".o-toggle-group-stub").exists()).toBe(true);
++      expect(wrapper.find('[data-test="traces-search-mode-spans-btn"]').exists()).toBe(true);
+       expect(wrapper.find('[data-test="traces-search-mode-traces-btn"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="traces-service-graph-toggle"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="traces-service-graph-toggle"]').exists()).toBe(false);
+       expect(wrapper.find('[data-test="traces-search-mode-services-catalog-btn"]').exists()).toBe(
+-        true,
+-      );
+-    });
+-  });
+-
+-  // -------------------------------------------------------------------------
+-  describe("search mode toggle emits (update:searchMode)", () => {
+-    it("should emit update:searchMode with 'service-graph' when the service-graph button is clicked", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      const sgBtn = wrapper.find('[data-test="traces-service-graph-toggle"]');
+-      expect(sgBtn.exists()).toBe(true);
+-      await sgBtn.trigger("click");
+-
+-      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+-      expect(wrapper.emitted("update:searchMode")![0]).toEqual(["service-graph"]);
+-    });
+-
+-    it("should emit update:searchMode with 'services-catalog' when the services-catalog button is clicked", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      const scBtn = wrapper.find('[data-test="traces-search-mode-services-catalog-btn"]');
+-      expect(scBtn.exists()).toBe(true);
+-      await scBtn.trigger("click");
+-
+-      expect(wrapper.emitted("update:searchMode")).toBeTruthy();
+-      expect(wrapper.emitted("update:searchMode")![0]).toEqual(["services-catalog"]);
+-    });
+-  });
+-
+-  // -------------------------------------------------------------------------
+-  describe("searchMode conditional rendering", () => {
+-    it("should show search controls when searchMode is 'traces'", async () => {
+-      searchObjInstance.meta.searchMode = "traces";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
+-    });
+-
+-    it("should hide search controls when searchMode is 'service-graph'", async () => {
+-      searchObjInstance.meta.searchMode = "service-graph";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').exists()).toBe(
+-        false,
+-      );
+-      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(false);
+-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+-    });
+-
+-    it("should hide search controls when searchMode is 'services-catalog'", async () => {
+-      searchObjInstance.meta.searchMode = "services-catalog";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="traces-search-bar-reset-filters-btn"]').exists()).toBe(
+         false,
+       );
+-      expect(wrapper.find('[data-test="logs-search-bar-date-time-dropdown"]').exists()).toBe(false);
+-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+-    });
+-
+-    it("should re-show controls when searchMode changes back to 'traces'", async () => {
+-      searchObjInstance.meta.searchMode = "service-graph";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(false);
+-
+-      searchObjInstance.meta.searchMode = "traces";
+-      await wrapper.vm.$nextTick();
+-
+-      expect(wrapper.find('[data-test="logs-search-bar-refresh-btn"]').exists()).toBe(true);
+     });
+   });
+ 
++  // -------------------------------------------------------------------------
+   // -------------------------------------------------------------------------
+   describe("search mode toggle (update:searchMode)", () => {
+     it("should emit update:searchMode with 'traces' when Traces button is clicked", async () => {
+@@ -529,19 +456,6 @@ describe("SearchBar", () => {
+         "selected",
+       );
+     });
+-
+-    it("should apply 'selected' class to Services Catalog button when searchMode is 'services-catalog'", async () => {
+-      searchObjInstance.meta.searchMode = "services-catalog";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(
+-        wrapper.find('[data-test="traces-search-mode-services-catalog-btn"]').classes(),
+-      ).toContain("selected");
+-      expect(wrapper.find('[data-test="traces-search-mode-traces-btn"]').classes()).not.toContain(
+-        "selected",
+-      );
+-    });
+   });
+ 
+   // -------------------------------------------------------------------------
+@@ -1108,15 +1022,6 @@ describe("SearchBar", () => {
+       expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+     });
+ 
+-    it("should have a tooltip inside the service-graph tab toggle button", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      const sgBtn = wrapper.find('[data-test="traces-service-graph-toggle"]');
+-      expect(sgBtn.exists()).toBe(true);
+-      expect(wrapper.findComponent({ name: "OTooltip" }).exists()).toBe(true);
+-    });
+-
+     it("should have a tooltip inside the Traces search mode button", async () => {
+       wrapper = mountSearchBar();
+       await flushPromises();
+@@ -1164,116 +1069,7 @@ describe("SearchBar", () => {
+   // -------------------------------------------------------------------------
+   // [auto-generated] Props
+   // -------------------------------------------------------------------------
+-  describe("service-graph mode toolbar", () => {
+-    beforeEach(() => {
+-      searchObjInstance.meta.searchMode = "service-graph";
+-    });
+-
+-    it("should render service-graph-date-time-picker when searchMode is service-graph", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(true);
+-    });
+-
+-    it("should render service-graph-refresh-btn when searchMode is service-graph", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(true);
+-    });
+-
+-    it("should render tree-view and graph-view toggle buttons when searchMode is service-graph", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="service-graph-tree-view-btn"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="service-graph-graph-view-btn"]').exists()).toBe(true);
+-    });
+-
+-    it("should emit service-graph-refresh when refresh btn is clicked", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      const refreshBtn = wrapper.find('[data-test="service-graph-refresh-btn"]');
+-      expect(refreshBtn.exists()).toBe(true);
+-      await refreshBtn.trigger("click");
+-
+-      expect(wrapper.emitted("service-graph-refresh")).toBeTruthy();
+-      expect(wrapper.emitted("service-graph-refresh")).toHaveLength(1);
+-    });
+-
+-    it("should call onServiceGraphVisualizationChange with 'tree' when tree-view btn is clicked", async () => {
+-      searchObjInstance.meta.serviceGraphVisualizationType = "graph";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      const treeBtn = wrapper.find('[data-test="service-graph-tree-view-btn"]');
+-      expect(treeBtn.exists()).toBe(true);
+-      await treeBtn.trigger("click");
+-
+-      expect(searchObjInstance.meta.serviceGraphVisualizationType).toBe("tree");
+-      expect(searchObjInstance.meta.serviceGraphLayoutType).toBe("horizontal");
+-    });
+-
+-    it("should call onServiceGraphVisualizationChange with 'graph' when graph-view btn is clicked", async () => {
+-      searchObjInstance.meta.serviceGraphVisualizationType = "tree";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      const graphBtn = wrapper.find('[data-test="service-graph-graph-view-btn"]');
+-      expect(graphBtn.exists()).toBe(true);
+-      await graphBtn.trigger("click");
+-
+-      expect(searchObjInstance.meta.serviceGraphVisualizationType).toBe("graph");
+-      expect(searchObjInstance.meta.serviceGraphLayoutType).toBe("force");
+-    });
+-
+-    it("should hide service-graph toolbar when searchMode is not service-graph", async () => {
+-      searchObjInstance.meta.searchMode = "traces";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="service-graph-date-time-picker"]').exists()).toBe(false);
+-      expect(wrapper.find('[data-test="service-graph-refresh-btn"]').exists()).toBe(false);
+-      expect(wrapper.find('[data-test="service-graph-tree-view-btn"]').exists()).toBe(false);
+-      expect(wrapper.find('[data-test="service-graph-graph-view-btn"]').exists()).toBe(false);
+-    });
+-  });
+-
+   // -------------------------------------------------------------------------
+-  describe("services-catalog mode toolbar", () => {
+-    beforeEach(() => {
+-      searchObjInstance.meta.searchMode = "services-catalog";
+-    });
+-
+-    it("should render services-catalog-date-time-picker when searchMode is services-catalog", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="services-catalog-date-time-picker"]').exists()).toBe(true);
+-    });
+-
+-    // The services-catalog refresh button was intentionally moved out of the
+-    // SearchBar header and into ServicesCatalog.vue (see commit "fix: take
+-    // refresh icon below not in header"). SearchBar no longer renders it.
+-    it("should not render services-catalog-refresh-btn in the header", async () => {
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="services-catalog-refresh-btn"]').exists()).toBe(false);
+-    });
+-
+-    it("should hide services-catalog toolbar when searchMode is not services-catalog", async () => {
+-      searchObjInstance.meta.searchMode = "traces";
+-      wrapper = mountSearchBar();
+-      await flushPromises();
+-
+-      expect(wrapper.find('[data-test="services-catalog-date-time-picker"]').exists()).toBe(false);
+-      expect(wrapper.find('[data-test="services-catalog-refresh-btn"]').exists()).toBe(false);
+-    });
+-  });
+-
+   // -------------------------------------------------------------------------
+   describe("props", () => {
+     it("should accept updated fieldValues without errors", async () => {
+diff --git a/web/src/plugins/traces/SearchBar.vue b/web/src/plugins/traces/SearchBar.vue
+index 682b1525e56..bb4fddb78f9 100644
+--- a/web/src/plugins/traces/SearchBar.vue
++++ b/web/src/plugins/traces/SearchBar.vue
+@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         ref="toolbarLeftRef"
+         class="flex min-w-0 flex-1 flex-row items-center gap-1.5 overflow-hidden"
+       >
+-        <!-- Unified View Toggle: Service Graph / Traces / Spans -->
++        <!-- Search granularity toggle: Spans / Traces -->
+         <OToggleGroup
+           :model-value="searchObj.meta.searchMode"
+           @update:model-value="$emit('update:searchMode', $event)"
+@@ -44,60 +44,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             <template #icon-left><OIcon name="account-tree" size="sm" class="shrink-0" /></template>
+             <span v-if="!shouldHideToggleText">{{ t("traces.tracesTab") }}</span>
+           </OToggleGroupItem>
+-          <OToggleGroupItem
+-            v-if="config.isEnterprise == 'true'"
+-            data-test="traces-service-graph-toggle"
+-            value="service-graph"
+-            size="sm"
+-            :tooltip="shouldHideToggleText ? t('traces.serviceGraphTab') : undefined"
+-          >
+-            <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+-            <span v-if="!shouldHideToggleText">{{ t("traces.serviceGraphTab") }}</span>
+-          </OToggleGroupItem>
+-          <OToggleGroupItem
+-            data-test="traces-search-mode-services-catalog-btn"
+-            value="services-catalog"
+-            size="sm"
+-            :tooltip="shouldHideToggleText ? t('traces.servicesCatalog.tabLabel') : undefined"
+-          >
+-            <template #icon-left><OIcon name="menu-book" size="sm" class="shrink-0" /></template>
+-            <span v-if="!shouldHideToggleText">{{ t("traces.servicesCatalog.tabLabel") }}</span>
+-          </OToggleGroupItem>
+         </OToggleGroup>
+ 
+-        <!-- Show search controls only when not on Service Graph or Services Catalog -->
+-        <template
+-          v-if="
+-            searchObj.meta.searchMode !== 'service-graph' &&
+-            searchObj.meta.searchMode !== 'services-catalog'
+-          "
++        <!-- Reset: icon+text at wide widths, icon-only when narrow -->
++        <OButton
++          data-test="traces-search-bar-reset-filters-btn"
++          variant="outline"
++          size="xs"
++          @click="resetFilters"
+         >
+-          <!-- Reset: icon+text at wide widths, icon-only when narrow -->
+-          <OButton
+-            data-test="traces-search-bar-reset-filters-btn"
+-            variant="outline"
+-            size="xs"
+-            @click="resetFilters"
+-          >
+-            <template #icon-left>
+-              <OIcon name="restart-alt" size="sm" class="shrink-0" />
+-            </template>
+-            <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
+-          </OButton>
++          <template #icon-left>
++            <OIcon name="restart-alt" size="sm" class="shrink-0" />
++          </template>
++          <span v-if="!shouldHideResetText">{{ t("common.reset") }}</span>
++        </OButton>
+ 
+-          <div
+-            class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
+-          >
+-            <OSwitch
+-              data-test="traces-search-bar-show-metrics-toggle-btn"
+-              v-model="searchObj.meta.showHistogram"
+-              class="o2-toggle-button-xs flex items-center justify-center pr-1"
+-              size="lg"
+-            />
+-            <OIcon name="bar-chart" size="sm" class="shrink-0" />
+-            <OTooltip :content="t('traces.RedMetrics')" />
+-          </div>
+-        </template>
++        <div
++          class="border-button-outline-border rounded-default hover:bg-button-outline-hover-bg flex cursor-pointer items-center justify-center border px-1.5 py-1 transition-all duration-200"
++        >
++          <OSwitch
++            data-test="traces-search-bar-show-metrics-toggle-btn"
++            v-model="searchObj.meta.showHistogram"
++            class="o2-toggle-button-xs flex items-center justify-center pr-1"
++            size="lg"
++          />
++          <OIcon name="bar-chart" size="sm" class="shrink-0" />
++          <OTooltip :content="t('traces.RedMetrics')" />
++        </div>
+ 
+         <!-- More menu: Syntax Guide — always last.
+              Sessions + LLM Insights were removed from Traces; they now
+@@ -123,13 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       </div>
+       <!-- Right toolbar — persistent wrapper so toolbarRightRef is always observable -->
+       <div ref="toolbarRightRef" class="flex flex-shrink-0 items-center">
+-        <div
+-          v-if="
+-            searchObj.meta.searchMode !== 'service-graph' &&
+-            searchObj.meta.searchMode !== 'services-catalog'
+-          "
+-          class="flex items-center gap-1.5"
+-        >
++        <div class="flex items-center gap-1.5">
+           <DateTime
+             ref="dateTimeRef"
+             auto-apply
+@@ -246,89 +213,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             shortcut-id="tracesCopyUrl"
+           />
+         </div>
+-
+-        <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout -->
+-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto">
+-          <div class="flex items-center gap-2">
+-            <DateTime
+-              ref="dateTimeRef"
+-              auto-apply
+-              :default-type="searchObj.data.datetime.type"
+-              :default-absolute-time="{
+-                startTime: searchObj.data.datetime.startTime,
+-                endTime: searchObj.data.datetime.endTime,
+-              }"
+-              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+-              data-test="service-graph-date-time-picker"
+-              class="h-8!"
+-              @on:date-change="updateDateTime"
+-            />
+-            <OButton
+-              data-test="service-graph-refresh-btn"
+-              variant="outline"
+-              size="icon-toolbar"
+-              class="min-w-[1.875rem]!"
+-              @click="$emit('service-graph-refresh')"
+-            >
+-              <OIcon name="refresh" size="sm" />
+-              <OTooltip :content="t('common.refresh')" />
+-            </OButton>
+-            <OToggleGroup
+-              :model-value="searchObj.meta.serviceGraphVisualizationType"
+-              @update:model-value="onServiceGraphVisualizationChange($event)"
+-            >
+-              <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
+-                <template #icon-left>
+-                  <OIcon name="git-branch" size="sm" />
+-                </template>
+-                {{ t("traces.treeView") }}
+-              </OToggleGroupItem>
+-              <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
+-                <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
+-                {{ t("traces.graphView") }}
+-              </OToggleGroupItem>
+-            </OToggleGroup>
+-            <OSelect
+-              v-model="searchObj.meta.serviceGraphLayoutType"
+-              :options="serviceGraphLayoutOptions"
+-              :searchable="false"
+-              class="h-8! min-h-8! w-[7.5rem]"
+-              :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
+-              @update:model-value="onServiceGraphLayoutChange"
+-            />
+-          </div>
+-        </div>
+-
+-        <!-- Services Catalog right toolbar: DateTime, Refresh -->
+-        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ml-auto">
+-          <div class="flex items-center gap-2">
+-            <DateTime
+-              ref="dateTimeRef"
+-              auto-apply
+-              menu-align="end"
+-              :default-type="searchObj.data.datetime.type"
+-              :default-absolute-time="{
+-                startTime: searchObj.data.datetime.startTime,
+-                endTime: searchObj.data.datetime.endTime,
+-              }"
+-              :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
+-              data-test="services-catalog-date-time-picker"
+-              class="mr-1.5 h-8!"
+-              @on:date-change="updateDateTime"
+-            />
+-          </div>
+-        </div>
+       </div>
+       <!-- /toolbarRightRef wrapper -->
+     </div>
+-    <div
+-      v-if="
+-        searchObj.meta.searchMode !== 'service-graph' &&
+-        searchObj.meta.searchMode !== 'services-catalog' &&
+-        searchObj.meta.showQuery
+-      "
+-      class="border-border-default flex min-h-0 flex-1 border-b"
+-    >
++    <div v-if="searchObj.meta.showQuery" class="border-border-default flex min-h-0 flex-1 border-b">
+       <div class="relative flex h-full w-full flex-col overflow-hidden">
+         <CodeQueryEditor
+           ref="queryEditorRef"
+@@ -381,7 +269,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+-import OSelect from "@/lib/forms/Select/OSelect.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+ import useTraces from "@/composables/useTraces";
+@@ -415,7 +302,6 @@ export default defineComponent({
+     ODropdown,
+     ODropdownItem,
+     OSwitch,
+-    OSelect,
+     OTooltip,
+     CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+     SyntaxGuide,
+@@ -427,8 +313,6 @@ export default defineComponent({
+     "error-only-toggled",
+     "filters-reset",
+     "onChangeTimezone",
+-    "service-graph-refresh",
+-    "services-catalog-refresh",
+   ],
+   props: {
+     fieldValues: {
+@@ -828,35 +712,6 @@ export default defineComponent({
+       dateTimeRef.value?.setDateType("absolute");
+     };
+ 
+-    // Service Graph toolbar controls
+-    const serviceGraphVisualizationTabs = [
+-      { label: t("traces.treeView"), value: "tree" },
+-      { label: t("traces.graphView"), value: "graph" },
+-    ];
+-
+-    const serviceGraphLayoutOptions = computed(() => {
+-      if (searchObj.meta.serviceGraphVisualizationType === "graph") {
+-        return [{ label: t("traces.layoutForce"), value: "force" }];
+-      }
+-      return [
+-        { label: t("traces.layoutHorizontal"), value: "horizontal" },
+-        { label: t("traces.layoutVertical"), value: "vertical" },
+-      ];
+-    });
+-
+-    const onServiceGraphVisualizationChange = (type: "tree" | "graph") => {
+-      searchObj.meta.serviceGraphVisualizationType = type;
+-      localStorage.setItem("serviceGraph_visualizationType", type);
+-      const newLayout = type === "tree" ? "horizontal" : "force";
+-      searchObj.meta.serviceGraphLayoutType = newLayout;
+-      localStorage.setItem("serviceGraph_layoutType", newLayout);
+-    };
+-
+-    const onServiceGraphLayoutChange = (type: string) => {
+-      searchObj.meta.serviceGraphLayoutType = type;
+-      localStorage.setItem("serviceGraph_layoutType", type);
+-    };
+-
+     const _traceStreamFields = computed(() => searchObj.data.stream.selectedStreamFields ?? []);
+     const _traceFieldValues = computed(() => props.fieldValues ?? {});
+     const _traceSqlMode = computed(() => false);
+@@ -906,10 +761,6 @@ export default defineComponent({
+       config,
+       applyFilters,
+       removeFilterByField,
+-      serviceGraphVisualizationTabs,
+-      serviceGraphLayoutOptions,
+-      onServiceGraphVisualizationChange,
+-      onServiceGraphLayoutChange,
+       toggleLiveMode,
+       traceEditorPlaceholder,
+       toolbarLeftRef,
+diff --git a/web/src/plugins/traces/ServiceGraph.vue b/web/src/plugins/traces/ServiceGraph.vue
+index 23f4440627b..0072bc4b9fb 100644
+--- a/web/src/plugins/traces/ServiceGraph.vue
++++ b/web/src/plugins/traces/ServiceGraph.vue
+@@ -23,8 +23,8 @@
+           :content="t('traces.serviceGraph.noStreamsDetected')"
+         />
+       </div>
+-      <!-- Search input -->
+-      <div data-test="service-graph-search-input">
++      <!-- Search input (hidden when a parent renders it in its own toolbar). -->
++      <div v-if="!hideSearchInput" data-test="service-graph-search-input">
+         <OSearchInput
+           v-model="searchFilter"
+           class="w-56!"
+@@ -441,6 +441,13 @@ export default defineComponent({
+       type: Boolean,
+       default: false,
+     },
++    // Same idea as `hideStreamSelector`: the standalone Service Graph page
++    // renders the search box in its own subnav row beside the stream picker,
++    // so the built-in one must not render twice.
++    hideSearchInput: {
++      type: Boolean,
++      default: false,
++    },
+     // Agent-node highlighting (indigo tint, larger size, radar-ping halo) is a
+     // treatment for the dedicated Agent Graph page ONLY. On the regular Service
+     // Graph tab agents are rendered like any other node. The Agent Graph page
+@@ -1865,8 +1872,20 @@ export default defineComponent({
+       loadServiceGraph();
+     });
+ 
+-    // Public API for parent pages (e.g. Agent Graph page's header refresh).
+-    expose({ refresh: loadServiceGraph, loading, lastRunAt });
++    // Public API for parent pages (e.g. Agent Graph page's header refresh, and
++    // the standalone Service Graph page, whose subnav-row stream picker calls
++    // `onStreamFilterChange` — it owns its own stream list because `expose()`
++    // unwraps refs, which would hand the parent a non-reactive snapshot).
++    expose({
++      refresh: loadServiceGraph,
++      loading,
++      lastRunAt,
++      onStreamFilterChange,
++      setSearchFilter: (v: string) => {
++        searchFilter.value = v;
++        applyFilters();
++      },
++    });
+ 
+     return {
+       raw,
+diff --git a/web/src/plugins/traces/ServicesCatalog.vue b/web/src/plugins/traces/ServicesCatalog.vue
+index 05d9377230c..692e7bede9f 100644
+--- a/web/src/plugins/traces/ServicesCatalog.vue
++++ b/web/src/plugins/traces/ServicesCatalog.vue
+@@ -524,6 +524,8 @@ function categoryOf(row: ServiceRow): EntityCategory {
+ }
+ 
+ const isLoading = ref(false);
++// Epoch-ms of the last completed load, shown on the page header's refresh control.
++const lastRunAt = ref<number | null>(null);
+ const services = ref<ServiceRow[]>([]);
+ const filterText = ref("");
+ const typeFilter = ref<TypeFilter>("service");
+@@ -1063,6 +1065,7 @@ ORDER BY total_requests DESC`;
+       },
+       complete: () => {
+         isLoading.value = false;
++        lastRunAt.value = Date.now();
+       },
+       reset: () => {
+         services.value = [];
+@@ -1072,8 +1075,15 @@ ORDER BY total_requests DESC`;
+   );
+ }
+ 
+-// Expose for parent ref access
+-defineExpose({ loadServicesCatalog, streamFilter });
++// Public API for the parent page header (mirrors ServiceGraph's shape:
++// refresh + loading + lastRunAt) plus the catalog's own members.
++defineExpose({
++  loadServicesCatalog,
++  streamFilter,
++  refresh: loadServicesCatalog,
++  loading: isLoading,
++  lastRunAt,
++});
+ 
+ // Keep streamFilter in sync when Traces/Spans tab changes the global stream
+ watch(
+@@ -1096,9 +1106,9 @@ watch(
+     searchObj.data.datetime.relativeTimePeriod,
+   ],
+   () => {
+-    if (searchObj.meta.searchMode === "services-catalog") {
+-      loadServicesCatalog();
+-    }
++    // This component only renders on its own route now, so no search-mode
++    // guard is needed — if it is mounted, it is the visible view.
++    loadServicesCatalog();
+   },
+ );
+ 
+diff --git a/web/src/plugins/traces/viewTracesHandoff.spec.ts b/web/src/plugins/traces/viewTracesHandoff.spec.ts
+new file mode 100644
+index 00000000000..5d4ef2f60fc
+--- /dev/null
++++ b/web/src/plugins/traces/viewTracesHandoff.spec.ts
+@@ -0,0 +1,181 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect } from "vitest";
++import {
++  buildViewTracesFilter,
++  normalizeViewTracesPayload,
++  viewTracesQuery,
++} from "./viewTracesHandoff";
++
++/**
++ * These cases were previously asserted against Index.vue's in-page
++ * `handleServiceGraphViewTraces` / `handleServicesCatalogViewTraces`. The filter
++ * building moved verbatim into this module when Service Graph and Services
++ * Catalog became standalone routes, so the coverage moved with it.
++ */
++describe("buildViewTracesFilter", () => {
++  it("builds a service_name filter for a plain service", () => {
++    expect(buildViewTracesFilter({ serviceName: "svc" })).toBe("service_name = 'svc'");
++  });
++
++  it("uses infer_service_name when a serviceType is present", () => {
++    expect(buildViewTracesFilter({ serviceName: "db", serviceType: "database" })).toBe(
++      "infer_service_name = 'db'",
++    );
++  });
++
++  it("escapes single quotes in the service name", () => {
++    // escapeSingleQuotes uses SQL-style escaping: ' → ''
++    expect(buildViewTracesFilter({ serviceName: "it's" })).toBe("service_name = 'it''s'");
++  });
++
++  it("includes operationName when provided", () => {
++    const q = buildViewTracesFilter({ serviceName: "svc", operationName: "POST /ingest" });
++    expect(q).toContain("AND operation_name = 'POST /ingest'");
++  });
++
++  it("includes nodeName when provided", () => {
++    const q = buildViewTracesFilter({ serviceName: "svc", nodeName: "node-2" });
++    expect(q).toContain("AND service_k8s_node_name = 'node-2'");
++  });
++
++  it("includes podName when provided", () => {
++    const q = buildViewTracesFilter({ serviceName: "svc", podName: "pod-xyz" });
++    expect(q).toContain("AND service_k8s_pod_name = 'pod-xyz'");
++  });
++
++  it("appends span_status = 'ERROR' when errorsOnly is true", () => {
++    const q = buildViewTracesFilter({ serviceName: "svc", errorsOnly: true });
++    expect(q).toContain("AND span_status = 'ERROR'");
++  });
++
++  it("includes duration bounds only when greater than zero", () => {
++    const withBounds = buildViewTracesFilter({
++      serviceName: "svc",
++      minDurationMicros: 1000,
++      maxDurationMicros: 9000,
++    });
++    expect(withBounds).toContain("AND duration >= 1000");
++    expect(withBounds).toContain("AND duration <= 9000");
++
++    const zeroed = buildViewTracesFilter({
++      serviceName: "svc",
++      minDurationMicros: 0,
++      maxDurationMicros: 0,
++    });
++    expect(zeroed).not.toContain("duration >=");
++    expect(zeroed).not.toContain("duration <=");
++  });
++
++  it("combines all optional filter fields when all are provided", () => {
++    const q = buildViewTracesFilter({
++      serviceName: "svc",
++      operationName: "POST /ingest",
++      nodeName: "node-2",
++      podName: "pod-xyz",
++      errorsOnly: true,
++      minDurationMicros: 1000,
++      maxDurationMicros: 9000,
++    });
++    expect(q).toContain("service_name = 'svc'");
++    expect(q).toContain("AND operation_name = 'POST /ingest'");
++    expect(q).toContain("AND service_k8s_node_name = 'node-2'");
++    expect(q).toContain("AND service_k8s_pod_name = 'pod-xyz'");
++    expect(q).toContain("AND span_status = 'ERROR'");
++    expect(q).toContain("AND duration >= 1000");
++    expect(q).toContain("AND duration <= 9000");
++  });
++
++  it("omits optional fields when they are not provided", () => {
++    const q = buildViewTracesFilter({ serviceName: "svc" });
++    expect(q).toBe("service_name = 'svc'");
++  });
++
++  it("appends a single-field resourceFilter", () => {
++    const q = buildViewTracesFilter({
++      serviceName: "svc",
++      resourceFilter: { field: "service_k8s_namespace_name", value: "prod" },
++    });
++    expect(q).toContain("AND service_k8s_namespace_name = 'prod'");
++  });
++
++  it("appends a multi-field resourceFilter as an OR fallback chain", () => {
++    const q = buildViewTracesFilter({
++      serviceName: "svc",
++      resourceFilter: { fields: ["a", "b"], value: "v" },
++    });
++    expect(q).toContain("AND (a = 'v' OR b = 'v')");
++  });
++
++  it("escapes single quotes in the resourceFilter value", () => {
++    const q = buildViewTracesFilter({
++      serviceName: "svc",
++      resourceFilter: { field: "f", value: "it's" },
++    });
++    expect(q).toContain("AND f = 'it''s'");
++  });
++
++  it("returns an empty filter when no service is named", () => {
++    expect(buildViewTracesFilter({})).toBe("");
++    expect(buildViewTracesFilter({ errorsOnly: true })).toBe("");
++  });
++});
++
++describe("normalizeViewTracesPayload", () => {
++  it("wraps a bare service-name string (catalog legacy path)", () => {
++    expect(normalizeViewTracesPayload("svc")).toEqual({ serviceName: "svc", mode: "traces" });
++  });
++
++  it("passes an object payload through untouched", () => {
++    const payload = { serviceName: "svc", mode: "spans" };
++    expect(normalizeViewTracesPayload(payload)).toBe(payload);
++  });
++});
++
++describe("viewTracesQuery", () => {
++  it("carries the built filter, stream and mode", () => {
++    const q = viewTracesQuery({ serviceName: "svc", stream: "default", mode: "traces" });
++    expect(q.filter).toBe("service_name = 'svc'");
++    expect(q.stream).toBe("default");
++    expect(q.tab).toBe("traces");
++  });
++
++  it("omits tab for spans — the canonical no-tab URL", () => {
++    const q = viewTracesQuery({ serviceName: "svc", mode: "spans" });
++    expect(q.tab).toBeUndefined();
++  });
++
++  it("carries an absolute time range as from/to", () => {
++    const q = viewTracesQuery({
++      serviceName: "svc",
++      timeRange: { startTime: 1755853746625720, endTime: 1755853746725720 },
++    });
++    expect(q.from).toBe("1755853746625720");
++    expect(q.to).toBe("1755853746725720");
++  });
++
++  it("omits the filter key entirely when no service is named", () => {
++    const q = viewTracesQuery({ stream: "default" });
++    expect(q.filter).toBeUndefined();
++    expect(q.stream).toBe("default");
++  });
++
++  it("accepts the catalog's bare-string payload", () => {
++    const q = viewTracesQuery("svc");
++    expect(q.filter).toBe("service_name = 'svc'");
++    expect(q.tab).toBe("traces");
++  });
++});
+diff --git a/web/src/plugins/traces/viewTracesHandoff.ts b/web/src/plugins/traces/viewTracesHandoff.ts
+new file mode 100644
+index 00000000000..177f7313464
+--- /dev/null
++++ b/web/src/plugins/traces/viewTracesHandoff.ts
+@@ -0,0 +1,124 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { escapeSingleQuotes } from "@/utils/zincutils";
++
++/**
++ * Payload emitted by ServiceGraph / ServicesCatalog `view-traces`. Every field
++ * is optional: the graph sends the richest form (operation, pod, caller,
++ * duration bounds), the catalog often sends only a service name.
++ */
++export interface ViewTracesPayload {
++  serviceName?: string;
++  serviceType?: string;
++  operationName?: string;
++  nodeName?: string;
++  podName?: string;
++  callerService?: string;
++  resourceFilter?: { value?: string; field?: string; fields?: string[] };
++  errorsOnly?: boolean;
++  minDurationMicros?: number;
++  maxDurationMicros?: number;
++  mode?: string;
++  stream?: string;
++  timeRange?: { startTime: number; endTime: number };
++}
++
++/**
++ * Build the traces search-bar filter (a bare WHERE condition — no SELECT/ORDER
++ * BY, since the traces editor is not in SQL mode) from a `view-traces` payload.
++ *
++ * Extracted verbatim from the former in-page handler so Service Graph and
++ * Services Catalog, now on their own routes, build the same string and hand off
++ * to Traces through the URL instead of by mutating shared state.
++ *
++ * @returns the filter string, or "" when the payload names no service (there is
++ *          nothing to filter on without one).
++ */
++export function buildViewTracesFilter(data: ViewTracesPayload): string {
++  if (!data.serviceName) return "";
++
++  const escapedServiceName = escapeSingleQuotes(data.serviceName);
++  const serviceField = data.serviceType ? "infer_service_name" : "service_name";
++  let filterQuery = `${serviceField} = '${escapedServiceName}'`;
++
++  if (data.operationName) {
++    filterQuery += ` AND operation_name = '${escapeSingleQuotes(data.operationName)}'`;
++  }
++  if (data.nodeName) {
++    filterQuery += ` AND service_k8s_node_name = '${escapeSingleQuotes(data.nodeName)}'`;
++  }
++  if (data.podName) {
++    filterQuery += ` AND service_k8s_pod_name = '${escapeSingleQuotes(data.podName)}'`;
++  }
++  if (data.callerService) {
++    filterQuery += ` AND service_name = '${escapeSingleQuotes(data.callerService)}'`;
++  }
++  if (data.resourceFilter?.value) {
++    const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
++    if (data.resourceFilter.fields?.length) {
++      // Fallback chain: (field1 = 'val' OR field2 = 'val')
++      const clauses = data.resourceFilter.fields
++        .map((f: string) => `${f} = '${escapedValue}'`)
++        .join(" OR ");
++      filterQuery += ` AND (${clauses})`;
++    } else if (data.resourceFilter.field) {
++      filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
++    }
++  }
++  if (data.errorsOnly) {
++    filterQuery += ` AND span_status = 'ERROR'`;
++  }
++  if (data.minDurationMicros && data.minDurationMicros > 0) {
++    filterQuery += ` AND duration >= ${data.minDurationMicros}`;
++  }
++  if (data.maxDurationMicros && data.maxDurationMicros > 0) {
++    filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
++  }
++  return filterQuery;
++}
++
++/**
++ * Normalize a `view-traces` payload. The catalog emits a plain service-name
++ * string in its legacy path; everything else emits an object.
++ */
++export function normalizeViewTracesPayload(data: string | ViewTracesPayload): ViewTracesPayload {
++  return typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
++}
++
++/**
++ * Turn a `view-traces` payload into the query params the Traces route hydrates
++ * from. Mirrors the param names `restoreUrlQueryParams` already understands
++ * (`stream`, `from`/`to`) and adds `filter` for the prebuilt WHERE condition,
++ * so a handoff URL is bookmarkable and survives a reload.
++ */
++export function viewTracesQuery(data: string | ViewTracesPayload): Record<string, string> {
++  const payload = normalizeViewTracesPayload(data);
++  const query: Record<string, string> = {};
++
++  const mode = payload.mode === "spans" ? "spans" : "traces";
++  if (mode !== "spans") query.tab = mode;
++
++  if (payload.stream) query.stream = payload.stream;
++
++  const filter = buildViewTracesFilter(payload);
++  if (filter) query.filter = filter;
++
++  if (payload.timeRange?.startTime && payload.timeRange?.endTime) {
++    query.from = String(payload.timeRange.startTime);
++    query.to = String(payload.timeRange.endTime);
++  }
++  return query;
++}
+diff --git a/web/src/plugins/traces/views/ServiceGraphView.vue b/web/src/plugins/traces/views/ServiceGraphView.vue
+new file mode 100644
+index 00000000000..c0ac53f595d
+--- /dev/null
++++ b/web/src/plugins/traces/views/ServiceGraphView.vue
+@@ -0,0 +1,277 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
++
++<!--
++  Standalone Service Graph route (`/traces/service-graph`).
++
++  Header follows the Agent Graph page exactly — OPageLayout with
++  title/subtitle/icon, a DateTime picker in #actions, and an ORefreshButton
++  showing the last run time in the same bordered box (see
++  enterprise/components/AIObservability/AiPageShell.vue). AiPageShell itself is
++  not reused: it is bound to the AI section's `useAiDateRange` state, whereas
++  the graph reads the shared traces datetime.
++
++  The graph-specific controls (view type, layout) sit right-aligned in the
++  #subnav strip, matching the Agent Graph page's #trailing slot.
++-->
++<template>
++  <OPageLayout
++    data-test="service-graph-page"
++    :title="t('menu.serviceGraph')"
++    :subtitle="t('traces.serviceGraphSubtitle')"
++    icon="share"
++    bleed
++    :scroll="false"
++  >
++    <template #actions>
++      <DateTime
++        auto-apply
++        menu-align="end"
++        :default-type="searchObj.data.datetime.type"
++        :default-absolute-time="{
++          startTime: searchObj.data.datetime.startTime,
++          endTime: searchObj.data.datetime.endTime,
++        }"
++        :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
++        data-test="service-graph-date-time-picker"
++        class="h-8"
++        @on:date-change="onDateChange"
++      />
++      <div
++        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
++      >
++        <ORefreshButton
++          :last-run-at="graphRef?.lastRunAt ?? null"
++          :loading="graphRef?.loading ?? false"
++          :disabled="graphRef?.loading ?? false"
++          data-test="service-graph-refresh-btn"
++          @click="graphRef?.refresh()"
++        />
++      </div>
++    </template>
++
++    <!-- Subnav row — same shape as the Agent Graph page: page-scope controls on
++         the left, view-type + layout pushed to the right corner with ml-auto. -->
++    <template #subnav>
++      <div class="px-page-edge flex items-center gap-2 py-1.5">
++        <!-- Stream scope + search on the left. Both are hidden inside the graph
++             (`hide-stream-selector` / `hide-search-input`) so each renders once,
++             here on this row. -->
++        <div data-test="service-graph-stream-selector" class="w-44 flex-shrink-0">
++          <OSelect
++            :model-value="selectedStream"
++            :options="streamOptions"
++            labelKey="label"
++            valueKey="value"
++            class="rounded-default w-full"
++            :disabled="streamOptions.length === 0"
++            @update:model-value="onStreamPick"
++          />
++        </div>
++        <div data-test="service-graph-search-input" class="flex-shrink-0">
++          <OSearchInput
++            v-model="searchText"
++            class="w-56!"
++            :placeholder="t('traces.serviceGraph.searchPlaceholder')"
++            :debounce="300"
++            clearable
++            @update:model-value="onSearchChange"
++          />
++        </div>
++        <div class="ml-auto flex shrink-0 items-center gap-2">
++          <OToggleGroup
++            :model-value="searchObj.meta.serviceGraphVisualizationType"
++            type="single"
++            @update:model-value="onVisualizationChange($event as 'tree' | 'graph')"
++          >
++            <OToggleGroupItem data-test="service-graph-tree-view-btn" value="tree" size="sm">
++              <template #icon-left><OIcon name="git-branch" size="sm" /></template>
++              {{ t("traces.treeView") }}
++            </OToggleGroupItem>
++            <OToggleGroupItem data-test="service-graph-graph-view-btn" value="graph" size="sm">
++              <template #icon-left><OIcon name="share" size="sm" class="shrink-0" /></template>
++              {{ t("traces.graphView") }}
++            </OToggleGroupItem>
++          </OToggleGroup>
++          <OSelect
++            v-model="searchObj.meta.serviceGraphLayoutType"
++            :options="layoutOptions"
++            :searchable="false"
++            data-test="service-graph-layout-type"
++            class="h-8! min-h-8! w-[7.5rem]"
++            :disabled="searchObj.meta.serviceGraphVisualizationType === 'graph'"
++            @update:model-value="onLayoutChange"
++          />
++        </div>
++      </div>
++    </template>
++
++    <div class="h-full min-h-0">
++      <ServiceGraph
++        ref="graphRef"
++        hide-stream-selector
++        hide-search-input
++        @view-traces="onViewTraces"
++        @request:stream-change="onStreamChange"
++        @jump-to-stream-data="onJumpToStreamData"
++      />
++    </div>
++  </OPageLayout>
++</template>
++
++<script setup lang="ts">
++import { computed, defineAsyncComponent, onMounted, ref, watch } from "vue";
++import { useRouter } from "vue-router";
++import { useStore } from "vuex";
++import { raw, useI18nTyped } from "@/types/i18n";
++import DateTime from "@/components/DateTime.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
++import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
++import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
++import OSelect from "@/lib/forms/Select/OSelect.vue";
++import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
++import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
++import useStreams from "@/composables/useStreams";
++import useTraces from "@/composables/useTraces";
++import { viewTracesQuery, type ViewTracesPayload } from "../viewTracesHandoff";
++import { applyUrlTimeRange } from "./useServiceViewTimeRange";
++
++const ServiceGraph = defineAsyncComponent(() => import("../ServiceGraph.vue"));
++
++const { t } = useI18nTyped();
++const graphRef = ref<any>(null);
++const router = useRouter();
++const store = useStore();
++const { searchObj } = useTraces();
++const { getStreams } = useStreams(t);
++
++// Stream list is loaded here rather than read off the graph: `expose()` unwraps
++// refs, so `graphRef.value.availableStreams` is a snapshot the template would
++// never see update.
++const availableStreams = ref<string[]>([]);
++const selectedStream = ref("");
++const streamOptions = computed(() =>
++  availableStreams.value.map((s) => ({ label: raw(s), value: s })),
++);
++
++// The Traces page sets this inside loadPageData(); on these standalone routes
++// nothing else does, and an empty org produces requests to `/api//_search`.
++searchObj.organizationIdentifier = store.state.selectedOrganization?.identifier ?? "";
++watch(
++  () => store.state.selectedOrganization?.identifier,
++  (id) => {
++    if (id) searchObj.organizationIdentifier = id;
++  },
++);
++
++// Honour ?period= / ?from=&to= before the graph queries (these routes are
++// deep-linked by tests and by shared links).
++applyUrlTimeRange(router, searchObj.data.datetime);
++
++onMounted(async () => {
++  try {
++    const res: any = await getStreams("traces", false, false);
++    if (res?.list?.length) availableStreams.value = res.list.map((x: any) => x.name);
++  } catch (e) {
++    console.error("Error loading trace streams:", e);
++  }
++  // Resolve the same way ServiceGraph does internally, so the picker opens on
++  // the stream that is actually drawn.
++  selectedStream.value =
++    searchObj.data.stream?.selectedStream?.value ||
++    localStorage.getItem("serviceGraph_streamFilter") ||
++    "default";
++});
++
++const searchText = ref("");
++function onSearchChange(value: any) {
++  graphRef.value?.setSearchFilter(String(value ?? ""));
++}
++
++function onStreamPick(stream: any) {
++  const name = String(stream ?? "");
++  if (!name) return;
++  selectedStream.value = name;
++  graphRef.value?.onStreamFilterChange(name);
++}
++
++const layoutOptions = computed(() =>
++  searchObj.meta.serviceGraphVisualizationType === "graph"
++    ? [{ label: t("traces.layoutForce"), value: "force" }]
++    : [
++        { label: t("traces.layoutHorizontal"), value: "horizontal" },
++        { label: t("traces.layoutVertical"), value: "vertical" },
++      ],
++);
++
++/**
++ * Hand off to the Traces route. The filter, stream, mode and time range travel
++ * as query params (see `viewTracesQuery`) rather than as a mutation of the
++ * shared store, so the resulting URL is bookmarkable and survives a reload.
++ */
++function onViewTraces(data: string | ViewTracesPayload) {
++  router.push({
++    name: "traces",
++    query: {
++      org_identifier: router.currentRoute.value.query.org_identifier,
++      ...viewTracesQuery(data),
++    },
++  });
++}
++
++/**
++ * Write the picked range into the shared traces datetime; the graph watches it
++ * and reloads itself.
++ */
++function onDateChange(value: any) {
++  searchObj.data.datetime = {
++    startTime: value.startTime,
++    endTime: value.endTime,
++    relativeTimePeriod: value.relativeTimePeriod
++      ? value.relativeTimePeriod
++      : searchObj.data.datetime.relativeTimePeriod,
++    type: value.relativeTimePeriod ? "relative" : "absolute",
++  };
++}
++
++function onVisualizationChange(type: "tree" | "graph") {
++  searchObj.meta.serviceGraphVisualizationType = type;
++  localStorage.setItem("serviceGraph_visualizationType", type);
++  const newLayout = type === "tree" ? "horizontal" : "force";
++  searchObj.meta.serviceGraphLayoutType = newLayout;
++  localStorage.setItem("serviceGraph_layoutType", newLayout);
++}
++
++function onLayoutChange(type: any) {
++  searchObj.meta.serviceGraphLayoutType = String(type);
++  localStorage.setItem("serviceGraph_layoutType", String(type));
++}
++
++/**
++ * On its own route there is no traces query editor to invalidate, so a stream
++ * change applies directly — no "you will lose your query" confirmation.
++ */
++function onStreamChange(newStream: string) {
++  searchObj.data.stream.selectedStream = { label: newStream, value: newStream };
++}
++
++function onJumpToStreamData(fromUs: number, toUs: number) {
++  searchObj.data.datetime.startTime = fromUs;
++  searchObj.data.datetime.endTime = toUs;
++  searchObj.data.datetime.type = "absolute";
++  searchObj.data.datetime.relativeTimePeriod = "";
++}
++</script>
+diff --git a/web/src/plugins/traces/views/ServicesCatalogView.vue b/web/src/plugins/traces/views/ServicesCatalogView.vue
+new file mode 100644
+index 00000000000..a278ca6560d
+--- /dev/null
++++ b/web/src/plugins/traces/views/ServicesCatalogView.vue
+@@ -0,0 +1,150 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>. -->
++
++<!--
++  Standalone Services route (`/traces/services`).
++
++  Header follows the Agent Graph page exactly — OPageLayout with
++  title/subtitle/icon, a DateTime picker in #actions, and an ORefreshButton
++  showing the last run time in the same bordered box (see
++  enterprise/components/AIObservability/AiPageShell.vue). AiPageShell itself is
++  not reused: it is bound to the AI section's `useAiDateRange` state, whereas
++  the catalog reads the shared traces datetime.
++-->
++<template>
++  <OPageLayout
++    data-test="services-catalog-page"
++    :title="t('menu.services')"
++    :subtitle="t('traces.servicesCatalogSubtitle')"
++    icon="menu-book"
++    bleed
++    :scroll="false"
++  >
++    <template #actions>
++      <DateTime
++        auto-apply
++        menu-align="end"
++        :default-type="searchObj.data.datetime.type"
++        :default-absolute-time="{
++          startTime: searchObj.data.datetime.startTime,
++          endTime: searchObj.data.datetime.endTime,
++        }"
++        :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
++        data-test="services-catalog-date-time-picker"
++        class="h-8"
++        @on:date-change="onDateChange"
++      />
++      <div
++        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
++      >
++        <ORefreshButton
++          :last-run-at="catalogRef?.lastRunAt ?? null"
++          :loading="catalogRef?.loading ?? false"
++          :disabled="catalogRef?.loading ?? false"
++          data-test="services-catalog-refresh-btn"
++          @click="catalogRef?.refresh()"
++        />
++      </div>
++    </template>
++
++    <ServicesCatalog
++      ref="catalogRef"
++      class="h-full"
++      @view-traces="onViewTraces"
++      @request:stream-change="onStreamChange"
++      @jump-to-stream-data="onJumpToStreamData"
++    />
++  </OPageLayout>
++</template>
++
++<script setup lang="ts">
++import { defineAsyncComponent, ref, watch } from "vue";
++import { useRouter } from "vue-router";
++import { useStore } from "vuex";
++import { useI18nTyped } from "@/types/i18n";
++import DateTime from "@/components/DateTime.vue";
++import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
++import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
++import useTraces from "@/composables/useTraces";
++import { viewTracesQuery, type ViewTracesPayload } from "../viewTracesHandoff";
++import { applyUrlTimeRange } from "./useServiceViewTimeRange";
++
++const ServicesCatalog = defineAsyncComponent(() => import("../ServicesCatalog.vue"));
++
++const { t } = useI18nTyped();
++const catalogRef = ref<any>(null);
++const router = useRouter();
++const store = useStore();
++const { searchObj } = useTraces();
++
++// The Traces page sets this inside loadPageData(); on these standalone routes
++// nothing else does, and an empty org produces requests to `/api//_search`.
++searchObj.organizationIdentifier = store.state.selectedOrganization?.identifier ?? "";
++watch(
++  () => store.state.selectedOrganization?.identifier,
++  (id) => {
++    if (id) searchObj.organizationIdentifier = id;
++  },
++);
++
++// Honour ?period= / ?from=&to= before the catalog queries (these routes are
++// deep-linked by tests and by shared links).
++applyUrlTimeRange(router, searchObj.data.datetime);
++
++/**
++ * Hand off to the Traces route. The filter, stream, mode and time range travel
++ * as query params (see `viewTracesQuery`) rather than as a mutation of the
++ * shared store, so the resulting URL is bookmarkable and survives a reload.
++ */
++function onViewTraces(data: string | ViewTracesPayload) {
++  router.push({
++    name: "traces",
++    query: {
++      org_identifier: router.currentRoute.value.query.org_identifier,
++      ...viewTracesQuery(data),
++    },
++  });
++}
++
++/**
++ * Write the picked range into the shared traces datetime; the catalog watches
++ * it and reloads itself.
++ */
++function onDateChange(value: any) {
++  searchObj.data.datetime = {
++    startTime: value.startTime,
++    endTime: value.endTime,
++    relativeTimePeriod: value.relativeTimePeriod
++      ? value.relativeTimePeriod
++      : searchObj.data.datetime.relativeTimePeriod,
++    type: value.relativeTimePeriod ? "relative" : "absolute",
++  };
++}
++
++/**
++ * On its own route there is no traces query editor to invalidate, so a stream
++ * change applies directly — no "you will lose your query" confirmation.
++ */
++function onStreamChange(newStream: string) {
++  searchObj.data.stream.selectedStream = { label: newStream, value: newStream };
++}
++
++function onJumpToStreamData(fromUs: number, toUs: number) {
++  searchObj.data.datetime.startTime = fromUs;
++  searchObj.data.datetime.endTime = toUs;
++  searchObj.data.datetime.type = "absolute";
++  searchObj.data.datetime.relativeTimePeriod = "";
++}
++</script>
+diff --git a/web/src/plugins/traces/views/useServiceViewTimeRange.ts b/web/src/plugins/traces/views/useServiceViewTimeRange.ts
+new file mode 100644
+index 00000000000..9da9eb76c7b
+--- /dev/null
++++ b/web/src/plugins/traces/views/useServiceViewTimeRange.ts
+@@ -0,0 +1,51 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import type { Router } from "vue-router";
++
++/**
++ * Apply `?period=` / `?from=`+`?to=` from the URL to the shared traces datetime.
++ *
++ * The Traces page has always supported these params (see `restoreUrlQueryParams`
++ * in plugins/traces/Index.vue). When Service Graph and Services Catalog were
++ * tabs on that page they inherited the behaviour for free; now that each is its
++ * own route, they have to read the params themselves — otherwise a link like
++ * `/traces/services?period=7d` silently renders the 15-minute default.
++ *
++ * @returns true when the URL specified a range (so the caller can skip its own
++ *          default), false when it did not.
++ */
++export function applyUrlTimeRange(router: Router, datetime: Record<string, any>): boolean {
++  const q = router.currentRoute.value.query;
++
++  const from = typeof q.from === "string" ? Number(q.from) : NaN;
++  const to = typeof q.to === "string" ? Number(q.to) : NaN;
++  if (Number.isFinite(from) && Number.isFinite(to) && from > 0 && to > 0) {
++    datetime.startTime = from;
++    datetime.endTime = to;
++    datetime.type = "absolute";
++    datetime.relativeTimePeriod = null;
++    return true;
++  }
++
++  const period = typeof q.period === "string" ? q.period.trim() : "";
++  if (period) {
++    datetime.relativeTimePeriod = period;
++    datetime.type = "relative";
++    return true;
++  }
++
++  return false;
++}

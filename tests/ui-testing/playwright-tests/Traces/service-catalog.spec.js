@@ -3,7 +3,7 @@
 // Tests table rendering, filtering, sorting, pagination, status pills, side panel, and edge cases
 // Uses existing default stream data (no beforeAll ingestion) — like other trace test files
 
-const { test, expect } = require('../utils/enhanced-baseFixtures.js');
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
@@ -523,5 +523,136 @@ test.describe("Service Catalog testcases", () => {
       testLogger.warn(`Console errors found: ${criticalErrors.join('; ')}`);
     }
     expect(criticalErrors, `Found ${criticalErrors.length} critical console errors`).toHaveLength(0);
+  });
+
+  // =========================================================================
+  // TRACES-STANDALONE-VIEWS: Standalone layout + nav verification tests
+  // (appended for traces-standalone-views feature)
+  // =========================================================================
+
+  test("P0: Services standalone page renders with OPageLayout header, DateTime, and Refresh", {
+    tag: ['@traces-standalone-views', '@traces', '@serviceCatalog', '@smoke', '@P0', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Verifying standalone OPageLayout header ===');
+
+    // Page is already on /traces/services?period=7d from beforeEach
+    const headerVisible = await pm.servicesCatalogPage.isPageHeaderVisible();
+    expect(headerVisible).toBeTruthy();
+    testLogger.info('OPageLayout root [data-test="services-catalog-page"] is visible');
+
+    // Verify page title is "Services"
+    const title = await pm.servicesCatalogPage.getPageTitleText();
+    testLogger.info(`Page title: "${title}"`);
+    expect(title).toContain('Services');
+
+    // Verify DateTime picker is visible
+    const dtVisible = await pm.servicesCatalogPage.isDateTimePickerVisible();
+    expect(dtVisible).toBeTruthy();
+    testLogger.info('DateTime picker is visible');
+
+    // Verify Refresh button is visible
+    const refreshVisible = await pm.servicesCatalogPage.isRefreshButtonVisible();
+    expect(refreshVisible).toBeTruthy();
+    testLogger.info('Refresh button is visible');
+
+    // Verify the URL is the standalone route, not the old tabbed layout
+    const currentUrl = page.url();
+    expect(currentUrl).toContain('/traces/services');
+    expect(currentUrl).not.toContain('?tab=serviceCatalog');
+    testLogger.info('URL confirms standalone route (/traces/services)');
+  });
+
+  test("P0: OSS — navigating to /traces/service-graph redirects to /traces", {
+    tag: ['@traces-standalone-views', '@traces', '@oss', '@smoke', '@P0', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing OSS redirect from /traces/service-graph ===');
+
+    const org = process.env['ORGNAME'] || 'default';
+    const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
+    await page.goto(`${baseUrl}/web/traces/service-graph?org_identifier=${org}&period=6h`, { timeout: 30000 });
+
+    // Wait for the redirect to settle
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+
+    const finalUrl = page.url();
+    testLogger.info(`Final URL after redirect: ${finalUrl}`);
+
+    // Verify the URL does NOT contain /traces/service-graph
+    expect(finalUrl).not.toContain('/service-graph');
+
+    // Verify the URL contains /traces (the main Traces search page)
+    expect(finalUrl).toMatch(/\/traces(\?|$)/);
+
+    // Verify query params are preserved
+    expect(finalUrl).toContain('period=6h');
+
+    testLogger.info('OSS redirect verified — Service Graph redirects to Traces in OSS');
+  });
+
+  test("P1: Navigate to Services via left-rail flyout", {
+    tag: ['@traces-standalone-views', '@traces', '@serviceCatalog', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing left-rail flyout navigation to Services ===');
+
+    // Start from base URL for a clean discovery path
+    await navigateToBase(page);
+
+    // Hover Traces rail and click Services in the flyout
+    await pm.servicesCatalogPage.clickServiceCatalogTab();
+
+    // Verify URL landed on the standalone service route
+    const currentUrl = page.url();
+    expect(currentUrl).toContain('/traces/services');
+    testLogger.info(`URL after flyout click: ${currentUrl}`);
+
+    // Wait for catalog to load
+    await pm.servicesCatalogPage.waitForLoad();
+
+    // Verify the standalone OPageLayout renders
+    const headerVisible = await pm.servicesCatalogPage.isPageHeaderVisible();
+    expect(headerVisible).toBeTruthy();
+    testLogger.info('Flyout navigation to Services verified — OPageLayout renders');
+  });
+
+  test("P1: URL time range hydration — DateTime reflects ?period=7d param", {
+    tag: ['@traces-standalone-views', '@traces', '@serviceCatalog', '@functional', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing URL time range hydration ===');
+
+    // Page is already on /traces/services?period=7d from beforeEach
+    const currentUrl = page.url();
+    testLogger.info(`Current URL: ${currentUrl}`);
+    expect(currentUrl).toContain('period=7d');
+
+    // Read the DateTime picker label text
+    const dtLabel = await pm.servicesCatalogPage.getDateTimeLabelText();
+    testLogger.info(`DateTime label: "${dtLabel}"`);
+
+    // The DateTime component should reflect the 7-day period.
+    // Label may be locale-dependent; use a flexible assertion.
+    expect(dtLabel).toMatch(/7/);
+    testLogger.info('DateTime label reflects the 7-day period from URL param');
+  });
+
+  test("P2: OSS — Service Graph nav item NOT visible in flyout", {
+    tag: ['@traces-standalone-views', '@traces', '@oss', '@edge', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('=== Testing OSS nav gate — Service Graph hidden in flyout ===');
+
+    // Start from base URL
+    await navigateToBase(page);
+
+    // Hover the Traces rail to reveal the subnav flyout
+    await pm.servicesCatalogPage.hoverTracesRail();
+
+    // Services Catalog nav item should be visible (no enterprise gate in OSS)
+    const servicesVisible = await pm.servicesCatalogPage.isServicesCatalogNavItemVisible();
+    expect(servicesVisible).toBeTruthy();
+    testLogger.info('Services nav item is visible in flyout');
+
+    // Service Graph nav item should NOT be visible in OSS (enterprise gate)
+    const serviceGraphVisible = await pm.servicesCatalogPage.isServiceGraphNavItemVisible();
+    expect(serviceGraphVisible).toBeFalsy();
+    testLogger.info('Service Graph nav item is hidden (OSS enterprise gate)');
   });
 });

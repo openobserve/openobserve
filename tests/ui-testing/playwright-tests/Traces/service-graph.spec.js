@@ -442,7 +442,7 @@ test.describe("Service Graph testcases", { tag: '@enterprise' }, () => {
 
     const rowCount = await pm.serviceGraphPage.getOperationsTableRowCount();
     testLogger.info(`Operations table row count: ${rowCount}`);
-    expect(rowCount).toBeGreaterThanOrEqual(0);
+    expect(rowCount).toBeGreaterThan(0);
 
     await pm.serviceGraphPage.closeSidePanel();
   });

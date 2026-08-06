@@ -93,6 +93,15 @@ export class ServicesCatalogPage {
     // =====================================================================
     this.tracesRailTile = page.locator('[data-test="nav-group-traces"]');
     this.servicesCatalogNavItem = page.locator('[data-test="nav-group-item-servicesCatalog"]');
+    this.serviceGraphNavItem = page.locator('[data-test="nav-group-item-serviceGraph"]');
+
+    // =====================================================================
+    // Standalone page layout — OPageLayout shell for /traces/services
+    // Source: web/src/plugins/traces/views/ServicesCatalogView.vue
+    // =====================================================================
+    this.pageHeader = page.locator('[data-test="services-catalog-page"]');
+    this.dateTimePicker = page.locator('[data-test="services-catalog-date-time-picker"]');
+    this.refreshBtn = page.locator('[data-test="services-catalog-refresh-btn"]');
 
     // =====================================================================
     // Factory locators — runtime-bound (allowed by POM strict policy)
@@ -626,5 +635,52 @@ export class ServicesCatalogPage {
       .waitFor({ state: 'visible', timeout: 5000 })
       .then(() => true)
       .catch(() => false);
+  }
+
+  // =========================================================================
+  // STANDALONE PAGE LAYOUT — OPageLayout header, DateTime, refresh, nav flyout
+  // =========================================================================
+
+  /** Hover the Traces left-rail tile to reveal the subnav flyout. */
+  async hoverTracesRail() {
+    await this.tracesRailTile.hover();
+    // Wait for flyout to render — at least the Services item must be visible
+    await this.servicesCatalogNavItem.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+  }
+
+  /** Verify the standalone OPageLayout root is visible. */
+  async isPageHeaderVisible() {
+    return await this.pageHeader.isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /** Verify the standalone DateTime picker is visible. */
+  async isDateTimePickerVisible() {
+    return await this.dateTimePicker.isVisible().catch(() => false);
+  }
+
+  /** Verify the standalone Refresh button is visible. */
+  async isRefreshButtonVisible() {
+    return await this.refreshBtn.isVisible().catch(() => false);
+  }
+
+  /** Read the page header title text (the <h1> inside OPageLayout). */
+  async getPageTitleText() {
+    const h1 = this.pageHeader.locator('h1');
+    return (await h1.textContent().catch(() => '')) || '';
+  }
+
+  /** Read the DateTime picker trigger text (e.g. "Past 7 Days"). */
+  async getDateTimeLabelText() {
+    return (await this.dateTimePicker.textContent().catch(() => '')) || '';
+  }
+
+  /** Verify the Service Graph nav item is visible in the left-rail flyout (enterprise-only). */
+  async isServiceGraphNavItemVisible() {
+    return await this.serviceGraphNavItem.isVisible().catch(() => false);
+  }
+
+  /** Verify the Services Catalog nav item is visible in the left-rail flyout. */
+  async isServicesCatalogNavItemVisible() {
+    return await this.servicesCatalogNavItem.isVisible().catch(() => false);
   }
 }

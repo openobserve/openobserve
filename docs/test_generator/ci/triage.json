@@ -1,0 +1,31 @@
+{
+  "feature_slug": "traces-standalone-views",
+  "feature_title": "Traces Service Graph & Services as Standalone Routes",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "service-graph.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/views/ServiceGraphView.vue",
+    "web/src/plugins/traces/views/ServicesCatalogView.vue",
+    "web/src/plugins/traces/Index.vue",
+    "web/src/plugins/traces/SearchBar.vue",
+    "web/src/plugins/traces/viewTracesHandoff.ts",
+    "web/src/lib/core/Navbar/navGroups.ts",
+    "web/src/composables/shared/router.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 20 changed file paths live under OSS locations: web/src/ (frontend) and tests/ui-testing/ (test infrastructure). No paths under enterprise/, o2_enterprise/, src/enterprise/, or any enterprise-gated directory. The code does reference config.isEnterprise and gate: 'enterprise' (e.g. the ServiceGraph route guard, the nav flyout gate), but these are enterprise-awareness guards within OSS code, not enterprise-only files. The feature's implementation lives entirely in the OSS repo.",
+    "skip": "Not skipped: no explicit opt-out marker (empty trigger_comment.txt, empty feature_hint.txt, no tests-added label in context). The change is highly user-facing — it adds two new top-level routes (/traces/service-graph, /traces/services) with standalone page layouts, refactors the left-rail nav to include a Traces flyout, removes Service Graph / Services Catalog tab buttons from the SearchBar, and adds handoff logic between routes. Every changed web/src file modifies a UI path a user can exercise.",
+    "e2e": "E2E is warranted. This change restructures the entire Traces navigation model: Service Graph and Services Catalog move from being tabs on a single page to being independent routes with their own OPageLayout headers, subnav toolbars (DateTime picker, refresh button, view/layout toggles), stream selectors, and search inputs. The left-rail nav gains a hover flyout for Traces sub-items. The handoff (view-traces) now travels through URL query params rather than direct store mutation. Existing tests were updated in the diff but the scope of the UI refactor — two new views, new navigation paths, new button states — demands verification of the full user journey.",
+    "area": "Traces — all UI changes live in web/src/plugins/traces/ (Index.vue, SearchBar.vue, ServiceGraph.vue, ServicesCatalog.vue, plus three new files under views/). The existing E2E spec service-graph.spec.js already lives in tests/ui-testing/playwright-tests/Traces/ and is registered in the enterprise ci_matrix.ent.json under the Traces group.",
+    "group": "Traces — the existing service-graph.spec.js is registered under the Traces testfolder in ci_matrix.ent.json (append.Traces). The generated/enhanced spec belongs to the same matrix shard.",
+    "existing_tests": "One Playwright E2E spec is in the diff: tests/ui-testing/playwright-tests/Traces/service-graph.spec.js. It was updated to match the new route-based URLs and nav flyout discovery paths but does not yet cover the new standalone view pages (ServiceGraphView.vue, ServicesCatalogView.vue) with their own headers, subnav toolbars, stream pickers, and refresh buttons. The other changed test files (tests/ui-testing/pages/tracesPages/*.js) are page-object utility classes, not spec files. The Vitest unit tests (web/src/**/*.spec.ts) are not E2E coverage."
+  }
+}
