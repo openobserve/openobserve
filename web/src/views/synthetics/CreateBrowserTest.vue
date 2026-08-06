@@ -41,6 +41,7 @@ import {
   makeBrowserCheckGateSchema,
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
+import { CHROME_UI_LABELS } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
@@ -133,7 +134,33 @@ const saveSchema = computed(() => makeBrowserCheckSaveSchema(t));
 // `extensionInstalled` is now driven by a real runtime probe (not a manual click).
 const recorder = useSyntheticsRecorder();
 const extensionInstalled = ref(false);
+// Session-only on purpose: persisting the attestations would keep tasks
+// pre-completed after the extension is removed. After the connect step's
+// page refresh, the install task re-completes itself through live detection.
+const installAck = ref(false);
 const incognitoAllowed = ref(false);
+
+const setupInstallDone = computed(() => extensionReady.value || installAck.value);
+const setupAllDone = computed(() => extensionReady.value && incognitoAllowed.value);
+const setupCtaLabel = computed(() =>
+  setupAllDone.value
+    ? t("synthetics.createBrowserTest.setupOpenRecord")
+    : t("synthetics.createBrowserTest.setupCtaLocked", {
+        action: t("synthetics.createBrowserTest.setupOpenRecord"),
+      }),
+);
+const setupBlockingHint = computed(() => {
+  if (!setupInstallDone.value) return t("synthetics.createBrowserTest.setupHintInstall");
+  if (!incognitoAllowed.value)
+    return t("synthetics.createBrowserTest.setupHintIncognito", {
+      setting: CHROME_UI_LABELS.allowIncognito,
+    });
+  if (!setupAllDone.value)
+    return t("synthetics.createBrowserTest.setupHintConnect", {
+      action: t("synthetics.createBrowserTest.setupOpenRecord"),
+    });
+  return null;
+});
 const extensionReady = ref(false);
 const checkingExtension = ref(false);
 
@@ -890,6 +917,7 @@ function onClearResults() {
         </p>
 
         <ExtensionSetupChecklist
+          v-model:install-ack="installAck"
           v-model:incognito-done="incognitoAllowed"
           :connected="extensionReady"
           class="mb-6"
@@ -898,14 +926,18 @@ function onClearResults() {
         <OButton
           variant="primary"
           size="lg"
-          class="mb-4 w-full"
-          :disabled="!extensionReady || !incognitoAllowed"
+          class="mb-3 w-full"
+          :disabled="!setupAllDone"
           data-test="synthetics-setup-open-record-btn"
           icon-left="smart-display"
           @click="onExtensionSetupRecord"
         >
-          {{ t("synthetics.createBrowserTest.setupOpenRecord") }}
+          {{ setupCtaLabel }}
         </OButton>
+
+        <p v-if="setupBlockingHint" class="text-text-secondary m-0 mb-3 text-center text-xs">
+          {{ setupBlockingHint }}
+        </p>
 
         <div class="text-center">
           <OButton
