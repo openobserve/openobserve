@@ -406,8 +406,8 @@ describe("HTMLRenderer", () => {
 
       const style = wrapper.find('[data-test="html-renderer"]').element.querySelector("style");
       expect(style?.textContent).toContain("#o2-html-panel-p1 .a");
-      expect(style?.textContent).toContain("0% { opacity: 0; }");
-      expect(style?.textContent).not.toContain("#o2-html-panel-p1 0%");
+      expect(style?.textContent).toContain("from { opacity: 0; }");
+      expect(style?.textContent).not.toContain("#o2-html-panel-p1 from");
     });
 
     it("should still strip script tags when style tags are allowed", () => {
