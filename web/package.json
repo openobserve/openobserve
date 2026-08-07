@@ -120,6 +120,8 @@
     "@types/luxon": "^3.7.3",
     "@types/node": "^25.0.3",
     "@types/uuid": "^11.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.66.0",
+    "@typescript-eslint/parser": "^8.66.0",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vitejs/plugin-vue-jsx": "^5.1.6",
     "@vitest/coverage-v8": "^4.1.10",
