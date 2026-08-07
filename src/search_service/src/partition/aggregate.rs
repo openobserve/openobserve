@@ -36,7 +36,7 @@ use crate::partition::sql_context::PartitionSqlContext;
 
 /// Determine whether a streaming aggregate query should be used for the given SQL query.
 pub fn is_streaming_aggregate(sql: &str, ts_column: Option<&str>) -> bool {
-    let feature_query_streaming_aggs = config::get_config().common.feature_query_streaming_aggs;
+    let feature_query_streaming_aggs = config::get_config().search.feature_query_streaming_aggs;
     let mut is_cachable_aggs = is_simple_aggregate_query(sql).unwrap_or(false);
 
     if let Ok(matches_pattern) = streaming_aggregate::matches_streaming_aggregate_pattern(sql) {

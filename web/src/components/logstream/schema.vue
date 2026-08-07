@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="text-3xs rounded-default text-text-secondary bg-surface-subtle px-1.5 py-0.5 font-medium"
           >
-            {{ t("logStream.utc") }}
+            {{ displayTimezone }}
           </span>
           <div class="text-text-body text-xs font-semibold">
             {{ indexData.stats.doc_time_min }}
@@ -789,7 +789,10 @@ import { computed, defineComponent, onBeforeMount, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { convertUnixToDateFormat as convertUnixToFormat, formatTimestamp } from "@/utils/date";
+import {
+  convertUnixToDateFormat as convertUnixToFormat,
+  formatTimestampInTimezone,
+} from "@/utils/date";
 import streamService from "../../services/stream";
 import segment from "../../services/segment_analytics";
 import {
@@ -914,6 +917,11 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    // Timezone used for the stream-stats time range: the user's selected
+    // timezone, falling back to the browser's zone (never a hardcoded "UTC").
+    const displayTimezone = computed(
+      () => store.state.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    );
     const indexData: any = ref(defaultValue());
     const updateSettingsForm: any = ref(null);
     const isCloud = config.isCloud;
@@ -1352,13 +1360,15 @@ export default defineComponent({
       indexData.value.stats.original_doc_time_max = streamResponse.stats.doc_time_max;
       indexData.value.stats.original_doc_time_min = streamResponse.stats.doc_time_min;
 
-      indexData.value.stats.doc_time_max = formatTimestamp(
+      indexData.value.stats.doc_time_max = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_max),
         "YYYY-MM-DDTHH:mm:ss:SS",
+        displayTimezone.value,
       );
-      indexData.value.stats.doc_time_min = formatTimestamp(
+      indexData.value.stats.doc_time_min = formatTimestampInTimezone(
         parseInt(streamResponse.stats.doc_time_min),
         "YYYY-MM-DDTHH:mm:ss:SS",
+        displayTimezone.value,
       );
 
       indexData.value.defined_schema_fields = streamResponse.settings.defined_schema_fields || [];
@@ -2436,6 +2446,7 @@ export default defineComponent({
       t,
       raw,
       store,
+      displayTimezone,
       config,
       dateChangeValue,
       isCloud,

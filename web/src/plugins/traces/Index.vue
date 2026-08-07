@@ -23,14 +23,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <div id="tracesSecondLevel" class="h-full">
       <OSplitter
-        :class="[
-          'traces-horizontal-splitter h-full',
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'hide-splitter-separator'
-            : '',
-        ]"
+        class="traces-horizontal-splitter h-full"
         v-model="splitterModel"
-        :disable="activeTab === 'service-graph' || activeTab === 'services-catalog'"
         :horizontal="true"
         unit="px"
         :limits="[85, 400]"
@@ -40,11 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           marginBottom: '-0.3125rem',
           zIndex: '10',
         }"
-        :before-class="
-          activeTab === 'service-graph' || activeTab === 'services-catalog'
-            ? 'z-auto overflow-visible max-h-[3.125rem]!'
-            : 'z-auto overflow-visible'
-        "
+        before-class="z-auto overflow-visible"
         @update:model-value="onSplitterUpdate"
       >
         <template v-slot:before>
@@ -58,50 +48,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ref="searchBarRef"
               :fieldValues="fieldValues"
               :isLoading="searchObj.loading"
-              :activeTab="activeTab"
               class="bg-card-glass-bg"
               @searchdata="searchData"
               @onChangeTimezone="refreshTimezone"
-              @update:activeTab="activeTab = $event"
               @error-only-toggled="onErrorOnlyToggled"
               @filters-reset="onFiltersReset"
               @cancel-query="cancelSearch"
               @update:searchMode="onSearchModeChange"
-              @service-graph-refresh="serviceGraphRef?.loadServiceGraph()"
-              @services-catalog-refresh="servicesCatalogRef?.loadServicesCatalog()"
             />
           </div>
         </template>
         <template v-slot:after>
           <div class="h-full overflow-hidden">
-            <!-- Service Graph Tab Content -->
+            <!-- Search results (Spans / Traces) -->
             <div
-              v-if="activeTab === 'service-graph' && config.isEnterprise == 'true'"
-              class="h-full overflow-hidden"
-            >
-              <ServiceGraph
-                ref="serviceGraphRef"
-                class="h-full"
-                @view-traces="handleServiceGraphViewTraces"
-                @request:stream-change="onChildStreamChangeRequest"
-                @jump-to-stream-data="onJumpToPanelStreamData"
-              />
-            </div>
-
-            <!-- Services Catalog Tab Content -->
-            <div v-if="activeTab === 'services-catalog'" class="h-full overflow-hidden">
-              <ServicesCatalog
-                ref="servicesCatalogRef"
-                class="h-full"
-                @view-traces="handleServicesCatalogViewTraces"
-                @request:stream-change="onChildStreamChangeRequest"
-                @jump-to-stream-data="onJumpToPanelStreamData"
-              />
-            </div>
-
-            <!-- Search Tab Content -->
-            <div
-              v-if="activeTab === 'search'"
               id="tracesThirdLevel"
               class="traces-search-result-container relative-position h-full"
             >
@@ -318,7 +278,6 @@ import {
   b64DecodeUnicode,
   formatTimeWithSuffix,
   timestampToTimezoneDate,
-  escapeSingleQuotes,
   getUUID,
   generateTraceContext,
 } from "@/utils/zincutils";
@@ -370,15 +329,7 @@ const SearchResult = defineAsyncComponent(() => import("./SearchResult.vue"));
 const SanitizedHtmlRenderer = defineAsyncComponent(
   () => import("@/components/SanitizedHtmlRenderer.vue"),
 );
-const ServiceGraph = defineAsyncComponent(() => import("./ServiceGraph.vue"));
-const ServicesCatalog = defineAsyncComponent(() => import("./ServicesCatalog.vue"));
-
 const store = useStore();
-const activeTab = computed(() => {
-  if (searchObj.meta.searchMode === "service-graph") return "service-graph";
-  if (searchObj.meta.searchMode === "services-catalog") return "services-catalog";
-  return "search";
-});
 const router = useRouter();
 const { t } = useI18nTyped();
 // Bubbles AI-chat requests up to MainLayout, which opens the O2AIChat panel.
@@ -413,8 +364,6 @@ correlationFilters.watchQuery();
 let refreshIntervalID = 0;
 const searchResultRef = ref(null);
 const searchBarRef = ref(null);
-const serviceGraphRef = ref<any>(null);
-const servicesCatalogRef = ref<any>(null);
 const splitterModel = ref(90);
 const fieldValues = ref({});
 const { showErrorNotification } = useNotifications();
@@ -1484,6 +1433,9 @@ onBeforeMount(async () => {
   }
   setupContextProvider();
   restoreUrlQueryParams();
+  // A handoff URL from Service Graph / Services Catalog (or a bookmark of one)
+  // carries a prebuilt filter; apply it before the first query runs.
+  applyHandoffFilter();
   await loadTracesParser();
   if (!searchObj.loading) {
     await loadPageData();
@@ -1518,6 +1470,18 @@ onActivated(async () => {
     restoreUrlQueryParams();
     await loadPageData();
   }
+
+  // Arriving from Service Graph / Services Catalog: this view is keep-alive, so
+  // a handoff navigation re-activates it without remounting. Apply the incoming
+  // stream/time/filter and run the query.
+  if (typeof params.filter === "string" && params.filter) {
+    restoreUrlQueryParams();
+    if (applyHandoffFilter()) {
+      await loadPageData();
+      await nextTick();
+      runQueryFn();
+    }
+  }
 });
 
 const runQueryFn = () => {
@@ -1550,14 +1514,10 @@ function restoreUrlQueryParams() {
     searchObj.data.editorValue = b64DecodeUnicode(queryParams.query);
   }
 
+  // Service Graph / Services Catalog are their own routes now; the only tab
+  // values this page still owns are its two search granularities.
   const tab = typeof queryParams.tab === "string" ? queryParams.tab : undefined;
-  if (
-    tab !== undefined &&
-    (["service-graph", "traces", "spans", "services-catalog"] as const).includes(
-      tab as "service-graph" | "traces" | "spans" | "services-catalog",
-    )
-  ) {
-    if (tab === "service-graph" && config.isEnterprise !== "true") return;
+  if (tab === "traces" || tab === "spans") {
     searchObj.meta.searchMode = tab as TraceSearchMode;
   }
 
@@ -1645,10 +1605,9 @@ const onErrorOnlyToggled = (value: boolean) => {
   }
 };
 
-// Handler for Search Mode toggle (Service Graph / Traces / Spans / Services Catalog)
-const onSearchModeChange = (mode: "traces" | "spans" | "service-graph" | "services-catalog") => {
+// Handler for the Spans / Traces granularity toggle
+const onSearchModeChange = (mode: "traces" | "spans") => {
   searchObj.meta.searchMode = mode;
-  if (mode === "service-graph" || mode === "services-catalog") return;
   if (
     mode === "traces" &&
     searchObj.meta.resultGrid.sortBy !== "start_time" &&
@@ -1955,8 +1914,6 @@ const searchData = () => {
     return;
   }
 
-  if (activeTab.value === "service-graph" || activeTab.value === "services-catalog") return;
-
   // Clear brush selections when running query
   // The filters are now part of the query, so brush selections should be cleared
   searchObj.meta.metricsRangeFilters.clear();
@@ -2111,99 +2068,24 @@ watch(
 // handler (filter add/remove, manual date change, redirect, metrics brush), not
 // by watching `searchObj.data.query`.
 
-// Handler for service graph view traces event
-const handleServiceGraphViewTraces = (data: any) => {
-  // Switch to search tab
-  searchObj.meta.searchMode = data.mode;
-
-  // Set the selected stream in dropdown
-  if (data.stream) {
-    searchObj.data.stream.selectedStream = {
-      label: data.stream,
-      value: data.stream,
-    };
-  }
-
-  // Set the filter query (just the WHERE condition, no SELECT or ORDER BY)
-  if (data.serviceName) {
-    const escapedServiceName = escapeSingleQuotes(data.serviceName);
-    const serviceField = data.serviceType ? "infer_service_name" : "service_name";
-    let filterQuery = `${serviceField} = '${escapedServiceName}'`;
-    if (data.operationName) {
-      const escapedOpName = escapeSingleQuotes(data.operationName);
-      filterQuery += ` AND operation_name = '${escapedOpName}'`;
-    }
-    if (data.nodeName) {
-      const escapedNodeName = escapeSingleQuotes(data.nodeName);
-      filterQuery += ` AND service_k8s_node_name = '${escapedNodeName}'`;
-    }
-    if (data.podName) {
-      const escapedPodName = escapeSingleQuotes(data.podName);
-      filterQuery += ` AND service_k8s_pod_name = '${escapedPodName}'`;
-    }
-    if (data.callerService) {
-      const escapedCaller = escapeSingleQuotes(data.callerService);
-      filterQuery += ` AND service_name = '${escapedCaller}'`;
-    }
-    if (data.resourceFilter?.value) {
-      const escapedValue = escapeSingleQuotes(data.resourceFilter.value);
-      if (data.resourceFilter.fields?.length) {
-        // Fallback chain: (field1 = 'val' OR field2 = 'val')
-        const clauses = data.resourceFilter.fields
-          .map((f: string) => `${f} = '${escapedValue}'`)
-          .join(" OR ");
-        filterQuery += ` AND (${clauses})`;
-      } else if (data.resourceFilter.field) {
-        filterQuery += ` AND ${data.resourceFilter.field} = '${escapedValue}'`;
-      }
-    }
-    if (data.errorsOnly) {
-      filterQuery += ` AND span_status = 'ERROR'`;
-    }
-    if (data.minDurationMicros && data.minDurationMicros > 0) {
-      filterQuery += ` AND duration >= ${data.minDurationMicros}`;
-    }
-    if (data.maxDurationMicros && data.maxDurationMicros > 0) {
-      filterQuery += ` AND duration <= ${data.maxDurationMicros}`;
-    }
-    searchObj.data.editorValue = filterQuery;
-    searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
-  }
-
-  // Set the time range
-  if (data.timeRange) {
-    searchObj.data.datetime = {
-      startTime: data.timeRange.startTime,
-      endTime: data.timeRange.endTime,
-      relativeTimePeriod: null,
-      type: "absolute",
-    };
-  }
-
-  // Run the query
-  nextTick(() => {
-    runQueryFn();
-  });
-};
-
 /**
- * Handler for the services catalog `view-traces` event.
+ * Hydrate a handoff from the standalone Service Graph / Services Catalog routes.
  *
- * Normalizes the payload (which may be a plain service name string for backward
- * compatibility, or a full object with `serviceName`, `serviceType`,
- * `resourceFilter`, etc.) and delegates to {@link handleServiceGraphViewTraces}
- * to populate the search bar and run the filtered traces query.
+ * Those views navigate here with the filter, stream, mode and time range as
+ * query params (see `viewTracesQuery` in ./viewTracesHandoff), rather than
+ * mutating the shared search state from inside a sibling tab. Applying them
+ * here keeps the handoff URL bookmarkable and reload-safe.
  *
- * @param data - Service name string (legacy) or structured filter object.
- *               Structured objects may include `serviceName`, `serviceType`,
- *               `operationName`, `nodeName`, `podName`, `callerService`,
- *               `resourceFilter`, `errorsOnly`, `minDurationMicros`,
- *               `maxDurationMicros`, `mode`, and `stream`.
+ * `restoreUrlQueryParams` already applies `stream`, `from`/`to` and `tab`, so
+ * this only adds the prebuilt filter and re-runs the query.
  */
-const handleServicesCatalogViewTraces = (data: string | Record<string, any>) => {
-  // Normalize plain string to object then delegate to the full handler
-  const payload = typeof data === "string" ? { serviceName: data, mode: "traces" } : data;
-  handleServiceGraphViewTraces(payload);
+const applyHandoffFilter = (): boolean => {
+  const filter = router.currentRoute.value.query.filter;
+  if (typeof filter !== "string" || !filter) return false;
+
+  searchObj.data.editorValue = filter;
+  searchObj.meta.sqlMode = false; // Traces doesn't use SQL mode
+  return true;
 };
 
 // watch(updateSelectedColumns, () => {

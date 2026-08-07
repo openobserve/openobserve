@@ -1770,6 +1770,9 @@ export default defineComponent({
           sourceType: "logs",
           // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
           availableDimensions: { ...logFilters, ...context.fields },
+          // Lets filter edits resolve across streams that alias the same
+          // semantic group under different field names (F35).
+          semanticGroups: semanticGroups.value,
           ftsFields: ftsFields, // Full text search fields for trace_id extraction from log body
           timeRange: {
             startTime: startTimeMicros,

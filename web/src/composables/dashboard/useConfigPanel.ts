@@ -416,6 +416,12 @@ export function useConfigPanel(
         visible: dashboardPanelData.data.type === "metric",
       },
     },
+    sparkline: {
+      sparkline: {
+        label: t("dashboard.configSectionSparkline"),
+        visible: dashboardPanelData.data.type === "metric",
+      },
+    },
   }));
 
   // ── Search state ──────────────────────────────────────────────────────────

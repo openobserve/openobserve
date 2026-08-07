@@ -941,7 +941,7 @@ pub async fn merge_files(
                 storage::put(&account, &new_file_key, buf.clone()).await?;
             }
 
-            if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
+            if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
                 generate_inverted_index(
                     org_id,
                     &new_file_key,
@@ -991,7 +991,7 @@ pub async fn merge_files(
                     storage::put(&account, &new_file_key, buf.clone()).await?;
                 }
 
-                if cfg.common.inverted_index_enabled && stream_type.support_index() && need_index {
+                if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {
                     generate_inverted_index(
                         org_id,
                         &new_file_key,

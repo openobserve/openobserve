@@ -154,7 +154,9 @@ export default defineComponent({
 
     const tabs = [
       { label: t("rum.overview"), value: "overview" },
-      { label: t("rum.webVitals"), value: "web_vitals" },
+      // Adaptive Vitals tab: browser Web Vitals or (Phase 2) Mobile Vitals, chosen by the
+      // platform whose data the stream holds. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+      { label: t("rum.vitals"), value: "web_vitals" },
       { label: t("rum.errors"), value: "errors" },
       { label: t("rum.api"), value: "api" },
     ];

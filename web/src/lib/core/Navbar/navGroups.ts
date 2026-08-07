@@ -32,7 +32,7 @@ export const GATE_PREDICATES: Record<string, (c: NavGateContext) => boolean> = {
   enterpriseMeta: (c) => c.isEnterprise && c.isMeta,
   cloudMeta: (c) => c.isCloud && c.isMeta,
   storage: (c) => c.isEnterprise && (!c.isCloud || c.orgStorage),
-  modelPricing: (c) => c.modelPricing,
+  modelPricing: (c) => (c.isEnterprise || c.isCloud) && c.modelPricing,
   correlation: (c) => c.isEnterprise && c.serviceStreams,
   llmProviders: (c) => (c.isEnterprise || c.isCloud) && c.onlineEvals,
   // IAM (isEnt = enterprise OR cloud)
@@ -211,12 +211,28 @@ export const NAV_GROUPS: NavGroupDef[] = [
  * Top-level links that ALSO reveal their own in-page section nav on hover,
  * keyed by the top-level item's `name`.
  *
- * Currently empty: AI / IAM / Management are intentionally plain links (no rail
- * submenu) — their in-page SectionRail is the place to switch sections. Re-add
- * an entry here (mirroring the page's SectionRail) to restore a hover flyout.
- * The `gate` machinery (GATE_PREDICATES) remains available for any future entry.
+ * AI / IAM / Management are intentionally plain links (no rail submenu) — their
+ * in-page SectionRail is the place to switch sections. Re-add an entry here
+ * (mirroring the page's SectionRail) to restore a hover flyout.
+ *
+ * Traces: each child is its own route. Spans is deliberately absent — it is a
+ * view-granularity toggle inside the Traces search page (it shares the
+ * query/stream/time context), not a destination. Service Graph carries the
+ * `enterprise` gate its route guard applies, so the rail never offers a link
+ * that would redirect straight back to Traces.
  */
-export const NAV_SUBNAV: Record<string, SubnavChild[]> = {};
+export const NAV_SUBNAV: Record<string, SubnavChild[]> = {
+  traces: [
+    { titleKey: "menu.traces", icon: "account-tree", name: "traces" },
+    {
+      titleKey: "menu.serviceGraph",
+      icon: "share",
+      name: "serviceGraph",
+      gate: "enterprise",
+    },
+    { titleKey: "menu.services", icon: "menu-book", name: "servicesCatalog" },
+  ],
+};
 
 /**
  * Transform the flat `linksList` into rail entries, PRESERVING the input order

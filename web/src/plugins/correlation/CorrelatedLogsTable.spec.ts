@@ -39,7 +39,6 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
     fetchCorrelatedLogs: vi.fn(),
     updateFilter: vi.fn(),
     updateFilters: vi.fn(),
-    resetFilters: vi.fn(),
     refresh: vi.fn(),
     isMatchedDimension: vi.fn(() => false),
     isAdditionalDimension: vi.fn(() => false),

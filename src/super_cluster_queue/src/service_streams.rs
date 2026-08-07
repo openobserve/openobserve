@@ -40,7 +40,9 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 record.service_name
             );
             let org_id = record.org_id.clone();
-            service_streams::put(&org_id, *record).await?;
+            // Orphan disambiguations are irrelevant here: the put event below makes this
+            // cluster's nodes reload the org's services wholesale (F19).
+            let _orphans = service_streams::put(&org_id, *record).await?;
             infra::coordinator::service_streams::emit_put_event(&org_id).await?;
         }
         ServiceStreamsMessage::Delete {
@@ -53,7 +55,9 @@ pub(crate) async fn process_msg(msg: ServiceStreamsMessage) -> Result<()> {
                 service_key
             );
             service_streams::delete_all(&org_id).await?;
-            infra::coordinator::service_streams::emit_delete_event(&org_id, &service_key).await?;
+            // Org-scope reload: the delete wiped the whole org's rows, so a per-service
+            // delete event would evict only one cache key on this cluster's nodes (F6).
+            infra::coordinator::service_streams::emit_reload_event(&org_id).await?;
         }
     }
     Ok(())

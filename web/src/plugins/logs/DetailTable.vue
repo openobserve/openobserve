@@ -262,6 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"

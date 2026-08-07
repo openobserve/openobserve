@@ -3110,14 +3110,6 @@ async function saveConfig() {
       return;
     }
 
-    if (trackedAliasIds.value.length === 0) {
-      toast({
-        variant: "warning",
-        message: t("settings.serviceIdentitySetup.selectAtLeastOneTrackedAlias"),
-      });
-      return;
-    }
-
     // "service" is always tracked implicitly by the backend; strip it to avoid 400.
     // Also drop orphan ids that no longer correspond to any known group (e.g. the
     // group was deleted from Field Mappings after being added to tracked aliases).

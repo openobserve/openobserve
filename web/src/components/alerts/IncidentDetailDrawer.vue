@@ -1140,6 +1140,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :source-stream="'incidents'"
                     :source-type="'incidents'"
                     :available-dimensions="availableDimensions"
+                    :semantic-groups="semanticGroups"
                     :fts-fields="ftsFields"
                     :time-range="telemetryTimeRange"
                     :hide-view-related-button="true"
@@ -3390,6 +3391,7 @@ export default defineComponent({
       telemetryTimeRange,
       actualMatchedDimensions,
       availableDimensions,
+      semanticGroups,
       ftsFields,
       incidentContextData,
       affectedServicesCount,

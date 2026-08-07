@@ -48,29 +48,6 @@ const useManagementRoutes = () => {
           path: "alert_destinations",
           redirect: (to: any) => ({ name: "alertDestinations", query: to.query }),
         },
-        {
-          path: "model_pricing",
-          name: "modelPricing",
-          meta: {
-            keepAlive: true,
-            title: "LLM Model Pricing",
-          },
-          component: () => import("@/components/settings/ModelPricingList.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "model_pricing/edit",
-          name: "modelPricingEditor",
-          meta: {
-            title: "Model Pricing Editor",
-          },
-          component: () => import("@/components/settings/ModelPricingEditor.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
         // Alert templates moved to /alert-templates (Reliability). Redirect kept
         // for the same reason as alert_destinations above, query included.
         {
@@ -88,11 +65,34 @@ const useManagementRoutes = () => {
       ],
     },
   ];
-  // LLM Providers and GenAI Agent Mapping (used by the AI Observability /
-  // Online Evals flows) are enterprise/cloud-only features — the backend routes
-  // only exist behind the enterprise feature flag, so they must not be exposed
-  // in OSS builds.
+  // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
+  // Observability / Online Evals flows) are enterprise/cloud-only features — the
+  // backend routes only exist behind the enterprise feature flag, so they must
+  // not be exposed in OSS builds.
   if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "model_pricing",
+      name: "modelPricing",
+      meta: {
+        keepAlive: true,
+        title: "LLM Model Pricing",
+      },
+      component: () => import("@/components/settings/ModelPricingList.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    routes[0].children.push({
+      path: "model_pricing/edit",
+      name: "modelPricingEditor",
+      meta: {
+        title: "Model Pricing Editor",
+      },
+      component: () => import("@/components/settings/ModelPricingEditor.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
     routes[0].children.push({
       path: "llm_providers",
       name: "llmProviders",

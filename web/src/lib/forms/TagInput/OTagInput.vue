@@ -24,7 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="label"
         data-test="tag-input-label"
         class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ml-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
-        :class="hasContent ? 'text-theme-accent -translate-y-2 scale-75' : 'text-text-secondary'"
+        :class="
+          hasContent || isFocused
+            ? 'text-theme-accent -translate-y-2 scale-75'
+            : 'text-text-secondary'
+        "
         >{{ label }}</label
       >
       <div
@@ -62,7 +66,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"
-          @blur="addTag"
+          @focus="isFocused = true"
+          @blur="
+            addTag();
+            isFocused = false;
+          "
         />
       </div>
     </div>
@@ -90,6 +98,12 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);
+// Live-reported bug: the label only floated when there was content, so an
+// empty, focused field showed the label sitting directly on top of the
+// placeholder ("Type and press Enter or comma") — indistinguishable from
+// garbled/overlapping text. Standard floating-label inputs also float on
+// focus, before any content exists; this input didn't.
+const isFocused = ref(false);
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string[]): void;
