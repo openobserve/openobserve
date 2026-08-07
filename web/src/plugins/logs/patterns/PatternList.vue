@@ -206,6 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
 import PatternCard from "./PatternCard.vue";
+import { usePatternActions } from "./usePatternActions";
 import WildcardValuePopover from "./WildcardValuePopover.vue";
 import useWildcardHover from "./useWildcardHover";
 import OVirtualScroll from "@/lib/core/VirtualScroll/OVirtualScroll.vue";
@@ -219,7 +220,7 @@ import {
   compactCount,
   type PatternSeverityKey,
 } from "./patternUtils";
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { DateTime } from "luxon";
 
 const SKELETON_WIDTHS = [
@@ -295,6 +296,11 @@ const openDetails = (pattern: any, index: number) => {
 
 const { hoveredToken, onPopoverEnter, onPopoverLeave } = useWildcardHover();
 
+// The severity filter is shared through usePatternActions rather than kept
+// local: "create an alert from the visible patterns" has to know which patterns
+// are visible, and that decision is made here.
+const { activeSeverities, setActiveSeverities } = usePatternActions();
+
 // --- Severity filter (multi-select; empty = show all) -----------------------
 const SEVERITY_ORDER: PatternSeverityKey[] = ["error", "warning", "info", "debug", "uncategorized"];
 const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
@@ -305,10 +311,8 @@ const SEVERITY_LABEL_KEY: Record<PatternSeverityKey, string> = {
   uncategorized: "logs.patternList.severityUncategorized",
 };
 
-const activeSeverities = ref<PatternSeverityKey[]>([]);
-
 const onSeverityFilterChange = (value: unknown) => {
-  activeSeverities.value = Array.isArray(value) ? (value as PatternSeverityKey[]) : [];
+  setActiveSeverities(Array.isArray(value) ? (value as PatternSeverityKey[]) : []);
 };
 
 // Chip counts come from the extraction sample, which is a clean partition
@@ -351,7 +355,7 @@ watch(severityChips, (chips) => {
   const available = new Set(chips.map((c) => c.key));
   const pruned = activeSeverities.value.filter((k) => available.has(k));
   if (pruned.length !== activeSeverities.value.length) {
-    activeSeverities.value = pruned;
+    setActiveSeverities(pruned);
   }
 });
 

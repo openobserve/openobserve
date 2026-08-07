@@ -1014,7 +1014,8 @@
     "changeQueryModeTitle": "Change Query Mode",
     "changeQueryModeConfirm": "Are you sure you want to change the query mode? The data saved for X-Axis, Y-Axis and Filters will be wiped off.",
     "patternExampleLog": "Example Log",
-    "patternCount": "Count"
+    "patternCount": "Count",
+    "menuGroupAlerts": "Alerts"
   },
   "menu": {
     "upgradeToProPlan": "Upgrade to PRO Plan",
@@ -6162,6 +6163,65 @@
       "eventCount": "Events",
       "notFoundTitle": "Alert not found",
       "notFoundDescription": "This alert no longer exists, or you do not have access to it. It may have been deleted."
+    },
+    "prefill": {
+      "dialog": {
+        "title": "Create alert",
+        "continue": "Continue to alert",
+        "streamLabel": "Stream",
+        "thresholdLabel": "Alert on",
+        "thresholdMatchingRows": "Matching rows",
+        "thresholdCount": "Count of rows",
+        "windowLabel": "Window",
+        "windowValue": "Last {minutes} minutes (from your time range)",
+        "queryLabel": "Query",
+        "queryCopied": "Query copied to clipboard",
+        "patternsLabel": "Patterns",
+        "patternsNone": "Don't use",
+        "patternsIncludeAll": "Include all",
+        "patternsExcludeAll": "Exclude all",
+        "patternsScopeAll": "Using all {total} extracted patterns.",
+        "patternsScopeFiltered": "Using {visible} of {total} patterns — the severity filter is applied to the list, and the alert follows it."
+      },
+      "sources": {
+        "default": {
+          "label": "Create Alert",
+          "toast": "Query imported into the alert form"
+        },
+        "logs": {
+          "label": "Create Alert",
+          "toast": "Query imported from your logs search"
+        },
+        "patterns": {
+          "label": "Create alert",
+          "toast": "Query imported from the selected patterns"
+        },
+        "panel": {
+          "label": "Create Alert",
+          "toast": "Query imported from dashboard panel: \"{sourceLabel}\""
+        }
+      },
+      "warnings": {
+        "absoluteToRolling": "Your absolute time range became a {minutes}-minute rolling window — alerts always evaluate the most recent window.",
+        "periodClamped": "The time range was shortened to {minutes} minutes; alerts cannot evaluate a window that long.",
+        "limitStripped": "LIMIT was removed — alerts evaluate every matching row in the window.",
+        "orderByStripped": "ORDER BY was removed — ordering has no effect on alert evaluation.",
+        "histogramNotSupported": "This query buckets results over time, which an alert cannot evaluate. Create the alert from a dashboard panel instead.",
+        "convertedToSql": "Your filter was converted to SQL because it uses expressions the condition builder cannot represent.",
+        "actionsDropped": "The selected action was not carried over — alerts support VRL functions only.",
+        "joinSingleStream": "This query reads more than one stream; the alert will be attached to \"{stream}\".",
+        "broadMatch": "This alert matches every record in the stream. Add a filter unless that is what you want.",
+        "noResults": "Your query returned no results — the alert will only fire once matching data appears.",
+        "savedFunctionCopied": "The function body was copied into the alert. Later edits to the saved function will not apply to it.",
+        "unsupportedPanelType": "The \"{type}\" panel type has no row count to alert on; check the query before saving.",
+        "unresolvedQuery": "The query could not be resolved into something an alert can run.",
+        "noStream": "No stream is selected, so there is nothing to alert on.",
+        "emptyQuery": "There is no query to create an alert from.",
+        "noQueries": "This panel has no query to create an alert from.",
+        "noConstants": "The selected patterns have no distinctive text to match on.",
+        "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
+        "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
+      }
     }
   },
   "alert_templates": {
@@ -12126,7 +12186,8 @@
     },
     "dashboard": {
       "clickOnTheChartDataOr": "Click on the chart data or select a range to add an annotation",
-      "runningQueryCanceledSuccessfully": "Running query canceled successfully"
+      "runningQueryCanceledSuccessfully": "Running query canceled successfully",
+      "panelQueryHasNoStreamToAlertOn": "This panel's query has no stream to alert on."
     },
     "useLogs": {
       "runningQueryCancelledSuccessfully": "Running query cancelled successfully",
@@ -12179,7 +12240,9 @@
       "streamDeletedSuccessfully": "Stream deleted successfully.",
       "pleaseWaitWhileLoadingStreams": "Please wait while loading streams...",
       "errorWhilePullingSummary": "Error while pulling summary.",
-      "pleaseWaitWhileLoadingSummary": "Please wait while loading summary..."
+      "pleaseWaitWhileLoadingSummary": "Please wait while loading summary...",
+      "noDestinationsCreateOneBeforeSaving": "No destinations found. Create one before saving this alert.",
+      "errorWhileLoadingAlert": "Error while loading alert."
     },
     "RUM": {
       "sourceMapsDeletedSuccessfullyForIn": "Source maps deleted successfully for {service} ({version}) in {environment}",
