@@ -42,9 +42,18 @@ const i18n = createI18n({
 });
 
 // Mock services
-vi.mock("@/services/users");
-vi.mock("@/services/organizations");
-vi.mock("@/services/iam");
+vi.mock("@/services/users", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/services/segment_analytics");
 
 // Mock aws-exports config
@@ -553,7 +562,7 @@ describe("User Component", () => {
       mockUsersService.orgUsers.mockResolvedValue({ data: { data: mockUsers } } as any);
       mockUsersService.invitedUsers.mockResolvedValue({ status: 200, data: [] } as any);
 
-      await wrapper.vm.getOrgMembers();
+      await wrapper.vm.getOrgMembers(true);
       await flushPromises();
 
       expect(mockUsersService.orgUsers).toHaveBeenCalledWith(
@@ -574,7 +583,7 @@ describe("User Component", () => {
       ];
       mockUsersService.orgUsers.mockResolvedValue({ data: { data: mockUsers } } as any);
 
-      await wrapper.vm.getOrgMembers();
+      await wrapper.vm.getOrgMembers(true);
 
       expect(wrapper.vm.currentUserRole).toBe("admin");
       expect(wrapper.vm.isCurrentUserInternal).toBe(true);
@@ -582,7 +591,7 @@ describe("User Component", () => {
 
     it("should handle getOrgMembers error", async () => {
       mockUsersService.orgUsers.mockRejectedValue(new Error("Fetch error"));
-      await expect(wrapper.vm.getOrgMembers()).rejects.toBe(false);
+      await expect(wrapper.vm.getOrgMembers(true)).rejects.toBe(false);
     });
   });
 

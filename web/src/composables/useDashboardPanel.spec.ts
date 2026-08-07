@@ -25,8 +25,14 @@ vi.mock("vue", async () => {
 vi.mock("vuex");
 vi.mock("./useNotifications");
 vi.mock("./dashboard/useValuesWebSocket");
-vi.mock("@/services/stream");
-vi.mock("@/services/search");
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/search", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/zincutils");
 vi.mock("@/utils/query/sqlUtils");
 vi.mock("@/utils/dashboard/convertDataIntoUnitValue");

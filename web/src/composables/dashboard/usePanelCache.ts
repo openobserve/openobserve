@@ -1,15 +1,41 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
- * This is the IndexedDB-based cache implementation for panel level cache data
- * Database structure:
- * - Database: 'PanelCache'
- * - Object Store: 'panels'
- * - Key format: 'folder_id:dashboard_id:panel_id'
- * - Value: { key, value, cacheTimeRange, timestamp }
+ * Per-panel result cache. The public API (`getPanelCache` / `savePanelCache`)
+ * is unchanged; the storage underneath is now the shared IndexedDB primitive,
+ * which brings three things this cache never had:
+ *
+ *  - the org in the key, so two orgs cannot collide on a dashboard id and the
+ *    org-switch purge can find these records;
+ *  - a TTL and an LRU cap, so panel payloads — the largest objects the app
+ *    stores — no longer grow without bound;
+ *  - structured-clone writes instead of `JSON.parse(JSON.stringify(...))` on
+ *    the main thread for multi-MB result sets.
  */
 
-const DB_NAME = "PanelCache";
-const DB_VERSION = 1;
-const STORE_NAME = "panels";
+import {
+  PANEL_CACHE_NAMESPACE,
+  cacheAllRecords,
+  cacheClear,
+  cacheGetRecord,
+  cacheMaintain,
+  cacheSetOrThrow,
+  orgScopedKey,
+} from "@/composables/query/idbStorage";
+import { panelKeyDigest } from "@/composables/query/panelKey";
 
 declare global {
   interface Window {
@@ -18,51 +44,30 @@ declare global {
   }
 }
 
-// Initialize IndexedDB
-const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+/** Panel results are large; keep far fewer of them than of small config values. */
+const MAX_PANEL_RECORDS = 200;
+const PANEL_TTL_MS = 24 * 60 * 60_000;
 
-    request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+export interface PanelCacheEntry {
+  key: any;
+  value: any;
+  cacheTimeRange: any;
+  timestamp: number;
+}
 
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: "id" });
-        store.createIndex("folderId", "folderId", { unique: false });
-        store.createIndex("dashboardId", "dashboardId", { unique: false });
-        store.createIndex("timestamp", "timestamp", { unique: false });
-      }
-    };
-  });
-};
+// The digest of the normalized schema + variables is part of the key, so a
+// panel's different variable combinations no longer overwrite each other.
+const panelKey = (
+  org: string,
+  folderId: string,
+  dashboardId: string,
+  panelId: string,
+  digest: string,
+): string => orgScopedKey(PANEL_CACHE_NAMESPACE, org, folderId, dashboardId, panelId, digest);
 
-// Helper function to generate cache key
-const generateCacheKey = (folderId: string, dashboardId: string, panelId: string): string => {
-  return `${folderId}:${dashboardId}:${panelId}`;
-};
-
-// Helper function to perform IndexedDB transactions
-const performTransaction = async <T>(
-  mode: IDBTransactionMode,
-  callback: (store: IDBObjectStore) => IDBRequest<T>,
-): Promise<T> => {
-  const db = await initDB();
-  const transaction = db.transaction([STORE_NAME], mode);
-  const store = transaction.objectStore(STORE_NAME);
-
-  return new Promise((resolve, reject) => {
-    const request = callback(store);
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-};
-
-// Global cache management functions
 window._o2_removeDashboardCache = async (): Promise<void> => {
   try {
-    await performTransaction("readwrite", (store) => store.clear());
+    await cacheClear();
   } catch (error) {
     console.error("Error clearing dashboard cache:", error);
   }
@@ -70,20 +75,21 @@ window._o2_removeDashboardCache = async (): Promise<void> => {
 
 window._o2_getDashboardCache = async (): Promise<any> => {
   try {
-    const allRecords = await performTransaction("readonly", (store) => store.getAll());
+    const records = await cacheAllRecords<PanelCacheEntry>();
     const cache: any = {};
 
-    allRecords.forEach((record: any) => {
-      const [folderId, dashboardId, panelId] = record.id.split(":");
+    records.forEach((record) => {
+      if (!record.key.startsWith(`${PANEL_CACHE_NAMESPACE}|`)) return;
+      const [, , folderId, dashboardId, panelId] = record.key.split("|");
 
       if (!cache[folderId]) cache[folderId] = {};
       if (!cache[folderId][dashboardId]) cache[folderId][dashboardId] = {};
 
       cache[folderId][dashboardId][panelId] = {
-        key: record.key,
-        value: record.value,
-        cacheTimeRange: record.cacheTimeRange,
-        timestamp: record.timestamp,
+        key: record.value.key,
+        value: record.value.value,
+        cacheTimeRange: record.value.cacheTimeRange,
+        timestamp: record.value.timestamp,
       };
     });
 
@@ -97,13 +103,19 @@ window._o2_getDashboardCache = async (): Promise<any> => {
 /**
  * Use Panel Cache Data on a per dashboard basis in combination with folderid, dashboard id and panel id
  */
-export const usePanelCache = (folderId: string, dashboardId: string, panelId: string) => {
+export const usePanelCache = (
+  folderId: string,
+  dashboardId: string,
+  panelId: string,
+  /** Scopes the cache key; two orgs can otherwise collide on a dashboard id. */
+  org = "",
+) => {
   if (!(folderId && dashboardId && panelId)) {
     const savePanelCache = async (_key: any, _data: any, _cacheTimeRange: any): Promise<void> => {
       // do nothing
     };
 
-    const getPanelCache = async (): Promise<null> => {
+    const getPanelCache = async (_key?: any): Promise<null> => {
       return null;
     };
 
@@ -113,41 +125,44 @@ export const usePanelCache = (folderId: string, dashboardId: string, panelId: st
     };
   }
 
-  const cacheKey = generateCacheKey(folderId, dashboardId, panelId);
+  let writesSinceSweep = 0;
 
   const savePanelCache = async (key: any, data: any, cacheTimeRange: any): Promise<void> => {
     try {
-      const cacheData = {
-        id: cacheKey,
-        folderId,
-        dashboardId,
-        panelId,
-        key: JSON.parse(JSON.stringify(key)), // deep copy key
-        value: JSON.parse(JSON.stringify(data)), // deep copy data
-        cacheTimeRange: JSON.parse(JSON.stringify(cacheTimeRange)),
-        timestamp: new Date().getTime(),
-      };
-
-      await performTransaction("readwrite", (store) => store.put(cacheData));
+      await cacheSetOrThrow<PanelCacheEntry>(
+        panelKey(org, folderId, dashboardId, panelId, panelKeyDigest(key)),
+        { key, value: data, cacheTimeRange, timestamp: Date.now() },
+        PANEL_TTL_MS,
+      );
+      // The SQL executor saves per partition, so sweep occasionally rather than
+      // paying the scan on every write.
+      if (++writesSinceSweep >= 20) {
+        writesSinceSweep = 0;
+        void cacheMaintain(MAX_PANEL_RECORDS);
+      }
     } catch (error) {
       console.error("Error saving panel cache:", error);
     }
   };
 
-  const getPanelCache = async (): Promise<any> => {
+  /**
+   * `currentKey` is the key the panel would run with now — its digest selects
+   * the matching entry. Callers still verify the returned key themselves, so a
+   * digest collision cannot serve the wrong result.
+   */
+  const getPanelCache = async (currentKey?: any): Promise<PanelCacheEntry | null> => {
     try {
-      const result = await performTransaction("readonly", (store) => store.get(cacheKey));
+      const record = await cacheGetRecord<PanelCacheEntry>(
+        panelKey(org, folderId, dashboardId, panelId, panelKeyDigest(currentKey)),
+      );
+      if (!record) return null;
 
-      if (result) {
-        return {
-          key: result.key,
-          value: result.value,
-          cacheTimeRange: result.cacheTimeRange,
-          timestamp: result.timestamp,
-        };
-      }
-
-      return null;
+      return {
+        key: record.value.key,
+        value: record.value.value,
+        cacheTimeRange: record.value.cacheTimeRange,
+        timestamp: record.value.timestamp,
+      };
     } catch (error) {
       console.error("Error getting panel cache:", error);
       return null;

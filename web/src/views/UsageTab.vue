@@ -556,8 +556,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import orgService from "@/services/organizations";
-import configService from "@/services/config";
 import config from "@/aws-exports";
 import { formatSizeFromMB } from "@/utils/zincutils";
 import { formatEventCount } from "@/utils/formatters";
@@ -575,6 +573,8 @@ import KpiCard from "@/components/common/KpiCard.vue";
 import KpiCardRow from "@/components/common/KpiCardRow.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import HomeNoDataState from "@/views/HomeNoDataState.vue";
+import { configQuery } from "@/services/config";
+import { orgSummaryQuery } from "@/services/organizations";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -637,9 +637,10 @@ const getSummary = (org_id: any) => {
     message: t("toastMessages.views.pleaseWaitWhileLoadingSummary"),
     timeout: 0,
   });
-  orgService
-    .get_organization_summary(org_id)
-    .then((res) => {
+  orgSummaryQuery
+    .get(org_id)
+    .then((data: any) => {
+      const res = { data };
       if (
         res.data.streams.num_streams == 0 &&
         res.data.alerts.num_realtime == 0 &&
@@ -955,8 +956,7 @@ onMounted(() => {
 
 const refreshConfig = async () => {
   try {
-    const res: any = await configService.get_config();
-    store.dispatch("setConfig", res.data);
+    store.dispatch("setConfig", await configQuery.refresh());
   } catch (error) {
     console.log(error);
   }

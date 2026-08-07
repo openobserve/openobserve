@@ -217,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               :title="t('common.refresh')"
               data-test="synthetic-monitoring-refresh-btn"
-              @click="loadMonitors()"
+              @click="loadMonitors(undefined, true)"
             />
           </template>
         </MonitorTable>
@@ -380,7 +380,7 @@ import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import syntheticsService from "@/services/synthetics";
+import syntheticsService, { syntheticsMonitorsQuery } from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   syntheticsCreateRoute,
@@ -510,7 +510,7 @@ function waitForOrgIdentifier(): Promise<void> {
   });
 }
 
-async function loadMonitors(folderId?: string) {
+async function loadMonitors(folderId?: string, force = false) {
   if (!orgIdentifier.value) return;
   loading.value = true;
   try {
@@ -520,11 +520,10 @@ async function loadMonitors(folderId?: string) {
         : searchAcrossFolders.value
           ? undefined
           : activeFolderId.value;
-    const res = await syntheticsService.listByFolderId(orgIdentifier.value, targetFolder);
-    // The API field was renamed `monitors` -> `checks`. Both are read so a
-    // bundle and a server on opposite sides of that rename still render.
-    const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
-    monitors.value = rows.map(mapMonitor);
+    const list = force
+      ? await syntheticsMonitorsQuery.refresh(orgIdentifier.value, targetFolder)
+      : await syntheticsMonitorsQuery.get(orgIdentifier.value, targetFolder);
+    monitors.value = list.map(mapMonitor);
   } finally {
     loading.value = false;
   }
@@ -664,7 +663,7 @@ const bulkDeleteMonitors = async () => {
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
-    await loadMonitors();
+    await loadMonitors(undefined, true);
   } catch (err: any) {
     dismiss();
     toast({
@@ -694,7 +693,7 @@ const moveSingleMonitor = (row: any) => {
 const onMoveUpdated = async () => {
   selectedMonitorIds.value = [];
   showMoveDialog.value = false;
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 };
 
 // ── Row click → Monitor Results page ───────────────────────────────────
@@ -986,7 +985,7 @@ async function bulkPauseMonitors() {
   }
   bulkActionLoading.value = false;
   selectedMonitorIds.value = [];
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 }
 
 async function bulkEnableMonitors() {
@@ -1024,7 +1023,7 @@ async function bulkEnableMonitors() {
   }
   bulkActionLoading.value = false;
   selectedMonitorIds.value = [];
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 }
 
 async function bulkTriggerMonitors() {
@@ -1224,7 +1223,7 @@ async function saveDuplicate() {
     if (!searchAcrossFolders.value && targetFolder !== activeFolderId.value) {
       activeFolderId.value = targetFolder;
     } else {
-      await loadMonitors();
+      await loadMonitors(undefined, true);
     }
   } catch (err: any) {
     dismiss();

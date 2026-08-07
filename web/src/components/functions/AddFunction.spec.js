@@ -6,12 +6,15 @@ import { nextTick } from "vue";
 import * as vueRouter from "vue-router";
 
 // Mock the jsTransform service
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
-    update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
+      update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
+    },
+  });
+});
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({

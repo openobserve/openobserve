@@ -131,6 +131,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
+  scoreConfigsQuery,
   type Provider,
   type ScoreConfig,
 } from "@/services/online-evals.service";
@@ -315,7 +316,7 @@ async function resolveRequiredScoreConfig(name: string): Promise<ScoreConfig> {
     );
   } catch (err: any) {
     if (err?.response?.status === 409) {
-      const refreshed = await onlineEvalsService.scoreConfigs.list(props.orgId);
+      const refreshed = await scoreConfigsQuery.refresh(props.orgId);
       const found = refreshed.find((row) => row.name === name);
       if (found) return found;
     }

@@ -5,11 +5,14 @@ import { createRouter, createWebHistory } from "vue-router";
 import AddAlertView from "./AddAlertView.vue";
 import destinationService from "@/services/alert_destination";
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 describe("AddAlertView.vue", () => {
   let store: any;
@@ -79,10 +82,9 @@ describe("AddAlertView.vue", () => {
 
     await flushPromises();
 
-    expect(destinationService.list).toHaveBeenCalledWith({
-      org_identifier: "test-org",
-      module: "alert",
-    });
+    expect(destinationService.list).toHaveBeenCalledWith(
+      expect.objectContaining({ org_identifier: "test-org", module: "alert" }),
+    );
   });
 
   it("should not render AddAlert when destinations are empty", async () => {

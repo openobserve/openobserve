@@ -377,7 +377,6 @@ import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
-import licenseServer from "@/services/license_server";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -385,6 +384,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { licenseQuery } from "@/services/license_server";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -470,8 +470,7 @@ export default defineComponent({
       if (isEnterprise && hasLicense && !isCloud) {
         isLoadingLicense.value = true;
         try {
-          const response = await licenseServer.get_license();
-          licenseData.value = response.data;
+          licenseData.value = await licenseQuery.get();
           // Generate dashboard after license data is fetched
           generateUsageDashboard();
         } catch (error) {

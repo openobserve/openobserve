@@ -111,7 +111,7 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import searchService from "@/services/search";
+import searchService, { traceDagQuery } from "@/services/search";
 
 // VueFlow CSS imports
 import "@vue-flow/core/dist/style.css";
@@ -404,14 +404,13 @@ export default defineComponent({
         error.value = null;
 
         const org = store.state.selectedOrganization.identifier;
-        const response = await searchService.getTraceDAG(
+        dagData.value = await traceDagQuery.get(
           org,
           props.streamName,
           props.traceId,
           props.startTime,
           props.endTime,
         );
-        dagData.value = response.data;
       } catch (err: any) {
         console.error("[TraceDAG] Failed to fetch DAG:", err);
         error.value =

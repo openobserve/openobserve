@@ -105,6 +105,7 @@ import usePermissions from "@/composables/iam/usePermissions";
 import GroupServiceAccounts from "./GroupServiceAccounts.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { groupsQuery } from "@/services/iam";
 
 onBeforeMount(() => {
   getGroupDetails();
@@ -262,6 +263,7 @@ const saveGroupChanges = () => {
     return;
   }
 
+  groupsQuery.invalidate(store.state.selectedOrganization.identifier);
   updateGroup({
     group_name: groupDetails.value.group_name,
     org_identifier: store.state.selectedOrganization.identifier,

@@ -27,7 +27,7 @@ import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import McpServerCard from "@/components/ingestion/ai/McpServerCard.vue";
 import useIngestion from "@/composables/useIngestion";
-import organizationsService from "@/services/organizations";
+import organizationsService, { orgPasscodeQuery } from "@/services/organizations";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import type { CardSubstitutions } from "@/components/ingestion/ai/content/renderMarkdown";
 
@@ -52,12 +52,12 @@ onMounted(() => {
   // snippet, copied in full). IAM can be opened without visiting Ingestion
   // first, so fetch it if the store doesn't already have it.
   if (!store.state.organizationData?.organizationPasscode) {
-    organizationsService
-      .get_organization_passcode(store.state.selectedOrganization.identifier)
+    orgPasscodeQuery
+      .get(store.state.selectedOrganization.identifier)
       .then((res: any) => {
-        if (res.data?.data?.passcode) {
-          store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-          store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
+        if (res.data?.passcode) {
+          store.dispatch("setOrganizationPasscode", res.data.passcode);
+          store.dispatch("setOrganizationPasscodeUser", res.data.user);
         }
       })
       .catch(() => {

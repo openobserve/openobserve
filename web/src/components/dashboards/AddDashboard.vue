@@ -150,7 +150,7 @@ export default defineComponent({
         const data = convertDashboardSchemaVersion(res?.data["v" + res?.data?.version]);
 
         //update store
-        await getAllDashboards(store, selectedFolder.value.value);
+        await getAllDashboards(store, selectedFolder.value.value, true);
         emit("updated", data.dashboardId, selectedFolder.value.value);
 
         showPositiveNotification(t("dashboard.addDashboardPage.addedSuccessfully"));

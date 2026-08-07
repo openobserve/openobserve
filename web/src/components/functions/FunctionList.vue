@@ -248,6 +248,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { functionsQuery } from "@/services/jstransform";
 
 export default defineComponent({
   name: "functionList",
@@ -624,6 +625,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
+        functionsQuery.invalidate(store.state.selectedOrganization.identifier);
 
         dismiss();
 

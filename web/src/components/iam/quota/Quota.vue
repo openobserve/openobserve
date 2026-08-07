@@ -417,7 +417,7 @@ import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { getRoles } from "@/services/iam";
+import { getRoles, rolesQuery } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
@@ -903,8 +903,8 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await getRoles(selectedOrganization.value?.value);
-        rolesLimitRows.value = response.data.map((role: any) => ({
+        const response = await rolesQuery.get(selectedOrganization.value?.value);
+        rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),
           list: 10,

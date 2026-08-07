@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 /** One entry of the server's SQL function catalog. */
 export interface ServerQueryFunction {
@@ -39,3 +40,11 @@ const queryFunctions = {
 };
 
 export default queryFunctions;
+
+/** SQL-editor autocomplete catalogue — needed before the first completion popup. */
+export const queryFunctionsQuery = defineQuery<[], any[]>({
+  key: ["functions", "queryFunctions"],
+  fetch: async (org) => (await queryFunctions.list(org)).data?.list ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["functions"],
+});

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const apiKeys = {
   list: () => {
@@ -40,3 +41,12 @@ const apiKeys = {
 };
 
 export default apiKeys;
+
+/** A credential list — memory only, never persisted. */
+export const rumTokensQuery = defineQuery<[], any>({
+  key: ["organizations", "rumTokens"],
+  fetch: async (org) => (await apiKeys.listRUMTokens(org)).data,
+  tier: "ENTITY_LIST",
+  persist: "none",
+  scope: ["organizations", "rumTokens"],
+});

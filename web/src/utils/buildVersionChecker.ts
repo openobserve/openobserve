@@ -1,4 +1,4 @@
-// Copyright 2026 OpenObserve Inc.
+import { configQuery } from "@/services/config"; // Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,8 +12,6 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-import configService from "@/services/config";
 
 /**
  * Approach:
@@ -67,8 +65,7 @@ class BuildVersionChecker {
       return this.cachedConfig.commit_hash;
     }
 
-    const response = await configService.get_config();
-    this.cachedConfig = response.data;
+    this.cachedConfig = await configQuery.refresh();
     this.lastCheckTime = now;
 
     return this.cachedConfig.commit_hash;

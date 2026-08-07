@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createRole } from "@/services/iam";
+import { createRole, rolesQuery } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -127,6 +127,7 @@ const saveRole = async (value: AddRoleForm) => {
   const name = value.name.trim();
   try {
     await createRole(name, store.state.selectedOrganization.identifier);
+    rolesQuery.invalidate(store.state.selectedOrganization.identifier);
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery, stableFilters } from "@/composables/query/queryClient";
 
 // POST /{org_id}/reports  -- Create Report
 // GET /{org_id}/reports/{name} -- Get One Report
@@ -116,3 +117,43 @@ const reports = {
 };
 
 export default reports;
+
+export interface ReportListFilters {
+  /** undefined = search across every folder. */
+  folder?: string;
+  isCache?: boolean;
+  nameQuery?: string;
+}
+
+/**
+ * The server applies the folder, the cached/scheduled tab and the name search,
+ * so all three are in the key — which is what makes re-typing a search a cache
+ * hit. The table's own filtering and paging stay out.
+ */
+export const reportsQuery = defineQuery<[filters: ReportListFilters], any[]>({
+  key: (filters) => [
+    "reports",
+    "list",
+    filters.folder ?? "__all__",
+    stableFilters({ isCache: filters.isCache, nameQuery: filters.nameQuery }),
+  ],
+  fetch: async (org, filters) =>
+    (
+      await reports.listByFolderId(
+        org,
+        filters.folder,
+        undefined,
+        filters.isCache,
+        filters.nameQuery || undefined,
+      )
+    ).data ?? [],
+  tier: "ENTITY_LIST",
+  scope: ["reports"],
+});
+
+export const reportDetailQuery = defineQuery<[reportId: string], any>({
+  key: (id) => ["reports", "detail", id],
+  fetch: async (org, id) => (await reports.getReportById(org, id)).data,
+  tier: "ENTITY_DETAIL",
+  scope: ["reports"],
+});

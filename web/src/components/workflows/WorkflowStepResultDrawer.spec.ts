@@ -45,12 +45,15 @@ vi.mock("@/utils/dom", () => ({
 }));
 
 const mockTestWorkflow = vi.fn();
-vi.mock("@/services/workflows", () => ({
-  default: {
-    testWorkflow: (...a: any[]) => mockTestWorkflow(...a),
-    getWorkflowRun: vi.fn(),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      testWorkflow: (...a: any[]) => mockTestWorkflow(...a),
+      getWorkflowRun: vi.fn(),
+    },
+  });
+});
 
 import WorkflowStepResultDrawer from "./WorkflowStepResultDrawer.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";

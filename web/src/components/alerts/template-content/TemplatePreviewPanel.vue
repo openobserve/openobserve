@@ -271,7 +271,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import type { ContentSpec } from "./contentSpec";
 
 // Wire values the backend documents for POST …/templates/preview. Kept local
@@ -490,15 +490,13 @@ const isTestSending = ref(false);
 
 const loadDestinations = async () => {
   try {
-    const response = await destinationService.list({
-      org_identifier: store.state.selectedOrganization?.identifier,
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      module: "alert",
-    });
-    destinationOptions.value = (response.data ?? []).map((dest: { name: string }) => ({
+    // Same shared query the alert form and destination lists read, so opening
+    // this panel reuses their cached list instead of issuing its own request.
+    const destinations = await destinationsQuery.get(
+      store.state.selectedOrganization?.identifier,
+      "alert",
+    );
+    destinationOptions.value = destinations.map((dest: { name: string }) => ({
       // Destination names are user data, not prose — nothing to translate.
       label: raw(dest.name),
       value: dest.name,

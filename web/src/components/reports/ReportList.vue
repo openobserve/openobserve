@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @click="
                     () => {
                       invalidateFolderCache(activeFolderId);
-                      loadReports(activeFolderId);
+                      loadReports(activeFolderId, undefined, true);
                     }
                   "
                 >
@@ -329,7 +329,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18nTyped } from "@/types/i18n";
-import reports from "@/services/reports";
+import reports, { reportsQuery } from "@/services/reports";
 import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -483,19 +483,7 @@ const columns = computed<OTableColumnDef[]>(() => {
 });
 
 // ── Load reports ──────────────────────────────────────────────────────────────
-const loadReports = async (folderId: string, nameQuery?: string) => {
-  // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
-  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
-    const cached = store.state.organizationData.allReportsListByFolderId[folderId];
-    staticReportsList.value = cached;
-    cachedFolderReports.value = cached;
-    filterReports();
-    // Data is served synchronously from cache — clear the initial loading flag
-    // so the skeleton doesn't stay stuck on a cached (re)mount.
-    isLoadingReports.value = false;
-    return;
-  }
-
+const loadReports = async (folderId: string, nameQuery?: string, force = false) => {
   isLoadingReports.value = true;
   const dismiss = toast({
     variant: "loading",
@@ -504,17 +492,19 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
   });
 
   try {
-    const folder = searchAcrossFolders.value ? undefined : folderId;
-    const isCache = activeTab.value === "cached";
-    const res = await reports.listByFolderId(
-      store.state.selectedOrganization.identifier,
-      folder,
-      undefined,
-      isCache,
-      nameQuery || undefined,
-    );
+    // Folder, tab and name search are all applied by the server, so each
+    // combination is its own cache entry — including searches, which used to
+    // bypass the cache entirely.
+    const filters = {
+      folder: searchAcrossFolders.value ? undefined : folderId,
+      isCache: activeTab.value === "cached",
+      nameQuery,
+    };
+    const rows = force
+      ? await reportsQuery.refresh(store.state.selectedOrganization.identifier, filters)
+      : await reportsQuery.get(store.state.selectedOrganization.identifier, filters);
 
-    const mapped = (res.data ?? []).map((report: any) => ({
+    const mapped = rows.map((report: any) => ({
       ...report,
       last_triggered_at_raw: report.last_triggered_at || null,
       last_triggered_at: report.last_triggered_at
@@ -522,16 +512,8 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
         : "-",
     }));
 
-    // Always cache the result — even if stale, so navigating back hits the cache
-    if (!nameQuery) {
-      store.dispatch("setAllReportsListByFolderId", {
-        ...store.state.organizationData.allReportsListByFolderId,
-        [folderId]: mapped,
-      });
-    }
-
-    // Race condition guard: don't update UI if user moved to another folder,
-    // but data is already cached above for future use (mirrors AlertList.vue:1574)
+    // The result is cached under its own key regardless, so a folder switch
+    // mid-flight only has to skip the render, not the caching.
     if (folderId !== activeFolderId.value && !nameQuery) {
       dismiss();
       return;
@@ -553,10 +535,10 @@ const loadReports = async (folderId: string, nameQuery?: string) => {
   }
 };
 
-const invalidateFolderCache = (folderId: string) => {
-  const updated = { ...store.state.organizationData.allReportsListByFolderId };
-  delete updated[folderId];
-  store.dispatch("setAllReportsListByFolderId", updated);
+// Called after every write and by the refresh button. Prefix invalidation, so
+// the cached/scheduled tab and any active name search all refetch too.
+const invalidateFolderCache = (_folderId?: string) => {
+  reportsQuery.invalidate(store.state.selectedOrganization.identifier);
 };
 
 const filterReports = () => {

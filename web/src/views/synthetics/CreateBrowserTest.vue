@@ -44,7 +44,6 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -61,6 +60,7 @@ import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTest
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import EmptyBrowserCheck from "@/lib/core/EmptyState/illustrations/EmptyBrowserCheck.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
+import { destinationsQuery } from "@/services/alert_destination";
 
 const router = useRouter();
 const route = useRoute();
@@ -243,16 +243,10 @@ async function fetchLocations() {
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations() {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const list = await destinationsQuery.get(store.state.selectedOrganization.identifier);
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }
@@ -321,7 +315,7 @@ onMounted(() => {
 
   fetchFolders();
   fetchLocations();
-  fetchDestinations();
+  loadDestinations();
 
   if (props.editId) {
     loadForEdit(props.editId).catch(console.error);
@@ -985,7 +979,7 @@ function onClearResults() {
               :validation-errors="validationErrors"
               allow-private-locations
               class="w-full!"
-              @refresh:destinations="fetchDestinations"
+              @refresh:destinations="loadDestinations"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"
               @add-agent="(id: string) => openAgentSetup(id)"

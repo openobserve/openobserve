@@ -82,7 +82,7 @@ import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useLoading } from "@/composables/useLoading";
-import { annotationService } from "@/services/dashboard_annotations";
+import { annotationService, dashboardAnnotationsQuery } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -234,6 +234,7 @@ const handleSave = async () => {
           tags: annotationData.value.tags,
         };
         const annotationId = annotationData.value.annotation_id ?? "";
+        dashboardAnnotationsQuery.invalidate(organization);
         const response = await annotationService.update_timed_annotations(
           organization,
           props.dashboardId,
@@ -250,6 +251,7 @@ const handleSave = async () => {
     } else {
       try {
         // create annotation
+        dashboardAnnotationsQuery.invalidate(organization);
         const response = await annotationService.create_timed_annotations(
           organization,
           props.dashboardId,
@@ -276,6 +278,7 @@ const confirmDelete = async () => {
   // Delete is reachable only for a persisted annotation, so `annotation_id` is a string.
   const annotationId = annotationData.value.annotation_id ?? "";
   await annotationService.delete_timed_annotations(organization, props.dashboardId, [annotationId]);
+  dashboardAnnotationsQuery.invalidate(organization);
 
   handleClose();
 };

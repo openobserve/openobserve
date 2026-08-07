@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const stream = {
   nameList: (
@@ -160,3 +161,48 @@ const stream = {
 };
 
 export default stream;
+
+export interface StreamPageParams {
+  offset: number;
+  limit: number;
+  keyword?: string;
+  sort?: string;
+  asc?: boolean;
+}
+
+/**
+ * The app's most-shared read — Logs, Traces, Metrics, Dashboards, Alerts,
+ * Pipelines, SLOs and Stream Explorer all need it before first paint, hence the
+ * persisted tier. One key per stream type, so a `logs` fetch no longer queues
+ * behind an in-flight `traces` fetch.
+ */
+export const streamNameListQuery = defineQuery<[type: string], any[]>({
+  key: (type) => ["streams", "nameList", type],
+  // `schema: false` deliberately — schemas are fetched per stream on demand.
+  fetch: async (org, type) => (await stream.nameList(org, type, false)).data.list ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["streams"],
+});
+
+/** One page of the paginated stream list; paging back does not blank the table. */
+export const streamPageQuery = defineQuery<
+  [type: string, params: StreamPageParams],
+  { list: any[]; total: number }
+>({
+  key: (type, params) => ["streams", "page", type || "all", params],
+  fetch: async (org, type, params) => {
+    const res = await stream.nameList(
+      org,
+      type,
+      false,
+      params.offset,
+      params.limit,
+      params.keyword ?? "",
+      params.sort ?? "",
+      params.asc ?? false,
+    );
+    return { list: res.data.list ?? [], total: res.data.total ?? 0 };
+  },
+  tier: "ENTITY_LIST",
+  scope: ["streams"],
+});

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const dashboards = {
   list: (
@@ -105,3 +106,12 @@ const dashboards = {
 };
 
 export default dashboards;
+
+/** Replaces the organizationData.allDashboardList map, which had no TTL. */
+export const dashboardsByFolderQuery = defineQuery<[folderId: string], any[]>({
+  key: (folderId) => ["dashboards", "list", folderId],
+  fetch: async (org, folderId) =>
+    (await dashboards.list(0, 1000, "name", false, "", org, folderId, "")).data?.dashboards ?? [],
+  tier: "ENTITY_LIST",
+  scope: ["dashboards"],
+});

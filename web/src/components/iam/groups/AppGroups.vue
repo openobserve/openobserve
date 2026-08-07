@@ -163,7 +163,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup, bulkDeleteGroups, getGroup } from "@/services/iam";
+import { getGroups, deleteGroup, bulkDeleteGroups, getGroup, groupsQuery } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -247,7 +247,7 @@ const addGroup = () => {
 // with an empty group.
 const onGroupAdded = (payload: { group_name: string; data?: any }) => {
   if (!payload?.group_name) {
-    setupGroups();
+    setupGroups(true);
     return;
   }
 
@@ -276,11 +276,17 @@ const editGroup = (group: any) => {
 };
 
 const loading = ref(false);
-const setupGroups = async () => {
+// `force` for every reload that follows a write or an explicit refresh —
+// an "added" event means the server has something new to show.
+const setupGroups = async (force = false) => {
   loading.value = true;
-  await getGroups(store.state.selectedOrganization.identifier)
-    .then((res) => {
-      groupsState.groups = res.data.map((group: string) => ({
+  await (
+    force
+      ? groupsQuery.refresh(store.state.selectedOrganization.identifier)
+      : groupsQuery.get(store.state.selectedOrganization.identifier)
+  )
+    .then((res: any) => {
+      groupsState.groups = res.map((group: string) => ({
         group_name: group,
       }));
       updateTable();
@@ -294,13 +300,14 @@ const setupGroups = async () => {
 };
 
 const deleteUserGroup = (group: any) => {
+  groupsQuery.invalidate(store.state.selectedOrganization.identifier);
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
         message: t("iam.appGroups.groupDeletedSuccess"),
         variant: "success",
       });
-      setupGroups();
+      setupGroups(true);
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
@@ -371,6 +378,7 @@ const bulkDeleteUserGroups = async () => {
   const groupNames = selectedGroups.value.map((group: any) => group.group_name);
 
   try {
+    groupsQuery.invalidate(store.state.selectedOrganization.identifier);
     const response = await bulkDeleteGroups(store.state.selectedOrganization.identifier, {
       ids: groupNames,
     });
@@ -401,7 +409,7 @@ const bulkDeleteUserGroups = async () => {
       });
     }
 
-    await setupGroups();
+    await setupGroups(true);
     selectedGroups.value = [];
     confirmBulkDelete.value = false;
   } catch (error: any) {
@@ -429,7 +437,7 @@ useShortcuts([
   {
     id: "iamGroupsRefresh",
     handler: () => {
-      if (!isInputFocused()) setupGroups();
+      if (!isInputFocused()) setupGroups(true);
     },
   },
   {

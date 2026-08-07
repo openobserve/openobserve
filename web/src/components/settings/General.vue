@@ -572,7 +572,6 @@ import organizations from "@/services/organizations";
 import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
-import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import store from "@/test/unit/helpers/store";
@@ -591,6 +590,7 @@ import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OColor from "@/lib/forms/Color/OColor.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeGeneralSettingsSchema, type GeneralSettingsForm } from "./General.schema";
+import { configQuery } from "@/services/config";
 
 export default defineComponent({
   name: "PageGeneralSettings",
@@ -974,9 +974,7 @@ export default defineComponent({
                 }),
               });
 
-              await configService.get_config().then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+              store.dispatch("setConfig", await configQuery.refresh());
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1033,9 +1031,7 @@ export default defineComponent({
               }),
             });
 
-            await configService.get_config().then((res: any) => {
-              store.dispatch("setConfig", res.data);
-            });
+            store.dispatch("setConfig", await configQuery.refresh());
           } else {
             toast({
               variant: "error",

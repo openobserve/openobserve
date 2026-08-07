@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -1037,6 +1037,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       );
     }
 
+    destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
     emit("get:destinations");
     emit("cancel:hideform");
   } catch (error) {
@@ -1096,6 +1097,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .then(() => {
         dismiss();
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({
@@ -1126,6 +1128,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .then(() => {
         dismiss();
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({

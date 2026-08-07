@@ -1,7 +1,7 @@
 import pipelines from "@/services/pipelines";
 import { useStore } from "vuex";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { destinationsQuery } from "@/services/alert_destination";
 
 export const usePipelines = () => {
   const store = useStore();
@@ -22,17 +22,11 @@ export const usePipelines = () => {
     }
   }
   const getPipelineDestinations = async () => {
-    const destinations = await destinationService.list({
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      org_identifier: store.state.selectedOrganization.identifier,
-      module: "pipeline",
-    });
-    return destinations.data.map((dest: any) => {
-      return dest.name;
-    });
+    const destinations = await destinationsQuery.get(
+      store.state.selectedOrganization.identifier,
+      "pipeline",
+    );
+    return destinations.map((dest: any) => dest.name);
   };
   return {
     getUsedStreamsList,

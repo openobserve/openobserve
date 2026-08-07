@@ -189,7 +189,7 @@ import { defineComponent, ref, computed } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import templateService from "@/services/alert_templates";
+import templateService, { templatesQuery } from "@/services/alert_templates";
 import BaseImport from "../common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -433,6 +433,7 @@ export default defineComponent({
 
     const createTemplate = async (input: any, index: number) => {
       try {
+        templatesQuery.invalidate(store.state.selectedOrganization.identifier);
         await templateService.create({
           org_identifier: store.state.selectedOrganization.identifier,
           template_name: input.name,

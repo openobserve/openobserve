@@ -7,12 +7,15 @@ import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
 
 // Mock external dependencies
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    create: vi.fn().mockResolvedValue({}),
-    list: vi.fn().mockResolvedValue([]),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn().mockResolvedValue({}),
+      list: vi.fn().mockResolvedValue([]),
+    },
+  });
+});
 
 vi.mock("@/utils/commons", () => ({
   deleteDashboardById: vi.fn().mockResolvedValue({}),
@@ -52,15 +55,18 @@ vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
 
 // Settings v2 KV backend for the home pin + per-user favorites — mocked so
 // mount-time loads and favorite toggles never hit the network.
-vi.mock("@/services/settings", () => ({
-  default: {
-    getSetting: vi.fn().mockResolvedValue({ data: null }),
-    setOrgSetting: vi.fn().mockResolvedValue({}),
-    setUserSetting: vi.fn().mockResolvedValue({}),
-    deleteOrgSetting: vi.fn().mockResolvedValue({}),
-    deleteUserSetting: vi.fn().mockResolvedValue({}),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getSetting: vi.fn().mockResolvedValue({ data: null }),
+      setOrgSetting: vi.fn().mockResolvedValue({}),
+      setUserSetting: vi.fn().mockResolvedValue({}),
+      deleteOrgSetting: vi.fn().mockResolvedValue({}),
+      deleteUserSetting: vi.fn().mockResolvedValue({}),
+    },
+  });
+});
 
 import settingsService from "@/services/settings";
 import { useFavoriteDashboards } from "@/composables/useFavoriteDashboards";

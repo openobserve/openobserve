@@ -17,7 +17,7 @@
 // We keep the real useWorkflowCanvas (module-level workflowObj is the contract the
 // drawer drives) and stub the drawer chrome + the four body forms.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 vi.mock("@vue-flow/core", () => ({
   MarkerType: { ArrowClosed: "arrowclosed" },
@@ -67,7 +67,6 @@ vi.mock("@/plugins/workflows/nodes/WorkflowDestination.vue", () =>
   }),
 );
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";

@@ -434,7 +434,7 @@ import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
@@ -1157,6 +1157,7 @@ const createDestination = (value?: DestinationForm) => {
         module: "pipeline",
       })
       .then(() => {
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         dismiss();
         emit("updated", name);
       })
@@ -1180,6 +1181,7 @@ const createDestination = (value?: DestinationForm) => {
         module: "pipeline",
       })
       .then(() => {
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         dismiss();
         emit("created", name);
       })

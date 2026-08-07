@@ -37,35 +37,41 @@ node.style.height = "1024px";
 document.body.appendChild(node);
 
 // Mock services
-vi.mock("@/services/action_scripts", () => ({
-  default: {
-    create: vi.fn().mockResolvedValue({ data: { code: 200, message: "Success" } }),
-    update: vi.fn().mockResolvedValue({ data: { code: 200, message: "Success" } }),
-    get_by_id: vi.fn().mockResolvedValue({
-      data: {
-        id: "test-id",
-        name: "Test Action",
-        description: "Test Description",
-        type: "scheduled",
-        execution_details: "repeat",
-        cron_expr: "0 0 * * *",
-        service_account: "test@example.com",
-        environment_variables: {},
-        zip_file_name: "test.zip",
-      },
-    }),
-  },
-}));
+vi.mock("@/services/action_scripts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn().mockResolvedValue({ data: { code: 200, message: "Success" } }),
+      update: vi.fn().mockResolvedValue({ data: { code: 200, message: "Success" } }),
+      get_by_id: vi.fn().mockResolvedValue({
+        data: {
+          id: "test-id",
+          name: "Test Action",
+          description: "Test Description",
+          type: "scheduled",
+          execution_details: "repeat",
+          cron_expr: "0 0 * * *",
+          service_account: "test@example.com",
+          environment_variables: {},
+          zip_file_name: "test.zip",
+        },
+      }),
+    },
+  });
+});
 
-vi.mock("@/services/service_accounts", () => ({
-  default: {
-    list: vi.fn().mockResolvedValue({
-      data: {
-        data: [{ email: "service1@example.com" }, { email: "service2@example.com" }],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn().mockResolvedValue({
+        data: {
+          data: [{ email: "service1@example.com" }, { email: "service2@example.com" }],
+        },
+      }),
+    },
+  });
+});
 
 // Keep the real Toast module (other exports stay intact) but replace `toast`
 // with a spy that returns a dismiss fn — so we can assert the error toast on a

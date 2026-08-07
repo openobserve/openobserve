@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 type PatternPayload = {
   name: string;
   pattern: string;
@@ -61,3 +62,18 @@ const regexPatterns = {
 };
 
 export default regexPatterns;
+
+export const regexPatternsQuery = defineQuery<[], any[]>({
+  key: ["settings", "regexPatterns"],
+  fetch: async (org) => (await regexPatterns.list(org)).data?.patterns ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["settings", "regexPatterns"],
+});
+
+/** Ships with the release, so static for the session. Replaces RegexPatternCache. */
+export const builtInRegexPatternsQuery = defineQuery<[], any[]>({
+  key: ["settings", "builtInRegexPatterns"],
+  fetch: async (org) => (await regexPatterns.getBuiltInPatterns(org)).data.patterns ?? [],
+  tier: "SESSION_STATIC",
+  scope: ["settings", "builtInRegexPatterns"],
+});

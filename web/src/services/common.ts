@@ -1,4 +1,5 @@
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const common = {
   list_Folders: (organization: string, folder_type: string) => {
@@ -34,3 +35,39 @@ const common = {
 };
 
 export default common;
+
+export interface Folder {
+  folderId: string;
+  name: string;
+  description?: string;
+  [extra: string]: unknown;
+}
+
+const DEFAULT_FOLDER: Folder = { name: "default", folderId: "default", description: "default" };
+
+/** "default" first, then the rest alphabetically — the order the sidebar expects. */
+const normalizeFolders = (list: Folder[]): Folder[] => {
+  const defaultFolder = list.find((f) => f.folderId === "default") ?? DEFAULT_FOLDER;
+  const rest = list
+    .filter((f) => f.folderId !== "default")
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return [defaultFolder, ...rest];
+};
+
+/** Needed before the sidebar can paint on Dashboards, Alerts, Reports and Synthetics. */
+export const foldersQuery = defineQuery<[type: string], Folder[]>({
+  key: (type) => ["folders", type],
+  fetch: async (org, type) =>
+    normalizeFolders((await common.list_Folders(org, type)).data.list ?? []),
+  tier: "ORG_CONFIG",
+  scope: ["folders"],
+});
+
+export const nodesQuery = defineQuery<[], any>({
+  key: ["settings", "nodes"],
+  fetch: async (org) => (await common.list_nodes(org)).data,
+  // Not persisted: stale cluster state is more confusing than a second of loading.
+  tier: "ORG_CONFIG",
+  persist: "none",
+  scope: ["settings", "nodes"],
+});

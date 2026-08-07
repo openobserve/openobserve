@@ -7,30 +7,36 @@ import { nextTick } from "vue";
 import useStreams from "@/composables/useStreams";
 
 // Mock the jstransform service
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    test: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          results: [{ event: { field1: "value1" } }, { event: { field2: "value2" } }],
-        },
-      }),
-    ),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      test: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            results: [{ event: { field1: "value1" } }, { event: { field2: "value2" } }],
+          },
+        }),
+      ),
+    },
+  });
+});
 
 // Mock the search service
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          hits: [{ field1: "value1" }, { field2: "value2" }],
-        },
-      }),
-    ),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            hits: [{ field1: "value1" }, { field2: "value2" }],
+          },
+        }),
+      ),
+    },
+  });
+});
 
 // Mock the useStreams composable
 vi.mock("@/composables/useStreams", () => ({

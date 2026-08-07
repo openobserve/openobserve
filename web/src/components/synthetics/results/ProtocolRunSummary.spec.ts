@@ -33,11 +33,14 @@ vi.mock("@/composables/useSyntheticResults", () => ({
 
 const mockGetSynthetics = vi.fn().mockResolvedValue({ data: {} });
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: (...args: any[]) => mockGetSynthetics(...args),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: (...args: any[]) => mockGetSynthetics(...args),
+    },
+  });
+});
 
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vuex")>();

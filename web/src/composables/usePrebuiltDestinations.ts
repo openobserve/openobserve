@@ -16,7 +16,7 @@ import { ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 // Services
-import alertDestinationService from "@/services/alert_destination";
+import alertDestinationService, { destinationsQuery } from "@/services/alert_destination";
 import templatesService from "@/services/alert_templates";
 
 // Types and configurations
@@ -553,6 +553,7 @@ export function usePrebuiltDestinations() {
         destination_name: name,
         data: destinationData,
       });
+      destinationsQuery.invalidate(organizationIdentifier.value);
 
       toast({
         variant: "success",
@@ -690,6 +691,7 @@ export function usePrebuiltDestinations() {
         destination_name: originalName, // Use original name for lookup
         data: destinationData,
       });
+      destinationsQuery.invalidate(organizationIdentifier.value);
 
       toast({
         variant: "success",
@@ -784,6 +786,7 @@ export function usePrebuiltDestinations() {
         destination_name: destinationName,
         data: updatedData,
       });
+      destinationsQuery.invalidate(organizationIdentifier.value);
 
       toast({
         variant: "success",

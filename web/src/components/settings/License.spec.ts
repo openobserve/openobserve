@@ -72,12 +72,15 @@ const ODialogStub = {
 };
 
 // Mock the license server service
-vi.mock("@/services/license_server", () => ({
-  default: {
-    get_license: vi.fn(),
-    update_license: vi.fn(),
-  },
-}));
+vi.mock("@/services/license_server", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_license: vi.fn(),
+      update_license: vi.fn(),
+    },
+  });
+});
 
 // Mock the LicensePeriod component
 vi.mock("@/enterprise/components/billings/LicensePeriod.vue", () => ({

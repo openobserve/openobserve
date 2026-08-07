@@ -469,7 +469,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="loading"
                 data-test="nodes-list-refresh-btn"
-                @click="() => getData(true)"
+                @click="refreshData"
               >
                 <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
               </OButton>
@@ -572,7 +572,7 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
-import CommonService from "@/services/common";
+import CommonService, { nodesQuery } from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -883,7 +883,10 @@ export default defineComponent({
       };
     }
 
-    const getData = (filterFlag: boolean = false) => {
+    // Bound to the refresh control: always hits the server.
+    const refreshData = () => getData(false, true);
+
+    const getData = (filterFlag: boolean = false, force: boolean = false) => {
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
@@ -891,9 +894,11 @@ export default defineComponent({
         timeout: 0,
       });
 
-      CommonService.list_nodes(store.state.selectedOrganization.identifier)
-        .then((response) => {
-          const responseData = response.data;
+      const org = store.state.selectedOrganization.identifier;
+      // Returned so callers can await the load — it never was, which only
+      // worked while the fetch resolved in a single microtask.
+      return (force ? nodesQuery.refresh(org) : nodesQuery.get(org))
+        .then((responseData: any) => {
           const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
           regionRows.value = uniqueValues.regions.map((name) => ({ name }));
           clusterRows.value = uniqueValues.clusters.map((name) => ({ name }));
@@ -1187,12 +1192,13 @@ export default defineComponent({
       {
         id: "nodesRefresh",
         handler: () => {
-          if (!isInputFocused()) getData(true);
+          if (!isInputFocused()) refreshData();
         },
       },
     ]);
 
     return {
+      refreshData,
       t,
       store,
       router,

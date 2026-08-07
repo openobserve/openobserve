@@ -37,8 +37,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <AddExternalAlertSource
       v-model:open="showAddDrawer"
       :editing-integration="editTargetIntegration"
-      @created="fetchAll"
-      @updated="fetchAll"
+      @created="fetchAll(true)"
+      @updated="fetchAll(true)"
     />
 
     <div class="min-h-0 w-full flex-1 overflow-hidden">
@@ -292,7 +292,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
-import alertSources from "@/services/alert_sources";
+import alertSources, { alertSourcesQuery } from "@/services/alert_sources";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
@@ -529,8 +529,8 @@ export default defineComponent({
     this.fetchAll();
   },
   methods: {
-    async fetchAll() {
-      await this.fetchIntegrations();
+    async fetchAll(force = false) {
+      await this.fetchIntegrations(force);
       const fetches: Promise<void>[] = [];
       if (this.defaultSource) {
         fetches.push(this.fetchSenders(this.defaultSource.id));
@@ -540,11 +540,12 @@ export default defineComponent({
       }
       await Promise.all(fetches);
     },
-    async fetchIntegrations() {
+    async fetchIntegrations(force = false) {
       this.loading = true;
       try {
-        const res = await alertSources.list(this.orgIdentifier);
-        this.integrations = res.data.integrations;
+        this.integrations = force
+          ? await alertSourcesQuery.refresh(this.orgIdentifier)
+          : await alertSourcesQuery.get(this.orgIdentifier);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {
@@ -656,7 +657,7 @@ export default defineComponent({
         toast({ variant: "success", message: this.t("alert_sources.deletedSuccess") });
         this.revealedIds = this.revealedIds.filter((id) => id !== this.deleteTarget?.id);
         this.deleteTarget = undefined;
-        await this.fetchAll();
+        await this.fetchAll(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
@@ -670,7 +671,7 @@ export default defineComponent({
             ? this.t("alert_sources.disabledSuccess")
             : this.t("alert_sources.enabledSuccess"),
         });
-        await this.fetchIntegrations();
+        await this.fetchIntegrations(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }

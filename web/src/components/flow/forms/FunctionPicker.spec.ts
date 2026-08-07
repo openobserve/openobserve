@@ -22,9 +22,12 @@ import FunctionPicker from "./FunctionPicker.vue";
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 const mockList = vi.fn();
-vi.mock("@/services/jstransform", () => ({
-  default: { list: (...args: any[]) => mockList(...args) },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...args: any[]) => mockList(...args) },
+  });
+});
 
 // Minimal, controllable stubs for the lib inputs so we can drive v-model.
 const OSelectStub = {

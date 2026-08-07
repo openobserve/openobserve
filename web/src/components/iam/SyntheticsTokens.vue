@@ -295,7 +295,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import syntheticsService from "@/services/synthetics";
+import syntheticsService, { agentTokensQuery } from "@/services/synthetics";
 import type { AgentSetup } from "@/types/synthetics";
 
 interface AgentToken {
@@ -422,10 +422,8 @@ export default defineComponent({
     const fetchTokens = async () => {
       loading.value = true;
       try {
-        const res = await syntheticsService.listAgentTokens(
-          store.state.selectedOrganization.identifier,
-        );
-        tokens.value = res.data.tokens ?? [];
+        const res = await agentTokensQuery.get(store.state.selectedOrganization.identifier);
+        tokens.value = res.tokens ?? [];
       } catch (e: any) {
         toast({
           variant: "error",
@@ -451,6 +449,7 @@ export default defineComponent({
         );
         showCreateForm.value = false;
         reveal(res.data.name, res.data.token);
+        agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.createSuccess"), timeout: 4000 });
       } catch (e: any) {
@@ -471,6 +470,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
         );
         reveal(res.data.name, res.data.token);
+        agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         toast({ variant: "success", message: t("synthetics.tokens.rotateSuccess"), timeout: 4000 });
       } catch (e: any) {
@@ -492,6 +492,7 @@ export default defineComponent({
           name,
           enabled,
         );
+        agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         toast({
           variant: "success",
@@ -550,7 +551,10 @@ export default defineComponent({
       {
         id: "syntheticsTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) fetchTokens();
+          if (!isInputFocused()) {
+            agentTokensQuery.invalidate(store.state.selectedOrganization.identifier);
+            fetchTokens();
+          }
         },
       },
       {

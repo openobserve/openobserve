@@ -35,6 +35,8 @@ import { restHandlers } from "./handlers";
 // registry-labelled badges render real text in component tests.
 import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 import enMessages from "@/locales/languages/en-US.json";
+import { queryClient } from "@/composables/query/queryClient";
+import { purgeAllPersisted } from "@/composables/query/persisters";
 setBadgeTranslator(
   (key: string) =>
     key.split(".").reduce<any>((o, k) => (o == null ? undefined : o[k]), enMessages) ?? key,
@@ -252,6 +254,10 @@ Object.defineProperty(navigator, "clipboard", {
 beforeAll(() => {
   server.listen();
 
+  // Retries would turn a rejecting service mock into a multi-second timeout
+  // instead of the assertion the test is making.
+  queryClient.setDefaultOptions({ queries: { retry: false }, mutations: { retry: false } });
+
   // Handle unhandled promise rejections to prevent CI/CD failures
   process.on("unhandledRejection", (reason: any) => {
     // Suppress expected error messages from tests that intentionally test error scenarios
@@ -318,6 +324,11 @@ afterEach(() => {
   server.resetHandlers();
   // Clear any pending timers globally
   vi.clearAllTimers();
+  // The app's query client is a module singleton, so a cached read would leak
+  // into the next test and silently skip its service mock. `clear()` alone is
+  // not enough — persisted tiers would be restored from localStorage.
+  queryClient.clear();
+  void purgeAllPersisted();
 });
 
 // Stop the server when tests are done

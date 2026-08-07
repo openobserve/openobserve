@@ -1,4 +1,5 @@
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 export const annotationService = {
   create_timed_annotations: (
@@ -76,3 +77,16 @@ export const annotationService = {
     });
   },
 };
+
+/**
+ * Every panel on a dashboard asks for the same window, so this collapses N
+ * requests into one per distinct window. `?? null` because a query result may
+ * not be undefined.
+ */
+export const dashboardAnnotationsQuery = defineQuery<[dashboardId: string, params: unknown], any>({
+  key: (dashboardId, params) => ["dashboards", "annotations", dashboardId, params],
+  fetch: async (org, dashboardId, params) =>
+    (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
+  tier: "ENTITY_DETAIL",
+  scope: ["dashboards"],
+});

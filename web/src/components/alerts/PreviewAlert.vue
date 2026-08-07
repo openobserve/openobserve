@@ -44,15 +44,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, computed, nextTick } from "vue";
+import { ref, watch, onMounted, computed, nextTick, reactive, onBeforeMount } from "vue";
 import { buildThresholdMarkLines } from "@/utils/alerts/thresholdMarkLines";
 import {
   cleanAggregationQuery,
   getDefaultDashboardPanelData,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import PanelSchemaRenderer from "../dashboards/PanelSchemaRenderer.vue";
-import { reactive } from "vue";
-import { onBeforeMount } from "vue";
 import { cloneDeep } from "lodash-es";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";

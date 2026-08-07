@@ -737,6 +737,7 @@ import {
   onMounted,
   computed,
   reactive,
+  nextTick,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
@@ -748,8 +749,7 @@ import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
-import alertsService from "@/services/alerts";
-import destinationService from "@/services/alert_destination";
+import alertsService, { alertDetailQuery, alertsListQuery } from "@/services/alerts";
 import templateService from "@/services/alert_templates";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -764,7 +764,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -789,6 +788,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { destinationsQuery } from "@/services/alert_destination";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1405,22 +1405,18 @@ export default defineComponent({
 
     // ---------------------------------------------------------------------------
 
+    // The folder is part of the query key, so a revisit inside the tier's
+    // staleTime resolves from cache with no request and no special loading path.
     const getAlertsByFolderId = async (store: any, folderId: any) => {
-      //this is the condition where we are fetching the alerts from the server
-      // assigning it to the allAlertsListByFolderId in the store
-      if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
-        await getAlertsFn(store, folderId);
-      } else {
-        //this is the condition where we are assigning the alerts to the filteredResults so whenever
-        // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-        allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
-        // Data is served synchronously from cache — clear the loading flag
-        // (it starts true to avoid the empty-state flash) so the table renders
-        // the cached rows instead of staying stuck on the skeleton.
-        loading.value = false;
-      }
+      await getAlertsFn(store, folderId);
     };
-    const getAlertsFn = async (store: any, folderId: any, query = "", refreshResults = true) => {
+    const getAlertsFn = async (
+      store: any,
+      folderId: any,
+      query = "",
+      refreshResults = true,
+      force = false,
+    ) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
       //we forcing the destination and source folder to fetch the alerts again
@@ -1447,20 +1443,14 @@ export default defineComponent({
       }
       loading.value = true;
       try {
-        const res = await alertsService.listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          store?.state?.selectedOrganization?.identifier,
-          folderId,
-          query,
-        );
+        const org = store?.state?.selectedOrganization?.identifier;
+        const rows = force
+          ? await alertsListQuery.refresh(org, folderId, query)
+          : await alertsListQuery.get(org, folderId, query);
         var counter = 1;
         let localAllAlerts = [];
         //this is the alerts that we use to store
-        localAllAlerts = res.data.list.map((alert: any) => {
+        localAllAlerts = rows.map((alert: any) => {
           return {
             ...alert,
             uuid: getUUID(),
@@ -1612,12 +1602,12 @@ export default defineComponent({
         timeout: 0,
       });
       try {
-        const res = await alertsService.get_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          id,
-        );
+        // Cached for the editor-open path only. The read-modify-write in
+        // WorkflowLinkAlertsDialog deliberately still goes straight to the
+        // service — a stale alert there would overwrite someone else's edit.
+        const data = await alertDetailQuery.get(store.state.selectedOrganization.identifier, id);
         dismiss();
-        return res.data;
+        return data;
       } catch (error) {
         dismiss();
         throw error;
@@ -1657,9 +1647,9 @@ export default defineComponent({
 
     const refreshAlerts = async () => {
       if (searchAcrossFolders.value && searchQuery.value) {
-        await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+        await getAlertsFn(store, activeFolderId.value, searchQuery.value, true, true);
       } else {
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, true);
       }
       filterAlertsByTab();
     };
@@ -1834,13 +1824,10 @@ export default defineComponent({
       { immediate: true }, // Run immediately to handle direct navigation
     );
     const getDestinations = async () => {
-      destinationService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        })
-        .then((res) => {
-          destinations.value = res.data;
+      destinationsQuery
+        .get(store.state.selectedOrganization.identifier, "alert")
+        .then((list) => {
+          destinations.value = list as any;
         })
         .catch(() =>
           toast({
@@ -1932,7 +1919,7 @@ export default defineComponent({
             message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
-          await getAlertsFn(store, folderIdToBeCloned.value);
+          await getAlertsFn(store, folderIdToBeCloned.value, "", true, true);
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
@@ -2002,7 +1989,7 @@ export default defineComponent({
                 message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
-              await getAlertsFn(store, folderIdToBeCloned.value);
+              await getAlertsFn(store, folderIdToBeCloned.value, "", true, true);
               activeFolderId.value = folderIdToBeCloned.value;
             } else {
               toast({
@@ -2042,7 +2029,7 @@ export default defineComponent({
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
       // Always fetch the latest alerts for the folder from backend
-      await getAlertsFn(store, resolvedFolderId);
+      await getAlertsFn(store, resolvedFolderId, "", true, true);
       // Re-apply active search/filter on the freshly fetched data
       if (filterQuery.value) {
         filterAlertsByQuery(filterQuery.value);
@@ -2078,7 +2065,7 @@ export default defineComponent({
               variant: "success",
               message: res.data.message,
             });
-            await getAlertsFn(store, activeFolderId.value);
+            await getAlertsFn(store, activeFolderId.value, "", true, true);
             if (filterQuery.value) {
               filterAlertsByQuery(filterQuery.value);
             }
@@ -2286,7 +2273,7 @@ export default defineComponent({
           message: t("alerts.alertTriggeredSuccess"),
         });
         if (row.type === "anomaly") {
-          await getAlertsFn(store, activeFolderId.value);
+          await getAlertsFn(store, activeFolderId.value, "", true, true);
         }
       } catch (error: any) {
         toast({
@@ -2408,8 +2395,8 @@ export default defineComponent({
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
-      await getAlertsFn(store, selectedFolderId, "", false);
-      await getAlertsFn(store, activeFolderId);
+      await getAlertsFn(store, selectedFolderId, "", false, true);
+      await getAlertsFn(store, activeFolderId, "", true, true);
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
       selectedAnomalyConfigsToMove.value = [];
@@ -2586,7 +2573,7 @@ export default defineComponent({
 
     //this function is used to refresh the imported alerts
     const refreshImportedAlerts = async (store: any, folderId: any) => {
-      await getAlertsFn(store, folderId);
+      await getAlertsFn(store, folderId, "", true, true);
     };
     const updateFolderIdToBeCloned = (folderId: any) => {
       folderIdToBeCloned.value = folderId.value;
@@ -2689,7 +2676,7 @@ export default defineComponent({
           });
         }
         // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, true);
 
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);
@@ -2786,7 +2773,7 @@ export default defineComponent({
 
         selectedAlerts.value = [];
         // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, true);
 
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);

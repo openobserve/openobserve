@@ -251,7 +251,7 @@ import { ref, onActivated, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 
-import templateService from "@/services/alert_templates";
+import templateService, { templatesQuery } from "@/services/alert_templates";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -651,6 +651,7 @@ async function saveTemplate(value: AddTemplateForm) {
       };
 
   const onSuccess = () => {
+    templatesQuery.invalidate(store.state.selectedOrganization.identifier);
     dismiss();
     emit("get:templates");
     emit("cancel:hideform");

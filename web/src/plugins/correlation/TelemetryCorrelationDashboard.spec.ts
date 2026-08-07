@@ -82,18 +82,24 @@ vi.mock("@/utils/metrics/metricGrouping", async (importOriginal) => {
   };
 });
 
-vi.mock("@/services/stream", () => ({
-  default: {
-    nameList: vi.fn(() => Promise.resolve({ data: { list: [] } })),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      nameList: vi.fn(() => Promise.resolve({ data: { list: [] } })),
+    },
+  });
+});
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0, took: 0 } })),
-    get_traces: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0 } })),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0, took: 0 } })),
+      get_traces: vi.fn(() => Promise.resolve({ data: { hits: [], total: 0 } })),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;

@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="pipeline-list-refresh-btn"
-              @click="getPipelines"
+              @click="refreshPipelines"
             >
               <OTooltip
                 side="bottom"
@@ -491,7 +491,7 @@ import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
-import pipelineService from "@/services/pipelines";
+import pipelineService, { pipelinesQuery } from "@/services/pipelines";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 
@@ -780,7 +780,7 @@ const togglePipelineState = (row: any, from_now: boolean) => {
         message: raw(message),
         variant: "success",
       });
-      await getPipelines();
+      await getPipelines(true);
     })
     .catch((error) => {
       if (error.response.status != 403) {
@@ -946,15 +946,16 @@ const goToImportPipeline = () => {
 };
 
 const loading = ref(true);
-const getPipelines = async () => {
+// Bound to the refresh button: always hits the server.
+const refreshPipelines = () => getPipelines(true);
+
+const getPipelines = async (force = false) => {
   loading.value = true;
   try {
-    const response = await pipelineService.getPipelines(
-      store.state.selectedOrganization.identifier,
-    );
+    const org = store.state.selectedOrganization.identifier;
+    const list = force ? await pipelinesQuery.refresh(org) : await pipelinesQuery.get(org);
     pipelines.value = [];
-    // resultTotal.value = response.data.list.length;
-    pipelines.value = response.data.list.map((pipeline: any) => {
+    pipelines.value = list.map((pipeline: any) => {
       const updatedEdges = pipeline.edges.map((edge: any) => ({
         ...edge,
         markerEnd: {
@@ -1039,7 +1040,7 @@ const savePipeline = (data: any) => {
       org_identifier: store.state.selectedOrganization.identifier,
     })
     .then(() => {
-      getPipelines();
+      getPipelines(true);
       dismiss();
       showCreatePipeline.value = false;
       toast({
@@ -1087,7 +1088,7 @@ const deletePipeline = async () => {
     })
     .finally(async () => {
       selectedPipelineIds.value = [];
-      await getPipelines();
+      await getPipelines(true);
       updateActiveTab();
       dismiss();
     });
@@ -1234,7 +1235,7 @@ const bulkTogglePipelines = async (action: "pause" | "resume") => {
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error) {
     dismiss();
@@ -1329,7 +1330,7 @@ const bulkDeletePipelines = async () => {
     }
 
     selectedPipelineIds.value = [];
-    await getPipelines();
+    await getPipelines(true);
     updateActiveTab();
   } catch (error: any) {
     dismiss();
@@ -1386,7 +1387,7 @@ useShortcuts([
   {
     id: "pipelinesRefresh",
     handler: () => {
-      if (!isInputFocused()) getPipelines();
+      if (!isInputFocused()) getPipelines(true);
     },
   },
   {

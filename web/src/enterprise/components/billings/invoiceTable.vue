@@ -61,7 +61,7 @@ import { onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
-import BillingService from "@/services/billings";
+import BillingService, { invoiceHistoryQuery } from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -167,10 +167,11 @@ const getInvoiceHistory = () => {
     timeout: 0,
   });
 
-  BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
-    .then((res) => {
+  invoiceHistoryQuery
+    .get(store.state.selectedOrganization.identifier)
+    .then((res: any) => {
       dismiss();
-      const invoiceList = res.data.invoices;
+      const invoiceList = res.invoices;
       if (invoiceList.length > 0) {
         invoiceHistory.value = invoiceList.map((invoice: Invoice, index: number) => {
           return {

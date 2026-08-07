@@ -243,7 +243,7 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
-import organizationsService from "@/services/organizations";
+import organizationsService, { ingestionTokensQuery } from "@/services/organizations";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -353,10 +353,8 @@ export default defineComponent({
     const fetchTokens = async () => {
       loading.value = true;
       try {
-        const res = await organizationsService.list_org_ingestion_tokens(
-          store.state.selectedOrganization.identifier,
-        );
-        tokens.value = res.data.data;
+        const res = await ingestionTokensQuery.get(store.state.selectedOrganization.identifier);
+        tokens.value = res.data;
       } catch (e: any) {
         toast({
           variant: "error",
@@ -388,6 +386,7 @@ export default defineComponent({
         };
         showCreateForm.value = false;
         showRevealedDialog.value = true;
+        ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -414,6 +413,7 @@ export default defineComponent({
           name,
           enabled,
         );
+        ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -460,7 +460,10 @@ export default defineComponent({
       {
         id: "ingestionTokensRefresh",
         handler: () => {
-          if (!isInputFocused()) fetchTokens();
+          if (!isInputFocused()) {
+            ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
+            fetchTokens();
+          }
         },
       },
       {

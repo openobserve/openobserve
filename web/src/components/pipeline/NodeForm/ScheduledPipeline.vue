@@ -935,6 +935,8 @@ import {
   nextTick,
   onMounted,
   onBeforeMount,
+  inject,
+  onBeforeUnmount,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -960,7 +962,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { inject } from "vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
 
@@ -986,7 +987,6 @@ import PreviewPromqlQuery from "./PreviewPromqlQuery.vue";
 import config from "../../../aws-exports";
 
 import useAiChat from "@/composables/useAiChat";
-import { onBeforeUnmount } from "vue";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useSqlSuggestions from "@/composables/useSuggestions";

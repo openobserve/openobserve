@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="refresh"
               :loading="loading"
               data-test="iam-service-accounts-refresh-btn"
-              @click="getServiceAccountsUsers"
+              @click="refreshServiceAccounts"
             >
               <OTooltip
                 side="bottom"
@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -478,8 +478,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
-import service_accounts from "@/services/service_accounts";
+import service_accounts, { serviceAccountsQuery } from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -662,7 +661,7 @@ export default defineComponent({
     const bulkDeleteLoading = ref(false);
 
     onBeforeMount(async () => {
-      await getServiceAccountsUsers();
+      await getServiceAccountsUsers(true);
 
       // Only `action=update&email=…` auto-opens the edit dialog so a shared
       // edit link still lands directly on the user's form. `action=add` is
@@ -751,7 +750,10 @@ export default defineComponent({
       deleteUserEmailIdentifier.value = row.email;
     };
     const loading = ref(false);
-    const getServiceAccountsUsers = async () => {
+    // Bound to refresh / post-write reloads: always hits the server.
+    const refreshServiceAccounts = () => getServiceAccountsUsers(true);
+
+    const getServiceAccountsUsers = async (force = false) => {
       const dismiss = toast({
         variant: "loading",
         message: t("serviceAccounts.toast.loading"),
@@ -759,13 +761,13 @@ export default defineComponent({
       });
 
       loading.value = true;
+      const org = store.state.selectedOrganization.identifier;
       return new Promise((resolve, reject) => {
-        service_accounts
-          .list(store.state.selectedOrganization.identifier)
-          .then((res) => {
-            resultTotal.value = res.data.data.length;
+        (force ? serviceAccountsQuery.refresh(org) : serviceAccountsQuery.get(org))
+          .then((accounts: any[]) => {
+            resultTotal.value = accounts.length;
             currentUserRole.value = "";
-            serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
+            serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
               return {
                 email: data.email,
                 first_name: data.first_name,
@@ -956,7 +958,7 @@ export default defineComponent({
               message: t("serviceAccounts.toast.deleted"),
               variant: "success",
             });
-            await getServiceAccountsUsers();
+            await getServiceAccountsUsers(true);
           }
         })
         .catch((err: any) => {
@@ -1007,7 +1009,7 @@ export default defineComponent({
 
         selectedAccounts.value = [];
         confirmBulkDelete.value = false;
-        await getServiceAccountsUsers();
+        await getServiceAccountsUsers(true);
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
@@ -1089,6 +1091,7 @@ export default defineComponent({
       },
     ]);
     return {
+      refreshServiceAccounts,
       t,
       router,
       store,

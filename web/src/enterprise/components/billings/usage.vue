@@ -248,7 +248,7 @@ import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18nTyped } from "@/types/i18n";
-import BillingService from "@/services/billings";
+import BillingService, { aiUsageQuery } from "@/services/billings";
 import organizations from "@/services/organizations";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
@@ -421,7 +421,7 @@ export default defineComponent({
       if (config.isCloud !== "true") return;
       const orgId = store.state.selectedOrganization.identifier;
       try {
-        aiUsage.value = (await BillingService.get_ai_usage(orgId)).data;
+        aiUsage.value = await aiUsageQuery.get(orgId);
       } catch {
         aiUsage.value = null;
       }

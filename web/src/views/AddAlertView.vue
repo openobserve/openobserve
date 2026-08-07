@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :destinations="destinations"
       @update:list="handleUpdateList"
       @cancel:hideform="handleCancel"
-      @refresh:destinations="getDestinations"
+      @refresh:destinations="refreshDestinations"
     />
   </div>
 </template>
@@ -32,9 +32,10 @@ import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { destinationsQuery } from "@/services/alert_destination";
+import { alertDetailQuery, alertsListQuery } from "@/services/alerts";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -49,13 +50,19 @@ export default defineComponent({
     const destinations = ref([]);
     const isUpdated = ref(false);
 
+    // Explicit refresh from the alert form (a destination was just created or
+    // edited) — drop the cached list so this is a real refetch.
+    const refreshDestinations = async () => {
+      await destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
+      await getDestinations();
+    };
+
     const getDestinations = async () => {
       try {
-        const res = await destinationService.list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        });
-        destinations.value = res.data;
+        destinations.value = (await destinationsQuery.get(
+          store.state.selectedOrganization.identifier,
+          "alert",
+        )) as any;
       } catch (error) {
         toast({
           variant: "error",
@@ -67,13 +74,10 @@ export default defineComponent({
     const handleUpdateList = (folderId?: string) => {
       const resolvedFolder = folderId || (route.query.folder as string) || "default";
 
-      // Invalidate cached alerts for this folder so the AlertList
-      // component fetches fresh data when it mounts.
-      const cached = store.state.organizationData.allAlertsListByFolderId;
-      if (cached && cached[resolvedFolder]) {
-        const { [resolvedFolder]: _, ...rest } = cached;
-        store.dispatch("setAllAlertsListByFolderId", rest);
-      }
+      // Drop the cached alerts (list and any search) so AlertList refetches on
+      // mount instead of rendering the pre-save rows.
+      alertsListQuery.invalidate(store.state.selectedOrganization.identifier);
+      alertDetailQuery.invalidate(store.state.selectedOrganization.identifier);
 
       // Navigate back to alert list after successful save
       router.push({
@@ -111,6 +115,7 @@ export default defineComponent({
       destinations,
       isUpdated,
       getDestinations,
+      refreshDestinations,
       handleUpdateList,
       handleCancel,
     };

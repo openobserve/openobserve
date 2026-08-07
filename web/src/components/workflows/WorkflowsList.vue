@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="loading"
                 data-test="workflow-list-refresh"
-                @click="getWorkflows"
+                @click="refreshWorkflows"
               >
                 <OTooltip side="bottom" :content="t('workflow.refresh')" />
               </OButton>
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <!-- Editor (add/edit) renders here as a child route. On a successful save it
        emits `saved`, so this parent refreshes the list — no route watcher. -->
   <router-view v-else v-slot="{ Component }">
-    <component :is="Component" @saved="getWorkflows" />
+    <component :is="Component" @saved="refreshWorkflows" />
   </router-view>
 
   <ConfirmDialog
@@ -241,7 +241,7 @@ import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
-import workflowService from "@/services/workflows";
+import workflowService, { workflowsQuery } from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
@@ -345,12 +345,15 @@ const columns = computed(() => [
 ]);
 const otableColumns = computed(() => columns.value);
 
-const getWorkflows = async () => {
+// Bound to refresh / "saved" events: always hits the server.
+const refreshWorkflows = () => getWorkflows(true);
+
+const getWorkflows = async (force = false) => {
   loading.value = true;
   try {
-    const response = await workflowService.listWorkflows(orgId.value);
-    // list handler returns a bare array of Workflow.
-    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
+    const list = force
+      ? await workflowsQuery.refresh(orgId.value)
+      : await workflowsQuery.get(orgId.value);
     workflows.value = list.map((wf: any, index: number) => ({
       ...wf,
       "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
@@ -415,7 +418,7 @@ const toggleWorkflow = (row: any) => {
           : t("workflow.pauseSuccess", { name: row.name }),
         variant: "success",
       });
-      getWorkflows();
+      getWorkflows(true);
     })
     .catch((error: any) => {
       if (error?.response?.status !== 403) {
@@ -456,7 +459,7 @@ const deleteWorkflow = async () => {
   try {
     await workflowService.deleteWorkflow({ org_identifier: orgId.value, id: row.id });
     toast({ message: t("workflow.deleteSuccess"), variant: "success" });
-    await getWorkflows();
+    await getWorkflows(true);
   } catch (error: any) {
     if (error?.response?.status !== 403) {
       toast({

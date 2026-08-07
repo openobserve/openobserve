@@ -267,9 +267,7 @@ import { updateRole, getResources, getAllRolePermissions, getRoleUsers } from "@
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
-import templateService from "@/services/alert_templates";
 import actions from "@/services/action_scripts";
-import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
@@ -289,6 +287,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+import { destinationsQuery } from "@/services/alert_destination";
+import { templatesQuery } from "@/services/alert_templates";
+import { resourcesQuery, rolePermissionsQuery } from "@/services/iam";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -469,9 +470,10 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  getResources(store.state.selectedOrganization.identifier)
-    .then(async (res) => {
-      permissionsState.resources = res.data
+  resourcesQuery
+    .get(store.state.selectedOrganization.identifier)
+    .then(async (res: any) => {
+      permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
 
@@ -1630,12 +1632,9 @@ const getFunctions = async () => {
 };
 
 const getDestinations = async () => {
-  const destinations = await destinationService.list({
-    sort_by: "name",
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const destinations = await destinationsQuery.get(store.state.selectedOrganization.identifier);
 
-  updateResourceEntities("destination", ["name"], [...destinations.data]);
+  updateResourceEntities("destination", ["name"], [...destinations]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1643,11 +1642,9 @@ const getDestinations = async () => {
 };
 
 const getTemplates = async () => {
-  const templates = await templateService.list({
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const templates = await templatesQuery.get(store.state.selectedOrganization.identifier);
 
-  updateResourceEntities("template", ["name"], [...templates.data]);
+  updateResourceEntities("template", ["name"], [...templates]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -2240,6 +2237,7 @@ const saveRole = () => {
     return;
   }
 
+  rolePermissionsQuery.invalidate(store.state.selectedOrganization.identifier);
   updateRole({
     role_id: editingRole.value,
     org_identifier: store.state.selectedOrganization.identifier,

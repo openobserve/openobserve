@@ -155,7 +155,7 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
+import alertsService, { alertHistoryQuery } from "@/services/alerts";
 import { conditionSummary } from "@/utils/alerts/runOutcome";
 
 const props = defineProps<{ alertId: string }>();
@@ -198,15 +198,15 @@ const fetchHistory = async () => {
   try {
     const endTime = Date.now() * 1000;
     const startTime = endTime - (RANGE_MS[range.value] ?? RANGE_MS["1h"]) * 1000;
-    const res = await alertsService.getHistory(orgId, {
+    const data = await alertHistoryQuery.get(orgId, {
       alert_id: props.alertId,
       start_time: startTime,
       end_time: endTime,
       from: (currentPage.value - 1) * pageSize.value,
       size: pageSize.value,
     });
-    history.value = res.data?.hits || [];
-    totalCount.value = res.data?.total || 0;
+    history.value = data?.hits || [];
+    totalCount.value = data?.total || 0;
   } catch {
     history.value = [];
     totalCount.value = 0;

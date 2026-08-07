@@ -68,20 +68,23 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    listByFolderId: mockServiceList,
-    list: mockServiceList,
-    get: mockServiceGet,
-    create: mockServiceCreate,
-    enable: mockServiceEnable,
-    delete: mockServiceDelete,
-    bulkDelete: mockServiceBulkDelete,
-    run: mockServiceRun,
-    getLocations: mockServiceGetLocations,
-    getAgentSetup: mockServiceGetAgentSetup,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: mockServiceList,
+      list: mockServiceList,
+      get: mockServiceGet,
+      create: mockServiceCreate,
+      enable: mockServiceEnable,
+      delete: mockServiceDelete,
+      bulkDelete: mockServiceBulkDelete,
+      run: mockServiceRun,
+      getLocations: mockServiceGetLocations,
+      getAgentSetup: mockServiceGetAgentSetup,
+    },
+  });
+});
 
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn().mockResolvedValue([]),

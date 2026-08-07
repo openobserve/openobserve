@@ -176,7 +176,7 @@ import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -571,6 +571,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
 
         dismiss();
 

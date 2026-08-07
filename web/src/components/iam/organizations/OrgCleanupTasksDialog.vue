@@ -233,7 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OButton variant="outline" size="sm" @click="$emit('update:open', false)">
         {{ t("iam.orgCleanupTasksDialog.close") }}
       </OButton>
-      <OButton variant="ghost" size="sm" :disabled="loading" @click="fetchTasks">
+      <OButton variant="ghost" size="sm" :disabled="loading" @click="refreshTasks">
         <OIcon name="refresh" size="sm" />
         {{ t("iam.orgCleanupTasksDialog.refresh") }}
       </OButton>
@@ -242,14 +242,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onUnmounted } from "vue";
+import { defineComponent, ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import organizationsService from "@/services/organizations";
+import { cleanupTasksQuery } from "@/services/organizations";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 
 interface CleanupTask {
@@ -277,8 +277,6 @@ export default defineComponent({
   setup(props) {
     const { t } = useI18nTyped();
     const tasks = ref<CleanupTask[]>([]);
-    const loading = ref(false);
-    let pollTimer: ReturnType<typeof setInterval> | null = null;
 
     const sortedTasks = computed(() =>
       [...tasks.value].sort((a, b) => a.step_order - b.step_order),
@@ -392,47 +390,35 @@ export default defineComponent({
       }
     };
 
-    const fetchTasks = async () => {
-      if (!props.orgId) return;
-      loading.value = true;
-      try {
-        const res = await organizationsService.get_cleanup_tasks(props.orgId);
-        tasks.value = res.data ?? [];
-      } catch (e) {
-        // silently fail — next poll will retry
-      } finally {
-        loading.value = false;
-      }
-    };
+    // The 5s poll is the query's own `refetchInterval`, which stops on its own
+    // once every step is done and is torn down with the component — no manual
+    // timer to start, clear and leak.
+    const cleanupTasks = cleanupTasksQuery.use(() => [props.orgId], {
+      enabled: () => props.open && !!props.orgId,
+      refetchInterval: () => (props.open && !isComplete.value ? 5000 : false),
+    });
 
-    const startPolling = () => {
-      stopPolling();
-      fetchTasks();
-      pollTimer = setInterval(() => {
-        if (!isComplete.value) fetchTasks();
-      }, 5000);
-    };
+    watch(
+      cleanupTasks.data,
+      (value) => {
+        if (value) tasks.value = value;
+      },
+      { immediate: true },
+    );
 
-    const stopPolling = () => {
-      if (pollTimer !== null) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-      }
-    };
+    const loading = cleanupTasks.isPending;
 
+    // The dialog's own refresh button — an explicit poll tick on demand.
+    const refreshTasks = () => cleanupTasks.refetch();
+
+    // Clear the previous run's rows when the dialog reopens; starting and
+    // stopping the poll is the query's job.
     watch(
       () => props.open,
       (isOpen) => {
-        if (isOpen) {
-          tasks.value = [];
-          startPolling();
-        } else {
-          stopPolling();
-        }
+        if (isOpen) tasks.value = [];
       },
     );
-
-    onUnmounted(stopPolling);
 
     const formatStepName = (step: string): string => {
       // "delete_stream:logs/mystream" → "Delete stream: logs/mystream"
@@ -474,7 +460,7 @@ export default defineComponent({
       progressBarVariant,
       rowAccentClass,
       statusIcon,
-      fetchTasks,
+      refreshTasks,
       formatStepName,
       badgeVariant,
     };

@@ -8,14 +8,19 @@ vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(async () => ({ data: ["Admin", "Viewer", "Editor"] })),
-  deleteRole: vi.fn(async () => ({})),
-  bulkDeleteRoles: vi.fn(async () => ({
-    data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
-  })),
-  getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn(async () => ({ data: ["Admin", "Viewer", "Editor"] }));
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+    deleteRole: vi.fn(async () => ({})),
+    bulkDeleteRoles: vi.fn(async () => ({
+      data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
+    })),
+    getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
+    rolesQuery: queryStub(getRoles),
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
@@ -27,6 +32,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import AppRoles from "@/components/iam/roles/AppRoles.vue";
 import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import { queryClient } from "@/composables/query/queryClient";
 
 const node = document.createElement("div");
 node.setAttribute("id", "app-roles-test");

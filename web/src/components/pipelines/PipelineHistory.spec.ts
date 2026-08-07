@@ -35,19 +35,22 @@ vi.mock("vue-router", async (importOriginal) => {
   };
 });
 
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn().mockResolvedValue({
-      data: {
-        list: [
-          { name: "Alpha Pipeline", pipeline_id: "pid-alpha" },
-          { name: "Beta Pipeline", pipeline_id: "pid-beta" },
-          { name: "Gamma Pipeline", pipeline_id: "pid-gamma" },
-        ],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn().mockResolvedValue({
+        data: {
+          list: [
+            { name: "Alpha Pipeline", pipeline_id: "pid-alpha" },
+            { name: "Beta Pipeline", pipeline_id: "pid-beta" },
+            { name: "Gamma Pipeline", pipeline_id: "pid-gamma" },
+          ],
+        },
+      }),
+    },
+  });
+});
 
 const mockHttpGet = vi.fn().mockResolvedValue({
   data: {

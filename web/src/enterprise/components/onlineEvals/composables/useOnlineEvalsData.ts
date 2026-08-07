@@ -1,6 +1,10 @@
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
+  evalJobsQuery,
+  providersQuery,
+  scoreConfigsQuery,
+  scorersQuery,
   type EvalJob,
   type Provider,
   type ScoreConfig,
@@ -22,12 +26,14 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     isLoading.value = true;
     try {
+      // Cached per list: revisiting the page inside the tier's staleTime costs
+      // nothing, and the four requests still fan out in parallel on a miss.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          onlineEvalsService.providers.list(orgId),
-          onlineEvalsService.scoreConfigs.list(orgId),
-          onlineEvalsService.scorers.list(orgId),
-          onlineEvalsService.jobs.list(orgId),
+          providersQuery.get(orgId),
+          scoreConfigsQuery.get(orgId),
+          scorersQuery.get(orgId),
+          evalJobsQuery.get(orgId),
         ],
       );
 
@@ -65,7 +71,7 @@ export function useOnlineEvalsData() {
   async function loadProviders(orgId: string) {
     if (!orgId) return;
     try {
-      providers.value = await onlineEvalsService.providers.list(orgId);
+      providers.value = await providersQuery.refresh(orgId);
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));
     }

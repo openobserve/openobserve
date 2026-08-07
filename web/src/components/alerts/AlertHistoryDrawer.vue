@@ -397,7 +397,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
+import alertsService, { alertHistoryQuery } from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
@@ -791,12 +791,14 @@ const fetchAlertHistory = async (alertId: string) => {
     } else {
       historyParams.alert_id = alertId;
     }
-    const response = await alertsService.getHistory(
+    // Same cached page query as the Alert History page — paging back to a page
+    // already fetched keeps its rows instead of blanking.
+    const data = await alertHistoryQuery.get(
       store?.state?.selectedOrganization?.identifier,
       historyParams,
     );
-    alertHistory.value = response.data?.hits || [];
-    resultTotal.value = response.data?.total || 0;
+    alertHistory.value = data?.hits || [];
+    resultTotal.value = data?.total || 0;
   } catch (error: any) {
     alertHistory.value = [];
     resultTotal.value = 0;

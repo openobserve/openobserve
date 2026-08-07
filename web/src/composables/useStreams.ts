@@ -14,14 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import StreamService from "@/services/stream";
+import StreamService, { streamNameListQuery } from "@/services/stream";
 import { computed, ComputedRef } from "vue";
-import { ref } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
-
-const getStreamsPromise: any = ref(null);
 
 const useStreams = (t: TranslateFn) => {
   const store = useStore();
@@ -61,8 +58,16 @@ const useStreams = (t: TranslateFn) => {
       schema = false;
       void (async () => {
         try {
-          if (getStreamsPromise.value) {
-            await getStreamsPromise.value;
+          // No global in-flight promise any more: each stream type is its own
+          // query key, so concurrent callers share a request per type instead of
+          // every type queueing behind whichever fetch started first.
+          // `force` must reach the server: drop the cached list first, otherwise
+          // the query would answer from cache and force would be a no-op.
+          if (force) {
+            await streamNameListQuery.invalidate(
+              store.state.selectedOrganization.identifier,
+              streamName === "all" ? undefined : streamName,
+            );
           }
           if (!isStreamFetched(streamName || "all") || force) {
             // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -90,25 +95,16 @@ const useStreams = (t: TranslateFn) => {
                 (_streamType) => !streamsCache[_streamType]?.value,
               );
 
-              getStreamsPromise.value = Promise.allSettled(
+              // One cached query per type: a hit resolves without a request.
+              Promise.allSettled(
                 [...streamsToFetch].map((streamType) =>
-                  StreamService.nameList(
-                    store.state.selectedOrganization.identifier,
-                    streamType,
-                    schema,
-                  ),
+                  streamNameListQuery.get(store.state.selectedOrganization.identifier, streamType),
                 ),
-              );
-
-              getStreamsPromise.value
+              )
                 .then((results: any) => {
                   results.forEach((result: any, index: number) => {
-                    if (
-                      result.status === "fulfilled" &&
-                      Object.hasOwn(result, "value") &&
-                      result?.value?.data?.list.length > 0
-                    ) {
-                      setStreams(streamsToFetch[index], result?.value?.data?.list);
+                    if (result.status === "fulfilled" && result.value?.length > 0) {
+                      setStreams(streamsToFetch[index], result.value);
                     }
                   });
 
@@ -116,36 +112,27 @@ const useStreams = (t: TranslateFn) => {
                     streamList.every((stream) => !!streamsCache[stream].value),
                   );
 
-                  getStreamsPromise.value = null;
-
                   dismiss();
                   resolve(getAllStreamsPayload());
                 })
                 .catch((e: any) => {
-                  getStreamsPromise.value = null;
                   dismiss();
                   reject(new Error(e.message));
                 });
             } else {
-              getStreamsPromise.value = StreamService.nameList(
-                store.state.selectedOrganization.identifier,
-                _streamName,
-                schema,
-              );
-              getStreamsPromise.value
-                .then((res: any) => {
-                  setStreams(streamName, res.data.list);
+              streamNameListQuery
+                .get(store.state.selectedOrganization.identifier, _streamName)
+                .then((list: any) => {
+                  setStreams(streamName, list);
                   const streamData = {
                     name: streamName,
-                    list: res.data.list,
+                    list,
                     schema: false,
                   };
-                  getStreamsPromise.value = null;
                   dismiss();
                   resolve(streamData);
                 })
                 .catch((e: any) => {
-                  getStreamsPromise.value = null;
                   dismiss();
                   reject(new Error(e.message));
                 });
@@ -182,9 +169,6 @@ const useStreams = (t: TranslateFn) => {
       schema = false;
       void (async () => {
         try {
-          if (getStreamsPromise.value) {
-            await getStreamsPromise.value;
-          }
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
             ? toast({
@@ -194,7 +178,7 @@ const useStreams = (t: TranslateFn) => {
               })
             : () => {};
 
-          getStreamsPromise.value = StreamService.nameList(
+          const pageResponse = StreamService.nameList(
             store.state.selectedOrganization.identifier,
             _streamType,
             schema,
@@ -204,7 +188,7 @@ const useStreams = (t: TranslateFn) => {
             sort,
             asc,
           );
-          getStreamsPromise.value
+          pageResponse
             .then((res: any) => {
               const streamData = {
                 name: streamType,
@@ -212,12 +196,10 @@ const useStreams = (t: TranslateFn) => {
                 schema: false,
                 total: res.data.total,
               };
-              getStreamsPromise.value = null;
               dismiss();
               resolve(streamData);
             })
             .catch((e: any) => {
-              getStreamsPromise.value = null;
               dismiss();
               reject(new Error(e.message));
             });
@@ -252,11 +234,8 @@ const useStreams = (t: TranslateFn) => {
           resolve(null);
         }
 
-        // Wait for the streams to be fetched if they are being fetched
-        if (getStreamsPromise.value) {
-          await getStreamsPromise.value;
-        }
-
+        // No global wait: the `getStreams` call below dedupes through the query
+        // cache, so a schema read no longer queues behind an unrelated type.
         // If the stream is not fetched, and trying to fetch the specific stream. First fetch all streams
         if (!isStreamFetched(streamType)) {
           try {
@@ -497,6 +476,9 @@ const useStreams = (t: TranslateFn) => {
         updateStreamsInStore(streamType, streamList);
       }
     }
+    // Whole streams prefix, not just this type's name list: the paginated
+    // Log Streams pages cache the deleted row too.
+    void streamNameListQuery.invalidate(store.state.selectedOrganization.identifier);
   };
 
   const addStream = async (stream: any) => {
@@ -527,7 +509,6 @@ const useStreams = (t: TranslateFn) => {
     });
     updateStreamIndexMappingInStore({});
     updateStreamsFetchedInStore(false);
-    getStreamsPromise.value = null;
     store.dispatch("setIsDataIngested", false);
   };
 

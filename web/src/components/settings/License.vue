@@ -467,7 +467,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import licenseServer from "@/services/license_server";
+import licenseServer, { licenseQuery } from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
@@ -543,8 +543,7 @@ export default defineComponent({
     const loadLicenseData = async () => {
       try {
         loading.value = true;
-        const response = await licenseServer.get_license();
-        licenseData.value = response.data;
+        licenseData.value = await licenseQuery.get();
         checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);

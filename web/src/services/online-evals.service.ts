@@ -6,6 +6,7 @@
 // (at your option) any later version.
 
 import http from "@/services/http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 export type EvalJobStatus = "draft" | "active" | "paused" | "degraded" | "archived";
 export type EvalTargetScope = "span" | "trace" | "session";
@@ -342,3 +343,32 @@ const onlineEvalsService = {
 };
 
 export default onlineEvalsService;
+
+/** Providers change rarely and gate the job form, so they persist. */
+export const providersQuery = defineQuery<[], any[]>({
+  key: ["onlineEvals", "providers"],
+  fetch: (org) => onlineEvalsService.providers.list(org),
+  tier: "ORG_CONFIG",
+  scope: ["onlineEvals"],
+});
+
+export const scoreConfigsQuery = defineQuery<[], any[]>({
+  key: ["onlineEvals", "scoreConfigs"],
+  fetch: (org) => onlineEvalsService.scoreConfigs.list(org),
+  tier: "ENTITY_LIST",
+  scope: ["onlineEvals"],
+});
+
+export const scorersQuery = defineQuery<[], any[]>({
+  key: ["onlineEvals", "scorers"],
+  fetch: (org) => onlineEvalsService.scorers.list(org),
+  tier: "ENTITY_LIST",
+  scope: ["onlineEvals"],
+});
+
+export const evalJobsQuery = defineQuery<[], any[]>({
+  key: ["onlineEvals", "jobs"],
+  fetch: (org) => onlineEvalsService.jobs.list(org),
+  tier: "ENTITY_LIST",
+  scope: ["onlineEvals"],
+});

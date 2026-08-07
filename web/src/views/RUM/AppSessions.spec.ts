@@ -68,31 +68,34 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({
-      data: {
-        hits: [
-          {
-            session_id: "session1",
-            zo_sql_timestamp: 1672531200000,
-            start_time: 1672531000,
-            end_time: 1672531300,
-            source: "web",
-            user_agent_user_agent_family: "Chrome",
-            user_agent_os_family: "Windows",
-            ip: "192.168.1.1",
-            error_count: 2,
-            user_email: "test@example.com",
-            country: "US",
-            city: "New York",
-            country_iso_code: "us",
-          },
-        ],
-      },
-    }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({
+        data: {
+          hits: [
+            {
+              session_id: "session1",
+              zo_sql_timestamp: 1672531200000,
+              start_time: 1672531000,
+              end_time: 1672531300,
+              source: "web",
+              user_agent_user_agent_family: "Chrome",
+              user_agent_os_family: "Windows",
+              ip: "192.168.1.1",
+              error_count: 2,
+              user_email: "test@example.com",
+              country: "US",
+              city: "New York",
+              country_iso_code: "us",
+            },
+          ],
+        },
+      }),
+    },
+  });
+});
 
 // Mock utility functions
 vi.mock("@/utils/zincutils", async (importOriginal) => {

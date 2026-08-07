@@ -23,9 +23,12 @@ const mockToast = vi.fn();
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: (...a: any[]) => mockToast(...a) }));
 
 const mockList = vi.fn();
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: (...args: any[]) => mockList(...args) },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...args: any[]) => mockList(...args) },
+  });
+});
 
 const OSelectStub = {
   name: "OSelect",

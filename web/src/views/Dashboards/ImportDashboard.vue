@@ -258,6 +258,7 @@ import {
   onUnmounted,
   reactive,
   watch,
+  defineAsyncComponent,
 } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
@@ -282,7 +283,6 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import stream from "@/services/stream.js";
 export default defineComponent({
@@ -473,7 +473,7 @@ export default defineComponent({
       );
 
       //update store
-      await getAllDashboards(store, selectedFolder.value);
+      await getAllDashboards(store, selectedFolder.value, true);
 
       //return new dashboard
       return newDashboard;

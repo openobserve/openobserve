@@ -367,6 +367,7 @@ import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, {
+  providersQuery,
   type EvalJob,
   type ScoreConfig,
   type Scorer,
@@ -918,6 +919,7 @@ async function activateJob(row: EvalJob) {
   pendingJobStatusId.value = row.id;
   try {
     await onlineEvalsService.jobs.activate(orgId.value, row.id);
+    providersQuery.invalidate(orgId.value);
     toast({
       variant: "success",
       message: t("onlineEvals.actions.activated"),
@@ -935,6 +937,7 @@ async function pauseJob(row: EvalJob) {
   pendingJobStatusId.value = row.id;
   try {
     await onlineEvalsService.jobs.pause(orgId.value, row.id);
+    providersQuery.invalidate(orgId.value);
     toast({
       variant: "success",
       message: t("onlineEvals.actions.paused"),
@@ -1224,6 +1227,7 @@ async function performDelete() {
     else if (tab === "scorers")
       await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
     else if (tab === "jobs") await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+    providersQuery.invalidate(orgId.value);
 
     toast({
       variant: "success",
@@ -1248,6 +1252,7 @@ async function performBulkJobsDelete() {
     const results = await Promise.allSettled(
       ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
     );
+    providersQuery.invalidate(orgId.value);
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed > 0) {
       showError(

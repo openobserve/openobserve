@@ -18,12 +18,15 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("@/services/incidents", () => ({
-  default: {
-    list: vi.fn(),
-    updateStatus: vi.fn(),
-  },
-}));
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      updateStatus: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/date", () => ({
   formatToReadable: vi.fn((ts: number) => `ts-${ts}`),
