@@ -24,7 +24,14 @@ const randomDashboardName =
 // Favorites for any account that has some. Select the folder the dashboard was
 // created in so the row is on screen no matter what the account has starred.
 const returnToDashboardFolder = async (page, pm, folderName = "default") => {
-  await pm.dashboardList.menuItem("dashboards-item");
+  // Visiting the Alerts page can reset the app's active-org state, so a plain
+  // sidebar click here can land on the wrong org's dashboards (which then
+  // redirects to billing) — force the org explicitly rather than trusting
+  // menuItem()'s sidebar-click navigation.
+  await page.goto(
+    `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=${folderName}`
+  );
+  await page.waitForLoadState("domcontentloaded");
   await waitForDashboardPage(page);
 
   // waitForDashboardPage settles on the folders API response, which lands well
@@ -43,6 +50,15 @@ test.describe("Dashboard Create Alert testcases", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
+
+    // navigateToBase() alone can land on the wrong org's page on cloud (the
+    // stored session's "last active org" wins over the org_identifier query
+    // param on a bare root load) — force the correct org context with an
+    // explicit navigation to a real feature page.
+    await page.goto(
+      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
+    );
+    await page.waitForLoadState("domcontentloaded");
   });
 
   // ===== P0: SMOKE TESTS =====
@@ -153,11 +169,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data
-      const dashboardStreamPromise = page.waitForResponse(
-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
-        { timeout: 30000 }
-      );
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -249,11 +267,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data
-      const dashboardStreamPromise = page.waitForResponse(
-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
-        { timeout: 30000 }
-      );
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });
@@ -326,11 +346,13 @@ test.describe("Dashboard Create Alert testcases", () => {
       await streamPromise;
       await pm.dashboardPanelActions.waitForChartToRender();
 
-      // Save the panel and wait for dashboard to reload chart data
-      const dashboardStreamPromise = page.waitForResponse(
-        (resp) => resp.url().includes("_search_stream") && resp.status() === 200,
-        { timeout: 30000 }
-      );
+      // Save the panel and wait for dashboard to reload chart data.
+      // _search_stream is SSE/chunked (progress events, then a final
+      // [[DONE]] message) — page.waitForResponse(status===200) resolves on
+      // the first response event (headers), which fires as soon as the
+      // stream opens, not when it actually finishes. waitForStreamComplete
+      // reads the body and waits for the real [[DONE]] marker instead.
+      const dashboardStreamPromise = waitForStreamComplete(page, 30000);
       await pm.dashboardPanelActions.savePanel();
       await dashboardStreamPromise;
       await page.locator('[data-test="chart-renderer"] canvas').first().waitFor({ state: "visible", timeout: 15000 });

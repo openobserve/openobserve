@@ -620,6 +620,17 @@ export default class LogsVisualise {
   // Click the dashboard back button
   async clickDashboardBackBtn() {
     await this.page.locator('[data-test="dashboard-back-btn"]').click();
+
+    // Both the panel-editor and dashboard-view page render an element with
+    // the same data-test="dashboard-back-btn" — a click right after saving
+    // can land on a stale instance mid page-transition and silently no-op.
+    // Verify the URL actually changed and retry once if not.
+    try {
+      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 8000 });
+    } catch (e) {
+      await this.page.locator('[data-test="dashboard-back-btn"]').click();
+      await this.page.waitForURL(/\/dashboards(?:\?|$)/, { timeout: 15000 });
+    }
   }
 
   // Get chart renderer canvas locator

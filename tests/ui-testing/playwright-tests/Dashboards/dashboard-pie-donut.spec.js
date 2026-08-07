@@ -4,6 +4,7 @@ const {
   navigateToBase,
 } = require("../utils/enhanced-baseFixtures.js");
 import PageManager from "../../pages/page-manager";
+import { ingestion } from "./utils/dashIngestion.js";
 import { cleanupTestDashboard, setupTestDashboard } from "./utils/dashCreation.js";
 import {
   generateDashboardName,
@@ -49,6 +50,12 @@ async function getPlottedPixelCount(page) {
 test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
+    // This file never sets an explicit panel time range, so every panel
+    // relies on the editor's default window covering whenever e2e_automate
+    // was last ingested. Ingest fresh data every test (matching every other
+    // dashboard spec file) instead of depending on another file's ingest
+    // still being within that window.
+    await ingestion(page);
   });
 
   // ---------------------------------------------------------------------------
@@ -277,6 +284,13 @@ test.describe("Pie & Donut Chart — E2E Tests (SQL Builder / Logs Stream)", () 
 
     // Save panel first to access legend button on dashboard view
     await pm.dashboardPanelActions.savePanel();
+
+    // ShowLegendsPopup derives its legend list from the panel's live
+    // panelData/series prop — clicking the legend button before the
+    // freshly re-rendered dashboard-view panel has fully repainted can
+    // read a stale/empty series list even though the canvas already shows
+    // colored pixels. Wait for the chart to finish rendering post-save.
+    await pm.dashboardPanelActions.waitForChartToRender().catch(() => {});
 
     // Hover over panel bar to reveal legend button
     const panelBar = page.locator('[data-test="dashboard-panel-bar"]').first();

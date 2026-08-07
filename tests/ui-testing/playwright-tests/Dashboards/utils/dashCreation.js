@@ -80,9 +80,17 @@ export async function deleteDashboard(page, dashboardName) {
     page.waitForSelector('[data-test="dashboard-table"]', { timeout: 20000 }),
   ]);
 
-  const deleteButton = page
+  // Wait for THIS dashboard's row specifically — the generic table/API wait
+  // above can resolve before the target row has rendered (e.g. under
+  // parallel workers where other dashboards are being created/removed at
+  // the same time), leaving the delete-button locator below pointed at
+  // nothing until it times out.
+  const nameCell = page
     .locator(`[data-test="dashboard-name-cell-${dashboardName}"]`)
-    .first()
+    .first();
+  await nameCell.waitFor({ state: 'visible', timeout: 20000 });
+
+  const deleteButton = nameCell
     .locator('xpath=ancestor::*[starts-with(@data-test,"o2-table-row-")]')
     .locator('[data-test="dashboard-delete"]');
   await deleteButton.click();
@@ -247,7 +255,13 @@ export async function setupTestDashboard(page, pm, dashboardName, options = {}) 
   await pm.dashboardCreate.createDashboard(dashboardName);
 
   if (waitForAddPanelBtn) {
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 10000 });
+    // createDashboard() returns as soon as /dashboards/view is reachable and the
+    // header's back button has mounted, but the empty-state add-panel button
+    // lives in RenderDashboardCharts (v-if="!panels.length"), which only renders
+    // once the dashboard GET and variables init have finished. Under parallel CI
+    // load that lands well after the header, so this wait needs the same budget
+    // as the other post-navigation waits here rather than a tight 10s.
+    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 30000 });
   }
 
   testLogger.info('Test dashboard setup complete', { dashboardName });

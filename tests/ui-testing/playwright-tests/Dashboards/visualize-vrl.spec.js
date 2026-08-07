@@ -7,6 +7,7 @@ import { ingestion } from "./utils/dashIngestion.js";
 import logData from "../../fixtures/log.json";
 import PageManager from "../../pages/page-manager";
 import { deleteDashboard } from "./utils/dashCreation.js";
+const { isCloudEnvironment } = require("../../pages/cloudPages/cloud-env.js");
 
 // Dashboard and panel names - using slice() instead of deprecated substr()
 const randomDashboardName =
@@ -58,6 +59,11 @@ async function enableVrlEditor(page) {
 
 test.describe("VRL visualization support testcases", () => {
   test.beforeEach(async ({ page }) => {
+    // Every test in this file opens the Visualize tab via openVisualiseTabWithVrl(),
+    // which is gated behind store.state.zoConfig.timechart_enabled — confirmed
+    // false on alpha1 (verified via /config). No test code can enable a
+    // disabled backend flag, so skip the whole file on cloud.
+    test.skip(isCloudEnvironment(), "Visualize tab disabled on alpha1 (timechart_enabled=false)");
     await navigateToBase(page);
     await ingestion(page);
 
