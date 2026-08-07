@@ -1,0 +1,72 @@
+# Skyramp Workspace Configuration
+workspace:
+  repoName: mrugeshmaster/openobserve
+  repoUrl: https://github.com/mrugeshmaster/openobserve
+metadata:
+  schemaVersion: v1
+  executorVersion: v1.3.37
+  createdAt: "2026-08-07T06:25:59.776Z"
+  updatedAt: "2026-08-07T06:25:59.777Z"
+services:
+  - serviceName: openobserve
+    language: javascript
+    framework: playwright
+    testDirectory: tests/ui-testing/playwright-tests
+    api:
+      schemaPath: http://localhost:5080/api-doc/openapi.json
+      authType: basic
+      authHeader: Authorization
+      baseUrl: http://localhost:5080
+    runtimeDetails:
+      serverStartCommand: bash .skyramp/sut/setup.sh
+      runtime: local
+      testSuites:
+        - framework: playwright
+          testRunCommand: >-
+            ZO_BASE_URL=$SKYRAMP_TEST_BASE_URL ./tests/ui-testing/node_modules/.bin/playwright test --config
+            tests/ui-testing/playwright.config.js
+          testEnv:
+            ZO_ROOT_USER_EMAIL: root@example.com
+            ZO_ROOT_USER_PASSWORD: Complexpass#123
+            WS_ZO_BASE_URL: ws://localhost:5080
+            ZO_BASE_URL_SC: http://localhost:5080
+            ZO_BASE_URL_SC_UI: http://localhost:5080
+            INGESTION_URL: http://localhost:5080
+            ORGNAME: default
+            ZO_SMTP_ENABLED: "true"
+            ZO_CREATE_ORG_THROUGH_INGESTION: "true"
+            ZO_SSRF_ALLOW_LOOPBACK: "true"
+            ZO_QUICK_MODE_ENABLED: "false"
+            ZO_TIMECHART_ENABLED: "true"
+            ZO_ENABLE_CROSS_LINKING: "true"
+          pathGlobs:
+            - tests/ui-testing/playwright-tests/**
+          canaryStatus: unproven
+          canaryDetail: >-
+            Canary attempt: exit 127 — ./tests/ui-testing/node_modules/.bin/playwright: No such file or directory. npm
+            ci has not been run because setup.sh requires the pre-built OpenObserve binary (release-ci Rust
+            nightly-2026-05-20 + protoc + Node.js 22) staged at ./release-ci-binary/openobserve by the GHA pre-steps.
+            Once the GHA workflow runs setup.sh, npm ci installs playwright and the binary starts; canary will pass on
+            first CI run.
+        - framework: pytest
+          testRunCommand: >-
+            ZO_BASE_URL=$SKYRAMP_TEST_BASE_URL bash .skyramp/sut/run-api-tests.sh --ignore=tests/regression
+            --ignore=tests/query_agent --ignore=tests/vortex
+          testEnv:
+            ZO_ROOT_USER_EMAIL: root@example.com
+            ZO_ROOT_USER_PASSWORD: Complexpass#123
+            ZO_BASE_URL_SC: http://localhost:5080/
+            ZO_USAGE_REPORTING_ENABLED: "true"
+            ZO_USAGE_PUBLISH_INTERVAL: "5"
+            ZO_ALERT_SCHEDULE_INTERVAL: "3"
+            ZO_SMTP_ENABLED: "true"
+            ZO_CREATE_ORG_THROUGH_INGESTION: "true"
+            ZO_INGEST_ALLOWED_UPTO: "48"
+            ZO_SSRF_ALLOW_LOOPBACK: "true"
+          pathGlobs:
+            - tests/api-testing/tests/**
+          canaryStatus: unproven
+          canaryDetail: >-
+            Canary attempt: exit 127 — rye: not found. rye is not installed in the bootstrap environment; setup.sh
+            installs it via curl and runs rye sync + pytest-json-report install. Blocked by the same binary build
+            requirement as the Playwright suite. Canary will pass on first CI run after setup.sh executes.
