@@ -415,7 +415,6 @@ const FEATURE_LINKS = {
   audit_trail: "audit_trail",
   sensitive_data_redaction: "data_redact",
   pipeline_remote_destinations: "pipeline_remote",
-  query_optimizer: "query_opt",
   incident_management: "incident_mgmt",
   sre_agent: "sre_agent",
   ai_assistant: "ai_assistant",
