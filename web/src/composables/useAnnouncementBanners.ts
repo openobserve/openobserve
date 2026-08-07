@@ -19,8 +19,9 @@ import { useStore } from "vuex";
 import config from "@/aws-exports";
 import announcements from "@/services/announcements";
 import { raw, type I18nText } from "@/types/i18n";
+import { orderBanners, type BannerVariantName } from "@/utils/announcementOrder";
 
-export type BannerVariant = "info" | "warning" | "critical" | "promo";
+export type BannerVariant = BannerVariantName;
 
 export interface BannerCta {
   text: I18nText;
@@ -121,13 +122,8 @@ export function useAnnouncementBanners() {
     );
   });
 
-  /** A promo next to an outage notice reads badly. */
-  const renderedBanners = computed(() => {
-    const hasCritical = visibleBanners.value.some((b) => b.variant === "critical");
-    return hasCritical
-      ? visibleBanners.value.filter((b) => b.variant !== "promo")
-      : visibleBanners.value;
-  });
+  /** Same resolver the settings preview uses, so the two always agree. */
+  const renderedBanners = computed(() => orderBanners(visibleBanners.value));
 
   const clearBoundaryTimer = () => {
     if (boundaryTimer) {
