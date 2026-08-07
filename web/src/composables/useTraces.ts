@@ -263,8 +263,7 @@ const useTraces = () => {
     const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
     // storage ref .value is typed {} at this boundary; narrow to the stored map shape
     const stored = useLocalTraceFilterField()?.value as
-      | Record<string, Record<string, string[]>>
-      | undefined;
+      Record<string, Record<string, string[]>> | undefined;
     const saved: Record<string, string[]> | undefined = stored?.[key];
 
     const fields: string[] = saved?.[searchMode]?.length
