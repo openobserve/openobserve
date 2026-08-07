@@ -55,7 +55,7 @@ use {
     },
     openobserve_api_management::request::{
         actions, ai, anomaly_detection, domain_management, eval_jobs, gen_ai, keys, license,
-        providers, score_configs, scorers, service_streams, synthetics, workflows,
+        oncall, providers, score_configs, scorers, service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1217,6 +1217,40 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/synthetics/agent/heartbeat",
                     post(synthetics::agent_heartbeat),
+                );
+        }
+
+        // On-call — all routes gated behind O2_ONCALL_ENABLED. When off,
+        // nothing is registered and every on-call path 404s.
+        if get_o2_config().oncall.enabled {
+            router = router
+                .route(
+                    "/{org_id}/oncall/teams",
+                    get(oncall::list_teams).post(oncall::create_team),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}",
+                    get(oncall::get_team)
+                        .put(oncall::update_team)
+                        .delete(oncall::delete_team),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/members",
+                    get(oncall::list_members)
+                        .post(oncall::add_member)
+                        .delete(oncall::remove_member),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/schedule",
+                    get(oncall::get_schedule).put(oncall::set_schedule),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/on-call",
+                    get(oncall::who_is_on_call),
+                )
+                .route(
+                    "/{org_id}/oncall/teams/{team_id}/policy",
+                    get(oncall::get_policy).put(oncall::set_policy),
                 );
         }
     }
