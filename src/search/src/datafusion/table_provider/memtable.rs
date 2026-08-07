@@ -193,7 +193,7 @@ impl TableProvider for NewMemTable {
             .map(|v| v.can_remove_filter())
             .unwrap_or(true);
         let index_condition =
-            if can_remove_filter || get_config().common.feature_query_remove_filter_with_index {
+            if can_remove_filter || get_config().search.feature_query_remove_filter_with_index {
                 self.index_condition.as_ref()
             } else {
                 None

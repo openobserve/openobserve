@@ -3598,8 +3598,11 @@ export class LogsPage {
      * @returns {Promise<boolean>}
      */
     async isViewRelatedButtonVisible() {
+        // Correlation ("View Related") was redesigned into inline tabs in the log-detail drawer;
+        // the old log-correlation-btn is gone. The presence of the traces correlation tab means
+        // the enterprise correlation feature is available (OSS lacks it, so the caller skips).
         try {
-            await this.page.locator(this.viewRelatedBtn).waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.locator(this.correlatedTracesTab).waitFor({ state: 'visible', timeout: 5000 });
             return true;
         } catch (e) {
             return false;
@@ -3629,8 +3632,10 @@ export class LogsPage {
      * @returns {Promise<void>}
      */
     async clickViewRelatedButton() {
-        await this.page.locator(this.viewRelatedBtn).click();
-        testLogger.info('Clicked View Related button');
+        // Open the traces correlation area — now an inline tab in the log-detail drawer
+        // (replaces the removed log-correlation-btn / correlation dashboard).
+        await this.page.locator(this.correlatedTracesTab).click();
+        testLogger.info('Opened correlated traces tab');
         // Wait for correlation to start loading
         await this.page.waitForTimeout(1000);
     }
@@ -3732,10 +3737,15 @@ export class LogsPage {
     }
 
     async hoverOnCorrelationDashboard() {
-        const closeBtn = this.page.locator(this.correlationDashboardClose);
-        const dashboardPanel = closeBtn.locator('..');
-        await dashboardPanel.hover();
-        testLogger.info('Hovered over correlation dashboard panel');
+        // Bug #11469: hovering the traces correlation area must NOT surface the log-field
+        // copy/include/exclude context menu. The old correlation-dashboard-close element is
+        // gone; hover the active traces correlation tab panel instead. Verified live on alpha:
+        // in this panel the include/exclude field buttons are not present, so the assertion in
+        // expectNoContextMenuVisible() stays real (fails if a menu ever appears on hover).
+        const panel = this.page.locator('[role="tabpanel"]:visible').first();
+        await panel.waitFor({ state: 'visible', timeout: 10000 });
+        await panel.hover();
+        testLogger.info('Hovered over correlated traces panel');
     }
 
     async expectNoContextMenuVisible() {

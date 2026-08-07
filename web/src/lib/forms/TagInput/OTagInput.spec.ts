@@ -111,6 +111,32 @@ describe("OTagInput", () => {
 
       expect(wrapper.find('[data-test="tag-input-label"]').exists()).toBe(false);
     });
+
+    // Live-reported bug: an empty, focused field showed the label sitting
+    // directly on top of the placeholder text — the label only floated when
+    // `modelValue`/`inputValue` had content, never on focus alone.
+    it("floats the label on focus even with no content yet", async () => {
+      wrapper = buildWrapper({ modelValue: [], label: "Columns" });
+
+      const label = wrapper.find('[data-test="tag-input-label"]');
+      expect(label.classes()).not.toContain("-translate-y-2");
+
+      await wrapper.find('[data-test="tag-input-field"]').trigger("focus");
+
+      expect(label.classes()).toContain("-translate-y-2");
+      expect(label.classes()).toContain("scale-75");
+    });
+
+    it("un-floats the label on blur when the field is left empty", async () => {
+      wrapper = buildWrapper({ modelValue: [], label: "Columns" });
+
+      const input = wrapper.find('[data-test="tag-input-field"]');
+      await input.trigger("focus");
+      await input.trigger("blur");
+
+      const label = wrapper.find('[data-test="tag-input-label"]');
+      expect(label.classes()).not.toContain("-translate-y-2");
+    });
   });
 
   // ── Rendering existing tags ───────────────────────────────────────────────

@@ -289,8 +289,11 @@ test.describe("Settings DomainManagement form validation", {
 });
 
 // ── ModelPricingEditor form validation ────────────────────────────────────────
+// LLM Model Pricing is enterprise/cloud-only — absent in the OSS build.
 
-test.describe("Settings ModelPricingEditor form validation", () => {
+test.describe("Settings ModelPricingEditor form validation", {
+    tag: '@enterprise'
+}, () => {
     test.describe.configure({ mode: 'serial' });
     let pm;
 
@@ -298,7 +301,16 @@ test.describe("Settings ModelPricingEditor form validation", () => {
         testLogger.testStart(testInfo.title, testInfo.file);
         await navigateToBase(page);
         pm = new PageManager(page);
-        await pm.settingsFormValidation.navigateToModelPricing();
+        // Model Pricing is enterprise/cloud-only — gate to a clean SKIP on OSS.
+        if (featureAvailable['settings-model-pricing'] === false) {
+            test.skip(true, 'LLM Model Pricing is an enterprise/cloud-only feature — absent in the OSS build');
+            return;
+        }
+        featureAvailable['settings-model-pricing'] = await pm.settingsFormValidation.navigateToModelPricing();
+        if (!featureAvailable['settings-model-pricing']) {
+            test.skip(true, 'LLM Model Pricing is an enterprise/cloud-only feature — absent in the OSS build');
+            return;
+        }
         testLogger.info('Navigated to Settings > Model Pricing');
     });
 

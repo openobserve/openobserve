@@ -18,7 +18,7 @@ use std::sync::{Arc, LazyLock as Lazy};
 use config::{
     RwAHashMap, RwHashMap,
     meta::{
-        alerts::alert::Alert,
+        alerts::{alert::Alert, content_spec::ContentSpec},
         destinations::{Destination, Template},
         folder::Folder,
         pipeline::Pipeline,
@@ -62,6 +62,12 @@ pub static STREAM_ALERTS: Lazy<RwAHashMap<String, Vec<String>>> = Lazy::new(Defa
 pub static ALERTS: Lazy<RwAHashMap<String, (Folder, Alert)>> = Lazy::new(Default::default);
 // Key for realtime alert triggers cache is org/alert_id
 pub static ALERTS_TEMPLATES: Lazy<RwHashMap<String, Template>> = Lazy::new(Default::default);
+// Parsed `ContentSpec` cache for content-kind templates, keyed the same as
+// `ALERTS_TEMPLATES` ("{org_id}/{name}"). Invalidated by the same template
+// watch event as `ALERTS_TEMPLATES` so there is exactly one invalidation
+// path. See `db::alerts::templates::get_parsed_content`.
+pub static ALERTS_CONTENT_SPECS: Lazy<RwHashMap<String, Arc<ContentSpec>>> =
+    Lazy::new(Default::default);
 pub static DESTINATIONS: Lazy<RwHashMap<String, Destination>> = Lazy::new(Default::default);
 pub static MAXMIND_DB_CLIENT: Lazy<Arc<tokio::sync::RwLock<Option<MaxmindClient>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(None)));

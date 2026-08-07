@@ -216,7 +216,7 @@ impl TreeNodeRewriter for BroadcastJoinRewriter {
         if node.name() == "HashJoinExec" {
             // 1. get the left table, apply limit, and rewrite it use RemoteScanRewriter
             let left_max_rows = config::get_config()
-                .common
+                .search
                 .feature_broadcast_join_left_side_max_rows;
             let left = node.children()[0].clone();
             let left: Arc<dyn ExecutionPlan> =

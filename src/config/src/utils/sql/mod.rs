@@ -21,6 +21,7 @@ mod simple_aggregate_query;
 mod simple_distinct_query;
 mod timestamp_selected;
 mod visitors;
+mod where_fragment;
 
 pub use complex_query::{is_complex_query, is_complex_query_stmt};
 pub use eligible_for_histogram::is_eligible_for_histogram;
@@ -29,6 +30,7 @@ pub use simple_aggregate_query::is_simple_aggregate_query;
 pub use simple_distinct_query::is_simple_distinct_query;
 pub use timestamp_selected::is_timestamp_selected;
 pub use visitors::TimestampVisitor;
+pub use where_fragment::validate_where_fragment;
 
 pub const AGGREGATE_UDF_LIST: [&str; 17] = [
     "min",
