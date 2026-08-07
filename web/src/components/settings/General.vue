@@ -630,13 +630,11 @@ export default defineComponent({
     // Built once from the component's `t` so the messages are localized.
     const generalSettingsSchema = makeGeneralSettingsSchema(t);
     // Dynamic defaults (edit-prefill from the store) → a typed computed.
-    const generalSettingsDefaults = computed(
-      (): GeneralSettingsForm => ({
-        scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
-        max_series_per_query:
-          store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
-      }),
-    );
+    const generalSettingsDefaults = computed((): GeneralSettingsForm => ({
+      scrape_interval: store.state?.organizationData?.organizationSettings?.scrape_interval ?? 15,
+      max_series_per_query:
+        store.state?.organizationData?.organizationSettings?.max_series_per_query ?? null,
+    }));
 
     const loadingState = ref(false);
     const customText = ref("");

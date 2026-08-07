@@ -122,15 +122,13 @@ const uploadSourceMapsSchema = makeUploadSourceMapsSchema(t);
 // Dynamic (query-param prefill) defaults → a typed component computed. The
 // service/version/environment are seeded from the route query; `file` always
 // starts empty.
-const uploadSourceMapsDefaults = computed(
-  (): UploadSourceMapsForm => ({
-    service: (route.query.service as string) || "",
-    version: (route.query.version as string) || "",
-    environment: (route.query.environment as string) || "",
-    // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
-    file: null as unknown as File,
-  }),
-);
+const uploadSourceMapsDefaults = computed((): UploadSourceMapsForm => ({
+  service: (route.query.service as string) || "",
+  version: (route.query.version as string) || "",
+  environment: (route.query.environment as string) || "",
+  // Empty file slot at init; schema is `.nullable()` so null is valid at runtime.
+  file: null as unknown as File,
+}));
 
 // Navigate back to source maps list
 const navigateBack = () => {

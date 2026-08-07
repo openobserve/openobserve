@@ -362,8 +362,7 @@ export interface RecorderPortMessage {
 
 /** Anything the extension can post over the port (data push + command acks). */
 export type RecorderPortInbound =
-  | RecorderPortMessage
-  | { type: "synthetics-response"; response: unknown };
+  RecorderPortMessage | { type: "synthetics-response"; response: unknown };
 
 // ---- Bridge transport types (content-script relay, replaces chrome.runtime.*) ----
 

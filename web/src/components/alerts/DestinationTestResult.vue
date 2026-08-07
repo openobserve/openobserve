@@ -131,8 +131,7 @@ limitations under the License. -->
               </div>
               <pre
                 class="rounded-default text-3xs text-text-body m-0 max-h-37.5 overflow-y-auto border border-[rgba(0,0,0,0.1)] bg-[rgba(0,0,0,0.05)] p-2 font-mono leading-[1.5] whitespace-pre dark:border-[rgba(255,255,255,0.1)] dark:bg-[rgba(255,255,255,0.05)]"
-                >{{ formatResponseBody(result.responseBody) }}</pre
-              >
+                >{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>

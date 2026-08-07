@@ -207,8 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <pre
             v-if="compilationErr"
             class="text-status-error-text text-sm font-bold whitespace-pre-wrap"
-            >{{ compilationErr }}</pre
-          >
+            >{{ compilationErr }}</pre>
         </div>
       </div>
 
