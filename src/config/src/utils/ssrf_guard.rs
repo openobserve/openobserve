@@ -31,14 +31,11 @@ pub struct SsrfGuard;
 impl SsrfGuard {
     pub fn validate_url_with_config(url: &str) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
-        Self::validate_url_inner(url, allow_loopback)
+        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
+        Self::validate_url_inner(url, allow_loopback, skip_ssrf)
     }
 
-    pub fn validate_url(url: &str) -> Result<(), String> {
-        Self::validate_url_inner(url, false)
-    }
-
-    fn validate_url_inner(url: &str, allow_loopback: bool) -> Result<(), String> {
+    fn validate_url_inner(url: &str, allow_loopback: bool, skip_ssrf: bool) -> Result<(), String> {
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
 
         if parsed.scheme() != "http" && parsed.scheme() != "https" {
@@ -51,6 +48,10 @@ impl SsrfGuard {
         let host = parsed
             .host_str()
             .ok_or_else(|| "URL must have a valid host".to_string())?;
+
+        if skip_ssrf {
+            return Ok(());
+        }
 
         // Strip IPv6 brackets so IpAddr can parse the literal.
         let unbracketed_host = if host.starts_with('[') && host.ends_with(']') {
@@ -117,6 +118,10 @@ impl SsrfGuard {
     /// hostname string passed the pre-flight check.
     pub fn check_ip_with_config(ip: &IpAddr) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
+        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
+        if skip_ssrf {
+            return Ok(());
+        }
         Self::check_ip_inner(ip, allow_loopback)
     }
 
@@ -136,14 +141,15 @@ impl SsrfGuard {
     /// bypass that the sync validator can't see.
     pub async fn validate_url_with_config_async(url: &str) -> Result<(), String> {
         let allow_loopback = crate::get_config().common.ssrf_allow_loopback;
+        let skip_ssrf = crate::get_config().common.skip_ssrf_checks;
         // When loopback is explicitly allowed we're in a dev/test environment;
         // skip SSRF validation entirely so test fixtures with placeholder URLs
         // (e.g. "DEMO") and unresolvable hostnames don't get rejected at save time.
         // Production keeps ZO_SSRF_ALLOW_LOOPBACK=false and remains strict.
-        if allow_loopback {
+        if allow_loopback || skip_ssrf {
             return Ok(());
         }
-        Self::validate_url_inner(url, allow_loopback)?;
+        Self::validate_url_inner(url, allow_loopback, skip_ssrf)?;
 
         let parsed = url::Url::parse(url).map_err(|e| format!("Invalid URL: {}", e))?;
         let Some(host) = parsed.host_str() else {
