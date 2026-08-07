@@ -22,9 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="show"
         class="charts-wrapper h-40 min-h-[8.5rem] overflow-hidden py-0! will-change-[transform,opacity]"
       >
-        <div
-          class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-sm"
-        >
+        <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-sm">
           <RenderDashboardCharts
             v-if="show"
             ref="dashboardChartsRef"

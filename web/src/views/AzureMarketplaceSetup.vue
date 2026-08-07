@@ -61,9 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <div class="mx-auto max-w-100">
           <!-- Create New Org -->
-          <OCard
-            class="rounded-default mb-4 transition-all duration-200 hover:shadow-md"
-          >
+          <OCard class="rounded-default mb-4 transition-all duration-200 hover:shadow-md">
             <OCardSection role="body">
               <div class="text-xl font-semibold">
                 {{ t("billing.azureMarketplace.createNewOrg") }}

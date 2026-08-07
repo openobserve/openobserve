@@ -126,7 +126,7 @@
                       }}</span>
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap border-b border-border-default"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary border-border-default inline-flex h-6 min-w-6 items-center justify-center border border-b px-1.5 font-mono font-medium whitespace-nowrap"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -183,7 +183,7 @@
                       }}</span>
                       <kbd
                         v-else
-                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary inline-flex h-6 min-w-6 items-center justify-center border px-1.5 font-mono font-medium whitespace-nowrap border-b border-border-default"
+                        class="bg-surface-base border-border-default rounded-default text-2xs text-text-secondary border-border-default inline-flex h-6 min-w-6 items-center justify-center border border-b px-1.5 font-mono font-medium whitespace-nowrap"
                         >{{ part }}</kbd
                       >
                     </template>
@@ -201,13 +201,13 @@
       <div class="text-2xs text-text-secondary flex items-center justify-between">
         <div class="flex flex-wrap items-center gap-1.5">
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono border-b border-border-default"
+            class="bg-surface-base border-border-default rounded-default text-2xs border-border-default inline-flex h-5 items-center justify-center border border-b px-1.5 font-mono"
             >{{ t("shortcuts.escKey") }}</kbd
           >
           <span>{{ t("shortcuts.footerClose") }}</span>
           <span class="opacity-40">·</span>
           <kbd
-            class="bg-surface-base border-border-default rounded-default text-2xs inline-flex h-5 items-center justify-center border px-1.5 font-mono border-b border-border-default"
+            class="bg-surface-base border-border-default rounded-default text-2xs border-border-default inline-flex h-5 items-center justify-center border border-b px-1.5 font-mono"
             >?</kbd
           >
           <span>{{ t("shortcuts.footerReopen") }}</span>

@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OCard
                   class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   :class="{
-                    'border-theme-accent border-2 shadow-md shadow-theme-accent/30':
+                    'border-theme-accent shadow-theme-accent/30 border-2 shadow-md':
                       selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"

@@ -94,10 +94,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
                 <div
                   data-test="enterprise-upgrade-offer-badge"
-                  class="rounded-default inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-success-500/40 backdrop-blur-[10px]"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
                   :class="{
-                    'bg-[rgba(255,255,255,0.2)]! shadow-md!':
-                      dialogConfig.isLicensed,
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
                   }"
                 >
                   <!-- eslint-enable local/no-hardcoded-px -->

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge text-3xs text-text-inverse absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 border-[var(--color-grey-900)] bg-[image:var(--color-gradient-notification)] px-1 leading-none font-bold shadow-md shadow-error-500/50"
+          class="menu-badge text-3xs text-text-inverse shadow-error-500/50 absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 border-[var(--color-grey-900)] bg-[image:var(--color-gradient-notification)] px-1 leading-none font-bold shadow-md"
           aria-live="polite"
           :aria-label="t('common.notificationsCount', { count: badge })"
         >

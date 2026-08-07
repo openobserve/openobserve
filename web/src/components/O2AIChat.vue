@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden shadow-md shadow-hover-shadow"
+    class="chat-container rounded-default text-text-body bg-card-glass-solid shadow-hover-shadow flex h-full w-full flex-col overflow-hidden shadow-md"
     :class="[{ 'chat-open': isOpen }]"
   >
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
@@ -268,7 +268,7 @@
           <div
             v-for="(message, index) in processedMessages"
             :key="index"
-            class="message rounded-default border-border-default border p-3 shadow-md shadow-text-heading/10"
+            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-md"
             :class="[
               message.role,
               message.role === 'user'
@@ -1250,7 +1250,7 @@
 
         <div
           v-if="!pendingConfirmation"
-          class="unified-input-box rounded-default bg-surface-base border-border-default flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2 focus-within:ring-accent"
+          class="unified-input-box rounded-default bg-surface-base border-border-default focus-within:ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
           @dragover="handleDragOver"
           @drop="handleDrop"
           @paste="handlePaste"
@@ -1357,7 +1357,7 @@
                 @click="sendMessage"
                 variant="ai-gradient"
                 size="icon-xs-circle"
-                class="send-button bg-(image:--color-gradient-ai)! shadow-lg! shadow-ai-accent/30! [transition:all_0.3s_ease]!"
+                class="send-button shadow-ai-accent/30! bg-(image:--color-gradient-ai)! shadow-lg! [transition:all_0.3s_ease]!"
               >
                 <OIcon name="send" size="sm" />
               </OButton>
@@ -1368,7 +1368,7 @@
                 @click="cancelCurrentRequest"
                 variant="ghost"
                 size="icon-xs-circle"
-                class="stop-button bg-(image:--color-gradient-danger)! shadow-lg! shadow-status-negative/30! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-lg! hover:shadow-status-negative/40! active:translate-y-0! active:shadow-md! active:shadow-status-negative/30!"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-(image:--color-gradient-danger)! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:bg-(image:--color-gradient-danger-hover)! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
               >
                 <OIcon name="stop" size="sm" />
               </OButton>

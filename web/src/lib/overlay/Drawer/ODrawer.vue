@@ -470,9 +470,7 @@ watch(internalOpen, (open) => {
             bodyPaddingClass,
             canScrollUp && 'shadow-scroll-top',
             canScrollDown && 'shadow-scroll-bottom',
-            canScrollUp &&
-              canScrollDown &&
-              'shadow-scroll-both',
+            canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <template v-if="!props.lazy || internalOpen">

@@ -36,7 +36,7 @@ const emit = defineEmits<{ (e: "select", prompt: string): void }>();
       ></span>
       <!-- eslint-enable local/no-hardcoded-px -->
       <div
-        class="capability-card__icon rounded-default relative z-1 mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center ring-1 ring-inset ring-[rgba(var(--accent),0.18)]"
+        class="capability-card__icon rounded-default relative z-1 mb-2.5 inline-flex h-9.5 w-9.5 items-center justify-center ring-1 ring-[rgba(var(--accent),0.18)] ring-inset"
         :class="card.iconBgClass"
       >
         <OIcon :name="card.icon" size="md" :class="card.iconColorClass" />

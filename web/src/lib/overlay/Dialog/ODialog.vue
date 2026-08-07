@@ -530,10 +530,7 @@ watch(internalOpen, (open) => {
             'text-dialog-content-text',
             !isFullSize && canScrollUp && 'shadow-scroll-top',
             !isFullSize && canScrollDown && 'shadow-scroll-bottom',
-            !isFullSize &&
-              canScrollUp &&
-              canScrollDown &&
-              'shadow-scroll-both',
+            !isFullSize && canScrollUp && canScrollDown && 'shadow-scroll-both',
           ]"
         >
           <slot />
