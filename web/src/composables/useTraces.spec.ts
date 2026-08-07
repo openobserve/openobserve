@@ -37,6 +37,16 @@ vi.mock("vue-router", () => ({
   })),
 }));
 
+// The span/trace id column names are org-configurable. Kept as one stable
+// mutable object so tests can repoint them and prove the query builders read
+// settings rather than hardcoding the defaults.
+const { mockOrgSettings } = vi.hoisted(() => ({
+  mockOrgSettings: {
+    span_id_field_name: "span_id",
+    trace_id_field_name: "trace_id",
+  } as Record<string, string | undefined>,
+}));
+
 vi.mock("vuex", async (importOriginal) => {
   const actual = await importOriginal();
   return {
@@ -46,10 +56,7 @@ vi.mock("vuex", async (importOriginal) => {
         selectedOrganization: { identifier: "test-org" },
         zoConfig: { timestamp_column: "_timestamp", sql_reserved_keywords: [] },
         organizationData: {
-          organizationSettings: {
-            span_id_field_name: "span_id",
-            trace_id_field_name: "trace_id",
-          },
+          organizationSettings: mockOrgSettings,
         },
       },
       dispatch: vi.fn(),
@@ -163,6 +170,8 @@ describe("useTraces", () => {
     });
     mockSemanticGroups.value = [];
     mockLoadSemanticGroups.mockImplementation(async () => mockSemanticGroups.value);
+    mockOrgSettings.span_id_field_name = "span_id";
+    mockOrgSettings.trace_id_field_name = "trace_id";
     // Reset shared singleton state before each test
     const { resetSearchObj } = useTraces();
     resetSearchObj();
@@ -524,6 +533,48 @@ describe("useTraces", () => {
       expect(String(details.query)).toContain("b64std:");
     });
 
+    it("names the id columns from the org's configured field names", () => {
+      mockOrgSettings.span_id_field_name = "custom_span_col";
+      mockOrgSettings.trace_id_field_name = "custom_trace_col";
+      const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.data.traceDetails.selectedLogStreams = ["my-logs"] as any;
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "trace-xyz",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+
+      const details = buildQueryDetails({ spanId: "s1", start_time: 1000, end_time: 2000 }, true);
+
+      expect(String(details.query).replace(/^b64std:/, "")).toBe(
+        "custom_span_col='s1' AND custom_trace_col='trace-xyz'",
+      );
+    });
+
+    // Regression: the field names were previously interpolated as
+    // String(settings.span_id_field_name) with no fallback, so an org missing
+    // the setting produced a column literally named "undefined".
+    it("falls back to span_id/trace_id instead of an 'undefined' column", () => {
+      mockOrgSettings.span_id_field_name = undefined;
+      mockOrgSettings.trace_id_field_name = undefined;
+      const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
+      resetSearchObj();
+      searchObj.data.traceDetails.selectedLogStreams = ["my-logs"] as any;
+      searchObj.data.traceDetails.selectedTrace = {
+        trace_id: "trace-xyz",
+        trace_start_time: 0,
+        trace_end_time: 0,
+      };
+
+      const query = String(
+        buildQueryDetails({ spanId: "s1", start_time: 1000, end_time: 2000 }, true).query,
+      ).replace(/^b64std:/, "");
+
+      expect(query).not.toContain("undefined");
+      expect(query).toBe("span_id='s1' AND trace_id='trace-xyz'");
+    });
+
     it("joins multiple log streams with comma", () => {
       const { searchObj, buildQueryDetails, resetSearchObj } = useTraces();
       resetSearchObj();
@@ -646,6 +697,28 @@ describe("useTraces", () => {
 
       // The exact trace id wins over the stream's alias for the same group.
       expect(pushedQuery()).toBe("trace_id = 'trace-4'");
+    });
+
+    it("names the id columns from the org's configured field names", async () => {
+      mockOrgSettings.span_id_field_name = "custom_span_col";
+      mockOrgSettings.trace_id_field_name = "custom_trace_col";
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-5", "trace-5");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("custom_span_col = 'span-5' and custom_trace_col = 'trace-5'");
+    });
+
+    it("falls back to span_id/trace_id when the org settings are absent", async () => {
+      mockOrgSettings.span_id_field_name = undefined;
+      mockOrgSettings.trace_id_field_name = undefined;
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-6", "trace-6");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'span-6' and trace_id = 'trace-6'");
     });
   });
 
