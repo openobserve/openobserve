@@ -5,6 +5,8 @@
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
+use std::collections::HashSet;
+
 use axum::{
     extract::{Path, Query},
     response::Response,
@@ -14,7 +16,8 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::{
     auth::{UserEmail, is_ofga_object_visible},
     llm_evaluations::annotation_queues::{
-        self, AnnotationQueueError, ListAnnotationQueueItemsFilter,
+        self, AnnotationQueue, AnnotationQueueError, ListAnnotationQueueItemsFilter,
+        PinnedScoreConfig,
     },
     self_reporting::llm_scores_writer,
 };
@@ -99,6 +102,108 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
     }
 }
 
+async fn permitted_objects(
+    org_id: &str,
+    user_id: &str,
+    permission: &str,
+    object_type: &str,
+) -> Result<Option<Vec<String>>, Response> {
+    openobserve_api_common::auth::validator::list_objects_for_user(
+        org_id,
+        user_id,
+        permission,
+        object_type,
+    )
+    .await
+    .map_err(|error| MetaHttpResponse::forbidden(error.to_string()))
+}
+
+fn score_configs_visible(
+    org_id: &str,
+    score_configs: &[PinnedScoreConfig],
+    permitted_score_configs: Option<&[String]>,
+) -> bool {
+    score_configs.iter().all(|score_config| {
+        is_ofga_object_visible(
+            org_id,
+            "score_config",
+            &score_config.entity_id,
+            permitted_score_configs,
+        )
+    })
+}
+
+/// Return Queues for which the caller can see both the Queue object and every
+/// pinned Score Config. Discovery shares this projection so Queue membership
+/// cannot leak an otherwise hidden Queue.
+pub(crate) async fn visible_annotation_queues_for_user(
+    org_id: &str,
+    user_id: &str,
+) -> Result<Vec<AnnotationQueue>, Response> {
+    let permitted_queues = permitted_objects(org_id, user_id, "GET", "annotation_queue").await?;
+    let permitted_score_configs = permitted_objects(org_id, user_id, "GET", "score_config").await?;
+    let queues = annotation_queues::list(org_id)
+        .await
+        .map_err(annotation_queue_error_response)?;
+
+    Ok(queues
+        .into_iter()
+        .filter(|queue| {
+            is_ofga_object_visible(
+                org_id,
+                "annotation_queue",
+                &queue.id,
+                permitted_queues.as_deref(),
+            ) && score_configs_visible(
+                org_id,
+                &queue.score_configs,
+                permitted_score_configs.as_deref(),
+            )
+        })
+        .collect())
+}
+
+/// Enforce the Queue's transitive Score Config dependency for an individual
+/// Queue route. Route middleware checks the primary Queue permission; this
+/// secondary check protects the Queue's rubric dimensions.
+pub(crate) async fn ensure_annotation_queue_score_configs_visible(
+    org_id: &str,
+    user_id: &str,
+    queue_id: &str,
+) -> Result<AnnotationQueue, Response> {
+    let queue = annotation_queues::get(org_id, queue_id)
+        .await
+        .map_err(annotation_queue_error_response)?;
+    let permitted_score_configs = permitted_objects(org_id, user_id, "GET", "score_config").await?;
+    if !score_configs_visible(
+        org_id,
+        &queue.score_configs,
+        permitted_score_configs.as_deref(),
+    ) {
+        return Err(MetaHttpResponse::forbidden(
+            "One or more Queue Score Configs are not accessible",
+        ));
+    }
+    Ok(queue)
+}
+
+async fn ensure_requested_score_configs_visible(
+    org_id: &str,
+    user_id: &str,
+    row_ids: &[String],
+) -> Result<Vec<PinnedScoreConfig>, Response> {
+    let score_configs = annotation_queues::resolve_pinned_score_configs(org_id, row_ids)
+        .await
+        .map_err(annotation_queue_error_response)?;
+    let permitted_score_configs = permitted_objects(org_id, user_id, "GET", "score_config").await?;
+    if !score_configs_visible(org_id, &score_configs, permitted_score_configs.as_deref()) {
+        return Err(MetaHttpResponse::forbidden(
+            "One or more selected Score Configs are not accessible",
+        ));
+    }
+    Ok(score_configs)
+}
+
 /// EnqueueAnnotationQueueItem
 #[utoipa::path(
     post,
@@ -124,8 +229,14 @@ fn annotation_queue_error_response(value: AnnotationQueueError) -> Response {
 )]
 pub async fn enqueue_annotation_queue_item(
     Path((org_id, queue_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<EnqueueAnnotationQueueItemRequestBody>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::enqueue_item(&org_id, &queue_id, body.into()).await {
         Ok(item) => MetaHttpResponse::json(AnnotationQueueItemResponseBody::from(item)),
         Err(err) => annotation_queue_error_response(err),
@@ -156,7 +267,13 @@ pub async fn enqueue_annotation_queue_item(
 )]
 pub async fn get_annotation_queue_item(
     Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::get_item_detail(&org_id, &queue_id, &queue_item_id).await {
         Ok(item) => MetaHttpResponse::json(AnnotationQueueItemDetailResponseBody::from(item)),
         Err(err) => annotation_queue_error_response(err),
@@ -192,6 +309,11 @@ pub async fn review_annotation_queue_item(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<ReviewAnnotationQueueItemRequestBody>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::submit_review(
         &org_id,
         &queue_id,
@@ -232,7 +354,13 @@ pub async fn review_annotation_queue_item(
 )]
 pub async fn list_annotation_queue_item_reviews(
     Path((org_id, queue_id, queue_item_id)): Path<(String, String, String)>,
+    Headers(user): Headers<UserEmail>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::list_reviews(&org_id, &queue_id, &queue_item_id).await {
         Ok(list) => MetaHttpResponse::json(ListQueueReviewsResponseBody { list }),
         Err(err) => annotation_queue_error_response(err),
@@ -263,8 +391,14 @@ pub async fn list_annotation_queue_item_reviews(
 )]
 pub async fn archive_annotation_queue_items(
     Path((org_id, queue_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<AnnotationQueueItemSelectionRequestBody>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::archive_items(&org_id, &queue_id, body.into()).await {
         Ok(archived_count) => {
             MetaHttpResponse::json(ArchiveAnnotationQueueItemsResponseBody { archived_count })
@@ -297,8 +431,14 @@ pub async fn archive_annotation_queue_items(
 )]
 pub async fn clear_annotation_queue_items(
     Path((org_id, queue_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<AnnotationQueueItemSelectionRequestBody>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::clear_items(&org_id, &queue_id, body.into()).await {
         Ok(cleared_count) => {
             MetaHttpResponse::json(ClearAnnotationQueueItemsResponseBody { cleared_count })
@@ -340,30 +480,17 @@ pub async fn list_annotation_queue_items(
         Ok(filter) => filter,
         Err(err) => return annotation_queue_error_response(err),
     };
-    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user.user_id,
-        "GET",
-        "annotation_queue",
-    )
-    .await
-    {
-        Ok(list) => list,
-        Err(err) => return MetaHttpResponse::forbidden(err.to_string()),
-    };
+    let visible_queue_ids: HashSet<String> =
+        match visible_annotation_queues_for_user(&org_id, &user.user_id).await {
+            Ok(queues) => queues.into_iter().map(|queue| queue.id).collect(),
+            Err(response) => return response,
+        };
 
     match annotation_queues::list_items(&org_id, filter).await {
         Ok(items) => {
             let items: Vec<_> = items
                 .into_iter()
-                .filter(|item| {
-                    is_ofga_object_visible(
-                        &org_id,
-                        "annotation_queue",
-                        &item.queue_id,
-                        permitted_objects.as_deref(),
-                    )
-                })
+                .filter(|item| visible_queue_ids.contains(&item.queue_id))
                 .collect();
             MetaHttpResponse::json(ListAnnotationQueueItemsResponseBody::from(items))
         }
@@ -389,33 +516,9 @@ pub async fn list_annotation_queues(
     Path(org_id): Path<String>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
-    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user.user_id,
-        "GET",
-        "annotation_queue",
-    )
-    .await
-    {
-        Ok(list) => list,
-        Err(err) => return MetaHttpResponse::forbidden(err.to_string()),
-    };
-    match annotation_queues::list(&org_id).await {
-        Ok(queues) => {
-            let queues: Vec<_> = queues
-                .into_iter()
-                .filter(|queue| {
-                    is_ofga_object_visible(
-                        &org_id,
-                        "annotation_queue",
-                        &queue.id,
-                        permitted_objects.as_deref(),
-                    )
-                })
-                .collect();
-            MetaHttpResponse::json(ListAnnotationQueuesResponseBody::from(queues))
-        }
-        Err(err) => annotation_queue_error_response(err),
+    match visible_annotation_queues_for_user(&org_id, &user.user_id).await {
+        Ok(queues) => MetaHttpResponse::json(ListAnnotationQueuesResponseBody::from(queues)),
+        Err(response) => response,
     }
 }
 
@@ -443,6 +546,12 @@ pub async fn create_annotation_queue(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<CreateAnnotationQueueRequestBody>,
 ) -> Response {
+    if let Err(response) =
+        ensure_requested_score_configs_visible(&org_id, &user.user_id, &body.score_config_row_ids)
+            .await
+    {
+        return response;
+    }
     match annotation_queues::create(&org_id, &user.user_id, body.into()).await {
         Ok(queue) => {
             set_ownership(&org_id, "annotation_queues", Authz::new(&queue.id)).await;
@@ -471,10 +580,13 @@ pub async fn create_annotation_queue(
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "get"}))),
 )]
-pub async fn get_annotation_queue(Path((org_id, queue_id)): Path<(String, String)>) -> Response {
-    match annotation_queues::get(&org_id, &queue_id).await {
+pub async fn get_annotation_queue(
+    Path((org_id, queue_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    match ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await {
         Ok(queue) => MetaHttpResponse::json(AnnotationQueueResponseBody::from(queue)),
-        Err(err) => annotation_queue_error_response(err),
+        Err(response) => response,
     }
 }
 
@@ -506,6 +618,17 @@ pub async fn update_annotation_queue(
     Headers(user): Headers<UserEmail>,
     axum::Json(body): axum::Json<UpdateAnnotationQueueRequestBody>,
 ) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
+    if let Err(response) =
+        ensure_requested_score_configs_visible(&org_id, &user.user_id, &body.score_config_row_ids)
+            .await
+    {
+        return response;
+    }
     match annotation_queues::update(&org_id, &queue_id, &user.user_id, body.into()).await {
         Ok(queue) => MetaHttpResponse::json(AnnotationQueueResponseBody::from(queue)),
         Err(err) => annotation_queue_error_response(err),
@@ -531,7 +654,15 @@ pub async fn update_annotation_queue(
     ),
     extensions(("x-o2-ratelimit" = json!({"module": "AnnotationQueues", "operation": "delete"}))),
 )]
-pub async fn delete_annotation_queue(Path((org_id, queue_id)): Path<(String, String)>) -> Response {
+pub async fn delete_annotation_queue(
+    Path((org_id, queue_id)): Path<(String, String)>,
+    Headers(user): Headers<UserEmail>,
+) -> Response {
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
+    }
     match annotation_queues::delete(&org_id, &queue_id).await {
         Ok(()) => {
             remove_ownership(&org_id, "annotation_queues", Authz::new(&queue_id)).await;
@@ -544,6 +675,44 @@ pub async fn delete_annotation_queue(Path((org_id, queue_id)): Path<(String, Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pinned_score_config(entity_id: &str) -> PinnedScoreConfig {
+        PinnedScoreConfig {
+            row_id: format!("row-{entity_id}"),
+            entity_id: entity_id.to_string(),
+            name: entity_id.to_string(),
+            version: 1,
+            data_type: infra::table::score_configs::ScoreConfigDataType::Numeric,
+        }
+    }
+
+    #[test]
+    fn queue_requires_visibility_of_every_pinned_score_config() {
+        let configs = vec![
+            pinned_score_config("config-1"),
+            pinned_score_config("config-2"),
+        ];
+
+        assert!(score_configs_visible("org-1", &configs, None));
+        assert!(score_configs_visible(
+            "org-1",
+            &configs,
+            Some(&["score_config:_all_org-1".to_string()]),
+        ));
+        assert!(!score_configs_visible(
+            "org-1",
+            &configs,
+            Some(&["score_config:config-1".to_string()]),
+        ));
+        assert!(score_configs_visible(
+            "org-1",
+            &configs,
+            Some(&[
+                "score_config:config-1".to_string(),
+                "score_config:config-2".to_string(),
+            ]),
+        ));
+    }
 
     #[test]
     fn maps_client_and_conflict_errors() {
