@@ -51,6 +51,10 @@ const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
+// Cache of KV Store handles keyed by full bucket nam.
+static BUCKET_CACHE: Lazy<tokio::sync::RwLock<HashMap<String, jetstream::kv::Store>>> =
+    Lazy::new(|| tokio::sync::RwLock::new(HashMap::new()));
+
 pub async fn get_nats_client() -> &'static Client {
     NATS_CLIENT.get_or_init(connect).await
 }
@@ -60,12 +64,19 @@ async fn get_bucket_by_key<'a>(
     key: &'a str,
 ) -> Result<(jetstream::kv::Store, &'a str)> {
     let cfg = get_config();
-    let client = get_nats_client().await.clone();
-    let jetstream = jetstream::new(client);
     let key = key.trim_start_matches('/');
     let bucket_name = key.split('/').next().unwrap();
+    let full_bucket_name = format!("{prefix}{bucket_name}");
+
+    // return a cached handle without any server round trip
+    if let Some(kv) = BUCKET_CACHE.read().await.get(&full_bucket_name).cloned() {
+        return Ok((kv, key.trim_start_matches(bucket_name)));
+    }
+
+    let client = get_nats_client().await.clone();
+    let jetstream = jetstream::new(client);
     let mut bucket = jetstream::kv::Config {
-        bucket: format!("{prefix}{bucket_name}"),
+        bucket: full_bucket_name.clone(),
         num_replicas: cfg.nats.replicas,
         history: cfg.nats.history,
         ..Default::default()
@@ -82,7 +93,6 @@ async fn get_bucket_by_key<'a>(
 
     // STREAM.INFO is served by asset leader, 
     // but STREAM.CREATE is routed to JetStream meta leader.
-    let full_bucket_name = bucket.bucket.clone();
     let kv = match jetstream.get_key_value(&full_bucket_name).await {
         Ok(kv) => kv,
         Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
@@ -91,6 +101,12 @@ async fn get_bucket_by_key<'a>(
             ))
         })?,
     };
+
+    // cache the kv store handle for future use.
+    BUCKET_CACHE
+        .write()
+        .await
+        .insert(full_bucket_name, kv.clone());
 
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
