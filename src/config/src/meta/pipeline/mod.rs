@@ -1567,4 +1567,123 @@ mod tests {
         let destinations = pipeline.get_all_destination_streams(&node_map, &graph);
         assert!(destinations.is_empty());
     }
+
+    // --- validate_nodes_edges / is_draft behavior ---
+
+    fn trigger_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::WorkflowTrigger,
+            0.0,
+            0.0,
+            "input".to_string(),
+        )
+    }
+
+    fn function_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Function(components::FunctionParams {
+                name: "fn1".to_string(),
+                after_flatten: false,
+                num_args: 0,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        )
+    }
+
+    fn destination_node(id: &str) -> Node {
+        Node::new(
+            id.to_string(),
+            NodeData::Destination(components::WorkflowDestination {
+                destination_id: "dest-1".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        )
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_no_edges_strict_rejects() {
+        let nodes = vec![trigger_node("t1"), destination_node("d1")];
+
+        // strict: no edges at all between two nodes is rejected
+        let err = validate_nodes_edges(&nodes, &[], false).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("more than 1 node and at least 1 edge")
+        );
+
+        // draft: same graph, no edges, is tolerated
+        assert!(validate_nodes_edges(&nodes, &[], true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_insufficient_edge_count() {
+        // 3 nodes but only 1 edge (need 2 to connect all of them)
+        let nodes = vec![
+            trigger_node("t1"),
+            function_node("f1"),
+            destination_node("d1"),
+        ];
+        let edges = vec![Edge::new("t1".to_string(), "f1".to_string())];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(err.to_string().contains("Insufficient number of edges"));
+
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_allows_non_terminal_leaf() {
+        // Trigger -> Function, where Function dead-ends (not Stream/Destination)
+        let nodes = vec![trigger_node("t1"), function_node("f1")];
+        let edges = vec![Edge::new("t1".to_string(), "f1".to_string())];
+
+        let err = validate_nodes_edges(&nodes, &edges, false).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("All terminal nodes must be stream nodes or destination nodes")
+        );
+
+        assert!(validate_nodes_edges(&nodes, &edges, true).is_ok());
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_still_rejects_cycles() {
+        // t1 -> f1 -> t1 : cyclical, must be rejected even in draft mode
+        let nodes = vec![trigger_node("t1"), function_node("f1")];
+        let edges = vec![
+            Edge::new("t1".to_string(), "f1".to_string()),
+            Edge::new("f1".to_string(), "t1".to_string()),
+        ];
+
+        for is_draft in [false, true] {
+            let err = validate_nodes_edges(&nodes, &edges, is_draft).unwrap_err();
+            assert!(
+                err.to_string().contains("Cyclical pipeline detected"),
+                "is_draft={is_draft}: expected cycle error, got {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_validate_nodes_edges_draft_still_rejects_single_node_graph() {
+        // Documents current behavior: a lone Trigger node is rejected by the
+        // `nodes.len() < 2` floor even with is_draft=true, since that check is not
+        // gated on is_draft (only the edges-related checks below it are). This means
+        // testing a graph that's just a freshly-dropped Trigger node - the first
+        // partial-graph scenario - still fails validation today.
+        let nodes = vec![trigger_node("t1")];
+
+        let err = validate_nodes_edges(&nodes, &[], true).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("more than 1 node and at least 1 edge")
+        );
+    }
 }

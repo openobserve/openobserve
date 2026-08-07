@@ -2706,7 +2706,10 @@ fn resolve_stream_name(haystack: &str, record: &Value) -> Result<String> {
 mod tests {
     use std::collections::HashMap;
 
-    use config::utils::json;
+    use config::{
+        meta::pipeline::components::{Edge, Node},
+        utils::json,
+    };
 
     use super::*;
 
@@ -3419,5 +3422,264 @@ mod tests {
         assert_eq!(result["processed"], true);
         assert_eq!(result["count"], 6);
         assert_eq!(result["name"], "test");
+    }
+
+    // --- node mute / is_disabled bypass ---
+
+    fn dummy_metadata(node_idx: usize) -> ProcessMetadata {
+        ProcessMetadata {
+            pipeline_id: "pipe-1".to_string(),
+            node_idx,
+            org_id: "org-1".to_string(),
+            pipeline_name: "wf-1".to_string(),
+            pipeline_kind: PipelineKind::User,
+            stream_name: None,
+            source_stream_name: "src".to_string(),
+            source_stream_type: StreamType::Logs,
+            inv_id: "test".to_string(),
+            print_event: false,
+            leaf_dest_stream: None,
+            return_value_for_error: false,
+        }
+    }
+
+    /// Builds the channel plumbing a `process_node` test needs: an input sender to feed
+    /// records on, one receiver per requested child (so the test can assert what got
+    /// forwarded), a throwaway error channel, and - if requested - an inputs/replay
+    /// channel, all bundled into a ready-to-use `ProcessChannels`.
+    fn build_test_channels(
+        num_children: usize,
+        with_inputs_channel: bool,
+    ) -> (
+        Sender<PipelineItem>,
+        Vec<Receiver<PipelineItem>>,
+        Option<Receiver<(String, Value)>>,
+        ProcessChannels,
+    ) {
+        let (input_tx, input_rx) = channel(4);
+        let (error_tx, _error_rx) = channel(4);
+
+        let (child_senders, child_receivers): (Vec<_>, Vec<_>) =
+            (0..num_children).map(|_| channel(4)).unzip();
+
+        let (inputs_sender, inputs_rx) = if with_inputs_channel {
+            let (tx, rx) = channel(4);
+            (Some(tx), Some(rx))
+        } else {
+            (None, None)
+        };
+
+        let channels = ProcessChannels {
+            receiver: input_rx,
+            child_senders,
+            result_sender: None,
+            error_sender: error_tx,
+            inputs_sender,
+        };
+
+        (input_tx, child_receivers, inputs_rx, channels)
+    }
+
+    /// Sends `records` in order as `PipelineItem`s on `input_tx`.
+    async fn send_records(input_tx: &Sender<PipelineItem>, records: Vec<Value>) {
+        for (idx, record) in records.into_iter().enumerate() {
+            input_tx
+                .send(PipelineItem {
+                    idx,
+                    record,
+                    flattened: false,
+                })
+                .await
+                .unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_node_disabled_forwards_input_unchanged_and_skips_send_input() {
+        // A disabled Function node must not run its transform - it should just forward
+        // whatever it received to its children, and must not record anything on the
+        // inputs channel (which backs the Input/Output panel + retry_run's replay map).
+        let node = ExecutableNode {
+            id: "fn-1".to_string(),
+            node_data: NodeData::Function(config::meta::pipeline::components::FunctionParams {
+                name: "should-not-run".to_string(),
+                after_flatten: false,
+                num_args: 0,
+            }),
+            children: vec!["child-1".to_string()],
+            is_disabled: true,
+        };
+
+        let (input_tx, mut child_rx, inputs_rx, channels) = build_test_channels(1, true);
+        let mut inputs_rx = inputs_rx.unwrap();
+
+        let record = json::json!({"key": "value", "untouched": true});
+        send_records(&input_tx, vec![record.clone()]).await;
+        drop(input_tx);
+
+        let result = process_node(dummy_metadata(1), node, None, channels).await;
+
+        assert!(result.is_ok());
+
+        let forwarded = child_rx[0]
+            .try_recv()
+            .expect("disabled node should forward its input unchanged to children");
+        assert_eq!(forwarded.record, record);
+
+        assert!(
+            inputs_rx.try_recv().is_err(),
+            "disabled node must not populate the inputs/replay channel"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_node_disabled_destination_with_no_children_drains_without_panic() {
+        // "disable this destination" should fall out for free: bypassing a leaf node
+        // with zero children is just draining the input with nowhere to send it.
+        let node = ExecutableNode {
+            id: "dest-1".to_string(),
+            node_data: NodeData::Destination(
+                config::meta::pipeline::components::WorkflowDestination {
+                    destination_id: "dest-1".to_string(),
+                    template_override: None,
+                },
+            ),
+            children: vec![],
+            is_disabled: true,
+        };
+
+        let (input_tx, _child_rx, _inputs_rx, channels) = build_test_channels(0, false);
+
+        let records = (0..3).map(|i| json::json!({"i": i})).collect();
+        send_records(&input_tx, records).await;
+        drop(input_tx);
+
+        let result = process_node(dummy_metadata(1), node, None, channels).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_process_node_disabled_workflow_trigger_is_not_bypassed() {
+        // The WorkflowTrigger node must ignore is_disabled entirely and keep running
+        // its normal branch - which, unlike the generic bypass branch, does record
+        // through the inputs channel. This distinguishes "ran normally" from "bypassed".
+        let node = ExecutableNode {
+            id: "trigger-1".to_string(),
+            node_data: NodeData::WorkflowTrigger,
+            children: vec!["child-1".to_string()],
+            is_disabled: true,
+        };
+
+        let (input_tx, mut child_rx, inputs_rx, channels) = build_test_channels(1, true);
+        let mut inputs_rx = inputs_rx.unwrap();
+
+        let record = json::json!({"triggered": true});
+        send_records(&input_tx, vec![record.clone()]).await;
+        drop(input_tx);
+
+        let result = process_node(dummy_metadata(0), node, None, channels).await;
+
+        assert!(result.is_ok());
+
+        let forwarded = child_rx[0]
+            .try_recv()
+            .expect("disabled WorkflowTrigger should still forward records");
+        assert_eq!(forwarded.record, record);
+
+        let (recorded_id, recorded_value) = inputs_rx
+            .try_recv()
+            .expect("disabled WorkflowTrigger must still run its normal branch and record input");
+        assert_eq!(recorded_id, "trigger-1");
+        assert_eq!(recorded_value, record);
+    }
+
+    // --- new_from_workflow trigger-node selection ---
+
+    fn test_workflow(nodes: Vec<Node>, edges: Vec<Edge>) -> Workflow {
+        Workflow {
+            id: "wf-1".to_string(),
+            org_id: "org-1".to_string(),
+            created_at: 0,
+            updated_at: 0,
+            created_by: "tester".to_string(),
+            enabled: true,
+            name: "test-workflow".to_string(),
+            description: String::new(),
+            nodes,
+            edges,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_new_from_workflow_selects_trigger_node_over_orphan_node() {
+        // Simulates a partial/draft graph: an orphan node dropped on canvas with no
+        // edges yet, alongside the real trigger. Source selection must find the
+        // WorkflowTrigger explicitly rather than falling back to whichever node the
+        // (effectively random) HashMap iteration puts first. Uses a Destination (not
+        // Function) node for the orphan so building the executable doesn't require a
+        // real function/DB lookup via register_functions().
+        let orphan = Node::new(
+            "orphan-1".to_string(),
+            NodeData::Destination(config::meta::pipeline::components::WorkflowDestination {
+                destination_id: "unwired-dest".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        );
+        let trigger = Node::new(
+            "trigger-1".to_string(),
+            NodeData::WorkflowTrigger,
+            0.0,
+            0.0,
+            "input".to_string(),
+        );
+        let dest = Node::new(
+            "dest-1".to_string(),
+            NodeData::Destination(config::meta::pipeline::components::WorkflowDestination {
+                destination_id: "dest-1".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "output".to_string(),
+        );
+        let workflow = test_workflow(
+            vec![orphan, trigger, dest],
+            vec![Edge::new("trigger-1".to_string(), "dest-1".to_string())],
+        );
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("should build executable pipeline from a partial workflow graph");
+
+        assert_eq!(executable.source_node_id, "trigger-1");
+    }
+
+    #[tokio::test]
+    async fn test_new_from_workflow_without_trigger_silently_picks_a_node() {
+        // Documents current behavior: when no WorkflowTrigger node is present,
+        // `new_from_workflow` falls back to `sorted_nodes[0]` instead of returning a
+        // "no trigger node in graph" error. This is reachable now that draft=true
+        // allows testing/saving a graph before its trigger node is placed.
+        let dest_node = Node::new(
+            "dest-1".to_string(),
+            NodeData::Destination(config::meta::pipeline::components::WorkflowDestination {
+                destination_id: "dest-1".to_string(),
+                template_override: None,
+            }),
+            0.0,
+            0.0,
+            "default".to_string(),
+        );
+        let workflow = test_workflow(vec![dest_node], vec![]);
+
+        let executable = ExecutablePipeline::new_from_workflow(&workflow)
+            .await
+            .expect("currently succeeds instead of erroring on a trigger-less graph");
+
+        assert_eq!(executable.source_node_id, "dest-1");
     }
 }
