@@ -606,6 +606,123 @@ impl FileFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FileFormatConfig {
+    default: FileFormat,
+    logs: Option<FileFormat>,
+    metrics: Option<FileFormat>,
+    traces: Option<FileFormat>,
+}
+
+impl FileFormatConfig {
+    pub const fn new(default: FileFormat) -> Self {
+        Self {
+            default,
+            logs: None,
+            metrics: None,
+            traces: None,
+        }
+    }
+
+    pub fn for_stream(self, stream_type: StreamType) -> FileFormat {
+        match stream_type {
+            StreamType::Logs => self.logs,
+            StreamType::Metrics => self.metrics,
+            StreamType::Traces => self.traces,
+            _ => None,
+        }
+        .unwrap_or(self.default)
+    }
+}
+
+impl Default for FileFormatConfig {
+    fn default() -> Self {
+        Self::new(FileFormat::default())
+    }
+}
+
+impl std::fmt::Display for FileFormatConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.default)?;
+        for (stream_type, file_format) in [
+            (StreamType::Logs, self.logs),
+            (StreamType::Metrics, self.metrics),
+            (StreamType::Traces, self.traces),
+        ] {
+            if let Some(file_format) = file_format {
+                write!(f, ",{stream_type}={file_format}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl std::str::FromStr for FileFormatConfig {
+    type Err = anyhow::Error;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let mut parts = value.split(',');
+        let default = parts
+            .next()
+            .map(str::trim)
+            .filter(|part| !part.is_empty() && !part.contains('='))
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid file format config: a default format must be specified first"
+                )
+            })?
+            .parse()?;
+        let mut config = Self::new(default);
+
+        for part in parts {
+            let (stream_type, file_format) = part.trim().split_once('=').ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid file format override '{part}': expected <stream_type>=<file_format>"
+                )
+            })?;
+            let file_format = file_format.trim().parse()?;
+            let target = match stream_type.trim().to_lowercase().as_str() {
+                "logs" => &mut config.logs,
+                "metrics" => &mut config.metrics,
+                "traces" => &mut config.traces,
+                stream_type => {
+                    return Err(anyhow::anyhow!(
+                        "Invalid stream type '{stream_type}' in file format config: expected logs, metrics, or traces"
+                    ));
+                }
+            };
+            if target.replace(file_format).is_some() {
+                return Err(anyhow::anyhow!(
+                    "Duplicate file format override for stream type '{}'",
+                    stream_type.trim()
+                ));
+            }
+        }
+
+        Ok(config)
+    }
+}
+
+impl Serialize for FileFormatConfig {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
+impl<'de> Deserialize<'de> for FileFormatConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Config {
     pub auth: Auth,
@@ -1080,9 +1197,9 @@ pub struct Common {
         name = "ZO_FILE_FORMAT",
         parse,
         default = "parquet",
-        help = "File format for data storage: parquet or vortex"
+        help = "Default file format for data storage with optional per-stream overrides, for example: parquet,metrics=vortex"
     )]
-    pub file_format: FileFormat,
+    pub file_format: FileFormatConfig,
     #[env_config(
         name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
         default = false,
@@ -4150,6 +4267,59 @@ mod tests {
     }
 
     #[test]
+    fn test_file_format_config_from_str() {
+        let config = " parquet , LOGS=vortex, metrics = vortex, traces=parquet "
+            .parse::<FileFormatConfig>()
+            .unwrap();
+
+        assert_eq!(config.for_stream(StreamType::Logs), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Metrics), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Traces), FileFormat::Parquet);
+        assert_eq!(config.for_stream(StreamType::Metadata), FileFormat::Parquet);
+        assert_eq!(
+            config.to_string(),
+            "parquet,logs=vortex,metrics=vortex,traces=parquet"
+        );
+
+        let config = "vortex".parse::<FileFormatConfig>().unwrap();
+        assert_eq!(config.for_stream(StreamType::Logs), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Metrics), FileFormat::Vortex);
+        assert_eq!(config.for_stream(StreamType::Traces), FileFormat::Vortex);
+    }
+
+    #[test]
+    fn test_file_format_config_rejects_invalid_values() {
+        for value in [
+            "",
+            "metrics=vortex",
+            "parquet,logs",
+            "parquet,unknown=vortex",
+            "parquet,metrics=unknown",
+            "parquet,logs=vortex,LOGS=parquet",
+            "parquet,vortex",
+        ] {
+            assert!(
+                value.parse::<FileFormatConfig>().is_err(),
+                "'{value}' should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn test_file_format_config_serde_as_string() {
+        let config = "parquet,metrics=vortex"
+            .parse::<FileFormatConfig>()
+            .unwrap();
+        let serialized = serde_json::to_string(&config).unwrap();
+
+        assert_eq!(serialized, r#""parquet,metrics=vortex""#);
+        assert_eq!(
+            serde_json::from_str::<FileFormatConfig>(&serialized).unwrap(),
+            config
+        );
+    }
+
+    #[test]
     fn test_file_format_from_extension() {
         assert_eq!(
             FileFormat::from_extension("data.parquet"),
@@ -4169,13 +4339,16 @@ mod tests {
     }
 
     #[test]
-    fn test_common_config_preserves_vortex_file_format() {
+    fn test_common_config_preserves_file_format_overrides() {
         let mut cfg = Config::init().unwrap();
-        cfg.common.file_format = FileFormat::Vortex;
+        cfg.common.file_format = "parquet,metrics=vortex".parse().unwrap();
 
         check_common_config(&mut cfg).unwrap();
 
-        assert_eq!(cfg.common.file_format, FileFormat::Vortex);
+        assert_eq!(
+            cfg.common.file_format,
+            "parquet,metrics=vortex".parse().unwrap()
+        );
     }
 
     #[test]
