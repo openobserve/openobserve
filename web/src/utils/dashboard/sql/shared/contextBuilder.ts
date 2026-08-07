@@ -267,7 +267,7 @@ export function buildSQLContext(
         }
         for (const k in sums) if (sums[k] > hi) hi = sums[k];
       }
-      const lo = Number.isFinite(min) ? Math.min(0, min) : 0;
+      const lo = Number.isFinite(min) ? Math.min(min, hi) : 0;
 
       const ticks = calculateNiceTickValues(lo, hi);
       if (!ticks?.length) throw new Error("no ticks");
