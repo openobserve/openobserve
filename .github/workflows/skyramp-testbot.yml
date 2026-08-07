@@ -135,6 +135,7 @@ jobs:
           cargo build --profile release-ci --target x86_64-unknown-linux-gnu
           wait $NPM_PID
           test -f /tmp/dist/index.html
+          sed -i 's|folder = "/tmp/dist/"|folder = "../../web/dist/"|' src/web/src/lib.rs && grep -q 'folder = "../../web/dist/"' src/web/src/lib.rs
 
       - name: Stage binary for SUT startup
         if: steps.self-trigger.outputs.skip != 'true'
