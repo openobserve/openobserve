@@ -240,6 +240,12 @@
       "import": "Import pipeline",
       "importDesc": "Upload a pipeline definition"
     },
+    "noQueues": {
+      "title": "Create your first queue",
+      "description": "Queues are stateful review to-do lists — bind Score Configs, a target dataset, and a filter that feeds items in for human review.",
+      "action": "New queue",
+      "actionDesc": "Start an empty queue"
+    },
     "noDatasets": {
       "title": "Create your first dataset",
       "description": "Golden datasets collect annotated traces and reviews into versioned evaluation sets. Create one to start curating.",
@@ -487,6 +493,7 @@
     "loading": "Loading...",
     "getStartedRUM": "Get Started with RUM",
     "beta": "Beta",
+    "optional": "optional",
     "play": "Play",
     "pause": "Pause",
     "close": "Close",
@@ -8801,6 +8808,7 @@
       "sessions": "Sessions",
       "agentGraph": "Agent Graph",
       "agentBehavior": "Agent Behavior",
+      "queues": "Queues",
       "datasets": "Datasets",
       "quality": "Quality",
       "evalJobs": "Eval Jobs",
@@ -8812,11 +8820,66 @@
       "sessions": "Browse and inspect agent sessions turn by turn",
       "agentGraph": "See what your agents interact with — tools, models, services, and datastores",
       "agentBehavior": "Spot agents stuck in loops and the errors making them fail",
+      "queues": "Stateful review to-do lists",
       "datasets": "Curate golden datasets from annotated traces and reviews",
       "quality": "Track score quality across span, trace, and session evaluations",
       "evalJobs": "Run and monitor evaluation jobs across your sessions",
       "scorers": "Create and manage the scorers that grade LLM outputs",
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
+    },
+    "queues": {
+      "listTitle": "Queues",
+      "searchPlaceholder": "Search Queues...",
+      "newButton": "New Queue",
+      "loadError": "Failed to load queues",
+      "review": "Review",
+      "cleared": "Cleared",
+      "reviewedCount": "{reviewed} / {total} reviewed",
+      "columns": {
+        "name": "Name",
+        "description": "Description",
+        "scoreConfigs": "Score Configs",
+        "targetDataset": "Target Dataset",
+        "progress": "Progress",
+        "updated": "Updated"
+      },
+      "create": {
+        "title": "New Queue",
+        "errors": {
+          "name": "Name is required",
+          "scoreConfigs": "Bind at least one Score Config"
+        },
+        "nameLabel": "Name",
+        "namePlaceholder": "e.g. hallucination_review",
+        "descriptionLabel": "Description",
+        "descriptionPlaceholder": "What this queue is for and who reviews it...",
+        "scoreConfigsLabel": "Score Configs",
+        "scoreConfigsHint": "A queue scores items on one or more dimensions. Each Score Config is a single dimension — pick the configs to bind, and pin each to a version.",
+        "scoreConfigsEmpty": "Pick the Score Configs to bind.",
+        "addScoreConfig": "Add Score Config",
+        "targetDatasetLabel": "Target Dataset",
+        "targetDatasetNone": "None (review-only)",
+        "targetDatasetHint": "Review-only queue — reviewed items won't be distilled to a dataset.",
+        "autoRoutingLabel": "Auto-routing",
+        "autoRoutingHint": "Automatically enqueue objects whose scores match a condition. Leave empty to feed this queue manually from Discovery.",
+        "autoRoutingEmpty": "No auto-routing — this queue is fed manually.",
+        "addCondition": "Add Condition",
+        "conditionAnd": "AND",
+        "operatorIs": "is",
+        "operatorIsNot": "is not",
+        "conditionScorePlaceholder": "Score Config",
+        "conditionValuePlaceholder": "Value",
+        "pin": "Pin Version",
+        "versionLatest": "v{version} (latest)",
+        "success": "Queue created",
+        "error": "Failed to create queue"
+      },
+      "detail": {
+        "fallbackTitle": "Queue",
+        "back": "Back to Queues",
+        "comingSoonTitle": "Review workbench coming soon",
+        "comingSoonBody": "The queue's items and the review workbench will appear here in an upcoming update."
+      }
     },
     "datasets": {
       "listTitle": "Datasets",
@@ -8839,10 +8902,13 @@
       },
       "create": {
         "title": "New Dataset",
+        "errors": {
+          "name": "Name is required"
+        },
         "nameLabel": "Name",
         "namePlaceholder": "e.g. Support Reply Quality",
         "descriptionLabel": "Description",
-        "descriptionPlaceholder": "What this dataset is for (optional)",
+        "descriptionPlaceholder": "What this dataset is for...",
         "tagsLabel": "Tags",
         "tagsPlaceholder": "Type a tag, press Enter...",
         "success": "Dataset created",
