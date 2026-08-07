@@ -29,7 +29,8 @@ import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
-import { calculateMetricFontSize } from "./sql/charts/convertSQLMetricChart";
+import { calculateMetricFontSize, buildMetricSparkline } from "./sql/charts/convertSQLMetricChart";
+import { resolveMetricValueStyle } from "./tableConfigUtils";
 import { getPromqlLegendName, getLegendPosition } from "./promql/shared/legendBuilder";
 import { getPropsByChartTypeForSeries } from "./promqlChartSeriesProps";
 import { applyMeasuredYAxisLeftInset } from "./chartDimensionUtils";
@@ -826,7 +827,7 @@ export const convertPromQLData = async (
         // we doesnt required to hover timeseries for gauge chart
         isTimeSeriesFlag = false;
         const series = it?.result?.map((metric: any) => {
-          const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+          const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
           gaugeIndex++;
 
           const seriesName = getPromqlLegendName(
@@ -865,7 +866,7 @@ export const convertPromQLData = async (
               {
                 name: seriesName,
                 // taking first value for gauge
-                value: values[0][1],
+                value: values?.[0]?.[1] ?? 0,
                 detail: {
                   formatter: function (value: any) {
                     const unitValue = getUnitValue(
@@ -948,66 +949,80 @@ export const convertPromQLData = async (
 
         switch (it?.resultType) {
           case "matrix": {
-            // take first result
             const metric = it?.result?.[0];
 
-            const values = metric.values.sort((a: any, b: any) => a[0] - b[0]);
+            const values = (metric?.values ?? []).sort((a: any, b: any) => a[0] - b[0]);
             const latestValue = values[values.length - 1]?.[1] ?? 0;
 
-            const unitValue = getUnitValue(
-              latestValue,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
+            const metricStyle = resolveMetricValueStyle(latestValue, {
+              mappings: panelSchema.config?.mappings,
+              unit: panelSchema.config?.unit,
+              customUnit: panelSchema.config?.unit_custom,
+              decimals: panelSchema.config?.decimals,
+              panelBackground: panelSchema.config?.background?.value?.color ?? "",
+            });
+            options.backgroundColor = metricStyle.bgColor;
+            const metricText = metricStyle.text;
+            // metric value color: explicit mapping text color wins; otherwise auto-contrast.
+            const metricFillColor =
+              metricStyle.textColor ??
+              getContrastColor(
+                metricStyle.bgColor,
+                chartColor("--color-chart-metric-text"),
+                chartNumber("--chart-metric-contrast-threshold", 0.5),
+              );
+            // Optional sparkline: the trend of the full matrix series.
+            const sparkValues = values.map((v: any) => Number(v?.[1]));
+            const sparkline = buildMetricSparkline(
+              sparkValues,
+              panelSchema.config?.sparkline,
+              chartColor("--color-accent"),
             );
-            options.backgroundColor = panelSchema.config?.background?.value?.color ?? "";
-            const metricText = formatUnitValue(unitValue);
-            const series: any[] = [
-              {
-                type: "custom",
-                silent: true,
-                coordinateSystem: "polar",
-                _metricText: metricText,
-                renderItem: function (params: any) {
-                  const backgroundColor = panelSchema?.config?.background?.value?.color;
-                  return {
-                    type: "text",
-                    style: {
-                      text: metricText,
-                      fontSize: calculateMetricFontSize(
-                        metricText,
-                        params?.coordSys?.cx * 2,
-                        params?.coordSys?.cy * 2,
-                      ), //coordSys is relative. so that we can use it to calculate the dynamic size
-                      fontWeight: 500,
-                      align: "center",
-                      verticalAlign: "middle",
-                      x: params?.coordSys?.cx,
-                      y: params?.coordSys?.cy,
-                      fill: getContrastColor(
-                        backgroundColor,
-                        chartColor("--color-chart-metric-text"),
-                        chartNumber("--chart-metric-contrast-threshold", 0.5),
-                      ),
-                    },
-                  };
-                },
+
+            const textSeries: any = {
+              type: "custom",
+              silent: true,
+              coordinateSystem: "polar",
+              _metricText: metricText,
+              z: 2,
+              renderItem: function (params: any) {
+                return {
+                  type: "text",
+                  style: {
+                    text: metricText,
+                    fontSize: calculateMetricFontSize(
+                      metricText,
+                      params?.coordSys?.cx * 2,
+                      params?.coordSys?.cy * 2,
+                    ), //coordSys is relative. so that we can use it to calculate the dynamic size
+                    fontWeight: 500,
+                    align: "center",
+                    verticalAlign: "middle",
+                    x: params?.coordSys?.cx,
+                    y: params?.coordSys?.cy,
+                    fill: metricFillColor,
+                  },
+                };
               },
-            ];
+            };
+            // Text series first; sparkline layered behind via z.
+            const series: any[] = sparkline ? [textSeries, sparkline.series] : [textSeries];
 
             // Rect for the per-value copy icon overlay (single metric fills the area).
             const panelEl = chartPanelRef?.value;
             if (panelEl) {
               const w = panelEl?.offsetWidth;
               const h = panelEl?.offsetHeight;
-              series[0]._metricLayout = {
+              const valueH = sparkline ? h * sparkline.valueBandFactor : h;
+              const cy = sparkline ? h * sparkline.valueCenterFactor : h / 2;
+              textSeries._metricLayout = {
                 left: 0,
                 top: 0,
                 width: w,
-                height: h,
+                height: valueH,
                 cx: w / 2,
-                cy: h / 2,
-                fontSize: calculateMetricFontSize(metricText, w, h),
+                cy,
+                fontSize: calculateMetricFontSize(metricText, w, valueH),
               };
             }
 
@@ -1021,9 +1036,16 @@ export const convertPromQLData = async (
             options.radiusAxis = {
               show: false,
             };
-            options.polar = {};
-            options.xAxis = [];
-            options.yAxis = [];
+            if (sparkline) {
+              options.polar = { center: ["50%", sparkline.polarCenterY], radius: 0 };
+              options.grid = sparkline.grid;
+              options.xAxis = sparkline.xAxis;
+              options.yAxis = sparkline.yAxis;
+            } else {
+              options.polar = {};
+              options.xAxis = [];
+              options.yAxis = [];
+            }
 
             return series;
           }
@@ -1076,12 +1098,16 @@ export const convertPromQLData = async (
     });
   }
 
-  options.series = options.series.flat();
-
-  // For metric chart type, only show one metric value (from last query with data)
+  // For metric chart type, only show one metric value (from the last query with
+  // data). Slice BEFORE flattening: each metric query contributes an array
+  // [textSeries] (+ sparklineSeries when enabled), so keeping the last query's
+  // array preserves both the value and its sparkline. Slicing after flatten would
+  // keep only the trailing element — the sparkline — and drop the value text.
   if (panelSchema.type === "metric" && options.series.length > 1) {
     options.series = options.series.slice(-1);
   }
+
+  options.series = options.series.flat();
 
   // Apply series color mappings via reusable helper
   applySeriesColorMappings(
