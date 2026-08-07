@@ -45,6 +45,8 @@ const props = defineProps<{
   dense?: boolean;
   /** Show the per-column value-filter dropdown on filterable columns. */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on formattable columns. */
+  enableColumnFormat?: boolean;
 }>();
 
 // ── Per-column value filter ─────────────────────────────────────
@@ -113,6 +115,8 @@ const emit = defineEmits<{
   /** Per-column close ("x"). Emits the column definition so the consumer can
    *  drop the field - distinct from hiding it. */
   "close-column": [column: any];
+  /** Per-column format icon click. Emits the column id. */
+  "format-column": [columnId: string];
 }>();
 
 // Notify the parent BEFORE the resize begins so it can freeze any flex columns
@@ -678,6 +682,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </div>
             </div>
           </ODropdown>
+
+          <button
+            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
+            type="button"
+            :data-test="`o2-table-column-format-btn-${header.column.id}`"
+            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            :aria-label="t('components.table.formatColumnAria')"
+            @click.stop="emit('format-column', header.column.id)"
+          >
+            <OIcon name="tune" size="xs" class="opacity-50" />
+          </button>
         </div>
 
         <!-- Column resize handle -->
@@ -948,6 +963,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               </div>
             </div>
           </ODropdown>
+
+          <button
+            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
+            type="button"
+            :data-test="`o2-table-column-format-btn-${header.column.id}`"
+            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            :aria-label="t('components.table.formatColumnAria')"
+            @click.stop="emit('format-column', header.column.id)"
+          >
+            <OIcon name="tune" size="xs" class="opacity-50" />
+          </button>
         </div>
         <div
           v-if="header.column.getCanResize()"

@@ -255,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :searchType="searchType"
                         :searchResponse="props.searchResponse"
                         :is_ui_histogram="props.isUiHistogram"
+                        :enableColumnFormat="true"
                         @metadata-update="metaDataValue"
                         @result-metadata-update="handleResultMetadataUpdate"
                         @limit-number-of-series-warning-message-update="
@@ -273,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
                         "
                         @update:initial-variable-values="handleInitialVariableValuesUpdate"
+                        @format-column="openColumnFormatting"
                       />
                     </div>
                   </div>
@@ -308,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :dashboardPanelData="dashboardPanelData"
                     :variablesData="resolvedVariablesData"
                     :panelData="seriesData"
+                    @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
                   />
                 </PanelSidebar>
               </div>
@@ -597,6 +600,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :panelData="currentPanelData"
       data-test="panel-editor-legends-dialog"
     />
+
+    <OverrideConfig
+      v-if="dashboardPanelData.data.type === 'table'"
+      ref="overrideConfigRef"
+      :panelData="seriesData"
+    />
   </div>
 </template>
 
@@ -640,10 +649,14 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import type OverrideConfigComponent from "@/components/dashboards/addPanel/OverrideConfig.vue";
 
 // Async component imports for code splitting
 const ConfigPanel = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/ConfigPanel.vue"),
+);
+const OverrideConfig = defineAsyncComponent(
+  () => import("@/components/dashboards/addPanel/OverrideConfig.vue"),
 );
 const ShowLegendsPopup = defineAsyncComponent(
   () => import("@/components/dashboards/addPanel/ShowLegendsPopup.vue"),
@@ -720,6 +733,11 @@ const builderScrollTick = ref(0);
 provide("sidebarScrollTick", builderScrollTick);
 const onBuilderScroll = () => {
   builderScrollTick.value++;
+};
+
+const overrideConfigRef = ref<InstanceType<typeof OverrideConfigComponent> | null>(null);
+const openColumnFormatting = (field: string) => {
+  overrideConfigRef.value?.openOverrideConfigPopup(field);
 };
 
 // ============================================================================

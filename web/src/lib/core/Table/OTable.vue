@@ -1219,6 +1219,7 @@ defineExpose({
             :pinned-first-column="props.pinnedFirstColumn"
             :enable-column-resize="props.enableColumnResize"
             :enable-column-filter="props.enableColumnFilter"
+            :enable-column-format="props.enableColumnFormat"
             :is-resizing="columnMgmt.isResizing.value"
             :sorting-enabled="sorting.isEnabled.value"
             :sort-by="sorting.activeSortBy.value ?? undefined"
@@ -1244,6 +1245,7 @@ defineExpose({
             @drag-end="columnMgmt.onDragEnd"
             @resize-start="freezeFlexColumns"
             @close-column="(col: any) => emit('close-column', col)"
+            @format-column="(colId: string) => emit('format-column', colId)"
           />
 
           <!-- ── Skeleton Body (loading with no existing data) ───── -->
