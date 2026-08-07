@@ -821,6 +821,7 @@ import useLogs from "../../composables/useLogs";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import usePatterns from "@/composables/useLogs/usePatterns";
 import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import { useAlertCreation } from "@/composables/alerts/useAlertCreation";
 import { extractConstantsFromPattern } from "@/plugins/logs/patterns/patternUtils";
 import {
   convertLogData,
@@ -1237,8 +1238,26 @@ export default defineComponent({
       navTotal: patternNavTotal,
       addPatternToSearch,
       addWildcardValueToSearch,
-      createAlertFromPattern,
+      buildSinglePatternAlertPrefill,
     } = usePatternActions();
+
+    const { openAlertCreation } = useAlertCreation();
+
+    /**
+     * Single-pattern alert creation from the detail drawer. Previously this
+     * wrote a sessionStorage payload nothing ever read, so the alert form opened
+     * blank; it now goes through the same prefill contract as every other
+     * surface.
+     */
+    const createAlertFromPattern = (pattern: any) => {
+      const launched = openAlertCreation(buildSinglePatternAlertPrefill(pattern));
+      if (!launched) {
+        toast({
+          variant: "warning",
+          message: t("logs.patternList.alertBroadMatch"),
+        });
+      }
+    };
 
     // Context the pattern details drawer needs to look up a pattern's
     // window-wide volume, so its Occurrences figure matches the list's `~N`
