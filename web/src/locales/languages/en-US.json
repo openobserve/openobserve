@@ -11680,7 +11680,8 @@
         "resetToDefault": "Reset to default",
         "resetColumnWidths": "Reset column widths"
       },
-      "removeColumnAria": "Remove column"
+      "removeColumnAria": "Remove column",
+      "formatColumnAria": "Format column"
     },
     "predefinedThemes": {
       "title": "Theme",

@@ -1215,7 +1215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
       </template>
       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
-        <OverrideConfig :dashboardPanelData="dashboardPanelData" :panelData="panelData" />
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="$emit('open-field-overrides')"
+          data-test="dashboard-addpanel-config-override-config-add-btn"
+        >
+          {{ t("dashboard.addFieldOverride") }}
+        </OButton>
       </div>
     </OCollapsible>
 
@@ -1760,7 +1767,6 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
 import BackGroundColorConfig from "./BackGroundColorConfig.vue";
 import SparklineConfig from "./SparklineConfig.vue";
-import OverrideConfig from "./OverrideConfig.vue";
 import ConfigPanelSearch from "./ConfigPanelSearch.vue";
 import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
 import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
@@ -1824,7 +1830,6 @@ export default defineComponent({
     ColorPaletteDropDown,
     BackGroundColorConfig,
     SparklineConfig,
-    OverrideConfig,
     PromQLChartConfig,
     OButton,
     OTooltip,
@@ -1832,6 +1837,7 @@ export default defineComponent({
     OCollapsible,
   },
   props: ["dashboardPanelData", "variablesData", "panelData"],
+  emits: ["open-field-overrides"],
   setup(props) {
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { t } = useI18nTyped();

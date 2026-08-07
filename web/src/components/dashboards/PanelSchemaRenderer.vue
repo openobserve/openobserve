@@ -47,11 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
+          @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :enable-column-format="enableColumnFormat"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
@@ -413,6 +415,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Table preview's per-column format icon; explicit opt-in, not derived from `viewOnly` (which tracks print mode) — only PanelEditor sets this.
+    enableColumnFormat: {
+      type: Boolean,
+      default: false,
+    },
     shouldRefreshWithoutCache: {
       type: Boolean,
       required: false,
@@ -458,6 +465,7 @@ export default defineComponent({
     "series-data-update",
     "contextmenu",
     "show-legends",
+    "format-column",
   ],
   setup(props, { emit }) {
     const store = useStore();
@@ -1464,6 +1472,8 @@ export default defineComponent({
 
     const { showErrorNotification, showPositiveNotification } = useNotifications();
 
+    const onFormatColumn = (field: string) => emit("format-column", field);
+
     const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
       usePanelDrilldown({
         panelSchema,
@@ -1579,6 +1589,7 @@ export default defineComponent({
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onFormatColumn,
       onDataZoom,
       drilldownArray,
       selectedAnnotationData,
