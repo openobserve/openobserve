@@ -918,9 +918,7 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(onSetupPhase(wrapper)).toBe(false);
-      expect((gateUrlInput(wrapper).element as HTMLInputElement).value).toBe(
-        "https://example.com",
-      );
+      expect((gateUrlInput(wrapper).element as HTMLInputElement).value).toBe("https://example.com");
       expect((gateNameInput(wrapper).element as HTMLInputElement).value).toBe("Restored Check");
     });
   });
@@ -1017,8 +1015,7 @@ describe("CreateBrowserTest", () => {
     }
 
     const ctaDisabled = (w: VueWrapper) =>
-      w.find('[data-test="synthetics-setup-open-record-btn"]').attributes("disabled") !==
-      undefined;
+      w.find('[data-test="synthetics-setup-open-record-btn"]').attributes("disabled") !== undefined;
 
     it("should re-probe on the ack and enable the CTA only once the fresh probe passes", async () => {
       wrapper = await mountAtSetupPhase();
