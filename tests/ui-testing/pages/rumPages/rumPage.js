@@ -29,13 +29,65 @@ export class RumPage {
         this.prettyTab = page.getByRole('tab', { name: 'Pretty' });
         this.prettyUnavailableState = page.locator('[data-test="rum-pretty-stack-trace-unavailable"]');
         this.prettyErrorState = page.locator('[data-test="rum-pretty-stack-trace-error"]');
-        this.prettyLoadingText = page.getByText('Translating stack trace with source maps...');
-        this.prettyUnavailableText = page.getByText('Source Maps Not Available');
-        this.prettyTranslateFailedText = page.getByText(/Unable to translate stack trace/i);
+        // Prefer data-test selectors; keep text fallbacks for binary compatibility
+        this.prettyLoadingText = page.locator('[data-test="rum-pretty-stack-trace-loading"]');
+        this.prettyUnavailableText = page.locator('[data-test="rum-pretty-stack-trace-unavailable"]');
+        this.prettyTranslateFailedText = page.locator('[data-test="rum-pretty-stack-trace-error"]');
 
         // Store first error data from query response
         this.firstErrorId = null;
         this.firstErrorTimestamp = null;
+
+        // ===== ERROR DETAIL REDESIGN — selectors =====
+        // Impact strip
+        this.impactStrip = '[data-test="rum-error-impact-strip"]';
+        this.impactStripScope = '[data-test="rum-error-impact-strip-scope"]';
+        this.impactEvents = '[data-test="rum-error-impact-events"]';
+        this.impactUsers = '[data-test="rum-error-impact-users"]';
+        this.impactSessions = '[data-test="rum-error-impact-sessions"]';
+        this.impactFirstSeen = '[data-test="rum-error-impact-first-seen"]';
+        this.impactLastSeen = '[data-test="rum-error-impact-last-seen"]';
+        // Occurrences chart
+        this.occurrencesChart = '[data-test="rum-error-occurrences-chart"]';
+        this.occurrencesCanvas = '[data-test="rum-error-occurrences-canvas"]';
+        this.occurrencesLoading = '[data-test="rum-error-occurrences-loading"]';
+        this.occurrencesPeak = '[data-test="rum-error-occurrences-peak"]';
+        // Facet breakdown
+        this.facetBreakdown = '[data-test="rum-error-facet-breakdown"]';
+        this.facetBreakdownLoading = '[data-test="rum-error-facet-breakdown-loading"]';
+        this.facetBreakdownEmpty = '[data-test="rum-error-facet-breakdown-empty"]';
+        this.facetBrowser = '[data-test="rum-error-facet-browser"]';
+        this.facetBrowserValue = '[data-test="rum-error-facet-browser-value"]';
+        this.facetBrowserShare = '[data-test="rum-error-facet-browser-share"]';
+        // Error header — type, badges, metadata
+        this.headerErrorType = '[data-test="error-header-error-type"]';
+        this.headerHandlingBadge = '[data-test="error-header-handling-badge"]';
+        this.headerSourceBadge = '[data-test="error-header-source-badge"]';
+        this.headerMessage = '[data-test="error-header-message"]';
+        this.headerTimestamp = '[data-test="error-header-timestamp"]';
+        this.headerErrorId = '[data-test="error-id"]';
+        this.headerRoute = '[data-test="error-header-route"]';
+        // Copy actions
+        this.copyLinkBtn = '[data-test="error-header-copy-link-btn"]';
+        this.copyIdBtn = '[data-test="error-header-copy-id-btn"]';
+        // Back button
+        this.backButton = '[data-test="back-button"]';
+        // Context card
+        this.contextCard = '[data-test="rum-error-context-card"]';
+        this.contextUserName = '[data-test="rum-error-context-user-name"]';
+        this.contextUserEmail = '[data-test="rum-error-context-user-email"]';
+        this.contextBrowser = '[data-test="rum-error-context-browser"]';
+        this.contextOS = '[data-test="rum-error-context-os"]';
+        this.contextDevice = '[data-test="rum-error-context-device"]';
+        this.contextLocation = '[data-test="rum-error-context-location"]';
+        this.contextIP = '[data-test="rum-error-context-ip"]';
+        this.contextURL = '[data-test="rum-error-context-url"]';
+        // Session replay
+        this.sessionReplayCard = '[data-test="error-session-replay-card"]';
+        this.sessionReplayPlayBtn = '[data-test="error-session-replay-play-btn"]';
+        // Events / breadcrumbs timeline
+        this.eventsTimeline = '[data-test="error-events-timeline"]';
+        this.eventsEmpty = '[data-test="error-events-empty"]';
     }
 
     async gotoRumPage() {
@@ -65,7 +117,7 @@ export class RumPage {
 
     async navigateToErrorTracking() {
         await this.page.locator(this.errorTrackingTab).or(this.page.locator(this.errorsTab)).first().click();
-        await this.page.waitForTimeout(2000);
+        await expect(this.page.locator(this.dateTimeDropdown)).toBeVisible({ timeout: 15000 });
     }
 
     async expectErrorTrackingPageLoaded() {
@@ -160,8 +212,8 @@ export class RumPage {
             `${process.env.ZO_BASE_URL}/web/rum/errors/view/${this.firstErrorId}?timestamp=${this.firstErrorTimestamp}&org_identifier=${org}`
         );
 
-        // Wait for page to load
-        await this.page.waitForTimeout(2000);
+        // Wait for the error viewer container (replaces fixed sleep)
+        await this.page.waitForSelector(this.errorViewerContainer, { timeout: 15000 });
     }
 
     async expectErrorDetailViewLoaded() {
@@ -315,6 +367,231 @@ export class RumPage {
     /** The translating spinner must be gone (not hung). */
     async expectPrettyLoadingResolved() {
         await expect(this.prettyLoadingText).toHaveCount(0);
+    }
+
+    // ===== ERROR DETAIL REDESIGN METHODS =====
+
+    // --- Impact strip ---
+    async expectImpactStripVisible() {
+        await expect(this.page.locator(this.impactStrip)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getImpactScopeText() {
+        return await this.page.locator(this.impactStripScope).textContent();
+    }
+
+    async getImpactEventsText() {
+        return await this.page.locator(this.impactEvents).textContent();
+    }
+
+    async getImpactUsersText() {
+        return await this.page.locator(this.impactUsers).textContent();
+    }
+
+    async getImpactSessionsText() {
+        return await this.page.locator(this.impactSessions).textContent();
+    }
+
+    async getImpactFirstSeenText() {
+        return await this.page.locator(this.impactFirstSeen).textContent();
+    }
+
+    async getImpactLastSeenText() {
+        return await this.page.locator(this.impactLastSeen).textContent();
+    }
+
+    // --- Occurrences chart ---
+    async expectOccurrencesChartVisible() {
+        await expect(this.page.locator(this.occurrencesChart)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectOccurrencesCanvasVisible() {
+        await expect(this.page.locator(this.occurrencesCanvas)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectOccurrencesLoadingHidden() {
+        await expect(this.page.locator(this.occurrencesLoading)).toBeHidden({ timeout: 10000 });
+    }
+
+    async getOccurrencesPeakText() {
+        return await this.page.locator(this.occurrencesPeak).textContent();
+    }
+
+    // --- Facet breakdown ---
+    async expectFacetBreakdownVisible() {
+        await expect(this.page.locator(this.facetBreakdown)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectFacetBreakdownLoadingHidden() {
+        await expect(this.page.locator(this.facetBreakdownLoading)).toBeHidden({ timeout: 10000 });
+    }
+
+    async expectFacetBrowserGroupVisible() {
+        await expect(this.page.locator(this.facetBrowser)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectFacetBrowserValueVisible() {
+        await expect(this.page.locator(this.facetBrowserValue).first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectFacetBrowserShareVisible() {
+        await expect(this.page.locator(this.facetBrowserShare).first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectFacetBreakdownEmptyVisible() {
+        await expect(this.page.locator(this.facetBreakdownEmpty)).toBeVisible({ timeout: 10000 });
+    }
+
+    // --- Error header ---
+    async getHeaderErrorTypeText() {
+        return await this.page.locator(this.headerErrorType).textContent();
+    }
+
+    async expectHandlingBadgeVisible() {
+        await expect(this.page.locator(this.headerHandlingBadge)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getHandlingBadgeText() {
+        return await this.page.locator(this.headerHandlingBadge).textContent();
+    }
+
+    async expectSourceBadgeVisible() {
+        await expect(this.page.locator(this.headerSourceBadge)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectErrorMessageBannerVisible() {
+        await expect(this.page.locator(this.headerMessage)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getMessageBannerText() {
+        return await this.page.locator(this.headerMessage).textContent();
+    }
+
+    async expectTimestampVisible() {
+        await expect(this.page.locator(this.headerTimestamp)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getTimestampText() {
+        return await this.page.locator(this.headerTimestamp).textContent();
+    }
+
+    async expectErrorIdVisible() {
+        await expect(this.page.locator(this.headerErrorId)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectRouteVisible() {
+        await expect(this.page.locator(this.headerRoute)).toBeVisible({ timeout: 10000 });
+    }
+
+    // --- Copy actions ---
+    async expectCopyLinkBtnEnabled() {
+        await expect(this.page.locator(this.copyLinkBtn)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.copyLinkBtn)).toBeEnabled({ timeout: 5000 });
+    }
+
+    async clickCopyIdBtn() {
+        await this.page.locator(this.copyIdBtn).click();
+    }
+
+    async expectCopyIdBtnEnabled() {
+        await expect(this.page.locator(this.copyIdBtn)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.copyIdBtn)).toBeEnabled({ timeout: 5000 });
+    }
+
+    async expectCopyIdBtnDisabled() {
+        await expect(this.page.locator(this.copyIdBtn)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.copyIdBtn)).toBeDisabled({ timeout: 5000 });
+    }
+
+    // --- Back button ---
+    async clickBackButton() {
+        await this.page.locator(this.backButton).click();
+    }
+
+    async expectBackButtonVisible() {
+        await expect(this.page.locator(this.backButton)).toBeVisible({ timeout: 10000 });
+    }
+
+    // --- Context card ---
+    async getContextUserNameText() {
+        return await this.page.locator(this.contextUserName).textContent();
+    }
+
+    async getContextUserEmailText() {
+        return await this.page.locator(this.contextUserEmail).textContent();
+    }
+
+    async getContextBrowserText() {
+        return await this.page.locator(this.contextBrowser).textContent();
+    }
+
+    async getContextOSText() {
+        return await this.page.locator(this.contextOS).textContent();
+    }
+
+    async expectContextDeviceVisible() {
+        await expect(this.page.locator(this.contextDevice)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectContextLocationVisible() {
+        await expect(this.page.locator(this.contextLocation)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectContextIPVisible() {
+        await expect(this.page.locator(this.contextIP)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectContextURLVisible() {
+        await expect(this.page.locator(this.contextURL)).toBeVisible({ timeout: 10000 });
+    }
+
+    // --- Session replay ---
+    async expectSessionReplayCardVisible() {
+        await expect(this.page.locator(this.sessionReplayCard)).toBeVisible({ timeout: 10000 });
+    }
+
+    async clickSessionReplayPlayBtn() {
+        await this.page.locator(this.sessionReplayPlayBtn).click();
+    }
+
+    async expectSessionReplayBtnEnabled() {
+        await expect(this.page.locator(this.sessionReplayPlayBtn)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.sessionReplayPlayBtn)).toBeEnabled({ timeout: 5000 });
+    }
+
+    async expectSessionReplayBtnDisabled() {
+        await expect(this.page.locator(this.sessionReplayPlayBtn)).toBeVisible({ timeout: 10000 });
+        await expect(this.page.locator(this.sessionReplayPlayBtn)).toBeDisabled({ timeout: 5000 });
+    }
+
+    // --- Events / breadcrumbs timeline ---
+    async expectEventsTimelineVisible() {
+        await expect(this.page.locator(this.eventsTimeline)).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectEventsEmptyVisible() {
+        await expect(this.page.locator(this.eventsEmpty)).toBeVisible({ timeout: 10000 });
+    }
+
+    async getEventsTimelineCount() {
+        return await this.page.locator(this.eventsTimeline).count();
+    }
+
+    // --- Facet breakdown empty state (inline check) ---
+    async expectFacetBreakdownEmptyOrSectionVisible() {
+        const emptyLocator = this.page.locator(this.facetBreakdownEmpty);
+        const sectionLocator = this.page.locator(this.facetBreakdown);
+        const result = await Promise.race([
+            emptyLocator.waitFor({ state: 'visible', timeout: 10000 }).then(() => 'empty'),
+            sectionLocator.waitFor({ state: 'visible', timeout: 10000 }).then(() => 'section'),
+        ]).catch(() => null);
+        return result;
+    }
+
+    // --- Notification toast ---
+    async expectAnyToastVisible(timeoutMs = 5000) {
+        const toast = this.page.locator('[data-test="notification-toast"], [data-test="o-toast-message"], [role="alert"]').first();
+        await expect(toast).toBeVisible({ timeout: timeoutMs });
     }
 
 }

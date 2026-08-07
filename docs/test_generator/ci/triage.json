@@ -1,0 +1,33 @@
+{
+  "feature_slug": "rum-error-detail-redesign",
+  "feature_title": "RUM Error Detail Redesign",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "error-detail.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/error-detail.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [
+    "web/src/views/RUM/ErrorViewer.vue",
+    "web/src/components/rum/errorTracking/view/ErrorHeader.vue",
+    "web/src/components/rum/errorTracking/view/ErrorContextCard.vue",
+    "web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.vue",
+    "web/src/components/rum/errorTracking/view/ErrorImpactStrip.vue",
+    "web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue",
+    "web/src/composables/rum/useErrorDetail.ts",
+    "web/src/utils/rum/errorDetailQueries.ts",
+    "web/src/utils/rum/errorIssueUtils.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 23 changed file paths live under web/src/ (OSS frontend components, composables, utilities, and the ErrorViewer view) or tests/ui-testing/ (test infrastructure). No path under enterprise/, o2_enterprise/, or src/enterprise/ was touched. The @enterprise tag on the existing sourcemap-ui.spec.js is a Playwright test-filtration label, not a file-path signal — it does not make this an enterprise change. Edition is oss.",
+    "skip": "The change modifies user-facing Vue components (ErrorViewer layout restructured to a two-column grid, new ErrorContextCard, ErrorFacetBreakdown, ErrorImpactStrip, ErrorOccurrencesChart components, a redesigned ErrorHeader) and adds new i18n strings. No explicit skip marker (tests-added label or skip comment) was present. The diff is definitely user-facing, so the skip gate is not applied.",
+    "e2e": "Six user-facing Vue components were added or meaningfully restructured: ErrorViewer now has a two-column grid with an impact strip, occurrences chart, and side panel (facet breakdown, context card); ErrorHeader was redesigned with new badges, a message banner, deployment chips, and copy actions; four entirely new components (ErrorContextCard, ErrorFacetBreakdown, ErrorImpactStrip, ErrorOccurrencesChart) were introduced. All of these are interactive, data-driven UI surfaces that need E2E validation — the existing sourcemap-ui spec was only minimally updated (method rename) and does not exercise the new detail page structure.",
+    "area": "All 23 changed files cluster under the RUM product area: web/src/components/rum/, web/src/composables/rum/, web/src/utils/rum/, and web/src/views/RUM/. The existing Playwright spec that was updated lives at tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js. The RUM test area is the only natural home for specs covering the error detail view.",
+    "group": "The playwright matrix group is RUM. The enterprise CI matrix overlay (ci_matrix.ent.json) has no RUM entry, meaning the RUM shard lives in the OSS base manifest (ci_matrix.json). The existing sourcemap-ui.spec.js already belongs to that group; a new error-detail.spec.js should join the same shard.",
+    "existing_tests": "The diff modifies tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js — a Playwright E2E spec — to rename a page-object method (expectTagsSectionVisible → expectContextSectionVisible) so it stays compatible with the redesigned UI. This is a maintenance update to an existing test, not new coverage for the redesign. No other Playwright E2E specs were changed. The numerous Vitest unit specs (.spec.ts files under web/src/) are unit tests, not E2E coverage, and are not counted here."
+  }
+}

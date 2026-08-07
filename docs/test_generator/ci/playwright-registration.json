@@ -1,0 +1,6 @@
+{
+  "group": "RUM",
+  "spec_filename": "error-detail.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

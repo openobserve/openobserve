@@ -1,0 +1,25 @@
+{
+  "feature_slug": "rum-error-detail-redesign",
+  "feature_title": "RUM Error Detail Redesign",
+  "area": "RUM",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "error-detail.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/RUM/error-detail.spec.js",
+  "playwright_group": "RUM",
+  "source_files": [
+    "web/src/views/RUM/ErrorViewer.vue",
+    "web/src/components/rum/errorTracking/view/ErrorHeader.vue",
+    "web/src/components/rum/errorTracking/view/ErrorContextCard.vue",
+    "web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.vue",
+    "web/src/components/rum/errorTracking/view/ErrorImpactStrip.vue",
+    "web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue",
+    "web/src/composables/rum/useErrorDetail.ts",
+    "web/src/utils/rum/errorDetailQueries.ts",
+    "web/src/utils/rum/errorIssueUtils.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

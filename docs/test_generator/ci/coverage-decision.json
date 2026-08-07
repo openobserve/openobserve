@@ -1,0 +1,15 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/RUM/error-detail.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js"
+  ],
+  "needs_registration": true,
+  "registration": {
+    "file": "tests/ui-testing/ci-matrix/ci_matrix.json",
+    "group": "RUM",
+    "add_to_run_files": "error-detail.spec.js",
+    "note": "Add 'error-detail.spec.js' to the run_files array in the RUM testfolder entry (around line 326). The RUM group already exists; just append the new filename."
+  },
+  "rationale": "The error detail redesign introduces six new/redesigned Vue components (ErrorImpactStrip, ErrorOccurrencesChart, ErrorFacetBreakdown, ErrorContextCard, redesigned ErrorHeader with badges/copy actions, and the two-column ErrorViewer layout) that are OSS features. The existing sourcemap-ui.spec.js is @enterprise-tagged, focuses on sourcemap display, and only minimally touches the detail view (context section visibility, stack trace). A clean OSS spec for the error detail view avoids mixing concerns and correctly carries @rum-error-detail-redesign + @RUM tags. Duplication with sourcemap-ui.spec.js is intentionally avoided: this spec does NOT re-test stack-trace display or the sourcemap Pretty tab (already covered there), focusing instead on the aggregation panels, facet breakdown, impact strip, context card contents, redesigned header badges, copy actions, and session replay navigation."
+}

@@ -1,0 +1,4128 @@
+===== COMPLETE LIST OF CHANGED FILES (23 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/pages/rumPages/rumPage.js
+tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js
+web/src/components/rum/errorTracking/view/ErrorContextCard.spec.ts
+web/src/components/rum/errorTracking/view/ErrorContextCard.vue
+web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.spec.ts
+web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.vue
+web/src/components/rum/errorTracking/view/ErrorHeader.spec.ts
+web/src/components/rum/errorTracking/view/ErrorHeader.vue
+web/src/components/rum/errorTracking/view/ErrorImpactStrip.spec.ts
+web/src/components/rum/errorTracking/view/ErrorImpactStrip.vue
+web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.spec.ts
+web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue
+web/src/components/rum/errorTracking/view/ErrorTags.spec.ts
+web/src/components/rum/errorTracking/view/ErrorTags.vue
+web/src/composables/rum/useErrorDetail.spec.ts
+web/src/composables/rum/useErrorDetail.ts
+web/src/locales/languages/en-US.json
+web/src/utils/rum/errorDetailQueries.spec.ts
+web/src/utils/rum/errorDetailQueries.ts
+web/src/utils/rum/errorIssueQueries.ts
+web/src/utils/rum/errorIssueUtils.ts
+web/src/views/RUM/ErrorViewer.spec.ts
+web/src/views/RUM/ErrorViewer.vue
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/pages/rumPages/rumPage.js b/tests/ui-testing/pages/rumPages/rumPage.js
+index b2af2788456..dccf91bd6d1 100644
+--- a/tests/ui-testing/pages/rumPages/rumPage.js
++++ b/tests/ui-testing/pages/rumPages/rumPage.js
+@@ -172,11 +172,11 @@ export class RumPage {
+         await loadingSpinner.waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
+     }
+ 
+-    async expectTagsSectionVisible() {
+-        // #12764 (scoped scss styles removal) dropped the `.tags-title` class from the
+-        // RUM error-detail sections; the Tags section title now carries a data-test hook.
+-        const tagsSection = this.page.locator('[data-test="error-tags-title"]').first();
+-        await expect(tagsSection).toBeVisible({ timeout: 5000 });
++    async expectContextSectionVisible() {
++        // The error-detail redesign replaced the flat "Tags" strip with the
++        // context card (user, device, geo, deployment) in the right rail.
++        const contextSection = this.page.locator('[data-test="rum-error-context-card"]').first();
++        await expect(contextSection).toBeVisible({ timeout: 5000 });
+     }
+ 
+     async getErrorViewerContainerText() {
+diff --git a/tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js b/tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js
+index 8663a261d5f..4cc3a6fd6d9 100644
+--- a/tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js
++++ b/tests/ui-testing/playwright-tests/RUM/sourcemap-ui.spec.js
+@@ -186,8 +186,8 @@ test.describe("Sourcemap UI Tests", { tag: '@enterprise' }, () => {
+     // Verify metadata sections
+     testLogger.info('Checking for metadata sections');
+ 
+-    // Tags section
+-    await pm.rumPage.expectTagsSectionVisible();
++    // Context section — who hit the error, on what device and build
++    await pm.rumPage.expectContextSectionVisible();
+ 
+     // Get container text
+     const containerText = await pm.rumPage.getErrorViewerContainerText();
+diff --git a/web/src/components/rum/errorTracking/view/ErrorContextCard.spec.ts b/web/src/components/rum/errorTracking/view/ErrorContextCard.spec.ts
+new file mode 100644
+index 00000000000..96124544957
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorContextCard.spec.ts
+@@ -0,0 +1,155 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, afterEach, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++import ErrorContextCard from "@/components/rum/errorTracking/view/ErrorContextCard.vue";
++import i18n from "@/locales";
++
++const mockError = {
++  usr_name: "Göksenin Güngör",
++  usr_email: "goksenin.gungor@example.ch",
++  ip: "176.42.18.160",
++  geo_info_city: "Ankara",
++  geo_info_country: "Türkiye",
++  user_agent_user_agent_family: "Chrome",
++  user_agent_user_agent_major: "149",
++  user_agent_os_family: "Mac OS X",
++  user_agent_os_major: "10",
++  user_agent_os_minor: "15",
++  user_agent_device_brand: "Apple",
++  user_agent_device_family: "Mac",
++  view_url: "https://app.example.com/billings/plans",
++  service: "checkout-web",
++  version: "2.4.1",
++  env: "production",
++  sdk_version: "0.3.2-beta.3",
++  source: "console",
++};
++
++describe("ErrorContextCard", () => {
++  let wrapper: VueWrapper<any>;
++
++  const mountComponent = (error: Record<string, any> = mockError) =>
++    mount(ErrorContextCard, {
++      props: { error },
++      global: { plugins: [i18n] },
++    });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++  });
++
++  describe("identity", () => {
++    it("shows the user's name and email", () => {
++      wrapper = mountComponent();
++
++      expect(wrapper.find('[data-test="rum-error-context-user-name"]').text()).toBe(
++        "Göksenin Güngör",
++      );
++      expect(wrapper.find('[data-test="rum-error-context-user-email"]').text()).toBe(
++        "goksenin.gungor@example.ch",
++      );
++    });
++
++    it("falls back to an unknown-user label when no identity was captured", () => {
++      wrapper = mountComponent({});
++
++      expect(wrapper.find('[data-test="rum-error-context-user-name"]').text()).toBe("Unknown User");
++    });
++
++    it("derives initials from the email when there is no name", () => {
++      wrapper = mountComponent({ usr_email: "ada.lovelace@example.com" });
++
++      expect(wrapper.text()).toContain("al");
++    });
++  });
++
++  describe("environment", () => {
++    it("shows the browser family and version", () => {
++      wrapper = mountComponent();
++
++      expect(wrapper.find('[data-test="rum-error-context-browser"]').text()).toBe("Chrome");
++      expect(wrapper.text()).toContain("Version 149");
++    });
++
++    it("shows the operating system with a dotted version", () => {
++      wrapper = mountComponent();
++
++      expect(wrapper.find('[data-test="rum-error-context-os"]').text()).toBe("Mac OS X");
++      expect(wrapper.text()).toContain("Version 10.15");
++    });
++
++    it("says the version is unknown when no version parts were captured", () => {
++      wrapper = mountComponent({ user_agent_user_agent_family: "Chrome" });
++
++      expect(wrapper.text()).toContain("Version unknown");
++    });
++  });
++
++  describe("metadata rows", () => {
++    it("shows the device, location, ip and page url", () => {
++      wrapper = mountComponent();
++
++      expect(wrapper.find('[data-test="rum-error-context-device"]').text()).toContain("Apple Mac");
++      expect(wrapper.find('[data-test="rum-error-context-location"]').text()).toContain(
++        "Ankara, Türkiye",
++      );
++      expect(wrapper.find('[data-test="rum-error-context-ip"]').text()).toContain("176.42.18.160");
++      expect(wrapper.find('[data-test="rum-error-context-url"]').text()).toContain(
++        "https://app.example.com/billings/plans",
++      );
++    });
++
++    it("omits the ip and url rows when those fields are absent", () => {
++      wrapper = mountComponent({ usr_email: "a@b.com" });
++
++      expect(wrapper.find('[data-test="rum-error-context-ip"]').exists()).toBe(false);
++      expect(wrapper.find('[data-test="rum-error-context-url"]').exists()).toBe(false);
++    });
++
++    it("shows an unknown label for device and location when nothing was captured", () => {
++      wrapper = mountComponent({});
++
++      expect(wrapper.find('[data-test="rum-error-context-device"]').text()).toContain("Unknown");
++      expect(wrapper.find('[data-test="rum-error-context-location"]').text()).toContain("Unknown");
++    });
++
++    it("shows just the country when the city is missing", () => {
++      wrapper = mountComponent({ geo_info_country: "Türkiye" });
++
++      expect(wrapper.find('[data-test="rum-error-context-location"]').text()).toContain("Türkiye");
++    });
++  });
++
++  describe("deployment chips", () => {
++    it("shows the service, version, environment and sdk chips", () => {
++      wrapper = mountComponent();
++
++      const text = wrapper.text();
++      expect(text).toContain("checkout-web");
++      expect(text).toContain("2.4.1");
++      expect(text).toContain("production");
++      expect(text).toContain("0.3.2-beta.3");
++    });
++
++    it("renders no chips when the error carries no deployment identity", () => {
++      wrapper = mountComponent({ usr_email: "a@b.com" });
++
++      expect(wrapper.text()).not.toContain("checkout-web");
++    });
++  });
++});
+diff --git a/web/src/components/rum/errorTracking/view/ErrorContextCard.vue b/web/src/components/rum/errorTracking/view/ErrorContextCard.vue
+new file mode 100644
+index 00000000000..ac280c3d6b0
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorContextCard.vue
+@@ -0,0 +1,216 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  Who hit this error and on what — the identity, device and build behind the
++  single occurrence the page was opened on. Distinct from the breakdown panel,
++  which describes the whole issue.
++-->
++<template>
++  <section
++    class="rounded-default border-border-default bg-card-glass-bg border p-3"
++    data-test="rum-error-context-card"
++  >
++    <h4>{{ t("rum.errorDetail.contextTitle") }}</h4>
++
++    <!-- Identity -->
++    <div class="mt-2 flex items-center gap-2">
++      <span
++        class="bg-icon-chip-primary-bg text-icon-chip-primary-text grid h-8 w-8 shrink-0 place-items-center rounded-full text-xs font-semibold uppercase"
++        aria-hidden="true"
++        >{{ initials }}</span
++      >
++      <div class="min-w-0">
++        <div
++          class="text-text-heading truncate font-semibold"
++          :title="userName"
++          data-test="rum-error-context-user-name"
++        >
++          {{ userName }}
++        </div>
++        <small class="block truncate" :title="userEmail" data-test="rum-error-context-user-email">{{
++          userEmail
++        }}</small>
++      </div>
++    </div>
++
++    <!-- Environment: browser / OS at a glance -->
++    <div class="mt-3 flex items-center gap-3">
++      <div class="flex min-w-0 items-center gap-2">
++        <img :src="browserIcon" :alt="t('rum.browserImageAlt')" class="h-auto w-6 shrink-0" />
++        <div class="min-w-0">
++          <div class="truncate" data-test="rum-error-context-browser">{{ browserName }}</div>
++          <small class="block">{{ browserVersion }}</small>
++        </div>
++      </div>
++      <OSeparator vertical />
++      <div class="flex min-w-0 items-center gap-2">
++        <img :src="osIcon" :alt="t('rum.osImageAlt')" class="h-auto w-6 shrink-0" />
++        <div class="min-w-0">
++          <div class="truncate" data-test="rum-error-context-os">{{ osName }}</div>
++          <small class="block">{{ osVersion }}</small>
++        </div>
++      </div>
++    </div>
++
++    <!-- Everything else, in a scannable key/value list -->
++    <dl class="border-border-default m-0 mt-3 border-t pt-2">
++      <KeyValueRow
++        v-for="row in rows"
++        :key="row.key"
++        :label="row.label"
++        :value="row.value"
++        :show-border="false"
++        :data-test="`rum-error-context-${row.key}`"
++      />
++    </dl>
++
++    <div class="mt-2 flex flex-wrap">
++      <ErrorTag v-for="(value, tag) in chips" :key="tag" :tag="{ key: tag, value }" />
++    </div>
++  </section>
++</template>
++
++<script setup lang="ts">
++import { computed } from "vue";
++import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
++import KeyValueRow from "@/components/rum/common/KeyValueRow.vue";
++import ErrorTag from "@/components/rum/errorTracking/view/ErrorTag.vue";
++import OSeparator from "@/lib/core/Separator/OSeparator.vue";
++import chrome from "@/assets/images/rum/chrome.png";
++import firefox from "@/assets/images/rum/firefox.png";
++import safari from "@/assets/images/rum/safari.png";
++import opera from "@/assets/images/rum/opera.png";
++import edge from "@/assets/images/rum/edge.png";
++import windows from "@/assets/images/rum/windows.png";
++import mac from "@/assets/images/rum/mac.png";
++import linux from "@/assets/images/rum/linux.png";
++
++const props = defineProps<{
++  error: Record<string, any>;
++}>();
++
++const { t } = useI18nTyped();
++
++const BROWSER_ICONS: Array<[string, string]> = [
++  ["chrome", chrome],
++  ["opera", opera],
++  ["firefox", firefox],
++  ["edge", edge],
++  ["safari", safari],
++];
++
++const OS_ICONS: Array<[string, string]> = [
++  ["windows", windows],
++  ["mac", mac],
++  ["linux", linux],
++];
++
++const pickIcon = (value: string | undefined, table: Array<[string, string]>, fallback: string) => {
++  const needle = value?.toLowerCase() ?? "";
++  return table.find(([name]) => needle.includes(name))?.[1] ?? fallback;
++};
++
++const browserName = computed(() => props.error.user_agent_user_agent_family || t("rum.unknown"));
++const osName = computed(() => props.error.user_agent_os_family || t("rum.unknown"));
++
++const browserIcon = computed(() =>
++  pickIcon(props.error.user_agent_user_agent_family, BROWSER_ICONS, chrome),
++);
++const osIcon = computed(() => pickIcon(props.error.user_agent_os_family, OS_ICONS, windows));
++
++const joinVersion = (parts: Array<string | number | undefined>) => {
++  const usable = parts.filter((part) => part != null && part !== "");
++  return usable.length ? t("rum.versionPrefix") + usable.join(".") : t("rum.versionUnknown");
++};
++
++const browserVersion = computed(() =>
++  joinVersion([
++    props.error.user_agent_user_agent_major,
++    props.error.user_agent_user_agent_minor,
++    props.error.user_agent_user_agent_patch,
++  ]),
++);
++
++const osVersion = computed(() =>
++  joinVersion([
++    props.error.user_agent_os_major,
++    props.error.user_agent_os_minor,
++    props.error.user_agent_os_patch,
++  ]),
++);
++
++const userName = computed(() => props.error.usr_name || t("rum.unknownUser"));
++const userEmail = computed(() => props.error.usr_email || t("rum.unknown"));
++
++const initials = computed(() => {
++  const source = String(props.error.usr_name || props.error.usr_email || "");
++  const letters = source
++    .split(/[\s@._-]+/)
++    .filter(Boolean)
++    .slice(0, 2)
++    .map((part) => part[0])
++    .join("");
++  return letters || raw("?");
++});
++
++const location = computed(() => {
++  const parts = [props.error.geo_info_city, props.error.geo_info_country].filter(Boolean);
++  return parts.length ? parts.join(", ") : t("rum.unknown");
++});
++
++const device = computed(() => {
++  const parts = [props.error.user_agent_device_brand, props.error.user_agent_device_family].filter(
++    Boolean,
++  );
++  return parts.length ? parts.join(" ") : t("rum.unknown");
++});
++
++interface ContextRow {
++  key: string;
++  label: I18nText;
++  value: string;
++}
++
++const rows = computed<ContextRow[]>(() => {
++  const entries: ContextRow[] = [
++    { key: "device", label: t("rum.errorDetail.device"), value: device.value },
++    { key: "location", label: t("rum.errorDetail.location"), value: location.value },
++  ];
++  if (props.error.ip) {
++    entries.push({ key: "ip", label: t("rum.ipLabel"), value: String(props.error.ip) });
++  }
++  if (props.error.view_url) {
++    entries.push({
++      key: "url",
++      label: t("rum.errorDetail.pageUrl"),
++      value: String(props.error.view_url),
++    });
++  }
++  return entries;
++});
++
++/** Deployment identity — the fields you quote when filing the bug. */
++const chips = computed(() => {
++  const out: Record<string, string> = {};
++  if (props.error.service) out.service = String(props.error.service);
++  if (props.error.version) out.version = String(props.error.version);
++  if (props.error.env) out.env = String(props.error.env);
++  if (props.error.sdk_version) out.sdk_version = String(props.error.sdk_version);
++  if (props.error.source) out.source = String(props.error.source);
++  return out;
++});
++</script>
+diff --git a/web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.spec.ts b/web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.spec.ts
+new file mode 100644
+index 00000000000..8fe59771047
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.spec.ts
+@@ -0,0 +1,161 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, afterEach, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++import ErrorFacetBreakdown from "@/components/rum/errorTracking/view/ErrorFacetBreakdown.vue";
++import type { FacetKey, FacetValue } from "@/utils/rum/errorDetailQueries";
++import i18n from "@/locales";
++
++const emptyFacets = (): Record<FacetKey, FacetValue[]> => ({
++  browser: [],
++  os: [],
++  release: [],
++  page: [],
++});
++
++const facetsWith = (overrides: Partial<Record<FacetKey, FacetValue[]>>) => ({
++  ...emptyFacets(),
++  ...overrides,
++});
++
++describe("ErrorFacetBreakdown", () => {
++  let wrapper: VueWrapper<any>;
++
++  const mountComponent = (props: Record<string, unknown> = {}) =>
++    mount(ErrorFacetBreakdown, {
++      props: { facets: emptyFacets(), ...props },
++      global: { plugins: [i18n] },
++    });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++  });
++
++  describe("rendering", () => {
++    it("lists each value in a populated facet", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({
++          browser: [
++            { value: "Chrome", events: 8, share: 0.8 },
++            { value: "Safari", events: 2, share: 0.2 },
++          ],
++        }),
++      });
++
++      const values = wrapper
++        .findAll('[data-test="rum-error-facet-browser-value"]')
++        .map((node) => node.text());
++      expect(values).toEqual(["Chrome", "Safari"]);
++    });
++
++    it("shows each value's share as a whole percentage", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({
++          release: [
++            { value: "2.4.1", events: 7, share: 0.666 },
++            { value: "2.4.0", events: 3, share: 0.334 },
++          ],
++        }),
++      });
++
++      const shares = wrapper
++        .findAll('[data-test="rum-error-facet-release-share"]')
++        .map((node) => node.text());
++      expect(shares).toEqual(["67%", "33%"]);
++    });
++
++    it("omits facets that have no values", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({ os: [{ value: "Mac", events: 4, share: 1 }] }),
++      });
++
++      expect(wrapper.find('[data-test="rum-error-facet-os"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="rum-error-facet-browser"]').exists()).toBe(false);
++    });
++
++    it("shows an empty state when no facet has values", () => {
++      wrapper = mountComponent();
++
++      expect(wrapper.find('[data-test="rum-error-facet-breakdown-empty"]').exists()).toBe(true);
++    });
++
++    it("shows skeletons instead of the empty state while loading", () => {
++      wrapper = mountComponent({ loading: true });
++
++      expect(wrapper.find('[data-test="rum-error-facet-breakdown-loading"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="rum-error-facet-breakdown-empty"]').exists()).toBe(false);
++    });
++  });
++
++  describe("dominant-value insight", () => {
++    it("calls out a value that owns most of the traffic", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({
++          browser: [
++            { value: "Safari", events: 94, share: 0.94 },
++            { value: "Chrome", events: 6, share: 0.06 },
++          ],
++        }),
++      });
++
++      const insight = wrapper.find('[data-test="rum-error-facet-breakdown-insight"]');
++      expect(insight.exists()).toBe(true);
++      expect(insight.text()).toContain("94%");
++      expect(insight.text()).toContain("Safari");
++    });
++
++    it("stays silent when the traffic is spread across values", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({
++          browser: [
++            { value: "Chrome", events: 6, share: 0.6 },
++            { value: "Safari", events: 4, share: 0.4 },
++          ],
++        }),
++      });
++
++      expect(wrapper.find('[data-test="rum-error-facet-breakdown-insight"]').exists()).toBe(false);
++    });
++
++    it("stays silent when the facet has only one value to concentrate in", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({ browser: [{ value: "Chrome", events: 10, share: 1 }] }),
++      });
++
++      expect(wrapper.find('[data-test="rum-error-facet-breakdown-insight"]').exists()).toBe(false);
++    });
++
++    it("reports the strongest concentration when several qualify", () => {
++      wrapper = mountComponent({
++        facets: facetsWith({
++          browser: [
++            { value: "Safari", events: 85, share: 0.85 },
++            { value: "Chrome", events: 15, share: 0.15 },
++          ],
++          release: [
++            { value: "2.4.1", events: 97, share: 0.97 },
++            { value: "2.4.0", events: 3, share: 0.03 },
++          ],
++        }),
++      });
++
++      const insight = wrapper.find('[data-test="rum-error-facet-breakdown-insight"]');
++      expect(insight.text()).toContain("97%");
++      expect(insight.text()).toContain("2.4.1");
++    });
++  });
++});
+diff --git a/web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.vue b/web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.vue
+new file mode 100644
+index 00000000000..41c41428a21
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorFacetBreakdown.vue
+@@ -0,0 +1,147 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<!--
++  Where this error concentrates — browser, OS, release and page, each as a
++  share of the issue's total events. This is the panel that turns a stack trace
++  into a lead: "94% Safari 17" or "100% v2.4.1" is the fix, the stack trace is
++  only the symptom.
++-->
++<template>
++  <section
++    class="rounded-default border-border-default bg-card-glass-bg border p-3"
++    data-test="rum-error-facet-breakdown"
++  >
++    <h4>{{ t("rum.errorDetail.breakdownTitle") }}</h4>
++    <small class="mb-2 block">{{ t("rum.errorDetail.breakdownHint") }}</small>
++
++    <div v-if="loading" class="flex flex-col gap-3" data-test="rum-error-facet-breakdown-loading">
++      <OSkeleton v-for="index in 4" :key="index" variant="text" />
++    </div>
++
++    <p
++      v-else-if="!populatedFacets.length"
++      class="text-text-muted"
++      data-test="rum-error-facet-breakdown-empty"
++    >
++      {{ t("rum.errorDetail.breakdownEmpty") }}
++    </p>
++
++    <template v-else>
++      <OBanner
++        v-if="dominant"
++        variant="error-soft"
++        dense
++        icon="lightbulb"
++        class="mb-3"
++        data-test="rum-error-facet-breakdown-insight"
++      >
++        {{
++          t("rum.errorDetail.dominantInsight", {
++            share: Math.round(dominant.value.share * 100),
++            dimension: dominant.label,
++            value: dominant.value.value,
++          })
++        }}
++      </OBanner>
++
++      <dl class="m-0 flex flex-col gap-3">
++        <div
++          v-for="facet in populatedFacets"
++          :key="facet.key"
++          :data-test="`rum-error-facet-${facet.key}`"
++        >
++          <dt class="text-text-label text-xs font-medium tracking-wide uppercase">
++            {{ facet.label }}
++          </dt>
++          <dd class="m-0 mt-1 flex flex-col gap-1.5">
++            <div v-for="entry in facet.values" :key="entry.value" class="flex flex-col gap-0.5">
++              <div class="flex min-w-0 items-baseline justify-between gap-2">
++                <span
++                  class="text-text-body min-w-0 truncate"
++                  :title="entry.value"
++                  :data-test="`rum-error-facet-${facet.key}-value`"
++                  >{{ entry.value }}</span
++                >
++                <span
++                  class="text-text-secondary shrink-0 tabular-nums"
++                  :data-test="`rum-error-facet-${facet.key}-share`"
++                  >{{ percentLabel(entry.share) }}</span
++                >
++              </div>
++              <OProgressBar :value="entry.share" size="xs" variant="danger" />
++            </div>
++          </dd>
++        </div>
++      </dl>
++    </template>
++  </section>
++</template>
++
++<script setup lang="ts">
++import { computed } from "vue";
++import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
++import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
++import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
++import type { FacetKey, FacetValue } from "@/utils/rum/errorDetailQueries";
++
++const props = defineProps<{
++  facets: Record<FacetKey, FacetValue[]>;
++  loading?: boolean;
++}>();
++
++const { t } = useI18nTyped();
++
++/** A single value owning this much of the traffic is the actionable signal. */
++const DOMINANT_SHARE = 0.8;
++
++const FACET_ORDER: FacetKey[] = ["browser", "os", "release", "page"];
++
++const facetLabel = (key: FacetKey) => {
++  if (key === "browser") return t("rum.errorDetail.facetBrowser");
++  if (key === "os") return t("rum.errorDetail.facetOs");
++  if (key === "release") return t("rum.errorDetail.facetRelease");
++  return t("rum.errorDetail.facetPage");
++};
++
++const populatedFacets = computed(() =>
++  FACET_ORDER.filter((key) => props.facets[key]?.length).map((key) => ({
++    key,
++    label: facetLabel(key),
++    values: props.facets[key],
++  })),
++);
++
++/**
++ * The strongest single concentration across all facets — surfaced as a hint so
++ * the reader does not have to compare four bar groups by eye. Suppressed when
++ * the facet has only one distinct value, where "100% Chrome" says nothing more
++ * than "we only have Chrome data".
++ */
++const dominant = computed(() => {
++  let best: { label: I18nText; value: FacetValue } | null = null;
++  for (const facet of populatedFacets.value) {
++    if (facet.values.length < 2) continue;
++    const top = facet.values[0];
++    if (top.share < DOMINANT_SHARE) continue;
++    if (!best || top.share > best.value.share) best = { label: facet.label, value: top };
++  }
++  return best;
++});
++
++const percentLabel = (share: number) => raw(`${Math.round(share * 100)}%`);
++</script>
+diff --git a/web/src/components/rum/errorTracking/view/ErrorHeader.spec.ts b/web/src/components/rum/errorTracking/view/ErrorHeader.spec.ts
+index b2f804f967b..105a30b8991 100644
+--- a/web/src/components/rum/errorTracking/view/ErrorHeader.spec.ts
++++ b/web/src/components/rum/errorTracking/view/ErrorHeader.spec.ts
+@@ -42,26 +42,23 @@ describe("ErrorHeader", () => {
+ 
+   const mockError = {
+     error_id: "error-abc123",
+-    type: "TypeError",
++    type: "error",
++    error_type: "TypeError",
+     error_message: "Cannot read property 'foo' of undefined",
+     error_handling: "unhandled",
++    source: "console",
++    service: "checkout-web",
++    version: "2.4.1",
++    env: "production",
++    view_url: "https://app.example.com/billings/plans?tab=1",
+     timestamp: "2024-01-01 10:00:00 UTC",
+   };
+ 
+-  const mountComponent = (error = mockError) =>
++  const mountComponent = (error: Record<string, any> = mockError) =>
+     mount(ErrorHeader, {
+       attachTo: "#app",
+       props: { error },
+-      global: {
+-        plugins: [i18n],
+-        stubs: {
+-          OIcon: {
+-            template: '<i data-test="OIcon" :class="name" @click="$emit(\'click\')"></i>',
+-            props: ["name", "size"],
+-            emits: ["click"],
+-          },
+-        },
+-      },
++      global: { plugins: [i18n] },
+     });
+ 
+   beforeEach(() => {
+@@ -69,99 +66,125 @@ describe("ErrorHeader", () => {
+   });
+ 
+   afterEach(() => {
+-    wrapper.unmount();
++    wrapper?.unmount();
+     vi.restoreAllMocks();
+   });
+ 
+-  describe("back button", () => {
+-    it("renders the back button element", async () => {
+-      // Arrange
++  describe("identity", () => {
++    it("shows the error type as the title", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="back-button"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("TypeError");
+     });
+ 
+-    it("has a Back title attribute on the back button", async () => {
+-      // Arrange
+-      wrapper = mountComponent();
++    it("falls back to a generic label when error_type is missing", async () => {
++      wrapper = mountComponent({ ...mockError, error_type: undefined });
+       await flushPromises();
+ 
+-      // Assert — OPageHeader's back button uses the standard "Back" label.
+-      expect(wrapper.find('[data-test="back-button"]').attributes("title")).toBe("Back");
++      expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("Error");
+     });
+ 
+-    it("calls router.back() when the back button is clicked", async () => {
+-      // Arrange
++    it("shows the error message in an alert region", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Act
+-      await wrapper.find('[data-test="back-button"]').trigger("click");
++      const banner = wrapper.find('[data-test="error-header-message"]');
++      expect(banner.exists()).toBe(true);
++      expect(banner.text()).toContain("Cannot read property 'foo' of undefined");
++    });
+ 
+-      // Assert
+-      expect(mockRouterBack).toHaveBeenCalledTimes(1);
++    it("explains the absence when no message was captured", async () => {
++      wrapper = mountComponent({ ...mockError, error_message: "" });
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="error-header-message"]').text()).toContain(
++        "No error message was captured.",
++      );
+     });
+   });
+ 
+-  describe("error ID display", () => {
+-    it("renders the error ID element", async () => {
+-      // Arrange
++  describe("badges", () => {
++    it("shows the handling badge with the raw handling value", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-id"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-header-handling-badge"]').text()).toBe("unhandled");
+     });
+ 
+-    it("shows the error ID text", async () => {
+-      // Arrange
++    it("still shows the handling badge for a handled error", async () => {
++      wrapper = mountComponent({ ...mockError, error_handling: "handled" });
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="error-header-handling-badge"]').text()).toBe("handled");
++    });
++
++    it("hides the handling badge when error_handling is absent", async () => {
++      const errorWithoutHandling: Record<string, any> = { ...mockError };
++      delete errorWithoutHandling.error_handling;
++      wrapper = mountComponent(errorWithoutHandling);
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="error-header-handling-badge"]').exists()).toBe(false);
++    });
++
++    it("shows the source badge when the error carries a source", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.text()).toContain("error-abc123");
++      expect(wrapper.find('[data-test="error-header-source-badge"]').text()).toBe("console");
+     });
++  });
+ 
+-    it("has a title attribute matching the error ID", async () => {
+-      // Arrange
++  describe("context line", () => {
++    it("shows the event id", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-id"]').attributes("title")).toBe("error-abc123");
++      expect(wrapper.find('[data-test="error-id"]').text()).toBe("error-abc123");
+     });
+ 
+-    it("shows the Event ID label", async () => {
+-      // Arrange
++    it("shows the page route rather than the full url", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.text()).toContain("Event ID");
++      expect(wrapper.find('[data-test="error-header-route"]').text()).toBe("/billings/plans");
++    });
++
++    it("hides the route when no view url was captured", async () => {
++      wrapper = mountComponent({ ...mockError, view_url: undefined });
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="error-header-route"]').exists()).toBe(false);
+     });
+-  });
+ 
+-  describe("copy icon", () => {
+-    it("renders a copy icon", async () => {
+-      // Arrange
++    it("falls back to the formatted timestamp string when there is no _timestamp", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="OIcon"].content-copy').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-header-timestamp"]').text()).toBe(
++        "2024-01-01 10:00:00 UTC",
++      );
++    });
++
++    it("shows the deployment identity chips", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++
++      const text = wrapper.text();
++      expect(text).toContain("checkout-web");
++      expect(text).toContain("2.4.1");
++      expect(text).toContain("production");
+     });
++  });
+ 
+-    it("calls copyToClipboard with the error ID when the copy icon is clicked", async () => {
+-      // Arrange
++  describe("actions", () => {
++    it("copies the event id when the copy-id button is clicked", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Act
+-      await wrapper.find('[data-test="OIcon"].content-copy').trigger("click");
++      await wrapper.find('[data-test="error-header-copy-id-btn"]').trigger("click");
+ 
+-      // Assert
+       expect(mockCopyToClipboard).toHaveBeenCalledWith(
+         "error-abc123",
+         expect.any(Function),
+@@ -169,172 +192,111 @@ describe("ErrorHeader", () => {
+       );
+     });
+ 
+-    it("copies the updated error ID after prop change", async () => {
+-      // Arrange
++    it("copies the updated event id after the error prop changes", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+       await wrapper.setProps({ error: { ...mockError, error_id: "different-id" } });
+ 
+-      // Act
+-      await wrapper.find('[data-test="OIcon"].content-copy').trigger("click");
++      await wrapper.find('[data-test="error-header-copy-id-btn"]').trigger("click");
+ 
+-      // Assert
+       expect(mockCopyToClipboard).toHaveBeenCalledWith(
+         "different-id",
+         expect.any(Function),
+         expect.objectContaining({ successMessage: "Copied to clipboard" }),
+       );
+     });
+-  });
+ 
+-  describe("timestamp display", () => {
+-    it("shows the timestamp text", async () => {
+-      // Arrange
+-      wrapper = mountComponent();
++    it("disables the copy-id button when the error has no id", async () => {
++      wrapper = mountComponent({ ...mockError, error_id: "" });
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.text()).toContain("2024-01-01 10:00:00 UTC");
++      expect(
++        wrapper.find('[data-test="error-header-copy-id-btn"]').attributes("disabled"),
++      ).toBeDefined();
+     });
+-  });
+ 
+-  describe("error type display", () => {
+-    it("shows the error type text", async () => {
+-      // Arrange
++    it("copies the page url when the copy-link button is clicked", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-header-error-type"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("TypeError");
+-    });
+-  });
++      await wrapper.find('[data-test="error-header-copy-link-btn"]').trigger("click");
+ 
+-  describe("error message display", () => {
+-    it("shows the error message text", async () => {
+-      // Arrange
+-      wrapper = mountComponent();
+-      await flushPromises();
+-
+-      // Assert
+-      expect(wrapper.text()).toContain("Cannot read property 'foo' of undefined");
++      expect(mockCopyToClipboard).toHaveBeenCalledWith(
++        window.location.href,
++        expect.any(Function),
++        expect.objectContaining({ successMessage: "Link copied to clipboard" }),
++      );
+     });
+   });
+ 
+-  describe("unhandled error badge", () => {
+-    it("shows the unhandled badge when error_handling is unhandled", async () => {
+-      // Arrange
++  describe("back button", () => {
++    it("renders the back button", async () => {
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').text()).toBe("unhandled");
++      expect(wrapper.find('[data-test="back-button"]').exists()).toBe(true);
+     });
+ 
+-    it("does not show the unhandled badge when error_handling is handled", async () => {
+-      // Arrange
+-      wrapper = mountComponent({ ...mockError, error_handling: "handled" });
++    it("calls router.back() when the back button is clicked", async () => {
++      wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').exists()).toBe(false);
+-    });
+-
+-    it("does not show the unhandled badge when error_handling is absent", async () => {
+-      // Arrange
+-      const errorWithoutHandling = { ...mockError };
+-      delete (errorWithoutHandling as any).error_handling;
+-      wrapper = mountComponent(errorWithoutHandling as any);
+-      await flushPromises();
++      await wrapper.find('[data-test="back-button"]').trigger("click");
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-header-unhandled-badge"]').exists()).toBe(false);
++      expect(mockRouterBack).toHaveBeenCalledTimes(1);
+     });
+   });
+ 
+   describe("prop updates", () => {
+     it("reflects new error data when the error prop is changed", async () => {
+-      // Arrange
+       wrapper = mountComponent();
+       await flushPromises();
+ 
+-      // Act
+       await wrapper.setProps({
+         error: {
+           error_id: "custom-error-456",
+-          type: "ReferenceError",
++          error_type: "ReferenceError",
+           error_message: "Variable is not defined",
+           error_handling: "handled",
+           timestamp: "2024-02-01 15:30:00 UTC",
+         },
+       });
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="error-id"]').attributes("title")).toBe("custom-error-456");
++      expect(wrapper.find('[data-test="error-id"]').text()).toBe("custom-error-456");
+       expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("ReferenceError");
+-      expect(wrapper.text()).toContain("Variable is not defined");
+-      expect(wrapper.text()).toContain("2024-02-01 15:30:00 UTC");
+-    });
+-
+-    it("updates error type correctly across multiple prop changes", async () => {
+-      // Arrange
+-      wrapper = mountComponent();
+-      await flushPromises();
+-
+-      const errors = [
+-        { ...mockError, error_id: "error1", type: "TypeError", timestamp: "Time 1" },
+-        { ...mockError, error_id: "error2", type: "ReferenceError", timestamp: "Time 2" },
+-        { ...mockError, error_id: "error3", type: "SyntaxError", timestamp: "Time 3" },
+-      ];
+-
+-      // Act & Assert
+-      for (const error of errors) {
+-        await wrapper.setProps({ error });
+-        expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe(error.type);
+-        expect(wrapper.text()).toContain(error.timestamp);
+-      }
++      expect(wrapper.find('[data-test="error-header-message"]').text()).toContain(
++        "Variable is not defined",
++      );
++      expect(wrapper.find('[data-test="error-header-timestamp"]').text()).toBe(
++        "2024-02-01 15:30:00 UTC",
++      );
+     });
+   });
+ 
+   describe("edge cases", () => {
+-    it("renders without crash when error properties are null", async () => {
+-      // Arrange
++    it("renders without crashing when every error property is null", async () => {
+       wrapper = mountComponent({
+         error_id: null,
+-        type: null,
++        error_type: null,
+         error_message: null,
+         error_handling: null,
++        source: null,
++        view_url: null,
+         timestamp: null,
+-      } as any);
+-      await flushPromises();
+-
+-      // Assert
+-      expect(wrapper.exists()).toBe(true);
+-    });
+-
+-    it("renders without crash when error properties are undefined", async () => {
+-      // Arrange
+-      wrapper = mountComponent({
+-        error_id: undefined,
+-        type: undefined,
+-        error_message: undefined,
+-        error_handling: undefined,
+-        timestamp: undefined,
+-      } as any);
++      });
+       await flushPromises();
+ 
+-      // Assert
+-      expect(wrapper.exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-header-error-type"]').text()).toBe("Error");
++      expect(wrapper.find('[data-test="error-header-message"]').text()).toContain(
++        "No error message was captured.",
++      );
+     });
+ 
+-    it("handles a very long error ID without crashing", async () => {
+-      // Arrange
++    it("keeps a very long event id reachable through its title attribute", async () => {
+       const longId = "very-long-error-id-that-might-cause-layout-issues-12345678901234567890";
+       wrapper = mountComponent({ ...mockError, error_id: longId });
+       await flushPromises();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="error-id"]').attributes("title")).toBe(longId);
+     });
+   });
+diff --git a/web/src/components/rum/errorTracking/view/ErrorHeader.vue b/web/src/components/rum/errorTracking/view/ErrorHeader.vue
+index 0b8ad5814d5..db0ee4fab9e 100644
+--- a/web/src/components/rum/errorTracking/view/ErrorHeader.vue
++++ b/web/src/components/rum/errorTracking/view/ErrorHeader.vue
+@@ -1,4 +1,4 @@
+-﻿<!-- Copyright 2026 OpenObserve Inc.
++<!-- Copyright 2026 OpenObserve Inc.
+ 
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU Affero General Public License as published by
+@@ -14,66 +14,157 @@ You should have received a copy of the GNU Affero General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
++<!--
++  The identity band: WHAT failed (type + how it was handled), WHAT it said, and
++  the handles you need to talk about it elsewhere (event id, deploy, when).
++  Everything quantitative lives below in the impact strip.
++-->
+ <template>
+   <div>
+-    <div>
+-      <OPageHeader :back="{ onClick: () => router.back(), dataTest: 'back-button' }">
+-        <template #title>
+-          <span class="font-bold">{{ t("rum.eventID") }}:</span>
+-          <span data-test="error-id" :title="error.error_id" class="cursor-pointer pl-1"
+-            >{{ error.error_id }}
+-            <OIcon
+-              size="xs"
+-              name="content-copy"
+-              class="hover:text-button-primary"
+-              @click="copyErrorId(error.error_id)"
+-          /></span>
+-        </template>
+-        <template #actions>
+-          <span>{{ error.timestamp }}</span>
+-        </template>
+-      </OPageHeader>
+-      <div class="my-1 flex flex-nowrap items-center">
+-        <div data-test="error-header-error-type" class="text-2xl font-bold">{{ error.type }}</div>
+-      </div>
+-      <div class="flex items-center pt-1 text-base">
+-        <div
+-          v-if="error.error_handling === 'unhandled'"
+-          data-test="error-header-unhandled-badge"
+-          :class="
+-            error.error_handling === 'unhandled'
+-              ? 'text-status-error-text border-status-negative rounded-default mr-2 border px-1 text-sm'
+-              : ''
+-          "
++    <OPageHeader
++      :back="{ onClick: () => router.back(), dataTest: 'back-button' }"
++      title-overflow="visible"
++    >
++      <template #title>
++        <span class="flex min-w-0 items-center gap-2">
++          <span class="truncate" data-test="error-header-error-type">{{ errorType }}</span>
++          <OTag
++            v-if="error.error_handling"
++            :label="raw(error.error_handling)"
++            :variant="isUnhandled ? 'error' : 'warning-outline'"
++            size="xs"
++            shape="rounded"
++            class="shrink-0 uppercase"
++            data-test="error-header-handling-badge"
++          />
++          <OTag
++            v-if="error.source"
++            :label="raw(error.source)"
++            variant="default-soft"
++            size="xs"
++            shape="rounded"
++            class="shrink-0"
++            data-test="error-header-source-badge"
++          />
++        </span>
++      </template>
++
++      <template #actions>
++        <OButton
++          variant="outline"
++          size="sm-action"
++          icon-left="link"
++          data-test="error-header-copy-link-btn"
++          @click="copyPermalink"
++        >
++          {{ t("rum.errorDetail.copyLink") }}
++          <OTooltip :content="t('rum.errorDetail.copyLinkHint')" />
++        </OButton>
++        <OButton
++          variant="outline"
++          size="sm-action"
++          icon-left="content-copy"
++          :disabled="!error.error_id"
++          data-test="error-header-copy-id-btn"
++          @click="copyErrorId"
+         >
+-          {{ error.error_handling }}
+-        </div>
+-        {{ error.error_message }}
++          {{ t("rum.errorDetail.copyEventId") }}
++          <OTooltip :content="raw(error.error_id) || t('rum.errorDetail.copyEventId')" />
++        </OButton>
++      </template>
++    </OPageHeader>
++
++    <div class="px-page-edge pt-2.5">
++      <!--
++        The message carries the whole diagnosis, so it gets a real alert surface
++        rather than a line of body text: it is the first thing read and the thing
++        pasted into a ticket.
++      -->
++      <OBanner
++        variant="error-soft"
++        dense
++        icon="error-outline"
++        role="alert"
++        data-test="error-header-message"
++      >
++        <span class="font-mono break-words">{{ messageText }}</span>
++      </OBanner>
++
++      <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
++        <span class="text-text-secondary flex items-center gap-1">
++          <OIcon name="schedule" size="xs" />
++          <span data-test="error-header-timestamp">{{ occurredAt }}</span>
++        </span>
++        <span v-if="error.error_id" class="text-text-secondary flex min-w-0 items-center gap-1">
++          <OIcon name="tag" size="xs" />
++          <code class="min-w-0 truncate" :title="error.error_id" data-test="error-id">{{
++            error.error_id
++          }}</code>
++        </span>
++        <span v-if="route" class="text-text-secondary flex min-w-0 items-center gap-1">
++          <OIcon name="web" size="xs" />
++          <code class="min-w-0 truncate" :title="error.view_url" data-test="error-header-route">{{
++            route
++          }}</code>
++        </span>
++        <ODimensionChip v-if="error.service" dim-key="service" :value="error.service" />
++        <ODimensionChip v-if="error.version" dim-key="version" :value="error.version" />
++        <ODimensionChip v-if="error.env" dim-key="env" :value="error.env" />
+       </div>
+     </div>
+   </div>
+ </template>
+ 
+ <script lang="ts" setup>
++import { computed } from "vue";
+ import { useRouter } from "vue-router";
+ import { copyToClipboard } from "@/utils/clipboard";
+-import { useI18nTyped } from "@/types/i18n";
++import { raw, useI18nTyped } from "@/types/i18n";
++import { formatDate } from "@/utils/date";
++import { routeFromUrl } from "@/utils/rum/errorIssueUtils";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
++import OTag from "@/lib/core/Badge/OTag.vue";
++import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
++import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+ 
++const props = defineProps<{
++  error: Record<string, any>;
++}>();
++
+ const { t } = useI18nTyped();
+ const router = useRouter();
+-defineProps({
+-  error: {
+-    type: Object,
+-    required: true,
+-  },
++
++// "handled" is the only safe state — treat missing/other values as unhandled.
++const isUnhandled = computed(() => props.error.error_handling !== "handled");
++
++const errorType = computed(() => raw(props.error.error_type) || t("rum.error"));
++
++const messageText = computed(
++  () => raw(props.error.error_message) || t("rum.errorDetail.noMessage"),
++);
++
++const route = computed(() => routeFromUrl(props.error.view_url));
++
++const occurredAt = computed(() => {
++  const micros = Number(props.error._timestamp) || 0;
++  if (!micros) return raw(props.error.timestamp) || t("rum.unknown");
++  return raw(formatDate(Math.floor(micros / 1000), "MMM DD, YYYY HH:mm:ss Z"));
+ });
+ 
+-const copyErrorId = (id: string) => {
+-  copyToClipboard(id, t, {
++const copyErrorId = () => {
++  copyToClipboard(props.error.error_id, t, {
+     successMessage: t("rum.copiedToClipboard"),
+     timeout: 1500,
+   });
+ };
++
++const copyPermalink = () => {
++  copyToClipboard(window.location.href, t, {
++    successMessage: t("rum.errorDetail.linkCopied"),
++    timeout: 1500,
++  });
++};
+ </script>
+diff --git a/web/src/components/rum/errorTracking/view/ErrorImpactStrip.spec.ts b/web/src/components/rum/errorTracking/view/ErrorImpactStrip.spec.ts
+new file mode 100644
+index 00000000000..3e6f8ab732d
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorImpactStrip.spec.ts
+@@ -0,0 +1,134 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++import ErrorImpactStrip from "@/components/rum/errorTracking/view/ErrorImpactStrip.vue";
++import type { ErrorImpact } from "@/composables/rum/useErrorDetail";
++import i18n from "@/locales";
++
++const NOW_MS = Date.UTC(2026, 0, 10, 12, 0, 0);
++const NOW_US = NOW_MS * 1000;
++const HOUR_US = 3_600_000_000;
++const DAY_US = 86_400_000_000;
++
++const baseImpact: ErrorImpact = {
++  events: 1240,
++  usersAffected: 37,
++  sessionsAffected: 52,
++  firstSeen: NOW_US - 3 * DAY_US,
++  lastSeen: NOW_US - 2 * HOUR_US,
++};
++
++describe("ErrorImpactStrip", () => {
++  let wrapper: VueWrapper<any>;
++
++  const mountComponent = (props: Record<string, unknown> = {}) =>
++    mount(ErrorImpactStrip, {
++      props: { impact: baseImpact, ...props },
++      global: { plugins: [i18n] },
++    });
++
++  const tileText = (key: string) => wrapper.find(`[data-test="rum-error-impact-${key}"]`).text();
++
++  beforeEach(() => {
++    vi.useFakeTimers();
++    vi.setSystemTime(new Date(NOW_MS));
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.useRealTimers();
++    vi.clearAllMocks();
++  });
++
++  describe("rendering", () => {
++    it("shows the occurrence count", () => {
++      wrapper = mountComponent();
++
++      expect(tileText("events")).toContain("1.2K");
++    });
++
++    it("shows the users and sessions reached", () => {
++      wrapper = mountComponent();
++
++      expect(tileText("users")).toContain("37");
++      expect(tileText("sessions")).toContain("52");
++    });
++
++    it("shows first and last seen as compact ages", () => {
++      wrapper = mountComponent();
++
++      expect(tileText("first-seen")).toContain("3d");
++      expect(tileText("last-seen")).toContain("2h");
++    });
++
++    it("shows the absolute lifespan caption", () => {
++      wrapper = mountComponent();
++
++      expect(wrapper.find('[data-test="rum-error-impact-strip-scope"]').text()).toContain(
++        "First seen",
++      );
++    });
++  });
++
++  describe("missing data", () => {
++    it("shows a dash for every tile while loading", () => {
++      wrapper = mountComponent({ loading: true });
++
++      expect(tileText("events")).toContain("—");
++      expect(tileText("users")).toContain("—");
++      expect(tileText("first-seen")).toContain("—");
++    });
++
++    it("hides the lifespan caption while loading", () => {
++      wrapper = mountComponent({ loading: true });
++
++      expect(wrapper.find('[data-test="rum-error-impact-strip-scope"]').exists()).toBe(false);
++    });
++
++    it("shows a dash rather than a zero when a count is unavailable", () => {
++      wrapper = mountComponent({
++        impact: { ...baseImpact, usersAffected: null, sessionsAffected: null },
++      });
++
++      expect(tileText("users")).toContain("—");
++      expect(tileText("sessions")).toContain("—");
++    });
++
++    it("shows a dash for every tile when there is no impact at all", () => {
++      wrapper = mountComponent({ impact: null });
++
++      expect(tileText("events")).toContain("—");
++      expect(tileText("last-seen")).toContain("—");
++    });
++
++    it("renders a real zero as zero", () => {
++      wrapper = mountComponent({ impact: { ...baseImpact, events: 0 } });
++
++      expect(tileText("events")).toContain("0");
++    });
++  });
++
++  describe("weak signature", () => {
++    it("explains why the issue cannot be aggregated", () => {
++      wrapper = mountComponent({ impact: null, hasSignature: false });
++
++      expect(wrapper.find('[data-test="rum-error-impact-strip-scope"]').text()).toContain(
++        "cannot be grouped",
++      );
++    });
++  });
++});
+diff --git a/web/src/components/rum/errorTracking/view/ErrorImpactStrip.vue b/web/src/components/rum/errorTracking/view/ErrorImpactStrip.vue
+new file mode 100644
+index 00000000000..2ee790a4e81
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorImpactStrip.vue
+@@ -0,0 +1,112 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<template>
++  <section :aria-label="t('rum.errorDetail.impactAria')" data-test="rum-error-impact-strip">
++    <OStatStrip :items="items" />
++    <small v-if="scopeCaption" class="mt-1 block" data-test="rum-error-impact-strip-scope">{{
++      scopeCaption
++    }}</small>
++  </section>
++</template>
++
++<script setup lang="ts">
++import { computed } from "vue";
++import { useI18nTyped } from "@/types/i18n";
++import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
++import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
++import { formatLargeNumber } from "@/utils/formatters";
++import { formatCompactAge, formatRelativeTime } from "@/utils/rum/errorIssueUtils";
++import type { ErrorImpact } from "@/composables/rum/useErrorDetail";
++
++// hasSignature defaults to TRUE explicitly: Vue casts an absent boolean prop to
++// false, which would otherwise make every caller that omits it claim the error
++// cannot be grouped.
++const props = withDefaults(
++  defineProps<{
++    impact: ErrorImpact | null;
++    loading?: boolean;
++    /** False when the error has no signature strong enough to aggregate on. */
++    hasSignature?: boolean;
++  }>(),
++  { hasSignature: true },
++);
++
++const { t } = useI18nTyped();
++
++// A dash while loading (and when the aggregate is unavailable) rather than a
++// zero: "0 users affected" is a claim, "—" is the absence of one.
++const count = (value: number | null | undefined): string | number =>
++  props.loading || value == null ? "—" : formatLargeNumber(value);
++
++const age = (value: number | undefined): string =>
++  props.loading || !value ? "—" : formatCompactAge(value);
++
++const items = computed<StatItem[]>(() => {
++  const impact = props.impact;
++  return [
++    {
++      key: "events",
++      label: t("rum.errorDetail.occurrences"),
++      value: count(impact?.events),
++      icon: "error",
++      tone: "error",
++      dataTest: "rum-error-impact-events",
++    },
++    {
++      key: "users",
++      label: t("rum.usersAffected"),
++      value: count(impact?.usersAffected),
++      icon: "group",
++      tone: "warning",
++      dataTest: "rum-error-impact-users",
++    },
++    {
++      key: "sessions",
++      label: t("rum.errorDetail.sessionsAffected"),
++      value: count(impact?.sessionsAffected),
++      icon: "devices",
++      tone: "info",
++      dataTest: "rum-error-impact-sessions",
++    },
++    {
++      key: "first-seen",
++      label: t("rum.errorDetail.firstSeen"),
++      value: age(impact?.firstSeen),
++      icon: "history",
++      tone: "neutral",
++      dataTest: "rum-error-impact-first-seen",
++    },
++    {
++      key: "last-seen",
++      label: t("rum.errorDetail.lastSeen"),
++      value: age(impact?.lastSeen),
++      icon: "schedule",
++      tone: "neutral",
++      dataTest: "rum-error-impact-last-seen",
++    },
++  ];
++});
++
++const scopeCaption = computed(() => {
++  if (props.hasSignature === false) return t("rum.errorDetail.noSignature");
++  if (props.loading || !props.impact?.firstSeen) return "";
++  return t("rum.errorDetail.impactScope", {
++    firstSeen: formatRelativeTime(props.impact.firstSeen),
++    lastSeen: formatRelativeTime(props.impact.lastSeen),
++  });
++});
++</script>
+diff --git a/web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.spec.ts b/web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.spec.ts
+new file mode 100644
+index 00000000000..6ce6fa785ef
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.spec.ts
+@@ -0,0 +1,142 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, afterEach, vi } from "vitest";
++import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
++import { createStore } from "vuex";
++import ErrorOccurrencesChart from "@/components/rum/errorTracking/view/ErrorOccurrencesChart.vue";
++import type { OccurrenceBucket } from "@/composables/rum/useErrorDetail";
++import i18n from "@/locales";
++
++const HOUR_US = 3_600_000_000;
++const BASE_TS = Date.UTC(2026, 0, 10, 0, 0, 0) * 1000;
++
++const buckets = (counts: number[]): OccurrenceBucket[] =>
++  counts.map((events, index) => ({ ts: BASE_TS + index * HOUR_US, events }));
++
++const store = createStore({ state: { theme: "light" } });
++
++describe("ErrorOccurrencesChart", () => {
++  let wrapper: VueWrapper<any>;
++
++  const mountComponent = (props: Record<string, unknown> = {}) =>
++    mount(ErrorOccurrencesChart, {
++      props: { buckets: buckets([1, 4, 2]), ...props },
++      global: {
++        plugins: [i18n, store],
++        stubs: {
++          // The real renderer boots ECharts against a canvas; stubbing it also
++          // removes the async boundary and exposes `data` for assertion.
++          ChartRenderer: {
++            name: "ChartRenderer",
++            template: '<div data-test="chart-renderer-stub" />',
++            props: ["data"],
++          },
++        },
++      },
++    });
++
++  /** ECharts options handed to the (stubbed) renderer. */
++  const chartOptions = () => wrapper.findComponent({ name: "ChartRenderer" }).props("data").options;
++
++  afterEach(() => {
++    wrapper?.unmount();
++    vi.clearAllMocks();
++  });
++
++  describe("states", () => {
++    it("renders the chart when there are occurrences", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-canvas"]').exists()).toBe(true);
++    });
++
++    it("shows skeleton bars while loading", () => {
++      wrapper = mountComponent({ loading: true });
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-loading"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="rum-error-occurrences-canvas"]').exists()).toBe(false);
++    });
++
++    it("shows an empty state when every bucket is zero", () => {
++      wrapper = mountComponent({ buckets: buckets([0, 0, 0]) });
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-empty"]').exists()).toBe(true);
++    });
++
++    it("shows an empty state when there are no buckets at all", () => {
++      wrapper = mountComponent({ buckets: [] });
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-empty"]').exists()).toBe(true);
++    });
++  });
++
++  describe("peak caption", () => {
++    it("reports the busiest bucket", () => {
++      wrapper = mountComponent({ buckets: buckets([1, 9, 2]) });
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-peak"]').text()).toContain("9");
++    });
++
++    it("is hidden while loading", () => {
++      wrapper = mountComponent({ loading: true });
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-peak"]').exists()).toBe(false);
++    });
++
++    it("is hidden when there is nothing to peak at", () => {
++      wrapper = mountComponent({ buckets: buckets([0, 0]) });
++
++      expect(wrapper.find('[data-test="rum-error-occurrences-peak"]').exists()).toBe(false);
++    });
++  });
++
++  describe("chart options", () => {
++    it("plots one bar per bucket", async () => {
++      wrapper = mountComponent({ buckets: buckets([1, 4, 2]) });
++      await flushPromises();
++
++      expect(chartOptions().series[0].data).toEqual([1, 4, 2]);
++    });
++
++    it("marks the bucket that holds the event being viewed", async () => {
++      wrapper = mountComponent({
++        buckets: buckets([1, 4, 2]),
++        currentTimestamp: BASE_TS + HOUR_US + 60_000_000,
++      });
++      await flushPromises();
++
++      expect(chartOptions().series[0].markLine.data).toEqual([{ xAxis: 1 }]);
++    });
++
++    it("draws no marker when the viewed event falls outside the window", async () => {
++      wrapper = mountComponent({
++        buckets: buckets([1, 4, 2]),
++        currentTimestamp: BASE_TS - HOUR_US,
++      });
++      await flushPromises();
++
++      expect(chartOptions().series[0].markLine).toBeUndefined();
++    });
++
++    it("draws no marker when no event timestamp was given", async () => {
++      wrapper = mountComponent();
++      await flushPromises();
++
++      expect(chartOptions().series[0].markLine).toBeUndefined();
++    });
++  });
++});
+diff --git a/web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue b/web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue
+new file mode 100644
+index 00000000000..5a5af02ae4a
+--- /dev/null
++++ b/web/src/components/rum/errorTracking/view/ErrorOccurrencesChart.vue
+@@ -0,0 +1,149 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<template>
++  <section
++    class="rounded-default border-border-default bg-card-glass-bg flex flex-col border p-3"
++    data-test="rum-error-occurrences-chart"
++  >
++    <div class="flex items-baseline justify-between gap-2">
++      <h4>{{ t("rum.errorDetail.occurrencesTitle") }}</h4>
++      <small v-if="peakCaption" data-test="rum-error-occurrences-peak">{{ peakCaption }}</small>
++    </div>
++
++    <div
++      v-if="loading"
++      class="flex h-32 items-end gap-1 pt-2"
++      data-test="rum-error-occurrences-loading"
++    >
++      <OSkeleton
++        v-for="index in 24"
++        :key="index"
++        variant="button"
++        class="flex-1"
++        :style="{ height: `${20 + ((index * 13) % 70)}%` }"
++      />
++    </div>
++
++    <div
++      v-else-if="!hasData"
++      class="flex h-32 items-center justify-center"
++      data-test="rum-error-occurrences-empty"
++    >
++      <p class="text-text-muted">{{ t("rum.noErrorsInWindow") }}</p>
++    </div>
++
++    <div v-else class="h-32" data-test="rum-error-occurrences-canvas">
++      <ChartRenderer :data="{ options: chartOptions }" />
++    </div>
++  </section>
++</template>
++
++<script setup lang="ts">
++import { computed, defineAsyncComponent } from "vue";
++import { format } from "date-fns";
++import { useStore } from "vuex";
++import { useI18nTyped } from "@/types/i18n";
++import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
++import { addCommasToNumber } from "@/utils/formatters";
++import type { OccurrenceBucket } from "@/composables/rum/useErrorDetail";
++
++const ChartRenderer = defineAsyncComponent(
++  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
++);
++
++const props = defineProps<{
++  buckets: OccurrenceBucket[];
++  loading?: boolean;
++  /** µs timestamp of the event being viewed — marked on the series. */
++  currentTimestamp?: number;
++}>();
++
++const { t } = useI18nTyped();
++const store = useStore();
++
++const hasData = computed(() => props.buckets.some((bucket) => bucket.events > 0));
++
++/** Window span and bucket resolution decide the x-axis label format. */
++const labelFormat = computed(() => {
++  if (props.buckets.length < 2) return "HH:mm";
++  const span = props.buckets[props.buckets.length - 1].ts - props.buckets[0].ts;
++  if (span >= 86400_000_000) return "MM-dd HH:mm";
++  const bucketSpan = props.buckets[1].ts - props.buckets[0].ts;
++  return bucketSpan < 60_000_000 ? "HH:mm:ss" : "HH:mm";
++});
++
++const resolveToken = (token: string, fallback: string): string => {
++  if (typeof window === "undefined") return fallback;
++  const value = getComputedStyle(document.body).getPropertyValue(token).trim();
++  return value || fallback;
++};
++
++/** Bucket holding the event the page was opened on, so the user can see where
++ *  in the issue's life this particular occurrence sits. */
++const currentIndex = computed(() => {
++  if (!props.currentTimestamp || props.buckets.length < 2) return -1;
++  const span = props.buckets[1].ts - props.buckets[0].ts;
++  return props.buckets.findIndex(
++    (bucket) => props.currentTimestamp! >= bucket.ts && props.currentTimestamp! < bucket.ts + span,
++  );
++});
++
++const chartOptions = computed(() => {
++  // Read the theme so token colors re-resolve when it flips —
++  // getComputedStyle alone is not reactive.
++  void store.state.theme;
++  const errorColor = resolveToken("--color-severity-error-color", "#EF5350");
++  const labels = props.buckets.map((bucket) =>
++    format(new Date(Math.floor(bucket.ts / 1000)), labelFormat.value),
++  );
++
++  const series: Record<string, any> = {
++    name: t("rum.errorDetail.occurrences"),
++    type: "bar",
++    color: errorColor,
++    data: props.buckets.map((bucket) => bucket.events),
++  };
++  if (currentIndex.value >= 0) {
++    series.markLine = {
++      symbol: "none",
++      animation: false,
++      lineStyle: { type: "dashed" },
++      label: { formatter: t("rum.errorDetail.thisEvent"), position: "insideEndTop" },
++      data: [{ xAxis: currentIndex.value }],
++    };
++  }
++
++  return {
++    grid: { left: 8, right: 8, top: 16, bottom: 8, containLabel: true },
++    tooltip: { trigger: "axis", axisPointer: { type: "shadow" } },
++    xAxis: {
++      type: "category",
++      data: labels,
++      axisTick: { show: false },
++      axisLabel: { hideOverlap: true },
++    },
++    yAxis: { type: "value", splitNumber: 3, minInterval: 1 },
++    series: [series],
++  };
++});
++
++const peakCaption = computed(() => {
++  if (props.loading || !hasData.value) return "";
++  const peak = Math.max(...props.buckets.map((bucket) => bucket.events));
++  return t("rum.errorDetail.peakPerBucket", { count: addCommasToNumber(peak) });
++});
++</script>
+diff --git a/web/src/components/rum/errorTracking/view/ErrorTags.spec.ts b/web/src/components/rum/errorTracking/view/ErrorTags.spec.ts
+deleted file mode 100644
+index 442d91b5dbb..00000000000
+--- a/web/src/components/rum/errorTracking/view/ErrorTags.spec.ts
++++ /dev/null
+@@ -1,501 +0,0 @@
+-// Copyright 2026 OpenObserve Inc.
+-//
+-// This program is free software: you can redistribute it and/or modify
+-// it under the terms of the GNU Affero General Public License as published by
+-// the Free Software Foundation, either version 3 of the License, or
+-// (at your option) any later version.
+-//
+-// This program is distributed in the hope that it will be useful
+-// but WITHOUT ANY WARRANTY; without even the implied warranty of
+-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-// GNU Affero General Public License for more details.
+-//
+-// You should have received a copy of the GNU Affero General Public License
+-// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-
+-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+-import { mount, flushPromises } from "@vue/test-utils";
+-import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
+-import i18n from "@/locales";
+-
+-vi.mock("@/assets/images/rum/chrome.png", () => ({ default: "/mock/chrome.png" }));
+-vi.mock("@/assets/images/rum/firefox.png", () => ({ default: "/mock/firefox.png" }));
+-vi.mock("@/assets/images/rum/safari.png", () => ({ default: "/mock/safari.png" }));
+-vi.mock("@/assets/images/rum/opera.png", () => ({ default: "/mock/opera.png" }));
+-vi.mock("@/assets/images/rum/edge.png", () => ({ default: "/mock/edge.png" }));
+-vi.mock("@/assets/images/rum/ip_ad.png", () => ({ default: "/mock/ip.png" }));
+-vi.mock("@/assets/images/rum/windows.png", () => ({ default: "/mock/windows.png" }));
+-vi.mock("@/assets/images/rum/mac.png", () => ({ default: "/mock/mac.png" }));
+-vi.mock("@/assets/images/rum/linux.png", () => ({ default: "/mock/linux.png" }));
+-
+-const mockError = {
+-  ip: "192.168.1.1",
+-  user_agent_user_agent_family: "Chrome",
+-  user_agent_user_agent_major: "120",
+-  user_agent_user_agent_minor: "0",
+-  user_agent_user_agent_patch: "0",
+-  user_agent_os_family: "Windows",
+-  user_agent_os_major: "10",
+-  user_agent_os_minor: "0",
+-  user_agent_os_patch: "19045",
+-  view_url: "https://example.com/dashboard",
+-  error_handling: "unhandled",
+-  service: "web-app",
+-  source: "browser",
+-  user_agent_device_brand: "Dell",
+-  user_agent_device_family: "Desktop",
+-  sdk_version: "1.2.3",
+-  usr_email: "user@example.com",
+-  geo_info_country: "United States",
+-  geo_info_city: "New York",
+-};
+-
+-function mountComponent(error = mockError) {
+-  return mount(ErrorTags, {
+-    props: { error },
+-    global: {
+-      plugins: [i18n],
+-      stubs: {
+-        OSeparator: {
+-          template: '<div data-test="separator" />',
+-          props: ["vertical"],
+-        },
+-        ErrorTag: {
+-          name: "ErrorTag",
+-          template: '<div data-test="error-tag">{{ tag.key }}: {{ tag.value }}</div>',
+-          props: ["tag"],
+-        },
+-      },
+-    },
+-  });
+-}
+-
+-describe("ErrorTags Component", () => {
+-  let wrapper: any;
+-
+-  beforeEach(async () => {
+-    wrapper = mountComponent();
+-    await flushPromises();
+-  });
+-
+-  afterEach(() => {
+-    wrapper.unmount();
+-    vi.restoreAllMocks();
+-  });
+-
+-  it("mounts successfully", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.exists()).toBe(true);
+-  });
+-
+-  it("shows the Tags section title", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Tags");
+-  });
+-
+-  it("displays the IP address", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("192.168.1.1");
+-  });
+-
+-  it("renders the IP icon image", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const img = wrapper.find('img[alt="IP"]');
+-    expect(img.exists()).toBe(true);
+-    expect(img.attributes("src")).toBe("/mock/ip.png");
+-  });
+-
+-  it("displays the browser family name", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Chrome");
+-  });
+-
+-  it("displays the browser version", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Version 120.0.0");
+-  });
+-
+-  it("renders the Chrome browser icon on mount", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const img = wrapper.find('img[src="/mock/chrome.png"]');
+-    expect(img.exists()).toBe(true);
+-  });
+-
+-  it("displays the OS family name", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Windows");
+-  });
+-
+-  it("displays the OS version", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Version 10.0.19045");
+-  });
+-
+-  it("renders the Windows OS icon on mount", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const img = wrapper.find('img[src="/mock/windows.png"]');
+-    expect(img.exists()).toBe(true);
+-  });
+-
+-  it("renders ErrorTag components for all tags", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const errorTags = wrapper.findAll('[data-test="error-tag"]');
+-    expect(errorTags.length).toBeGreaterThan(0);
+-  });
+-
+-  it("renders an ErrorTag with the ip value", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const ipTag = tags.find((t: any) => t.text().includes("ip"));
+-    expect(ipTag).toBeDefined();
+-    expect(ipTag!.text()).toContain("192.168.1.1");
+-  });
+-
+-  it("renders an ErrorTag with the service value", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const serviceTag = tags.find((t: any) => t.text().includes("service"));
+-    expect(serviceTag).toBeDefined();
+-    expect(serviceTag!.text()).toContain("web-app");
+-  });
+-
+-  it("renders an ErrorTag with the location value", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const locationTag = tags.find((t: any) => t.text().includes("location"));
+-    expect(locationTag).toBeDefined();
+-    expect(locationTag!.text()).toContain("United States, New York");
+-  });
+-
+-  it("renders an ErrorTag with handled: false for unhandled errors", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const handledTag = tags.find((t: any) => t.text().includes("handled"));
+-    expect(handledTag).toBeDefined();
+-    expect(handledTag!.text()).toContain("false");
+-  });
+-
+-  it("renders an ErrorTag with handled: true for handled errors", async () => {
+-    // Arrange
+-    await wrapper.setProps({ error: { ...mockError, error_handling: "handled" } });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const handledTag = tags.find((t: any) => t.text().includes("handled"));
+-    expect(handledTag).toBeDefined();
+-    expect(handledTag!.text()).toContain("true");
+-  });
+-
+-  it("shows Unknown for missing service", async () => {
+-    // Arrange
+-    await wrapper.setProps({ error: { ip: "127.0.0.1" } });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const serviceTag = tags.find((t: any) => t.text().includes("service"));
+-    expect(serviceTag!.text()).toContain("Unknown");
+-  });
+-
+-  it("shows Unknown for missing source", async () => {
+-    // Arrange
+-    await wrapper.setProps({ error: { ip: "127.0.0.1" } });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const sourceTag = tags.find((t: any) => t.text().includes("source"));
+-    expect(sourceTag!.text()).toContain("Unknown");
+-  });
+-
+-  it("shows Unknown User for missing user email", async () => {
+-    // Arrange
+-    await wrapper.setProps({ error: { ip: "127.0.0.1" } });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const emailTag = tags.find((t: any) => t.text().includes("user_email"));
+-    expect(emailTag!.text()).toContain("Unknown User");
+-  });
+-
+-  it("shows Unknown location when both country and city are missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, geo_info_country: null, geo_info_city: null },
+-    });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const locationTag = tags.find((t: any) => t.text().includes("location"));
+-    expect(locationTag!.text()).toContain("Unknown");
+-  });
+-
+-  it("shows only city when country is missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, geo_info_country: null },
+-    });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const locationTag = tags.find((t: any) => t.text().includes("location"));
+-    expect(locationTag!.text()).toContain("New York");
+-  });
+-
+-  it("shows only country when city is missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, geo_info_city: null },
+-    });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const locationTag = tags.find((t: any) => t.text().includes("location"));
+-    expect(locationTag!.text()).toContain("United States");
+-  });
+-
+-  it("shows device brand and family combined", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+-    expect(deviceTag!.text()).toContain("Dell Desktop");
+-  });
+-
+-  it("shows only device family when brand is missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, user_agent_device_brand: null },
+-    });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+-    expect(deviceTag!.text()).toContain("Desktop");
+-  });
+-
+-  it("shows only device brand when family is missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, user_agent_device_family: null },
+-    });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+-    expect(deviceTag!.text()).toContain("Dell");
+-  });
+-
+-  it("shows Unknown device when both brand and family are missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: {
+-        ...mockError,
+-        user_agent_device_brand: null,
+-        user_agent_device_family: null,
+-      },
+-    });
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const deviceTag = tags.find((t: any) => t.text().includes("device"));
+-    expect(deviceTag!.text()).toContain("Unknown");
+-  });
+-
+-  it("shows Version Unknown when browser major version is missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, user_agent_user_agent_major: null },
+-    });
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Version Unknown");
+-  });
+-
+-  it("shows partial browser version when only major is present", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: {
+-        ...mockError,
+-        user_agent_user_agent_major: "119",
+-        user_agent_user_agent_minor: null,
+-        user_agent_user_agent_patch: null,
+-      },
+-    });
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Version 119");
+-  });
+-
+-  it("shows Version Unknown when OS major version is missing", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: { ...mockError, user_agent_os_major: null },
+-    });
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Version Unknown");
+-  });
+-
+-  it("shows partial OS version when only major is present", async () => {
+-    // Arrange
+-    await wrapper.setProps({
+-      error: {
+-        ...mockError,
+-        user_agent_os_major: "14",
+-        user_agent_os_minor: null,
+-        user_agent_os_patch: null,
+-      },
+-    });
+-
+-    // Assert
+-    expect(wrapper.text()).toContain("Version 14");
+-  });
+-
+-  it("renders Firefox browser icon when browser family contains 'Firefox'", async () => {
+-    // Arrange — remount with Firefox to capture onMounted icon selection
+-    const firefoxWrapper = mountComponent({
+-      ...mockError,
+-      user_agent_user_agent_family: "Firefox",
+-    });
+-    await flushPromises();
+-
+-    // Assert
+-    const img = firefoxWrapper.find('img[src="/mock/firefox.png"]');
+-    expect(img.exists()).toBe(true);
+-    firefoxWrapper.unmount();
+-  });
+-
+-  it("renders Safari browser icon when browser family contains 'Safari'", async () => {
+-    // Arrange
+-    const safariWrapper = mountComponent({
+-      ...mockError,
+-      user_agent_user_agent_family: "Safari",
+-    });
+-    await flushPromises();
+-
+-    // Assert
+-    const img = safariWrapper.find('img[src="/mock/safari.png"]');
+-    expect(img.exists()).toBe(true);
+-    safariWrapper.unmount();
+-  });
+-
+-  it("renders Opera browser icon when browser family contains 'Opera'", async () => {
+-    // Arrange
+-    const operaWrapper = mountComponent({
+-      ...mockError,
+-      user_agent_user_agent_family: "Opera",
+-    });
+-    await flushPromises();
+-
+-    // Assert
+-    const img = operaWrapper.find('img[src="/mock/opera.png"]');
+-    expect(img.exists()).toBe(true);
+-    operaWrapper.unmount();
+-  });
+-
+-  it("renders Edge browser icon when browser family contains 'Edge'", async () => {
+-    // Arrange
+-    const edgeWrapper = mountComponent({
+-      ...mockError,
+-      user_agent_user_agent_family: "Edge",
+-    });
+-    await flushPromises();
+-
+-    // Assert
+-    const img = edgeWrapper.find('img[src="/mock/edge.png"]');
+-    expect(img.exists()).toBe(true);
+-    edgeWrapper.unmount();
+-  });
+-
+-  it("renders Mac OS icon when OS family contains 'Mac'", async () => {
+-    // Arrange
+-    const macWrapper = mountComponent({
+-      ...mockError,
+-      user_agent_os_family: "Mac OS X",
+-    });
+-    await flushPromises();
+-
+-    // Assert
+-    const img = macWrapper.find('img[src="/mock/mac.png"]');
+-    expect(img.exists()).toBe(true);
+-    macWrapper.unmount();
+-  });
+-
+-  it("renders Linux OS icon when OS family contains 'Linux'", async () => {
+-    // Arrange
+-    const linuxWrapper = mountComponent({
+-      ...mockError,
+-      user_agent_os_family: "Ubuntu Linux",
+-    });
+-    await flushPromises();
+-
+-    // Assert
+-    const img = linuxWrapper.find('img[src="/mock/linux.png"]');
+-    expect(img.exists()).toBe(true);
+-    linuxWrapper.unmount();
+-  });
+-
+-  it("renders an ErrorTag with the url value", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const urlTag = tags.find((t: any) => t.text().includes("url"));
+-    expect(urlTag).toBeDefined();
+-    expect(urlTag!.text()).toContain("https://example.com/dashboard");
+-  });
+-
+-  it("renders an ErrorTag with level: error", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const tags = wrapper.findAll('[data-test="error-tag"]');
+-    const levelTag = tags.find((t: any) => t.text().includes("level"));
+-    expect(levelTag).toBeDefined();
+-    expect(levelTag!.text()).toContain("error");
+-  });
+-
+-  it("renders vertical separators between info sections", () => {
+-    // Arrange + Act handled in beforeEach
+-
+-    // Assert
+-    const separators = wrapper.findAll('[data-test="separator"]');
+-    expect(separators.length).toBeGreaterThan(0);
+-  });
+-
+-  it("requires the error prop", () => {
+-    // Assert
+-    expect(ErrorTags.props?.error?.required).toBe(true);
+-    expect(ErrorTags.props?.error?.type).toBe(Object);
+-  });
+-});
+diff --git a/web/src/components/rum/errorTracking/view/ErrorTags.vue b/web/src/components/rum/errorTracking/view/ErrorTags.vue
+deleted file mode 100644
+index e5b938dd023..00000000000
+--- a/web/src/components/rum/errorTracking/view/ErrorTags.vue
++++ /dev/null
+@@ -1,186 +0,0 @@
+-<!-- Copyright 2026 OpenObserve Inc.
+-
+-This program is free software: you can redistribute it and/or modify
+-it under the terms of the GNU Affero General Public License as published by
+-the Free Software Foundation, either version 3 of the License, or
+-(at your option) any later version.
+-
+-This program is distributed in the hope that it will be useful
+-but WITHOUT ANY WARRANTY; without even the implied warranty of
+-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-GNU Affero General Public License for more details.
+-
+-You should have received a copy of the GNU Affero General Public License
+-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+--->
+-
+-<template>
+-  <div>
+-    <div data-test="error-tags-title" class="ml-1 text-base font-bold">{{ t("rum.tags") }}</div>
+-    <div class="flex items-center">
+-      <div class="mr-4 items-center">
+-        <img :src="ip" :alt="t('rum.ipLabel')" class="mr-2 inline-block h-auto! w-[1.875rem]!" />
+-        <div class="inline-block">
+-          <div class="pl-1">{{ t("rum.ipLabel") }}</div>
+-          <span class="pl-1"> {{ error.ip }} </span>
+-        </div>
+-      </div>
+-      <OSeparator vertical />
+-      <div class="mx-4 items-center">
+-        <img
+-          :src="browserIcon"
+-          :alt="t('rum.browserImageAlt')"
+-          class="mr-3 inline-block h-auto w-[1.875rem]"
+-        />
+-        <div class="inline-block">
+-          <div class="pl-1">{{ error.user_agent_user_agent_family }}</div>
+-          <span class="pl-1"> {{ getBrowserVersion }} </span>
+-        </div>
+-      </div>
+-      <OSeparator vertical />
+-      <div class="mx-4 items-center">
+-        <img
+-          :src="osIcon"
+-          :alt="t('rum.osImageAlt')"
+-          class="mr-3 inline-block h-auto w-[1.875rem]"
+-        />
+-        <div class="inline-block">
+-          <div class="pl-1">{{ error.user_agent_os_family }}</div>
+-          <div class="flex pl-1">{{ getOsVersion }}</div>
+-        </div>
+-      </div>
+-    </div>
+-    <div class="mt-3 flex flex-wrap items-center">
+-      <template v-for="(value, tag) in getTags" :key="tag">
+-        <ErrorTag :tag="{ key: tag, value }" />
+-      </template>
+-    </div>
+-  </div>
+-</template>
+-
+-<script setup lang="ts">
+-import { computed, onMounted, ref } from "vue";
+-import ErrorTag from "@/components/rum/errorTracking/view/ErrorTag.vue";
+-import chrome from "@/assets/images/rum/chrome.png";
+-import firefox from "@/assets/images/rum/firefox.png";
+-import safari from "@/assets/images/rum/safari.png";
+-import opera from "@/assets/images/rum/opera.png";
+-import edge from "@/assets/images/rum/edge.png";
+-import ip from "@/assets/images/rum/ip_ad.png";
+-import windows from "@/assets/images/rum/windows.png";
+-import mac from "@/assets/images/rum/mac.png";
+-import linux from "@/assets/images/rum/linux.png";
+-import { useI18nTyped } from "@/types/i18n";
+-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+-
+-const { t } = useI18nTyped();
+-
+-const props = defineProps({
+-  error: {
+-    type: Object,
+-    required: true,
+-  },
+-});
+-
+-const osIcon = ref("");
+-const browserIcon = ref("");
+-
+-onMounted(() => {
+-  osIcon.value = getOsIcon();
+-  browserIcon.value = getBrowserIcon();
+-});
+-
+-const getBrowserIcon = () => {
+-  if (!props.error.user_agent_user_agent_family) return chrome;
+-
+-  if (props.error.user_agent_user_agent_family?.toLowerCase().includes("chrome")) {
+-    return chrome;
+-  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("opera")) {
+-    return opera;
+-  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("firefox")) {
+-    return firefox;
+-  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("edge")) {
+-    return edge;
+-  } else if (props.error.user_agent_user_agent_family?.toLowerCase().includes("safari")) {
+-    return safari;
+-  }
+-  return chrome;
+-};
+-
+-const getOsIcon = () => {
+-  if (props.error?.user_agent_os_family?.toLowerCase().includes("windows")) {
+-    return windows;
+-  } else if (props.error?.user_agent_os_family?.toLowerCase().includes("mac")) {
+-    return mac;
+-  } else if (props.error?.user_agent_os_family?.toLowerCase().includes("linux")) {
+-    return linux;
+-  } else {
+-    return windows;
+-  }
+-};
+-
+-const getOsVersion = computed(() => {
+-  let version: string = t("rum.versionPrefix");
+-
+-  if (!props.error.user_agent_os_major) return version + t("rum.unknown");
+-
+-  if (props.error.user_agent_os_major) version += props.error.user_agent_os_major;
+-
+-  if (props.error.user_agent_os_minor) version += "." + props.error.user_agent_os_minor;
+-
+-  if (props.error.user_agent_os_patch) version += "." + props.error.user_agent_os_patch;
+-
+-  return version;
+-});
+-
+-const getBrowserVersion = computed(() => {
+-  let version: string = t("rum.versionPrefix");
+-
+-  if (!props.error.user_agent_user_agent_major) return version + t("rum.unknown");
+-
+-  if (props.error.user_agent_user_agent_major) version += props.error.user_agent_user_agent_major;
+-
+-  if (props.error.user_agent_user_agent_minor)
+-    version += "." + props.error.user_agent_user_agent_minor;
+-
+-  if (props.error.user_agent_user_agent_patch)
+-    version += "." + props.error.user_agent_user_agent_patch;
+-
+-  return version;
+-});
+-
+-const getTags = computed(() => {
+-  return {
+-    ip: props.error.ip,
+-    url: props.error.view_url,
+-    handled: props.error.error_handling === "handled",
+-    location: getLocation(),
+-    service: props.error.service || t("rum.unknown"),
+-    source: props.error.source || t("rum.unknown"),
+-    device: getDevice(),
+-    browser: props.error.user_agent_user_agent_family,
+-    level: "error",
+-    sdk_version: props.error.sdk_version,
+-    user_email: props.error.usr_email || t("rum.unknownUser"),
+-  };
+-});
+-
+-const getDevice = () => {
+-  if (!props.error.user_agent_device_brand && !props.error.user_agent_device_family)
+-    return t("rum.unknown");
+-
+-  if (!props.error.user_agent_device_brand) return props.error.user_agent_device_family;
+-
+-  if (!props.error.user_agent_device_family) return props.error.user_agent_device_brand;
+-
+-  return props.error.user_agent_device_brand + " " + props.error.user_agent_device_family;
+-};
+-
+-const getLocation = () => {
+-  if (!props.error.geo_info_country && !props.error.geo_info_city) return t("rum.unknown");
+-  if (!props.error.geo_info_country) return props.error.geo_info_city;
+-  if (!props.error.geo_info_city) return props.error.geo_info_country;
+-
+-  return props.error.geo_info_country + ", " + props.error.geo_info_city;
+-};
+-</script>
+diff --git a/web/src/composables/rum/useErrorDetail.spec.ts b/web/src/composables/rum/useErrorDetail.spec.ts
+new file mode 100644
+index 00000000000..c4e03d509d5
+--- /dev/null
++++ b/web/src/composables/rum/useErrorDetail.spec.ts
+@@ -0,0 +1,324 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it, beforeEach, vi } from "vitest";
++import { defineComponent } from "vue";
++import { mount } from "@vue/test-utils";
++import { createStore } from "vuex";
++
++vi.mock("@/services/search", () => ({
++  default: { search: vi.fn() },
++}));
++
++// The payload's encoding decides whether the SQL is base64-wrapped, so the
++// tests need to flip it.
++const { payloadEncoding } = vi.hoisted(() => ({ payloadEncoding: { value: "" } }));
++
++vi.mock("@/composables/useQuery", () => ({
++  default: () => ({
++    getTimeInterval: () => ({ interval: "1 hour" }),
++    buildQueryPayload: () => ({ query: {}, encoding: payloadEncoding.value }),
++  }),
++}));
++
++import searchService from "@/services/search";
++import useErrorDetail from "@/composables/rum/useErrorDetail";
++import { b64DecodeUnicode } from "@/utils/zincutils";
++
++const HOUR_US = 3_600_000_000;
++const WINDOW_START = Date.UTC(2026, 0, 10, 0, 0, 0) * 1000;
++const WINDOW_END = WINDOW_START + 3 * HOUR_US;
++
++const FULL_SCHEMA = {
++  error_type: true,
++  error_message: true,
++  error_handling: true,
++  session_id: true,
++  usr_id: true,
++  user_agent_user_agent_family: true,
++  user_agent_os_family: true,
++  version: true,
++  view_url: true,
++};
++
++const SIGNATURE = {
++  error_type: "TypeError",
++  error_message: "boom",
++  error_handling: "unhandled",
++};
++
++const store = createStore({
++  state: {
++    selectedOrganization: { identifier: "test-org" },
++    zoConfig: { timestamp_column: "_timestamp" },
++  },
++});
++
++/** `useStore()` requires an active component instance, so the composable is
++ *  exercised through a throwaway host rather than called bare. */
++const setup = () => {
++  let api!: ReturnType<typeof useErrorDetail>;
++  const host = defineComponent({
++    setup() {
++      api = useErrorDetail(((key: string) => key) as any);
++      return () => null;
++    },
++  });
++  mount(host, { global: { plugins: [store] } });
++  return api;
++};
++
++const fetchParams = (overrides: Record<string, unknown> = {}) => ({
++  signature: SIGNATURE,
++  schema: { ...FULL_SCHEMA },
++  startTime: WINDOW_START,
++  endTime: WINDOW_END,
++  ...overrides,
++});
++
++/** Resolve each search in call order with the given hit arrays. */
++const respondInOrder = (...responses: any[][]) => {
++  let call = 0;
++  vi.mocked(searchService.search).mockImplementation(
++    () => Promise.resolve({ data: { hits: responses[call++] ?? [] } }) as any,
++  );
++};
++
++const impactHit = {
++  events: 10,
++  first_seen: WINDOW_START,
++  last_seen: WINDOW_END,
++  sessions_affected: 4,
++  users_affected: 3,
++};
++
++describe("useErrorDetail", () => {
++  beforeEach(() => {
++    vi.clearAllMocks();
++    payloadEncoding.value = "";
++  });
++
++  describe("impact", () => {
++    it("exposes the issue's volume, reach and lifespan", async () => {
++      respondInOrder([impactHit], [], [], []);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.impact.value).toEqual({
++        events: 10,
++        usersAffected: 3,
++        sessionsAffected: 4,
++        firstSeen: WINDOW_START,
++        lastSeen: WINDOW_END,
++      });
++    });
++
++    it("reports a missing distinct count as null rather than zero", async () => {
++      respondInOrder([{ events: 5, first_seen: 1, last_seen: 2 }], [], [], []);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.impact.value?.usersAffected).toBeNull();
++      expect(api.impact.value?.sessionsAffected).toBeNull();
++    });
++
++    it("clears the loading flag once impact lands", async () => {
++      respondInOrder([impactHit], [], [], []);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.isLoadingImpact.value).toBe(false);
++      expect(api.isLoadingInsights.value).toBe(false);
++    });
++  });
++
++  describe("weak signature", () => {
++    it("skips every search when the error cannot be grouped", async () => {
++      const api = setup();
++
++      await api.fetchDetail(fetchParams({ signature: { error_handling: "unhandled" } }));
++
++      expect(searchService.search).not.toHaveBeenCalled();
++      expect(api.hasSignature.value).toBe(false);
++      expect(api.impact.value).toBeNull();
++    });
++  });
++
++  describe("occurrences and facets", () => {
++    it("zero-fills the occurrence series across the window", async () => {
++      respondInOrder([impactHit], [{ ts: WINDOW_START, events: 4 }], [], []);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.occurrences.value.map((bucket) => bucket.events)).toEqual([4, 0, 0]);
++    });
++
++    it("pivots each group-by result into its own facet", async () => {
++      respondInOrder(
++        [impactHit],
++        [],
++        [
++          { user_agent_user_agent_family: "Safari", user_agent_os_family: "Mac", events: 9 },
++          { user_agent_user_agent_family: "Chrome", user_agent_os_family: "Mac", events: 1 },
++        ],
++        [{ version: "2.4.1", view_url: "/plans", events: 10 }],
++      );
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.facets.value.browser).toEqual([
++        { value: "Safari", events: 9, share: 0.9 },
++        { value: "Chrome", events: 1, share: 0.1 },
++      ]);
++      expect(api.facets.value.os).toEqual([{ value: "Mac", events: 10, share: 1 }]);
++      expect(api.facets.value.release).toEqual([{ value: "2.4.1", events: 10, share: 1 }]);
++      expect(api.facets.value.page).toEqual([{ value: "/plans", events: 10, share: 1 }]);
++    });
++
++    it("leaves facets empty when the stream has none of their columns", async () => {
++      respondInOrder([impactHit], []);
++      const api = setup();
++
++      await api.fetchDetail(
++        fetchParams({ schema: { error_type: true, error_message: true, session_id: true } }),
++      );
++
++      expect(api.facets.value).toEqual({ browser: [], os: [], release: [], page: [] });
++    });
++
++    it("skips the breakdown searches when the issue has no events", async () => {
++      respondInOrder([{ events: 0 }]);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(searchService.search).toHaveBeenCalledTimes(1);
++      expect(api.occurrences.value).toEqual([]);
++    });
++  });
++
++  describe("failure handling", () => {
++    it("leaves the panels empty when the impact search fails", async () => {
++      vi.mocked(searchService.search).mockRejectedValue(new Error("boom"));
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.impact.value).toBeNull();
++      expect(api.isLoadingImpact.value).toBe(false);
++      expect(api.isLoadingInsights.value).toBe(false);
++    });
++
++    it("keeps the facets that succeeded when one group-by search fails", async () => {
++      let call = 0;
++      vi.mocked(searchService.search).mockImplementation(() => {
++        call += 1;
++        if (call === 1) return Promise.resolve({ data: { hits: [impactHit] } }) as any;
++        if (call === 3) return Promise.reject(new Error("browser facet failed")) as any;
++        if (call === 4) {
++          return Promise.resolve({
++            data: { hits: [{ version: "2.4.1", view_url: "/plans", events: 10 }] },
++          }) as any;
++        }
++        return Promise.resolve({ data: { hits: [] } }) as any;
++      });
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.facets.value.browser).toEqual([]);
++      expect(api.facets.value.release).toEqual([{ value: "2.4.1", events: 10, share: 1 }]);
++    });
++  });
++
++  describe("request payload", () => {
++    it("sends plain SQL when the payload is not base64-encoded", async () => {
++      respondInOrder([impactHit], [], [], []);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      const sent = vi.mocked(searchService.search).mock.calls[0][0] as any;
++      expect(sent.query.query.sql).toContain("COUNT(*) AS events");
++      expect(sent.org_identifier).toBe("test-org");
++    });
++
++    it("base64-encodes the SQL when the payload asks for it", async () => {
++      payloadEncoding.value = "base64";
++      respondInOrder([impactHit], [], [], []);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      const sent = vi.mocked(searchService.search).mock.calls[0][0] as any;
++      expect(sent.query.query.sql).not.toContain("COUNT(*)");
++      expect(b64DecodeUnicode(sent.query.query.sql)).toContain("COUNT(*) AS events");
++    });
++
++    it("treats a response without hits as no data", async () => {
++      vi.mocked(searchService.search).mockResolvedValue({ data: {} } as any);
++      const api = setup();
++
++      await api.fetchDetail(fetchParams());
++
++      expect(api.impact.value?.events).toBe(0);
++    });
++  });
++
++  describe("superseded runs", () => {
++    it("commits only the latest run's results", async () => {
++      let call = 0;
++      vi.mocked(searchService.search).mockImplementation(() => {
++        call += 1;
++        // The first run's impact search resolves LAST, after the second run
++        // has already replaced it.
++        if (call === 1) {
++          return new Promise((resolve) =>
++            queueMicrotask(() =>
++              queueMicrotask(() => resolve({ data: { hits: [{ events: 999 }] } } as any)),
++            ),
++          ) as any;
++        }
++        return Promise.resolve({ data: { hits: [impactHit] } }) as any;
++      });
++      const api = setup();
++
++      const stale = api.fetchDetail(fetchParams());
++      await api.fetchDetail(fetchParams());
++      await stale;
++
++      expect(api.impact.value?.events).toBe(10);
++    });
++  });
++
++  describe("cancellation", () => {
++    it("stops reporting progress after cancelAll", async () => {
++      respondInOrder([impactHit], [], [], []);
++      const api = setup();
++
++      const inFlight = api.fetchDetail(fetchParams());
++      api.cancelAll();
++      await inFlight;
++
++      expect(api.isLoadingImpact.value).toBe(false);
++      expect(api.isLoadingInsights.value).toBe(false);
++    });
++  });
++});
+diff --git a/web/src/composables/rum/useErrorDetail.ts b/web/src/composables/rum/useErrorDetail.ts
+new file mode 100644
+index 00000000000..4b2d91b17ea
+--- /dev/null
++++ b/web/src/composables/rum/useErrorDetail.ts
+@@ -0,0 +1,246 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { ref, type Ref } from "vue";
++import { useStore } from "vuex";
++import type { TranslateFn } from "@/types/i18n";
++import searchService from "@/services/search";
++import useQuery from "@/composables/useQuery";
++import { b64EncodeUnicode } from "@/utils/zincutils";
++import { pivotCounts } from "@/utils/rum/errorIssueQueries";
++import { intervalToMicros, type IssueSignature } from "@/utils/rum/errorIssueUtils";
++import {
++  FACET_GROUPS,
++  availableFacets,
++  buildFacetSql,
++  buildIssueImpactSql,
++  buildIssueOccurrencesSql,
++  buildSignatureWhere,
++  pivotFacet,
++  FACET_ROW_LIMIT,
++  type ErrorDetailContext,
++  type FacetKey,
++  type FacetValue,
++} from "@/utils/rum/errorDetailQueries";
++
++export interface ErrorImpact {
++  events: number;
++  usersAffected: number | null;
++  sessionsAffected: number | null;
++  firstSeen: number;
++  lastSeen: number;
++}
++
++export interface OccurrenceBucket {
++  ts: number;
++  events: number;
++}
++
++export interface FetchErrorDetailParams {
++  signature: IssueSignature;
++  /** Stream schema presence map from `getStream()`. */
++  schema: Record<string, boolean>;
++  /** Analysis window, microseconds. */
++  startTime: number;
++  endTime: number;
++}
++
++const emptyFacets = (): Record<FacetKey, FacetValue[]> => ({
++  browser: [],
++  os: [],
++  release: [],
++  page: [],
++});
++
++/**
++ * Issue-scoped aggregates for the error detail page: how often this exact
++ * error signature fires, how many people it reaches, and which browser / OS /
++ * release / page it concentrates in.
++ *
++ * The single error event the page opens with cannot answer any of that — it is
++ * one row. These searches are what turn the page from "an error happened" into
++ * "this is how bad it is and where to look".
++ */
++const useErrorDetail = (t: TranslateFn) => {
++  const store = useStore();
++  const { getTimeInterval, buildQueryPayload } = useQuery();
++
++  const impact: Ref<ErrorImpact | null> = ref(null);
++  const occurrences: Ref<OccurrenceBucket[]> = ref([]);
++  const facets: Ref<Record<FacetKey, FacetValue[]>> = ref(emptyFacets());
++  const isLoadingImpact = ref(false);
++  const isLoadingInsights = ref(false);
++  /** False when the error carries no signature strong enough to aggregate on. */
++  const hasSignature = ref(true);
++
++  // Only the latest run may commit; superseded runs are aborted outright so they
++  // stop holding slots in the server's per-user work-group queue.
++  let runId = 0;
++  let runController = new AbortController();
++
++  const runSearch = (
++    sql: string,
++    range: { startTime: number; endTime: number },
++    size: number,
++    signal: AbortSignal,
++  ): Promise<any[]> => {
++    const req = buildQueryPayload(
++      {
++        sqlMode: false,
++        streamName: "_rumdata",
++        timestamp_column: store.state.zoConfig.timestamp_column,
++        timestamps: { startTime: range.startTime, endTime: range.endTime },
++        size,
++      } as any,
++      t,
++    );
++    // buildQueryPayload encodes its template SQL before we override it, so the
++    // replacement must be re-encoded when base64 mode is active.
++    req.query.sql = req.encoding === "base64" ? b64EncodeUnicode(sql) : sql;
++    req.query.from = 0;
++    req.query.size = size;
++    delete req.aggs;
++    return searchService
++      .search(
++        {
++          org_identifier: store.state.selectedOrganization.identifier,
++          query: req,
++          page_type: "logs",
++          signal,
++        },
++        "RUM",
++      )
++      .then((res) => res.data.hits ?? []);
++  };
++
++  const reset = () => {
++    impact.value = null;
++    occurrences.value = [];
++    facets.value = emptyFacets();
++    isLoadingImpact.value = false;
++    isLoadingInsights.value = false;
++  };
++
++  const fetchDetail = async (params: FetchErrorDetailParams): Promise<void> => {
++    const currentRun = ++runId;
++    runController.abort();
++    runController = new AbortController();
++    const signal = runController.signal;
++
++    const ctx: ErrorDetailContext = {
++      streamName: "_rumdata",
++      timestampColumn: store.state.zoConfig.timestamp_column || "_timestamp",
++      schema: params.schema,
++      signature: params.signature,
++    };
++    const where = buildSignatureWhere(ctx);
++    hasSignature.value = where !== null;
++    if (!where) {
++      reset();
++      return;
++    }
++
++    const range = { startTime: params.startTime, endTime: params.endTime };
++    reset();
++    isLoadingImpact.value = true;
++    isLoadingInsights.value = true;
++
++    // Stage 1 — impact alone. It is the number the page leads with, and every
++    // panel below is a breakdown OF it, so nothing else is worth spending a
++    // work-group slot on until we know this issue has events at all.
++    let impactHit: any = null;
++    try {
++      const hits = await runSearch(buildIssueImpactSql(ctx, where), range, 10, signal);
++      if (currentRun !== runId) return;
++      impactHit = hits[0] ?? null;
++    } catch {
++      if (currentRun !== runId) return;
++      isLoadingImpact.value = false;
++      isLoadingInsights.value = false;
++      return;
++    }
++
++    const events = Number(impactHit?.events) || 0;
++    impact.value = {
++      events,
++      usersAffected:
++        impactHit?.users_affected != null ? Number(impactHit.users_affected) || 0 : null,
++      sessionsAffected:
++        impactHit?.sessions_affected != null ? Number(impactHit.sessions_affected) || 0 : null,
++      firstSeen: Number(impactHit?.first_seen) || 0,
++      lastSeen: Number(impactHit?.last_seen) || 0,
++    };
++    isLoadingImpact.value = false;
++
++    if (!events) {
++      isLoadingInsights.value = false;
++      return;
++    }
++
++    // Stage 2 — the breakdowns. Three concurrent searches, inside the cap.
++    const interval = getTimeInterval(params.startTime, params.endTime).interval;
++    const facetGroups = FACET_GROUPS.map((group) => availableFacets(ctx, group));
++    const [occurrencesR, ...facetResults] = await Promise.allSettled([
++      runSearch(buildIssueOccurrencesSql(ctx, where, interval), range, 2000, signal),
++      ...facetGroups.map((group) => {
++        const sql = buildFacetSql(ctx, where, group);
++        return sql ? runSearch(sql, range, FACET_ROW_LIMIT, signal) : Promise.resolve([]);
++      }),
++    ]);
++    if (currentRun !== runId) return;
++
++    occurrences.value =
++      occurrencesR.status === "fulfilled"
++        ? pivotCounts(
++            occurrencesR.value,
++            params.startTime,
++            params.endTime,
++            intervalToMicros(interval),
++          )
++        : [];
++
++    // Each facet group degrades on its own — a failed group shows no rows
++    // rather than blanking the whole breakdown panel.
++    const unknownLabel = t("rum.unknown");
++    const next = emptyFacets();
++    facetResults.forEach((result, index) => {
++      if (result.status !== "fulfilled") return;
++      for (const facet of facetGroups[index]) {
++        next[facet.key] = pivotFacet(result.value, facet.column, unknownLabel);
++      }
++    });
++    facets.value = next;
++    isLoadingInsights.value = false;
++  };
++
++  return {
++    impact,
++    occurrences,
++    facets,
++    hasSignature,
++    isLoadingImpact,
++    isLoadingInsights,
++    fetchDetail,
++    /** Abort every search in flight. Call when the view is left. */
++    cancelAll: () => {
++      runController.abort();
++      runController = new AbortController();
++      isLoadingImpact.value = false;
++      isLoadingInsights.value = false;
++    },
++  };
++};
++
++export default useErrorDetail;
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index fa956db2c07..b99d0d4cb61 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -1230,8 +1230,38 @@
+     "browserImageAlt": "Browser",
+     "osImageAlt": "OS",
+     "versionPrefix": "Version ",
++    "versionUnknown": "Version unknown",
+     "unknown": "Unknown",
+     "unknownUser": "Unknown User",
++    "errorDetail": {
++      "impactAria": "Error impact summary",
++      "occurrences": "Occurrences",
++      "occurrencesTitle": "Occurrences over time",
++      "sessionsAffected": "Sessions",
++      "firstSeen": "First seen",
++      "lastSeen": "Last seen",
++      "impactScope": "First seen {firstSeen}, last seen {lastSeen} in the selected time range",
++      "noSignature": "This error carries no type or message, so it cannot be grouped with its other occurrences.",
++      "peakPerBucket": "Peak {count} per bucket",
++      "thisEvent": "This event",
++      "breakdownTitle": "Where it happens",
++      "breakdownHint": "Share of this error's occurrences in the selected time range",
++      "breakdownEmpty": "No breakdown is available for this error.",
++      "dominantInsight": "{share}% of occurrences share the same {dimension} — {value}",
++      "facetBrowser": "Browser",
++      "facetOs": "Operating system",
++      "facetRelease": "Release",
++      "facetPage": "Page",
++      "contextTitle": "Who hit this",
++      "device": "Device",
++      "location": "Location",
++      "pageUrl": "Page URL",
++      "noMessage": "No error message was captured.",
++      "copyLink": "Copy link",
++      "copyLinkHint": "Copy a permalink to this error",
++      "copyEventId": "Copy event ID",
++      "linkCopied": "Link copied to clipboard"
++    },
+     "translatingStackTrace": "Translating stack trace with source maps...",
+     "translatingStackTraceHint": "This may take a few moments",
+     "sourceMapsNotAvailable": "Source Maps Not Available",
+diff --git a/web/src/utils/rum/errorDetailQueries.spec.ts b/web/src/utils/rum/errorDetailQueries.spec.ts
+new file mode 100644
+index 00000000000..caaa520859e
+--- /dev/null
++++ b/web/src/utils/rum/errorDetailQueries.spec.ts
+@@ -0,0 +1,254 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, expect, it } from "vitest";
++import {
++  FACET_GROUPS,
++  MAX_SIGNATURE_MESSAGE_LEN,
++  availableFacets,
++  buildBreadcrumbsSql,
++  buildFacetSql,
++  buildIssueImpactSql,
++  buildIssueOccurrencesSql,
++  buildSignatureWhere,
++  pivotFacet,
++  type ErrorDetailContext,
++} from "@/utils/rum/errorDetailQueries";
++
++const FULL_SCHEMA = {
++  error_type: true,
++  error_message: true,
++  error_handling: true,
++  session_id: true,
++  usr_id: true,
++  user_agent_user_agent_family: true,
++  user_agent_os_family: true,
++  version: true,
++  view_url: true,
++};
++
++const makeContext = (overrides: Partial<ErrorDetailContext> = {}): ErrorDetailContext => ({
++  streamName: "_rumdata",
++  timestampColumn: "_timestamp",
++  schema: { ...FULL_SCHEMA },
++  signature: {
++    error_type: "TypeError",
++    error_message: "Cannot read properties of undefined",
++    error_handling: "unhandled",
++  },
++  ...overrides,
++});
++
++describe("buildSignatureWhere", () => {
++  it("pins rows to every present signature field", () => {
++    const where = buildSignatureWhere(makeContext());
++
++    expect(where).toBe(
++      "type='error' AND error_type='TypeError' AND " +
++        "error_message='Cannot read properties of undefined' AND error_handling='unhandled'",
++    );
++  });
++
++  it("escapes single quotes in the message", () => {
++    const ctx = makeContext({
++      signature: { error_type: "TypeError", error_message: "can't read 'x'" },
++    });
++
++    expect(buildSignatureWhere(ctx)).toBe(
++      "type='error' AND error_type='TypeError' AND error_message='can''t read ''x'''",
++    );
++  });
++
++  it("skips fields the stream schema does not have", () => {
++    const ctx = makeContext({ schema: { error_message: true } });
++
++    expect(buildSignatureWhere(ctx)).toBe(
++      "type='error' AND error_message='Cannot read properties of undefined'",
++    );
++  });
++
++  it("returns null when only error_handling identifies the row", () => {
++    const ctx = makeContext({
++      signature: { error_handling: "unhandled" },
++    });
++
++    expect(buildSignatureWhere(ctx)).toBeNull();
++  });
++
++  it("returns null when the signature is entirely empty", () => {
++    expect(buildSignatureWhere(makeContext({ signature: {} }))).toBeNull();
++  });
++
++  it("drops an oversized message rather than embedding it", () => {
++    const ctx = makeContext({
++      signature: { error_message: "x".repeat(MAX_SIGNATURE_MESSAGE_LEN + 1) },
++    });
++
++    expect(buildSignatureWhere(ctx)).toBeNull();
++  });
++
++  it("still identifies the issue by type when the message is oversized", () => {
++    const ctx = makeContext({
++      signature: {
++        error_type: "TypeError",
++        error_message: "x".repeat(MAX_SIGNATURE_MESSAGE_LEN + 1),
++      },
++    });
++
++    expect(buildSignatureWhere(ctx)).toBe("type='error' AND error_type='TypeError'");
++  });
++});
++
++describe("buildIssueImpactSql", () => {
++  it("counts events, sessions, users and the issue lifespan", () => {
++    const sql = buildIssueImpactSql(makeContext(), "type='error'");
++
++    expect(sql).toBe(
++      "SELECT COUNT(*) AS events, MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen, " +
++        "COUNT(DISTINCT session_id) AS sessions_affected, COUNT(DISTINCT usr_id) AS users_affected " +
++        "FROM \"_rumdata\" WHERE type='error'",
++    );
++  });
++
++  it("omits the distinct counts when the stream carries neither column", () => {
++    const ctx = makeContext({ schema: { error_message: true } });
++
++    expect(buildIssueImpactSql(ctx, "type='error'")).toBe(
++      "SELECT COUNT(*) AS events, MIN(_timestamp) AS first_seen, MAX(_timestamp) AS last_seen " +
++        "FROM \"_rumdata\" WHERE type='error'",
++    );
++  });
++
++  it("falls back to session_id for the user count when usr_id is absent", () => {
++    const ctx = makeContext({ schema: { session_id: true } });
++
++    expect(buildIssueImpactSql(ctx, "type='error'")).toContain(
++      "COUNT(DISTINCT session_id) AS users_affected",
++    );
++  });
++});
++
++describe("buildIssueOccurrencesSql", () => {
++  it("buckets the issue's events by the given interval", () => {
++    const sql = buildIssueOccurrencesSql(makeContext(), "type='error'", "5 minute");
++
++    expect(sql).toBe(
++      "SELECT histogram(_timestamp, '5 minute') AS ts, COUNT(*) AS events" +
++        " FROM \"_rumdata\" WHERE type='error' GROUP BY ts ORDER BY ts",
++    );
++  });
++});
++
++describe("availableFacets", () => {
++  it("keeps only facets whose column exists in the schema", () => {
++    const ctx = makeContext({ schema: { user_agent_os_family: true } });
++
++    expect(availableFacets(ctx, FACET_GROUPS[0]).map((facet) => facet.key)).toEqual(["os"]);
++  });
++
++  it("returns an empty list when no facet column exists", () => {
++    const ctx = makeContext({ schema: {} });
++
++    expect(availableFacets(ctx, FACET_GROUPS[1])).toEqual([]);
++  });
++
++  it("groups the four dimensions into two low-cardinality searches", () => {
++    expect(FACET_GROUPS.map((group) => group.map((facet) => facet.key))).toEqual([
++      ["browser", "os"],
++      ["release", "page"],
++    ]);
++  });
++});
++
++describe("buildFacetSql", () => {
++  it("groups by every requested column", () => {
++    const ctx = makeContext();
++
++    expect(buildFacetSql(ctx, "type='error'", FACET_GROUPS[0])).toBe(
++      "SELECT user_agent_user_agent_family, user_agent_os_family, COUNT(*) AS events" +
++        " FROM \"_rumdata\" WHERE type='error'" +
++        " GROUP BY user_agent_user_agent_family, user_agent_os_family ORDER BY events DESC",
++    );
++  });
++
++  it("returns null when there is nothing to group by", () => {
++    expect(buildFacetSql(makeContext(), "type='error'", [])).toBeNull();
++  });
++});
++
++describe("buildBreadcrumbsSql", () => {
++  it("scopes the trail to one session and orders it chronologically", () => {
++    const sql = buildBreadcrumbsSql(makeContext(), "session-1");
++
++    expect(sql).toBe(
++      'SELECT * FROM "_rumdata"' +
++        " WHERE session_id='session-1' AND type IN ('error', 'action', 'view', 'resource')" +
++        " ORDER BY _timestamp",
++    );
++  });
++
++  it("escapes quotes in the session id", () => {
++    expect(buildBreadcrumbsSql(makeContext(), "a'b")).toContain("session_id='a''b'");
++  });
++});
++
++describe("pivotFacet", () => {
++  it("sums a dimension across the group-by cross product", () => {
++    const hits = [
++      { user_agent_user_agent_family: "Chrome", user_agent_os_family: "Mac", events: 6 },
++      { user_agent_user_agent_family: "Chrome", user_agent_os_family: "Windows", events: 2 },
++      { user_agent_user_agent_family: "Safari", user_agent_os_family: "Mac", events: 2 },
++    ];
++
++    expect(pivotFacet(hits, "user_agent_user_agent_family", "Unknown")).toEqual([
++      { value: "Chrome", events: 8, share: 0.8 },
++      { value: "Safari", events: 2, share: 0.2 },
++    ]);
++  });
++
++  it("folds missing and empty values into a single unknown bucket", () => {
++    const hits = [
++      { version: null, events: 1 },
++      { version: "", events: 1 },
++      { version: "2.4.1", events: 8 },
++    ];
++
++    expect(pivotFacet(hits, "version", "Unknown")).toEqual([
++      { value: "2.4.1", events: 8, share: 0.8 },
++      { value: "Unknown", events: 2, share: 0.2 },
++    ]);
++  });
++
++  it("caps the result at the requested top-N", () => {
++    const hits = Array.from({ length: 8 }, (_, index) => ({
++      version: `v${index}`,
++      events: 8 - index,
++    }));
++
++    expect(pivotFacet(hits, "version", "Unknown", 3).map((entry) => entry.value)).toEqual([
++      "v0",
++      "v1",
++      "v2",
++    ]);
++  });
++
++  it("returns an empty list when nothing was counted", () => {
++    expect(pivotFacet([{ version: "2.4.1", events: 0 }], "version", "Unknown")).toEqual([]);
++  });
++
++  it("returns an empty list for no hits at all", () => {
++    expect(pivotFacet([], "version", "Unknown")).toEqual([]);
++  });
++});
+diff --git a/web/src/utils/rum/errorDetailQueries.ts b/web/src/utils/rum/errorDetailQueries.ts
+new file mode 100644
+index 00000000000..1ccd5cbba23
+--- /dev/null
++++ b/web/src/utils/rum/errorDetailQueries.ts
+@@ -0,0 +1,163 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { escapeSqlString, type IssueSignature } from "@/utils/rum/errorIssueUtils";
++import { pickUserField } from "@/utils/rum/errorIssueQueries";
++
++/** Messages longer than this are dropped from the signature predicate. */
++export const MAX_SIGNATURE_MESSAGE_LEN = 4096;
++/** Distinct values shown per breakdown facet. */
++export const FACET_TOP_N = 5;
++/** Row cap for the facet group-by searches. */
++export const FACET_ROW_LIMIT = 1000;
++
++export interface ErrorDetailContext {
++  streamName: string;
++  timestampColumn: string;
++  /** Stream schema presence map — optional columns are guarded through it. */
++  schema: Record<string, boolean>;
++  /** The signature of the error being viewed (type + message + handling). */
++  signature: IssueSignature;
++}
++
++const SIGNATURE_FIELDS = ["error_type", "error_message", "error_handling"] as const;
++
++/**
++ * WHERE fragment pinning rows to this error's signature, or `null` when the
++ * signature is too weak to identify an issue — `error_handling` alone matches
++ * every error in the stream, so aggregates built on it would be nonsense and
++ * the caller should skip them instead.
++ */
++export const buildSignatureWhere = (ctx: ErrorDetailContext): string | null => {
++  const clauses = ["type='error'"];
++  let identifying = 0;
++  for (const field of SIGNATURE_FIELDS) {
++    const value = ctx.signature[field];
++    if (!ctx.schema[field] || value == null || value === "") continue;
++    if (field === "error_message" && String(value).length > MAX_SIGNATURE_MESSAGE_LEN) continue;
++    clauses.push(`${field}='${escapeSqlString(String(value))}'`);
++    if (field !== "error_handling") identifying++;
++  }
++  return identifying ? clauses.join(" AND ") : null;
++};
++
++/** Impact aggregates for this one issue: volume, reach, and its lifespan. */
++export const buildIssueImpactSql = (ctx: ErrorDetailContext, where: string): string => {
++  const ts = ctx.timestampColumn;
++  const userField = pickUserField(ctx.schema);
++  const select = ["COUNT(*) AS events", `MIN(${ts}) AS first_seen`, `MAX(${ts}) AS last_seen`];
++  if (ctx.schema["session_id"]) select.push("COUNT(DISTINCT session_id) AS sessions_affected");
++  if (userField) select.push(`COUNT(DISTINCT ${userField}) AS users_affected`);
++  return `SELECT ${select.join(", ")} FROM "${ctx.streamName}" WHERE ${where}`;
++};
++
++/** Occurrences of this one issue over time. */
++export const buildIssueOccurrencesSql = (
++  ctx: ErrorDetailContext,
++  where: string,
++  interval: string,
++): string =>
++  `SELECT histogram(${ctx.timestampColumn}, '${interval}') AS ts, COUNT(*) AS events` +
++  ` FROM "${ctx.streamName}" WHERE ${where} GROUP BY ts ORDER BY ts`;
++
++export type FacetKey = "browser" | "os" | "release" | "page";
++
++export interface FacetSpec {
++  key: FacetKey;
++  column: string;
++}
++
++/**
++ * The breakdown dimensions, split into two group-by searches. Splitting is
++ * deliberate: one query grouping all four columns returns their CROSS PRODUCT,
++ * which for a busy issue blows past any sane row cap. Grouping the two
++ * low-cardinality environment columns separately from the two
++ * higher-cardinality deployment columns keeps both result sets small.
++ */
++export const FACET_GROUPS: FacetSpec[][] = [
++  [
++    { key: "browser", column: "user_agent_user_agent_family" },
++    { key: "os", column: "user_agent_os_family" },
++  ],
++  [
++    { key: "release", column: "version" },
++    { key: "page", column: "view_url" },
++  ],
++];
++
++/** Facets whose column is actually present in the stream schema. */
++export const availableFacets = (ctx: ErrorDetailContext, group: FacetSpec[]): FacetSpec[] =>
++  group.filter((facet) => ctx.schema[facet.column]);
++
++export const buildFacetSql = (
++  ctx: ErrorDetailContext,
++  where: string,
++  facets: FacetSpec[],
++): string | null => {
++  if (!facets.length) return null;
++  const columns = facets.map((facet) => facet.column).join(", ");
++  return (
++    `SELECT ${columns}, COUNT(*) AS events FROM "${ctx.streamName}"` +
++    ` WHERE ${where} GROUP BY ${columns} ORDER BY events DESC`
++  );
++};
++
++/**
++ * Events from the SAME session around the failure — the breadcrumb trail.
++ * Scoping to the session is what makes the trail trustworthy: without it the
++ * list is whatever the stream happened to receive, i.e. other people's clicks.
++ */
++export const buildBreadcrumbsSql = (ctx: ErrorDetailContext, sessionId: string): string => {
++  const types = ["'error'", "'action'", "'view'", "'resource'"].join(", ");
++  return (
++    `SELECT * FROM "${ctx.streamName}"` +
++    ` WHERE session_id='${escapeSqlString(sessionId)}' AND type IN (${types})` +
++    ` ORDER BY ${ctx.timestampColumn}`
++  );
++};
++
++export interface FacetValue {
++  value: string;
++  events: number;
++  /** Share of this issue's events, 0–1. */
++  share: number;
++}
++
++/**
++ * Collapse a group-by result down to one dimension. Rows missing the column
++ * are folded into a single bucket keyed by `unknownLabel`, so the shares always
++ * add up to 100% rather than silently dropping traffic.
++ */
++export const pivotFacet = (
++  hits: any[],
++  column: string,
++  unknownLabel: string,
++  topN = FACET_TOP_N,
++): FacetValue[] => {
++  const totals = new Map<string, number>();
++  let grandTotal = 0;
++  for (const hit of hits) {
++    const value = hit?.[column];
++    const key = value == null || value === "" ? unknownLabel : String(value);
++    const events = Number(hit?.events) || 0;
++    totals.set(key, (totals.get(key) ?? 0) + events);
++    grandTotal += events;
++  }
++  if (!grandTotal) return [];
++  return [...totals.entries()]
++    .map(([value, events]) => ({ value, events, share: events / grandTotal }))
++    .sort((a, b) => b.events - a.events)
++    .slice(0, topN);
++};
+diff --git a/web/src/utils/rum/errorIssueQueries.ts b/web/src/utils/rum/errorIssueQueries.ts
+index ff903b5df61..570e7c76d03 100644
+--- a/web/src/utils/rum/errorIssueQueries.ts
++++ b/web/src/utils/rum/errorIssueQueries.ts
+@@ -237,6 +237,27 @@ export const pivotStackedHistogram = (
+   return buckets;
+ };
+ 
++/** Pivot a single-series histogram into a zero-filled `{ts, events}` array. */
++export const pivotCounts = (
++  hits: Array<{ ts: string | number; events: number }>,
++  windowStart: number,
++  windowEnd: number,
++  intervalMicros: number,
++): Array<{ ts: number; events: number }> => {
++  const start = alignedStart(windowStart, intervalMicros);
++  const count = bucketCount(windowStart, windowEnd, intervalMicros);
++  const buckets = Array.from({ length: count }, (_, i) => ({
++    ts: start + i * intervalMicros,
++    events: 0,
++  }));
++  for (const hit of hits) {
++    const index = Math.floor((histogramKeyToMicros(hit.ts) - start) / intervalMicros);
++    if (index < 0 || index >= count) continue;
++    buckets[index].events += Number(hit.events) || 0;
++  }
++  return buckets;
++};
++
+ /** Pivot Q3 hits into zero-filled per-issue bucket arrays keyed by issueKey. */
+ export const pivotTrends = (
+   hits: Array<{
+diff --git a/web/src/utils/rum/errorIssueUtils.ts b/web/src/utils/rum/errorIssueUtils.ts
+index 355148cbb75..cdca84e858a 100644
+--- a/web/src/utils/rum/errorIssueUtils.ts
++++ b/web/src/utils/rum/errorIssueUtils.ts
+@@ -220,3 +220,29 @@ export const formatRelativeTime = (timestampMicros: number): string => {
+     addSuffix: true,
+   });
+ };
++
++const AGE_UNITS: Array<{ micros: number; suffix: string }> = [
++  { micros: 86400 * 1_000_000, suffix: "d" },
++  { micros: 3600 * 1_000_000, suffix: "h" },
++  { micros: 60 * 1_000_000, suffix: "m" },
++  { micros: 1_000_000, suffix: "s" },
++];
++
++/**
++ * Age of a microsecond timestamp in one compact token ("2d", "45m", "now").
++ * The long form ("about 2 days ago") does not fit a stat tile's value slot,
++ * where the number has to stay on one line to be readable.
++ */
++export const formatCompactAge = (
++  timestampMicros: number,
++  nowMicros = Date.now() * 1000,
++): string => {
++  if (!timestampMicros) return "—";
++  const delta = Math.max(0, nowMicros - timestampMicros);
++  for (const unit of AGE_UNITS) {
++    if (delta >= unit.micros) return `${Math.floor(delta / unit.micros)}${unit.suffix}`;
++  }
++  // Units only, never a word: this string lands in a stat tile's value slot,
++  // which is not a translated surface.
++  return "0s";
++};
+diff --git a/web/src/views/RUM/ErrorViewer.spec.ts b/web/src/views/RUM/ErrorViewer.spec.ts
+index 0ad7ddf6b13..7f7f93d7481 100644
+--- a/web/src/views/RUM/ErrorViewer.spec.ts
++++ b/web/src/views/RUM/ErrorViewer.spec.ts
+@@ -48,14 +48,38 @@ vi.mock("@/components/rum/errorTracking/view/ErrorHeader.vue", () => ({
+   },
+ }));
+ 
+-vi.mock("@/components/rum/errorTracking/view/ErrorTags.vue", () => ({
++vi.mock("@/components/rum/errorTracking/view/ErrorContextCard.vue", () => ({
+   default: {
+-    name: "ErrorTags",
+-    template: "<div data-test='error-tags'>ErrorTags</div>",
++    name: "ErrorContextCard",
++    template: "<div data-test='error-context-card'>ErrorContextCard</div>",
+     props: ["error"],
+   },
+ }));
+ 
++vi.mock("@/components/rum/errorTracking/view/ErrorImpactStrip.vue", () => ({
++  default: {
++    name: "ErrorImpactStrip",
++    template: "<div data-test='error-impact-strip'>ErrorImpactStrip</div>",
++    props: ["impact", "loading", "hasSignature"],
++  },
++}));
++
++vi.mock("@/components/rum/errorTracking/view/ErrorOccurrencesChart.vue", () => ({
++  default: {
++    name: "ErrorOccurrencesChart",
++    template: "<div data-test='error-occurrences-chart'>ErrorOccurrencesChart</div>",
++    props: ["buckets", "loading", "currentTimestamp"],
++  },
++}));
++
++vi.mock("@/components/rum/errorTracking/view/ErrorFacetBreakdown.vue", () => ({
++  default: {
++    name: "ErrorFacetBreakdown",
++    template: "<div data-test='error-facet-breakdown'>ErrorFacetBreakdown</div>",
++    props: ["facets", "loading"],
++  },
++}));
++
+ vi.mock("@/components/rum/errorTracking/view/ErrorEvents.vue", () => ({
+   default: {
+     name: "ErrorEvents",
+@@ -398,7 +422,10 @@ describe("ErrorViewer.vue", () => {
+       await nextTick();
+ 
+       expect(wrapper.find('[data-test="error-header"]').exists()).toBe(true);
+-      expect(wrapper.find('[data-test="error-tags"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-impact-strip"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-occurrences-chart"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-facet-breakdown"]').exists()).toBe(true);
++      expect(wrapper.find('[data-test="error-context-card"]').exists()).toBe(true);
+       expect(wrapper.find('[data-test="error-stack-trace"]').exists()).toBe(true);
+       expect(wrapper.find('[data-test="error-session-replay"]').exists()).toBe(true);
+       expect(wrapper.find('[data-test="error-events"]').exists()).toBe(true);
+@@ -437,9 +464,14 @@ describe("ErrorViewer.vue", () => {
+       expect(errorHeader.props("error")).toEqual(wrapper.vm.errorDetails);
+     });
+ 
+-    it("should pass correct props to ErrorTags", () => {
+-      const errorTags = wrapper.findComponent({ name: "ErrorTags" });
+-      expect(errorTags.props("error")).toEqual(wrapper.vm.errorDetails);
++    it("should pass correct props to ErrorContextCard", () => {
++      const contextCard = wrapper.findComponent({ name: "ErrorContextCard" });
++      expect(contextCard.props("error")).toEqual(wrapper.vm.errorDetails);
++    });
++
++    it("should anchor the occurrences chart on the viewed event", () => {
++      const chart = wrapper.findComponent({ name: "ErrorOccurrencesChart" });
++      expect(chart.props("currentTimestamp")).toBe(wrapper.vm.errorDetails._timestamp);
+     });
+ 
+     it("should pass correct props to ErrorStackTrace", () => {
+diff --git a/web/src/views/RUM/ErrorViewer.vue b/web/src/views/RUM/ErrorViewer.vue
+index 43217251ee1..468fb72d261 100644
+--- a/web/src/views/RUM/ErrorViewer.vue
++++ b/web/src/views/RUM/ErrorViewer.vue
+@@ -26,46 +26,77 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         </div>
+       </div>
+     </template>
+-    <div v-else>
++    <div v-else class="pb-4">
+       <div class="py-2.5">
+         <ErrorHeader :error="errorDetails" />
+       </div>
+       <OSeparator class="w-full" />
+-      <div class="px-page-edge py-2.5">
+-        <ErrorTags :error="errorDetails" />
+-        <ErrorStackTrace :error_stack="errorDetails.error_stack || []" :error="errorDetails" />
+-        <ErrorSessionReplay :error="errorDetails" />
+-        <TraceCorrelationCard
+-          v-if="errorTraceId"
+-          :trace-id="errorTraceId"
+-          :session-id="errorDetails.session_id || ''"
+-          :timestamp="errorDetails._timestamp || 0"
+-          data-test="error-viewer-trace-correlation"
++
++      <div class="px-page-edge flex flex-col gap-3 py-3">
++        <ErrorImpactStrip
++          :impact="impact"
++          :loading="isLoadingImpact"
++          :has-signature="hasSignature"
+         />
+-        <ErrorEvents :error="errorDetails" />
++
++        <!--
++          Two columns: the diagnosis path (what happened, in code) on the left,
++          the corroborating evidence (replay, backend trace, who/where) on the
++          right. Collapses to one column below xl, keeping that reading order.
++        -->
++        <div class="grid grid-cols-1 gap-3 xl:grid-cols-3">
++          <div class="flex min-w-0 flex-col gap-3 xl:col-span-2">
++            <ErrorOccurrencesChart
++              :buckets="occurrences"
++              :loading="isLoadingInsights"
++              :current-timestamp="errorDetails._timestamp"
++            />
++            <ErrorStackTrace :error_stack="errorDetails.error_stack || []" :error="errorDetails" />
++            <ErrorEvents :error="errorDetails" />
++          </div>
++
++          <aside class="flex min-w-0 flex-col gap-3">
++            <ErrorSessionReplay :error="errorDetails" />
++            <TraceCorrelationCard
++              v-if="errorTraceId"
++              :trace-id="errorTraceId"
++              :session-id="errorDetails.session_id || ''"
++              :timestamp="errorDetails._timestamp || 0"
++              data-test="error-viewer-trace-correlation"
++            />
++            <ErrorFacetBreakdown :facets="facets" :loading="isLoadingInsights" />
++            <ErrorContextCard :error="errorDetails" />
++          </aside>
++        </div>
+       </div>
+     </div>
+   </div>
+ </template>
+ 
+ <script setup lang="ts">
+-import { rumField } from "@/utils/rum/fields";
+ // Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+ // view. Without it the name is inferred from the FILENAME, so renaming the file
+ // would silently drop it from the cache and bring back the refetch-on-return.
+ defineOptions({ name: "ErrorViewer" });
+ 
+-import { computed, onActivated, ref } from "vue";
++import { computed, onActivated, onBeforeUnmount, onDeactivated, ref } from "vue";
++import { useRouter } from "vue-router";
++import { useStore } from "vuex";
+ import ErrorHeader from "@/components/rum/errorTracking/view/ErrorHeader.vue";
+-import ErrorTags from "@/components/rum/errorTracking/view/ErrorTags.vue";
+ import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
+ import ErrorSessionReplay from "@/components/rum/errorTracking/view/ErrorSessionReplay.vue";
+-import { useRouter } from "vue-router";
+-import { useStore } from "vuex";
+-import useErrorTracking from "@/composables/useErrorTracking";
+-import searchService from "@/services/search";
+ import ErrorStackTrace from "@/components/rum/errorTracking/view/ErrorStackTrace.vue";
++import ErrorImpactStrip from "@/components/rum/errorTracking/view/ErrorImpactStrip.vue";
++import ErrorOccurrencesChart from "@/components/rum/errorTracking/view/ErrorOccurrencesChart.vue";
++import ErrorFacetBreakdown from "@/components/rum/errorTracking/view/ErrorFacetBreakdown.vue";
++import ErrorContextCard from "@/components/rum/errorTracking/view/ErrorContextCard.vue";
+ import TraceCorrelationCard from "@/components/rum/correlation/TraceCorrelationCard.vue";
++import useErrorTracking from "@/composables/useErrorTracking";
++import useErrorDetail from "@/composables/rum/useErrorDetail";
++import useStreams from "@/composables/useStreams";
++import searchService from "@/services/search";
++import { rumField } from "@/utils/rum/fields";
++import { buildBreadcrumbsSql, type ErrorDetailContext } from "@/utils/rum/errorDetailQueries";
+ import { useI18nTyped } from "@/types/i18n";
+ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+@@ -76,13 +107,42 @@ const isLoading = ref<boolean[]>([]);
+ const router = useRouter();
+ const store = useStore();
+ const { errorTrackingState } = useErrorTracking();
++const { getStream } = useStreams(t);
+ const errorDetails = ref<any>({});
++const streamSchema = ref<Record<string, boolean>>({});
+ 
+-onActivated(async () => {
+-  await getError();
+-  getErrorLogs();
++const {
++  impact,
++  occurrences,
++  facets,
++  hasSignature,
++  isLoadingImpact,
++  isLoadingInsights,
++  fetchDetail,
++  cancelAll,
++} = useErrorDetail(t);
++
++/** Breadcrumbs are read from a bounded slice of the session around the error. */
++const BREADCRUMB_WINDOW_US = 1_800_000_000;
++/** Steps shown leading up to the failure, and the few that follow it. */
++const BREADCRUMBS_BEFORE = 30;
++const BREADCRUMBS_AFTER = 5;
++/** Fallback analysis window when the page is opened without one (deep link). */
++const DEFAULT_ANALYSIS_SPAN_US = 86_400_000_000;
++
++onActivated(() => {
++  // Each stage already degrades on its own; this only stops an unexpected
++  // rejection surfacing as an unhandled promise.
++  load().catch(() => {
++    isLoading.value = [];
++  });
+ });
+ 
++// Leaving frees the searches this page started; the server holds a work-group
++// slot until each request completes, so abandoned runs starve the next view.
++onBeforeUnmount(() => cancelAll());
++onDeactivated(() => cancelAll());
++
+ const getTimestamp = computed(() => {
+   return Number(router.currentRoute.value.query.timestamp) || 30000;
+ });
+@@ -99,37 +159,98 @@ const errorTraceId = computed(() => {
+   return rumField<string>(xhrWithTrace, "trace_id") || "";
+ });
+ 
+-const getErrorLogs = () => {
+-  const req = {
+-    query: {
+-      sql: 'select *[QUERY_FUNCTIONS] from "[INDEX_NAME]" [WHERE_CLAUSE]',
+-      start_time: getTimestamp.value - 3600000000,
+-      end_time: getTimestamp.value + 1,
+-      from: 0,
+-      size: 150,
++/**
++ * The window the issue-level aggregates are computed over. It mirrors the range
++ * the errors list was queried with, so "12 occurrences" on this page means the
++ * same thing as the row the user clicked. A deep link has no such range, so it
++ * falls back to the day ending at the error.
++ */
++const analysisRange = computed(() => {
++  const { startTime, endTime } = errorTrackingState.data.datetime ?? {};
++  if (startTime && endTime && endTime > startTime) return { startTime, endTime };
++  const end = getTimestamp.value;
++  return { startTime: end - DEFAULT_ANALYSIS_SPAN_US, endTime: end + 1 };
++});
++
++const load = async () => {
++  await Promise.all([getError(), loadSchema()]);
++  if (!errorDetails.value?.error_id && !errorDetails.value?.error_message) return;
++  getErrorLogs();
++  fetchDetail({
++    signature: {
++      error_type: errorDetails.value.error_type,
++      error_message: errorDetails.value.error_message,
++      error_handling: errorDetails.value.error_handling,
+     },
+-  };
++    schema: streamSchema.value,
++    ...analysisRange.value,
++  });
++};
+ 
+-  req.query.sql = `select * from ${errorTrackingState.data.stream.errorStream} where type='error' or type='action' or type='view' or (type='resource' and resource_type='xhr') order by ${store.state.zoConfig.timestamp_column}`;
++const loadSchema = async () => {
++  // The SQL builders name optional columns, and naming one the stream lacks
++  // fails the WHOLE query — so the schema decides which aggregates can run.
++  try {
++    const stream = await getStream(errorTrackingState.data.stream.errorStream, "logs", true);
++    const presence: Record<string, boolean> = {};
++    for (const field of stream?.schema ?? []) presence[field.name] = true;
++    streamSchema.value = presence;
++  } catch {
++    streamSchema.value = {};
++  }
++};
++
++const detailContext = computed<ErrorDetailContext>(() => ({
++  streamName: errorTrackingState.data.stream.errorStream,
++  timestampColumn: store.state.zoConfig.timestamp_column || "_timestamp",
++  schema: streamSchema.value,
++  signature: {},
++}));
++
++/**
++ * The breadcrumb trail: what this user did in THIS session before the crash.
++ * Scoped to the session id — an unscoped read returns whatever the stream
++ * happened to receive in the window, i.e. other people's clicks presented as
++ * the reproduction steps.
++ */
++const getErrorLogs = () => {
++  const sessionId = errorDetails.value.session_id;
++  if (!sessionId) {
++    errorDetails.value.events = [];
++    return;
++  }
++
++  const errorTs = Number(errorDetails.value._timestamp) || getTimestamp.value;
+   isLoading.value.push(true);
+   searchService
+     .search(
+       {
+         org_identifier: store.state.selectedOrganization.identifier,
+-        query: req,
++        query: {
++          query: {
++            sql: buildBreadcrumbsSql(detailContext.value, sessionId),
++            start_time: errorTs - BREADCRUMB_WINDOW_US,
++            end_time: errorTs + BREADCRUMB_WINDOW_US,
++            from: 0,
++            size: 500,
++          },
++        },
+         page_type: "logs",
+       },
+       "RUM",
+     )
+     .then((res) => {
+-      const errorIndex = res.data.hits.findIndex(
+-        (hit: any) => hit.error_id === errorDetails.value.error_id,
+-      );
+-      errorDetails.value.events = res.data.hits.slice(errorIndex, errorIndex + 100);
+-      errorDetails.value.events = errorDetails.value.events.map((event: any) => ({
+-        ...event,
+-        category: getErrorCategory(event),
+-      }));
++      const hits = res.data.hits ?? [];
++      const errorIndex = hits.findIndex((hit: any) => hit.error_id === errorDetails.value.error_id);
++      // Without the error in the result set, anchor on the tail so the user
++      // still sees the most recent activity rather than an empty timeline.
++      const anchor = errorIndex >= 0 ? errorIndex : hits.length - 1;
++      errorDetails.value.events = hits
++        .slice(Math.max(0, anchor - BREADCRUMBS_BEFORE), anchor + BREADCRUMBS_AFTER + 1)
++        .map((event: any) => ({ ...event, category: getErrorCategory(event) }));
++    })
++    .catch(() => {
++      errorDetails.value.events = [];
+     })
+     .finally(() => isLoading.value.pop());
+ };
+@@ -172,7 +293,7 @@ const getError = () => {
+         // Prioritize error_stack (actual application error) over error_handling_stack (Vue internals)
+         const errorStack =
+           errorDetails.value.error_stack || errorDetails.value.error_handling_stack;
+-        errorDetails.value.error_stack = errorStack.split("\n");
++        errorDetails.value.error_stack = errorStack ? errorStack.split("\n") : [];
+         // Keep the original stack for translation
+         errorDetails.value.original_error_stack = errorDetails.value.error_stack;
+       })

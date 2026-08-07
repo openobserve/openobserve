@@ -1,0 +1,7 @@
+[
+  {
+    "title": "P2: should show empty state message when no facet data available",
+    "action": "extend",
+    "verifies": "facet breakdown renders either empty state or section (not null) when error has no signature"
+  }
+]
