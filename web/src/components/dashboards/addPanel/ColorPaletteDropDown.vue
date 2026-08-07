@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :label="t('dashboard.colorPalette')"
         class="showLabelOnTop flex-1"
         @update:model-value="onColorModeChange"
-        :dropdownStyle="{ width: '240px' }"
+        :dropdownStyle="{ width: '15rem' }"
       >
         <template #trigger>
           <div class="flex min-w-0 flex-1 items-center gap-1.5">

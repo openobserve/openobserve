@@ -192,7 +192,7 @@
             <OIcon name="info-outline" size="sm" class="text-text-secondary">
               <OTooltip
                 :content="t('onlineEvals.scoreConfig.healthyThresholdIntro')"
-                max-width="300px"
+                max-width="18.75rem"
               />
             </OIcon>
           </span>

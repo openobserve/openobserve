@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Advanced Options -->
         <div
-          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border flex flex-col overflow-hidden border shadow-[0_0_5px_1px_var(--color-hover-shadow)] transition-all"
+          class="collapsible-section bg-card-glass-bg rounded-default border-card-glass-border shadow-hover-shadow flex flex-col overflow-hidden border shadow-md transition-all"
           data-test="advanced-options-section"
         >
           <div

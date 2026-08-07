@@ -117,9 +117,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
                 <OCard
-                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_4px_12px_color-mix(in_srgb,var(--color-black)_15%,transparent)]"
+                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   :class="{
-                    'border-theme-accent border-2 shadow-[0_4px_12px_color-mix(in_srgb,var(--color-theme-accent)_30%,transparent)]':
+                    'border-theme-accent shadow-theme-accent/30 border-2 shadow-md':
                       selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"

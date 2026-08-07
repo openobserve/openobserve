@@ -54,6 +54,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="messages-view"
             :class="shouldFillSingleJsonMessage && 'h-full'"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-for="(msg, idx) in previewMessages"
               :key="idx"
@@ -61,9 +62,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
               :style="{
                 border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
+                borderRadius: '0.5rem',
               }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
@@ -71,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ roleLabel(msg.role) }}
               </div>
               <div
@@ -149,6 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="messages-view"
             :class="shouldFillSingleJsonMessage && 'h-full'"
           >
+            <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
             <div
               v-for="(msg, idx) in parsedMessages"
               :key="idx"
@@ -156,9 +161,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="shouldFillSingleJsonMessage && 'mb-0 flex h-full flex-col'"
               :style="{
                 border: '1px solid var(--color-border-default)',
-                borderRadius: '8px',
+                borderRadius: '0.5rem',
               }"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
               <div
                 class="message-role p-2 text-xs font-bold capitalize"
                 :style="{
@@ -166,6 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   borderBottom: '1px solid var(--color-border-default)',
                 }"
               >
+                <!-- eslint-enable local/no-hardcoded-px -->
                 {{ roleLabel(msg.role) }}
               </div>
               <div
@@ -738,6 +746,7 @@ const renderMarkdown = (content: string): string => {
 
 .messages-view .message-item .message-content :deep(table th),
 .messages-view .message-item .message-content :deep(table td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table rule must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   padding: 0.375rem 0.5rem;
   text-align: left;

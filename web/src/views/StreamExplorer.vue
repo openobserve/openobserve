@@ -10,6 +10,7 @@
       :is-loading="isLoading"
       @change:date-time="updateDateTime"
     />
+    <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div class="h-[calc(100vh-197px)]">
       <OTable
         data-test="stream-explorer-results-table"

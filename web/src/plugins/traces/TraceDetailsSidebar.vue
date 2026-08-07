@@ -558,6 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </JsonPreview>
           </div>
           <!-- Table View -->
+          <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
           <div
             v-else
             class="tab-content-dynamic-height border-card-glass-border flex-1 overflow-hidden border-1 border-solid"
@@ -568,6 +569,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             data-test="trace-details-sidebar-attributes-tenstack-table"
           >
+            <!-- eslint-enable local/no-hardcoded-px -->
             <OTable
               :data="attributesTableRows"
               :columns="attributesTableColumns"
@@ -619,6 +621,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
+            <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
             <div
               class="traces-events-table-container tab-content-dynamic-height border-card-glass-border rounded-default flex-1 overflow-hidden border-1 border-solid"
               :class="
@@ -628,6 +631,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
               data-test="trace-details-sidebar-events-table"
             >
+              <!-- eslint-enable local/no-hardcoded-px -->
               <OTable
                 :data="eventsRowsWithKey"
                 :columns="eventsTableColumns"
@@ -2036,7 +2040,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(complex-state): Deliberate CSS — generated content the template can't class up,
    child-component internals reached with :deep(), :fullscreen chains, and
    scrollbar rails. */
@@ -2084,7 +2088,9 @@ export default defineComponent({
 .trace-details-sidebar :deep(.trace-detail-tab-table) {
   th,
   td {
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-bottom: 1px solid var(--color-table-row-divider);
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
     border-right: 1px solid var(--color-table-row-divider);
     text-align: left;
     padding: 0.5rem;

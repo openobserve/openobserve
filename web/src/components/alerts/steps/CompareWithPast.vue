@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="t('alerts.compareWithPast.cycleTooltip')"
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                 />
               </span>
             </div>
@@ -144,7 +144,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="t('alerts.compareWithPast.timeFrameTooltip')"
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                 />
               </span>
             </div>
@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :content="t('alerts.compareWithPast.cycleTooltip')"
                   side="right"
                   align="center"
-                  max-width="300px"
+                  max-width="18.75rem"
                 />
               </span>
             </div>

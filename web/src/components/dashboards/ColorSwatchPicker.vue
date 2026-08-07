@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- None — checkerboard tint with a diagonal strike -->
     <button
       type="button"
-      class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_2px,transparent_2px,transparent_6px)] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
+      class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border bg-[repeating-linear-gradient(45deg,color-mix(in_srgb,var(--color-grey-500)_12%,transparent),color-mix(in_srgb,var(--color-grey-500)_12%,transparent)_0.125rem,transparent_0.125rem,transparent_0.375rem)] p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
       :class="!modelValue ? 'border-accent ring-focus-ring ring-2' : ''"
       :title="t('dashboard.colorNone')"
       :aria-label="t('dashboard.colorNone')"

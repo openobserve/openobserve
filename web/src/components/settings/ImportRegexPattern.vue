@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #output-content>
         <div
           class="border-border-default flex h-full w-full flex-col border-l"
-          style="min-width: 400px"
+          style="min-width: 25rem"
         >
           <div
             v-if="regexPatternErrorsToDisplay.length > 0"
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       "
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
+                      <div style="width: 18.75rem">
                         <OInput
                           data-test="regex-pattern-import-name-input"
                           v-model="userSelectedRegexPatternName[index]"
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ errorMessage.message }}
                       <!-- name is required so we need to show the input field -->
-                      <div style="width: 300px">
+                      <div style="width: 18.75rem">
                         <OInput
                           data-test="regex-pattern-import-name-input"
                           v-model="userSelectedRegexPattern[index]"

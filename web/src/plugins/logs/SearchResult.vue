@@ -2499,7 +2499,7 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 /* keep(lib-override:logs-cell-font): the monospace log-cell font. Body cells are
    rendered by OTableBodyCell, so the rule must reach them through :deep(), and it
    is scoped to the DATA cells so the expanded row keeps its own typography. */
@@ -2557,81 +2557,82 @@ export default defineComponent({
   padding: 0.5rem 0;
   font-size: var(--text-xs);
   outline: none;
+}
 
-  &__time {
-    font-size: var(--text-2xs);
-    font-weight: 500;
-    opacity: 0.65;
-    padding: 0 0.625rem 0.25rem;
-    margin-bottom: 0;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-grey-500) 15%, transparent);
+.oo-pin-tooltip__time {
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  opacity: 0.65;
+  padding: 0 0.625rem 0.25rem;
+  margin-bottom: 0;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
+  border-bottom: 1px solid color-mix(in srgb, var(--color-grey-500) 15%, transparent);
+}
+
+.oo-pin-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.0625rem 0.625rem;
+  transition: background 0.1s;
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-grey-500) 12%, transparent);
   }
+}
 
-  &__row {
-    display: flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 1px 0.625rem;
-    transition: background 0.1s;
+.oo-pin-tooltip__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
-    &:hover {
-      background: color-mix(in srgb, var(--color-grey-500) 12%, transparent);
-    }
+.oo-pin-tooltip__name {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.oo-pin-tooltip__count {
+  font-weight: 600;
+  min-width: 2rem;
+  text-align: right;
+  transition: opacity 0.1s;
+}
+
+.oo-pin-tooltip__row-actions {
+  display: flex;
+  gap: 0.1875rem;
+  flex-shrink: 0;
+  margin-left: 0.25rem;
+}
+
+.oo-pin-tooltip__action {
+  width: 1.375rem;
+  height: 1.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-default);
+  cursor: pointer;
+  font-size: var(--text-compact);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.oo-pin-tooltip__action--include {
+  background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
+
+  &:hover {
+    background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
   }
+}
 
-  &__dot {
-    width: 0.5rem;
-    height: 0.5rem;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
+.oo-pin-tooltip__action--exclude {
+  background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
 
-  &__name {
-    flex: 1;
-    white-space: nowrap;
-  }
-
-  &__count {
-    font-weight: 600;
-    min-width: 2rem;
-    text-align: right;
-    transition: opacity 0.1s;
-  }
-
-  &__row-actions {
-    display: flex;
-    gap: 0.1875rem;
-    flex-shrink: 0;
-    margin-left: 0.25rem;
-  }
-
-  &__action {
-    width: 1.375rem;
-    height: 1.375rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-default);
-    cursor: pointer;
-    font-size: var(--text-compact);
-    font-weight: 700;
-    line-height: 1;
-
-    &--include {
-      background: color-mix(in srgb, var(--color-status-info-text) 12%, transparent);
-
-      &:hover {
-        background: color-mix(in srgb, var(--color-status-info-text) 25%, transparent);
-      }
-    }
-
-    &--exclude {
-      background: color-mix(in srgb, var(--color-status-error-text) 8%, transparent);
-
-      &:hover {
-        background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
-      }
-    }
+  &:hover {
+    background: color-mix(in srgb, var(--color-status-error-text) 20%, transparent);
   }
 }
 
@@ -2682,28 +2683,28 @@ export default defineComponent({
 .histogram-container {
   border-radius: 0.5rem;
   position: relative;
+}
 
-  /* Pinned along X only: still scrolls away with the log lines, but stays put
-     when the wide results table scrolls sideways. */
-  &--pinned-x {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-  }
+/* Pinned along X only: still scrolls away with the log lines, but stays put
+   when the wide results table scrolls sideways. */
+.histogram-container--pinned-x {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
 
-  &--visible {
-    height: 6.25rem;
-    padding-top: 0.25rem;
-    opacity: 1;
-    transition: all 0.3s ease-in-out;
-  }
+.histogram-container--visible {
+  height: 6.25rem;
+  padding-top: 0.25rem;
+  opacity: 1;
+  transition: all 0.3s ease-in-out;
+}
 
-  &--hidden {
-    height: 0;
-    opacity: 0;
-    overflow: hidden;
-    transition: all 0.3s ease-in-out;
-  }
+.histogram-container--hidden {
+  height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
 }
 
 .histogram-chart {
@@ -2718,10 +2719,10 @@ export default defineComponent({
 .histogram-empty {
   height: 6.25rem;
   border-radius: 0.5rem;
+}
 
-  &__message {
-    min-height: 2rem;
-  }
+.histogram-empty__message {
+  min-height: 2rem;
 }
 
 .histogram-skeleton {
@@ -2738,85 +2739,85 @@ export default defineComponent({
   flex-direction: column;
   padding-top: 0.25rem;
   overflow: hidden;
+}
 
-  &__main {
-    flex: 1;
-    display: flex;
-    min-height: 0;
+.histogram-skeleton__main {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.histogram-skeleton__y-axis {
+  width: 2.25rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-right: 0.3125rem;
+  padding-bottom: 0.125rem;
+}
+
+.histogram-skeleton__y-label {
+  height: 0.4375rem;
+  border-radius: 0.125rem;
+  background-color: var(--hsk-bar);
+}
+
+.histogram-skeleton__plot {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.histogram-skeleton__bars {
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  gap: 0.125rem;
+  padding: 0.25rem 0.25rem 0;
+  overflow: hidden;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      transparent 20%,
+      var(--hsk-shimmer) 50%,
+      transparent 80%,
+      transparent 100%
+    );
+    animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
+    pointer-events: none;
   }
+}
 
-  &__y-axis {
-    width: 2.25rem;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding-right: 0.3125rem;
-    padding-bottom: 0.125rem;
-  }
+.histogram-skeleton__bar {
+  flex: 0 0 0.4375rem;
+  flex-shrink: 0;
+  border-radius: 0.0625rem 0.0625rem 0 0;
+  background-color: var(--hsk-bar);
+}
 
-  &__y-label {
-    height: 0.4375rem;
-    border-radius: 0.125rem;
-    background-color: var(--hsk-bar);
-  }
+.histogram-skeleton__x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding-left: 2.25rem;
+  padding-top: 0.1875rem;
+}
 
-  &__plot {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-  }
-
-  &__bars {
-    flex: 1;
-    display: flex;
-    align-items: flex-end;
-    gap: 0.125rem;
-    padding: 0.25rem 0.25rem 0;
-    overflow: hidden;
-    position: relative;
-
-    &::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(
-        90deg,
-        transparent 0%,
-        transparent 20%,
-        var(--hsk-shimmer) 50%,
-        transparent 80%,
-        transparent 100%
-      );
-      animation: histogram-bar-shimmer 1.6s ease-in-out infinite;
-      pointer-events: none;
-    }
-  }
-
-  &__bar {
-    flex: 0 0 0.4375rem;
-    flex-shrink: 0;
-    border-radius: 0.0625rem 0.0625rem 0 0;
-    background-color: var(--hsk-bar);
-  }
-
-  &__x-axis {
-    display: flex;
-    justify-content: space-between;
-    padding-left: 2.25rem;
-    padding-top: 0.1875rem;
-  }
-
-  &__x-label {
-    width: 2.25rem;
-    height: 0.4375rem;
-    border-radius: 0.125rem;
-  }
+.histogram-skeleton__x-label {
+  width: 2.25rem;
+  height: 0.4375rem;
+  border-radius: 0.125rem;
 }
 
 @keyframes histogram-bar-shimmer {
@@ -2831,9 +2832,9 @@ export default defineComponent({
 .histogram-error {
   margin: 0.5rem 0;
   border-radius: 0.5rem;
+}
 
-  &__message {
-    min-height: 2rem;
-  }
+.histogram-error__message {
+  min-height: 2rem;
 }
 </style>

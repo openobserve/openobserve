@@ -247,6 +247,7 @@ function getPivotRowColStyle(colId: string): Record<string, any> {
     position: "sticky",
     left: `${leftOffset}px`,
     zIndex: 12,
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text
     boxShadow: leftOffset > 0 ? "2px 0 4px -2px var(--color-border-default)" : "none",
     backgroundColor: "var(--color-table-header-bg)",
   };
@@ -269,6 +270,7 @@ function getPivotTotalHeaderStyle(cell: any): Record<string, any> {
     backgroundColor: "var(--color-table-header-bg)",
     // Same separator the pinned/actions columns use; the body and grand-total
     // cells carry it too, so the whole column reads as one shadowed column.
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
@@ -288,6 +290,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
     minWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     maxWidth: `${PIVOT_TABLE_TOTAL_COLUMN_WIDTH}px`,
     backgroundColor: "var(--color-table-header-bg)",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — the sticky total-column separator shadow would bloom if it scaled with text
     boxShadow: "-2px 0 4px -2px var(--color-border-default)",
   };
 }
@@ -464,6 +467,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
       />
 
       <!-- Column headers -->
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text -->
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
@@ -522,6 +526,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ...getStandardStickyTotalStyle(header),
         }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',
@@ -760,6 +765,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
         aria-hidden="true"
       />
 
+      <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — the pinned-column edge shadow would bloom if it scaled with text -->
       <th
         v-for="header in headerGroup.headers"
         :key="header.id"
@@ -811,6 +817,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           ...getStandardStickyTotalStyle(header),
         }"
       >
+        <!-- eslint-enable local/no-hardcoded-px -->
         <div
           :class="[
             'flex h-full min-w-0 items-center gap-1 overflow-hidden',

@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
-                style="width: 200px"
+                style="width: 12.5rem"
                 :placeholder="
                   {
                     'api-limits': t('quota.api-search'),

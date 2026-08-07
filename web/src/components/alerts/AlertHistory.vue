@@ -79,6 +79,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <OTable
           data-test="alert-history-table"
           :data="rows"
@@ -101,6 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @pagination-change="onPaginationChange"
           @sort-change="onSortChange"
         >
+          <!-- eslint-enable local/no-hardcoded-px -->
           <template #empty>
             <div class="h-screen w-full">
               <NoData />
@@ -158,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="alert-history-group-label"
               >
                 {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                <OTooltip :content="row.group_label" :max-width="'300px'" />
+                <OTooltip :content="row.group_label" :max-width="'18.75rem'" />
               </span>
             </div>
           </template>

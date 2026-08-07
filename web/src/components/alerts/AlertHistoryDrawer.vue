@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :value="row.status"
                         data-test="alert-history-status-chip"
                       />
-                      <OTooltip v-if="row.error" :max-width="'300px'" :content="row.error" />
+                      <OTooltip v-if="row.error" :max-width="'18.75rem'" :content="row.error" />
                     </span>
                   </template>
 
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-history-group-label"
                       >
                         {{ t("alerts.historyTable.forGroup", { group: row.group_label }) }}
-                        <OTooltip :content="row.group_label" :max-width="'300px'" />
+                        <OTooltip :content="row.group_label" :max-width="'18.75rem'" />
                       </span>
                     </div>
                   </template>
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </OButton>
                 </div>
                 <pre
-                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
                   >{{ anomalySql || t("alerts.alertDetails.noCondition") }}</pre>
               </div>
             </template>
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <!-- Code content — scrolls internally -->
                 <pre
-                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[10px_14px] font-mono leading-relaxed whitespace-pre-wrap"
+                  class="text-compact m-0 flex-1 overflow-x-auto overflow-y-auto p-[0.625rem_0.875rem] font-mono leading-relaxed whitespace-pre-wrap"
                   >{{
                     alertDetails.conditions !== "" && alertDetails.conditions !== "--"
                       ? alertDetails.type === "sql" || alertDetails.type === "promql"

@@ -176,7 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_15%,transparent)] dark:shadow-[0_2px_8px_color-mix(in_srgb,var(--color-black)_40%,transparent)]"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
         data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
@@ -606,6 +606,7 @@ export default defineComponent({
         top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
         transform: "translateY(-50%)",
         backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
+        // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
         boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
       };
     };

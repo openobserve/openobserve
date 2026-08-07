@@ -1104,7 +1104,9 @@ export default defineComponent({
 
 .o2-schema-table :deep(thead th),
 .o2-schema-table :deep(tbody td) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-right: 1px solid var(--color-card-glass-border);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel table cell divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid var(--color-card-glass-border);
 }
 

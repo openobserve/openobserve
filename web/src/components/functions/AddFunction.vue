@@ -153,12 +153,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
         :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
       >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
         <O2AIChat
           class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
           :aiChatInputContext="aiChatInputContext"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </div>

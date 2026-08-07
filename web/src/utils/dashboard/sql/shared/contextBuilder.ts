@@ -353,6 +353,7 @@ export function buildSQLContext(
   // If truncate width is not set and not time-based/horizontal, calculate the actual max width from data
   if (!hasTimestampField && !isHorizontalChart && labelWidth === 0 && xAxisKeys.length > 0) {
     const longestLabelStr = largestLabel(getAxisDataFromKey(xAxisKeys[0]));
+    // eslint-disable-next-line local/no-hardcoded-px -- must match `labelFontSize` below, which ECharts paints axis labels at as a literal CSS px that never scales with the root; rem here would over-reserve nameGap
     labelWidth = calculateWidthText(longestLabelStr, "12px");
   } else if (!hasTimestampField && !isHorizontalChart && labelWidth === 0) {
     labelWidth = 120; // Fallback
@@ -443,6 +444,7 @@ export function buildSQLContext(
       borderWidth: 1,
       padding: [8, 12],
       extraCssText:
+        // eslint-disable-next-line local/no-hardcoded-px -- ECharts serialises this into its own container — no CSS cascade resolves rem
         "max-height: 200px; overflow: auto; max-width: 400px; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;",
       axisPointer: {
         type: "cross",

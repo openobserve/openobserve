@@ -229,6 +229,7 @@ onMounted(() => {
     (entries) => {
       isVisible.value = entries[0].isIntersecting;
     },
+    // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
     { root: null, rootMargin: "200px", threshold: 0 },
   );
   setTimeout(() => {

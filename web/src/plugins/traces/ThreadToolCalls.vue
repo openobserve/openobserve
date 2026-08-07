@@ -176,7 +176,7 @@ function formatDuration(ns: number): string {
 }
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(complex-state): the tiled SVG zigzag artwork (masked so it takes a theme
    token) plus the nested per-tool open/hover state cascade the utility layer
    cannot express. */
@@ -218,6 +218,7 @@ function formatDuration(ns: number): string {
     gap: 0.125rem;
     padding: 0.5rem 1.125rem;
     border-radius: 0.625rem;
+    /* eslint-disable-next-line local/no-hardcoded-px -- optical effect (box-shadow offset), not layout — scaling it with text makes elevation bloom */
     box-shadow: 0 1px 0.125rem color-mix(in srgb, var(--color-black) 4%, transparent);
     transition:
       box-shadow 0.15s ease,
@@ -258,6 +259,7 @@ function formatDuration(ns: number): string {
 }
 
 .thread-tool {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel tool row divider must not scale with text or it smears at fractional zoom */
   border-bottom: 1px solid color-mix(in srgb, var(--tt-accent) 15%, transparent);
   background: color-mix(in srgb, var(--tt-accent) 4%, transparent);
   transition: background 120ms ease;
@@ -265,10 +267,10 @@ function formatDuration(ns: number): string {
   &:last-child {
     border-bottom: none;
   }
+}
 
-  &--open {
-    background: color-mix(in srgb, var(--tt-accent) 10%, transparent);
-  }
+.thread-tool--open {
+  background: color-mix(in srgb, var(--tt-accent) 10%, transparent);
 }
 
 .thread-tool-row {
@@ -283,46 +285,46 @@ function formatDuration(ns: number): string {
   &:hover {
     background: color-mix(in srgb, var(--tt-accent) 12%, transparent);
   }
+}
 
-  &__caret {
-    font-size: var(--text-2xs);
-    width: 0.75rem;
-    text-align: center;
-  }
+.thread-tool-row__caret {
+  font-size: var(--text-2xs);
+  width: 0.75rem;
+  text-align: center;
+}
 
-  &__icon {
-    width: 1.125rem;
-    height: 1.125rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--text-base);
-  }
+.thread-tool-row__icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-base);
+}
 
-  &__name {
-    font-family: var(--font-mono);
+.thread-tool-row__name {
+  font-family: var(--font-mono);
+  color: var(--tt-accent-text);
+  font-weight: 500;
+}
+
+.thread-tool-row__view {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: all 120ms ease;
+
+  &:hover {
+    background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
     color: var(--tt-accent-text);
-    font-weight: 500;
-  }
-
-  &__view {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.375rem;
-    height: 1.375rem;
-    border-radius: 0.25rem;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    line-height: 1;
-    flex-shrink: 0;
-    transition: all 120ms ease;
-
-    &:hover {
-      background: color-mix(in srgb, var(--tt-accent) 18%, transparent);
-      color: var(--tt-accent-text);
-    }
   }
 }
 
@@ -337,18 +339,20 @@ function formatDuration(ns: number): string {
   letter-spacing: 0.03rem;
   font-family: var(--font-mono);
   white-space: nowrap;
+}
 
-  &--ok {
-    background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
-    color: var(--color-success-600);
-    border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
-  }
+.thread-pill--ok {
+  background: color-mix(in srgb, var(--color-success-600) 10%, transparent);
+  color: var(--color-success-600);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
+  border: 1px solid color-mix(in srgb, var(--color-success-600) 25%, transparent);
+}
 
-  &--error {
-    background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
-    color: var(--color-error-600);
-    border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
-  }
+.thread-pill--error {
+  background: color-mix(in srgb, var(--color-error-600) 10%, transparent);
+  color: var(--color-error-600);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel pill border must not scale with text or it smears at fractional zoom */
+  border: 1px solid color-mix(in srgb, var(--color-error-600) 25%, transparent);
 }
 
 .thread-tool-body {
@@ -356,31 +360,31 @@ function formatDuration(ns: number): string {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
 
-  &__section {
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-  }
+.thread-tool-body__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
 
-  &__label {
-    font-size: var(--text-3xs);
-    font-weight: 700;
-    letter-spacing: 0.06rem;
-  }
+.thread-tool-body__label {
+  font-size: var(--text-3xs);
+  font-weight: 700;
+  letter-spacing: 0.06rem;
+}
 
-  &__pre {
-    margin: 0;
-    padding: 0.5rem 0.625rem;
-    border-radius: 0.25rem;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    line-height: 1.45;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 17.5rem;
-    overflow: auto;
-  }
+.thread-tool-body__pre {
+  margin: 0;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 17.5rem;
+  overflow: auto;
 }
 
 /* ─── dark mode overrides ─────────────────────────────────────────────────
@@ -393,22 +397,26 @@ function formatDuration(ns: number): string {
   .thread-tool {
     background: color-mix(in srgb, var(--tt-accent) 6%, transparent);
     border-bottom-color: color-mix(in srgb, var(--tt-accent) 20%, transparent);
-
-    &--open {
-      background: color-mix(in srgb, var(--tt-accent) 14%, transparent);
-    }
   }
+}
 
+.dark .thread-tools-thread .thread-tool--open {
+  background: color-mix(in srgb, var(--tt-accent) 14%, transparent);
+}
+
+.dark .thread-tools-thread {
   .thread-tool-row {
     &:hover {
       background: color-mix(in srgb, var(--tt-accent) 16%, transparent);
     }
-
-    &__view:hover {
-      background: color-mix(in srgb, var(--tt-accent) 22%, transparent);
-    }
   }
+}
 
+.dark .thread-tools-thread .thread-tool-row__view:hover {
+  background: color-mix(in srgb, var(--tt-accent) 22%, transparent);
+}
+
+.dark .thread-tools-thread {
   .thread-pill--ok {
     background: color-mix(in srgb, var(--color-success-500) 14%, transparent);
     color: var(--color-success-400);

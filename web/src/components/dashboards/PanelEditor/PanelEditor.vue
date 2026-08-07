@@ -61,7 +61,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :style="splitterStyle"
           :disable="!dashboardPanelData.layout.showFieldList"
           separatorClass="field-list-separator"
-          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
+          :separatorStyle="{
+            width: '0.625rem',
+            marginLeft: '-0.3125rem',
+            marginRight: '-0.3125rem',
+            zIndex: '10',
+          }"
         >
           <!-- Field List (before slot) -->
           <template #before>
@@ -284,6 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Query Editor -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="flex flex-col"
@@ -291,6 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -413,11 +420,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :limits="[0, 20]"
           :disable="!dashboardPanelData.layout.showFieldList"
           :style="{
-            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
+            width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 3.125rem)',
             height: '100%',
           }"
           separatorClass="field-list-separator"
-          :separatorStyle="{ width: '10px', marginLeft: '-5px', marginRight: '-5px', zIndex: '10' }"
+          :separatorStyle="{
+            width: '0.625rem',
+            marginLeft: '-0.3125rem',
+            marginRight: '-0.3125rem',
+            zIndex: '10',
+          }"
         >
           <!-- Field List for custom chart -->
           <!-- Mirror the normal field-list block above: a fixed-height wrapper
@@ -562,6 +574,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <!-- Query Editor for custom chart -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <div
                   v-if="resolvedConfig.showQueryEditor"
                   class="flex flex-col"
@@ -569,6 +582,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     height: 'calc(100vh - var(--navbar-height) - 144px)',
                   }"
                 >
+                  <!-- eslint-enable local/no-hardcoded-px -->
                   <DashboardQueryEditor />
                 </div>
               </div>
@@ -859,8 +873,9 @@ const contentHeight = computed(() => {
     case "metrics":
       return "100%";
     case "logs":
-      return "calc(100% - 36px)";
+      return "calc(100% - 2.25rem)";
     case "build":
+      // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
       return "calc(100vh - var(--navbar-height) - 24px)";
     default:
       return "100%";
@@ -870,7 +885,7 @@ const contentHeight = computed(() => {
 // Chart area class based on page type
 const chartAreaClass = computed(() => {
   if (props.pageType === "logs" || props.pageType === "build") {
-    return "h-[calc(100%-36px)] min-h-35";
+    return "h-[calc(100%-2.25rem)] min-h-35";
   }
   return "min-h-35 mt-10";
 });
@@ -881,8 +896,9 @@ const chartAreaStyle = computed(() => {
     return {};
   }
   return {
+    // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
     height: "calc(100vh - var(--navbar-height) - 464px)",
-    marginTop: "0px",
+    marginTop: "0",
   };
 });
 
@@ -938,7 +954,7 @@ const splitterLimits = computed<[number, number]>(() => {
 // Splitter style
 const splitterStyle = computed(() => {
   return {
-    width: dashboardPanelData.layout.showFieldList ? "100%" : "calc(100% - 50px)",
+    width: dashboardPanelData.layout.showFieldList ? "100%" : "calc(100% - 3.125rem)",
     height: "100%",
   };
 });
