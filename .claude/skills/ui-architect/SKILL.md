@@ -92,7 +92,7 @@ read it once, it is the backbone of everything below.
    contract: new px cannot enter the codebase unnoticed, and a px that is genuinely
    correct only passes once someone has written down why.
    **CI-enforced by `local/no-hardcoded-px`** (eslint, defined in `web/eslint.config.js`),
-   run by `lint:ci` over `src/**/*.{vue,ts,css}`. It reports line:column with the rem value
+   run by `lint:ci` over `src/**/*.{vue,ts,js,css}`. It reports line:column with the rem value
    and the Tailwind step, and surfaces in the editor as you type.
    - **Conversion:** `1rem = 16px` (the app sets no `html { font-size }`, so root is
      the browser default). So `px ÷ 16` → rem, and `px ÷ 4` → the Tailwind scale
@@ -163,7 +163,11 @@ read it once, it is the backbone of everything below.
      defined but deliberately *not* registered, so `border-border-subtle` compiles to
      nothing and the border falls back to `currentColor`. Use
      `border-(--color-border-subtle)` or register the token — never assume the pair.
-   - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role:**
+   - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role.**
+     Only the px spelling is caught mechanically (`local/no-hardcoded-px` fails
+     `text-[13px]`); **`text-[0.8125rem]` compiles silently**, so the rem form is a
+     review item, not a CI gate. Both are equally banned — an arbitrary text size
+     bypasses the scale whichever unit it uses.
 
      | Utility | px | Use for |
      |---|---|---|
@@ -213,9 +217,10 @@ read it once, it is the backbone of everything below.
    (`rawProjectRamp`) — use a semantic token (`text-text-secondary`, `bg-accent`),
    not the ramp. See [references/design-tokens.md](references/design-tokens.md).
 
-   > **All of §3–§5 are CI-enforced and FAIL the build** — `lint:design:strict`
-   > (hardcoded hex/px, arbitrary radius, retired aliases, raw palette/ramp, raw
-   > `var()`, un-justified `<style>`, literal font stacks), `lint:tokens`,
+   > **All of §3–§5 are CI-enforced and FAIL the build** — `local/no-hardcoded-px`
+   > (eslint) owns **px on every file type**; `lint:design:strict` owns the rest
+   > (hardcoded hex, arbitrary radius, retired aliases, raw palette/ramp, raw
+   > `var()`, un-justified `<style>`, literal font stacks), plus `lint:tokens`,
    > `lint:token-purity`, and `lint:styles` (stylelint) run on every PR. The strict
    > ratchet leaves **no headroom**: a bypass count can only shrink, so new
    > raw-token usage fails even in a file that still carries old debt. The

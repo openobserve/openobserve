@@ -16,7 +16,7 @@ along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="incident-service-graph rounded-default border-border-default dark:ring-grey-700/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-sm ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-md dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)]"
+    class="incident-service-graph rounded-default border-border-default dark:ring-border-default/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-sm ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-md dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)]"
   >
     <!-- Info Icon → Graph Legend popover (hover to show) -->
     <span
