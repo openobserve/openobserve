@@ -4,6 +4,7 @@
       error ||
       maxQueryRangeWarning ||
       limitNumberOfSeriesWarningMessage ||
+      sparklineWarning ||
       xAliasInconsistencyWarning ||
       isCachedDataDifferWithCurrentTimeRange ||
       (isPartialData && !isPanelLoading) ||
@@ -50,6 +51,21 @@
       <OTooltip side="bottom" align="end" hoverable>
         <template #content
           ><div class="whitespace-pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template
+        >
+      </OTooltip>
+    </OButton>
+    <OButton
+      v-if="sparklineWarning"
+      variant="ghost-warning"
+      size="icon"
+      data-test="panel-sparkline-warning"
+    >
+      <template #icon-left><OIcon name="show-chart" size="sm" /></template>
+      <OTooltip side="bottom" align="end" max-width="420px" hoverable>
+        <template #content
+          ><div class="whitespace-pre-wrap" data-test="panel-sparkline-warning-content">
+            {{ sparklineWarning }}
+          </div></template
         >
       </OTooltip>
     </OButton>
@@ -138,6 +154,10 @@ export default defineComponent({
       default: "",
     },
     limitNumberOfSeriesWarningMessage: {
+      type: String,
+      default: "",
+    },
+    sparklineWarning: {
       type: String,
       default: "",
     },
