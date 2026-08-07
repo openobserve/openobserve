@@ -648,6 +648,15 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
+    // Stateless alert-chart render endpoint — the URL carries an HMAC-signed
+    // chart payload, verified inside the handler itself (never via
+    // auth_middleware), so it must stay in basic_routes like the incident
+    // webhooks below. Renders run in-process on this node; no search/storage.
+    router = router.route(
+        "/api/v2/{org_id}/alerts/charts/render",
+        get(alerts::chart_render::render_chart),
+    );
+
     // External alert source webhooks — token-authenticated inside the handler itself
     // (never via auth_middleware), so these must stay in basic_routes rather than
     // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
@@ -924,6 +933,7 @@ pub fn service_routes() -> Router {
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
         .route("/{org_id}/alerts/templates/system/prebuilt", get(alerts::templates::get_system_templates))
+        .route("/{org_id}/alerts/templates/preview", post(alerts::templates::preview_template))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
 
@@ -932,6 +942,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
+        .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
         // Deduplication

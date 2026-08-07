@@ -270,7 +270,7 @@ export default defineComponent({
           description: t("settings.modelPricingDesc"),
           icon: "paid",
           to: { name: "modelPricing", query: { org_identifier: org } },
-          visible: !!z.model_pricing_enabled,
+          visible: (isEnt || isCloud) && !!z.model_pricing_enabled,
           dataTest: "model-pricing-tab",
           group: "Data & AI",
         },

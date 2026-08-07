@@ -173,7 +173,7 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
             alert.name
         );
         match alert
-            .send_notification(&trace_id, val, now, None, now, None, None, None)
+            .send_notification(&trace_id, val, now, None, now, None, None, None, &[])
             .await
         {
             Err(e) => {
@@ -182,9 +182,9 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
                 trigger_data_stream.error =
                     Some(format!("error sending notification for alert: {e}"));
             }
-            Ok((success_msg, error_msg)) => {
-                let success_msg = success_msg.trim().to_owned();
-                let error_msg = error_msg.trim().to_owned();
+            Ok(outcome) => {
+                let success_msg = outcome.success_message.trim().to_owned();
+                let error_msg = outcome.error_message.trim().to_owned();
                 if !error_msg.is_empty() {
                     trigger_data_stream.error = Some(error_msg);
                 }

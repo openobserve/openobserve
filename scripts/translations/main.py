@@ -16,9 +16,9 @@ Environment:
     DEEPSEEK_API_KEY   Required. API key for https://api.deepseek.com.
     DEEPSEEK_MODEL     Model id (default "deepseek-v4-flash").
     TRANSLATION_BATCH_SIZE  Strings per API call (default 50).
+    TRANSLATION_CONCURRENCY Batches in flight per locale (default 4; 1 = serial).
 """
 
-import json
 import sys
 
 from translator import (
@@ -33,6 +33,7 @@ from translator import (
     new_counters,
     save_state,
     translate_pending,
+    write_json,
 )
 
 
@@ -75,8 +76,9 @@ def main():
         translated = translate_pending(pending, locale) if pending else {}
 
         target = build_locale(source, existing, state, translated, counters)
-        with open(get_language_file_path(locale), "w", encoding="utf-8") as f:
-            f.write(json.dumps(target, indent=2, ensure_ascii=False) + "\n")
+        # Flushed per locale (atomically), so a run that is cancelled or dies part
+        # way through still leaves every completed locale on disk for CI to commit.
+        write_json(get_language_file_path(locale), target)
         locale_targets[locale] = target
 
     # Advance shared state only on a full run, where every supported locale was

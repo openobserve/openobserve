@@ -21,10 +21,18 @@ use axum::{
     http::StatusCode,
     response::Response,
 };
+use config::meta::{alerts::content_spec::ContentSpec, destinations::Module};
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::check_permissions;
-use openobserve_core::{alerts::destinations, auth::UserEmail, http::destination_error_response};
+use openobserve_core::{
+    alerts::{
+        destinations,
+        notifications::{TestSendError, check_rate_limit, test_send as core_test_send},
+    },
+    auth::UserEmail,
+    http::destination_error_response,
+};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -603,6 +611,144 @@ pub async fn list_prebuilt_destinations(Path(org_id): Path<String>) -> Response 
         .collect::<Vec<_>>();
 
     MetaHttpResponse::json(prebuilt_destinations)
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, utoipa::ToSchema)]
+pub struct TestSendRequest {
+    /// A draft content-template spec to test-send. Exactly one of
+    /// `definition` / `template_name` must be set.
+    pub definition: Option<ContentSpec>,
+    /// The name of an already-saved template to test-send. Exactly one of
+    /// `definition` / `template_name` must be set.
+    pub template_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct TestSendResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+/// TestSendNotification
+///
+/// **Safety note:** this posts a REAL message to the destination's real
+/// channel — a Slack channel, a PagerDuty service, an inbox — marked
+/// `[TEST] `. It is gated on destination WRITE (not template read), so
+/// reading a template can never by itself grant the ability to post into a
+/// channel, and it is rate-capped per user.
+#[utoipa::path(
+    post,
+    path = "/{org_id}/alerts/destinations/{destination_name}/test_send",
+    context_path = "/api",
+    tag = "Alerts",
+    operation_id = "TestSendNotification",
+    summary = "Test-send a content template to a real destination",
+    description = "Renders a content-template definition (draft, via `definition`, or saved, via `template_name`) \
+                   against a deterministic synthetic sample and DISPATCHES it to the named destination's real \
+                   channel, with every title/subject prefixed `[TEST] `. Requires destination write permission. \
+                   Rate-capped per user (`ZO_ALERT_TEST_SEND_PER_MINUTE`, default 6/min) — returns 429 when exceeded.",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("destination_name" = String, Path, description = "Destination name"),
+    ),
+    request_body(content = inline(TestSendRequest), description = "Test-send request data", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Success", content_type = "application/json", body = inline(TestSendResponse)),
+        (status = 400, description = "Error",   content_type = "application/json", body = ()),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+        (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+        (status = 429, description = "Rate limited", content_type = "application/json", body = ()),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Destinations", "operation": "test_send"})),
+        ("x-o2-mcp" = json!({"enabled": false}))
+    )
+)]
+pub async fn test_send(
+    Path((org_id, destination_name)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(req): Json<TestSendRequest>,
+) -> Response {
+    let user_id = &user_email.user_id;
+
+    // Permission: destination WRITE, not template read — reading a template
+    // must never by itself grant the ability to post into a channel.
+    #[cfg(feature = "enterprise")]
+    if !check_permissions(
+        &destination_name,
+        &org_id,
+        user_id,
+        "destinations",
+        "PUT",
+        None,
+        false,
+        false,
+        false,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
+    // Rate cap: per-user, config `ZO_ALERT_TEST_SEND_PER_MINUTE` (default 6).
+    if let Err(e @ TestSendError::RateLimited { .. }) = check_rate_limit(user_id) {
+        return MetaHttpResponse::too_many_requests(e.to_string());
+    }
+
+    // Exactly one of definition / template_name.
+    let spec = match (&req.definition, &req.template_name) {
+        (Some(_), Some(_)) => {
+            return MetaHttpResponse::bad_request(
+                "Exactly one of `definition` or `template_name` must be set, not both",
+            );
+        }
+        (None, None) => {
+            return MetaHttpResponse::bad_request(
+                "Exactly one of `definition` or `template_name` must be set",
+            );
+        }
+        (Some(definition), None) => definition.clone(),
+        (None, Some(template_name)) => {
+            let template = match db::alerts::templates::get(&org_id, template_name).await {
+                Ok(t) => t,
+                Err(_) => {
+                    return MetaHttpResponse::not_found(format!(
+                        "Template {template_name} not found"
+                    ));
+                }
+            };
+            match db::alerts::templates::get_parsed_content(&template) {
+                Ok(spec) => (*spec).clone(),
+                Err(e) => {
+                    return MetaHttpResponse::bad_request(format!(
+                        "Template {template_name} is not a valid content template: {e}"
+                    ));
+                }
+            }
+        }
+    };
+
+    let dest = match destinations::get(&org_id, &destination_name).await {
+        Ok(d) => d,
+        Err(e) => return destination_error_response(e),
+    };
+    let Module::Alert {
+        destination_type, ..
+    } = &dest.module
+    else {
+        return MetaHttpResponse::bad_request("Test-send is only supported for alert destinations");
+    };
+
+    match core_test_send(destination_type, &spec).await {
+        Ok(message) => MetaHttpResponse::json(TestSendResponse {
+            success: true,
+            message,
+        }),
+        Err(e) => MetaHttpResponse::bad_request(e.to_string()),
+    }
 }
 
 #[cfg(test)]

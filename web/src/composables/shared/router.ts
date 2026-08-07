@@ -39,6 +39,8 @@ const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
 const SessionDetails = () => import("@/plugins/traces/SessionDetails.vue");
+const ServiceGraphView = () => import("@/plugins/traces/views/ServiceGraphView.vue");
+const ServicesCatalogView = () => import("@/plugins/traces/views/ServicesCatalogView.vue");
 
 const ViewDashboard = () => import("@/views/Dashboards/ViewDashboard.vue");
 const AddPanel = () => import("@/views/Dashboards/addPanel/AddPanel.vue");
@@ -261,6 +263,36 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         title: "Traces",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/service-graph",
+      name: "serviceGraph",
+      component: ServiceGraphView,
+      meta: {
+        keepAlive: true,
+        title: "Service Graph",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        // Enterprise-only, mirroring the nav flyout's `enterprise` gate. An OSS
+        // build lands on Traces rather than an empty page.
+        if (config.isEnterprise !== "true") {
+          next({ name: "traces", query: to.query });
+          return;
+        }
+        routeGuard(to, from, next);
+      },
+    },
+    {
+      path: "traces/services",
+      name: "servicesCatalog",
+      component: ServicesCatalogView,
+      meta: {
+        keepAlive: true,
+        title: "Services",
       },
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);

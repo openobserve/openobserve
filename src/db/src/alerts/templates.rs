@@ -15,10 +15,13 @@
 
 use std::sync::Arc;
 
-use common::infra::config::{ALERTS, ALERTS_TEMPLATES, DESTINATIONS};
+use common::infra::config::{ALERTS, ALERTS_CONTENT_SPECS, ALERTS_TEMPLATES, DESTINATIONS};
 use config::{
     DEFAULT_ORG,
-    meta::destinations::{Module, Template},
+    meta::{
+        alerts::content_spec::ContentSpec,
+        destinations::{Module, Template, TemplateKind},
+    },
 };
 use infra::table;
 use itertools::Itertools;
@@ -60,6 +63,10 @@ pub enum TemplateError {
          Pick a different name."
     )]
     ReservedName(String),
+    #[error("invalid template kind: {0}")]
+    InvalidKind(String),
+    #[error("content template body is not a valid content spec: {0}")]
+    InvalidContentSpec(String),
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Template, TemplateError> {
@@ -207,11 +214,12 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                         continue;
                     }
                 };
-                ALERTS_TEMPLATES.insert(format!("{org_id}/{name}"), item_value);
+                let cache_key = format!("{org_id}/{name}");
+                apply_template_cache_event(&cache_key, Some(&item_value));
             }
             db::Event::Delete(ev) => {
                 let item_key = ev.key.strip_prefix(TEMPLATE_WATCHER_PREFIX).unwrap();
-                ALERTS_TEMPLATES.remove(item_key);
+                apply_template_cache_event(item_key, None);
             }
             db::Event::Empty => {}
         }
@@ -219,14 +227,90 @@ pub async fn watch() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Apply one template cache event to both `ALERTS_TEMPLATES` and
+/// `ALERTS_CONTENT_SPECS`, keeping them coherent. Extracted from `watch()` so
+/// the content-cache invalidation rules are unit-testable without a
+/// coordinator loop.
+///
+/// - `Some(template)` is a Put: the template is written into `ALERTS_TEMPLATES`, and
+///   `ALERTS_CONTENT_SPECS` is updated to match:
+///   - content-kind that parses -> insert the parsed `Arc<ContentSpec>`
+///   - content-kind that fails to parse (only possible for rows written by pre-upgrade nodes) ->
+///     log and remove any stale cached spec, never panic
+///   - not content-kind -> remove any stale cached spec, so a template converted content -> custom
+///     stops serving its old parsed spec
+/// - `None` is a Delete: `cache_key` is removed from both caches.
+pub(crate) fn apply_template_cache_event(cache_key: &str, template: Option<&Template>) {
+    match template {
+        Some(item_value) => {
+            if item_value.kind == TemplateKind::Content {
+                match ContentSpec::parse(&item_value.body) {
+                    Ok(spec) => {
+                        ALERTS_CONTENT_SPECS.insert(cache_key.to_string(), Arc::new(spec));
+                    }
+                    Err(e) => {
+                        // Only possible for rows written by pre-upgrade
+                        // nodes. Do not leave a stale spec behind.
+                        log::error!(
+                            "[Template] content template {cache_key} failed to parse, \
+                             removing any stale cached spec: {e}"
+                        );
+                        ALERTS_CONTENT_SPECS.remove(cache_key);
+                    }
+                }
+            } else {
+                // Template converted from content -> custom (or was
+                // never content); make sure no stale spec lingers.
+                ALERTS_CONTENT_SPECS.remove(cache_key);
+            }
+            ALERTS_TEMPLATES.insert(cache_key.to_string(), item_value.clone());
+        }
+        None => {
+            ALERTS_TEMPLATES.remove(cache_key);
+            ALERTS_CONTENT_SPECS.remove(cache_key);
+        }
+    }
+}
+
 pub async fn cache() -> Result<(), anyhow::Error> {
     let all_temps = table::templates::list_all().await?;
     for (org, temp) in all_temps {
         let cache_key = format!("{}/{}", org, temp.name);
+        if temp.kind == TemplateKind::Content {
+            match ContentSpec::parse(&temp.body) {
+                Ok(spec) => {
+                    ALERTS_CONTENT_SPECS.insert(cache_key.clone(), Arc::new(spec));
+                }
+                Err(e) => {
+                    log::error!(
+                        "[Template] content template {cache_key} failed to parse during cache \
+                         seeding, removing any stale cached spec: {e}"
+                    );
+                    // Match `apply_template_cache_event`'s parse-failure rule: a body we
+                    // cannot parse must never leave an older spec serving stale content.
+                    // Seeding normally starts from empty maps, but a re-seed must not be
+                    // the one path that diverges from the watch handler.
+                    ALERTS_CONTENT_SPECS.remove(&cache_key);
+                }
+            }
+        }
         ALERTS_TEMPLATES.insert(cache_key, temp);
     }
     log::info!("{} Templates Cached", ALERTS_TEMPLATES.len());
     Ok(())
+}
+
+/// Returns the parsed `ContentSpec` for a content-kind template, sharing one
+/// parse across callers via the `ALERTS_CONTENT_SPECS` cache. Cache-first,
+/// parse-on-miss; a parse error is returned without inserting anything.
+pub fn get_parsed_content(template: &Template) -> Result<Arc<ContentSpec>, serde_json::Error> {
+    let key = format!("{}/{}", template.org_id, template.name);
+    if let Some(spec) = ALERTS_CONTENT_SPECS.get(&key) {
+        return Ok(spec.clone());
+    }
+    let spec = Arc::new(ContentSpec::parse(&template.body)?);
+    ALERTS_CONTENT_SPECS.insert(key, spec.clone());
+    Ok(spec)
 }
 
 #[cfg(test)]
@@ -267,5 +351,185 @@ mod tests {
     fn test_template_error_display_delete_with_alert() {
         let e = TemplateError::DeleteWithAlert("my-alert".to_string());
         assert!(e.to_string().contains("my-alert"));
+    }
+
+    fn content_template(org_id: &str, name: &str, body: &str) -> Template {
+        Template {
+            org_id: org_id.to_string(),
+            name: name.to_string(),
+            body: body.to_string(),
+            kind: config::meta::destinations::TemplateKind::Content,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_get_parsed_content_caches_same_arc() {
+        let template = content_template(
+            "test_org_cache_hit",
+            "content-tpl",
+            r#"{"title":"CPU high"}"#,
+        );
+        let first = get_parsed_content(&template).expect("first parse should succeed");
+        let second = get_parsed_content(&template).expect("second call should hit cache");
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "expected cached call to return the same Arc"
+        );
+    }
+
+    #[test]
+    fn test_get_parsed_content_parse_error_does_not_insert() {
+        let template = content_template("test_org_parse_err", "bad-content-tpl", "not valid json");
+        let key = format!("{}/{}", template.org_id, template.name);
+
+        let result = get_parsed_content(&template);
+        assert!(result.is_err());
+        assert!(
+            ALERTS_CONTENT_SPECS.get(&key).is_none(),
+            "a parse error must not insert into the cache"
+        );
+    }
+
+    fn custom_template(org_id: &str, name: &str, body: &str) -> Template {
+        Template {
+            org_id: org_id.to_string(),
+            name: name.to_string(),
+            body: body.to_string(),
+            kind: config::meta::destinations::TemplateKind::Custom,
+            ..Default::default()
+        }
+    }
+
+    /// Asserts the one-directional invariant that keeps the two caches from
+    /// diverging: whenever `ALERTS_CONTENT_SPECS` holds a spec for `key`,
+    /// `ALERTS_TEMPLATES` must show that key as content-kind. (The converse
+    /// does not hold: a content-kind template whose body fails to parse is
+    /// legitimately left in `ALERTS_TEMPLATES` with no entry in
+    /// `ALERTS_CONTENT_SPECS` — see the "never panic on parse failure" case.)
+    fn assert_caches_agree(key: &str) {
+        if ALERTS_CONTENT_SPECS.get(key).is_some() {
+            let templates_has_content = ALERTS_TEMPLATES
+                .get(key)
+                .is_some_and(|t| t.kind == config::meta::destinations::TemplateKind::Content);
+            assert!(
+                templates_has_content,
+                "ALERTS_CONTENT_SPECS has an entry for {key} but ALERTS_TEMPLATES does not show \
+                 it as content-kind — the caches have diverged"
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_put_content_inserts_and_replaces_spec() {
+        let org_id = "test_org_apply_put_content";
+        let name = "content-tpl";
+        let key = format!("{org_id}/{name}");
+
+        let first = content_template(org_id, name, r#"{"title":"first"}"#);
+        apply_template_cache_event(&key, Some(&first));
+        let first_spec = ALERTS_CONTENT_SPECS
+            .get(&key)
+            .expect("Put of content-kind template must insert a spec")
+            .clone();
+        assert_eq!(
+            ALERTS_TEMPLATES.get(&key).unwrap().body,
+            r#"{"title":"first"}"#
+        );
+        assert_caches_agree(&key);
+
+        // A second Put with a changed body must replace the cached spec.
+        let second = content_template(org_id, name, r#"{"title":"second"}"#);
+        apply_template_cache_event(&key, Some(&second));
+        let second_spec = ALERTS_CONTENT_SPECS
+            .get(&key)
+            .expect("Put must keep a spec cached")
+            .clone();
+        assert_eq!(
+            ALERTS_TEMPLATES.get(&key).unwrap().body,
+            r#"{"title":"second"}"#
+        );
+        assert!(
+            !Arc::ptr_eq(&first_spec, &second_spec),
+            "changed body must produce a freshly parsed (and re-inserted) spec"
+        );
+        assert_caches_agree(&key);
+    }
+
+    #[test]
+    fn test_apply_put_content_to_custom_evicts_stale_entry() {
+        let org_id = "test_org_evict";
+        let name = "convert-tpl";
+        let key = format!("{org_id}/{name}");
+
+        // Prime both caches via the real Put path, as if the template had
+        // originally been content-kind.
+        let original = content_template(org_id, name, r#"{"title":"old"}"#);
+        apply_template_cache_event(&key, Some(&original));
+        assert!(ALERTS_CONTENT_SPECS.get(&key).is_some());
+        assert_caches_agree(&key);
+
+        // The template is now converted to custom-kind; the extracted
+        // function (== watch()'s Put branch) must evict the stale spec.
+        let updated = custom_template(org_id, name, "custom template body");
+        apply_template_cache_event(&key, Some(&updated));
+
+        assert!(
+            ALERTS_CONTENT_SPECS.get(&key).is_none(),
+            "content->custom conversion must evict the stale parsed spec"
+        );
+        assert_eq!(ALERTS_TEMPLATES.get(&key).unwrap().kind, updated.kind);
+        assert_caches_agree(&key);
+    }
+
+    #[test]
+    fn test_apply_put_content_parse_failure_removes_stale_entry_without_panicking() {
+        let org_id = "test_org_apply_parse_fail";
+        let name = "bad-content-tpl";
+        let key = format!("{org_id}/{name}");
+
+        // Prime a stale spec via a valid Put first.
+        let original = content_template(org_id, name, r#"{"title":"old"}"#);
+        apply_template_cache_event(&key, Some(&original));
+        assert!(ALERTS_CONTENT_SPECS.get(&key).is_some());
+
+        // Simulate a row written by a pre-upgrade node: content-kind but a
+        // body that fails to parse. Must not panic, and must remove the
+        // stale entry rather than leaving it behind.
+        let broken = content_template(org_id, name, "not valid json");
+        apply_template_cache_event(&key, Some(&broken));
+
+        assert!(
+            ALERTS_CONTENT_SPECS.get(&key).is_none(),
+            "a parse failure on Put must remove any stale cached spec"
+        );
+        // ALERTS_TEMPLATES still reflects the latest (unparseable) row, since
+        // that mirrors the DB state, but no stale spec may accompany it.
+        assert_eq!(ALERTS_TEMPLATES.get(&key).unwrap().body, "not valid json");
+        assert_caches_agree(&key);
+    }
+
+    #[test]
+    fn test_apply_delete_removes_from_both_caches() {
+        let org_id = "test_org_apply_delete";
+        let name = "content-tpl";
+        let key = format!("{org_id}/{name}");
+
+        let template = content_template(org_id, name, r#"{"title":"to delete"}"#);
+        apply_template_cache_event(&key, Some(&template));
+        assert!(ALERTS_TEMPLATES.get(&key).is_some());
+        assert!(ALERTS_CONTENT_SPECS.get(&key).is_some());
+
+        apply_template_cache_event(&key, None);
+
+        assert!(
+            ALERTS_TEMPLATES.get(&key).is_none(),
+            "Delete must remove the template entry"
+        );
+        assert!(
+            ALERTS_CONTENT_SPECS.get(&key).is_none(),
+            "Delete must remove the content-spec entry"
+        );
+        assert_caches_agree(&key);
     }
 }
