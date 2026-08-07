@@ -58,37 +58,63 @@ export interface LlmDatasetPayload {
 /** Where a golden item came from. Mirrors `llm_dataset_items.source`. */
 export type LlmDatasetItemSource = "trace" | "annotation" | "manual";
 
-/** One golden item (input → expected_output), normalized. MVCC: editing an
- *  item's expected_output appends a new version rather than mutating in place. */
+/** One golden item (input → expected_output), normalized. MVCC: editing an item
+ *  APPENDS a row carrying the same logical id and the next dataset version. */
 export interface LlmDatasetItem {
-  /** Stable logical identity shared by every immutable version. */
+  /** LOGICAL id — stable across versions, and what update/delete address. */
   id: string;
-  /** Physical identity of this specific immutable version. */
-  rowId?: string;
+  /** Physical row id of this immutable version. */
+  rowId: string;
   datasetId: string;
-  /** Sanitized input (model_name/tokens/logprobs stripped) — "purified". */
+  /** Sanitized input, flattened to text for the list and the edit form. */
   input: string;
   /** The golden answer. Required and never empty. */
   expectedOutput: string;
+  /** Untouched API values — re-sent verbatim when the text wasn't edited, so a
+   *  structured input (a messages array) never collapses into a string. */
+  rawInput: unknown;
+  rawExpectedOutput: unknown;
   source: LlmDatasetItemSource;
   tags: string[];
-  /** Dataset-global MVCC version assigned to this immutable item row. */
+  /** Dataset-wide MVCC sequence this row was written at (server-owned). */
   version: number;
-  isDeleted?: boolean;
   /** Lineage pointer to the review/trace this golden was distilled from. */
-  distilledFrom?: string | null;
+  distilledFrom: string | null;
+  isDeleted: boolean;
+  updatedBy?: string;
   updatedAt?: number;
 }
 
-/** Add/edit-item payload. Only user-authored fields; version is server-owned. */
+/** Add/edit-item payload. `input`/`expectedOutput` are JSON values server-side,
+ *  so they stay `unknown` here: the UI sends text, lineage-bearing rows re-send
+ *  their original structure. */
 export interface LlmDatasetItemPayload {
-  input: string;
-  expectedOutput: string;
-  source?: LlmDatasetItemSource;
+  input: unknown;
+  expectedOutput: unknown;
   tags?: string[];
+  metadata?: Record<string, unknown> | null;
 }
 
+export interface LlmDatasetItemPage {
+  items: LlmDatasetItem[];
+  total: number;
+  from: number;
+  size: number;
+  hasMore: boolean;
+}
+
+export interface ListDatasetItemsParams {
+  from?: number;
+  size?: number;
+  /** Include the latest tombstone for deleted logical items. */
+  includeDeleted?: boolean;
+}
+
+/** The items API's page-size ceiling (`size` is validated to 1..100). */
+export const DATASET_ITEMS_MAX_PAGE_SIZE = 100;
+
 const base = (org: string) => `/api/${org}/datasets`;
+const itemsBase = (org: string, datasetId: string) => `${base(org)}/${datasetId}/items`;
 
 /** Fold the API's snake_case (or already-camel) row into the normalized shape. */
 function normalize(d: any): LlmDataset {
@@ -112,117 +138,46 @@ function normalize(d: any): LlmDataset {
   };
 }
 
-/** Fold an API item row into the normalized shape. */
+/** A JSON value rendered as one line of text for the table and the edit form. */
+function itemText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+/** Fold an API item row into the normalized shape. The row's `id` is the LOGICAL
+ *  id — `rowId` identifies this one immutable version and is never sent back. */
 function normalizeItem(d: any): LlmDatasetItem {
+  const input = d.input ?? null;
+  const expectedOutput = d.expectedOutput ?? d.expected_output ?? null;
   return {
-    id: d.logical_id ?? d.logicalId ?? d.id,
-    rowId: d.row_id ?? d.rowId,
-    datasetId: d.dataset_id ?? d.datasetId,
-    input: d.input ?? "",
-    expectedOutput: d.expected_output ?? d.expectedOutput ?? "",
+    id: d.logicalId ?? d.logical_id ?? d.id ?? "",
+    rowId: d.rowId ?? d.row_id ?? "",
+    datasetId: d.datasetId ?? d.dataset_id ?? "",
+    input: itemText(input),
+    expectedOutput: itemText(expectedOutput),
+    rawInput: input,
+    rawExpectedOutput: expectedOutput,
     source: (d.source ?? "manual") as LlmDatasetItemSource,
     tags: Array.isArray(d.tags) ? d.tags : [],
-    version: d.global_version ?? d.globalVersion ?? d.version ?? 1,
-    isDeleted: d.is_deleted ?? d.isDeleted ?? false,
-    distilledFrom: d.source_ref ?? d.sourceRef ?? d.distilled_from ?? d.distilledFrom ?? null,
-    updatedAt: d.updated_at ?? d.updatedAt,
+    version: Number(d.globalVersion ?? d.global_version ?? 0),
+    distilledFrom:
+      d.sourceRef ??
+      d.source_ref ??
+      d.reviewSubmissionId ??
+      d.review_submission_id ??
+      d.importFilename ??
+      d.import_filename ??
+      null,
+    isDeleted: (d.isDeleted ?? d.is_deleted) === true,
+    updatedBy: d.updatedBy ?? d.updated_by,
+    updatedAt: d.updatedAt ?? d.updated_at,
   };
 }
-
-// Mock golden items, keyed by dataset. Faithful to the "input (purified) →
-// expected_output, source, tags, version" shape the detail view renders.
-let mockItemSeq = 100;
-const mockItems: Record<string, LlmDatasetItem[]> = {
-  ds_mock_1: [
-    {
-      id: "it_1",
-      datasetId: "ds_mock_1",
-      input: "Customer wants to return a red T-shirt bought yesterday — is it eligible?",
-      expectedOutput:
-        "Hello! Order SH202604280912 is within the 7-day no-questions-asked window, so the red T-shirt is eligible for a full refund.",
-      source: "annotation",
-      tags: ["refund"],
-      version: 2,
-      distilledFrom: "queue:hallucination/trace-000021",
-      updatedAt: Date.now() - 1000 * 60 * 60 * 2,
-    },
-    {
-      id: "it_2",
-      datasetId: "ds_mock_1",
-      input: "What is the capital of France according to the retrieved records?",
-      expectedOutput:
-        "Based on the retrieved records, the relevant administrative capital is Paris.",
-      source: "trace",
-      tags: ["faithfulness", "rag"],
-      version: 3,
-      updatedAt: Date.now() - 1000 * 60 * 60 * 6,
-    },
-    {
-      id: "it_3",
-      datasetId: "ds_mock_1",
-      input: "Summarize the key recommendations from the attached compliance report.",
-      expectedOutput:
-        "The report's key recommendations are: (1) enforce mandatory review gates, (2) rotate access keys quarterly, and (3) log all privileged actions.",
-      source: "trace",
-      tags: ["summarization", "compliance"],
-      version: 3,
-      updatedAt: Date.now() - 1000 * 60 * 60 * 24,
-    },
-    {
-      id: "it_4",
-      datasetId: "ds_mock_1",
-      input: "Can I still get a refund after 30 days?",
-      expectedOutput:
-        "Beyond 30 days is normally outside the standard refund window and requires manual review — it is not auto-approved.",
-      source: "annotation",
-      tags: ["refund", "policy"],
-      version: 1,
-      distilledFrom: "queue:refund-policy/trace-000048",
-      updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "it_5",
-      datasetId: "ds_mock_1",
-      input: "Retrieve and ground: which clauses cover liability caps?",
-      expectedOutput:
-        "Liability caps are governed by Section 9.2 (Limitation of Liability) of the master agreement.",
-      source: "trace",
-      tags: ["rag", "legal"],
-      version: 1,
-      updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 3,
-    },
-    {
-      id: "it_6",
-      datasetId: "ds_mock_1",
-      input: "Can I use points to offset the shipping fee?",
-      expectedOutput:
-        "Yes. Points can offset shipping at 100 points = $1; check your balance at checkout.",
-      source: "manual",
-      tags: ["points"],
-      version: 1,
-      updatedAt: Date.now() - 1000 * 60 * 60 * 24 * 4,
-    },
-  ],
-};
-
-// Datasets without hand-authored fixtures get a small generated pool so the
-// detail view is populated for every row.
-function generatedItems(datasetId: string, count: number): LlmDatasetItem[] {
-  const sources: LlmDatasetItemSource[] = ["trace", "annotation", "manual"];
-  return Array.from({ length: Math.min(count, 8) }, (_, i) => ({
-    id: `${datasetId}_gen_${i + 1}`,
-    datasetId,
-    input: `Sample input ${i + 1} for this dataset.`,
-    expectedOutput: `Expected golden answer ${i + 1}.`,
-    source: sources[i % sources.length],
-    tags: i % 2 === 0 ? ["sample"] : [],
-    version: 1,
-    updatedAt: Date.now() - 1000 * 60 * 60 * (i + 1),
-  }));
-}
-
-const withLatency = <T>(value: T): Promise<T> =>
-  new Promise((resolve) => setTimeout(() => resolve(value), 250));
 
 const llmDatasetsService = {
   // Dataset-level CRUD is bound to the real API. The response has no
@@ -238,12 +193,29 @@ const llmDatasetsService = {
     return normalize(res.data);
   },
 
-  // TODO(BE): no list-dataset-items endpoint yet. Items stay on in-memory mock
-  // until the API lands; the whole item subsystem (list/add/edit/delete) is mock
-  // for consistency (add/edit/delete item endpoints are also incomplete).
-  async listItems(_orgId: string, datasetId: string): Promise<LlmDatasetItem[]> {
-    const items = mockItems[datasetId] ?? generatedItems(datasetId, 6);
-    return withLatency(items.map(normalizeItem));
+  /** Current snapshot: the latest row per logical item, tombstones excluded
+   *  unless `includeDeleted`. Paged server-side (size 1..100, default 20). */
+  async listItems(
+    orgId: string,
+    datasetId: string,
+    params: ListDatasetItemsParams = {},
+  ): Promise<LlmDatasetItemPage> {
+    const res = await http().get(itemsBase(orgId, datasetId), {
+      params: {
+        from: params.from ?? 0,
+        size: Math.min(params.size ?? 20, DATASET_ITEMS_MAX_PAGE_SIZE),
+        includeDeleted: params.includeDeleted ?? false,
+      },
+    });
+    const data = res.data ?? {};
+    const list = Array.isArray(data.list) ? data.list : [];
+    return {
+      items: list.map(normalizeItem),
+      total: Number(data.total ?? list.length),
+      from: Number(data.from ?? 0),
+      size: Number(data.size ?? list.length),
+      hasMore: data.hasMore === true,
+    };
   },
 
   async getItemVersions(
@@ -269,53 +241,44 @@ const llmDatasetsService = {
     await http().delete(`${base(orgId)}/${id}`);
   },
 
-  // Item mutations stay on mock (see listItems TODO(BE) above).
+  /** Add a user-authored golden. The push endpoint is a tagged union; the UI
+   *  only ever writes the `manual` entry point (telemetry pushes come from the
+   *  trace detail views, which carry an immutable trace/span reference). */
   async addItem(
-    _orgId: string,
+    orgId: string,
     datasetId: string,
     payload: LlmDatasetItemPayload,
   ): Promise<LlmDatasetItem> {
-    const row: LlmDatasetItem = {
-      id: `it_mock_${++mockItemSeq}`,
-      datasetId,
-      input: payload.input.trim(),
-      expectedOutput: payload.expectedOutput.trim(),
-      source: payload.source ?? "manual",
+    const res = await http().post(itemsBase(orgId, datasetId), {
+      entryPoint: "manual",
+      input: payload.input,
+      expectedOutput: payload.expectedOutput,
+      metadata: payload.metadata ?? null,
       tags: payload.tags ?? [],
-      version: 1,
-      distilledFrom: null,
-      updatedAt: Date.now(),
-    };
-    (mockItems[datasetId] ??= []).unshift(row);
-    return withLatency(normalizeItem(row));
+    });
+    return normalizeItem(res.data?.item ?? res.data);
   },
 
-  /** Edit an item. MVCC: changing expected_output appends a new version. */
+  /** Edit an item. MVCC: the server APPENDS a row with the same logical id and
+   *  the next dataset version, so `itemId` here is the LOGICAL id. */
   async updateItem(
-    _orgId: string,
+    orgId: string,
     datasetId: string,
     itemId: string,
     payload: LlmDatasetItemPayload,
   ): Promise<LlmDatasetItem> {
-    const pool = mockItems[datasetId] ?? [];
-    const row = pool.find((it) => it.id === itemId);
-    if (!row) throw new Error("item not found");
-    const answerChanged = row.expectedOutput !== payload.expectedOutput.trim();
-    row.input = payload.input.trim();
-    row.expectedOutput = payload.expectedOutput.trim();
-    if (payload.tags) row.tags = payload.tags;
-    if (answerChanged) row.version += 1;
-    row.updatedAt = Date.now();
-    return withLatency(normalizeItem(row));
+    const res = await http().put(`${itemsBase(orgId, datasetId)}/${itemId}`, {
+      input: payload.input,
+      expectedOutput: payload.expectedOutput,
+      metadata: payload.metadata ?? null,
+      tags: payload.tags ?? [],
+    });
+    return normalizeItem(res.data);
   },
 
-  async removeItem(_orgId: string, datasetId: string, itemId: string): Promise<void> {
-    const pool = mockItems[datasetId];
-    if (pool) {
-      const idx = pool.findIndex((it) => it.id === itemId);
-      if (idx >= 0) pool.splice(idx, 1);
-    }
-    return withLatency(undefined);
+  /** Soft delete — appends a tombstone, so the response is the tombstone row. */
+  async removeItem(orgId: string, datasetId: string, itemId: string): Promise<void> {
+    await http().delete(`${itemsBase(orgId, datasetId)}/${itemId}`);
   },
 
   async create(orgId: string, payload: LlmDatasetPayload): Promise<LlmDataset> {
