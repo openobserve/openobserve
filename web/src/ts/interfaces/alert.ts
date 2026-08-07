@@ -83,6 +83,11 @@ export interface Template {
   isPrebuilt?: boolean;
   type: "http" | "email";
   title?: I18nText;
+  // Distinguishes a structured "content" template (built via the fields/links/
+  // rows editor, body is a serialized ContentSpec JSON string) from a
+  // "custom" raw-payload template (body is an arbitrary user string). Absent
+  // on templates created before this field existed — treat as "custom".
+  kind?: "content" | "custom";
 }
 
 // Template object which is modified in frontend to display in table and form

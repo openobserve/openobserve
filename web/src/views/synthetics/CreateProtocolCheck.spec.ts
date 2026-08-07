@@ -30,6 +30,7 @@ const {
   mockServiceUpdate,
   mockServiceGet,
   mockRouterPush,
+  mockToast,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [] },
@@ -38,6 +39,7 @@ const {
   mockServiceUpdate: vi.fn().mockResolvedValue({}),
   mockServiceGet: vi.fn().mockResolvedValue({ data: {} }),
   mockRouterPush: vi.fn(),
+  mockToast: vi.fn(),
 }));
 
 vi.mock("vue-i18n", () => ({
@@ -76,7 +78,7 @@ vi.mock("@/utils/commons", () => ({
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
-  toast: vi.fn(() => vi.fn()),
+  toast: mockToast,
 }));
 
 vi.mock("@/utils/synthetics/buildPayload", () => ({
@@ -170,6 +172,27 @@ describe("CreateProtocolCheck", () => {
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("locations fetch failure", () => {
+    it("should stay silent when the endpoint 403s (community build)", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 403 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("should toast on a real fetch failure", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message: "synthetics.locations.fetchFailed",
+        }),
+      );
+    });
   });
 
   describe("initial render", () => {

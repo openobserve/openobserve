@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.edit')
+                row.isPrebuilt ? t('alert_templates.systemReadOnlyEdit') : t('alert_templates.edit')
               "
               :disabled="row.isPrebuilt"
               @click="editTemplate(row)"
@@ -198,7 +198,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               :title="
-                row.isPrebuilt ? t('alert_templates.systemReadOnly') : t('alert_templates.delete')
+                row.isPrebuilt
+                  ? t('alert_templates.systemReadOnlyDelete')
+                  : t('alert_templates.delete')
               "
               :disabled="row.isPrebuilt"
               @click="conformDeleteDestination(row)"

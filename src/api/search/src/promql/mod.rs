@@ -200,7 +200,7 @@ async fn query(
                             OFGA_MODELS
                                 .get(stream_type_str)
                                 .map_or(stream_type_str, |model| model.key),
-                            name
+                            openobserve_core::auth::into_ofga_supported_format(&name)
                         ),
                         org_id: org_id.to_string(),
                         bypass_check: false,
@@ -490,7 +490,7 @@ async fn query_range(
                                 OFGA_MODELS
                                     .get(stream_type_str)
                                     .map_or(stream_type_str, |model| model.key),
-                                name
+                                openobserve_core::auth::into_ofga_supported_format(&name)
                             ),
                             org_id: org_id.to_string(),
                             bypass_check: false,
@@ -846,7 +846,7 @@ async fn series(
                             OFGA_MODELS
                                 .get(stream_type_str)
                                 .map_or(stream_type_str, |model| model.key),
-                            metric_name
+                            openobserve_core::auth::into_ofga_supported_format(&metric_name)
                         ),
                         org_id: org_id.to_string(),
                         bypass_check: false,

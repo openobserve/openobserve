@@ -44,6 +44,12 @@ pub struct StreamInfo {
     /// Example: {"namespace": "production", "cluster": "us-east-1"}
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub filters: HashMap<String, String>,
+
+    /// Identity dimensions that could not be resolved to a queryable field on
+    /// this stream's schema and were therefore omitted from `filters`.
+    /// Consumers should warn: queries on this stream are wider than the chips imply.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped_dimensions: Vec<String>,
 }
 
 impl std::hash::Hash for StreamInfo {
@@ -67,6 +73,7 @@ impl StreamInfo {
             stream_name,
             stream_type: StreamType::default(),
             filters: HashMap::new(),
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -76,6 +83,7 @@ impl StreamInfo {
             stream_name,
             stream_type,
             filters: HashMap::new(),
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -85,6 +93,7 @@ impl StreamInfo {
             stream_name,
             stream_type: StreamType::default(),
             filters,
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -98,6 +107,7 @@ impl StreamInfo {
             stream_name,
             stream_type,
             filters,
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -451,6 +461,24 @@ impl CardinalityClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_stream_info_dropped_dimensions_serde() {
+        // Old payloads without the field must deserialize (default = empty)
+        let old: StreamInfo =
+            serde_json::from_str(r#"{"stream_name":"s1","stream_type":"logs"}"#).unwrap();
+        assert!(old.dropped_dimensions.is_empty());
+
+        // Empty vec must be skipped on serialization (backward-compatible wire format)
+        let ser = serde_json::to_string(&old).unwrap();
+        assert!(!ser.contains("dropped_dimensions"));
+
+        // Populated vec round-trips
+        let mut s = StreamInfo::new("s2".to_string());
+        s.dropped_dimensions = vec!["k8s-cluster".to_string()];
+        let round: StreamInfo = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(round.dropped_dimensions, vec!["k8s-cluster".to_string()]);
+    }
 
     #[test]
     fn test_stream_info_with_type() {

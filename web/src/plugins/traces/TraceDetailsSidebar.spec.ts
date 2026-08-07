@@ -23,11 +23,17 @@ const {
   mockBuildQueryDetails,
   mockNavigateToLogs,
   mockNavigateToCorrelatedLogs,
+  mockToast,
 } = vi.hoisted(() => ({
   mockLoadSemanticGroups: vi.fn().mockResolvedValue([]),
   mockBuildQueryDetails: vi.fn().mockReturnValue({}),
   mockNavigateToLogs: vi.fn(),
   mockNavigateToCorrelatedLogs: vi.fn(),
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
 }));
 
 vi.mock("@/utils/traces/convertTraceData", () => ({
@@ -439,16 +445,24 @@ describe("TraceDetailsSidebar", async () => {
       });
     });
 
-    describe("when isEnterprise is true but correlationProps is null (fallback path)", () => {
+    describe("when isEnterprise is true but no correlation was found", () => {
       beforeEach(() => {
         config.isEnterprise = "true";
-        // correlationProps is null — correlation data hasn't been loaded yet
+        // Remount with a streamName so loadCorrelation() runs the real lookup
+        // instead of bailing out on a missing stream. findRelatedTelemetry is
+        // mocked to resolve null, i.e. the lookup succeeds with nothing correlated.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({
+          parentMode: "standalone",
+          streamName: "default",
+        });
         viewLogsWrapper.vm.correlationProps = null;
+        mockToast.mockClear();
         dispatchSpy = vi.spyOn(mockStore, "dispatch").mockResolvedValue(undefined);
         pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined);
       });
 
-      it("should fall back to buildQueryDetails and navigateToLogs when correlationProps is null", async () => {
+      it("should toast a warning instead of navigating when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -457,11 +471,16 @@ describe("TraceDetailsSidebar", async () => {
         await viewLogsBtn.trigger("click");
         await flushPromises();
 
-        expect(mockBuildQueryDetails).toHaveBeenCalledWith(mockSpan);
-        expect(mockNavigateToLogs).toHaveBeenCalled();
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "No correlated logs found for this span",
+          }),
+        );
+        expect(pushSpy).not.toHaveBeenCalled();
       });
 
-      it("should not call navigateToCorrelatedLogs when correlationProps is null", async () => {
+      it("should not call navigateToCorrelatedLogs when nothing is correlated", async () => {
         const viewLogsBtn = viewLogsWrapper.find(
           '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
         );
@@ -469,6 +488,26 @@ describe("TraceDetailsSidebar", async () => {
         await flushPromises();
 
         expect(mockNavigateToCorrelatedLogs).not.toHaveBeenCalled();
+      });
+
+      it("should toast the lookup failure reason when correlation could not be loaded", async () => {
+        // No streamName — loadCorrelation() bails out and records why.
+        viewLogsWrapper.unmount();
+        viewLogsWrapper = mountSidebar({ parentMode: "standalone" });
+        mockToast.mockClear();
+
+        const viewLogsBtn = viewLogsWrapper.find(
+          '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]',
+        );
+        await viewLogsBtn.trigger("click");
+        await flushPromises();
+
+        expect(mockToast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            variant: "warning",
+            message: "Missing span or stream name",
+          }),
+        );
       });
     });
 

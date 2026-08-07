@@ -1,0 +1,70 @@
+{
+  "attachments": [
+    {
+      "blocks": [
+        {
+          "text": {
+            "text": "*<https://o2.example/short/abc|CPU \"high\" &amp; &lt;fire&gt; on web-1>*",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "text": {
+            "text": "Value *92.5* exceeded `80` — see <https://rb.example/x|runbook>\n\n&lt;script&gt;alert(1)&lt;/script&gt;",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        },
+        {
+          "fields": [
+            {
+              "text": "*host*\nweb-1 &amp; web-2",
+              "type": "mrkdwn"
+            },
+            {
+              "text": "*cpu*\n92.5",
+              "type": "mrkdwn"
+            }
+          ],
+          "type": "section"
+        },
+        {
+          "text": {
+            "text": "`host` web-1 · `cpu` 92.5",
+            "type": "mrkdwn"
+          },
+          "type": "section"
+        }
+      ],
+      "color": "#E01E5A"
+    },
+    {
+      "blocks": [
+        {
+          "elements": [
+            {
+              "text": {
+                "text": "Runbook",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "url": "https://rb.example/x"
+            },
+            {
+              "style": "primary",
+              "text": {
+                "text": "View in OpenObserve",
+                "type": "plain_text"
+              },
+              "type": "button",
+              "url": "https://o2.example/short/abc"
+            }
+          ],
+          "type": "actions"
+        }
+      ],
+      "color": "#E01E5A"
+    }
+  ]
+}

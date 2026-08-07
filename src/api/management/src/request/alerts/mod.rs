@@ -70,6 +70,7 @@ use crate::{
     },
 };
 
+pub mod chart_render;
 pub mod dedup_stats;
 pub mod deduplication;
 pub mod destinations;

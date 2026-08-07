@@ -274,6 +274,13 @@ export class AlertsFormValidationPage {
 
   async fillTemplateBodyViaEditor(content) {
     testLogger.info('Filling template body via Monaco editor');
+    // Templates v2: a new template opens in the guided "content" mode, where
+    // the raw Monaco body editor does not exist — it lives under the "custom"
+    // tab. Switch there first (no-op safety check for older UIs without tabs).
+    const customTab = this.page.locator('[data-test="tab-custom"]');
+    if (await customTab.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await customTab.click();
+    }
     // Drive Monaco via window.monaco — typing char-by-char triggers Monaco's
     // bracket/quote auto-close and mangles the JSON. setValue writes the literal
     // string and fires onDidChangeModelContent so the editor's v-model updates.
