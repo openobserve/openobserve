@@ -84,13 +84,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="main-content"
           class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
           :style="{
-            width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%',
+            width: !store.state.isAiChatEnabled
+              ? '100%'
+              : store.state.isAiChatExpanded
+                ? '50%'
+                : '75%',
           }"
         >
           <!-- Content card — all pages render inside this. The border stays present in both
                themes (transparent in light) so toggling dark mode can't shift page content by 1px. -->
           <div
-            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-[0_1px_3px_rgba(16,40,55,0.06),0_6px_20px_rgba(16,40,55,0.08)]"
+            class="bg-surface-base rounded-surface flex min-h-0 flex-1 flex-col overflow-hidden border shadow-md"
             :class="isDark ? 'border-border-default' : 'border-transparent'"
           >
             <div
@@ -108,35 +112,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
         <aside
           v-show="store.state.isAiChatEnabled && isLoading"
-          class="o2-sidebar o2-sidebar-right sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
+          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
           :class="[
             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
+            // The chat is a floating card in both modes — match the main content
+            // card's right/bottom gap (+ rounded-surface corners) so they read as
+            // the same card. Expanding only widens it; it never overlays the header.
+            'pr-2 pb-2',
           ]"
           :style="[
             {
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
+              maxWidth: '100%',
             },
+            // Full-screen just widens the panel (25% → 50%) beside the content —
+            // same top position + height, so the main header stays visible.
             store.state.isAiChatExpanded
-              ? {
-                  position: 'fixed',
-                  top: 0,
-                  right: 0,
-                  width: '50%',
-                  maxWidth: '100%',
-                  minWidth: '18.75rem',
-                  height: '100vh',
-                  zIndex: 200,
-                }
-              : {
-                  width: '25%',
-                  maxWidth: '100%',
-                  minWidth: '4.688rem',
-                },
+              ? { width: '50%', minWidth: '18.75rem' }
+              : { width: '25%', minWidth: '4.688rem' },
           ]"
         >
           <O2AIChat
-            :header-height="42.5"
+            :header-height="40"
             :is-open="store.state.isAiChatEnabled"
             @close="closeChat"
             :aiChatInputContext="aiChatInputContext"

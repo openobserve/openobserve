@@ -220,10 +220,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </OForm>
       </div>
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
         class="ml-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
-        style="width: 35%; min-width: 75px; height: calc(100vh - 90px) !important"
+        style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
       >
         <O2AIChat
           :aiChatInputContext="inputContext"
@@ -231,6 +232,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :is-open="store.state.isAiChatEnabled"
           @close="store.state.isAiChatEnabled = false"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
   </ODrawer>

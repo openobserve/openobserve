@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <router-view></router-view>
   <OToastProvider />
   <ConfirmDialogProvider />
+  <CreateAlertDialogProvider />
   <component :is="QueryDevtools" v-if="QueryDevtools" />
 </template>
 
@@ -28,6 +29,7 @@ import { defineAsyncComponent, onMounted, watch } from "vue";
 import { applyCurrentTheme } from "@/utils/themeManager";
 import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
+import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
 
 // Query cache inspector — dev builds only; the branch is eliminated in a
 // production build so neither the component nor its chunk ships.
@@ -38,7 +40,7 @@ const QueryDevtools = import.meta.env.DEV
   : null;
 
 export default {
-  components: { OToastProvider, ConfirmDialogProvider },
+  components: { OToastProvider, ConfirmDialogProvider, CreateAlertDialogProvider },
   setup() {
     const store = useStore();
     const router = useRouter();

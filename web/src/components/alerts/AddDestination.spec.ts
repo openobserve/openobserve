@@ -45,6 +45,13 @@ vi.mock("@/services/alert_destination", async (importOriginal) => {
   });
 });
 
+vi.mock("@/services/users", () => ({
+  default: {
+    orgUsers: vi.fn(),
+    getRoles: vi.fn(),
+  },
+}));
+
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
 }));
@@ -77,6 +84,7 @@ vi.mock("@/composables/usePrebuiltDestinations", async () => {
 
 import AddDestination from "@/components/alerts/AddDestination.vue";
 import destinationService from "@/services/alert_destination";
+import usersService from "@/services/users";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 
@@ -101,6 +109,12 @@ function mountComp(props: Record<string, any> = {}) {
         DestinationTestResult: {
           template: '<div data-test="destination-test-result-stub"></div>',
           props: ["result"],
+        },
+        AddUser: {
+          name: "AddUser",
+          props: ["open", "container", "roles", "userRole", "isCloud"],
+          emits: ["update:open", "updated"],
+          template: '<div data-test="add-user-stub"></div>',
         },
         DestinationPreview: {
           template: '<div data-test="destination-preview-stub"></div>',
@@ -201,14 +215,16 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
     });
   });
 
-  it("email branch: invalid emails blocked; valid emails → array payload with type=email", async () => {
+  it("email branch: no recipients blocked; picked users → array payload with type=email", async () => {
+    // Recipients are org users chosen from a list, so the only invalid state is
+    // an empty selection — there is no free text left to mistype.
     wrapper = mountComp({ isAlerts: true });
     const form = getForm(wrapper);
     form.setFieldValue("destination_type", "custom");
     form.setFieldValue("type", "email");
     form.setFieldValue("name", "dest-email");
     form.setFieldValue("template", "tmpl1");
-    form.setFieldValue("emails", "not-an-email");
+    form.setFieldValue("emails", []);
     await nextTick();
 
     await form.handleSubmit();
@@ -216,7 +232,7 @@ describe("AddDestination - custom path schema gating + payload parity", () => {
     expect(form.state.isValid).toBe(false);
     expect(destinationService.create).not.toHaveBeenCalled();
 
-    form.setFieldValue("emails", "a@b.com, c@d.com");
+    form.setFieldValue("emails", ["a@b.com", "c@d.com"]);
     await nextTick();
     await form.handleSubmit();
     await flushPromises();
@@ -492,5 +508,118 @@ describe("AddDestination - prebuilt (single form, no nested <form>)", () => {
     const save = wrapper.find('[data-test="add-destination-submit-btn"]');
     expect(save.attributes("type")).toBe("submit");
     expect(save.attributes("form")).toBe("add-destination-form");
+  });
+});
+
+describe("AddDestination — email recipients are org users", () => {
+  const ORG_USERS = [
+    { email: "alice@acme.io", role: "admin" },
+    { email: "bob@acme.io", role: "member" },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(usersService.orgUsers).mockResolvedValue({ data: { data: ORG_USERS } } as any);
+    vi.mocked(usersService.getRoles).mockResolvedValue({
+      data: [{ label: "Admin", value: "admin" }],
+    } as any);
+  });
+
+  const mountEmailForm = async () => {
+    const wrapper = mountComp({ isAlerts: true });
+    const form = getForm(wrapper);
+    form.setFieldValue("destination_type", "custom");
+    form.setFieldValue("type", "email");
+    await flushPromises();
+    await nextTick();
+    return { wrapper, form };
+  };
+
+  it("offers the organization's users as recipient options", async () => {
+    const { wrapper } = await mountEmailForm();
+
+    expect(usersService.orgUsers).toHaveBeenCalledWith(store.state.selectedOrganization.identifier);
+
+    const select = wrapper.find('[data-test="add-destination-emails-select"]');
+    expect(select.exists()).toBe(true);
+    expect(wrapper.vm.orgUserOptions).toEqual([
+      { label: "alice@acme.io", value: "alice@acme.io" },
+      { label: "bob@acme.io", value: "bob@acme.io" },
+    ]);
+  });
+
+  it("leaves the picker empty rather than breaking the form when the fetch fails", async () => {
+    vi.mocked(usersService.orgUsers).mockRejectedValue(new Error("403"));
+
+    const { wrapper } = await mountEmailForm();
+
+    expect(wrapper.vm.orgUserOptions).toEqual([]);
+    expect(wrapper.find('[data-test="add-destination-emails-select"]').exists()).toBe(true);
+  });
+
+  it("opens the create-user drawer from the action under the options", async () => {
+    const { wrapper } = await mountEmailForm();
+
+    expect(wrapper.vm.showCreateUser).toBe(false);
+    wrapper.vm.openCreateUser();
+    await nextTick();
+
+    const addUser = wrapper.findComponent({ name: "AddUser" });
+    expect(addUser.props("open")).toBe(true);
+    // A sidebar, not a dialog stacked on the destination form.
+    expect(addUser.props("container")).toBe("drawer");
+  });
+
+  it("refreshes the list and selects the user that was just created", async () => {
+    const { wrapper, form } = await mountEmailForm();
+    wrapper.vm.openCreateUser();
+
+    vi.mocked(usersService.orgUsers).mockResolvedValue({
+      data: { data: [...ORG_USERS, { email: "carol@acme.io", role: "member" }] },
+    } as any);
+
+    await wrapper
+      .findComponent({ name: "AddUser" })
+      .vm.$emit("updated", { email: "carol@acme.io" });
+    await flushPromises();
+
+    // The round trip ends where the user was heading: a recipient chosen.
+    expect(wrapper.vm.orgUserOptions).toHaveLength(3);
+    expect(form.state.values.emails).toContain("carol@acme.io");
+    expect(wrapper.vm.showCreateUser).toBe(false);
+  });
+
+  it("infers the new user when the event carries no email", async () => {
+    const { wrapper, form } = await mountEmailForm();
+
+    vi.mocked(usersService.orgUsers).mockResolvedValue({
+      data: { data: [...ORG_USERS, { email: "dan@acme.io", role: "member" }] },
+    } as any);
+
+    await wrapper.findComponent({ name: "AddUser" }).vm.$emit("updated");
+    await flushPromises();
+
+    expect(form.state.values.emails).toContain("dan@acme.io");
+  });
+
+  it("does not duplicate a recipient that is already selected", async () => {
+    const { wrapper, form } = await mountEmailForm();
+    form.setFieldValue("emails", ["alice@acme.io"]);
+
+    await wrapper
+      .findComponent({ name: "AddUser" })
+      .vm.$emit("updated", { email: "alice@acme.io" });
+    await flushPromises();
+
+    expect(form.state.values.emails).toEqual(["alice@acme.io"]);
+  });
+
+  it("passes the org's own roles to the create-user drawer", async () => {
+    const { wrapper } = await mountEmailForm();
+
+    expect(usersService.getRoles).toHaveBeenCalled();
+    expect(wrapper.findComponent({ name: "AddUser" }).props("roles")).toEqual([
+      { label: "Admin", value: "admin" },
+    ]);
   });
 });

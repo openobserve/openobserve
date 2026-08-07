@@ -31,6 +31,9 @@ vi.mock("@/services/alerts", async (importOriginal) => {
 // The view reads its identity from the route; a hermetic route beats standing
 // up the whole app router with its guards.
 const mockRouterPush = vi.fn();
+// Mutable so a test can arrive from a non-default folder, the way the list
+// navigates here.
+const mockRouteQuery: Record<string, string> = {};
 vi.mock("vue-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue-router")>();
   return {
@@ -39,7 +42,7 @@ vi.mock("vue-router", async (importOriginal) => {
       name: "alertDetail",
       path: "/alerts/detail/alert-1",
       params: { alert_id: "alert-1" },
-      query: {},
+      query: mockRouteQuery,
       meta: {},
     }),
     useRouter: () => ({ push: mockRouterPush }),
@@ -335,6 +338,77 @@ describe("AlertDetail — History tab", () => {
       expect(
         chart.element.compareDocumentPosition(tabs.element) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+    });
+  });
+
+  describe("back navigation", () => {
+    beforeEach(() => {
+      for (const key of Object.keys(mockRouteQuery)) delete mockRouteQuery[key];
+    });
+
+    it("returns to the folder the alert was opened from", async () => {
+      // The list navigates here with the row's folder; dropping it on the way
+      // back stranded the user in "default", not where their alert lives.
+      mockRouteQuery.folder = "team-a";
+
+      const wrapper = await mountView({});
+      const back = wrapper.findComponent({ name: "OPageHeader" }).props("back") as any;
+
+      expect(back.to.query.folder).toBe("team-a");
+    });
+
+    it("falls back to the default folder when none was carried in", async () => {
+      const wrapper = await mountView({});
+      const back = wrapper.findComponent({ name: "OPageHeader" }).props("back") as any;
+
+      expect(back.to.query.folder).toBe("default");
+    });
+
+    it("keeps the org identifier on the way back", async () => {
+      mockRouteQuery.folder = "team-a";
+
+      const wrapper = await mountView({});
+      const back = wrapper.findComponent({ name: "OPageHeader" }).props("back") as any;
+
+      expect(back.to.name).toBe("alertList");
+      expect(back.to.query.org_identifier).toBeTruthy();
+    });
+  });
+
+  describe("edit navigation", () => {
+    beforeEach(() => {
+      for (const key of Object.keys(mockRouteQuery)) delete mockRouteQuery[key];
+      mockRouterPush.mockClear();
+    });
+
+    it("goes straight to the editor, not through the list", async () => {
+      // Editing used to push the list route with ?action=update, so the list
+      // rendered and refetched before the form appeared.
+      const wrapper = await mountView({});
+      await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
+
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      const target = mockRouterPush.mock.calls[0][0];
+
+      expect(target.name).toBe("editAlert");
+      expect(target.params.alert_id).toBe("alert-1");
+      expect(target.query.action).toBeUndefined();
+    });
+
+    it("carries the folder so saving returns to the right one", async () => {
+      mockRouteQuery.folder = "team-a";
+
+      const wrapper = await mountView({});
+      await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
+
+      expect(mockRouterPush.mock.calls[0][0].query.folder).toBe("team-a");
+    });
+
+    it("falls back to the default folder when none was carried in", async () => {
+      const wrapper = await mountView({});
+      await wrapper.find('[data-test="alerts-alertdetail-edit"]').trigger("click");
+
+      expect(mockRouterPush.mock.calls[0][0].query.folder).toBe("default");
     });
   });
 });

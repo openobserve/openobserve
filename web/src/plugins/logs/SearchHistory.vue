@@ -175,8 +175,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.sql }}</pre
-                  >
+                    >{{ row?.sql }}</pre>
                 </div>
               </div>
             </div>
@@ -218,8 +217,7 @@
                   <pre
                     v-else
                     class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                    >{{ row?.function }}</pre
-                  >
+                    >{{ row?.function }}</pre>
                 </div>
               </div>
             </div>
@@ -228,7 +226,7 @@
                    the query blocks above. -->
           <div v-show="activeTab === 'more_details'" class="px-4">
             <QueryEditor
-              style="height: 200px"
+              style="height: 12.5rem"
               :ref="`QueryEditorRef${row.trace_id + row.sql}`"
               :editor-id="`search-query-editor${row.trace_id + row.sql}`"
               :debounceTime="600"

@@ -248,8 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre
           class="bg-surface-panel rounded-default text-3xs overflow-auto p-3"
           data-test="template-preview-panel-raw-json"
-          >{{ rawPayloadJson }}</pre
-        >
+          >{{ rawPayloadJson }}</pre>
       </template>
     </div>
   </div>

@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :placeholder="t('iam.editRole.selectResource')"
                 clearable
                 searchable
-                style="width: 200px"
+                style="width: 12.5rem"
                 @update:model-value="onResourceChange"
               />
             </div>
@@ -171,7 +171,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex flex-nowrap">
-              <div :style="isHelpOpen ? { width: 'calc(100% - 350px)' } : { width: '100%' }">
+              <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
                 <QueryEditor
                   data-test="logs-vrl-function-editor"
                   editor-id="add-function-editor"
@@ -181,8 +182,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-model:query="permissionsJsonValue"
                   style="height: calc(100vh - var(--navbar-height) - 295px)"
                 />
+                <!-- eslint-enable local/no-hardcoded-px -->
               </div>
-              <div v-if="isHelpOpen" style="width: 350px" class="p-2">
+              <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
                 <div class="flex items-center justify-between px-2">
                   <div style="font-size: var(--text-base)">
                     {{ t("iam.editRole.quickReference") }}
@@ -2221,14 +2223,12 @@ const saveRole = () => {
     ) as string[],
   };
 
-  if (
-    !(
-      payload.add.length ||
-      payload.remove.length ||
-      payload.add_users.length ||
-      payload.remove_users.length
-    )
-  ) {
+  if (!(
+    payload.add.length ||
+    payload.remove.length ||
+    payload.add_users.length ||
+    payload.remove_users.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editRole.noUpdatesDetected"),

@@ -173,8 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <pre
                   class="m-0 font-[inherit] [overflow-wrap:break-word] [word-break:break-word] [white-space:pre-wrap] [word-wrap:break-word]"
-                  >{{ val.message }}</pre
-                >
+                  >{{ val.message }}</pre>
               </div>
             </div>
           </div>

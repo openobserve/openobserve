@@ -673,6 +673,7 @@ export const usePanelDataLoader = (
   onMounted(async () => {
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
+      // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
       rootMargin: "0px",
       threshold: 0, // Adjust as needed
     });
@@ -778,8 +779,16 @@ export const usePanelDataLoader = (
 
     const cacheKeysMatch = isEqual(normalizedCurrentKey, normalizedSavedKey);
 
+    const cachedIncompleteLoad =
+      tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
+
     // Check if it is stale or not
-    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && cacheKeysMatch) {
+    if (
+      tempPanelCacheValue &&
+      Object.keys(tempPanelCacheValue).length > 0 &&
+      cacheKeysMatch &&
+      !cachedIncompleteLoad
+    ) {
       // const cache = getPanelCache();
       state.data = markRaw(tempPanelCacheValue.data ?? []);
       state.loading = tempPanelCacheValue.loading;

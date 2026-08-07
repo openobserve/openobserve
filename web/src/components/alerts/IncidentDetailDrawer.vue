@@ -1028,8 +1028,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.sql }}</pre>
                             </div>
 
                             <!-- PromQL Query -->
@@ -1039,8 +1038,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   'text-compact overflow-x-auto break-words whitespace-pre-wrap',
                                   'text-text-body',
                                 ]"
-                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre
-                              >
+                                >{{ alerts[selectedAlertIndex]?.query_condition?.promql }}</pre>
                             </div>
 
                             <!-- Custom Conditions -->
@@ -1056,8 +1054,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                   formatCustomConditions(
                                     alerts[selectedAlertIndex]?.query_condition?.conditions,
                                   )
-                                }}</pre
-                              >
+                                }}</pre>
                             </div>
 
                             <!-- No conditions -->

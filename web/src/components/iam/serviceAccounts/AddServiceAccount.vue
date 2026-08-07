@@ -184,14 +184,12 @@ export default defineComponent({
 
     // The OForm owns all editable fields. Name/roles/groups are always blank on
     // create; the description prefills from modelValue in update mode.
-    const addServiceAccountDefaults = computed(
-      (): AddServiceAccountForm => ({
-        name: "",
-        first_name: props.modelValue?.first_name ?? "",
-        roles: [],
-        groups: [],
-      }),
-    );
+    const addServiceAccountDefaults = computed((): AddServiceAccountForm => ({
+      name: "",
+      first_name: props.modelValue?.first_name ?? "",
+      roles: [],
+      groups: [],
+    }));
 
     // Roles/groups exist only on enterprise/cloud (OSS has no RBAC UI).
     const showAccessPickers = computed(

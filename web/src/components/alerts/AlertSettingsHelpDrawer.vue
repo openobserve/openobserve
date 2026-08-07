@@ -599,17 +599,17 @@ defineExpose({ applyTemplate, previewTemplate });
   </ODrawer>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(complex-state): the .seg-live/-sample/-opaque/-text segment styles are
    applied by the computed segClass() mapper to the v-for'd preview segments —
    a dynamic, per-kind class name the utility layer cannot inline — and the
    legend / preview-box / destination-card BEM blocks cascade hover and kind
    variants around them. All values already resolve to design tokens. */
-// Colors use the design-token layer defined in src/lib/styles/tokens/*.css
-// (--color-*, --radius-*) — the same theme-aware tokens the O* component
-// library consumes, with dark-mode overrides in tokens/dark.css.
+/* Colors use the design-token layer defined in src/lib/styles/tokens/*.css
+   (--color-*, --radius-*) — the same theme-aware tokens the O* component
+   library consumes, with dark-mode overrides in tokens/dark.css. */
 
-// ── Layout ───────────────────────────────────────────────────────────
+/* ── Layout ─────────────────────────────────────────────────────────── */
 .help-body {
   display: flex;
   flex-direction: column;
@@ -619,10 +619,10 @@ defineExpose({ applyTemplate, previewTemplate });
   color: var(--color-text-body);
 }
 
-// ── Legend: a compact, readable key (not a banner) ───────────────────
-// A small key that reads top-to-bottom: each row is a concrete example of how
-// that kind of value appears in the preview, then "= plain explanation".
-// Stacked (not wrapped inline) so labels never get cramped or cut off.
+/* ── Legend: a compact, readable key (not a banner) ───────────────────
+   A small key that reads top-to-bottom: each row is a concrete example of how
+   that kind of value appears in the preview, then "= plain explanation".
+   Stacked (not wrapped inline) so labels never get cramped or cut off. */
 .help-legend {
   display: flex;
   flex-direction: column;
@@ -632,89 +632,91 @@ defineExpose({ applyTemplate, previewTemplate });
   background: var(--color-surface-subtle);
   font-size: var(--text-xs);
   color: var(--color-text-secondary);
-
-  &__title {
-    font-weight: 600;
-    color: var(--color-text-heading);
-  }
-
-  &__item {
-    display: flex;
-    align-items: baseline;
-    gap: 0.5rem;
-    line-height: 1.4;
-  }
-
-  &__sep {
-    color: var(--color-text-muted);
-  }
-
-  // Each swatch is a real example rendered in that style, so the row is
-  // self-explanatory: the swatch IS what it describes.
-  &__swatch {
-    flex-shrink: 0;
-    min-width: 3.5rem;
-    padding: 0.0625rem 0.375rem;
-    border-radius: var(--radius-default);
-    font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-    line-height: 1.4;
-    text-align: center;
-  }
-  &__swatch--live {
-    font-weight: 600;
-    color: var(--color-text-heading);
-    background: var(--color-surface-base);
-    border: 1px solid var(--color-border-subtle);
-  }
-  &__swatch--sample {
-    font-style: italic;
-    color: var(--color-text-secondary);
-    text-decoration: underline dashed;
-    background: var(--color-surface-base);
-    border: 1px solid var(--color-border-subtle);
-  }
-  &__swatch--opaque {
-    background: var(--color-surface-subtle-hover);
-    color: var(--color-text-body);
-  }
 }
 
-// ── Sections ─────────────────────────────────────────────────────────
+.help-legend__title {
+  font-weight: 600;
+  color: var(--color-text-heading);
+}
+
+.help-legend__item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  line-height: 1.4;
+}
+
+.help-legend__sep {
+  color: var(--color-text-muted);
+}
+
+/* Each swatch is a real example rendered in that style, so the row is
+   self-explanatory: the swatch IS what it describes. */
+.help-legend__swatch {
+  flex-shrink: 0;
+  min-width: 3.5rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--radius-default);
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+  text-align: center;
+}
+.help-legend__swatch--live {
+  font-weight: 600;
+  color: var(--color-text-heading);
+  background: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid var(--color-border-subtle);
+}
+.help-legend__swatch--sample {
+  font-style: italic;
+  color: var(--color-text-secondary);
+  text-decoration: underline dashed;
+  background: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid var(--color-border-subtle);
+}
+.help-legend__swatch--opaque {
+  background: var(--color-surface-subtle-hover);
+  color: var(--color-text-body);
+}
+
+/* ── Sections ───────────────────────────────────────────────────────── */
 .help-section {
   display: flex;
   flex-direction: column;
-
-  &__title {
-    font-size: var(--text-sm);
-    font-weight: 600;
-    color: var(--color-text-heading);
-    margin: 0 0 0.5rem;
-  }
-
-  &__text {
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-    margin: 0;
-
-    &--mb {
-      margin-bottom: 0.75rem;
-    }
-  }
-
-  &__hint {
-    color: var(--color-text-secondary);
-    font-size: var(--text-xs);
-    margin: 0.5rem 0 0;
-
-    &--top {
-      margin: 0 0 0.5rem;
-    }
-  }
 }
 
-// Collapsible section header ("Browse built-in variables") — looks like a
-// clickable disclosure row, matching .help-section__title weight.
+.help-section__title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-heading);
+  margin: 0 0 0.5rem;
+}
+
+.help-section__text {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.help-section__text--mb {
+  margin-bottom: 0.75rem;
+}
+
+.help-section__hint {
+  color: var(--color-text-secondary);
+  font-size: var(--text-xs);
+  margin: 0.5rem 0 0;
+}
+
+.help-section__hint--top {
+  margin: 0 0 0.5rem;
+}
+
+/* Collapsible section header ("Browse built-in variables") — looks like a
+   clickable disclosure row, matching .help-section__title weight. */
 .help-disclosure {
   display: flex;
   align-items: center;
@@ -732,8 +734,8 @@ defineExpose({ applyTemplate, previewTemplate });
   }
 }
 
-// "What gets sent" rendered-result label + box — shows the concrete output so
-// a beginner sees input → result, not just a template full of placeholders.
+/* "What gets sent" rendered-result label + box — shows the concrete output so
+   a beginner sees input → result, not just a template full of placeholders. */
 .help-result-label {
   display: block;
   margin: 0.625rem 0 0.25rem;
@@ -749,25 +751,25 @@ defineExpose({ applyTemplate, previewTemplate });
 }
 
 .help-empty {
-  // Empty-state guidance is meant to be READ — use secondary text, not the
-  // muted/placeholder token which is too faint (esp. in light mode).
+  /* Empty-state guidance is meant to be READ — use secondary text, not the
+     muted/placeholder token which is too faint (esp. in light mode). */
   color: var(--color-text-secondary);
   font-style: italic;
   margin: 0;
-
-  &--sm {
-    font-size: var(--text-xs);
-  }
 }
 
-// Inline lead-in label for a sentence (e.g. "When should I override?").
+.help-empty--sm {
+  font-size: var(--text-xs);
+}
+
+/* Inline lead-in label for a sentence (e.g. "When should I override?"). */
 .help-inline-label {
   font-weight: 600;
   color: var(--color-text-heading);
 }
 
-// "Currently selected: [String]" — readable label next to an OBadge showing
-// the active row-template type (badge styling comes from OBadge, reused).
+/* "Currently selected: [String]" — readable label next to an OBadge showing
+   the active row-template type (badge styling comes from OBadge, reused). */
 .help-current-type {
   display: flex;
   align-items: center;
@@ -777,57 +779,58 @@ defineExpose({ applyTemplate, previewTemplate });
   color: var(--color-text-secondary);
 }
 
-// Row-template compose example: stacked labeled code blocks.
+/* Row-template compose example: stacked labeled code blocks. */
 .help-compose {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
-
-  &__label {
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-secondary);
-  }
 }
 
-// ── Why-use-a-variable before/after comparison ───────────────────────
+.help-compose__label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+}
+
+/* ── Why-use-a-variable before/after comparison ─────────────────────── */
 .help-compare {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
 
-  &__col {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-    padding: 0.75rem;
-    border: 1px solid var(--color-border-default);
-    border-radius: var(--radius-surface);
-    border-left-width: 0.125rem;
+.help-compare__col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid var(--color-border-default);
+  border-radius: var(--radius-surface);
+  border-left-width: 0.125rem;
+}
 
-    &--bad {
-      border-left-color: var(--color-warning-500);
-    }
-    &--good {
-      border-left-color: var(--color-primary-500);
-    }
-  }
+.help-compare__col--bad {
+  border-left-color: var(--color-warning-500);
+}
+.help-compare__col--good {
+  border-left-color: var(--color-primary-500);
+}
 
-  &__label {
-    font-size: var(--text-2xs);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--color-text-secondary);
-  }
-  &__desc {
-    margin: 0;
-    font-size: var(--text-compact);
-    color: var(--color-text-secondary);
-    line-height: 1.45;
-  }
+.help-compare__label {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-secondary);
+}
+.help-compare__desc {
+  margin: 0;
+  font-size: var(--text-compact);
+  color: var(--color-text-secondary);
+  line-height: 1.45;
 }
 
 .help-preview-select {
@@ -839,7 +842,7 @@ defineExpose({ applyTemplate, previewTemplate });
   margin-top: 0.75rem;
 }
 
-// ── Destination cards (current message per destination) ──────────────
+/* ── Destination cards (current message per destination) ────────────── */
 .help-dest-list {
   display: flex;
   flex-direction: column;
@@ -854,27 +857,28 @@ defineExpose({ applyTemplate, previewTemplate });
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-surface);
   background: var(--color-surface-base);
-
-  &__head {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    align-items: baseline;
-  }
-  &__name {
-    font-weight: 600;
-    color: var(--color-text-heading);
-  }
-  &__tpl {
-    font-size: var(--text-xs);
-    color: var(--color-text-muted);
-  }
 }
 
-// ── Built-in variable chips ──────────────────────────────────────────
+.help-dest-card__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+.help-dest-card__name {
+  font-weight: 600;
+  color: var(--color-text-heading);
+}
+.help-dest-card__tpl {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+/* ── Built-in variable chips ────────────────────────────────────────── */
 .help-chips {
   display: flex;
   flex-wrap: wrap;
@@ -883,6 +887,7 @@ defineExpose({ applyTemplate, previewTemplate });
 
 .help-chip {
   padding: 0.25rem 0.5rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-default);
   background: transparent;
@@ -897,7 +902,7 @@ defineExpose({ applyTemplate, previewTemplate });
   }
 }
 
-// ── User's context variables list ────────────────────────────────────
+/* ── User's context variables list ──────────────────────────────────── */
 .help-var-list {
   display: flex;
   flex-direction: column;
@@ -912,20 +917,21 @@ defineExpose({ applyTemplate, previewTemplate });
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.375rem 0.5rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   border-radius: var(--radius-default);
-
-  &__key {
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    color: var(--color-text-code);
-  }
-  &__val {
-    color: var(--color-text-secondary);
-  }
 }
 
-// ── Preview box + segment styles ─────────────────────────────────────
+.help-var-row__key {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-code);
+}
+.help-var-row__val {
+  color: var(--color-text-secondary);
+}
+
+/* ── Preview box + segment styles ───────────────────────────────────── */
 .preview-box {
   white-space: pre-wrap;
   word-break: break-word;
@@ -935,30 +941,31 @@ defineExpose({ applyTemplate, previewTemplate });
   margin: 0;
   padding: 0.75rem;
   border-radius: var(--radius-surface);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
   border: 1px solid var(--color-border-default);
   background: var(--color-surface-subtle);
   color: var(--color-text-body);
-
-  // Nested inside a destination card — lighter so it doesn't double-frame.
-  &--nested {
-    border-color: var(--color-border-subtle);
-    background: var(--color-surface-panel);
-  }
 }
 
-// live = the user's real data, shown plainly but with a touch of weight.
+/* Nested inside a destination card — lighter so it doesn't double-frame. */
+.preview-box--nested {
+  border-color: var(--color-border-subtle);
+  background: var(--color-surface-panel);
+}
+
+/* live = the user's real data, shown plainly but with a touch of weight. */
 .seg-live {
   font-weight: 600;
   color: var(--color-text-heading);
 }
-// sample = a mock runtime value: clearly "example", never mistaken for real.
+/* sample = a mock runtime value: clearly "example", never mistaken for real. */
 .seg-sample {
   font-style: italic;
   text-decoration: underline dashed;
   color: var(--color-text-secondary);
 }
-// opaque = filled at notification time. Readable chip in BOTH themes — the
-// previous version put faint text on a near-same gray and was unreadable.
+/* opaque = filled at notification time. Readable chip in BOTH themes — the
+   previous version put faint text on a near-same gray and was unreadable. */
 .seg-opaque {
   padding: 0 0.25rem;
   border-radius: var(--radius-default);

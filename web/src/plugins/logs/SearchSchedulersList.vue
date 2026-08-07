@@ -164,8 +164,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.sql }}</pre
-                    >
+                      >{{ row?.sql }}</pre>
                   </div>
                 </div>
               </div>
@@ -206,8 +205,7 @@
                     <pre
                       v-else
                       class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
-                      >{{ row?.function }}</pre
-                    >
+                      >{{ row?.function }}</pre>
                   </div>
                 </div>
               </div>
@@ -217,7 +215,7 @@
                 class="mb-2 flex max-h-screen w-[calc(95vw-2.5rem)] min-w-[calc(90vw-1.25rem)] flex-col overflow-hidden px-4 py-0 text-left"
               >
                 <QueryEditor
-                  style="height: 130px"
+                  style="height: 8.125rem"
                   :key="row.trace_id"
                   :ref="`QueryEditorRef${row.trace_id}`"
                   :editor-id="`alerts-query-editor${row.trace_id}`"

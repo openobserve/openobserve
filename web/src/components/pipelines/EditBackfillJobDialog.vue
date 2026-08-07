@@ -186,18 +186,16 @@ const errorMessage = ref("");
 // Typed dynamic defaults for the form-owned fields (seeded from props.job). The
 // time range is an absolute range carrying the job's start/end (forces the
 // picker to absolute mode + pre-fills it).
-const backfillDefaults = computed(
-  (): BackfillForm => ({
-    timerange: {
-      type: "absolute",
-      from: props.job?.start_time,
-      to: props.job?.end_time,
-    },
-    chunkPeriodMinutes: props.job?.chunk_period_minutes || null,
-    delayBetweenChunks: props.job?.delay_between_chunks_secs || null,
-    deleteBeforeBackfill: props.job?.delete_before_backfill || false,
-  }),
-);
+const backfillDefaults = computed((): BackfillForm => ({
+  timerange: {
+    type: "absolute",
+    from: props.job?.start_time,
+    to: props.job?.end_time,
+  },
+  chunkPeriodMinutes: props.job?.chunk_period_minutes || null,
+  delayBetweenChunks: props.job?.delay_between_chunks_secs || null,
+  deleteBeforeBackfill: props.job?.delete_before_backfill || false,
+}));
 
 // Blank defaults used by cancel/reset (the open-watch re-seeds from props.job).
 const blankDefaults = (): BackfillForm => ({

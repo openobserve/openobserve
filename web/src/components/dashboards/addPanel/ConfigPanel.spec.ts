@@ -973,6 +973,35 @@ describe("ConfigPanel", () => {
     });
   });
 
+  describe("Field Overrides button", () => {
+    it("should render its own button and emit open-field-overrides on click", async () => {
+      const tableData = {
+        ...mockDashboardPanelData,
+        data: { ...mockDashboardPanelData.data, type: "table" },
+      };
+
+      wrapper = createWrapper({ dashboardPanelData: tableData });
+
+      const addBtn = wrapper.find(
+        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+      );
+      expect(addBtn.exists()).toBe(true);
+
+      await addBtn.trigger("click");
+
+      expect(wrapper.emitted("open-field-overrides")).toBeTruthy();
+    });
+
+    it("should not render for non-table panels", () => {
+      wrapper = createWrapper(); // Default is line chart
+
+      const addBtn = wrapper.find(
+        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+      );
+      expect(addBtn.exists()).toBe(false);
+    });
+  });
+
   describe("Component Initialization Logic", () => {
     it("should initialize all default configuration values on mount", () => {
       // Create a completely fresh mock data with minimal config to test initialization

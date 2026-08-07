@@ -15,6 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <div class="w-full p-3" style="height: calc(100vh - 130px)">
     <!-- Billing usage tiles (always shown). When self-usage reporting is
            enabled, the calendar in the toolbar drives the range and a daily
@@ -623,7 +624,7 @@ export default defineComponent({
           },
           enterable: true,
           backgroundColor: "rgba(255,255,255,1)",
-          extraCssText: "max-height: 200px; overflow: auto; max-width: 400px",
+          extraCssText: "max-height: 12.5rem; overflow: auto; max-width: 25rem",
           axisPointer: {
             type: "cross",
             label: {

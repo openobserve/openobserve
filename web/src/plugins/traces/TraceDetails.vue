@@ -533,7 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
                 <div
                   ref="traceScrollContainer"
-                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! overflow-x-hidden! overflow-y-auto! [scrollbar-gutter:stable]!"
+                  class="relative-position trace-content-scroll min-h-0! max-w-full! flex-1! [scrollbar-gutter:stable]! overflow-x-hidden! overflow-y-auto!"
                   :style="{
                     width: isSidebarOpen ? leftWidth + 'px' : '100%',
                   }"
@@ -724,7 +724,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
                 class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
-                style="width: 40%; min-width: 300px"
+                style="width: 40%; min-width: 18.75rem"
               >
                 <TraceDetailsSidebar
                   data-test="trace-details-thread-sidebar"
@@ -755,7 +755,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="flex min-h-0 flex-1 items-center justify-center"
             >
               <div class="p-10 text-center" style="color: var(--color-text-secondary)">
-                <OIcon name="table-chart" class="mb-4" style="width: 48px; height: 48px" />
+                <OIcon name="table-chart" class="mb-4" style="width: 3rem; height: 3rem" />
                 <div class="mb-2 font-semibold" style="font-size: var(--text-base)">
                   {{ t("traces.spansTableView") }}
                 </div>
@@ -2003,12 +2003,10 @@ export default defineComponent({
               endTime = Math.ceil(res.data.hits[0].end_time / 1000);
 
               // If the trace is not in the current time range, update the time range
-              if (
-                !(
-                  startTime >= Number(router.currentRoute.value.query.from) &&
-                  endTime <= Number(router.currentRoute.value.query.to)
-                )
-              ) {
+              if (!(
+                startTime >= Number(router.currentRoute.value.query.from) &&
+                endTime <= Number(router.currentRoute.value.query.to)
+              )) {
                 updateUrlQueryParams({
                   from: startTime,
                   to: endTime,
@@ -2224,6 +2222,7 @@ export default defineComponent({
         tics.push({
           value: Number(time.toFixed(2)),
           label: raw(formatTimeWithSuffix(time * 1000)),
+          // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel offset that pulls the first tick onto the axis line; scaling it with text would misalign it
           left: i === 0 ? "-1px" : `${25 * i}%`,
         });
         time += quarterMs;

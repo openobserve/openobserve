@@ -37,7 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="options"
           labelKey="label"
           valueKey="value"
-          style="width: 120px"
+          style="width: 7.5rem"
         />
         <OButton variant="primary" size="xs" class="!h-8" type="submit" :loading="isSubmitting">
           {{ t("user.sendInvite") }}

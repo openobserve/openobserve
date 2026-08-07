@@ -18,7 +18,7 @@ limitations under the License. -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="rounded-default border-status-positive flex gap-3 border-l-[3px] border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
+      class="rounded-default border-status-positive flex gap-3 border-l-3 border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
     >
       <div class="text-status-positive shrink-0 pt-0.5">
         <OIcon name="check-circle" size="md" />
@@ -50,7 +50,7 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="rounded-default border-status-negative flex gap-3 border-l-[3px] border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
+      class="rounded-default border-status-negative flex gap-3 border-l-3 border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
     >
       <div class="text-status-negative shrink-0 pt-0.5">
         <OIcon name="error" size="md" />
@@ -103,7 +103,7 @@ limitations under the License. -->
           <div data-test="test-failure-details" class="pt-2">
             <div v-if="result.error" data-test="test-error-message" class="error-item mb-3">
               <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
               >
                 {{ t("alerts.error") }}
               </div>
@@ -114,7 +114,7 @@ limitations under the License. -->
 
             <div v-if="result.statusCode" data-test="test-http-status" class="error-item mb-3">
               <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
               >
                 {{ t("alerts.httpStatus") }}
               </div>
@@ -125,14 +125,13 @@ limitations under the License. -->
 
             <div v-if="result.responseBody" data-test="test-response-body" class="error-item mb-3">
               <div
-                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.5px] uppercase"
+                class="text-3xs text-text-secondary mb-1 font-semibold tracking-[0.03125rem] uppercase"
               >
                 {{ t("alerts.responseBody") }}
               </div>
               <pre
                 class="rounded-default text-3xs text-text-body m-0 max-h-37.5 overflow-y-auto border border-[rgba(0,0,0,0.1)] bg-[rgba(0,0,0,0.05)] p-2 font-mono leading-[1.5] whitespace-pre dark:border-[rgba(255,255,255,0.1)] dark:bg-[rgba(255,255,255,0.05)]"
-                >{{ formatResponseBody(result.responseBody) }}</pre
-              >
+                >{{ formatResponseBody(result.responseBody) }}</pre>
             </div>
           </div>
         </OCollapsible>
@@ -158,7 +157,7 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="rounded-default border-theme-accent flex gap-3 border-l-[3px] border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
+      class="rounded-default border-theme-accent flex gap-3 border-l-3 border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
     >
       <div class="text-theme-accent shrink-0 pt-0.5">
         <OSpinner size="xs" />

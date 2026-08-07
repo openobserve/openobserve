@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :placeholder="
             modelValue.length > 0 ? '' : (placeholder ?? t('common.typeAndPressEnterOrComma'))
           "
-          class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_100px] border-0 bg-transparent p-1 text-sm outline-none"
+          class="text-text-body placeholder:text-text-secondary min-w-25 [flex:1_1_6.25rem] border-0 bg-transparent p-1 text-sm outline-none"
           @keydown.enter.prevent="addTag"
           @input="handleInput"
           @keydown.delete="handleBackspace"

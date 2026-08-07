@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="raw(errorTooltip)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
@@ -322,7 +322,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               :content="raw(errorReport)"
               content-class="whitespace-pre-line"
-              max-width="360px"
+              max-width="22.5rem"
               :delay="400"
             />
           </OButton>
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTooltip
               :content="t('metrics.explorer.card.sparseHint')"
               content-class="whitespace-pre-line"
-              max-width="320px"
+              max-width="20rem"
               :delay="200"
             />
             {{ t("metrics.explorer.card.sparse") }}
@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="raw(renderError)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="error-outline" size="sm" class="text-error-600" />
@@ -431,7 +431,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`metrics-explorer-card-nan-guard-${card.name}`"
       >
         <span class="inline-flex cursor-help">
-          <OTooltip :content="t('metrics.explorer.card.nanGuard')" max-width="360px" :delay="200" />
+          <OTooltip
+            :content="t('metrics.explorer.card.nanGuard')"
+            max-width="22.5rem"
+            :delay="200"
+          />
           <OIcon name="info-outline" size="xs" />
         </span>
       </div>
@@ -455,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip
             :content="raw(staleTooltip)"
             content-class="whitespace-pre-line"
-            max-width="360px"
+            max-width="22.5rem"
             :delay="200"
           />
           <OIcon name="sync-problem" size="xs" />
@@ -727,6 +731,7 @@ export default defineComponent({
             emit(entry.isIntersecting ? "visible" : "hidden", props.card);
           }
         },
+        // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
         { rootMargin: "100% 0px" },
       );
       observer.observe(root.value);

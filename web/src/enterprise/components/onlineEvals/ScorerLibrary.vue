@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
       data-test="scorer-library-error"
     >
-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
       <div class="text-status-error-text">{{ loadError }}</div>
       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
         {{ t("common.retry") }}
@@ -93,7 +93,7 @@ the Free Software Foundation, either version 3 of the License, or
               class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
               :class="[
                 isSelected(entry.name)
-                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
+                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-accent)_6%,transparent)]'
                   : 'hover:bg-table-row-hover-bg border-transparent',
               ]"
               :data-test="`scorer-library-item-${entry.name}`"

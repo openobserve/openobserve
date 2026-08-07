@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               data-test="action-scripts-loading"
               v-if="alertStateLoadingMap[row.uuid]"
-              style="display: inline-block; width: 33.14px"
+              style="display: inline-block; width: 2.07125rem"
               class="ml-1 flex h-auto items-center justify-center"
               :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
             >
@@ -206,8 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #header-left>
         <div
           data-test="add-action-back-btn"
-          class="flex cursor-pointer items-center justify-center"
-          style="border: 1.5px solid; border-radius: 50%; width: 22px; height: 22px"
+          class="flex size-5.5 cursor-pointer items-center justify-center rounded-full border border-current"
           :title="t('common.goBack')"
           @click="showForm = false"
         >
