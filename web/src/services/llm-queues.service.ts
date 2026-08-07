@@ -40,11 +40,11 @@ export interface LlmQueue {
   name: string;
   description: string | null;
   targetDatasetId: string | null;
-  /** Resolved by the queue overview from the visible Dataset catalog. */
+  /** Resolved by the queue list API. */
   targetDatasetName: string | null;
   allowedRefTypes: string[];
   scoreConfigs: LlmQueueBinding[];
-  /** Derived from active Queue Items by the queue overview. */
+  /** Aggregated by the queue list API from non-archived Queue Items. */
   reviewedCount: number;
   totalCount: number;
   createdBy?: string;
