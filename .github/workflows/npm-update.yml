@@ -48,8 +48,12 @@ jobs:
 
       - name: Configure Git
         run: |
-          # Commit as one of the user rather than the bot, so the commit and the PR share
-          # one author and the PR shows up under his own filters.
+          # Commit as a real user rather than the bot, so the commit and the PR
+          # share one author and the PR shows up under their own filters.
+          # Without these, `git commit` below aborts with "Please tell me who you
+          # are" — Actions runners have no global git identity of their own.
+          git config user.name "Bhargav"
+          git config user.email "551527+bjp232004@users.noreply.github.com"
 
       - name: Create update branch
         run: |
