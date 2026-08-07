@@ -17,9 +17,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!--
   Dataset Detail — the goldens inside one dataset. Reached by clicking a row on
   the Datasets list. Header carries the dataset meta + Edit / Delete / Add Item;
-  the body is the Items table. Frontend-first: reads llm-datasets.service.ts
-  (mock until the API lands). Golden items are MVCC — editing an item's
-  expected_output appends a version.
+  the body is the Items table, paged server-side off
+  GET /datasets/{id}/items. Golden items are MVCC — editing one APPENDS a row
+  under the same logical id, which is why every write addresses the logical id.
 -->
 <template>
   <OPageLayout
@@ -51,17 +51,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        show-index
         :footer-title="t('aiObservability.datasets.detail.footerTitle')"
         :global-filter="search"
         :show-global-filter="false"
-        :page-size="20"
-        :page-size-options="[20, 50, 100, 250, 500]"
+        pagination="server"
+        :current-page="currentPage"
+        :total-count="totalItems"
+        :page-size="pageSize"
+        :page-size-options="pageSizeOptions"
         :default-columns="false"
         :enable-column-resize="true"
         :persist-columns="true"
         table-id="ai-dataset-items"
         width="100%"
         class="h-full w-full"
+        @update:current-page="onPageChange"
+        @update:page-size="onPageSizeChange"
       >
         <template #toolbar>
           <OSearchInput
@@ -74,23 +80,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #empty>
-          <div class="flex flex-col items-center justify-center gap-2 py-10">
-            <span class="text-text-heading text-sm font-semibold">
-              {{ t("aiObservability.datasets.detail.emptyTitle") }}
-            </span>
-            <span class="text-text-secondary text-xs">
-              {{ t("aiObservability.datasets.detail.emptyBody") }}
-            </span>
-            <OButton
-              variant="primary"
-              size="sm"
-              icon-left="add"
-              class="mt-1"
-              data-test="ai-dataset-detail-empty-add"
-              @click="openAddItem"
-            >
-              {{ t("aiObservability.datasets.detail.addItem.button") }}
-            </OButton>
+          <div class="flex items-center justify-center py-8">
+            <OEmptyState
+              size="hero"
+              preset="no-dataset-items"
+              :filtered="Boolean(search)"
+              data-test="ai-dataset-detail-empty-state"
+              @action="openAddItem"
+            />
           </div>
         </template>
 
@@ -152,9 +149,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
     </div>
 
-    <!-- Add / Edit item -->
-    <ODialog
+    <!-- Add / Edit item — a drawer, same shell as the dataset create/edit form -->
+    <ODrawer
       v-model:open="itemOpen"
+      side="right"
+      size="lg"
       :title="
         editingItemId
           ? t('aiObservability.datasets.detail.addItem.editTitle')
@@ -164,13 +163,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :primary-button-label="t('common.save')"
       :secondary-button-label="t('common.cancel')"
       :primary-button-loading="isItemSubmitting"
-      data-test="ai-dataset-detail-item-dialog"
+      data-test="ai-dataset-detail-item-drawer"
       @click:secondary="itemOpen = false"
     >
       <OForm id="dataset-item-form" :form="itemForm">
-        <div class="flex flex-col gap-4 p-1">
+        <div class="flex flex-col gap-4">
           <div class="flex flex-col gap-1.5">
-            <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
+            <span
+              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+            >
               {{ t("aiObservability.datasets.detail.addItem.inputLabel") }}
             </span>
             <OFormTextarea
@@ -182,7 +183,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </div>
           <div class="flex flex-col gap-1.5">
-            <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
+            <span
+              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+            >
               {{ t("aiObservability.datasets.detail.addItem.expectedLabel") }}
             </span>
             <OFormTextarea
@@ -198,10 +201,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div class="flex flex-col gap-1.5">
             <span class="inline-flex items-center gap-1">
-              <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
+              <span
+                class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+              >
                 {{ t("aiObservability.datasets.create.tagsLabel") }}
               </span>
-              <span class="text-text-secondary text-2xs font-normal">{{ t("common.optional") }}</span>
+              <span class="text-text-secondary text-2xs font-normal">{{
+                t("common.optional")
+              }}</span>
             </span>
             <OFormTagInput
               name="tags"
@@ -211,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </OForm>
-    </ODialog>
+    </ODrawer>
   </OPageLayout>
 </template>
 
@@ -227,8 +234,9 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -238,6 +246,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { makeDatasetItemFormSchema, type DatasetItemForm } from "./DatasetItemForm.schema";
 import llmDatasetsService, {
+  DATASET_ITEMS_MAX_PAGE_SIZE,
   type LlmDataset,
   type LlmDatasetItem,
   type LlmDatasetItemSource,
@@ -258,6 +267,12 @@ const items = ref<LlmDatasetItem[]>([]);
 const loading = ref(false);
 const search = ref("");
 
+// The items endpoint pages server-side (size 1..100), so the table does too.
+const currentPage = ref(1);
+const pageSize = ref(20);
+const totalItems = ref(0);
+const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
+
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
   to: { name: "aiDatasets", query: { org_identifier: orgId.value } },
@@ -269,7 +284,7 @@ const metaSubtitle = computed(() => {
     ? formatDistanceToNowStrict(new Date(dataset.value.updatedAt), { addSuffix: true })
     : "";
   return t("aiObservability.datasets.detail.meta", {
-    count: dataset.value.itemCount,
+    count: totalItems.value,
     updated,
   });
 });
@@ -298,7 +313,9 @@ const columns = computed(() => [
     header: t("aiObservability.datasets.detail.columns.source"),
     accessorKey: "source",
     hideable: true,
-    sortable: true,
+    // Not sortable: the items API takes no sort param, so a client sort would
+    // only reorder the loaded page.
+    sortable: false,
     size: 130,
     meta: { align: "left" },
   },
@@ -316,7 +333,7 @@ const columns = computed(() => [
     header: t("aiObservability.datasets.detail.columns.version"),
     accessorKey: "version",
     hideable: true,
-    sortable: true,
+    sortable: false,
     size: 90,
     meta: { align: "left" },
   },
@@ -339,17 +356,32 @@ async function refresh() {
   if (!orgId.value || !datasetId.value) return;
   loading.value = true;
   try {
-    const [ds, its] = await Promise.all([
+    const [ds, page] = await Promise.all([
       llmDatasetsService.get(orgId.value, datasetId.value),
-      llmDatasetsService.listItems(orgId.value, datasetId.value),
+      llmDatasetsService.listItems(orgId.value, datasetId.value, {
+        from: (currentPage.value - 1) * pageSize.value,
+        size: pageSize.value,
+      }),
     ]);
     dataset.value = ds;
-    items.value = its;
+    items.value = page.items;
+    totalItems.value = page.total;
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.loadError") });
   } finally {
     loading.value = false;
   }
+}
+
+function onPageChange(page: number) {
+  currentPage.value = page;
+  refresh();
+}
+
+function onPageSizeChange(size: number) {
+  pageSize.value = size;
+  currentPage.value = 1;
+  refresh();
 }
 
 // ── Add / Edit item (one form, editingItemId decides the mode) ──
@@ -376,14 +408,28 @@ function openEditItem(row: LlmDatasetItem) {
 
 async function saveItem(values: DatasetItemForm) {
   if (!orgId.value || !dataset.value) return;
+  const input = values.input.trim();
+  const expectedOutput = values.expectedOutput.trim();
+  const editing = items.value.find((item) => item.id === editingItemId.value) ?? null;
   const payload = {
-    input: values.input.trim(),
-    expectedOutput: values.expectedOutput.trim(),
+    // Both fields are JSON server-side. When the text is untouched, re-send the
+    // original value so a structured input (a messages array) isn't flattened
+    // into a string by an edit that only changed the answer.
+    input: editing && input === editing.input ? editing.rawInput : input,
+    expectedOutput:
+      editing && expectedOutput === editing.expectedOutput
+        ? editing.rawExpectedOutput
+        : expectedOutput,
     tags: values.tags,
   };
   try {
     if (editingItemId.value) {
-      await llmDatasetsService.updateItem(orgId.value, dataset.value.id, editingItemId.value, payload);
+      await llmDatasetsService.updateItem(
+        orgId.value,
+        dataset.value.id,
+        editingItemId.value,
+        payload,
+      );
     } else {
       await llmDatasetsService.addItem(orgId.value, dataset.value.id, payload);
     }

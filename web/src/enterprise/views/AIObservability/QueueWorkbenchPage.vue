@@ -488,6 +488,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :variant="scoredCount === boundConfigs.length ? 'success' : 'default'"
                   size="sm"
                 />
+                <!-- Distill to dataset — the second destination for a human
+                     judgment (the first being the score itself). Only a REVIEWED
+                     trace/span item can be distilled; the API refuses the rest. -->
+                <div
+                  class="border-border-default flex items-center gap-2 border-t pt-2"
+                  data-test="ai-queue-workbench-distill"
+                >
+                  <OIcon name="table-chart" size="sm" class="text-text-secondary" />
+                  <span class="text-text-body text-xs font-semibold">
+                    {{ t("aiObservability.queues.workbench.distill.title") }}
+                  </span>
+                  <OButton
+                    variant="outline"
+                    size="sm"
+                    icon-right="arrow-forward"
+                    class="ml-auto"
+                    :disabled="!canDistill"
+                    data-test="ai-queue-workbench-distill-btn"
+                    @click="openDistill"
+                  >
+                    {{ t("aiObservability.queues.workbench.distill.action") }}
+                    <OTooltip
+                      v-if="distillBlockedReason"
+                      side="top"
+                      :content="distillBlockedReason"
+                    />
+                  </OButton>
+                </div>
+
                 <div class="flex items-center gap-2">
                   <OButton
                     variant="outline"
@@ -517,6 +546,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </section>
     </div>
+
+    <!-- Distill drawer — the golden answer is always typed by a human; the
+         server hydrates the input from the item's trace reference. -->
+    <ODrawer
+      v-model:open="distillOpen"
+      side="right"
+      size="lg"
+      :title="t('aiObservability.queues.workbench.distill.title')"
+      :primary-button-label="t('aiObservability.queues.workbench.distill.confirm')"
+      :secondary-button-label="t('common.cancel')"
+      :primary-button-disabled="!canConfirmDistill"
+      :primary-button-loading="distilling"
+      data-test="ai-queue-workbench-distill-drawer"
+      @click:primary="confirmDistill"
+      @click:secondary="distillOpen = false"
+    >
+      <div class="flex flex-col gap-4">
+        <span class="text-text-secondary text-xs">
+          {{ t("aiObservability.queues.workbench.distill.hint") }}
+        </span>
+
+        <div class="flex flex-col gap-1.5">
+          <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
+            {{ t("aiObservability.queues.workbench.distill.datasetLabel") }}
+          </span>
+          <OSelect
+            :model-value="distillDatasetId"
+            :options="datasetOptions"
+            label-key="label"
+            value-key="value"
+            :loading="datasetsLoading"
+            :placeholder="t('aiObservability.queues.workbench.distill.datasetPlaceholder')"
+            class="w-full"
+            data-test="ai-queue-workbench-distill-dataset"
+            @update:model-value="(v: unknown) => (distillDatasetId = v ? String(v) : '')"
+          />
+          <span
+            v-if="!datasetsLoading && !datasetOptions.length"
+            class="text-text-secondary text-2xs"
+          >
+            {{ t("aiObservability.queues.workbench.distill.noDatasets") }}
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <span class="o-input-label text-compact text-input-label-text leading-tight font-medium">
+            {{ t("aiObservability.queues.workbench.distill.expectedLabel") }}
+          </span>
+          <OTextarea
+            v-model="distillExpected"
+            :placeholder="t('aiObservability.queues.workbench.distill.expectedPlaceholder')"
+            :rows="6"
+            data-test="ai-queue-workbench-distill-expected"
+          />
+          <OButton
+            v-if="currentCase.output"
+            variant="ghost"
+            size="sm"
+            class="self-start"
+            data-test="ai-queue-workbench-distill-use-output"
+            @click="distillExpected = currentCase.output"
+          >
+            {{ t("aiObservability.queues.workbench.distill.useOutput") }}
+          </OButton>
+        </div>
+
+        <div class="flex flex-col gap-1.5">
+          <span class="inline-flex items-center gap-1">
+            <span
+              class="o-input-label text-compact text-input-label-text leading-tight font-medium"
+            >
+              {{ t("aiObservability.datasets.create.tagsLabel") }}
+            </span>
+            <span class="text-text-secondary text-2xs font-normal">
+              {{ t("common.optional") }}
+            </span>
+          </span>
+          <OTagInput
+            v-model="distillTags"
+            :placeholder="t('aiObservability.datasets.create.tagsPlaceholder')"
+            data-test="ai-queue-workbench-distill-tags"
+          />
+        </div>
+      </div>
+    </ODrawer>
   </OPageLayout>
 </template>
 
@@ -539,7 +653,10 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ReviewContentBox from "./ReviewContentBox.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OTagInput from "@/lib/forms/TagInput/OTagInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmQueuesService, {
   type LlmQueue,
@@ -549,6 +666,7 @@ import llmQueuesService, {
   type LlmScoreConfigOption,
   type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
 
@@ -871,6 +989,100 @@ async function submit() {
     toast({ variant: "error", message: t("aiObservability.queues.workbench.submitError") });
   } finally {
     submitting.value = false;
+  }
+}
+
+// ── Distill to dataset ──
+// The API only accepts a REVIEWED, un-archived trace/span item, and it needs the
+// review submission that serves as adjudication evidence — so the gate here
+// mirrors those preconditions exactly rather than guessing.
+const distillOpen = ref(false);
+const distilling = ref(false);
+const distillDatasetId = ref("");
+const distillExpected = ref("");
+const distillTags = ref<string[]>([]);
+const datasets = ref<{ id: string; name: string }[]>([]);
+const datasetsLoading = ref(false);
+
+const datasetOptions = computed(() =>
+  datasets.value.map((dataset) => ({ label: dataset.name, value: dataset.id })),
+);
+
+/** The submission the golden is attributed to — the most recent one on this item. */
+const adjudicationSubmissionId = computed(
+  () => currentReviews.value[currentReviews.value.length - 1]?.submissionId ?? "",
+);
+
+const distillBlockedReason = computed(() => {
+  const item = currentItem.value;
+  if (!item) return "";
+  if (item.refType === "session")
+    return t("aiObservability.queues.workbench.distill.sessionUnsupported");
+  if (item.status !== "reviewed" || !adjudicationSubmissionId.value)
+    return t("aiObservability.queues.workbench.distill.needsReview");
+  return "";
+});
+
+const canDistill = computed(() => Boolean(currentItem.value) && !distillBlockedReason.value);
+
+const canConfirmDistill = computed(
+  () => Boolean(distillDatasetId.value) && distillExpected.value.trim().length > 0,
+);
+
+async function loadDatasets() {
+  if (datasets.value.length || datasetsLoading.value || !orgId.value) return;
+  datasetsLoading.value = true;
+  try {
+    datasets.value = await llmDatasetsService.list(orgId.value);
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.queues.workbench.distill.loadError") });
+  } finally {
+    datasetsLoading.value = false;
+  }
+}
+
+async function openDistill() {
+  if (!canDistill.value) return;
+  distillExpected.value = "";
+  distillTags.value = [];
+  // The queue's target dataset is the default destination when it has one.
+  distillDatasetId.value = queue.value?.targetDatasetId ?? "";
+  distillOpen.value = true;
+  await loadDatasets();
+}
+
+async function confirmDistill() {
+  const item = currentItem.value;
+  if (!item || !canConfirmDistill.value || distilling.value) return;
+  distilling.value = true;
+  try {
+    const result = await llmQueuesService.pushToDataset(orgId.value, queueId.value, item.id, {
+      datasetId: distillDatasetId.value,
+      reviewSubmissionId: adjudicationSubmissionId.value,
+      expectedOutput: distillExpected.value.trim(),
+      tags: distillTags.value,
+    });
+    const datasetId = distillDatasetId.value;
+    distillOpen.value = false;
+    toast({
+      variant: "success",
+      message: result.created
+        ? t("aiObservability.queues.workbench.distill.success")
+        : t("aiObservability.queues.workbench.distill.updated"),
+      action: {
+        label: t("aiObservability.queues.workbench.distill.openDataset"),
+        handler: () =>
+          router.push({
+            name: "aiDatasetDetail",
+            params: { id: datasetId },
+            query: { org_identifier: orgId.value },
+          }),
+      },
+    });
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.queues.workbench.distill.error") });
+  } finally {
+    distilling.value = false;
   }
 }
 
