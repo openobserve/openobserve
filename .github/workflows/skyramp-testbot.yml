@@ -88,7 +88,9 @@ jobs:
         # exists by now, so the frontend is embedded the same as a release build.
         run: cargo build --features mimalloc
 
-      - uses: skyramp/testbot@0fa71719e66159ba7a3186cdcc5bcc671a2e0b03 # v0.11.2
+      - uses: skyramp/testbot@v0.11.4 # v0.11.2
+        env:
+          SKYRAMP_FEATURE_POM_REUSE: "1"
         with:
           skyrampLicenseFile: ${{ secrets.SKYRAMP_LICENSE_FILE }}
           anthropicApiKey: ${{ secrets.SKYRAMP_TESTBOT_API_KEY }}
