@@ -21,45 +21,43 @@
  * parse — are stated and tested in one place.
  */
 
+import { orderBanners } from "@/utils/announcementOrder";
+
 /** What the editor opens on when nothing has been published yet. */
 export const EMPTY_CONFIG = `{\n  "banners": []\n}`;
 
 /**
  * Every field in one document, each banner showing a different way to schedule.
  *
- * The one-line annotations are `//` comments: strict JSON has no way to carry
- * them, and a schema you have to read somewhere else is a schema nobody reads
- * while editing. [`stripJsonComments`] removes them before the config is parsed
- * or published, so what reaches the server is still plain JSON.
+ * Annotated with `//` comments, which [`stripJsonComments`] removes before the
+ * config is parsed or published. Kept terse: the form covers authoring, so this
+ * is a field reference for people who already know what they are looking for.
  */
 export const EXAMPLE_CONFIG = `{
   "banners": [
     {
-      // message (required) — plain text, HTML is not interpreted
-      "message": "Scheduled maintenance Sat 02:00-04:00 UTC. Search may be unavailable.",
-      // "info" | "warning" | "critical" | "promo" — default "info"
+      // required
+      "message": "Scheduled maintenance Sat 02:00-04:00 UTC.",
+      // info | warning | critical | promo
       "variant": "warning",
-      // RFC 3339 with an offset — omit to show immediately
+      // RFC 3339, with an offset
       "starts_at": "2026-08-09T00:00:00Z",
-      // RFC 3339 with an offset — omit to show until removed
       "ends_at": "2026-08-12T04:00:00Z",
-      // optional link button; the URL must be http:// or https://
+      // http(s) only
       "cta": { "text": "Status page", "url": "https://status.example.com" }
     },
     {
-      // id — dismissal key; omit and it is derived from the text, so editing
-      // the message shows the banner again to everyone who dismissed it
+      // dismissal key — omit to derive it from the message
       "id": "read-only-window",
       "message": "We are in read-only mode while the migration finishes.",
       "variant": "critical",
-      // duration — instead of ends_at; resolved to an exact end on publish
+      // instead of ends_at
       "duration": "1h",
-      // dismissible — default true; false for a notice everyone must keep
       "dismissible": false
     },
     {
       "message": "Reminder: rotate your API keys before the end of the quarter.",
-      // orgs — restrict to these organizations; omit to show to all of them
+      // omit to show to every organization
       "orgs": ["acme", "acme-prod"]
     }
   ]
@@ -161,7 +159,11 @@ export function parseBannerConfig(buffer: string): ParsedConfig {
 }
 
 /**
- * Banners to show in the live preview.
+ * Banners to show in the live preview, in the order the app would render them.
+ *
+ * Ordering goes through the same resolver the live bar uses — authored order is
+ * not render order, and a preview that showed the JSON's sequence taught authors
+ * the wrong thing about which banner lands on top.
  *
  * Best-effort by design: the buffer is mid-edit most of the time, so anything
  * unparseable or missing a message simply does not preview.
@@ -170,7 +172,9 @@ export function previewBannersFrom(buffer: string): PreviewBanner[] {
   try {
     const parsed = JSON.parse(stripJsonComments(buffer));
     const banners = Array.isArray(parsed?.banners) ? parsed.banners : [];
-    return banners.filter((banner: PreviewBanner) => typeof banner?.message === "string");
+    return orderBanners(
+      banners.filter((banner: PreviewBanner) => typeof banner?.message === "string"),
+    );
   } catch {
     return [];
   }

@@ -380,8 +380,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </div>
 
-        <!-- Editing the banner JSON needs far more room than a settings row, so
-             the row is just the entry point into a drawer. -->
+        <!-- Authoring banners needs far more room than a settings row, so the
+             row is just the entry point into a drawer. -->
         <div
           class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
         >
@@ -404,17 +404,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- Publish/Discard live under the editor inside, next to the buffer they
-           act on, so the drawer carries no footer of its own. -->
-      <ODrawer
-        v-model:open="showAnnouncementBanners"
-        side="right"
-        size="xl"
-        :title="t('announcements.settings.label')"
-        :sub-title="t('announcements.settings.description')"
-      >
-        <AnnouncementBanners />
-      </ODrawer>
+      <!-- The drawer belongs to the component that fills it — its header toggle
+           and footer actions are part of the same surface. -->
+      <AnnouncementBanners v-model:open="showAnnouncementBanners" />
     </div>
 
     <!-- Danger Zone: delete this organization (owner/admin only).
@@ -622,7 +614,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import AnnouncementBanners from "./AnnouncementBanners.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OFile from "@/lib/forms/File/OFile.vue";
@@ -652,7 +643,6 @@ export default defineComponent({
     GroupHeader,
     OButton,
     ODialog,
-    ODrawer,
     OSpinner,
     OIcon,
     OTooltip,

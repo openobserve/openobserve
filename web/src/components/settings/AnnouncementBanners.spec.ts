@@ -29,7 +29,10 @@ vi.mock("@/services/announcements", () => ({
 }));
 
 const store = createStore({
-  state: { zoConfig: { meta_org: "_meta" } },
+  state: {
+    zoConfig: { meta_org: "_meta" },
+    organizations: [{ identifier: "acme" }, { identifier: "globex" }],
+  },
 });
 
 // The Monaco editor is an async import that never resolves under jsdom, so it is
@@ -37,14 +40,30 @@ const store = createStore({
 async function mountEditor(saved: unknown = { banners: [] }) {
   vi.mocked(announcements.getConfig).mockResolvedValue({ data: saved } as any);
 
-  const wrapper = mount(AnnouncementBanners, { global: { plugins: [i18n, store] } });
+  const wrapper = mount(AnnouncementBanners, {
+    props: { open: true },
+    global: { plugins: [i18n, store] },
+    attachTo: document.body,
+  });
   await flushPromises();
   return wrapper;
+}
+
+/** ODrawer teleports its body, so assertions run against the document. */
+const q = (selector: string) => document.querySelector(selector);
+const qa = (selector: string) => Array.from(document.querySelectorAll(selector));
+const textOf = (selector: string) => q(selector)?.textContent ?? "";
+
+/** Move to the JSON tab the same way the toggle does. */
+async function toJson(wrapper: any) {
+  await (wrapper.vm as any).switchMode("json");
+  await flushPromises();
 }
 
 describe("AnnouncementBanners", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    document.body.innerHTML = "";
   });
 
   it("reads the authored config from the meta org", async () => {
@@ -53,83 +72,69 @@ describe("AnnouncementBanners", () => {
     expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
   });
 
-  it("shows the example without any interaction", async () => {
+  it("opens on the form, not the JSON editor", async () => {
+    // Most authors are not writing JSON by hand; the raw editor is the escape
+    // hatch, not the front door.
     const wrapper = await mountEditor();
 
-    expect(wrapper.find('[data-test="announcement-banners-reference"]').isVisible()).toBe(true);
-    expect(wrapper.find('[data-test="announcement-banners-example"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="announcement-banners-insert-example-btn"]').exists()).toBe(
-      true,
-    );
+    expect((wrapper.vm as any).mode).toBe("form");
+    expect(q('[data-test="announcement-banners-list"]') !== null).toBe(true);
+    expect(q('[data-test="announcement-banners-editor"]') !== null).toBe(false);
   });
 
-  it("documents every field the server accepts, in the example itself", async () => {
-    // The field table is gone; the example is now the only reference, so it has
-    // to name every field or the schema becomes undiscoverable.
-    const example = (await mountEditor())
-      .find('[data-test="announcement-banners-example"]')
-      .text();
+  it("builds a card per saved banner", async () => {
+    await mountEditor({
+      banners: [{ message: "First" }, { message: "Second", variant: "critical" }],
+    });
 
-    for (const field of [
-      "message",
-      "variant",
-      "starts_at",
-      "ends_at",
-      "duration",
-      "dismissible",
-      "cta",
-      "orgs",
-      "id",
-    ]) {
-      expect(example, `example does not mention ${field}`).toContain(field);
-    }
+    expect(qa('[data-test^="announcements-banner-card-"]').length).toBeGreaterThan(0);
+    expect(textOf('[data-test="announcements-banner-card-0"]')).toContain("First");
+    expect(textOf('[data-test="announcements-banner-card-1"]')).toContain("Second");
   });
 
-  it("holds the editor back until the saved config is in hand", async () => {
-    // Creating Monaco while the drawer is still animating open lays it out at
-    // zero width and paints an empty black panel on every reopen.
-    vi.mocked(announcements.getConfig).mockReturnValue(new Promise(() => {}) as any);
-    const wrapper = mount(AnnouncementBanners, { global: { plugins: [i18n, store] } });
+  it("says so when nothing is configured yet", async () => {
+    await mountEditor();
 
-    expect(wrapper.find('[data-test="announcement-banners-editor-loading"]').exists()).toBe(true);
+    expect(q('[data-test="announcement-banners-list-empty"]') !== null).toBe(true);
   });
 
-  it("publishes and discards from under the editor", async () => {
-    const wrapper = await mountEditor();
+  it("previews in render order, not authored order", async () => {
+    // The whole point of the preview: authored order is not what users see.
+    await mountEditor({
+      banners: [
+        { message: "promo one", variant: "promo" },
+        { message: "notice one", variant: "info" },
+        { message: "warning one", variant: "warning" },
+      ],
+    });
 
-    expect(wrapper.find('[data-test="announcement-banners-save-btn"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="announcement-banners-discard-btn"]').exists()).toBe(true);
+    const preview = textOf('[data-test="announcement-banners-preview"]');
+
+    expect(preview.indexOf("warning one")).toBeLessThan(preview.indexOf("notice one"));
+    expect(preview.indexOf("notice one")).toBeLessThan(preview.indexOf("promo one"));
   });
 
-  it("remounts the editor when the buffer is replaced behind its back", async () => {
-    // CodeQueryEditor reads `query` only at monaco.editor.create() and never
-    // watches it, so a changed `:key` is the only thing that makes Insert
-    // example — or a reload — actually reach the editor.
-    const wrapper = await mountEditor();
-    const before = (wrapper.vm as any).bufferKey;
+  it("hides promos in the preview exactly as the live bar does", async () => {
+    await mountEditor({
+      banners: [
+        { message: "webinar", variant: "promo" },
+        { message: "outage", variant: "critical" },
+      ],
+    });
 
-    await wrapper.find('[data-test="announcement-banners-insert-example-btn"]').trigger("click");
+    const preview = textOf('[data-test="announcement-banners-preview"]');
 
-    expect((wrapper.vm as any).bufferKey).toBeGreaterThan(before);
-    expect((wrapper.vm as any).editorValue).toContain('"banners"');
-    expect((wrapper.vm as any).editorValue).toContain("Scheduled maintenance");
+    expect(preview).toContain("outage");
+    expect(preview).not.toContain("webinar");
   });
 
   it("says so when the config would render no banner", async () => {
-    const wrapper = await mountEditor();
+    await mountEditor();
 
-    expect(wrapper.find('[data-test="announcement-banners-preview-empty"]').exists()).toBe(true);
+    expect(q('[data-test="announcement-banners-preview-empty"]') !== null).toBe(true);
   });
 
-  it("previews the banners that are configured", async () => {
-    const wrapper = await mountEditor({ banners: [{ message: "Preview me", variant: "warning" }] });
-
-    const preview = wrapper.find('[data-test="announcement-banners-preview"]');
-    expect(preview.text()).toContain("Preview me");
-    expect(wrapper.find('[data-test="announcement-banners-preview-empty"]').exists()).toBe(false);
-  });
-
-  it("publishes the buffer, stripping the comments first", async () => {
+  it("publishes what the form holds", async () => {
     const wrapper = await mountEditor({
       banners: [{ message: "Ship it", cta: { text: "Docs", url: "https://example.com/a//b" } }],
     });
@@ -142,6 +147,153 @@ describe("AnnouncementBanners", () => {
     });
   });
 
+  it("adds a banner through the dialog", async () => {
+    const wrapper = await mountEditor();
+    vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
+
+    (wrapper.vm as any).editingIndex = -1;
+    (wrapper.vm as any).applyDraft({
+      id: "",
+      message: "Added from the form",
+      variant: "warning",
+      schedule: "always",
+      duration: "",
+      startsAt: "",
+      endsAt: "",
+      dismissible: true,
+      hasCta: false,
+      ctaText: "",
+      ctaUrl: "",
+      orgs: [],
+    });
+    await flushPromises();
+
+    await (wrapper.vm as any).save();
+
+    expect(announcements.setConfig).toHaveBeenCalledWith("_meta", {
+      banners: [{ message: "Added from the form", variant: "warning" }],
+    });
+  });
+
+  describe("JSON mode", () => {
+    it("shows the editor and the example once switched", async () => {
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+
+      expect(q('[data-test="announcement-banners-reference"]') !== null).toBe(true);
+      expect(q('[data-test="announcement-banners-example"]') !== null).toBe(true);
+      expect(q('[data-test="announcement-banners-insert-example-btn"]') !== null).toBe(true);
+    });
+
+    it("documents every field the server accepts, in the example itself", async () => {
+      // The example is the only reference, so it has to name every field or the
+      // schema becomes undiscoverable.
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+
+      const example = textOf('[data-test="announcement-banners-example"]');
+
+      for (const field of [
+        "message",
+        "variant",
+        "starts_at",
+        "ends_at",
+        "duration",
+        "dismissible",
+        "cta",
+        "orgs",
+        "id",
+      ]) {
+        expect(example, `example does not mention ${field}`).toContain(field);
+      }
+    });
+
+    it("hands the editor the banners built in the form", async () => {
+      const wrapper = await mountEditor({ banners: [{ message: "Round trip", variant: "promo" }] });
+      await toJson(wrapper);
+
+      expect((wrapper.vm as any).editorValue).toContain("Round trip");
+      expect((wrapper.vm as any).editorValue).toContain("promo");
+    });
+
+    it("remounts the editor when the buffer is replaced behind its back", async () => {
+      // CodeQueryEditor reads `query` only at monaco.editor.create() and never
+      // watches it, so a changed `:key` is the only thing that makes Insert
+      // example — or a reload — actually reach the editor.
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+      const before = (wrapper.vm as any).bufferKey;
+
+      (q('[data-test="announcement-banners-insert-example-btn"]') as HTMLElement).click();
+      await flushPromises();
+
+      expect((wrapper.vm as any).bufferKey).toBeGreaterThan(before);
+      expect((wrapper.vm as any).editorValue).toContain("Scheduled maintenance");
+    });
+
+    it("publishes the buffer, stripping the comments first", async () => {
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+      vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
+
+      (wrapper.vm as any).editorValue = `{
+        // a note to the next operator
+        "banners": [{ "message": "Ship it", "cta": { "text": "Docs", "url": "https://x.dev/a//b" } }]
+      }`;
+
+      await (wrapper.vm as any).save();
+
+      expect(announcements.setConfig).toHaveBeenCalledWith("_meta", {
+        banners: [{ message: "Ship it", cta: { text: "Docs", url: "https://x.dev/a//b" } }],
+      });
+    });
+
+    it("warns before dropping comments on the way back to the form", async () => {
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+
+      (wrapper.vm as any).editorValue = `{ // keep me\n "banners": [] }`;
+      await (wrapper.vm as any).switchMode("form");
+      await flushPromises();
+
+      // Still on JSON until the author accepts the loss.
+      expect((wrapper.vm as any).mode).toBe("json");
+      expect((wrapper.vm as any).showCommentWarning).toBe(true);
+
+      // Accepting keeps the banners and drops only the annotations.
+      await (wrapper.vm as any).confirmSwitchToForm();
+      await flushPromises();
+
+      expect((wrapper.vm as any).mode).toBe("form");
+      expect((wrapper.vm as any).showCommentWarning).toBe(false);
+    });
+
+    it("switches back silently when there are no comments to lose", async () => {
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+
+      (wrapper.vm as any).editorValue = `{ "banners": [{ "message": "Plain" }] }`;
+      await (wrapper.vm as any).switchMode("form");
+      await flushPromises();
+
+      expect((wrapper.vm as any).mode).toBe("form");
+      expect((wrapper.vm as any).drafts).toHaveLength(1);
+      expect((wrapper.vm as any).drafts[0].message).toBe("Plain");
+    });
+
+    it("refuses to leave JSON that does not parse", async () => {
+      const wrapper = await mountEditor();
+      await toJson(wrapper);
+
+      (wrapper.vm as any).editorValue = "{ not json";
+      await (wrapper.vm as any).switchMode("form");
+      await flushPromises();
+
+      expect((wrapper.vm as any).mode).toBe("json");
+      expect(q('[data-test="announcement-banners-error"]') !== null).toBe(true);
+    });
+  });
+
   it("surfaces the server's message when publishing is rejected", async () => {
     const wrapper = await mountEditor();
     vi.mocked(announcements.setConfig).mockRejectedValue({
@@ -151,7 +303,7 @@ describe("AnnouncementBanners", () => {
     await (wrapper.vm as any).save();
     await flushPromises();
 
-    expect(wrapper.find('[data-test="announcement-banners-error"]').text()).toContain(
+    expect(textOf('[data-test="announcement-banners-error"]')).toContain(
       "banners[0].message must not be empty",
     );
   });
@@ -162,6 +314,45 @@ describe("AnnouncementBanners", () => {
 
     await (wrapper.vm as any).reload();
 
+    expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
+  });
+
+  it("publishes and discards from the drawer footer", async () => {
+    // Pinned in the footer rather than floating mid-body, so they stay reachable
+    // however long the banner list gets.
+    await mountEditor();
+    vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
+
+    const publish = q('[data-test="o-drawer-primary-btn"]') as HTMLElement;
+    const discard = q('[data-test="o-drawer-secondary-btn"]') as HTMLElement;
+    expect(publish).not.toBeNull();
+    expect(discard).not.toBeNull();
+
+    publish.click();
+    await flushPromises();
+    expect(announcements.setConfig).toHaveBeenCalled();
+
+    vi.mocked(announcements.getConfig).mockClear();
+    discard.click();
+    await flushPromises();
+    expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
+  });
+
+  it("reads the config when the drawer opens, not before", async () => {
+    // The component now outlives the drawer, so an unopened Settings page must
+    // not fetch, and a second open must not show the first open's leftovers.
+    vi.mocked(announcements.getConfig).mockResolvedValue({ data: { banners: [] } } as any);
+
+    const wrapper = mount(AnnouncementBanners, {
+      props: { open: false },
+      global: { plugins: [i18n, store] },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    expect(announcements.getConfig).not.toHaveBeenCalled();
+
+    await wrapper.setProps({ open: true });
+    await flushPromises();
     expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
   });
 });

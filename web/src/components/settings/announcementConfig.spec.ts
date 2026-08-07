@@ -113,11 +113,11 @@ describe("EXAMPLE_CONFIG", () => {
     expect(banners.every((b: { message?: string }) => !!b.message)).toBe(true);
   });
 
-  it("annotates every field it uses, inline", () => {
-    // The annotations are the point of the example — it is the only schema
-    // reference in the drawer, and one you have to look up elsewhere is one
-    // nobody reads while editing. Asserted structurally rather than on wording,
-    // so the comments stay free to be reworded.
+  it("uses every field, and stays annotated", () => {
+    // The example is the only schema reference in the drawer, so a field missing
+    // from it is a field nobody discovers. The annotations are asserted in bulk
+    // rather than one per field: neighbouring fields can share a comment, and
+    // an obvious one (`"dismissible": false`) needs none.
     const lines = EXAMPLE_CONFIG.split("\n");
 
     for (const field of [
@@ -133,16 +133,12 @@ describe("EXAMPLE_CONFIG", () => {
     ]) {
       const at = lines.findIndex((line) => line.trim().startsWith(`"${field}":`));
       expect(at, `example never uses ${field}`).toBeGreaterThan(0);
-
-      // Walk back over any continuation lines of a multi-line comment.
-      const annotated = lines
-        .slice(0, at)
-        .reverse()
-        .find((line) => line.trim())
-        ?.trim()
-        .startsWith("//");
-      expect(annotated, `${field} is not annotated`).toBe(true);
     }
+
+    const comments = lines.filter((line) => line.trim().startsWith("//"));
+    expect(comments.length, "the example carries no annotations").toBeGreaterThan(4);
+    // Every comment is a one-liner; the wording itself is free to change.
+    expect(comments.every((line) => line.trim().length < 60)).toBe(true);
   });
 
   it("demonstrates both ways of scheduling, so neither has to be guessed", () => {
