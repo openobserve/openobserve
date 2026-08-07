@@ -59,33 +59,6 @@ echo "OpenObserve started with PID $(cat /tmp/o2.pid)"
 (
   cd tests/ui-testing
   npm ci
-
-  # Install Chromium system dependencies
-  npx playwright install-deps chromium
-
-  # Get Chromium revision from Playwright's own metadata (pinned via package-lock.json)
-  CHROMIUM_REV=$(node -pe "require('./node_modules/playwright-core/browsers.json').browsers.find(b => b.name === 'chromium').revision")
-
-  install_browser() {
-    local NAME="$1" BINARY="$2" ZIP_PATH="$3"
-    local DIR="$HOME/.cache/ms-playwright/${NAME}-${CHROMIUM_REV}"
-    if [ -f "${DIR}/INSTALLATION_COMPLETE" ]; then
-      echo "${NAME} already installed (cache hit)"; return 0
-    fi
-    rm -rf "${DIR}"
-    echo "Downloading ${NAME} r${CHROMIUM_REV}"
-    curl -fL --progress-bar "https://cdn.playwright.dev/dbazure/download/playwright/builds/${ZIP_PATH}" -o "/tmp/${NAME}.zip"
-    mkdir -p "${DIR}"
-    unzip -q "/tmp/${NAME}.zip" -d "${DIR}"
-    rm -f "/tmp/${NAME}.zip"
-    find "${DIR}" -name "${BINARY}" -type f -exec chmod 755 {} \;
-    find "${DIR}" -name 'chrome_sandbox' -type f -exec chmod 4755 {} \; 2>/dev/null || true
-    touch "${DIR}/INSTALLATION_COMPLETE"
-  }
-
-  install_browser "chromium" "chrome" "chromium/${CHROMIUM_REV}/chromium-linux.zip"
-  install_browser "chromium_headless_shell" "headless_shell" "chromium/${CHROMIUM_REV}/chromium-headless-shell-linux.zip"
-  ./node_modules/.bin/playwright install ffmpeg
 )
 
 echo "Setup complete."
