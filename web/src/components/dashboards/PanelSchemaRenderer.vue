@@ -47,6 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
+          @cell-click="onCellClick"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
@@ -223,6 +224,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="hideContextMenu"
       />
     </div>
+
+    <!-- Cell explorer drawer — opened when user clicks a table cell with no drilldown configured -->
+    <ODrawer
+      v-model:open="cellDrawer.open"
+      side="right"
+      :width="75"
+      :title="t('panel.logExplorer.title')"
+      data-test="dashboard-cell-explorer-drawer"
+      @update:open="onCellDrawerOpenChange"
+    >
+      <DashboardLogDrawer
+        v-if="cellDrawer.open"
+        :stream="cellDrawer.stream"
+        :stream-type="cellDrawer.streamType"
+        :field="cellDrawer.field"
+        :value="cellDrawer.value"
+        :start-time="cellDrawer.startTime"
+        :end-time="cellDrawer.endTime"
+      />
+    </ODrawer>
   </div>
 </template>
 
@@ -297,8 +318,14 @@ import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
+
+const DashboardLogDrawer = defineAsyncComponent(() => {
+  return import("./DashboardLogDrawer.vue");
+});
+
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { copyToClipboard } from "@/utils/clipboard";
 import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
@@ -322,6 +349,8 @@ export default defineComponent({
     OButton,
     OIcon,
     OEmptyState,
+    ODrawer,
+    DashboardLogDrawer,
   },
   props: {
     selectedTimeObj: {
@@ -1300,6 +1329,21 @@ export default defineComponent({
       }
     });
 
+    // Restore the cell drawer when navigating to a URL that already carries cell-explorer params.
+    onMounted(() => {
+      if (String(route.query.cell_panel) === String(props.panelSchema.id)) {
+        const field   = String(route.query.cell_field ?? "");
+        const value   = String(route.query.cell_value ?? "");
+        const stream  = String(route.query.cell_stream ?? "");
+        const stype   = String(route.query.cell_stype ?? "logs");
+        const t0      = Number(route.query.cell_t0 ?? 0);
+        const t1      = Number(route.query.cell_t1 ?? 0);
+        if (field && stream && t0 && t1) {
+          cellDrawer.value = { open: true, field, value, stream, streamType: stype, startTime: t0, endTime: t1 };
+        }
+      }
+    });
+
     onUnmounted(() => {
       if (resizeObserver) {
         resizeObserver.disconnect();
@@ -1546,6 +1590,126 @@ export default defineComponent({
       return { options: { backgroundColor: "transparent" } };
     });
 
+    // Cell-explorer drawer — opens when user clicks a table cell with no drilldown configured.
+    const cellDrawer = ref<{
+      open: boolean;
+      field: string;
+      value: string | number;
+      stream: string;
+      streamType: string;
+      startTime: number;
+      endTime: number;
+    }>({
+      open: false,
+      field: "",
+      value: "",
+      stream: "",
+      streamType: "logs",
+      startTime: 0,
+      endTime: 0,
+    });
+
+    function resolveAliasToColumn(alias: string, query: any): string {
+      // 1. Field config lookup (field-based panels).
+      const allConfigFields: any[] = [
+        ...(Array.isArray(query?.fields?.x) ? query.fields.x : []),
+        ...(Array.isArray(query?.fields?.y) ? query.fields.y : []),
+        ...(Array.isArray(query?.fields?.breakdown) ? query.fields.breakdown : []),
+      ];
+      const fromConfig = allConfigFields.find((f: any) => f.alias === alias && f.column);
+      if (fromConfig) return fromConfig.column;
+
+      // 2. SQL regex fallback (custom SQL panels): the dashboard query builder always
+      //    double-quotes aliases — `k8s_cluster as "x_axis_1"` — so match with optional quotes.
+      //    Columns may also carry a stream prefix like `default.k8s_cluster`; strip it.
+      const sql: string =
+        metadata.value?.queries?.[0]?.query ??
+        props.panelSchema.queries?.[0]?.query ??
+        "";
+      if (sql) {
+        const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(
+          `([\\w.]+)\\s+(?:as\\s+)?"?${escaped}"?(?=\\s*,|\\s+from|\\s*\\)|\\s*$)`,
+          "i",
+        );
+        const m = re.exec(sql.replace(/\n/g, " "));
+        if (m?.[1]) {
+          // Strip optional stream prefix: "default.k8s_cluster" → "k8s_cluster"
+          const col = m[1].split(".").pop()!;
+          if (col.toLowerCase() !== alias.toLowerCase()) return col;
+        }
+      }
+
+      return alias; // last resort — works when the alias IS the stream field name
+    }
+
+    // Timestamps throughout the dashboard are stored as µs (Dates constructed from µs values,
+    // so getTime() returns µs). This helper safely extracts the µs value from either a Date or
+    // a raw number already in µs.
+    function toµs(v: any): number {
+      if (v instanceof Date) return v.getTime();
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function openCellDrawer(params: {
+      field: string;
+      value: string | number;
+      stream: string;
+      streamType: string;
+      startTime: number;
+      endTime: number;
+    }) {
+      cellDrawer.value = { open: true, ...params };
+      // Sync to URL so the drawer state is shareable.
+      router.replace({
+        query: {
+          ...route.query,
+          cell_panel: props.panelSchema.id,
+          cell_field: params.field,
+          cell_value: String(params.value),
+          cell_stream: params.stream,
+          cell_stype: params.streamType,
+          cell_t0: String(params.startTime),
+          cell_t1: String(params.endTime),
+        },
+      });
+    }
+
+    function onCellDrawerOpenChange(open: boolean) {
+      cellDrawer.value.open = open;
+      if (!open) {
+        // Clear cell-explorer URL params without touching other query params.
+        const q = { ...route.query };
+        for (const k of ["cell_panel", "cell_field", "cell_value", "cell_stream", "cell_stype", "cell_t0", "cell_t1", "cell_event_ts"]) {
+          delete (q as any)[k];
+        }
+        router.replace({ query: q });
+      }
+    }
+
+    function onCellClick(alias: string, value: unknown, _row: any) {
+      if (props.panelSchema.config?.drilldown?.length > 0) return;
+      const query = props.panelSchema.queries?.[0];
+      const stream = query?.fields?.stream ?? query?.stream ?? "";
+      const streamType = query?.fields?.stream_type ?? query?.stream_type ?? "logs";
+      const realField = resolveAliasToColumn(alias, query);
+
+      const metaStartµs = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
+      const metaEndµs   = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+      const selStartµs  = toµs((props.selectedTimeObj as any).start_time);
+      const selEndµs    = toµs((props.selectedTimeObj as any).end_time);
+
+      openCellDrawer({
+        field: realField,
+        value: value as string | number,
+        stream,
+        streamType,
+        startTime: metaStartµs || selStartµs,
+        endTime: metaEndµs || selEndµs || Date.now() * 1000,
+      });
+    }
+
     return {
       t,
       store,
@@ -1611,6 +1775,9 @@ export default defineComponent({
       onChartDomContextMenu,
       hideContextMenu,
       handleCreateAlert,
+      cellDrawer,
+      onCellClick,
+      onCellDrawerOpenChange,
     };
   },
 });
