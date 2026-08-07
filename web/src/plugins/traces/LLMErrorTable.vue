@@ -28,23 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   same stream query the trend panels use — with the agent filter applied.
 -->
 <template>
-  <div
-    ref="rootEl"
-    class="bg-card-glass-bg llm-trend-panel rounded-default border-border-default flex flex-col overflow-hidden border"
-  >
-    <!-- Padding lives on the header only, so the table spans edge-to-edge
-         (no left/right/bottom inset) and sits flush within the card. -->
-    <div class="mb-2 flex items-baseline justify-between px-4 pt-4">
-      <div>
-        <div class="text-text-heading text-sm font-semibold">
-          {{ displayTitle }}
-        </div>
-        <div v-if="displaySubtitle" class="text-2xs mt-[0.1rem] leading-normal">
-          {{ displaySubtitle }}
-        </div>
-      </div>
-    </div>
-
+  <!-- The table spans the card edge-to-edge (LLMPanelCard's body has no inset). -->
+  <LLMPanelCard ref="cardRef" :title="displayTitle" :subtitle="displaySubtitle || undefined">
     <OTable
       :data="rows"
       :columns="columns"
@@ -82,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span :title="value">{{ value }}</span>
       </template>
     </OTable>
-  </div>
+  </LLMPanelCard>
 </template>
 
 <script lang="ts" setup>
@@ -90,6 +75,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
+import LLMPanelCard from "./LLMPanelCard.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
@@ -220,7 +206,8 @@ async function loadErrors() {
 // Defer the query until it scrolls into view, then refetch on input changes.
 // `needsReload` guards against refetching every time the panel re-enters the
 // viewport (scrolling back and forth) — only an input change re-arms it.
-const rootEl = ref<HTMLElement | null>(null);
+// Ref to the shared card so the lazy-load observer can watch its root element.
+const cardRef = ref<InstanceType<typeof LLMPanelCard> | null>(null);
 const isVisible = ref(false);
 const needsReload = ref(true);
 let observer: IntersectionObserver | null = null;
@@ -245,7 +232,8 @@ onMounted(() => {
     { root: null, rootMargin: "200px", threshold: 0 },
   );
   setTimeout(() => {
-    if (rootEl.value) observer?.observe(rootEl.value);
+    const el = cardRef.value?.getRootEl();
+    if (el) observer?.observe(el);
   }, 0);
 });
 

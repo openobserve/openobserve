@@ -263,6 +263,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.scoreConfig"),
       accessorKey: "name",
       sortable: true,
+      minSize: 200,
       size: COL.name,
       // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
       meta: { align: "left", flex: true },
@@ -280,7 +281,7 @@ const columns = computed(() =>
       header: t("onlineEvals.quality.overview.columns.quality"),
       accessorKey: "qualityValue",
       sortable: true,
-      size: 170,
+      size: 120,
       meta: { align: "right" },
     },
     {

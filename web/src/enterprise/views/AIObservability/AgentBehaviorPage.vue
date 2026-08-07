@@ -66,6 +66,7 @@
       <AgentBehaviorPanel
         ref="panelRef"
         class="min-h-0 flex-1"
+        :scope-ready="scopeReady"
         :source-stream="effectiveStream"
         :agent-filter="agentFilter"
         :agent-env="filterMode === 'agent' ? selectedAgent?.env : null"
@@ -107,6 +108,7 @@ const filterMode = ref<"stream" | "agent">("agent");
 const availableStreams = ref<string[]>([]);
 const activeStream = ref<string>("");
 const panelRef = ref<any>(null);
+const streamsLoaded = ref(false);
 
 // Agent-mode selection — mirrors Agent Graph. Same stream-scoped identity so
 // same-named agents in different streams don't collide. Owned by the shared
@@ -141,6 +143,10 @@ const {
 // Kept page-local: Behavior passes the agent NAME to its panel.
 const agentFilter = computed(() =>
   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
+);
+
+const scopeReady = computed(
+  () => streamsLoaded.value && (filterMode.value === "agent" ? agentsLoaded.value : true),
 );
 
 function onFilterModeChange(mode: unknown) {
@@ -183,6 +189,8 @@ onMounted(async () => {
     }
   } catch {
     availableStreams.value = [];
+  } finally {
+    streamsLoaded.value = true;
   }
 
   // Agent is the default scope, so the agent list must be ready on first paint.

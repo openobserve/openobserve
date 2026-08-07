@@ -70,6 +70,8 @@
           data-test="agent-signal-detail-errors"
           :data="errorRows"
           :columns="errorColumns"
+          :loading="loading"
+          :empty-message="t('aiObservability.behavior.detail.noErrors')"
           :default-columns="false"
           :frame="false"
           wrap
@@ -100,11 +102,6 @@
             </div>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && errorRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noErrors')"
-        />
       </section>
 
       <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
@@ -123,6 +120,8 @@
           data-test="agent-signal-detail-traces"
           :data="traceRows"
           :columns="traceColumns"
+          :loading="loading"
+          :empty-message="t('aiObservability.behavior.detail.noTraces')"
           :default-columns="false"
           :frame="false"
           pagination="client"
@@ -141,11 +140,6 @@
             </span>
           </template>
         </OTable>
-        <OEmptyState
-          v-if="!loading && traceRows.length === 0"
-          preset="no-data"
-          :title="t('aiObservability.behavior.detail.noTraces')"
-        />
       </section>
     </section>
   </ODrawer>
@@ -160,7 +154,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import searchService from "@/services/search";

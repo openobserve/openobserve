@@ -1,7 +1,7 @@
 <template>
   <div
     :class="[
-      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]',
+      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-0.5 overflow-hidden border px-3 pt-1.5 pb-1.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]',
       clickable &&
         'hover:border-accent focus-visible:ring-accent cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
     ]"
@@ -12,10 +12,10 @@
     @keydown.enter.prevent="activate"
     @keydown.space.prevent="activate"
   >
-    <div class="flex flex-col gap-1">
+    <div class="flex flex-col gap-0.5">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
-      <div class="mb-1 flex items-center justify-between gap-2">
+      <div class="flex items-center justify-between gap-2">
         <div
           class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
         >
@@ -85,8 +85,8 @@
       v-if="kpi.sparkline && kpi.sparkline.length > 1"
       :data="kpi.sparkline"
       :color="sparkColor"
-      :height="32"
-      class="mt-auto"
+      :height="20"
+      class="-mx-3 mt-auto -mb-1.5"
     />
   </div>
 </template>

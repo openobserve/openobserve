@@ -798,8 +798,16 @@ export const usePanelDataLoader = (
 
     const cacheKeysMatch = isEqual(normalizedCurrentKey, normalizedSavedKey);
 
+    const cachedIncompleteLoad =
+      tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
+
     // Check if it is stale or not
-    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && cacheKeysMatch) {
+    if (
+      tempPanelCacheValue &&
+      Object.keys(tempPanelCacheValue).length > 0 &&
+      cacheKeysMatch &&
+      !cachedIncompleteLoad
+    ) {
       // const cache = getPanelCache();
       state.data = markRaw(tempPanelCacheValue.data ?? []);
       state.loading = tempPanelCacheValue.loading;

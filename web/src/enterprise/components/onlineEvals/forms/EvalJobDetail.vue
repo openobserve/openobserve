@@ -218,7 +218,7 @@
                      must not light up on hover. -->
                 <button
                   type="button"
-                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
+                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-accent)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-accent)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
                   :disabled="!findScorerById(item.id)"
                   @click="onScorerClick(item.id)"
