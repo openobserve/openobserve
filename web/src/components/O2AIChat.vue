@@ -38,20 +38,13 @@
                   </div>
                 </OButton>
               </template>
-              <!-- History menu with search -->
               <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
-                <div
-                  class="search-history-bar-sticky bg-surface-base border-separator sticky top-0 z-2 shrink-0 border-b p-2"
-                >
-                  <OSearchInput
-                    v-model="historySearchTerm"
-                    :placeholder="t('aiAssistant.searchChatHistory')"
-                    class="mt-1"
-                  />
-                </div>
-                <div
-                  class="history-list-container border-border-default max-h-87.5 w-75 max-w-75 min-w-50 flex-1 overflow-x-hidden overflow-y-auto border"
-                >
+                <OSearchInput
+                  v-model="historySearchTerm"
+                  :placeholder="t('aiAssistant.searchChatHistory')"
+                  class="sticky top-0 z-2 shrink-0 p-2"
+                />
+                <div class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto">
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"
@@ -89,12 +82,12 @@
                 <!-- Clear all conversations button -->
                 <div
                   v-if="filteredChatHistory.length > 0"
-                  class="clear-all-container bg-surface-base border-separator shrink-0 border-t p-2"
+                  class="clear-all-container bg-surface-base shrink-0"
                 >
                   <ODropdownSeparator />
                   <OButton
-                    variant="ghost"
-                    class="clear-all-btn text-compact w-full text-[var(--color-status-negative)] hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    variant="ghost-destructive"
+                    class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
                     @click.stop="clearAllConversations"
                   >
                     <template #icon-left>
