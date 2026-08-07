@@ -8564,6 +8564,8 @@
     "alertDeduplicationMessage": "Alerts with the same values for these fields will be deduplicated (e.g., same fingerprint = same field values)",
     "atLeastOneDeduplicationField": "At least one field mapping is required for deduplication",
     "noSemanticGroupsInCategory": "No semantic groups in category: {category}",
+    "searchGroupsPlaceholder": "Search groups by name or field",
+    "noSearchResults": "No groups match \"{query}\". Search covers group names, IDs, and field names.",
     "importSemanticGroups": {
       "title": "Import Semantic Groups",
       "selectJsonFile": "Select JSON file",
