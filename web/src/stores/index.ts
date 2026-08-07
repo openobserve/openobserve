@@ -248,7 +248,15 @@ export default createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      state.organizationData.foldersByType = payload;
+      // Every caller commits ONE type's folders ({ alerts: [...] }), so replacing
+      // the whole map made each module's fetch wipe every other module's cached
+      // folders. Worst with a late-resolving fetch from a page the user has left:
+      // opening the alert form and going back to Dashboards landed on a folder
+      // sidebar holding nothing but Favorites.
+      state.organizationData.foldersByType = {
+        ...state.organizationData.foldersByType,
+        ...payload,
+      };
     },
     appTheme(state, payload) {
       state.theme = payload;

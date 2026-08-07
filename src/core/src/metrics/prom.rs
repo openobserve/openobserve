@@ -559,6 +559,16 @@ pub async fn remote_write(
             .unwrap_or_default();
         let partition_time_level = get_partition_time_level(StreamType::Metrics);
 
+        let cur_stream_alerts = stream_alerts_map.get(&format!(
+            "{}/{}/{}",
+            org_id,
+            StreamType::Metrics,
+            stream_name
+        ));
+        let mut triggers: TriggerAlertData =
+            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
+        let mut evaluated_alerts = HashSet::new();
+
         for (mut val_map, timestamp) in json_data {
             let hash = super::signature_without_labels(&val_map, &[VALUE_LABEL]);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
@@ -631,27 +641,43 @@ pub async fn remote_write(
                 .push(Arc::new(json::Value::Object(val_map.to_owned())));
             hour_buf.records_size += value_str.len();
 
-            // real time alert
-            let need_trigger = !stream_trigger_map.contains_key(&stream_name);
-            if need_trigger && !stream_alerts_map.is_empty() {
-                // Start check for alert trigger
-                let key = format!("{}/{}/{}", org_id, StreamType::Metrics, stream_name);
-                if let Some(alerts) = stream_alerts_map.get(&key) {
-                    let mut trigger_alerts: TriggerAlertData = Vec::new();
-                    let alert_end_time = now_micros();
-                    for alert in alerts {
-                        if let Ok(Some(data)) = alert
-                            .evaluate(Some(&val_map), (None, alert_end_time), None)
-                            .await
-                            .map(|res| res.data)
-                        {
-                            trigger_alerts.push((alert.clone(), data));
+            // start check for alert trigger
+            if let Some(alerts) = cur_stream_alerts
+                && triggers.len() < alerts.len()
+            {
+                let end_time = now_micros();
+                for alert in alerts {
+                    let key = format!(
+                        "{}/{}/{}/{}",
+                        org_id,
+                        StreamType::Metrics,
+                        alert.stream_name,
+                        alert.get_unique_key()
+                    );
+                    // For one alert, only one trigger per request
+                    // Trigger for this alert is already added.
+                    if evaluated_alerts.contains(&key) {
+                        continue;
+                    }
+                    match alert.evaluate(Some(&val_map), (None, end_time), None).await {
+                        Ok(trigger_results) if trigger_results.data.is_some() => {
+                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
+                            evaluated_alerts.insert(key);
+                        }
+                        Ok(_) => {
+                            // the data doesn't satisfy the alert condition
+                        }
+                        Err(e) => {
+                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
                         }
                     }
-                    stream_trigger_map.insert(stream_name.clone(), Some(trigger_alerts));
                 }
             }
-            // End check for alert trigger
+            // end check for alert triggers
+        }
+
+        if !triggers.is_empty() {
+            stream_trigger_map.insert(stream_name.clone(), Some(triggers));
         }
     }
     let elapsed_ms = step_start.elapsed().as_millis();
