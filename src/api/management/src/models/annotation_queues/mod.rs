@@ -59,8 +59,13 @@ pub struct AnnotationQueueResponseBody {
     pub name: String,
     pub description: Option<String>,
     pub target_dataset_id: Option<String>,
+    pub target_dataset_name: Option<String>,
     pub allowed_ref_types: Vec<String>,
     pub score_configs: Vec<PinnedScoreConfigResponseBody>,
+    /// Number of non-archived Queue Items whose review is complete.
+    pub reviewed_count: u64,
+    /// Number of non-archived Queue Items participating in review progress.
+    pub total_count: u64,
     pub created_by: String,
     pub created_at: i64,
     pub updated_by: String,
@@ -275,12 +280,15 @@ impl From<AnnotationQueue> for AnnotationQueueResponseBody {
             name: value.name,
             description: value.description,
             target_dataset_id: value.target_dataset_id,
+            target_dataset_name: value.target_dataset_name,
             allowed_ref_types: value.allowed_ref_types,
             score_configs: value
                 .score_configs
                 .into_iter()
                 .map(PinnedScoreConfigResponseBody::from)
                 .collect(),
+            reviewed_count: value.reviewed_count,
+            total_count: value.total_count,
             created_by: value.created_by,
             created_at: value.created_at,
             updated_by: value.updated_by,
@@ -389,6 +397,32 @@ impl From<Vec<AnnotationQueueItem>> for ListAnnotationQueueItemsResponseBody {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_response_includes_target_dataset_and_active_review_progress() {
+        let response = AnnotationQueueResponseBody::from(AnnotationQueue {
+            id: "queue-1".to_string(),
+            org_id: "org-1".to_string(),
+            name: "Safety review".to_string(),
+            description: None,
+            target_dataset_id: Some("dataset-1".to_string()),
+            target_dataset_name: Some("Golden answers".to_string()),
+            allowed_ref_types: vec!["trace".to_string()],
+            score_configs: vec![],
+            reviewed_count: 3,
+            total_count: 8,
+            created_by: "owner@example.com".to_string(),
+            created_at: 1,
+            updated_by: "owner@example.com".to_string(),
+            updated_at: 2,
+        });
+        let value = serde_json::to_value(response).unwrap();
+
+        assert_eq!(value["targetDatasetId"], "dataset-1");
+        assert_eq!(value["targetDatasetName"], "Golden answers");
+        assert_eq!(value["reviewedCount"], 3);
+        assert_eq!(value["totalCount"], 8);
+    }
 
     #[test]
     fn update_requires_expected_physical_binding_set() {

@@ -476,37 +476,20 @@ async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
   try {
-    const [queueRows, itemRows, datasets, configs] = await Promise.all([
+    const [queueRows, datasets, configs] = await Promise.all([
       llmQueuesService.list(orgId.value),
-      llmQueuesService.listItems(orgId.value),
       llmDatasetsService.list(orgId.value),
       llmQueuesService.listScoreConfigOptions(orgId.value),
     ]);
-    const progressByQueue = new Map<string, { reviewed: number; total: number }>();
-    for (const item of itemRows) {
-      const progress = progressByQueue.get(item.queueId) ?? { reviewed: 0, total: 0 };
-      progress.total += 1;
-      if (item.status === "reviewed") progress.reviewed += 1;
-      progressByQueue.set(item.queueId, progress);
-    }
-    const datasetNames = new Map(datasets.map((dataset) => [dataset.id, dataset.name]));
     const latestVersions = new Map(configs.map((config) => [config.id, config.latestVersion]));
 
-    queues.value = queueRows.map((queue) => {
-      const progress = progressByQueue.get(queue.id) ?? { reviewed: 0, total: 0 };
-      return {
-        ...queue,
-        targetDatasetName: queue.targetDatasetId
-          ? (datasetNames.get(queue.targetDatasetId) ?? null)
-          : null,
-        reviewedCount: progress.reviewed,
-        totalCount: progress.total,
-        scoreConfigs: queue.scoreConfigs.map((config) => ({
-          ...config,
-          latestVersion: latestVersions.get(config.scoreConfigId),
-        })),
-      };
-    });
+    queues.value = queueRows.map((queue) => ({
+      ...queue,
+      scoreConfigs: queue.scoreConfigs.map((config) => ({
+        ...config,
+        latestVersion: latestVersions.get(config.scoreConfigId),
+      })),
+    }));
     configOptions.value = configs;
     datasetOptions.value = datasets.map((dataset) => ({
       label: dataset.name,
