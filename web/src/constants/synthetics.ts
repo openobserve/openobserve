@@ -247,6 +247,16 @@ export const VALUE_TOOLTIP_KEYS: Record<string, I18nKey> = {
   assert: "synthetics.journey.valueTooltips.assert",
 };
 
+// ── Recorder extension ───────────────────────────────────────────────────────
+
+/**
+ * Chrome Web Store listing for the OpenObserve Recorder extension — fallback
+ * when the backend /config field `synthetics_recorder_extension_url`
+ * (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) is absent or empty.
+ */
+export const CHROME_WEB_STORE_URL =
+  "https://chromewebstore.google.com/detail/afhgiecgbpohkbobialnajlphbpcgomo";
+
 // ── Recorder locator configuration ───────────────────────────────────────────
 
 /**

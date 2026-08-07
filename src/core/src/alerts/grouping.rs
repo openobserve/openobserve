@@ -58,6 +58,7 @@ pub struct BatchedAlert {
 
 impl PendingBatch {
     /// Create a new pending batch
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         fingerprint: String,
         org_id: String,
@@ -115,6 +116,7 @@ impl PendingBatch {
 
 /// Add alert to pending batch or create new batch
 /// Returns true if batch is ready to send (expired or full)
+#[allow(clippy::too_many_arguments)]
 pub fn add_to_batch(
     fingerprint: String,
     org_id: String,
@@ -408,10 +410,12 @@ pub async fn send_grouped_notification(
             // in a batch shares one fingerprint, and the group component is
             // part of that fingerprint, so the whole batch is one group.
             batch.group_labels.as_ref(),
+            &[],
         )
         .await
     {
-        Ok((success_msg, err_msg)) => {
+        Ok(outcome) => {
+            let (success_msg, err_msg) = (outcome.success_message, outcome.error_message);
             if !err_msg.is_empty() {
                 log::error!(
                     "[alert_grouping_worker] Some destinations failed for grouped notification (fingerprint: {}): {}",

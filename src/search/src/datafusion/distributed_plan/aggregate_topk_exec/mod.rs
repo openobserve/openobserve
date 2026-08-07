@@ -166,8 +166,8 @@ impl ExecutionPlan for AggregateTopkExec {
         // heap is more memory effecient and performant when the K <= 200 range, but as the range
         // increases the performance takes a hit. In such cases, giving up on memory and
         // prioritizing performance make more sense.
-        let can_use_top_k_heap =
-            cfg.common.use_agg_topk_heap && self.limit <= cfg.common.agg_topk_heap_max_limit;
+        let can_use_top_k_heap = cfg.search.aggregation_topk_heap_enabled
+            && self.limit <= cfg.search.aggregation_topk_heap_max_limit;
 
         let pinned_stream: SendableRecordBatchStream = if can_use_top_k_heap {
             // we use inflated limit here to calculate topK values on partial aggregation results

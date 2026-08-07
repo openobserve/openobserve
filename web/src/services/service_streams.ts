@@ -50,6 +50,8 @@ export interface StreamInfo {
   stream_name: string;
   stream_type: string;
   filters?: Record<string, string>; // omitted by backend when empty (skip_serializing_if)
+  /** Identity dimensions the backend could not resolve on this stream's schema (query is wider than chips imply). */
+  dropped_dimensions?: string[];
 }
 
 export interface RelatedStreams {

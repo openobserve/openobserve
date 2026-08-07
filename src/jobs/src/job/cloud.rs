@@ -238,7 +238,13 @@ async fn check_all_orgs_ai_quota() {
             recipients: vec![admin.email.clone()],
         };
 
-        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        match openobserve_core::alerts::alert::send_email_notification(
+            &subject,
+            &email,
+            body.clone(),
+            body,
+        )
+        .await
         {
             Ok(_) => {
                 log::info!(
@@ -464,7 +470,13 @@ async fn check_external_contract_expiry() {
             recipients: vec![admin.email.clone()],
         };
 
-        match openobserve_core::alerts::alert::send_email_notification(&subject, &email, body).await
+        match openobserve_core::alerts::alert::send_email_notification(
+            &subject,
+            &email,
+            body.clone(),
+            body,
+        )
+        .await
         {
             Ok(_) => {
                 log::info!(

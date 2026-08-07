@@ -333,10 +333,17 @@ class EnrichmentPage {
         await openNavFlyoutChild(this.page, 'pipeline');
         await this.enrichmentTableTab.click();
         await listResponse;
-        // Wait for the enrichment tables list page to be visible. Alpha nav can be
-        // slow under load — give it room so a transient slow render doesn't abort
-        // callers that poll this (e.g. waitForUrlJobToFinish).
-        await this.listPage.waitFor({ state: 'visible', timeout: 20000 });
+        // Wait for the enrichment tables list page to be visible. Alpha nav can be slow
+        // under load; if the tab click didn't land or the page didn't render in time,
+        // re-open the nav flyout and re-click the tab once before failing (the
+        // enrichment-table-url:318 flake was this 20s wait timing out under load).
+        try {
+            await this.listPage.waitFor({ state: 'visible', timeout: 30000 });
+        } catch (e) {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.enrichmentTableTab.click().catch(() => {});
+            await this.listPage.waitFor({ state: 'visible', timeout: 30000 });
+        }
     }
 
     /**
