@@ -784,12 +784,16 @@ const getColumnWidth = (field: string, maxCap: number): { width: number; exceede
 
   try {
     // Font of table header — must match what actually renders, or the measured
-    // width is wrong and cells truncate/overflow.
-    canvasContext.font = canvasFont("14px", "sans", "bold");
+    // width is wrong and cells truncate/overflow. Rem, not px: this text is
+    // painted by the DOM, so it scales with the root font-size and the
+    // measurement has to scale with it. The px exemptions on the dashboard's
+    // canvas measurements are the opposite case — those measure text ECharts
+    // paints at a fixed numeric fontSize.
+    canvasContext.font = canvasFont("0.875rem", "sans", "bold");
     let max = canvasContext.measureText(field).width + 16;
 
     // Font of the table content
-    canvasContext.font = canvasFont("12px", "mono");
+    canvasContext.font = canvasFont("0.75rem", "mono");
 
     const hits = searchResults.value || [];
     for (let i = 0; i < Math.min(5, hits.length); i++) {

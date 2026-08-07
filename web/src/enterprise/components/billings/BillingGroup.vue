@@ -114,12 +114,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Left: headline + CTA -->
           <div class="max-w-120 min-w-70 flex-1">
             <div
-              class="text-accent mb-5 inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] px-2.5 py-1 text-xs font-semibold tracking-[0.4px]"
+              class="text-accent mb-5 inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--color-primary-600)_25%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)] px-2.5 py-1 text-xs font-semibold tracking-[0.025rem]"
             >
               <OIcon name="verified" size="xs" />
               {{ t("billing.billingGroup.statusActive") }}
             </div>
-            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.6px]">
+            <div class="mb-4 text-4xl leading-[1.2] font-bold tracking-[-0.0375rem]">
               {{ t("billing.billingGroup.childHeadline") }}
               <span
                 class="text-tabs-active-text inline-block max-w-full cursor-pointer overflow-hidden align-bottom text-ellipsis whitespace-nowrap"
@@ -274,13 +274,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed border-[color-mix(in_srgb,var(--color-primary-600)_30%,transparent)]"
           >
             <div
-              class="flex h-17 w-17 items-center justify-center rounded-full border-[1.5px] border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
+              class="flex h-17 w-17 items-center justify-center rounded-full border border-solid border-[color-mix(in_srgb,var(--color-primary-600)_24%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600)_10%,transparent)]"
             >
               <OIcon name="group-add" size="lg" class="text-accent opacity-85" />
             </div>
           </div>
 
-          <div class="mb-2.5 text-xl font-bold tracking-[-0.2px]">
+          <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
             {{
               allowedForBillingGroup
                 ? t("billing.billingGroup.emptyTitle")

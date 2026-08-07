@@ -957,7 +957,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -984,7 +984,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1043,7 +1043,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :class="[
                     isNaturalLanguageDetected && !searchObj.meta.nlpMode
                       ? 'o2-ai-generate-button rounded-s-default! rounded-e-none!'
-                      : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                      : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                     'rounded-s-default! rounded-e-none!',
                   ]"
                   @click="
@@ -1070,7 +1070,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         visualizeSearchRequestTraceIds.length
                           ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                           : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                            ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                            ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                             : '',
                         'rounded-e-default! rounded-s-none!',
                       ]"
@@ -1146,7 +1146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :class="[
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
-                    : 'bg-button-primary! text-button-primary-foreground! w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]',
+                    : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
                   store.state.zoConfig.auto_query_enabled
                     ? 'rounded-s-default! rounded-e-none!'
                     : 'rounded-default',
@@ -1212,7 +1212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (searchObj.loading == true || searchObj.loadingHistogram == true))
                         ? 'bg-cancel-query-bg! text-button-primary-foreground!'
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                          ? 'bg-button-primary! text-button-primary-foreground! hover:opacity-90 hover:[box-shadow:0_0_8px_color-mix(in_srgb,var(--color-button-primary),transparent_30%)]'
+                          ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
                       store.state.zoConfig.auto_query_enabled
                         ? 'rounded-e-default! rounded-s-none!'
@@ -1316,7 +1316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         size="icon-toolbar"
         @click="toggleEditorFullscreen"
-        class="rounded-default absolute! top-[0.1875rem] right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! [border:1px_solid_var(--color-card-glass-border)]!"
+        class="rounded-default border-card-glass-border! absolute! top-0.75 right-1 z-51 h-7.5! min-h-7.5! w-7.5! min-w-7.5! border!"
       >
         <OTooltip :content="isFocused ? t('search.collapse') : t('search.expand')" />
       </OButton>
@@ -1654,7 +1654,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
           <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
-          <OTooltip side="right" align="center" max-width="300px">
+          <OTooltip side="right" align="center" max-width="18.75rem">
             <template #content>
               <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
             </template>
@@ -1735,7 +1735,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
             :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
           >
-            <div class="flex flex-col" style="max-height: 486px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30.375rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-list-fields-table"
                 :data="searchObj.data.savedViews"
@@ -1827,7 +1827,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
-            <div class="flex flex-col" style="max-height: 480px; min-height: 280px">
+            <div class="flex flex-col" style="max-height: 30rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"
                 :data="localSavedViews"
@@ -2325,13 +2325,11 @@ export default defineComponent({
     // The dialog body unmounts on close + remounts on open; the form is created
     // here (owner pattern), so re-seed it to "create" mode on open. The
     // OFormToggleGroup changes the mode within the open session.
-    const savedFunctionDefaults = computed(
-      (): SavedFunctionForm => ({
-        isSavedFunctionAction: "create",
-        savedFunctionName: "",
-        savedFunctionSelectedName: "",
-      }),
-    );
+    const savedFunctionDefaults = computed((): SavedFunctionForm => ({
+      isSavedFunctionAction: "create",
+      savedFunctionName: "",
+      savedFunctionSelectedName: "",
+    }));
 
     // Owner-pattern form (Rule ③): SearchBar OWNS this <OForm> and its dialog
     // body needs the create/update mode to drive a v-if. We create the form here
@@ -2446,13 +2444,11 @@ export default defineComponent({
     // savedViewSchema).
     const savedViewFormRef = ref<any>(null);
     const savedViewSchema = makeSavedViewSchema(t);
-    const savedViewDefaults = computed(
-      (): SavedViewForm => ({
-        isSavedViewAction: isSavedViewAction.value,
-        savedViewName: "",
-        savedViewSelectedName: "",
-      }),
-    );
+    const savedViewDefaults = computed((): SavedViewForm => ({
+      isSavedViewAction: isSavedViewAction.value,
+      savedViewName: "",
+      savedViewSelectedName: "",
+    }));
     const showExplainDialog = ref(false);
     const confirmDelete = ref(false);
     const deleteViewID = ref("");

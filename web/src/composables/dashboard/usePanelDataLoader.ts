@@ -671,6 +671,7 @@ export const usePanelDataLoader = (
   onMounted(async () => {
     observer = new IntersectionObserver(handleIntersection, {
       root: null,
+      // eslint-disable-next-line local/no-hardcoded-px -- IntersectionObserver rootMargin parses px/% only — a rem value throws SyntaxError
       rootMargin: "0px",
       threshold: 0, // Adjust as needed
     });

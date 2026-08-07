@@ -477,7 +477,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const anomalySummarySectionStyle = computed(() => {
     if (!showAnomalySummary.value) return { flex: "0 0 auto" };
-    return { flex: "1", minHeight: "150px" };
+    return { flex: "1", minHeight: "9.375rem" };
   });
 
   // ── Expand / UI State ───────────────────────────────────────────────────
@@ -1575,8 +1575,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         // needs the SQL parser, which is async and lives here rather than in the
         // (pure, synchronous) adapters.
         const sqlHaving = prefill.meta?.sqlHaving as
-          | { column: string; operator: string; value: number }
-          | undefined;
+          { column: string; operator: string; value: number } | undefined;
         if (sql && sqlHaving?.column) {
           if (!parser) await importSqlParser();
           sql = addHavingClauseToQuery(

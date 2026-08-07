@@ -181,7 +181,7 @@ const onCopy = () => {
   </div>
 </template>
 
-<style scoped lang="scss">
+<style scoped>
 /* keep(generated-content): the `:deep(.hljs-*)` rules below colour highlight.js
    markup injected via v-html — those class names never appear in this template,
    so Tailwind cannot see them and no utility can reach them. The few non-:deep

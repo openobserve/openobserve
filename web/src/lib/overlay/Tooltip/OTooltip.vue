@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<TooltipProps>(), {
   sideOffset: 4,
   alignOffset: 0,
   delay: 700,
-  maxWidth: "320px",
+  maxWidth: "20rem",
   disabled: false,
   hoverable: false,
   // MUST stay explicitly undefined. Vue casts an absent Boolean prop to `false`,
@@ -171,7 +171,9 @@ const effectiveSideOffset = computed(() => props.sideOffset);
 const contentStyle = computed(() => ({
   maxWidth: props.maxWidth,
   filter: [
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     "drop-shadow(0 0 1px rgba(0,0,0,0.15))",
+    // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
     "drop-shadow(0 4px 12px rgba(0,0,0,0.14))",
   ].join(" "),
 }));

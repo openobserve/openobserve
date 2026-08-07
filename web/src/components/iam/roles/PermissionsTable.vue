@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="edit-role-permissions-table-no-permissions-title"
         v-if="!level && !rows.length && !loading"
         class="text-text-secondary mt-4 w-full text-center font-bold"
-        style="margin-top: 64px; font-size: var(--text-lg)"
+        style="margin-top: 4rem; font-size: var(--text-lg)"
       >
         <span> {{ t("iam.permissionsTable.noPermissionsSelected") }} </span>
       </div>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :id="`permissions-table-${parent.resourceName}`"
         :class="level > 0 ? 'overflow-x-hidden overflow-y-auto' : ''"
         :style="{
-          maxHeight: level > 0 ? '400px' : undefined,
+          maxHeight: level > 0 ? '25rem' : undefined,
         }"
       >
         <OTable

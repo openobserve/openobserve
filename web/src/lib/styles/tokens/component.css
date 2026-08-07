@@ -1560,6 +1560,7 @@
 .dark {
   .pagination__content {
     input {
+      /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
       border: 1px solid rgba(255, 255, 255, 0.28) !important;
       color: var(--color-text-heading);
       background-color: transparent;

@@ -39,12 +39,7 @@ import {
 export type LLMPanelType = "stacked-area" | "stacked-bar" | "horizontal-bar" | "table";
 
 export type LLMTableColumnFormat =
-  | "time"
-  | "service-chip"
-  | "error"
-  | "cost"
-  | "view-link"
-  | "text";
+  "time" | "service-chip" | "error" | "cost" | "view-link" | "text";
 
 export interface LLMTableColumn {
   /** Hit field used as the value source. May be omitted for "view-link". */

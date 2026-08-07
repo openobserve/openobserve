@@ -1002,8 +1002,7 @@ function openChromeExtensions() {
         v-if="blockedDetail"
         class="text-text-body bg-surface-subtle rounded-default m-0 overflow-x-auto px-2 py-1.5 font-mono text-xs whitespace-pre-wrap"
         data-test="synthetics-journey-preflight-detail"
-        >{{ blockedDetail }}</pre
-      >
+        >{{ blockedDetail }}</pre>
       <div class="flex items-center gap-2">
         <OButton
           variant="primary"

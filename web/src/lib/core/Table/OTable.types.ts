@@ -114,6 +114,8 @@ export interface OTableColumnMeta {
    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
    */
   fillRemaining?: boolean;
+  /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
+  formattable?: boolean;
   /** Arbitrary metadata for custom cell renderers */
   [key: string]: any;
 }
@@ -316,6 +318,8 @@ export interface OTableProps<TData = any> {
   enableColumnPin?: boolean;
   /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
   enableColumnFilter?: boolean;
+  /** Show the per-column "format this column" icon on `formattable` columns */
+  enableColumnFormat?: boolean;
   /** Initial column visibility */
   columnVisibility?: Record<string, boolean>;
   /**
@@ -453,6 +457,8 @@ export interface OTableEmits<TData = any> {
   "column-visibility-change": [visibility: Record<string, boolean>];
   /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
   "close-column": [column: OTableColumnDef<TData>];
+  /** A `formattable` column's format icon was clicked (requires `enableColumnFormat`). */
+  "format-column": [columnId: string];
   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
 
   // Row reorder
