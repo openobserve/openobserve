@@ -41,10 +41,10 @@ use crate::cache::bytes_cache::BytesCache;
 /// without re-issuing a head request.
 const SIZE_HEADER_LEN: usize = 8;
 
-/// Global cache. Sized via [`config::Config::limit::bloom_footer_cache_max_size`]
+/// Global cache. Sized via [`config::Config::search::bloom_footer_cache_max_size`]
 /// (env: `ZO_BLOOM_FOOTER_CACHE_MAX_SIZE`).
 pub static BLOOM_FOOTER_CACHE: LazyLock<BloomFooterCache> = LazyLock::new(|| {
-    let max = config::get_config().limit.bloom_footer_cache_max_size;
+    let max = config::get_config().search.bloom_footer_cache_max_size;
     BloomFooterCache::new(max)
 });
 

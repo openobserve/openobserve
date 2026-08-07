@@ -782,8 +782,8 @@ export class AlertsPage {
         return this.bulkOperations.pauseAllSelectedAlerts();
     }
 
-    async moveAllAlertsToFolder(targetFolderName) {
-        return this.bulkOperations.moveAllAlertsToFolder(targetFolderName);
+    async moveAllAlertsToFolder(targetFolderName, options = {}) {
+        return this.bulkOperations.moveAllAlertsToFolder(targetFolderName, options);
     }
 
     async deleteAllAlertsInFolder() {

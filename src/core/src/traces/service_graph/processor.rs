@@ -303,6 +303,23 @@ fn env_fragments(has_agent_env: bool, aliased: bool) -> (&'static str, &'static 
     }
 }
 
+/// Wrap a raw model-name SQL expression in a `CASE` that maps it to the same
+/// canonical pattern used for cost lookup (`otel::pricing`), so vendor-prefix
+/// / date-suffix variants of the same model (e.g. "anthropic/claude-sonnet-4-6"
+/// vs. "claude-sonnet-4-6") collapse into one service-graph node instead of
+/// splitting. Falls back to the raw expression when no pattern matches.
+/// Patterns are regex fragments (may contain `'`-unsafe chars only via the
+/// hardcoded static list in pricing.rs — never from user input), matched with
+/// DataFusion's `regexp_like`.
+#[cfg(feature = "enterprise")]
+fn build_model_canonicalization_case(model_expr: &str) -> String {
+    let arms: String = crate::traces::otel::pricing::model_patterns()
+        .map(|pattern| format!("WHEN regexp_like({model_expr}, '{pattern}') THEN '{pattern}'"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    format!("CASE {arms} ELSE {model_expr} END")
+}
+
 /// Process a single trace stream
 #[cfg(feature = "enterprise")]
 /// Aggregate one trace stream into service-graph edge hits for a window WITHOUT
@@ -583,6 +600,13 @@ async fn compute_stream_edges(
             (false, false) => "CAST(NULL AS STRING)",
         };
         let model_predicate = format!("{model_expr} IS NOT NULL AND {model_expr} != ''");
+        // Canonicalize the raw model string before it becomes a graph node key.
+        // Different frameworks/vendors report the same model under different raw
+        // strings (e.g. "anthropic/claude-sonnet-4-6" vs. "claude-sonnet-4-6"),
+        // which otherwise split into separate nodes. Reuses the same pattern list
+        // as cost lookup (pricing.rs) so node identity and cost stay consistent.
+        // Falls back to the raw expression when no known pattern matches.
+        let model_canon_expr = build_model_canonicalization_case(model_expr);
 
         // Metric aggregates shared by every edge query (aliased to child `c`
         // where a join is present, so it works in both flat and joined forms).
@@ -636,7 +660,7 @@ async fn compute_stream_edges(
                 ),
                 format!(
                     r#"{trace_agent_cte}
-                    SELECT {model_from} AS client, {model_expr_c} AS server,
+                    SELECT {model_from} AS client, {model_canon_expr_c} AS server,
                         'model' AS connection_type{env_sel_c}, {mc}
                     FROM "{stream_name}" AS c
                     {ancestor_joins}
@@ -644,9 +668,12 @@ async fn compute_stream_edges(
                         AND {model_predicate_c}
                         AND ({model_from}) IS NOT NULL AND ({model_from}) != ''
                         AND ({model_from}) != ({model_expr_c})
-                    GROUP BY {model_from}, {model_expr_c}{env_grp_c}"#,
+                    GROUP BY {model_from}, {model_canon_expr_c}{env_grp_c}"#,
                     model_expr_c = model_expr.replace("gen_ai_", "c.gen_ai_"),
                     model_predicate_c = model_predicate.replace("gen_ai_", "c.gen_ai_"),
+                    model_canon_expr_c = build_model_canonicalization_case(
+                        &model_expr.replace("gen_ai_", "c.gen_ai_")
+                    ),
                 ),
             )
         } else {
@@ -663,14 +690,14 @@ async fn compute_stream_edges(
                     GROUP BY {agent_or_service}, gen_ai_tool_name{env_grp_flat}"#,
                 ),
                 format!(
-                    r#"SELECT {agent_or_service} AS client, {model_expr} AS server,
+                    r#"SELECT {agent_or_service} AS client, {model_canon_expr} AS server,
                         'model' AS connection_type{env_sel_flat}, {m}
                     FROM "{stream_name}"
                     WHERE _timestamp >= {start_time} AND _timestamp < {end_time}
                         AND {model_predicate}
                         AND ({agent_or_service}) IS NOT NULL AND ({agent_or_service}) != ''
                         AND ({agent_or_service}) != ({model_expr})
-                    GROUP BY {agent_or_service}, {model_expr}{env_grp_flat}"#,
+                    GROUP BY {agent_or_service}, {model_canon_expr}{env_grp_flat}"#,
                 ),
             )
         };
