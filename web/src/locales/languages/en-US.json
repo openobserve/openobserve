@@ -431,6 +431,16 @@
       "filteredState": "Filtered state",
       "lightPreview": "Light preview",
       "darkPreview": "Dark preview"
+    },
+    "noOncallTeams": {
+      "title": "No on-call teams yet",
+      "description": "A team decides who gets woken when something breaks. Create one to start paging.",
+      "action": "Create a team",
+      "actionDesc": "Name it, pick a timezone, then add a rotation"
+    },
+    "noOncallResponses": {
+      "title": "Nothing is paging",
+      "description": "Open pages appear here as soon as an alert routes to a team."
     }
   },
   "common": {
@@ -12416,5 +12426,32 @@
       "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis — the same line read as SLI:\nSLI = 100% − burn rate × (100% − target)",
       "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
     }
+  },
+  "oncall": {
+    "teamsTitle": "On-Call Teams",
+    "teamsSubtitle": "Who gets paged, and in what order",
+    "addTeam": "Add team",
+    "editTeam": "Edit team",
+    "teamName": "Name",
+    "teamNameHint": "How this team is referred to on a page",
+    "teamNameRequired": "Team name is required",
+    "teamNameTooLong": "Team name cannot exceed 200 characters",
+    "timezone": "Timezone",
+    "timezoneHint": "Schedules are shown in this timezone",
+    "timezoneRequired": "Timezone is required",
+    "description": "Description",
+    "searchTeams": "Search teams",
+    "refresh": "Refresh",
+    "save": "Save",
+    "cancel": "Cancel",
+    "teamCreated": "Team created",
+    "teamUpdated": "Team updated",
+    "saveTeamFailed": "Could not save the team",
+    "loadTeamsFailed": "Could not load teams",
+    "shift8h": "8 hours",
+    "shift12h": "12 hours",
+    "shiftDaily": "Daily",
+    "shiftWeekly": "Weekly",
+    "shiftFortnightly": "Every 2 weeks"
   }
 }
