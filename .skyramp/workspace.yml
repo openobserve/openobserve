@@ -43,11 +43,12 @@ services:
             - tests/ui-testing/playwright-tests/**
           canaryStatus: unproven
           canaryDetail: >-
-            Canary attempt: exit 127 — ./tests/ui-testing/node_modules/.bin/playwright: No such file or directory. npm
-            ci has not been run because setup.sh requires the pre-built OpenObserve binary (release-ci Rust
-            nightly-2026-05-20 + protoc + Node.js 22) staged at ./release-ci-binary/openobserve by the GHA pre-steps.
-            Once the GHA workflow runs setup.sh, npm ci installs playwright and the binary starts; canary will pass on
-            first CI run.
+            No canary executed during bootstrap. The SUT fix loop needed four attempts to start OpenObserve and no test
+            was run after the final successful start, so no suite execution was ever observed. The environment itself is
+            verified: on attempt 4 setup.sh ran to completion — npm ci installed 110 packages, chromium hit the browser
+            cache, and /healthz returned {"status":"ok"} — so ./tests/ui-testing/node_modules/.bin/playwright does exist
+            once setup.sh has run. Proving this suite requires one run that executes a file from
+            tests/ui-testing/playwright-tests/.
         - framework: pytest
           testRunCommand: >-
             ZO_BASE_URL=$SKYRAMP_TEST_BASE_URL bash .skyramp/sut/run-api-tests.sh --ignore=tests/regression
@@ -67,6 +68,8 @@ services:
             - tests/api-testing/tests/**
           canaryStatus: unproven
           canaryDetail: >-
-            Canary attempt: exit 127 — rye: not found. rye is not installed in the bootstrap environment; setup.sh
-            installs it via curl and runs rye sync + pytest-json-report install. Blocked by the same binary build
-            requirement as the Playwright suite. Canary will pass on first CI run after setup.sh executes.
+            No canary executed during bootstrap, for the same reason as the Playwright suite: the SUT fix loop consumed
+            its attempts and no test ran after the final successful start. rye is not missing — on attempt 4 setup.sh
+            installed rye 0.44.0, pinned cpython@3.11.6, completed rye sync, and bootstrapped pip via ensurepip to
+            install pytest-json-report. Proving this suite requires one run that executes a file from
+            tests/api-testing/tests/.

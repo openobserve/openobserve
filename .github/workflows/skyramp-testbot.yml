@@ -59,11 +59,39 @@ jobs:
           token: ${{ steps.skyramp-testbot-app-token.outputs.token }}
           persist-credentials: false
 
+      # The Testbot action skips its own work when the PR head commit is its own
+      # autocommit on a synchronize event ("Detected self-triggered execution").
+      # That check runs inside the action, i.e. after the ~31 min build below —
+      # so without this guard every Testbot autocommit builds a binary that is
+      # then thrown away. Mirrors src/self-trigger.ts: bot name AND bot email AND
+      # a synchronize event. Deliberately narrower than the action's full check:
+      # skipping the build when Testbot does NOT skip would leave setup.sh to
+      # fall back to the published Docker image, testing released code instead
+      # of this PR. A needless build is cheaper than a wrong one.
+      - name: Check for self-triggered run
+        id: self-trigger
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          skip=false
+          if [ -n "$HEAD_SHA" ] && [ "$ACTION" = "synchronize" ]; then
+            name=$(git log -1 --pretty=format:%an "$HEAD_SHA" 2>/dev/null || echo "")
+            email=$(git log -1 --pretty=format:%ae "$HEAD_SHA" 2>/dev/null || echo "")
+            echo "Head commit $HEAD_SHA by '${name}' <${email}>"
+            if [ "$name" = "Skyramp Testbot" ] && [ "$email" = "test-bot@skyramp.dev" ]; then
+              skip=true
+              echo "::notice::Testbot autocommit on synchronize — skipping the SUT build; the Testbot step will skip too."
+            fi
+          fi
+          echo "skip=$skip" >> "$GITHUB_OUTPUT"
+
       # ── SUT build pre-steps (Pattern B) ──────────────────────────────────────
       # The OpenObserve binary is expensive to build (Rust nightly + npm, ~30-45 min).
       # Building here (outside the agent-timed fix-loop) avoids Testbot's 10-min cap.
 
       - name: Remove unused tools (free disk space)
+        if: steps.self-trigger.outputs.skip != 'true'
         run: |
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
@@ -71,26 +99,31 @@ jobs:
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
       - name: Setup Rust Toolchain
+        if: steps.self-trigger.outputs.skip != 'true'
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
 
       - name: Setup Rust Cache
+        if: steps.self-trigger.outputs.skip != 'true'
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
           shared-key: skyramp-testbot-release-ci
 
       - name: Install Protoc
+        if: steps.self-trigger.outputs.skip != 'true'
         run: bash ./.github/protoc.sh
 
       - name: Setup Node.js
+        if: steps.self-trigger.outputs.skip != 'true'
         uses: actions/setup-node@v7
         with:
           node-version: 22
 
       - name: Build binary and frontend
+        if: steps.self-trigger.outputs.skip != 'true'
         env:
           NODE_OPTIONS: "--max-old-space-size=8192"
           GIT_HASH_OVERRIDE: ${{ github.sha }}
@@ -104,13 +137,14 @@ jobs:
           test -f /tmp/dist/index.html
 
       - name: Stage binary for SUT startup
+        if: steps.self-trigger.outputs.skip != 'true'
         run: |
           mkdir -p release-ci-binary
           cp target/x86_64-unknown-linux-gnu/release-ci/openobserve release-ci-binary/openobserve
 
       # ── Testbot action ────────────────────────────────────────────────────────
 
-      - uses: skyramp/testbot@fa869431079dfac57e65acf4190d36e28c8a6db3 # v0.11.4
+      - uses: skyramp/testbot@87752cf8ab396b6aa73c47069e79834bd1c75eda # v0.11.5
         env:
           SKYRAMP_FEATURE_POM_REUSE: '1'
         with:
@@ -127,5 +161,4 @@ jobs:
           targetReadyCheckDiagnosticsCommand: 'echo "=== o2 log ===" && tail -50 /tmp/o2.log 2>/dev/null || true'
           targetTeardownCommand: 'bash .skyramp/sut/teardown.sh'
           authTokenCommand: 'bash .skyramp/sut/get-auth-token.sh'
-          authScheme: 'Basic'
           uiCredentials: 'root@example.com:Complexpass#123'
