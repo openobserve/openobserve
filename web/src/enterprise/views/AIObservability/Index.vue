@@ -69,6 +69,7 @@ const activeSection = computed<string>(() => {
   if (route.name === "aiSessions") return "sessions";
   if (route.name === "aiAgentGraph") return "agentGraph";
   if (route.name === "aiAgentBehavior") return "agentBehavior";
+  if (route.name === "aiDiscovery") return "discovery";
   if (route.name === "aiQueues" || route.name === "aiQueueWorkbench") return "queues";
   if (route.name === "aiDatasets") return "datasets";
   if (route.name === "aiEvaluations") {
@@ -112,6 +113,14 @@ const sectionItems = computed<(SectionHubItem & { group: string })[]>(() => [
     to: { name: "aiAgentBehavior", query: orgQuery.value },
     dataTest: "ai-secondary-nav-agent-behavior",
     group: "Monitor",
+  },
+  {
+    key: "discovery",
+    label: t("aiObservability.nav.discovery"),
+    icon: "saved-search",
+    to: { name: "aiDiscovery", query: orgQuery.value },
+    dataTest: "ai-secondary-nav-discovery",
+    group: "Annotate",
   },
   {
     key: "queues",
