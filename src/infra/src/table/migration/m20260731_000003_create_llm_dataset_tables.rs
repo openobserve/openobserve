@@ -69,6 +69,7 @@ fn create_datasets_statement() -> TableCreateStatement {
                 .not_null(),
         )
         .col(ColumnDef::new(LlmDatasets::Description).text().null())
+        .col(ColumnDef::new(LlmDatasets::Tags).json().null())
         // Allocated transactionally for every Dataset Item insert, edit, or
         // soft-delete. Dataset Item rows themselves are never updated.
         .col(
@@ -254,6 +255,7 @@ enum LlmDatasets {
     OrgId,
     Name,
     Description,
+    Tags,
     GlobalVersion,
     CreatedBy,
     CreatedAt,
@@ -297,6 +299,12 @@ mod tests {
         assert!(sql.contains("\"expected_output\" json NOT NULL"));
         assert!(!sql.contains("\"status\""));
         assert!(!sql.contains("\"source_scope\""));
+    }
+
+    #[test]
+    fn dataset_schema_includes_metadata_tags() {
+        let sql = create_datasets_statement().to_string(PostgresQueryBuilder);
+        assert!(sql.contains("\"tags\" json NULL"));
     }
 
     #[test]

@@ -1086,7 +1086,9 @@ pub fn service_routes() -> Router {
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}/items/{item_id}",
-                    put(datasets::update_dataset_item).delete(datasets::delete_dataset_item),
+                    get(datasets::get_dataset_item_versions)
+                        .put(datasets::update_dataset_item)
+                        .delete(datasets::delete_dataset_item),
                 )
                 .route(
                     "/{org_id}/datasets/{dataset_id}",
