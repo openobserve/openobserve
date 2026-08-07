@@ -16,7 +16,7 @@
 use std::{
     sync::{
         Arc, LazyLock as Lazy,
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
     },
     time::Duration,
 };
@@ -28,12 +28,12 @@ use bytes::Bytes;
 use config::{
     cluster, get_config, ider,
     utils::{
-        base64,
+        base64, hash,
         time::{now_micros, second_micros},
     },
 };
 use futures::{StreamExt, TryStreamExt};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use tokio::{
     sync::{Mutex, OnceCell, mpsc},
     task::JoinHandle,
@@ -158,6 +158,11 @@ impl NatsDb {
         let prefix = prefix.to_string();
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            let consumer_name = kv_watch_consumer_name(&prefix);
+            // last stream sequence we have processed; recreated consumers resume from
+            // here instead of dropping the events published while we were away
+            let mut last_seq: u64 = 0;
+            let mut backoff = KV_WATCH_BACKOFF_MIN;
             loop {
                 if cluster::is_offline() {
                     break;
@@ -166,76 +171,305 @@ impl NatsDb {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[NATS:kv_watch] prefix: {prefix}, get bucket error: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
                 let bucket_prefix = "/".to_string() + bucket.name.trim_start_matches(&self_prefix);
-                log::debug!(
-                    "[NATS:kv_watch] bucket: {}, prefix: {}",
-                    bucket.name,
-                    prefix
-                );
-                let mut entries = match bucket.watch_all().await {
+                let subject_prefix = format!("$KV.{}.", bucket.name);
+                let stream_name = bucket.stream_name.clone();
+                let mut stream = bucket.stream;
+                log::debug!("[NATS:kv_watch] stream: {stream_name}, prefix: {prefix}");
+                KV_WATCH_STREAMS.lock().await.insert(stream_name.clone());
+                start_kv_watch_janitor();
+                // if the bucket was recreated our resume point may be beyond its last
+                // sequence, in which case start from new messages only
+                if last_seq > 0
+                    && let Ok(info) = stream.info().await
+                    && info.state.last_sequence < last_seq
+                {
+                    last_seq = 0;
+                }
+                // the consumer name is fixed per node, so replace any previous
+                // incarnation instead of piling up a new consumer on every reconnect
+                _ = stream.delete_consumer(&consumer_name).await;
+                let deliver_policy = if last_seq == 0 {
+                    // a watcher that has not seen a message yet still needs a resume
+                    // point, so a recreation does not skip the interim events
+                    last_seq = stream.cached_info().state.last_sequence;
+                    jetstream::consumer::DeliverPolicy::New
+                } else {
+                    jetstream::consumer::DeliverPolicy::ByStartSequence {
+                        start_sequence: last_seq + 1,
+                    }
+                };
+                let consumer = match stream
+                    .create_consumer(jetstream::consumer::push::Config {
+                        name: Some(consumer_name.clone()),
+                        deliver_subject: get_nats_client().await.new_inbox(),
+                        // makes an idle consumer attributable to the node that owns it
+                        description: Some(format!(
+                            "o2 kv watch, node: {}, prefix: {prefix}",
+                            cluster::LOCAL_NODE.name
+                        )),
+                        filter_subject: format!("{subject_prefix}>"),
+                        deliver_policy,
+                        ack_policy: jetstream::consumer::AckPolicy::None,
+                        max_deliver: 1,
+                        replay_policy: jetstream::consumer::ReplayPolicy::Instant,
+                        flow_control: true,
+                        idle_heartbeat: KV_WATCH_IDLE_HEARTBEAT,
+                        inactive_threshold: KV_WATCH_INACTIVE_THRESHOLD,
+                        memory_storage: true,
+                        num_replicas: 1,
+                        ..Default::default()
+                    })
+                    .await
+                {
                     Ok(v) => v,
                     Err(e) => {
-                        log::error!(
-                            "[NATS:kv_watch] prefix: {prefix}, bucket.watch_all error: {e}"
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        log::error!("[NATS:kv_watch] prefix: {prefix}, create consumer error: {e}");
+                        backoff = kv_watch_backoff(backoff).await;
+                        continue;
+                    }
+                };
+                let mut messages = match consumer.messages().await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        log::error!("[NATS:kv_watch] prefix: {prefix}, subscribe error: {e}");
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
                 loop {
-                    match entries.next().await {
+                    let message = match messages.next().await {
                         None => {
-                            log::error!("[NATS:kv_watch] prefix: {prefix}, get message error");
+                            log::error!("[NATS:kv_watch] prefix: {prefix}, subscription closed");
                             break;
                         }
-                        Some(entry) => {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(e) => {
-                                    log::error!(
-                                        "[NATS:kv_watch] prefix: {prefix}, get message error: {e}"
+                        Some(Err(e)) => {
+                            // transient errors (e.g. missed heartbeats while the
+                            // connection re-establishes) recover on their own; only
+                            // recreate when the consumer is actually gone on the server
+                            match stream.consumer_info(&consumer_name).await {
+                                Ok(_) => {
+                                    log::debug!(
+                                        "[NATS:kv_watch] prefix: {prefix}, transient error: {e}"
+                                    );
+                                    continue;
+                                }
+                                Err(err)
+                                    if matches!(
+                                        err.kind(),
+                                        jetstream::context::ConsumerInfoErrorKind::NotFound
+                                            | jetstream::context::ConsumerInfoErrorKind::StreamNotFound
+                                    ) =>
+                                {
+                                    log::warn!(
+                                        "[NATS:kv_watch] prefix: {prefix}, consumer is gone, recreating: {e}"
                                     );
                                     break;
                                 }
-                            };
-                            let item_key = key_decode(&entry.key);
-                            if !item_key.starts_with(new_key) {
-                                continue;
-                            }
-                            let new_key = bucket_prefix.to_string() + &item_key;
-                            let ret = match entry.operation {
-                                jetstream::kv::Operation::Put => {
-                                    tx.try_send(Event::Put(EventData {
-                                        key: new_key.clone(),
-                                        value: Some(entry.value),
-                                        start_dt: None,
-                                    }))
+                                Err(err) => {
+                                    log::debug!(
+                                        "[NATS:kv_watch] prefix: {prefix}, error: {e}, consumer check failed: {err}"
+                                    );
+                                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                                    continue;
                                 }
-                                jetstream::kv::Operation::Delete
-                                | jetstream::kv::Operation::Purge => {
-                                    tx.try_send(Event::Delete(EventData {
-                                        key: new_key.clone(),
-                                        value: None,
-                                        start_dt: None,
-                                    }))
-                                }
-                            };
-                            if let Err(e) = ret {
-                                log::warn!(
-                                    "[NATS:kv_watch] prefix: {prefix}, key: {new_key}, send error: {e}"
-                                );
                             }
                         }
+                        Some(Ok(message)) => message,
+                    };
+                    // the watcher is healthy, the next failure starts over from the minimum
+                    backoff = KV_WATCH_BACKOFF_MIN;
+                    if let Ok(info) = message.info() {
+                        last_seq = info.stream_sequence;
+                    }
+                    let Some(item_key) = message
+                        .subject
+                        .strip_prefix(subject_prefix.as_str())
+                        .and_then(try_key_decode)
+                    else {
+                        log::warn!(
+                            "[NATS:kv_watch] prefix: {prefix}, invalid subject: {}",
+                            message.subject
+                        );
+                        continue;
+                    };
+                    if !item_key.starts_with(new_key) {
+                        continue;
+                    }
+                    let event_key = bucket_prefix.to_string() + &item_key;
+                    let ret = if kv_message_is_delete(&message) {
+                        tx.try_send(Event::Delete(EventData {
+                            key: event_key.clone(),
+                            value: None,
+                            start_dt: None,
+                        }))
+                    } else {
+                        tx.try_send(Event::Put(EventData {
+                            key: event_key.clone(),
+                            value: Some(message.payload.clone()),
+                            start_dt: None,
+                        }))
+                    };
+                    if let Err(e) = ret {
+                        log::warn!(
+                            "[NATS:kv_watch] prefix: {prefix}, key: {event_key}, send error: {e}"
+                        );
                     }
                 }
+                // the watcher died, wait before recreating it, otherwise a nats
+                // disruption turns into a consumer churn storm across the cluster
+                backoff = kv_watch_backoff(backoff).await;
+            }
+            // node is going offline: remove this node's consumer so it doesn't linger
+            if let Ok((bucket, _)) = get_bucket_by_key(&self_prefix, &prefix).await {
+                _ = bucket.stream.delete_consumer(&consumer_name).await;
             }
             Ok(())
         });
         Ok(Arc::new(rx))
+    }
+}
+
+// mirror the async-nats kv watch consumer tuning
+const KV_WATCH_CONSUMER_PREFIX: &str = "o2w_";
+const KV_WATCH_IDLE_HEARTBEAT: Duration = Duration::from_secs(5);
+const KV_WATCH_INACTIVE_THRESHOLD: Duration = Duration::from_secs(30);
+// every recreation creates a new consumer on the server, so a watcher that
+// keeps failing must not retry in a tight loop
+const KV_WATCH_BACKOFF_MIN: u64 = 1; // seconds
+const KV_WATCH_BACKOFF_MAX: u64 = 30; // seconds
+const KV_WATCH_JANITOR_INTERVAL: u64 = 600; // seconds
+const KV_WATCH_JANITOR_GRACE: i64 = 3600; // seconds
+
+// KV streams watched by this node; scopes the janitor's consumer scan
+static KV_WATCH_STREAMS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+static KV_WATCH_JANITOR_STARTED: AtomicBool = AtomicBool::new(false);
+
+// one deterministic consumer name per (node, watch prefix). The hash keeps two
+// prefixes that sanitize (or truncate) to the same label apart
+fn kv_watch_consumer_name(prefix: &str) -> String {
+    let label: String = prefix
+        .trim_matches('/')
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .take(32)
+        .collect();
+    format!(
+        "{KV_WATCH_CONSUMER_PREFIX}{}_{label}_{:x}",
+        cluster::LOCAL_NODE.uuid,
+        hash::sum64(prefix)
+    )
+}
+
+// sleep for the current backoff, then return the next one
+async fn kv_watch_backoff(secs: u64) -> u64 {
+    tokio::time::sleep(Duration::from_secs(secs)).await;
+    std::cmp::min(secs * 2, KV_WATCH_BACKOFF_MAX)
+}
+
+// same as key_decode, but a malformed key that came off the wire must not
+// take the process down
+#[inline]
+fn try_key_decode(key: &str) -> Option<String> {
+    base64::decode(key.replace('-', "+").replace('_', "/")).ok()
+}
+
+// mirror what the kv store does when it turns a raw message into an Entry
+fn kv_message_is_delete(message: &jetstream::Message) -> bool {
+    let Some(headers) = message.headers.as_ref() else {
+        return false;
+    };
+    match headers.get("KV-Operation").map(|v| v.as_str()) {
+        Some("DEL") | Some("PURGE") => true,
+        Some(_) => false,
+        // v2.11 buckets with limit markers report removals through a marker header
+        None => matches!(
+            headers
+                .get(async_nats::header::NATS_MARKER_REASON)
+                .map(|v| v.as_str()),
+            Some("MaxAge") | Some("Purge") | Some("Remove")
+        ),
+    }
+}
+
+fn start_kv_watch_janitor() {
+    if KV_WATCH_JANITOR_STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    tokio::task::spawn(kv_watch_janitor());
+}
+
+/// Removes `o2w_*` KV watch consumers whose owner node is no longer online.
+///
+/// Consumers are interest-based ephemerals, so the server normally reaps them
+/// 30s after the owning subscription goes away. This is a safety net for the
+/// cases where that fails (e.g. stale interest state left behind by connection
+/// storms, see nats-server#5352) and for node uuid rotation across restarts.
+async fn kv_watch_janitor() {
+    // spread nodes so they don't scan in lockstep
+    let jitter = now_micros() as u64 % KV_WATCH_JANITOR_INTERVAL;
+    tokio::time::sleep(tokio::time::Duration::from_secs(jitter)).await;
+    loop {
+        tokio::time::sleep(tokio::time::Duration::from_secs(KV_WATCH_JANITOR_INTERVAL)).await;
+        if cluster::is_offline() {
+            break;
+        }
+        let Some(nodes) = crate::cluster::get_cached_online_nodes().await else {
+            continue;
+        };
+        let owner_prefixes = nodes
+            .iter()
+            .map(|n| format!("{KV_WATCH_CONSUMER_PREFIX}{}_", n.uuid))
+            .collect::<Vec<_>>();
+        // if this node isn't in the cache the cache can't be trusted for reaping
+        let local_prefix = format!("{KV_WATCH_CONSUMER_PREFIX}{}_", cluster::LOCAL_NODE.uuid);
+        if !owner_prefixes.contains(&local_prefix) {
+            continue;
+        }
+        let streams = KV_WATCH_STREAMS
+            .lock()
+            .await
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>();
+        let client = get_nats_client().await.clone();
+        let jetstream = jetstream::new(client);
+        for stream_name in streams {
+            let Ok(stream) = jetstream.get_stream(&stream_name).await else {
+                continue;
+            };
+            let mut stale = Vec::new();
+            let mut names = stream.consumer_names();
+            while let Ok(Some(name)) = names.try_next().await {
+                if name.starts_with(KV_WATCH_CONSUMER_PREFIX)
+                    && !owner_prefixes.iter().any(|p| name.starts_with(p.as_str()))
+                {
+                    stale.push(name);
+                }
+            }
+            for name in stale {
+                let Ok(info) = stream.consumer_info(&name).await else {
+                    continue;
+                };
+                // grace period covers nodes that joined after our last cache refresh
+                if now_micros() / 1_000_000 - info.created.unix_timestamp() < KV_WATCH_JANITOR_GRACE
+                {
+                    continue;
+                }
+                match stream.delete_consumer(&name).await {
+                    Ok(_) => log::warn!(
+                        "[NATS:kv_watch] janitor deleted stale consumer {name} on stream {stream_name}"
+                    ),
+                    Err(e) => log::warn!(
+                        "[NATS:kv_watch] janitor delete consumer {name} on stream {stream_name} error: {e}"
+                    ),
+                }
+            }
+        }
     }
 }
 
@@ -943,6 +1177,37 @@ mod tests {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
         assert!(!use_kv_watcher("/other_prefix/"));
+    }
+
+    #[test]
+    fn test_kv_watch_consumer_name() {
+        let name = kv_watch_consumer_name("/compact/delete/");
+        let expected_prefix = format!("{KV_WATCH_CONSUMER_PREFIX}{}_", cluster::LOCAL_NODE.uuid);
+        assert!(name.starts_with(&expected_prefix));
+        // consumer names must not contain subject tokens
+        for c in ['.', '*', '>', '/', ' '] {
+            assert!(!name.contains(c), "name {name} contains invalid char {c}");
+        }
+        // deterministic: recreation must produce the same name
+        assert_eq!(name, kv_watch_consumer_name("/compact/delete/"));
+        // different watch prefixes must not collide on the same bucket
+        assert_ne!(name, kv_watch_consumer_name("/compact/other/"));
+        // prefixes that sanitize to the same label must still differ
+        assert_ne!(
+            kv_watch_consumer_name("/compact/delete/"),
+            kv_watch_consumer_name("/compact_delete/")
+        );
+    }
+
+    #[test]
+    fn test_try_key_decode() {
+        let encoded = key_encode("/compact/delete/org/logs/stream");
+        assert_eq!(
+            try_key_decode(&encoded).as_deref(),
+            Some("/compact/delete/org/logs/stream")
+        );
+        // a malformed key that came off the wire must not panic
+        assert_eq!(try_key_decode("!!not-base64!!"), None);
     }
 
     #[test]
