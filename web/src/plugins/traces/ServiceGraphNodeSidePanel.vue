@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                   <span class="text-xs">
                     {{ cfg.label }}
-                    <OTooltip :content="cfg.groupField" />
+                    <OTooltip :content="raw(cfg.groupField)" />
                   </span>
                 </ODropdownItem>
               </template>
@@ -301,7 +301,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="row.p99"
                     :max="rowMaxes(sortedOperationsTableRows, ['p99']).p99"
-                    :label="formatOperationLatency(row.p99)"
+                    :label="raw(formatOperationLatency(row.p99))"
                     variant="warning"
                     align="right"
                     inline
@@ -311,7 +311,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="row.p95"
                     :max="rowMaxes(sortedOperationsTableRows, ['p95']).p95"
-                    :label="formatOperationLatency(row.p95)"
+                    :label="raw(formatOperationLatency(row.p95))"
                     align="right"
                     inline
                   />
@@ -320,7 +320,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="row.p75"
                     :max="rowMaxes(sortedOperationsTableRows, ['p75']).p75"
-                    :label="formatOperationLatency(row.p75)"
+                    :label="raw(formatOperationLatency(row.p75))"
                     align="right"
                     inline
                   />
@@ -448,7 +448,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="row.p99"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p99']).p99"
-                    :label="formatOperationLatency(row.p99)"
+                    :label="raw(formatOperationLatency(row.p99))"
                     variant="warning"
                     align="right"
                     inline
@@ -458,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="row.p95"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p95']).p95"
-                    :label="formatOperationLatency(row.p95)"
+                    :label="raw(formatOperationLatency(row.p95))"
                     align="right"
                     inline
                   />
@@ -467,7 +467,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <ServiceCatalogBarCell
                     :value="row.p75"
                     :max="rowMaxes(sortResourceRows(buildResourceTableRows(cfg)), ['p75']).p75"
-                    :label="formatOperationLatency(row.p75)"
+                    :label="raw(formatOperationLatency(row.p75))"
                     align="right"
                     inline
                   />
@@ -621,7 +621,7 @@ import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText, type I18nKey } from "@/types/i18n";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -662,9 +662,9 @@ const AgentNodeBehaviorTab = defineAsyncComponent(
 
 export interface ResourceTabConfig {
   id: string; // unique tab name (= FoundGroup.group_id)
-  label: string; // display label
+  label: I18nText; // display label
   groupField: string; // SQL GROUP BY field (= FoundGroup.aliases["traces"])
-  colLabel: string; // header of the first column (entity name)
+  colLabel: I18nText; // header of the first column (entity name)
   colId: string; // row property key for the entity name column
   environment: string; // env key derived from group_id first segment
   isDefault: boolean; // pre-selected when the environment is first detected
@@ -696,10 +696,15 @@ export interface ResourceTabConfig {
 export interface InferredServiceTab {
   /** Unique tab identifier, e.g. "hosts", "databases", "queries" */
   id: string;
-  /** User-facing tab label, e.g. "Hosts", "Databases", "Queries" */
-  label: string;
-  /** Column header shown in the resource table, e.g. "Host", "Database", "DB Operation" */
-  colLabel: string;
+  /** Pre-resolved label — only for names that read the same in every language. */
+  label?: I18nText;
+  /** Preferred over `label`. This registry is module-scope so it cannot call
+   *  t(); the mapper in setup() resolves the key. */
+  labelKey?: I18nKey;
+  /** Key for the column header shown in the resource table, e.g. "Host",
+   *  "Database", "DB Operation". A key, not text: this registry is module-scope
+   *  so it cannot call t() — the mapper in setup() resolves it, like `labelKey`. */
+  colLabelKey: I18nKey;
   /**
    * Fallback-ordered field names for the attribute column, evaluated against the
    * stream schema at runtime. The first field present in the schema wins as the
@@ -735,62 +740,62 @@ const INFERRED_SERVICE_TABS: Record<string, InferredServiceTab[]> = {
   database: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "databases",
-      label: "Databases",
-      colLabel: "Database",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabDatabases",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDatabase",
       fields: ["db_namespace", "db_name"],
     },
     {
       id: "queries",
-      label: "Queries",
-      colLabel: "DB Operation",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabQueries",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDbOperation",
       fields: ["db_operations"],
     },
   ],
   queue: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "destinations",
-      label: "Destinations",
-      colLabel: "Destination",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabDestinations",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colDestination",
       fields: ["messaging_destination_name", "messaging_destination"],
     },
   ],
   rpc: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "rpc_services",
-      label: "RPC Services",
-      colLabel: "RPC Service",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabRpcServices",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colRpcService",
       fields: ["rpc_service"],
     },
   ],
   external: [
     {
       id: "hosts",
-      label: "Hosts",
-      colLabel: "Host",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabHosts",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colHost",
       fields: ["server_address", "net_peer_name", "net_peer_ip", "network_peer_address"],
     },
     {
       id: "urls",
-      label: "URLs",
-      colLabel: "URL",
+      labelKey: "traces.serviceGraphNodeSidePanel.tabUrls",
+      colLabelKey: "traces.serviceGraphNodeSidePanel.colUrl",
       fields: ["http_url", "url_full"],
     },
   ],
@@ -915,9 +920,9 @@ export default defineComponent({
   emits: ["close", "view-traces"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
-    const { getStream } = useStreams();
+    const { getStream } = useStreams(t);
 
     // RED Charts State
     const dashboardData = ref<any>({});
@@ -1150,7 +1155,7 @@ export default defineComponent({
       rangeFiltersVersion.value;
       const chips: {
         key: string;
-        label: string;
+        label: I18nText;
         type: "duration" | "error";
       }[] = [];
       localRangeFilters.value.forEach((f, key) => {
@@ -1248,7 +1253,7 @@ export default defineComponent({
       sourceEvent?: {
         timestamp?: number | string;
         severity?: string;
-        message?: string;
+        message?: I18nText;
       };
       logStreams: any[];
       metricStreams: any[];
@@ -1471,7 +1476,7 @@ export default defineComponent({
 
     /** Fetch the trace stream schema and populate streamFieldSet.
      *  Idempotent — skips if already resolved for the current stream.
-     *  Uses useStreams().getStream() which caches the schema in the Vuex store
+     *  Uses useStreams(t).getStream() which caches the schema in the Vuex store
      *  so other components benefit from the cached data. */
     const resolveStreamSchema = async () => {
       if (
@@ -1508,15 +1513,16 @@ export default defineComponent({
       // schema fetch completes (reactive via streamFieldSet).
       if (!schemaResolved.value) return [];
       const resolved: ResourceTabConfig[] = [];
-      for (const t of tabs) {
-        const present = t.fields.filter((f) => fieldSet.has(f));
+      // named `tab`, not `t` — that would shadow the translator used just below
+      for (const tab of tabs) {
+        const present = tab.fields.filter((f) => fieldSet.has(f));
         if (present.length === 0) continue;
         resolved.push({
-          id: t.id,
-          label: t.label,
+          id: tab.id,
+          label: tab.labelKey ? t(tab.labelKey) : (tab.label ?? raw("")),
           groupField: `COALESCE(${buildCoalesceExpr(present)})`,
-          colLabel: t.colLabel,
-          colId: t.id,
+          colLabel: t(tab.colLabelKey),
+          colId: tab.id,
           environment: "",
           isDefault: true,
           fields: present,
@@ -1631,15 +1637,15 @@ export default defineComponent({
     const serviceMetrics = computed(() => {
       if (!props.selectedNode || !props.graphData) {
         return {
-          requestRate: "N/A",
-          requestRateValue: "N/A",
+          requestRate: t("common.notAvailable"),
+          requestRateValue: t("common.notAvailable"),
           totalRequests: 0,
           incomingRequests: 0,
           outgoingRequests: 0,
-          errorRate: "N/A",
-          p50Latency: "N/A",
-          p95Latency: "N/A",
-          p99Latency: "N/A",
+          errorRate: t("common.notAvailable"),
+          p50Latency: t("common.notAvailable"),
+          p95Latency: t("common.notAvailable"),
+          p99Latency: t("common.notAvailable"),
         };
       }
 
@@ -1695,9 +1701,9 @@ export default defineComponent({
         incomingRequests: incomingRequests,
         outgoingRequests: outgoingRequests,
         errorRate: errorRate.toFixed(2) + "%",
-        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : "N/A",
-        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : "N/A",
-        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : "N/A",
+        p50Latency: incomingEdges.length > 0 ? formatLatency(p50Latency) : t("common.notAvailable"),
+        p95Latency: incomingEdges.length > 0 ? formatLatency(p95Latency) : t("common.notAvailable"),
+        p99Latency: incomingEdges.length > 0 ? formatLatency(p99Latency) : t("common.notAvailable"),
       };
     });
 
@@ -1848,7 +1854,7 @@ export default defineComponent({
     };
 
     // Generic helper: builds table columns with a dynamic first (entity) column
-    const buildEntityTableColumns = (entityId: string, entityHeader: string) => [
+    const buildEntityTableColumns = (entityId: string, entityHeader: I18nText) => [
       {
         id: entityId,
         accessorKey: entityId,
@@ -1876,7 +1882,7 @@ export default defineComponent({
       {
         id: "p99",
         accessorKey: "p99",
-        header: "P99",
+        header: t("traces.serviceGraphNodeSidePanel.p99"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -1884,7 +1890,7 @@ export default defineComponent({
       {
         id: "p95",
         accessorKey: "p95",
-        header: "P95",
+        header: t("traces.serviceGraphNodeSidePanel.p95"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -1892,7 +1898,7 @@ export default defineComponent({
       {
         id: "p75",
         accessorKey: "p75",
-        header: "P75",
+        header: t("traces.serviceGraphNodeSidePanel.p75"),
         size: 118,
         enableSorting: true,
         meta: { slot: true, sortable: true, align: "right" },
@@ -2215,9 +2221,9 @@ export default defineComponent({
           const envKey = groupEnvKey(g.group_id) ?? g.group_id.split("-")[0];
           return {
             id: g.group_id,
-            label: g.display,
+            label: raw(g.display),
             groupField: field,
-            colLabel: g.display,
+            colLabel: raw(g.display),
             colId: g.group_id.replace(/-/g, "_"),
             environment: envKey,
             isDefault: DEFAULT_GROUP_FIELDS.has(field),
@@ -2393,11 +2399,20 @@ export default defineComponent({
         sql_mode: "false",
         query: b64EncodeUnicode(filterQuery),
         org_identifier: org,
+        // The Logs route is keep-alive, so a repeat visit only runs onActivated —
+        // which restores the URL params solely on the trace-explorer branch.
+        type: "trace_explorer",
       };
 
       if (streamName) {
-        queryParams.stream_value = streamName;
+        queryParams.stream = streamName;
       }
+
+      // The Logs page keeps `isInitialized` in the store across unmounts, and while
+      // it is set it restores the previous session from the store instead of reading
+      // these params — dropping the stream, time range and filter. Clearing it makes
+      // the URL the source of truth, same as the trace-details "View Logs" button.
+      store.dispatch("logs/setIsInitialized", false);
 
       router.push({
         path: "/logs",
@@ -2412,7 +2427,7 @@ export default defineComponent({
       } else if (correlationError.value) {
         toast({
           variant: "warning",
-          message: correlationError.value,
+          message: raw(correlationError.value),
         });
       }
     };
@@ -2458,6 +2473,7 @@ export default defineComponent({
     }
 
     return {
+      raw,
       t,
       serviceMetrics,
       serviceHealth,

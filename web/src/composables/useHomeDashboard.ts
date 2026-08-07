@@ -16,11 +16,12 @@
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type I18nText } from "@/types/i18n";
 
 export interface HomeDashboard {
   dashboardId: string;
   folderId: string;
-  label: string;
+  label: I18nText;
 }
 
 const SETTING_KEY = "home_dashboard";
@@ -61,7 +62,7 @@ export function useHomeDashboard() {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "set") });
+      toast({ variant: "error", message: raw(errMessage(e, "set")) });
     }
   };
 
@@ -79,7 +80,7 @@ export function useHomeDashboard() {
       // null, don't revert, don't toast. Only real errors revert.
       if (e?.response?.status === 404) return;
       homeDashboard.value = prev; // revert
-      toast({ variant: "error", message: errMessage(e, "remove") });
+      toast({ variant: "error", message: raw(errMessage(e, "remove")) });
     }
   };
 
@@ -90,7 +91,7 @@ export function useHomeDashboard() {
   // this session and re-attempts on the next rename; never toast for it.
   const updateLabel = (org: string, dashboardId: string, label: string) => {
     if (homeDashboard.value?.dashboardId === dashboardId && homeDashboard.value.label !== label) {
-      const updated = { ...homeDashboard.value, label };
+      const updated = { ...homeDashboard.value, label: raw(label) };
       homeDashboard.value = updated;
       if (org) {
         settings.setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY).catch(() => {

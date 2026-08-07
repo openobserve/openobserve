@@ -3,6 +3,7 @@
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import * as echarts from "echarts";
@@ -15,7 +16,7 @@ const props = defineProps<{
   threshold: { value: number; direction: "gte" | "lte" } | null;
   yMin?: number | null;
   yMax?: number | null;
-  legendAvg: string;
+  legendAvg: I18nText;
   legendP95: string;
   legendThresholdFmt: string;
 }>();

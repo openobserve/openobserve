@@ -204,7 +204,7 @@ test.describe("Alerts E2E Flow", () => {
     // ===== Move Alert to Target Folder =====
     await pm.alertsPage.navigateToFolder(sourceFolderName);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await pm.alertsPage.moveAllAlertsToFolder(targetFolderName);
+    await pm.alertsPage.moveAllAlertsToFolder(targetFolderName, { expectAlertName: alertName });
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Moved all alerts to target folder', { targetFolderName });
 

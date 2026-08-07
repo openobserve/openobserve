@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <p class="m-0 min-w-0 flex-1 truncate text-sm">
       <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
       <span class="mx-1 opacity-60">·</span>
-      <span>Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
+      <span>{{ t("billing.upgradeToPlanMessage") }}</span>
     </p>
 
     <!-- CTA button -->
@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-ignore
 import { defineComponent, ref, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -89,7 +89,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
 

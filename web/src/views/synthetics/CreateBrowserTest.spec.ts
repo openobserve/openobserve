@@ -32,6 +32,8 @@ const {
   mockToast,
   mockRecorderStopReplay,
   mockRecorderReplayPhase,
+  mockGetFoldersListByType,
+  mockRoute,
 } = vi.hoisted(() => ({
   mockServiceGetLocations: vi.fn().mockResolvedValue({
     data: { locations: [], browsers: [], devices: [] },
@@ -45,13 +47,14 @@ const {
   // the phase itself. The composable owns stopping → stopped.
   mockRecorderStopReplay: vi.fn().mockResolvedValue(undefined),
   mockRecorderReplayPhase: { value: "idle" },
+  mockGetFoldersListByType: vi.fn().mockResolvedValue([]),
+  // Mutable so a test can drive `?folder=` — the preselected folder is read
+  // from the route on mount.
+  mockRoute: { params: {} as Record<string, string>, query: {} as Record<string, string> },
 }));
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    params: {},
-    query: {},
-  }),
+  useRoute: () => mockRoute,
   useRouter: () => ({
     push: mockRouterPush,
     replace: vi.fn(),
@@ -91,7 +94,7 @@ vi.mock("@/services/alert_destination", () => ({
 }));
 
 vi.mock("@/utils/commons", () => ({
-  getFoldersListByType: vi.fn().mockResolvedValue([]),
+  getFoldersListByType: mockGetFoldersListByType,
 }));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
@@ -110,18 +113,32 @@ vi.mock("@/utils/synthetics/mapRecordedStep", () => ({
 vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
   const { z } = require("zod");
   return {
-    makeBrowserCheckGateSchema: (t: any) =>
+    makeBrowserCheckGateSchema: (_t: any) =>
       z.object({
         url: z.string().min(1, "URL is required"),
         name: z.string().optional(),
       }),
-    makeBrowserCheckSaveSchema: (t: any) =>
-      z.object({
-        name: z.string().min(1, "Name is required"),
-        url: z.string().optional(),
-        locations: z.array(z.any()).optional(),
-        journey: z.array(z.any()).optional(),
-      }),
+    makeBrowserCheckSaveSchema: (_t: any) =>
+      z
+        .object({
+          name: z.string().min(1, "Name is required"),
+          url: z.string().optional(),
+          locations: z.array(z.any()).optional(),
+          journey: z.array(z.any()).optional(),
+        })
+        // Stands in for the real per-step rules: enough to emit an issue whose
+        // path starts with `journey.`, which is the branch of `persist` under test.
+        .superRefine((val: any, ctx: any) => {
+          (val.journey ?? []).forEach((step: any, i: number) => {
+            if (step?.needsFix) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["journey", i, "value"],
+                message: "Step value is required",
+              });
+            }
+          });
+        }),
   };
 });
 
@@ -168,18 +185,30 @@ const baseStubs = {
     emits: ["click:primary", "click:secondary", "update:open"],
     inheritAttrs: true,
   },
+  // OStepper/OStep run in WIZARD mode in this view (no `expanded` prop), so only
+  // the active step's panel is mounted. The previous stub rendered every panel
+  // unconditionally, which kept `journeyRef` alive on the Configure step and hid
+  // the create-mode bug where save-time journey issues reached nothing.
   OStepper: {
-    template: "<div><slot /></div>",
+    template: '<div class="o-stepper-stub"><slot /></div>',
     props: ["modelValue", "navigable", "class"],
   },
   OStep: {
-    template: '<div v-if="$parent.$parent || true"><slot /></div>',
+    template: '<div v-if="isActivePanel"><slot /></div>',
     props: ["name", "title", "icon", "done", "class"],
+    computed: {
+      isActivePanel(): boolean {
+        const stepper = (this as any).$parent;
+        const active = stepper?.modelValue;
+        return active === undefined || active === (this as any).name;
+      },
+    },
   },
   BrowserJourney: {
     template: '<div data-test="synthetics-browser-journey" />',
     props: [
       "modelValue",
+      "fieldIssues",
       "startUrl",
       "extensionReady",
       "autoRecord",
@@ -201,6 +230,7 @@ const baseStubs = {
       "devices",
       "destinations",
       "folders",
+      "foldersLoading",
       "validationErrors",
       "class",
     ],
@@ -288,10 +318,28 @@ describe("CreateBrowserTest", () => {
     mockServiceCreate.mockResolvedValue({ data: { id: "new-check-1" } });
     mockServiceUpdate.mockResolvedValue({});
     mockServiceGet.mockResolvedValue({ data: {} });
+    mockGetFoldersListByType.mockResolvedValue([]);
+    mockRoute.query = {};
   });
 
   afterEach(() => {
     wrapper?.unmount();
+  });
+
+  describe("locations fetch failure", () => {
+    it("should stay silent when the endpoint 403s (community build)", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 403 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).not.toHaveBeenCalled();
+    });
+
+    it("should toast on a real fetch failure", async () => {
+      mockServiceGetLocations.mockRejectedValue({ response: { status: 500 } });
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
   });
 
   describe("initial render", () => {
@@ -420,7 +468,7 @@ describe("CreateBrowserTest", () => {
       );
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics",
-        query: { folder: "folder-1" },
+        query: { org_identifier: "default", folder: "folder-1" },
       });
     });
 
@@ -468,7 +516,7 @@ describe("CreateBrowserTest", () => {
   describe("edit mode — check deleted while editing (404)", () => {
     const notFound = { response: { status: 404, data: {} } };
 
-    it("'Save & Exit' should navigate to the list once, without a folder query", async () => {
+    it("'Save & Exit' should navigate to the list exactly once", async () => {
       mockServiceUpdate.mockRejectedValue(notFound);
       wrapper = await mountValidEdit();
 
@@ -476,9 +524,13 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       // persist() already navigated for the 404 case — onSaveAndExit must bail
-      // out instead of pushing a second, folder-scoped route on top of it.
+      // out instead of pushing a second route on top of it. Both pushes are the
+      // same `backTo` target now, so the count is what distinguishes them.
       expect(mockRouterPush).toHaveBeenCalledTimes(1);
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: "synthetics" });
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { org_identifier: "default", folder: "folder-1" },
+      });
     });
 
     it("'Save & Exit' should warn (not error) when the check no longer exists", async () => {
@@ -504,7 +556,10 @@ describe("CreateBrowserTest", () => {
         false,
       );
       expect(mockRouterPush).toHaveBeenCalledTimes(1);
-      expect(mockRouterPush).toHaveBeenCalledWith({ name: "synthetics" });
+      expect(mockRouterPush).toHaveBeenCalledWith({
+        name: "synthetics",
+        query: { org_identifier: "default", folder: "folder-1" },
+      });
     });
 
     it("should clear the saving state after the 404 early return", async () => {
@@ -561,7 +616,7 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics",
-        query: { folder: "folder-1" },
+        query: { org_identifier: "default", folder: "folder-1" },
       });
     });
 
@@ -580,7 +635,7 @@ describe("CreateBrowserTest", () => {
       );
       expect(mockRouterPush).toHaveBeenCalledWith({
         name: "synthetics",
-        query: { folder: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -593,6 +648,54 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceCreate).not.toHaveBeenCalled();
       expect(mockRouterPush).not.toHaveBeenCalled();
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+  });
+
+  // Regression: in create mode the only Save button lives on the Configure step,
+  // and OStepper is a wizard — so BrowserJourney is UNMOUNTED at the moment
+  // `persist` runs. The view used to push issues into it via `journeyRef`, which
+  // was null there, so `?.` swallowed the call and the author got the toast and
+  // nothing else: no expanded rows, no highlighted fields. The issues are now
+  // parent-owned state handed down as a prop, so they survive the remount.
+  describe("create mode — journey validation errors reach the journey", () => {
+    async function saveWithABrokenStep() {
+      const w = await mountCreateAtConfigure();
+      const journeyStep = { id: "s1", action: "type", name: "Fill", needsFix: true };
+      // Seed the journey through the component the user would have used.
+      w.findComponent('[data-test="synthetics-browser-journey"]');
+      (w.vm as any).check.journey = [journeyStep];
+      await flushPromises();
+
+      await w.find('[data-test="synthetics-create-save-btn"]').trigger("click");
+      await flushPromises();
+      return w;
+    }
+
+    it("should not create the check", async () => {
+      wrapper = await saveWithABrokenStep();
+
+      expect(mockServiceCreate).not.toHaveBeenCalled();
+      expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
+    });
+
+    // The journey step must become the active one, or the expanded rows are on a
+    // tab the author is not looking at.
+    it("should switch back to the Journey step", async () => {
+      wrapper = await saveWithABrokenStep();
+
+      expect(wrapper.find('[data-test="synthetics-browser-journey"]').exists()).toBe(true);
+    });
+
+    // The assertion that would have caught the reported bug: the journey is
+    // handed the issues, rather than them being dropped into a null ref.
+    it("should hand the journey issues to BrowserJourney", async () => {
+      wrapper = await saveWithABrokenStep();
+
+      const journey = wrapper.findComponent('[data-test="synthetics-browser-journey"]');
+      const issues = journey.props("fieldIssues") as { path: PropertyKey[] }[];
+
+      expect(issues).toHaveLength(1);
+      expect(issues[0].path.join(".")).toBe("journey.0.value");
     });
   });
 
@@ -678,6 +781,58 @@ describe("CreateBrowserTest", () => {
       expect(mockRecorderStopReplay).toHaveBeenCalledTimes(1);
       // The view must not pre-empt the composable's stopping → stopped transition.
       expect(mockRecorderReplayPhase.value).toBe("running");
+    });
+  });
+
+  // Regression: `?folder=` was copied into the check unvalidated. A bookmarked
+  // link, a folder deleted since, or a link from another org left an id no
+  // option could resolve — the select rendered the raw id, and `persist` sent it
+  // back as `?folder=`, which the server treats as authoritative for both the
+  // destination folder and the RBAC gate, so the save failed on a folder the
+  // author never picked.
+  describe("create mode — preselected folder from ?folder=", () => {
+    const folders = [
+      { folderId: "default", name: "default" },
+      { folderId: "folder-1", name: "Critical Monitors" },
+    ];
+
+    /** The check as CheckConfigure currently sees it. */
+    const configuredCheck = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-check-configure"]').props("check") as any;
+
+    it("should keep a preselected folder that exists in this org", async () => {
+      mockRoute.query = { folder: "folder-1" };
+      mockGetFoldersListByType.mockResolvedValue(folders);
+
+      wrapper = await mountCreateAtConfigure();
+
+      expect(configuredCheck(wrapper).folder).toBe("folder-1");
+      expect(
+        wrapper.findComponent('[data-test="synthetics-check-configure"]').props("validationErrors"),
+      ).not.toHaveProperty("folder");
+    });
+
+    it("should fall back to the default folder when the preselected id is not in this org", async () => {
+      mockRoute.query = { folder: "folder-from-another-org" };
+      mockGetFoldersListByType.mockResolvedValue(folders);
+
+      wrapper = await mountCreateAtConfigure();
+
+      expect(configuredCheck(wrapper).folder).toBe("default");
+      const errors = wrapper
+        .findComponent('[data-test="synthetics-check-configure"]')
+        .props("validationErrors") as Record<string, string>;
+      expect(errors.folder).toContain("folder-from-another-org");
+    });
+
+    it("should not discard the preselected folder when the folder list failed to load", async () => {
+      mockRoute.query = { folder: "folder-1" };
+      mockGetFoldersListByType.mockRejectedValue(new Error("boom"));
+
+      wrapper = await mountCreateAtConfigure();
+
+      // An empty list means "we don't know", not "that folder is gone".
+      expect(configuredCheck(wrapper).folder).toBe("folder-1");
     });
   });
 });

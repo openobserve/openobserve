@@ -50,6 +50,7 @@ function createWrapper(props: Record<string, any> = {}) {
         OSwitch: OSwitchStub,
         CreateDestinationForm: {
           name: "CreateDestinationForm",
+          props: ["forcedType"],
           emits: ["created", "cancel"],
           template: '<div class="create-destination-stub" />',
         },
@@ -201,6 +202,15 @@ describe("DestinationPicker", () => {
     await expect((wrapper.vm as any).submit()).resolves.toMatchObject({
       destination_name: "sink-a", // and the new one is selected
     });
+  });
+
+  it("forwards forcedType to the inline create form", async () => {
+    const wrapper = createWrapper({ forcedType: "custom" });
+    await flushPromises();
+    await wrapper.find(".o-switch").trigger("click"); // into create mode
+    expect(wrapper.findComponent({ name: "CreateDestinationForm" }).props("forcedType")).toBe(
+      "custom",
+    );
   });
 
   it("refetches when toggling out of create mode", async () => {

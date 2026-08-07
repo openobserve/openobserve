@@ -112,6 +112,135 @@ export function buildFieldToGroupIdMap(semanticGroups: FieldAlias[]): Map<string
 }
 
 /**
+ * Overlay user filter edits onto ONE stream's base filters (F35).
+ *
+ * Chip keys are raw field names harvested from a single stream, but every
+ * correlated stream carries its own alias for the same semantic group (e.g.
+ * a log stream's `k8s_namespace_name` vs a trace stream's
+ * `service_k8s_namespace_name`). Requiring literal key identity silently drops
+ * the user's edit for every stream that spells the field differently, so the
+ * override is resolved through the semantic group when the exact key is absent.
+ *
+ * Precedence: an exact key match always wins; only then do we fall back to the
+ * group. Overrides that match neither are dropped — adding them would emit a
+ * WHERE condition on a column the stream does not have.
+ *
+ * @param baseFilters - the stream's own filters, keyed by its raw field names
+ * @param overrides - user-edited values, keyed by whichever stream's field names the chips came from
+ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function applyFilterOverlay(
+  baseFilters: Record<string, string>,
+  overrides: Record<string, string>,
+  fieldToGroupId: Map<string, string>,
+): Record<string, string> {
+  const effective: Record<string, string> = { ...baseFilters };
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (key in baseFilters) {
+      effective[key] = value;
+      continue;
+    }
+
+    const groupId = fieldToGroupId.get(key.toLowerCase());
+    if (!groupId) continue;
+
+    const target = Object.keys(baseFilters).find(
+      (baseKey) => fieldToGroupId.get(baseKey.toLowerCase()) === groupId,
+    );
+    if (target) effective[target] = value;
+  }
+
+  return effective;
+}
+
+/**
+ * Apply dimension-bar edits to ONE stream's filters (F36).
+ *
+ * `activeDimensions` is raw-field-keyed when the bar was seeded from stream
+ * filters (SearchResult / TraceDetailsSidebar dialog path) and
+ * semantic-ID-keyed when seeded from `matched_dimensions`
+ * (IncidentDetailDrawer path) — the component cannot tell which, so look up
+ * BOTH key spaces, raw field first.
+ *
+ * Only existing filter keys are updated: adding a key would emit a WHERE
+ * condition on a column the stream does not have.
+ *
+ * @param filters - the stream's own filters, keyed by its raw field names
+ * @param activeDimensions - edited values, keyed by raw field name OR semantic group ID
+ * @param fieldToDimensionId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function applyDimensionEditsToFilters(
+  filters: Record<string, string>,
+  activeDimensions: Record<string, string>,
+  fieldToDimensionId: Map<string, string>,
+): Record<string, string> {
+  const updated: Record<string, string> = { ...filters };
+
+  for (const filterKey of Object.keys(filters)) {
+    const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
+
+    // Raw-field key wins over the semantic-ID key. When the bar was seeded from
+    // a different stream's alias, fall back to any edit whose key resolves to
+    // the same semantic group.
+    let newValue = activeDimensions[filterKey];
+    if (newValue === undefined && dimensionId !== undefined) {
+      newValue = activeDimensions[dimensionId];
+    }
+    if (newValue === undefined && dimensionId !== undefined) {
+      const aliasKey = Object.keys(activeDimensions).find(
+        (key) => fieldToDimensionId.get(key.toLowerCase()) === dimensionId,
+      );
+      if (aliasKey !== undefined) newValue = activeDimensions[aliasKey];
+    }
+
+    if (newValue !== undefined) {
+      updated[filterKey] = newValue;
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Merge schema-verified subject overrides into ONE stream's filters (F31).
+ *
+ * The backend resolves a stream's filters using its own alias for a semantic
+ * group; the subject override is resolved against the stream schema and may
+ * land on a different alias of the SAME group. A plain spread therefore UNIONS
+ * the two aliases into `WHERE old_alias = 'prod' AND new_alias = 'staging'`,
+ * which matches nothing. Replace the same-group key instead of adding to it.
+ *
+ * An override whose group has no counterpart in `filters` is added — it was
+ * resolved against the stream schema, so the column is known to exist.
+ *
+ * @param filters - the stream's own filters, keyed by its raw field names
+ * @param overrides - schema-verified field name -> value
+ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function mergeSubjectOverrides(
+  filters: Record<string, string>,
+  overrides: Record<string, string>,
+  fieldToGroupId: Map<string, string>,
+): Record<string, string> {
+  const effective: Record<string, string> = { ...filters };
+
+  for (const [hit, value] of Object.entries(overrides)) {
+    const groupId = fieldToGroupId.get(hit.toLowerCase());
+    const existingKey = Object.keys(effective).find(
+      (key) =>
+        key === hit || (groupId !== undefined && fieldToGroupId.get(key.toLowerCase()) === groupId),
+    );
+    if (existingKey !== undefined && existingKey !== hit) {
+      delete effective[existingKey];
+    }
+    effective[hit] = value;
+  }
+
+  return effective;
+}
+
+/**
  * Filter dimensions to only include fields that are actually used for disambiguation
  *
  * This implements the same logic as the backend to determine which dimensions are relevant
@@ -168,6 +297,23 @@ export function filterDimensionsForCorrelation(
 }
 
 /**
+ * SQL escaping for correlation query builders. Values originate from
+ * telemetry labels (user-controlled data) — every builder MUST route
+ * field/value interpolation through these helpers (F2).
+ */
+export function quoteSqlIdentifier(field: string): string {
+  return `"${String(field).replace(/"/g, '""')}"`;
+}
+
+export function quoteSqlLiteral(value: string): string {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+export function buildSqlCondition(field: string, value: string): string {
+  return `${quoteSqlIdentifier(field)} = ${quoteSqlLiteral(value)}`;
+}
+
+/**
  * Build WHERE clause conditions using exact field names from StreamInfo.filters
  *
  * Uses the exact field names returned by the _correlate API instead of semantic variations.
@@ -181,9 +327,7 @@ function buildExactDimensionConditions(filters: Record<string, string>): string[
     if (value === SELECT_ALL_VALUE) {
       continue;
     }
-    // Escape single quotes in value
-    const escapedValue = value.replace(/'/g, "''");
-    conditions.push(`${fieldName} = '${escapedValue}'`);
+    conditions.push(buildSqlCondition(fieldName, value));
   }
 
   return conditions;

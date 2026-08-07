@@ -285,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="flex w-full items-center justify-between py-2">
               <div class="flex w-full items-center text-xs font-normal">
-                {{ scope.totalRows }} Stream(s)
+                {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
                 <OButton
                   v-if="selectedIds.length > 0"
                   icon-left="delete"
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >
-                  {{ isDeleting ? "Deleting..." : "Delete" }}
+                  {{ isDeleting ? t("common.deleting") : t("common.delete") }}
                 </OButton>
               </div>
             </div>
@@ -366,7 +366,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
-            Delete all Pipelines and Alerts associated with the selected streams
+            {{ t("logStream.deleteAssociatedAlertsPipelinesBatch") }}
           </span>
         </div>
       </div>
@@ -378,10 +378,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem, StatTrend } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -433,7 +434,7 @@ export default defineComponent({
   emits: [],
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const logStream: Ref<any[]> = ref([]);
     const showIndexSchemaDialog = ref(false);
@@ -466,7 +467,7 @@ export default defineComponent({
     );
 
     const streamTabs: never[] = [];
-    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams();
+    const { removeStream, getStream, getPaginatedStreams, addNewStreams } = useStreams(t);
 
     // Stats are absent until the ingester has flushed a stream, so "no number
     // yet" renders as a muted em dash rather than a misleading "0 MB".
@@ -652,7 +653,7 @@ export default defineComponent({
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
           variant: "loading",
-          message: "Please wait while loading streams...",
+          message: t("toastMessages.views.pleaseWaitWhileLoadingStreams"),
           timeout: 0,
         });
         logStream.value = [];
@@ -832,7 +833,7 @@ export default defineComponent({
       const compressionTrend = (): StatTrend | undefined => {
         const ratio = compressionRatio(s?.total_storage_size, s?.total_compressed_size);
         if (!ratio) return undefined;
-        return { direction: "down", label: ratio, tone: "success" };
+        return { direction: "down", label: raw(ratio), tone: "success" };
       };
       return [
         {
@@ -953,7 +954,7 @@ export default defineComponent({
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
-              message: "Stream deleted successfully.",
+              message: t("toastMessages.views.streamDeletedSuccessfully"),
               variant: "success",
             });
             removeStreamsFromTable([{ name: deleteStreamName, stream_type: deleteStreamType }]);
@@ -962,7 +963,7 @@ export default defineComponent({
         .catch((err: any) => {
           if (err.response.status != 403) {
             toast({
-              message: "Error while deleting stream.",
+              message: t("toastMessages.views.errorWhileDeletingStream"),
               variant: "error",
             });
           }
@@ -995,14 +996,18 @@ export default defineComponent({
 
           if (successfulDeletions.length > 0) {
             toast({
-              message: `Deleted ${successfulDeletions.length} streams successfully.`,
+              message: t("toastMessages.views.deletedStreamsSuccessfully", {
+                count: successfulDeletions.length,
+              }),
               variant: "success",
             });
           }
 
           if (failedDeletions.length > 0) {
             toast({
-              message: `Failed to delete ${failedDeletions.length} streams.`,
+              message: t("toastMessages.views.failedToDeleteStreams", {
+                count: failedDeletions.length,
+              }),
               variant: "error",
             });
           }
@@ -1056,7 +1061,7 @@ export default defineComponent({
       if (stream.stream_type === "enrichment_tables") {
         const dismiss = toast({
           variant: "loading",
-          message: "Redirecting to explorer...",
+          message: t("toastMessages.views.redirectingToExplorer"),
           timeout: 0,
         });
 
@@ -1136,7 +1141,7 @@ export default defineComponent({
     };
 
     const streamsEmptyActions = computed(() => {
-      const actions: { id: string; icon: string; titleKey: string; descriptionKey: string }[] = [
+      const actions: EmptyStateAction[] = [
         {
           id: "setup-ingestion",
           icon: "cloud-upload",

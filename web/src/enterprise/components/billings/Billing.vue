@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <OPageLayout :title="headerBasedOnRoute()" icon="paid" bleed>
+  <OPageLayout :title="raw(headerBasedOnRoute())" icon="paid" bleed>
     <template #actions>
       <div v-if="isOrgGroupRoute" class="flex items-center gap-2">
         <OButton
@@ -169,7 +169,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 // @ts-ignore
 import { defineComponent, ref, computed, onMounted, provide, reactive, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
@@ -200,7 +200,7 @@ export default defineComponent({
     DateTimePickerDashboard,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     // Default/fallback tab is "plans" — that's where /billings redirects on
@@ -257,21 +257,19 @@ export default defineComponent({
       return billingInfoLoaded.value && billingProvider.value === "stripe";
     });
     const options = computed(() => {
+      const periods = [
+        { label: t("billing.period30Days"), value: "30days" },
+        { label: t("billing.period60Days"), value: "60days" },
+        { label: t("billing.period3Months"), value: "3months" },
+        { label: t("billing.period6Months"), value: "6months" },
+      ];
       return billingInfoLoaded.value && billingProvider.value === "stripe" && isPaidUser.value
         ? [
-            { label: "Previous Cycle", value: "-1cycle" },
-            { label: "Current Cycle", value: "1cycle" },
-            { label: "30 Days", value: "30days" },
-            { label: "60 Days", value: "60days" },
-            { label: "3 Months", value: "3months" },
-            { label: "6 Months", value: "6months" },
+            { label: t("billing.previousCycle"), value: "-1cycle" },
+            { label: t("billing.currentCycle"), value: "1cycle" },
+            ...periods,
           ]
-        : [
-            { label: "30 Days", value: "30days" },
-            { label: "60 Days", value: "60days" },
-            { label: "3 Months", value: "3months" },
-            { label: "6 Months", value: "6months" },
-          ];
+        : periods;
     });
     const collapseSidebar = () => {
       showSidebar.value = !showSidebar.value;
@@ -398,18 +396,19 @@ export default defineComponent({
     };
     const tabs = [
       {
-        label: "GB",
+        label: raw("GB"),
         value: "gb",
         icon: "storage",
       },
       {
-        label: "MB",
+        label: raw("MB"),
         value: "mb",
         icon: "database",
       },
     ];
 
     return {
+      raw,
       t,
       store,
       router,

@@ -79,7 +79,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import organizationsService from "@/services/organizations";
@@ -111,7 +111,7 @@ export default defineComponent({
   emits: ["update:modelValue", "updated", "finish", "update:open"],
   setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const roleOptions = ["admin"];
 
     const updateRoleSchema = makeUpdateRoleSchema(t);

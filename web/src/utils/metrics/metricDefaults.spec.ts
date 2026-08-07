@@ -546,7 +546,7 @@ describe("variants (PRD 6.3)", () => {
     expect(d.legendTemplate).toBe("{quantile}");
     // Averaging pre-computed quantiles is not statistically mergeable, so the
     // pXX vocabulary is deliberately withheld from this variant.
-    expect(d.variants[0].label).toBe("Avg of reported quantiles");
+    expect(d.variants[0].labelKey).toBe("metrics.explorer.variants.avgReportedQuantiles");
     expect(JSON.stringify(d.variants[0])).not.toMatch(/p50|p90|p99/);
     // The raw variant must distinguish targets, not just quantiles.
     expect(d.variants[1].queries[0].legendTemplate).toBe("{instance} {quantile}");

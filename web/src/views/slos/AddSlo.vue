@@ -109,7 +109,7 @@
               <OTagInput
                 v-model="form.tags"
                 :label="t('slos.field.tags')"
-                placeholder=""
+                :placeholder="raw('')"
                 data-test="slos-addslo-tags"
               />
             </div>
@@ -170,8 +170,9 @@
               editor-id="slo-scope-editor"
               :label="t('slos.field.scope')"
               :hint="t('slos.field.scopeHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               data-test="slos-addslo-scope"
             />
@@ -180,8 +181,9 @@
               editor-id="slo-good-expr-editor"
               :label="t('slos.field.goodWhen')"
               :hint="t('slos.field.goodWhenHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               required
               class="mt-3"
               data-test="slos-addslo-good-expr"
@@ -219,8 +221,9 @@
               editor-id="slo-aggregate-editor"
               :label="t('slos.field.aggregate')"
               :hint="t('slos.field.aggregateHint')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               required
               data-test="slos-addslo-aggregate"
@@ -241,8 +244,9 @@
               v-model="form.config.scope"
               editor-id="slo-timeslice-scope-editor"
               :label="t('slos.field.scope')"
-              :keywords="autoCompleteKeywords"
-              :suggestions="autoCompleteSuggestions"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
               class="mt-3"
               data-test="slos-addslo-timeslice-scope"
             />
@@ -410,7 +414,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -434,7 +438,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
 import { formatTarget, formatWindow, sliTypeLabel } from "@/composables/useSloFormat";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -501,18 +505,18 @@ const sliTypeDescription = computed(
   () => sliTypeOptions.value.find((o) => o.value === form.sli_type)?.description ?? "",
 );
 
-const streamTypeOptions = [
-  { value: "logs", label: "logs" },
-  { value: "metrics", label: "metrics" },
-  { value: "traces", label: "traces" },
-];
+const streamTypeOptions = computed(() => [
+  { value: "logs", label: t("common.logs") },
+  { value: "metrics", label: t("common.metrics") },
+  { value: "traces", label: t("common.traces") },
+]);
 
 // ── Stream picker ─────────────────────────────────────────────────────────
 // Same shape as the alert form: pick a stream TYPE, then pick a stream NAME
 // from what that type actually has. A free-text box let a typo through to the
 // backend, where the SLO saves and then measures nothing — the failure only
 // shows up later as permanent no-data.
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 const streamOptions = ref<string[]>([]);
 const isFetchingStreams = ref(false);
 
@@ -548,7 +552,7 @@ function onStreamTypeChange(value: unknown) {
 // the scope / good-when expressions, and the group-by picker. Loaded when the
 // stream changes; a failure leaves the inputs as plain text rather than
 // blocking the form.
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 const streamFields = ref<{ label: string; value: string }[]>([]);
 const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 
@@ -557,9 +561,22 @@ const streamFieldNames = computed(() => streamFields.value.map((f) => f.value));
 // builds the field list (dropping the timestamp column) and merges it with
 // the SQL keyword and function sets. Nothing about autocomplete is
 // reimplemented here.
-const { autoCompleteKeywords, autoCompleteSuggestions, updateFieldKeywords } = useSqlSuggestions();
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  updateFieldKeywords,
+  resolveFieldValues,
+} = useSqlSuggestions();
 
 async function loadStreamFields(streamName: string) {
+  // Field VALUES are looked up under "org|streamType|streamName|field", so the
+  // resolver returns nothing at all until this is set. Cleared alongside the
+  // field list so a de-selected stream cannot keep offering its old values.
+  autoCompleteData.value.org = org.value ?? "";
+  autoCompleteData.value.streamType = String(form.config.stream_type ?? "");
+  autoCompleteData.value.streamName = streamName;
+
   if (!streamName || !form.config.stream_type) {
     streamFields.value = [];
     updateFieldKeywords([]);
@@ -584,10 +601,10 @@ watch(
 );
 
 const comparatorOptions = [
-  { value: "<", label: "<" },
-  { value: "<=", label: "<=" },
-  { value: ">", label: ">" },
-  { value: ">=", label: ">=" },
+  { value: "<", label: raw("<") },
+  { value: "<=", label: raw("<=") },
+  { value: ">", label: raw(">") },
+  { value: ">=", label: raw(">=") },
 ];
 
 const windowOptions = computed(() => [

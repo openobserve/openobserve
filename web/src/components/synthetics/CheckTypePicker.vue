@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import EmptyStateActionCard from "@/lib/core/EmptyState/EmptyStateActionCard.vue";
 import { CHECK_TYPE_CARDS, type CheckTypeCard } from "@/constants/synthetics";
@@ -38,7 +38,7 @@ const emit = defineEmits<{
   select: [type: SyntheticCheckType];
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 function isDisabled(card: CheckTypeCard): boolean {
   return props.disabledTypes.includes(card.type);
@@ -83,7 +83,7 @@ function onSelect(card: CheckTypeCard) {
         class="absolute top-2 right-2 z-10"
         data-test="check-type-picker-coming-soon-badge"
       >
-        Coming Soon
+        {{ t("synthetics.newCheck.comingSoon") }}
       </OTag>
       <EmptyStateActionCard
         :icon="card.icon"

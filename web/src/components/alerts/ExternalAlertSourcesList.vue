@@ -19,111 +19,150 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :title="t('alert_sources.header')"
     :subtitle="t('alert_sources.subtitle')"
     title-data-test="alert-sources-list-title"
-    scroll
-    pad-y
+    icon="webhook"
+    bleed
   >
     <template #actions>
       <OButton
-        variant="outline"
-        size="icon-sm"
-        icon-left="refresh"
-        :loading="loading"
-        data-test="alert-sources-refresh-btn"
-        @click="fetchAll"
-      />
+        variant="primary"
+        size="sm"
+        icon-left="add"
+        data-test="alert-sources-add-btn"
+        @click="openAddDrawer"
+      >
+        {{ t("alert_sources.add") }}
+      </OButton>
     </template>
 
-    <div v-if="defaultSource" class="flex flex-col gap-6 text-sm">
-      <!-- Webhook URL -->
-      <div class="flex flex-col gap-2">
-        <div class="font-semibold">{{ t("alert_sources.webhookUrlLabel") }}</div>
-        <p class="text-text-secondary">{{ t("alert_sources.webhookUrlHelp") }}</p>
-        <CopyContent
-          :key="isRevealed(defaultSource) ? 'revealed' : 'masked'"
-          :content="fullUrlFor(defaultSource)"
-          :display-content="displayedUrlFor(defaultSource)"
-          data-test="alert-sources-url-cell"
-        />
-      </div>
+    <AddExternalAlertSource
+      v-model:open="showAddDrawer"
+      :editing-integration="editTargetIntegration"
+      @created="fetchAll"
+      @updated="fetchAll"
+    />
 
-      <!-- Alerting tool + setup -->
-      <div class="flex flex-col gap-2">
-        <div class="font-semibold">{{ t("alert_sources.sourceTypeLabel") }}</div>
-        <OTabs v-model="selectedSetupType" dense data-test="alert-sources-setup-type-tabs">
-          <OTab
-            name="grafana"
-            :label="t('alert_sources.sourceTypes.grafana')"
-            data-test="alert-sources-setup-type-grafana"
-          />
-          <OTab
-            name="alertmanager"
-            :label="t('alert_sources.sourceTypes.alertmanager')"
-            data-test="alert-sources-setup-type-alertmanager"
-          />
-          <OTab
-            name="generic"
-            :label="t('alert_sources.sourceTypes.generic')"
-            data-test="alert-sources-setup-type-generic"
-          />
-        </OTabs>
-        <p class="text-text-secondary">
-          {{ t(`alert_sources.setup.${selectedSetupType}Steps`) }}
-        </p>
-        <CopyContent v-if="selectedSetupType === 'alertmanager'" :content="alertmanagerSnippet" />
-        <CopyContent v-else-if="selectedSetupType === 'generic'" :content="genericSnippet" />
-      </div>
-
-      <!-- Alert sources table -->
-      <div class="mt-2 flex flex-col gap-3 text-sm">
-        <div class="flex items-center justify-between">
-          <div class="font-semibold">{{ t("alert_sources.statusHeader") }}</div>
-          <OButton
-            v-if="!showAddEditor"
-            variant="primary"
-            size="sm"
-            icon-left="add"
-            data-test="alert-sources-add-btn"
-            @click="showAddEditor = true"
-          >
-            {{ t("alert_sources.add") }}
-          </OButton>
-        </div>
-        <AddExternalAlertSource
-          v-if="showAddEditor"
-          @created="fetchIntegrations"
-          @cancel:hideform="showAddEditor = false"
-        />
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
         <OTable
-          :data="tableRows"
+          :frame="false"
+          :data="visibleRows"
           :columns="advancedColumns"
           row-key="rowKey"
+          :loading="loading"
           pagination="client"
-          :page-size="10"
+          :page-size="20"
+          :page-size-options="[10, 20, 50, 100]"
+          :row-class="noDestinationRowClass"
+          :footer-title="t('alert_sources.header')"
+          wrap
+          horizontal-scroll
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="alerts-external-sources"
+          :show-global-filter="false"
           data-test="alert-sources-advanced-table"
         >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="flex-1"
+              :placeholder="t('alert_sources.searchPlaceholder')"
+              data-test="alert-sources-search-input"
+            />
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="alert-sources-refresh-btn"
+              @click="fetchAll"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('alert_sources.refresh')"
+                shortcut-id="alertSourcesRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-alert-sources"
+              :filtered="!!filterQuery"
+              data-test="alert-sources-empty-state"
+              @action="onEmptyAction"
+            />
+          </template>
           <template #cell-name="{ row }">
-            <div class="flex items-center gap-2">
-              <span>{{ row.displayName }}</span>
-              <OTag
-                v-if="row.sharesDefaultToken"
-                variant="default-outline"
-                :title="t('alert_sources.sharedTokenHint')"
-                data-test="alert-sources-shared-token-badge"
-              >
-                {{ t("alert_sources.sharedTokenBadge") }}
-              </OTag>
+            <div class="flex min-w-0 flex-col">
+              <div class="flex min-w-0 items-center gap-2">
+                <span class="min-w-0 truncate font-medium" :title="row.displayName">{{
+                  row.displayName
+                }}</span>
+              </div>
+              <span v-if="row.nameCaption" class="text-text-secondary truncate text-xs">{{
+                row.nameCaption
+              }}</span>
             </div>
           </template>
           <template #cell-status="{ row }">
-            <OTag v-if="row.status === 'receiving'" variant="success-soft" dot>
-              {{ t("alert_sources.statusReceiving") }}
+            <div class="flex items-center gap-1">
+              <OTag v-if="row.status === 'receiving'" variant="success-soft" dot>
+                {{ t("alert_sources.statusReceiving") }}
+              </OTag>
+              <OTag v-else-if="row.status === 'stale'" variant="warning-soft" dot>
+                {{ t("alert_sources.statusStale") }}
+              </OTag>
+              <OTag
+                v-else-if="row.resolveWiringHint"
+                variant="warning-soft"
+                dot
+                data-test="alert-sources-never-resolves-tag"
+              >
+                {{ t("alert_sources.statusNeverResolves") }}
+              </OTag>
+              <OTag v-else variant="default-outline">
+                {{ t("alert_sources.statusNotConnected") }}
+              </OTag>
+              <!-- The hint can co-occur with Receiving/Stale, so it also needs
+                   a standalone icon beside the status tag. -->
+              <OIcon
+                v-if="row.resolveWiringHint && row.status !== 'not_connected'"
+                name="flag"
+                size="xs"
+                class="text-status-warning-text"
+                data-test="alert-sources-never-resolves-icon"
+              >
+                <OTooltip :delay="300" :max-width="'20rem'">
+                  <template #content>
+                    <span class="font-medium">
+                      {{ t("alert_sources.resolveWiringWarningTitle", { name: row.displayName }) }}
+                    </span>
+                    {{ t("alert_sources.resolveWiringWarningBody") }}
+                  </template>
+                </OTooltip>
+              </OIcon>
+            </div>
+          </template>
+          <template #cell-destination="{ row }">
+            <span v-if="row.destinations.length > 0" class="text-text-secondary text-xs">
+              {{ row.destinations.join(", ") }}
+            </span>
+            <OTag
+              v-else-if="row.integration"
+              variant="error-soft"
+              dot
+              data-test="alert-sources-no-destination-tag"
+            >
+              {{ t("alert_sources.noDestinationSet") }}
             </OTag>
-            <OTag v-else-if="row.status === 'stale'" variant="warning-soft" dot>
-              {{ t("alert_sources.statusStale") }}
-            </OTag>
-            <OTag v-else variant="default-outline">
-              {{ t("alert_sources.statusNotConnected") }}
-            </OTag>
+            <span v-else class="text-text-secondary">—</span>
+          </template>
+          <template #cell-last_event="{ row }">
+            <span class="text-text-secondary text-xs">{{ row.lastEventLabel }}</span>
           </template>
           <template #cell-url="{ row }">
             <div v-if="row.integration" class="flex items-center gap-1">
@@ -147,12 +186,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data-test="`alert-sources-copy-${row.integration.id}`"
                 @click="copyUrlFor(row.integration)"
               />
-              <span class="truncate font-mono text-xs">{{ displayedUrlFor(row.integration) }}</span>
+              <OButton
+                variant="ghost"
+                size="icon-xs-sq"
+                icon-left="key"
+                :title="t('alert_sources.copyToken')"
+                :data-test="`alert-sources-copy-token-${row.integration.id}`"
+                @click="copyTokenFor(row.integration)"
+              />
+              <span class="truncate font-mono text-xs" :title="displayedUrlFor(row.integration)">{{
+                displayedUrlFor(row.integration)
+              }}</span>
             </div>
             <span v-else class="text-text-secondary">—</span>
           </template>
           <template #cell-actions="{ row }">
             <div v-if="row.integration" class="flex items-center gap-1">
+              <OButton
+                variant="ghost"
+                size="icon-sm"
+                icon-left="edit"
+                :title="t('alert_sources.edit')"
+                :data-test="`alert-sources-edit-${row.integration.id}`"
+                @click="openEditFor(row.integration)"
+              />
               <OButton
                 variant="ghost"
                 size="icon-sm"
@@ -172,15 +229,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="toggleEnabledFor(row.integration)"
               />
               <OButton
-                v-if="row.integration.name !== 'default'"
                 variant="ghost-destructive"
                 size="icon-sm"
                 icon-left="delete"
-                :title="t('alert_sources.delete')"
+                :disabled="row.integration.name === 'default'"
+                :title="
+                  row.integration.name === 'default'
+                    ? t('alert_sources.defaultCannotDelete')
+                    : t('alert_sources.delete')
+                "
                 :data-test="`alert-sources-delete-${row.integration.id}`"
                 @click="confirmDelete(row.integration)"
               />
             </div>
+            <span
+              v-else
+              class="text-text-secondary text-xs"
+              :title="t('alert_sources.sharedTokenActionsHint')"
+            >
+              —
+            </span>
           </template>
         </OTable>
       </div>
@@ -211,23 +279,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
+import { defineComponent, getCurrentInstance } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import CopyContent from "@/components/CopyContent.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
+import { formatTimeAgoUs } from "@/utils/synthetics/format";
 import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
+import { COL } from "@/lib/core/Table/OTable.types";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
 
 interface SourceStatusRow {
@@ -236,6 +309,21 @@ interface SourceStatusRow {
   acceptedCount: number;
   rejectedCount: number;
   resolveWiringHint: boolean;
+  lastReceivedAt: number;
+}
+
+/** A table row: an additional integration, or a sender under the default
+ *  source (those share the default's URL/token, so `integration` is unset). */
+interface SourceTableRow {
+  rowKey: string;
+  displayName: string;
+  nameCaption: string;
+  status: "receiving" | "stale" | "not_connected";
+  integration: AlertSourceIntegration | undefined;
+  sharesDefaultToken: boolean;
+  destinations: string[];
+  resolveWiringHint: boolean;
+  lastEventLabel: string;
 }
 
 export default defineComponent({
@@ -245,20 +333,48 @@ export default defineComponent({
     OButton,
     OTag,
     OTable,
-    OTabs,
-    OTab,
+    OIcon,
+    OSearchInput,
+    OEmptyState,
+    OTooltip,
     ConfirmDialog,
-    CopyContent,
     AddExternalAlertSource,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
-    return { store, t };
+    const { t } = useI18nTyped();
+
+    // useShortcuts must run in setup(); the proxy reaches this Options-API
+    // component's own methods.
+    const instance = getCurrentInstance();
+    const vm = () => instance?.proxy as any;
+    useShortcuts([
+      {
+        id: "alertSourcesAdd",
+        handler: () => {
+          if (!isInputFocused()) vm()?.openAddDrawer();
+        },
+      },
+      {
+        id: "alertSourcesRefresh",
+        handler: () => {
+          if (!isInputFocused()) vm()?.fetchAll();
+        },
+      },
+      {
+        id: "alertSourcesFocusSearch",
+        handler: () => focusSearchInput("alert-sources-search-input"),
+      },
+    ]);
+
+    return { store, t, raw };
   },
   data() {
     return {
       loading: false,
+      filterQuery: "",
+      showAddDrawer: false,
+      editTargetIntegration: undefined as AlertSourceIntegration | undefined,
       integrations: [] as AlertSourceIntegration[],
       sourceStatuses: [] as SourceStatusRow[],
       revealedIds: [] as string[],
@@ -266,24 +382,70 @@ export default defineComponent({
       rotateTarget: undefined as AlertSourceIntegration | undefined,
       deleteDialogVisible: false,
       deleteTarget: undefined as AlertSourceIntegration | undefined,
-      showAddEditor: false,
-      selectedSetupType: "grafana" as "grafana" | "alertmanager" | "generic",
       additionalStatusById: {} as Record<string, "receiving" | "stale" | "not_connected">,
+      additionalResolveWiringHintById: {} as Record<string, boolean>,
+      additionalLastReceivedAtById: {} as Record<string, number | undefined>,
+      // default-columns=false (table-fixed) is what keeps `wrap`ped text inside
+      // its own column instead of bleeding into the next one.
       advancedColumns: [
         {
           id: "name",
           header: this.t("alert_sources.name"),
           accessorKey: "displayName",
           sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.name,
+          minSize: 160,
+          // `flex`, not `autoWidth`: both absorb leftover width, but autoWidth
+          // columns are never resizable (no Name│Status drag handle).
+          meta: { align: "left", flex: true },
         },
         {
-          id: "source_type",
-          header: this.t("alert_sources.sourceType"),
-          accessorKey: "sourceType",
+          id: "status",
+          header: this.t("alert_sources.statusColumnHeader"),
+          accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
+          size: 150,
+          meta: { align: "left" },
         },
-        { id: "status", header: this.t("alert_sources.statusColumnHeader"), accessorKey: "rowKey" },
-        { id: "url", header: this.t("alert_sources.urlHeader"), accessorKey: "rowKey" },
-        { id: "actions", header: this.t("alert_sources.actions"), isAction: true, size: 100 },
+        {
+          id: "destination",
+          header: this.t("alert_sources.incidentDestination"),
+          accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "left" },
+        },
+        {
+          id: "last_event",
+          header: this.t("alert_sources.lastEvent"),
+          accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
+          size: 100,
+          meta: { align: "left" },
+        },
+        {
+          id: "url",
+          header: this.t("alert_sources.urlHeader"),
+          accessorKey: "rowKey",
+          resizable: true,
+          hideable: true,
+          size: 420,
+          minSize: 420,
+          meta: { align: "left" },
+        },
+        {
+          id: "actions",
+          header: this.t("alert_sources.actions"),
+          isAction: true,
+          pinned: "right",
+          size: 150,
+          meta: { align: "center", actionCount: 4 },
+        },
       ] as any[],
     };
   },
@@ -301,80 +463,66 @@ export default defineComponent({
       const ingestionURL = getIngestionURL();
       return getEndPoint(ingestionURL).url;
     },
-    fullUrl(): string {
-      if (!this.defaultSource) return "";
-      return this.fullUrlFor(this.defaultSource);
-    },
-    tableRows(): Array<{
-      rowKey: string;
-      displayName: string;
-      sourceType: string;
-      status: "receiving" | "stale" | "not_connected";
-      integration: AlertSourceIntegration | undefined;
-      sharesDefaultToken: boolean;
-    }> {
-      const rows: Array<{
-        rowKey: string;
-        displayName: string;
-        sourceType: string;
-        status: "receiving" | "stale" | "not_connected";
-        integration: AlertSourceIntegration | undefined;
-        sharesDefaultToken: boolean;
-      }> = [];
+    tableRows(): SourceTableRow[] {
+      const rows: SourceTableRow[] = [];
 
       if (this.defaultSource) {
         if (this.sourceStatuses.length === 0) {
           rows.push({
             rowKey: `default:${this.defaultSource.id}`,
             displayName: this.defaultSource.name,
-            sourceType: this.defaultSource.source_type,
+            nameCaption: this.t("alert_sources.acceptsAnyFormat"),
             status: "not_connected",
             integration: this.defaultSource,
             sharesDefaultToken: false,
+            destinations: this.defaultSource.destinations,
+            resolveWiringHint: false,
+            lastEventLabel: "—",
           });
         } else {
           this.sourceStatuses.forEach((s, idx) => {
             rows.push({
               rowKey: `default:${this.defaultSource!.id}:${s.displayName}`,
               displayName: s.displayName,
-              sourceType: this.defaultSource!.source_type,
+              nameCaption: "",
               status: s.status,
-              // Only the first sender row carries the shared URL/token controls
-              // to avoid repeating identical actions per sender.
+              // Only the first sender row carries the shared URL/token actions.
               integration: idx === 0 ? this.defaultSource : undefined,
               sharesDefaultToken: true,
+              destinations: this.defaultSource!.destinations,
+              resolveWiringHint: s.resolveWiringHint,
+              lastEventLabel: formatTimeAgoUs(s.lastReceivedAt),
             });
           });
         }
       }
 
       for (const integration of this.additionalIntegrations) {
+        const lastReceivedAt = this.additionalLastReceivedAtById[integration.id];
         rows.push({
           rowKey: `additional:${integration.id}`,
           displayName: integration.name,
-          sourceType: integration.source_type,
+          nameCaption: "",
           status: this.additionalStatusById[integration.id] ?? "not_connected",
           integration,
           sharesDefaultToken: false,
+          destinations: integration.destinations,
+          resolveWiringHint: this.additionalResolveWiringHintById[integration.id] ?? false,
+          lastEventLabel: lastReceivedAt ? formatTimeAgoUs(lastReceivedAt) : "—",
         });
       }
 
       return rows;
     },
-    alertmanagerSnippet(): string {
-      return [
-        "receivers:",
-        "  - name: openobserve-incidents",
-        "    webhook_configs:",
-        `      - url: "${this.fullUrl}"`,
-        "        send_resolved: true",
-      ].join("\n");
-    },
-    genericSnippet(): string {
-      return [
-        `curl -X POST '${this.fullUrl}' -H 'Content-Type: application/json' \\`,
-        `  -d '{"status":"firing","labels":{"alertname":"HighCPU","service":"checkout"}}'`,
-      ].join("\n");
+    // Client-side search — the list is fetched whole anyway.
+    visibleRows(): SourceTableRow[] {
+      const term = this.filterQuery.trim().toLowerCase();
+      if (!term) return this.tableRows;
+      return this.tableRows.filter(
+        (row) =>
+          row.displayName.toLowerCase().includes(term) ||
+          row.destinations.some((d) => d.toLowerCase().includes(term)),
+      );
     },
   },
   mounted() {
@@ -413,6 +561,7 @@ export default defineComponent({
           acceptedCount: s.accepted_count,
           rejectedCount: s.rejected_count,
           resolveWiringHint: s.resolve_wiring_hint,
+          lastReceivedAt: s.last_received_at,
         }));
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.senderError") });
@@ -422,9 +571,11 @@ export default defineComponent({
       try {
         const res = await alertSources.listSenders(this.orgIdentifier, integrationId);
         const now = Date.now() * 1000;
-        const statuses = res.data.senders.map((s: any) =>
-          getAlertSourceStatus(s.last_received_at, now),
-        );
+        const senders = res.data.senders as Array<{
+          last_received_at: number;
+          resolve_wiring_hint: boolean;
+        }>;
+        const statuses = senders.map((s) => getAlertSourceStatus(s.last_received_at, now));
         if (statuses.length === 0) {
           this.additionalStatusById = {
             ...this.additionalStatusById,
@@ -438,6 +589,15 @@ export default defineComponent({
         } else {
           this.additionalStatusById = { ...this.additionalStatusById, [integrationId]: "stale" };
         }
+        this.additionalResolveWiringHintById = {
+          ...this.additionalResolveWiringHintById,
+          [integrationId]: senders.some((s) => s.resolve_wiring_hint),
+        };
+        this.additionalLastReceivedAtById = {
+          ...this.additionalLastReceivedAtById,
+          [integrationId]:
+            senders.length > 0 ? Math.max(...senders.map((s) => s.last_received_at)) : undefined,
+        };
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.senderError") });
       }
@@ -454,7 +614,10 @@ export default defineComponent({
       }
     },
     copyUrlFor(integration: AlertSourceIntegration) {
-      copyToClipboard(this.fullUrlFor(integration));
+      copyToClipboard(this.fullUrlFor(integration), this.t);
+    },
+    copyTokenFor(integration: AlertSourceIntegration) {
+      copyToClipboard(integration.token, this.t);
     },
     fullUrlFor(integration: AlertSourceIntegration): string {
       return `${this.ingestionBaseUrl}${integration.url}`;
@@ -511,6 +674,26 @@ export default defineComponent({
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }
+    },
+    openAddDrawer() {
+      this.editTargetIntegration = undefined;
+      this.showAddDrawer = true;
+    },
+    openEditFor(integration: AlertSourceIntegration) {
+      this.editTargetIntegration = integration;
+      this.showAddDrawer = true;
+    },
+    // Tints rows that have no incident destination configured.
+    noDestinationRowClass(row: SourceTableRow): string {
+      return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
+    },
+    // `id` is optional: OEmptyState's simple-button mode emits no id.
+    onEmptyAction(id?: string) {
+      if (id === "clear-filters") {
+        this.filterQuery = "";
+        return;
+      }
+      this.openAddDrawer();
     },
   },
 });

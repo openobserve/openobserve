@@ -31,6 +31,8 @@
  * const result = processTextWithHighlights(text, queryString, colors, showQuotes);
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import { useStore } from "vuex";
 import { escapeHtml } from "@/utils/html";
 
@@ -40,7 +42,7 @@ import { escapeHtml } from "@/utils/html";
 
 export interface TextSegment {
   id: string;
-  content: string;
+  content: I18nText;
   color?: string;
   isHighlighted: boolean;
   isWhitespace: boolean;

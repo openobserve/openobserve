@@ -648,6 +648,15 @@ pub fn basic_routes() -> Router {
         router = router.route("/docs", get(|| async { Redirect::permanent("/swagger/") }));
     }
 
+    // Stateless alert-chart render endpoint — the URL carries an HMAC-signed
+    // chart payload, verified inside the handler itself (never via
+    // auth_middleware), so it must stay in basic_routes like the incident
+    // webhooks below. Renders run in-process on this node; no search/storage.
+    router = router.route(
+        "/api/v2/{org_id}/alerts/charts/render",
+        get(alerts::chart_render::render_chart),
+    );
+
     // External alert source webhooks — token-authenticated inside the handler itself
     // (never via auth_middleware), so these must stay in basic_routes rather than
     // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
@@ -806,6 +815,7 @@ pub fn service_routes() -> Router {
 
         // Search
         .route("/{org_id}/_search", post(search::search))
+        .route("/{org_id}/query_functions", get(search::query_functions::list))
         .route("/{org_id}/_search_partition", post(search::search_partition))
         .route("/{org_id}/{stream_name}/_around", get(search::around_v1).post(search::around_v2))
         .route("/{org_id}/{stream_name}/_values", get(search::values))
@@ -915,7 +925,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events", get(alerts::incidents::get_incident_events))
         .route("/v2/{org_id}/alerts/incidents/{incident_id}/events/comment", post(alerts::incidents::post_incident_comment))
         .route("/v2/{org_id}/incidents/integrations", get(alerts::incident_integrations::list_integrations).post(alerts::incident_integrations::create_integration))
-        .route("/v2/{org_id}/incidents/integrations/{integration_id}", delete(alerts::incident_integrations::delete_integration))
+        .route("/v2/{org_id}/incidents/integrations/{integration_id}", delete(alerts::incident_integrations::delete_integration).patch(alerts::incident_integrations::update_integration))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/enable", patch(alerts::incident_integrations::set_integration_enabled))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/rotate", post(alerts::incident_integrations::rotate_integration_token))
         .route("/v2/{org_id}/incidents/integrations/{integration_id}/senders", get(alerts::incident_integrations::list_integration_senders))
@@ -923,6 +933,7 @@ pub fn service_routes() -> Router {
         // Alert templates
         .route("/{org_id}/alerts/templates", get(alerts::templates::list_templates).post(alerts::templates::save_template))
         .route("/{org_id}/alerts/templates/system/prebuilt", get(alerts::templates::get_system_templates))
+        .route("/{org_id}/alerts/templates/preview", post(alerts::templates::preview_template))
         .route("/{org_id}/alerts/templates/{template_name}", get(alerts::templates::get_template).put(alerts::templates::update_template).delete(alerts::templates::delete_template))
         .route("/{org_id}/alerts/templates/bulk", delete(alerts::templates::delete_template_bulk))
 
@@ -931,6 +942,7 @@ pub fn service_routes() -> Router {
         .route("/{org_id}/alerts/destinations/prebuilt", get(alerts::destinations::list_prebuilt_destinations))
         .route("/{org_id}/alerts/destinations/{destination_name}", get(alerts::destinations::get_destination).put(alerts::destinations::update_destination).delete(alerts::destinations::delete_destination))
         .route("/{org_id}/alerts/destinations/test", post(alerts::destinations::test_destination))
+        .route("/{org_id}/alerts/destinations/{destination_name}/test_send", post(alerts::destinations::test_send))
         .route("/{org_id}/alerts/destinations/bulk", delete(alerts::destinations::delete_destination_bulk))
 
         // Deduplication
@@ -1512,6 +1524,117 @@ mod tests {
                 .and_then(Value::as_array)
                 .is_some_and(|keywords| !keywords.is_empty())
         );
+    }
+
+    // NOTE ON WHAT IS TESTABLE HERE.
+    //
+    // service_routes() wraps the entire router in auth_middleware, which
+    // short-circuits BEFORE routing: a completely nonexistent path also answers
+    // 401. So an HTTP-level test against service_routes() cannot tell a
+    // registered route from an absent one — an assertion like "not 404", or
+    // even "== 401", passes whether or not the endpoint exists.
+    //
+    // Registration is therefore pinned two ways that DO discriminate: the route
+    // appears in the OpenAPI surface, and a minimal router carrying only this
+    // route dispatches GET to the handler and rejects other methods.
+
+    #[tokio::test]
+    async fn query_functions_route_dispatches_get_and_rejects_other_methods() {
+        let app = Router::new().route(
+            "/{org_id}/query_functions",
+            get(search::query_functions::list),
+        );
+
+        let ok = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(ok.status(), StatusCode::OK);
+
+        let wrong_method = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/myorg/query_functions")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            wrong_method.status(),
+            StatusCode::METHOD_NOT_ALLOWED,
+            "the catalog is read-only; the frontend issues GET"
+        );
+    }
+
+    #[test]
+    fn query_functions_is_published_in_the_openapi_surface() {
+        // Discriminating: this fails if the handler is dropped from openapi.rs.
+        let spec = super::openapi::ApiDoc::openapi();
+        let json = serde_json::to_string(&spec).unwrap();
+        assert!(
+            json.contains("/{org_id}/query_functions"),
+            "query_functions is missing from the OpenAPI surface"
+        );
+    }
+
+    // ── tmp/code.md B4 — the query-function catalog route ─────────────────────
+    //
+    // catalog_functions() can be perfect while no HTTP route exposes it. This is
+    // the only assertion that fails if the endpoint is simply never registered.
+
+    #[tokio::test]
+    async fn query_functions_handler_returns_the_documented_payload_shape() {
+        // Calls the handler DIRECTLY, bypassing auth, so the body contract the
+        // frontend service depends on ({ list: [...] }) is actually asserted.
+        use axum::extract::Path;
+
+        let response =
+            openobserve_api_search::search::query_functions::list(Path("default".to_string()))
+                .await
+                .into_response();
+
+        assert_eq!(response.status(), StatusCode::OK);
+
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let payload: Value = serde_json::from_slice(&body).expect("body must be JSON");
+
+        let list = payload
+            .get("list")
+            .and_then(Value::as_array)
+            .expect("payload must be { list: [...] } — the frontend reads data.list");
+        assert!(!list.is_empty(), "catalog must not be empty");
+
+        let entry = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all"))
+            .expect("match_all must be present");
+        for field in ["name", "signature", "doc", "kind", "deprecated"] {
+            assert!(
+                entry.get(field).is_some(),
+                "serialized entry is missing `{field}`"
+            );
+        }
+
+        // Assert non-empty doc on an entry the SERVER is the sole source for.
+        // The frontend catalog carries its own prose for the O2 UDFs and wins
+        // on merge, so requiring a server-side doc for match_all would pin data
+        // the UI never renders.
+        let alias = list
+            .iter()
+            .find(|f| f.get("name").and_then(Value::as_str) == Some("match_all_raw"))
+            .expect("rewriter alias must be present");
+        assert!(!alias["doc"].as_str().unwrap_or("").is_empty());
+        assert_eq!(alias["deprecated"], Value::Bool(true));
     }
 
     // ── is_origin_allowed unit tests ──────────────────────────────────────────

@@ -54,7 +54,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-name-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="Name *"
+                      :label="t('onlineEvals.importNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -70,7 +70,7 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-rename-input-${err.itemIndex}`"
                       v-model="nameFixers[err.itemIndex]"
-                      label="New Name *"
+                      :label="t('onlineEvals.importNewNameRequired')"
                       @update:model-value="updateName(err.itemIndex, $event)"
                     />
                   </div>
@@ -87,7 +87,7 @@ the Free Software Foundation, either version 3 of the License, or
                       :data-test="`score-config-import-datatype-select-${err.itemIndex}`"
                       v-model="dataTypeFixers[err.itemIndex]"
                       :options="dataTypeOptions"
-                      label="Data Type *"
+                      :label="t('onlineEvals.importDataTypeRequired')"
                       @update:model-value="updateDataType(err.itemIndex, $event)"
                     />
                   </div>
@@ -103,14 +103,14 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].min"
-                      label="Min *"
+                      :label="t('onlineEvals.importMinRequired')"
                       type="number"
                       @update:model-value="updateNumericRange(err.itemIndex)"
                     />
                     <OInput
                       :data-test="`score-config-import-max-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].max"
-                      label="Max *"
+                      :label="t('onlineEvals.importMaxRequired')"
                       type="number"
                       @update:model-value="updateNumericRange(err.itemIndex)"
                     />
@@ -127,8 +127,8 @@ the Free Software Foundation, either version 3 of the License, or
                     <OInput
                       :data-test="`score-config-import-categories-input-${err.itemIndex}`"
                       v-model="categoriesFixers[err.itemIndex]"
-                      label="Categories (comma-separated) *"
-                      placeholder="good, ok, bad"
+                      :label="t('onlineEvals.importCategoriesRequired')"
+                      :placeholder="t('onlineEvals.importCategoriesPlaceholder')"
                       @update:model-value="updateCategories(err.itemIndex, $event as string)"
                     />
                   </div>
@@ -173,7 +173,7 @@ the Free Software Foundation, either version 3 of the License, or
 
 <script setup lang="ts">
 import { computed, reactive, ref, toRef } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import BaseImport from "@/components/common/BaseImport.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -202,7 +202,7 @@ const emit = defineEmits<{
   (e: "saved"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const baseImportRef = ref<any>(null);
 const isImporting = ref(false);
@@ -220,9 +220,9 @@ const numericRangeFixers = reactive<Record<number, { min: string; max: string }>
 const categoriesFixers = reactive<Record<number, string>>({});
 
 const dataTypeOptions = [
-  { label: "Numeric", value: "numeric" },
-  { label: "Categorical", value: "categorical" },
-  { label: "Boolean", value: "boolean" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.numeric"), value: "numeric" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.categorical"), value: "categorical" },
+  { label: t("onlineEvals.scoreConfig.dataTypes.boolean"), value: "boolean" },
 ];
 
 const editorHeights = computed(() => ({
@@ -319,7 +319,7 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
     }
   }
 
-  const prepared = prepareScoreConfigImport(rawItems, existingScoreConfigs.value);
+  const prepared = prepareScoreConfigImport(rawItems, existingScoreConfigs.value, t);
 
   // Seed inline fixers from current values so users see the existing data
   // they're about to overwrite, rather than empty inputs.
@@ -407,13 +407,18 @@ async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: 
 
   if (successCount === payloads.length) {
     toast({
-      message: `Successfully imported ${successCount} score config(s)`,
+      message: t("toastMessages.onlineEvals.successfullyImportedScoreConfigs", {
+        count: successCount,
+      }),
       variant: "success",
     });
     setTimeout(() => emit("saved"), 500);
   } else if (successCount > 0) {
     toast({
-      message: `Imported ${successCount} of ${payloads.length} score config(s)`,
+      message: t("toastMessages.onlineEvals.importedOfScoreConfigs", {
+        imported: successCount,
+        count: payloads.length,
+      }),
       variant: "warning",
     });
     emit("saved");

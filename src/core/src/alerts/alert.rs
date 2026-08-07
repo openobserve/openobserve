@@ -32,7 +32,8 @@ use config::{
             alert::{Alert, AlertListFilter, ListAlertsParams, RowTemplateType},
         },
         destinations::{
-            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateType,
+            AwsSns, DestinationType, Email, Endpoint, HTTPType, Module, Template, TemplateKind,
+            TemplateType,
         },
         folder::{DEFAULT_FOLDER, Folder, FolderType},
         search::{SearchEventContext, SearchEventType},
@@ -60,7 +61,10 @@ use infra::{
     table,
 };
 use itertools::Itertools;
-use lettre::{AsyncTransport, Message, message::MultiPart};
+use lettre::{
+    AsyncTransport, Message,
+    message::{Attachment, MultiPart, SinglePart},
+};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
 #[cfg(feature = "enterprise")]
@@ -77,7 +81,18 @@ use tracing::{Level, span};
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
 use crate::{
-    alerts::{QueryConditionExt, build_sql, destinations},
+    alerts::{
+        QueryConditionExt, build_sql, destinations,
+        notifications::{
+            NotificationContext, RenderedMessage, apply_custom_template, build_row_columns, chart,
+            custom::{VarValue, process_variable_replace},
+            derive_channel_format,
+            format::ChannelFormat,
+            render,
+            render::slack as slack_render,
+            resolve_content,
+        },
+    },
     auth::is_ofga_unsupported,
     common::{infra::config::ORGANIZATIONS, meta::authz::Authz, utils::ssrf_guard::SsrfGuard},
     short_url,
@@ -1162,9 +1177,10 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_id_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
-        alert
-            .send_notification(&trace_id, &[], now, None, now, None, None, None)
-            .await?
+        let outcome = alert
+            .send_notification(&trace_id, &[], now, None, now, None, None, None, &[])
+            .await?;
+        (outcome.success_message, outcome.error_message)
     } else {
         (String::new(), String::new())
     };
@@ -1246,14 +1262,47 @@ pub async fn trigger_by_name(
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_name_{trace_id}");
     let (success_message, err_message) = if !incident_routed {
-        alert
-            .send_notification(&trace_id, &[], now, None, now, None, None, None)
-            .await?
+        let outcome = alert
+            .send_notification(&trace_id, &[], now, None, now, None, None, None, &[])
+            .await?;
+        (outcome.success_message, outcome.error_message)
     } else {
         (String::new(), String::new())
     };
 
     Ok((success_message, err_message))
+}
+
+/// Per-destination result of one notification attempt.
+///
+/// `succeeded` and `failed` are destination NAMES, which is what makes a
+/// retry able to skip what already landed (Task 11's ledger) instead of
+/// re-paging every destination because one of them errored.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct NotificationOutcome {
+    /// Destination names delivered on THIS attempt. Ledgered-skipped
+    /// destinations are not re-listed — they were not dispatched here.
+    pub succeeded: Vec<String>,
+    /// Destination names that failed on this attempt, for any reason
+    /// (fetch error, missing template, bad content spec, transport error).
+    pub failed: Vec<String>,
+    pub success_message: String,
+    pub error_message: String,
+}
+
+/// Alert-level template wins over the destination's (§ precedence).
+///
+/// Extracted from the send loop so the precedence rule is testable without a
+/// database.
+fn choose_template<'a>(
+    alert_tpl: Option<&'a Template>,
+    dest_tpl: Option<&'a Template>,
+) -> Option<&'a Template> {
+    match (alert_tpl, dest_tpl) {
+        (Some(alert_tpl), _) => Some(alert_tpl),
+        (None, Some(dest_tpl)) => Some(dest_tpl),
+        (None, None) => None,
+    }
 }
 
 #[async_trait]
@@ -1287,7 +1336,10 @@ pub trait AlertExt: Sync + Send + 'static {
         actual_value: Option<f64>,
         // Per-group notification identity (M-4). `None` = alert-level send.
         group_labels: Option<&std::collections::BTreeMap<String, String>>,
-    ) -> Result<(String, String), AlertError>;
+        // Destinations already delivered on a PRIOR attempt (Task 11's retry
+        // ledger). Skipped here so a retry cannot double-page them.
+        skip_destinations: &[String],
+    ) -> Result<NotificationOutcome, AlertError>;
 }
 
 #[async_trait]
@@ -1338,10 +1390,17 @@ impl AlertExt for Alert {
         level: Option<config::meta::alerts::level::AlertLevel>,
         actual_value: Option<f64>,
         group_labels: Option<&std::collections::BTreeMap<String, String>>,
-    ) -> Result<(String, String), AlertError> {
+        skip_destinations: &[String],
+    ) -> Result<NotificationOutcome, AlertError> {
+        let mut outcome = NotificationOutcome::default();
         let mut err_message = "".to_string();
         let mut success_message = "".to_string();
         let mut no_of_error = 0;
+        // Destinations skipped by the ledger are neither dispatched nor
+        // failures — they must not count toward the all-failed check below,
+        // or a retry whose only remaining destination succeeds would still
+        // look like a total failure.
+        let mut no_of_skipped = 0;
 
         #[cfg(feature = "enterprise")]
         let mut workflow_error = 0;
@@ -1366,57 +1425,161 @@ impl AlertExt for Alert {
             None
         };
 
+        // §5.1 Template snapshot: resolve EVERY destination and its template
+        // before any send. Two things follow from doing this up front:
+        //   1. A template edited mid-notification can no longer render different content to
+        //      different destinations of one alert.
+        //   2. A destination fetch failure becomes a per-destination failure instead of a `?` that
+        //      aborts the remaining destinations — which, once an earlier destination had already
+        //      sent, made the resulting all-fail return trigger a retry that re-sent it (§6.1).
+        let mut snapshot: Vec<(String, Option<(DestinationType, Option<Template>)>)> =
+            Vec::with_capacity(self.destinations.len());
         for dest_name in self.destinations.iter() {
-            let (dest, dest_template) =
-                destinations::get_with_template(&self.org_id, dest_name).await?;
-            let Module::Alert {
-                destination_type, ..
-            } = dest.module
-            else {
-                return Err(AlertError::GetDestinationWithTemplateError(
-                    db::alerts::destinations::DestinationError::UnsupportedType,
-                ));
-            };
-
-            // Use alert-level template if specified, otherwise fall back to destination template
-            let template = match (&alert_template, &dest_template) {
-                (Some(alert_tpl), _) => alert_tpl,
-                (None, Some(dest_tpl)) => dest_tpl,
-                (None, None) => {
-                    no_of_error += 1;
-                    err_message = format!(
-                        "{err_message} No template configured for destination {};",
-                        dest.name
-                    );
+            // Ledgered destinations already landed on a prior attempt.
+            if skip_destinations.contains(dest_name) {
+                no_of_skipped += 1;
+                continue;
+            }
+            match destinations::get_with_template(&self.org_id, dest_name).await {
+                Ok((dest, dest_template)) => match dest.module {
+                    Module::Alert {
+                        destination_type, ..
+                    } => {
+                        // Keyed by the name CONFIGURED on the alert, not
+                        // `dest.name`: the ledger is matched against
+                        // `self.destinations` on the next attempt, so the two
+                        // must be the same string.
+                        snapshot.push((dest_name.clone(), Some((destination_type, dest_template))))
+                    }
+                    _ => {
+                        log::error!(
+                            "Unsupported destination type for alert {}/{}/{}/{} destination {dest_name}",
+                            self.org_id,
+                            self.stream_type,
+                            self.stream_name,
+                            self.name,
+                        );
+                        snapshot.push((dest_name.clone(), None));
+                        err_message = format!(
+                            "{err_message} Unsupported destination type for destination {dest_name};"
+                        );
+                    }
+                },
+                Err(e) => {
                     log::error!(
-                        "No template configured for alert {}/{}/{}/{} destination {}",
+                        "Error resolving destination {dest_name} for alert {}/{}/{}/{}: {e}",
                         self.org_id,
                         self.stream_type,
                         self.stream_name,
                         self.name,
-                        dest.name
                     );
-                    continue;
+                    snapshot.push((dest_name.clone(), None));
+                    err_message =
+                        format!("{err_message} Error resolving destination {dest_name} err: {e};");
                 }
+            }
+        }
+        // Pre-count the resolution failures captured above.
+        no_of_error += snapshot.iter().filter(|(_, d)| d.is_none()).count();
+        for (name, _) in snapshot.iter().filter(|(_, d)| d.is_none()) {
+            outcome.failed.push(name.clone());
+        }
+
+        // §5.1 The context is built ONCE per notification: it shortens the
+        // alert URL (a DB write) and may run `build_sql`. Per-destination
+        // construction would multiply both. Only `metadata` differs per
+        // destination, and it is swapped in place below.
+        //
+        // Built lazily — an alert whose destinations all failed to resolve
+        // must not pay for a URL shortening it will never render.
+        let mut ctx: Option<NotificationContext> = None;
+
+        // Chart image, built at most ONCE per firing on the first
+        // chart-enabled template (history query → downsample → signed URL;
+        // no rendering here — pixels are produced at fetch time on the HTTP
+        // node, except for email/discord which need bytes in the send).
+        // Outer None = not attempted yet; inner None = attempted, no chart.
+        let mut chart_asset: Option<Option<(String, chart::payload::ChartPayload)>> = None;
+        let mut chart_png: Option<Option<std::sync::Arc<Vec<u8>>>> = None;
+
+        for (dest_name, resolved) in snapshot.iter() {
+            let Some((destination_type, dest_template)) = resolved else {
+                continue; // already recorded as a resolution failure
             };
 
-            match send_notification(
-                self,
-                &destination_type,
-                template,
-                rows,
-                rows_end_time,
-                start_time,
-                evaluation_timestamp,
-                level,
-                actual_value,
-                group_labels,
+            // Use alert-level template if specified, otherwise fall back to
+            // the destination's. Neither set is NOT an error (design §4.4) —
+            // resolve through the org default / compiled-in fallback instead
+            // (a dangling EXPLICIT reference, i.e. Some(name) that fails to
+            // load, is still recorded as a resolution failure above and never
+            // reaches this point).
+            let explicit =
+                choose_template(alert_template.as_ref(), dest_template.as_ref()).cloned();
+            let effective = crate::alerts::notifications::org_default::resolve_effective_template(
+                &self.org_id,
+                explicit,
             )
-            .await
-            {
+            .await;
+            let template = effective.template();
+
+            if ctx.is_none() {
+                ctx = Some(
+                    build_send_context(
+                        self,
+                        rows,
+                        rows_end_time,
+                        start_time,
+                        evaluation_timestamp,
+                        level,
+                        actual_value,
+                        group_labels,
+                    )
+                    .await,
+                );
+            }
+            let ctx = ctx.as_mut().expect("context built above");
+
+            // Chart fields are set PER DESTINATION: only a destination whose
+            // template opted in sees them, so the shared context never leaks
+            // a chart into a template that didn't ask for one.
+            let wants_chart = template.kind == TemplateKind::Content
+                && db::alerts::templates::get_parsed_content(template)
+                    .map(|s| s.chart.enabled)
+                    .unwrap_or(false);
+            if wants_chart && chart_asset.is_none() {
+                chart_asset = Some(build_chart_asset(self, ctx).await);
+            }
+            match (wants_chart, chart_asset.as_ref().and_then(|a| a.as_ref())) {
+                (true, Some((url, payload))) => {
+                    ctx.chart_url = Some(url.clone());
+                    // Bytes travel in the send itself only for email (CID
+                    // attachment) and Discord (multipart upload); rendered at
+                    // most once and shared.
+                    let needs_png = matches!(destination_type, DestinationType::Email(_))
+                        || matches!(
+                            derive_channel_format(destination_type),
+                            ChannelFormat::Discord
+                        );
+                    ctx.chart_png = if needs_png {
+                        if chart_png.is_none() {
+                            chart_png =
+                                Some(chart::try_render_png(payload).map(std::sync::Arc::new));
+                        }
+                        chart_png.clone().flatten()
+                    } else {
+                        None
+                    };
+                }
+                _ => {
+                    ctx.chart_url = None;
+                    ctx.chart_png = None;
+                }
+            }
+
+            match send_to_destination(self, destination_type, template, ctx).await {
                 Ok(resp) => {
-                    success_message =
-                        format!("{success_message} destination {} {resp};", dest.name);
+                    outcome.succeeded.push(dest_name.clone());
+                    success_message = format!("{success_message} destination {dest_name} {resp};");
                 }
                 Err(e) => {
                     log::error!(
@@ -1425,13 +1588,13 @@ impl AlertExt for Alert {
                         self.stream_type,
                         self.stream_name,
                         self.name,
-                        dest.name,
+                        dest_name,
                         e
                     );
                     no_of_error += 1;
+                    outcome.failed.push(dest_name.clone());
                     err_message = format!(
-                        "{err_message} Error sending notification for destination {} err: {e};",
-                        dest.name
+                        "{err_message} Error sending notification for destination {dest_name} err: {e};"
                     );
                 }
             }
@@ -1516,42 +1679,45 @@ impl AlertExt for Alert {
             }
         }
 
-        if no_of_error == self.destinations.len() {
+        outcome.success_message = success_message;
+        outcome.error_message = err_message;
+
+        // Attempted = destinations not skipped by the ledger. An attempt in
+        // which every attempted destination failed is still a hard error, so
+        // the scheduler retries; a partial failure returns Ok and the caller
+        // reads `outcome.failed`.
+        //
+        // DELIBERATE BEHAVIOR CHANGE (`attempted > 0`): previously
+        // `no_of_error == self.destinations.len()` was also true when BOTH
+        // were zero, so an alert with no destinations at all returned
+        // `SendNotificationError` even when its workflows had just fired
+        // successfully. That was a latent bug — a workflow-only alert is a
+        // supported configuration and reporting it as a total delivery
+        // failure made the scheduler retry work that had already succeeded.
+        // With the guard, a zero-destination alert falls through to the
+        // workflow branch below, which errors only when the workflows
+        // themselves all failed. T11's retry logic keys off this return
+        // value, so the change is called out rather than left implicit.
+        let attempted = self.destinations.len() - no_of_skipped;
+        if attempted > 0 && no_of_error == attempted {
             Err(AlertError::SendNotificationError {
-                error_message: err_message,
+                error_message: outcome.error_message,
             })
         } else if self.destinations.is_empty() && workflow_error == self.workflows.len() {
             Err(AlertError::SendNotificationError {
                 error_message: workflow_err_msg,
             })
         } else {
-            Ok((success_message, err_message))
+            Ok(outcome)
         }
     }
 }
 
-/// Send a pre-built message string to a single destination type.
-///
-/// Used by incident notifications, which build their own payload rather than
-/// going through the alert template system.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn dispatch_notification(
-    dest_type: &DestinationType,
-    subject: &str,
-    msg: String,
-) -> Result<String, anyhow::Error> {
-    match dest_type {
-        DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        DestinationType::Email(email) => send_email_notification(subject, email, msg).await,
-        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
-    }
-}
-
+/// Build the notification context for a send, resolving the row template
+/// first. Metadata is left empty — the caller swaps in each destination's.
 #[allow(clippy::too_many_arguments)]
-async fn send_notification(
+async fn build_send_context(
     alert: &Alert,
-    dest_type: &DestinationType,
-    template: &Template,
     rows: &[Map<String, Value>],
     rows_end_time: i64,
     start_time: Option<i64>,
@@ -1559,7 +1725,7 @@ async fn send_notification(
     level: Option<config::meta::alerts::level::AlertLevel>,
     actual_value: Option<f64>,
     group_labels: Option<&std::collections::BTreeMap<String, String>>,
-) -> Result<String, anyhow::Error> {
+) -> NotificationContext {
     let org_name = if let Some(org) = ORGANIZATIONS.read().await.get(&alert.org_id) {
         org.name.clone()
     } else {
@@ -1576,15 +1742,8 @@ async fn send_notification(
             rows,
         )
     };
-    let is_email = matches!(dest_type, DestinationType::Email(_));
-    let empty_meta = hashbrown::HashMap::new();
-    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
-        DestinationType::Http(endpoint) => &endpoint.metadata,
-        _ => &empty_meta,
-    };
-    let msg: String = process_dest_template(
+    build_notification_context(
         &org_name,
-        &template.body,
         alert,
         rows,
         &rows_tpl_val,
@@ -1592,42 +1751,218 @@ async fn send_notification(
             rows_end_time,
             start_time,
             evaluation_timestamp,
-            is_email,
+            // Not read by the context builder; the per-destination
+            // `is_email` is applied at render time.
+            is_email: false,
             level,
             actual_value,
         },
-        metadata,
         group_labels,
     )
-    .await;
+    .await
+}
 
-    let email_subject = if let TemplateType::Email { title } = &template.template_type {
-        process_dest_template(
-            &org_name,
-            title,
-            alert,
-            rows,
-            &rows_tpl_val,
-            ProcessTemplateOptions {
-                rows_end_time,
-                start_time,
-                evaluation_timestamp,
-                is_email,
-                level,
-                actual_value,
-            },
-            metadata,
-            group_labels,
-        )
-        .await
-    } else {
-        template.name.clone()
+/// Render and dispatch one notification to one destination.
+///
+/// Once-per-firing chart build: evaluation history from the triggers stream
+/// → downsample → signed stateless render URL (nothing stored anywhere; see
+/// notifications::chart). Bounded by a hard timeout so a slow history query
+/// can never delay a page. Every failure path returns `None` — the caller
+/// degrades to a chartless notification, never an error.
+async fn build_chart_asset(
+    alert: &Alert,
+    ctx: &NotificationContext,
+) -> Option<(String, chart::payload::ChartPayload)> {
+    let alert_id = alert.id.map(|id| id.to_string())?;
+    let req = chart::ChartRequest {
+        org_id: &alert.org_id,
+        alert_id: &alert_id,
+        alert_name: &alert.name,
+        stream_name: &alert.stream_name,
+        period_secs: (alert.trigger_condition.period.max(1) as u64) * 60,
+        trigger_ts: (ctx.alert_trigger_time / 1_000_000) as u64,
+        // The context renders these as bare numbers ("5") or "N/A";
+        // parse().ok() maps the latter to absence. The *_crit/_warn pair is
+        // family-aware (T-5): for aggregation/PromQL alerts it carries the
+        // severity thresholds the comparison actually used — NOT
+        // `alert_threshold`, which for those families is the group-count
+        // gate (live-verified: using it drew the critical line at 1).
+        current_value: ctx.alert_agg_value.parse().ok(),
+        crit_threshold: ctx.alert_threshold_crit.parse().ok(),
+        warn_threshold: ctx.alert_threshold_warn.parse().ok(),
     };
+    let payload = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        chart::build_payload(&req),
+    )
+    .await
+    .ok()
+    .flatten()?;
+    let url = chart::build_chart_url(&alert.org_id, &payload).await?;
+    Some((url, payload))
+}
 
+/// `ctx` is the notification-wide context; this function swaps in the
+/// destination's metadata before rendering (§5.1).
+async fn send_to_destination(
+    alert: &Alert,
+    dest_type: &DestinationType,
+    template: &Template,
+    ctx: &mut NotificationContext,
+) -> Result<String, anyhow::Error> {
+    let is_email = matches!(dest_type, DestinationType::Email(_));
+    let empty_meta = hashbrown::HashMap::new();
+    let metadata: &hashbrown::HashMap<String, String> = match dest_type {
+        DestinationType::Http(endpoint) => &endpoint.metadata,
+        _ => &empty_meta,
+    };
+    ctx.metadata = metadata
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+
+    match template.kind {
+        TemplateKind::Custom => {
+            // Unchanged legacy path — byte-identical output.
+            let msg = apply_custom_template(&template.body, ctx, is_email);
+            let email_subject = if let TemplateType::Email { title } = &template.template_type {
+                apply_custom_template(title, ctx, is_email)
+            } else {
+                template.name.clone()
+            };
+            match dest_type {
+                DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
+                DestinationType::Email(email) => {
+                    // Same string for both parts: identical to the MIME this
+                    // path emitted before the signature took two bodies.
+                    send_email_notification(&email_subject, email, msg.clone(), msg).await
+                }
+                DestinationType::Sns(aws_sns) => {
+                    send_sns_notification(&alert.name, aws_sns, msg).await
+                }
+            }
+        }
+        TemplateKind::Content => {
+            let spec = db::alerts::templates::get_parsed_content(template)
+                .map_err(|e| anyhow::anyhow!("Invalid content template {}: {e}", template.name))?;
+            let format = derive_channel_format(dest_type);
+            let content = resolve_content(&spec, ctx, format.channel_family());
+            let rendered = render(format, &content, ctx)
+                .map_err(|e| anyhow::anyhow!("Renderer failed: {e}"))?;
+
+            match (rendered, dest_type) {
+                (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
+                    // Discord with a rendered chart: upload the PNG in the
+                    // same webhook POST (the embed references it as
+                    // `attachment://`). Actions destinations keep the plain
+                    // JSON path — their payload is rewritten server-side.
+                    if matches!(format, ChannelFormat::Discord)
+                        && endpoint.action_id.is_none()
+                        && let Some(png) = ctx.chart_png.clone()
+                    {
+                        send_discord_with_attachment(endpoint, body, png).await
+                    } else {
+                        send_http_notification(endpoint, body).await
+                    }
+                }
+                (
+                    RenderedMessage::Email {
+                        subject,
+                        html,
+                        text,
+                    },
+                    DestinationType::Email(email),
+                ) => {
+                    send_email_notification_with_inline_png(
+                        &subject,
+                        email,
+                        text,
+                        html,
+                        ctx.chart_png.clone(),
+                    )
+                    .await
+                }
+                (
+                    RenderedMessage::Sns {
+                        subject: _,
+                        message,
+                    },
+                    DestinationType::Sns(aws_sns),
+                ) => send_sns_notification(&alert.name, aws_sns, message).await,
+                (rendered, dest_type) => Err(anyhow::anyhow!(
+                    "Rendered message {rendered:?} does not match destination type {dest_type:?}"
+                )),
+            }
+        }
+    }
+}
+
+/// Send a pre-built message string to a single destination type.
+///
+/// Used by incident notifications, which build their own payload rather than
+/// going through the alert template system.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn dispatch_notification(
+    dest_type: &DestinationType,
+    subject: &str,
+    msg: String,
+) -> Result<String, anyhow::Error> {
     match dest_type {
         DestinationType::Http(endpoint) => send_http_notification(endpoint, msg).await,
-        DestinationType::Email(email) => send_email_notification(&email_subject, email, msg).await,
-        DestinationType::Sns(aws_sns) => send_sns_notification(&alert.name, aws_sns, msg).await,
+        // Incident notifications build one payload with no HTML/plaintext
+        // split, so both parts carry the same string — byte-identical to the
+        // MIME this path emitted before the signature took two bodies.
+        DestinationType::Email(email) => {
+            send_email_notification(subject, email, msg.clone(), msg).await
+        }
+        DestinationType::Sns(aws_sns) => send_sns_notification(subject, aws_sns, msg).await,
+    }
+}
+
+/// Dispatch a rendered test-send message to one destination.
+///
+/// `title` is the already-`[TEST] `-marked title `build_test_message` stamped
+/// onto the content before rendering — used as the SNS subject, mirroring the
+/// live path's `send_sns_notification(&alert.name, ...)` (this module,
+/// `send_to_destination`), which also uses a caller-supplied subject rather
+/// than deriving one from the rendered body. Passing it explicitly (instead
+/// of re-deriving it from `rendered`, or hardcoding a literal) keeps this
+/// function agnostic to the rendered payload's shape and guarantees the SNS
+/// subject is never anything other than the actual marked title.
+///
+/// Unlike [`dispatch_notification`], this is NOT enterprise-gated: test-send
+/// (Task 15) is an OSS-visible feature, and it needs the same private
+/// `send_http_notification` / `send_email_notification` / `send_sns_notification`
+/// transports this module already owns. Kept as a distinct, narrowly-scoped
+/// function rather than removing the `#[cfg]` from `dispatch_notification`
+/// itself, so the enterprise-only incident-notification call sites are
+/// untouched.
+pub(crate) async fn dispatch_test_message(
+    dest_type: &DestinationType,
+    title: &str,
+    rendered: RenderedMessage,
+) -> Result<String, anyhow::Error> {
+    match (rendered, dest_type) {
+        (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
+            send_http_notification(endpoint, body).await
+        }
+        (
+            RenderedMessage::Email {
+                subject,
+                html,
+                text,
+            },
+            DestinationType::Email(email),
+        ) => send_email_notification(&subject, email, text, html).await,
+        (RenderedMessage::Http { body }, DestinationType::Sns(aws_sns)) => {
+            send_sns_notification(title, aws_sns, body).await
+        }
+        (RenderedMessage::Sns { subject, message }, DestinationType::Sns(aws_sns)) => {
+            send_sns_notification(&subject, aws_sns, message).await
+        }
+        (rendered, dest_type) => Err(anyhow::anyhow!(
+            "Rendered message {rendered:?} does not match destination type {dest_type:?}"
+        )),
     }
 }
 
@@ -1679,30 +2014,57 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     };
     let client = common::utils::ssrf_guard::build_safe_client(builder)?;
     let url = url::Url::parse(&endpoint.url)?;
-    let mut req = match endpoint.method {
-        HTTPType::POST => client.post(url),
-        HTTPType::PUT => client.put(url),
-        HTTPType::GET => client.get(url),
+    let build_req = |body: String| {
+        let mut req = match endpoint.method {
+            HTTPType::POST => client.post(url.clone()),
+            HTTPType::PUT => client.put(url.clone()),
+            HTTPType::GET => client.get(url.clone()),
+        };
+        // Add additional headers if any from destination description
+        let mut has_context_type = false;
+        if let Some(headers) = &endpoint.headers {
+            for (key, value) in headers.iter() {
+                if !key.is_empty() && !value.is_empty() {
+                    if key.to_lowercase().trim() == "content-type" {
+                        has_context_type = true;
+                    }
+                    req = req.header(key, value);
+                }
+            }
+        };
+        // set default content type
+        if !has_context_type {
+            req = req.header("Content-type", "application/json");
+        }
+        req.body(body)
     };
 
-    // Add additional headers if any from destination description
-    let mut has_context_type = false;
-    if let Some(headers) = &endpoint.headers {
-        for (key, value) in headers.iter() {
-            if !key.is_empty() && !value.is_empty() {
-                if key.to_lowercase().trim() == "content-type" {
-                    has_context_type = true;
-                }
-                req = req.header(key, value);
-            }
-        }
-    };
-    // set default content type
-    if !has_context_type {
-        req = req.header("Content-type", "application/json");
+    // Slack validates image URLs server-side at post time: an unfetchable
+    // chart URL (VPN-only ZO_WEB_URL) makes it reject the ENTIRE message with
+    // `400 invalid_attachments`, losing the alert. Reachability is a property
+    // of the deployment, not the destination — once one send has bounced,
+    // pre-strip images for the next hour instead of paying a guaranteed
+    // reject-and-resend round trip on every alert.
+    let is_slack_hook = url.host_str() == Some("hooks.slack.com");
+    let now_secs = (config::utils::time::now_micros() / 1_000_000) as u64;
+    let mut msg = msg;
+    if is_slack_hook
+        && slack_render::images_undeliverable(now_secs)
+        && let Some(stripped) = slack_render::strip_image_blocks(&msg)
+    {
+        config::metrics::ALERT_CHART_EVENTS_TOTAL
+            .with_label_values(&["slack_image_pre_stripped"])
+            .inc();
+        msg = stripped;
     }
 
-    let resp = req.body(msg.clone()).send().await?;
+    let resp = match build_req(msg.clone()).send().await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("error sending request to {} with error {e:?}", endpoint.url);
+            return Err(anyhow::anyhow!("error sending request : {e:?}"));
+        }
+    };
     let resp_status = resp.status();
     let resp_body = resp.text().await?;
 
@@ -1714,6 +2076,31 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     );
 
     if !resp_status.is_success() {
+        // Slack-only recovery: the alert must not be lost over an image.
+        // Strip the image blocks, resend once, and remember process-wide.
+        if is_slack_hook
+            && resp_status == reqwest::StatusCode::BAD_REQUEST
+            && (resp_body.contains("invalid_attachments") || resp_body.contains("invalid_blocks"))
+            && let Some(stripped) = slack_render::strip_image_blocks(&msg)
+            && let Ok(retry_resp) = build_req(stripped).send().await
+            && retry_resp.status().is_success()
+        {
+            slack_render::mark_images_undeliverable(now_secs);
+            config::metrics::ALERT_CHART_EVENTS_TOTAL
+                .with_label_values(&["slack_image_rejected"])
+                .inc();
+            log::warn!(
+                "[ALERT_CHART] Slack rejected the notification ({resp_body}) because its image \
+                 proxy could not fetch the chart image; delivered without the image. Slack must \
+                 be able to reach {} from the public internet — or set \
+                 ZO_ALERT_CHART_ENABLED=false to stop embedding charts.",
+                config::get_config().common.web_url,
+            );
+            return Ok(format!(
+                "sent status: {} (chart image stripped: Slack could not fetch it)",
+                reqwest::StatusCode::OK,
+            ));
+        }
         log::error!(
             "Alert http notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
         );
@@ -1727,10 +2114,40 @@ async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<Stri
     Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
+/// Send a multipart/alternative email.
+///
+/// Parameter order is `(text_body, html_body)` to MATCH
+/// `MultiPart::alternative_plain_html`, whose first argument is the plaintext
+/// part. Keeping the two orderings identical is deliberate: the failure mode of
+/// swapping them — HTML delivered as the plaintext part, so every alert email
+/// shows raw markup — is silent and customer-visible.
+///
+/// The custom-template path passes the SAME string for both, which reproduces
+/// exactly the MIME this function emitted when it took one `msg`. The
+/// Phase-1b renderers pass genuinely distinct parts.
 pub async fn send_email_notification(
     email_subject: &str,
     email: &Email,
-    msg: String,
+    text_body: String,
+    html_body: String,
+) -> Result<String, anyhow::Error> {
+    send_email_notification_with_inline_png(email_subject, email, text_body, html_body, None).await
+}
+
+/// [`send_email_notification`] plus an optional inline chart PNG.
+///
+/// With a PNG the MIME becomes
+/// `alternative(plain, related(html, image))` — the HTML part references the
+/// image as `cid:` ([`render::email::CHART_CONTENT_ID`]) and the bytes travel
+/// inside this same email, so the chart renders even in clients that block
+/// remote images and nothing is hosted anywhere. Without a PNG the MIME is
+/// byte-identical to what this function always emitted.
+pub async fn send_email_notification_with_inline_png(
+    email_subject: &str,
+    email: &Email,
+    text_body: String,
+    html_body: String,
+    inline_png: Option<std::sync::Arc<Vec<u8>>>,
 ) -> Result<String, anyhow::Error> {
     let cfg = get_config();
     if !cfg.smtp.smtp_enabled {
@@ -1750,15 +2167,80 @@ pub async fn send_email_notification(
         email = email.reply_to(cfg.smtp.smtp_reply_to.parse()?);
     }
 
-    let email = email
-        .multipart(MultiPart::alternative_plain_html(msg.clone(), msg))
-        .unwrap();
+    let multipart = match inline_png {
+        None => MultiPart::alternative_plain_html(text_body, html_body),
+        Some(png) => MultiPart::alternative()
+            .singlepart(SinglePart::plain(text_body))
+            .multipart(
+                MultiPart::related()
+                    .singlepart(SinglePart::html(html_body))
+                    .singlepart(
+                        Attachment::new_inline(
+                            crate::alerts::notifications::render::email::CHART_CONTENT_ID
+                                .to_string(),
+                        )
+                        .body(
+                            png.as_ref().clone(),
+                            "image/png".parse().expect("static mime type"),
+                        ),
+                    ),
+            ),
+    };
+    let email = email.multipart(multipart).unwrap();
 
     // Send the email
     match SMTP_CLIENT.as_ref().unwrap().send(email).await {
         Ok(resp) => Ok(format!("sent email response code: {}", resp.code())),
         Err(e) => Err(anyhow::anyhow!("Error sending email: {e}")),
     }
+}
+
+/// Discord webhook send with the chart PNG uploaded in the same request
+/// (multipart: `payload_json` + one file part). The embed references the
+/// image as `attachment://` ([`render::discord::CHART_ATTACHMENT_NAME`]), so
+/// no URL fetch is involved anywhere — true zero-storage delivery. Same SSRF
+/// guard discipline as `send_http_notification`.
+async fn send_discord_with_attachment(
+    endpoint: &Endpoint,
+    msg: String,
+    png: std::sync::Arc<Vec<u8>>,
+) -> Result<String, anyhow::Error> {
+    if let Err(e) = SsrfGuard::validate_url_with_config_async(&endpoint.url).await {
+        return Err(anyhow::anyhow!(
+            "Destination URL blocked by SSRF guard: {e}"
+        ));
+    }
+    let builder = if endpoint.skip_tls_verify {
+        reqwest::Client::builder().danger_accept_invalid_certs(true)
+    } else {
+        reqwest::Client::builder()
+    };
+    let client = common::utils::ssrf_guard::build_safe_client(builder)?;
+    let url = url::Url::parse(&endpoint.url)?;
+
+    let form = reqwest::multipart::Form::new()
+        .text("payload_json", msg.clone())
+        .part(
+            "files[0]",
+            reqwest::multipart::Part::bytes(png.as_ref().clone())
+                .file_name(crate::alerts::notifications::render::discord::CHART_ATTACHMENT_NAME)
+                .mime_str("image/png")?,
+        );
+
+    let resp = client.post(url).multipart(form).send().await?;
+    let resp_status = resp.status();
+    let resp_body = resp.text().await?;
+    if !resp_status.is_success() {
+        log::error!(
+            "Alert discord notification failed with status: {resp_status}, body: {resp_body}, payload: {msg}"
+        );
+        return Err(anyhow::anyhow!(
+            "sent error status: {}, err: {}",
+            resp_status,
+            resp_body
+        ));
+    }
+    Ok(format!("sent status: {resp_status}, body: {resp_body}"))
 }
 
 async fn send_sns_notification(
@@ -1929,6 +2411,9 @@ struct ProcessTemplateOptions {
     pub rows_end_time: i64,
     pub start_time: Option<i64>,
     pub evaluation_timestamp: i64,
+    /// Only read by the test-only [`process_dest_template`] wrapper; the live
+    /// path derives `is_email` per destination at render time.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub is_email: bool,
     /// Severity classified by this evaluation, for `{alert_level}`.
     pub level: Option<config::meta::alerts::level::AlertLevel>,
@@ -1945,6 +2430,11 @@ fn fmt_observed(v: f64) -> String {
     }
 }
 
+/// Test-only wrapper preserving the pre-Task-9 call shape: build the context,
+/// swap in `metadata`, apply the custom template. The live path calls
+/// [`build_send_context`] + [`send_to_destination`] instead, which is the same
+/// two steps with the context hoisted out of the destination loop.
+#[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 async fn process_dest_template(
     org_name: &str,
@@ -1958,12 +2448,41 @@ async fn process_dest_template(
     // ungrouped alert, which keeps their rendering byte-identical.
     group_labels: Option<&std::collections::BTreeMap<String, String>>,
 ) -> String {
+    let is_email = options.is_email;
+    let mut ctx =
+        build_notification_context(org_name, alert, rows, rows_tpl_val, options, group_labels)
+            .await;
+    ctx.metadata = metadata
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    apply_custom_template(tpl, &ctx, is_email)
+}
+
+/// Build the [`NotificationContext`] for one notification.
+///
+/// Side-effecting: shortens the alert URL (a DB write) and may run
+/// `build_sql`. Called **once per notification**, before the destination loop
+/// (§5.1) — building it per destination would multiply both.
+///
+/// `metadata` is deliberately NOT a parameter: it is the only field that
+/// differs per destination, and the caller swaps it in place on the returned
+/// context (an O(1) `Vec` assignment) rather than rebuilding or cloning.
+#[allow(clippy::too_many_arguments)]
+async fn build_notification_context(
+    org_name: &str,
+    alert: &Alert,
+    rows: &[Map<String, Value>],
+    rows_tpl_val: &[Value],
+    options: ProcessTemplateOptions,
+    group_labels: Option<&std::collections::BTreeMap<String, String>>,
+) -> NotificationContext {
     let cfg = get_config();
     let ProcessTemplateOptions {
         rows_end_time,
         start_time,
         evaluation_timestamp,
-        is_email,
+        is_email: _,
         level,
         actual_value,
     } = options;
@@ -2140,336 +2659,59 @@ async fn process_dest_template(
         }
     };
 
-    let evaluation_timestamp_millis = evaluation_timestamp / 1000;
-    let evaluation_timestamp_seconds = evaluation_timestamp_millis / 1000;
-    let mut resp = tpl
-        .replace("{org_name}", org_name)
-        .replace("{stream_type}", alert.stream_type.as_str())
-        .replace("{stream_name}", &alert.stream_name)
-        .replace("{alert_name}", &alert.name)
-        .replace("{alert_type}", alert_type)
-        .replace(
-            "{alert_period}",
-            &alert.trigger_condition.period.to_string(),
-        )
-        .replace(
-            "{alert_operator}",
-            &alert.trigger_condition.operator.to_string(),
-        )
-        .replace(
-            "{alert_threshold}",
-            &alert.trigger_condition.threshold.to_string(),
-        )
-        .replace("{alert_count}", &alert_count)
-        // Multi-level threshold variables (alerts_2.md T-5). `{alert_level}` is
-        // what lets a template branch warning vs critical wording — per-level
-        // DESTINATIONS are Phase 4; v1 routing is template-side.
-        .replace(
-            "{alert_level}",
-            &level.map(|l| l.to_string()).unwrap_or_default(),
-        )
-        // Feature 2 (PT-4 / PT-9). Scope is DESTINATION TEMPLATES ONLY (D25):
-        // incident notifications build custom JSON and workflows carry
-        // hard-coded metadata; neither is wired here in v1. Unset priority and
-        // empty tags render as "" rather than "P0"/"null", so a template that
-        // interpolates them unconditionally still produces clean output.
-        .replace(
-            "{alert_priority}",
-            &alert.priority.map(|p| p.to_string()).unwrap_or_default(),
-        )
-        .replace("{alert_tags}", &alert.tags.join(","))
-        .replace("{alert_threshold_crit}", &fmt_observed(family_crit))
-        .replace(
-            "{alert_threshold_warn}",
-            &family_warn.map(fmt_observed).unwrap_or_default(),
-        )
-        // Legacy alias for `{alert_threshold_warn}` — now family-aware too;
-        // previously it always read the count-family warning.
-        .replace(
-            "{alert_warning_threshold}",
-            &family_warn.map(fmt_observed).unwrap_or_default(),
-        )
-        .replace("{alert_start_time}", &alert_start_time_str)
-        .replace("{alert_end_time}", &alert_end_time_str)
-        .replace("{alert_url}", &alert_url)
-        .replace("{alert_trigger_time}", &evaluation_timestamp.to_string())
-        .replace(
-            "{alert_trigger_time_millis}",
-            &evaluation_timestamp_millis.to_string(),
-        )
-        .replace(
-            "{alert_trigger_time_seconds}",
-            &evaluation_timestamp_seconds.to_string(),
-        )
-        .replace("{alert_trigger_time_str}", &evaluation_timestamp_str)
-        .replace("{alert_description}", &alert.description);
-
-    if let Some(contidion) = &alert.query_condition.promql_condition {
-        resp = resp
-            .replace("{alert_promql_operator}", &contidion.operator.to_string())
-            .replace("{alert_promql_value}", &contidion.value.to_string());
-    }
-
-    // Check if {rows}, {rows:N}, {...rows}, or {...rows:N} is in a JSON context
-    let is_json_rows_context = check_json_context(&resp, "rows");
-
-    if is_json_rows_context {
-        // Check if all row_tpl_val elements are actual JSON values (not string fallbacks)
-        let all_json = rows_tpl_val.iter().all(|v| !v.is_string());
-
-        if all_json {
-            // Handle "{rows}" and "{rows:N}" — standard (non-spread) replacement
-            if resp.contains("\"{rows}\"") || extract_rows_limit(&resp).is_some() {
-                let row_limit = extract_rows_limit(&resp);
-                let limited_rows = if let Some(n) = row_limit {
-                    &rows_tpl_val[..n.min(rows_tpl_val.len())]
-                } else {
-                    rows_tpl_val
-                };
-
-                let json_array = Value::Array(limited_rows.to_vec());
-                let json_str =
-                    serde_json::to_string(&json_array).unwrap_or_else(|_| "[]".to_string());
-
-                if let Some(n) = row_limit {
-                    let pattern = format!("\"{{rows:{n}}}\"");
-                    resp = resp.replace(&pattern, &json_str);
-                    // Also replace plain "{rows}" if it coexists
-                    if resp.contains("\"{rows}\"") {
-                        let all_rows_str =
-                            serde_json::to_string(&Value::Array(rows_tpl_val.to_vec()))
-                                .unwrap_or_else(|_| "[]".to_string());
-                        resp = resp.replace("\"{rows}\"", &all_rows_str);
-                    }
-                } else {
-                    resp = resp.replace("\"{rows}\"", &json_str);
-                }
-            }
-
-            // Handle "{...rows}" and "{...rows:N}" — spread/flatten replacement
-            if has_spread_rows(&resp) {
-                let spread_limit = extract_spread_rows_limit(&resp);
-                let spread_rows = if let Some(n) = spread_limit {
-                    &rows_tpl_val[..n.min(rows_tpl_val.len())]
-                } else {
-                    rows_tpl_val
-                };
-
-                // Flatten: if a row value is an array, spread its elements; otherwise include as-is
-                let flattened: Vec<Value> = spread_rows
+    NotificationContext {
+        org_name: org_name.to_string(),
+        stream_type: alert.stream_type.as_str().to_string(),
+        stream_name: alert.stream_name.clone(),
+        alert_name: alert.name.clone(),
+        alert_type: alert_type.to_string(),
+        alert_period: alert.trigger_condition.period.to_string(),
+        alert_operator: alert.trigger_condition.operator.to_string(),
+        alert_threshold: alert.trigger_condition.threshold.to_string(),
+        alert_count,
+        alert_agg_value: format_agg_value(actual_value),
+        alert_level: level.map(|l| l.to_string()).unwrap_or_default(),
+        alert_priority: alert.priority.map(|p| p.to_string()).unwrap_or_default(),
+        alert_tags: alert.tags.join(","),
+        alert_threshold_crit: fmt_observed(family_crit),
+        alert_threshold_warn: family_warn.map(fmt_observed).unwrap_or_default(),
+        alert_start_time: alert_start_time_str,
+        alert_end_time: alert_end_time_str,
+        alert_url,
+        alert_trigger_time: evaluation_timestamp,
+        alert_trigger_time_str: evaluation_timestamp_str,
+        alert_description: alert.description.clone(),
+        promql_operator: alert
+            .query_condition
+            .promql_condition
+            .as_ref()
+            .map(|c| c.operator.to_string()),
+        promql_value: alert
+            .query_condition
+            .promql_condition
+            .as_ref()
+            .map(|c| c.value.to_string()),
+        rows: rows.to_vec(),
+        rows_tpl_val: rows_tpl_val.to_vec(),
+        row_columns: build_row_columns(rows),
+        context_attributes: alert
+            .context_attributes
+            .as_ref()
+            .map(|attrs| {
+                attrs
                     .iter()
-                    .flat_map(|v| match v {
-                        Value::Array(arr) => arr.clone(),
-                        other => vec![other.clone()],
-                    })
-                    .collect();
-
-                let json_str = serde_json::to_string(&Value::Array(flattened))
-                    .unwrap_or_else(|_| "[]".to_string());
-
-                if let Some(n) = spread_limit {
-                    let pattern = format!("\"{{...rows:{n}}}\"");
-                    resp = resp.replace(&pattern, &json_str);
-                    // Also replace plain "{...rows}" if it coexists
-                    if resp.contains("\"{...rows}\"") {
-                        let all_flattened: Vec<Value> = rows_tpl_val
-                            .iter()
-                            .flat_map(|v| match v {
-                                Value::Array(arr) => arr.clone(),
-                                other => vec![other.clone()],
-                            })
-                            .collect();
-                        let all_str = serde_json::to_string(&Value::Array(all_flattened))
-                            .unwrap_or_else(|_| "[]".to_string());
-                        resp = resp.replace("\"{...rows}\"", &all_str);
-                    }
-                } else {
-                    resp = resp.replace("\"{...rows}\"", &json_str);
-                }
-            }
-        } else {
-            // Fallback to string behavior for non-JSON row values
-            process_variable_replace(
-                &mut resp,
-                "rows",
-                &VarValue::JsonArray(rows_tpl_val),
-                is_email,
-            );
-        }
-    } else {
-        // Normal string replacement (non-JSON context)
-        process_variable_replace(
-            &mut resp,
-            "rows",
-            &VarValue::JsonArray(rows_tpl_val),
-            is_email,
-        );
-    }
-
-    for (key, value) in vars.iter() {
-        // Match both bare `{key}` and length-suffixed `{key:N}` forms.
-        if resp.contains(&format!("{{{key}}}")) || resp.contains(&format!("{{{key}:")) {
-            let val = value.iter().cloned().collect::<Vec<_>>();
-            process_variable_replace(&mut resp, key, &VarValue::Str(&val.join(", ")), is_email);
-        }
-    }
-    if let Some(attrs) = &alert.context_attributes {
-        for (key, value) in attrs.iter() {
-            process_variable_replace(&mut resp, key, &VarValue::Str(value), is_email);
-        }
-    }
-
-    // Substitute endpoint metadata variables (e.g., credential_assignmentGroup,
-    // credential_priority)
-    for (key, value) in metadata.iter() {
-        resp = resp.replace(&format!("{{{}}}", key), value);
-    }
-
-    // ── Group variables, LAST (M-4) ─────────────────────────────────────────
-    // Position is the whole defence, not a detail. Label values are user data
-    // and can contain `{...}`; because nothing runs after this, a pod named
-    // `{alert_name}` is written literally instead of being expanded into the
-    // alert's name by a later pass. Anything added below this point reopens
-    // that hole.
-    //
-    // The `group.` prefix is the other half: it stops a label called
-    // `alert_name` from shadowing the alert's own variable.
-    if let Some(labels) = group_labels {
-        for (name, value) in config::meta::alerts::grouping::group_template_vars(labels) {
-            process_variable_replace(&mut resp, &name, &VarValue::Str(&value), is_email);
-        }
-    }
-
-    resp
-}
-
-/// Checks if a variable is being used in a JSON context (i.e., as a direct value in JSON)
-/// For example, {"key": "{var}"} returns true, but {"key": "text {var} text"} returns false.
-/// Also detects "{var:N}" patterns (e.g., "{rows:3}") and spread patterns
-/// "{...var}" / "{...var:N}".
-fn check_json_context(tpl: &str, var_name: &str) -> bool {
-    // Check for "{var}" pattern
-    let pattern_with_quotes = format!("\"{{{var_name}}}\"");
-    if is_json_value_position(tpl, &pattern_with_quotes) {
-        return true;
-    }
-
-    // Check for "{var:N}" pattern (e.g., "{rows:3}")
-    if check_json_context_with_prefix(tpl, &format!("\"{{{var_name}:")) {
-        return true;
-    }
-
-    // Check for "{...var}" spread pattern
-    let spread_pattern = format!("\"{{...{var_name}}}\"");
-    if is_json_value_position(tpl, &spread_pattern) {
-        return true;
-    }
-
-    // Check for "{...var:N}" spread pattern (e.g., "{...rows:3}")
-    if check_json_context_with_prefix(tpl, &format!("\"{{...{var_name}:")) {
-        return true;
-    }
-
-    false
-}
-
-/// Helper to check if a "{var:N}" or "{...var:N}" style pattern is in JSON value position.
-fn check_json_context_with_prefix(tpl: &str, prefix: &str) -> bool {
-    if let Some(start) = tpl.find(prefix) {
-        let after_prefix = start + prefix.len();
-        if let Some(end) = tpl[after_prefix..].find("}\"") {
-            let num_str = &tpl[after_prefix..after_prefix + end];
-            if num_str.parse::<usize>().is_ok() {
-                let full_pattern = &tpl[start..after_prefix + end + 2]; // includes closing }"
-                if is_json_value_position(tpl, full_pattern) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
-/// Checks if a pattern appears in a JSON value position (after `:` and before `,` or `}`)
-fn is_json_value_position(tpl: &str, pattern: &str) -> bool {
-    if let Some(pos) = tpl.find(pattern) {
-        let before = &tpl[..pos];
-        let after = &tpl[pos + pattern.len()..];
-
-        let before_trimmed = before.trim_end();
-        let after_trimmed = after.trim_start();
-
-        if before_trimmed.ends_with(':')
-            && (after_trimmed.starts_with(',') || after_trimmed.starts_with('}'))
-        {
-            return true;
-        }
-    }
-    false
-}
-
-/// Extracts the row limit N from a "{rows:N}" pattern in the template string.
-/// Returns None if only "{rows}" is present (no limit).
-fn extract_rows_limit(tpl: &str) -> Option<usize> {
-    extract_limit_with_prefix(tpl, "\"{rows:")
-}
-
-/// Extracts the row limit N from a "{...rows:N}" spread pattern in the template string.
-/// Returns None if only "{...rows}" is present (no limit).
-fn extract_spread_rows_limit(tpl: &str) -> Option<usize> {
-    extract_limit_with_prefix(tpl, "\"{...rows:")
-}
-
-/// Returns true if the template contains a spread rows pattern ("{...rows}" or "{...rows:N}").
-fn has_spread_rows(tpl: &str) -> bool {
-    tpl.contains("\"{...rows}\"") || extract_spread_rows_limit(tpl).is_some()
-}
-
-fn extract_limit_with_prefix(tpl: &str, prefix: &str) -> Option<usize> {
-    if let Some(start) = tpl.find(prefix) {
-        let after_prefix = start + prefix.len();
-        if let Some(end) = tpl[after_prefix..].find("}\"") {
-            let num_str = &tpl[after_prefix..after_prefix + end];
-            return num_str.parse::<usize>().ok();
-        }
-    }
-    None
-}
-
-fn process_variable_replace(tpl: &mut String, var_name: &str, var_val: &VarValue, is_email: bool) {
-    // 1) Handle every `{var:N}` occurrence first. We scan left-to-right and advance `cursor` past
-    //    each match so we don't loop forever on inputs that can't be parsed (e.g. `{var:abc}`) and
-    //    so multiple distinct lengths in the same template (`{msg:100}` and `{msg:200}`) are all
-    //    replaced.
-    let prefix = format!("{{{var_name}:");
-    let mut cursor = 0usize;
-    while let Some(rel_start) = tpl[cursor..].find(&prefix) {
-        let start = cursor + rel_start;
-        let num_start = start + prefix.len();
-        let Some(end_offset) = tpl[num_start..].find('}') else {
-            break;
-        };
-        let num_end = num_start + end_offset;
-        let full_end = num_end + 1; // include the closing `}`
-        let len = tpl[num_start..num_end].parse::<usize>().unwrap_or_default();
-        if len > 0 {
-            let replacement = var_val.to_string_with_length(len, is_email);
-            tpl.replace_range(start..full_end, &replacement);
-            cursor = start + replacement.len();
-        } else {
-            // Invalid/zero length — skip past this occurrence to avoid an
-            // infinite loop, but leave the original substring untouched.
-            cursor = full_end;
-        }
-    }
-
-    // 2) Then handle every bare `{var}` occurrence.
-    let bare = format!("{{{var_name}}}");
-    if tpl.contains(&bare) {
-        *tpl = tpl.replace(&bare, &var_val.to_string_with_length(0, is_email));
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+        // Swapped in per destination by the caller — see the doc comment.
+        metadata: Vec::new(),
+        group_labels: group_labels.cloned(),
+        level,
+        chart_url: None,
+        chart_png: None,
     }
 }
-
 pub fn get_row_column_map(rows: &[Map<String, Value>]) -> HashMap<String, HashSet<String>> {
     let mut vars = HashMap::with_capacity(rows.len());
     for row in rows.iter() {
@@ -2582,26 +2824,8 @@ pub fn get_alert_start_end_time(
     }
     (alert_start_time, alert_end_time)
 }
-fn format_variable_value(val: String) -> String {
-    val.chars()
-        .map(|c| match c {
-            '\'' => "\\\\'".to_string(),
-            '"' => "\\\"".to_string(),
-            '\\' => "\\\\".to_string(),
-            '\n' => "\\n".to_string(),
-            '\r' => "\\r".to_string(),
-            '\t' => "\\t".to_string(),
-            '\0' => "\\u{0}".to_string(),
-            '\x1b' => "\\u{1b}".to_string(),
-            '\x08' => "\\u{8}".to_string(),
-            '\x0c' => "\\u{c}".to_string(),
-            '\x0b' => "\\u{b}".to_string(),
-            '\x01' => "\\u{1}".to_string(),
-            '\x02' => "\\u{2}".to_string(),
-            '\x1f' => "\\u{1f}".to_string(),
-            _ => c.to_string(),
-        })
-        .collect::<String>()
+fn format_agg_value(actual_value: Option<f64>) -> String {
+    actual_value.map(|v| v.to_string()).unwrap_or_default()
 }
 
 pub(super) fn to_float(val: &Value) -> f64 {
@@ -2611,46 +2835,6 @@ pub(super) fn to_float(val: &Value) -> f64 {
         val.as_str().unwrap_or_default().parse().unwrap_or_default()
     }
 }
-
-enum VarValue<'a> {
-    Str(&'a str),
-    JsonArray(&'a [Value]),
-}
-
-impl VarValue<'_> {
-    fn len(&self) -> usize {
-        match self {
-            VarValue::Str(v) => v.chars().count(),
-            VarValue::JsonArray(v) => v.len(),
-        }
-    }
-
-    fn to_string_with_length(&self, n: usize, is_email: bool) -> String {
-        let n = if n > 0 && n < self.len() {
-            n
-        } else {
-            self.len()
-        };
-        match self {
-            VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
-            VarValue::JsonArray(v) => {
-                // Convert JSON values to strings
-                let strings: Vec<String> = v[0..n]
-                    .iter()
-                    .map(|val| {
-                        if val.is_string() {
-                            format_variable_value(val.as_str().unwrap_or("").to_string())
-                        } else {
-                            format_variable_value(val.to_string())
-                        }
-                    })
-                    .collect();
-                strings.join(if is_email { "" } else { "\\n" })
-            }
-        }
-    }
-}
-
 #[cfg(not(feature = "enterprise"))]
 async fn permitted_alerts(
     _org_id: &str,
@@ -3094,12 +3278,164 @@ mod threshold_validation_tests {
 }
 
 #[cfg(test)]
+mod send_path_tests {
+    use config::meta::destinations::{Template, TemplateKind};
+
+    use super::{NotificationOutcome, choose_template};
+
+    fn tpl(name: &str) -> Template {
+        Template {
+            name: name.to_string(),
+            kind: TemplateKind::Custom,
+            ..Default::default()
+        }
+    }
+
+    /// The alert-level template is an explicit override, so it wins even when
+    /// the destination also carries one — otherwise setting a template on the
+    /// alert would silently do nothing for any destination that has its own.
+    #[test]
+    fn alert_template_wins_over_destination_template() {
+        let alert_tpl = tpl("from-alert");
+        let dest_tpl = tpl("from-destination");
+        let chosen = choose_template(Some(&alert_tpl), Some(&dest_tpl)).unwrap();
+        assert_eq!(chosen.name, "from-alert");
+    }
+
+    /// An alert-level template also wins when the destination has none, which
+    /// is the case that makes an alert-level template usable at all.
+    #[test]
+    fn alert_template_wins_when_destination_has_none() {
+        let alert_tpl = tpl("from-alert");
+        let chosen = choose_template(Some(&alert_tpl), None).unwrap();
+        assert_eq!(chosen.name, "from-alert");
+    }
+
+    /// With no alert-level template the destination's is used — the legacy
+    /// behaviour every existing alert relies on.
+    #[test]
+    fn destination_template_is_the_fallback() {
+        let dest_tpl = tpl("from-destination");
+        let chosen = choose_template(None, Some(&dest_tpl)).unwrap();
+        assert_eq!(chosen.name, "from-destination");
+    }
+
+    /// Neither configured is not a panic and not a silent send: the caller
+    /// turns `None` into a per-destination failure.
+    #[test]
+    fn no_template_anywhere_yields_none() {
+        assert!(choose_template(None, None).is_none());
+    }
+
+    /// The retry ledger reads `succeeded`/`failed` by name, so a partial
+    /// delivery must report BOTH lists rather than collapsing to one flag.
+    #[test]
+    fn outcome_separates_delivered_from_failed_destinations() {
+        let outcome = NotificationOutcome {
+            succeeded: vec!["slack".into()],
+            failed: vec!["pagerduty".into()],
+            success_message: " destination slack sent;".into(),
+            error_message: " Error sending notification for destination pagerduty err: boom;"
+                .into(),
+        };
+        assert_eq!(outcome.succeeded, vec!["slack".to_string()]);
+        assert_eq!(outcome.failed, vec!["pagerduty".to_string()]);
+        // A retry must re-send only what failed.
+        assert!(!outcome.failed.contains(&"slack".to_string()));
+    }
+
+    /// `failed` is NOT in destination-declaration order: snapshot resolution
+    /// failures are recorded before send failures. That is safe only because
+    /// the ledger consumes it by MEMBERSHIP (`contains`), never by position —
+    /// this test pins that contract, so a future reader cannot assume the
+    /// order means anything.
+    #[test]
+    fn failed_is_consumed_as_a_membership_set_not_an_ordered_list() {
+        // "b" failed to resolve (recorded first), "a" failed to send.
+        let outcome = NotificationOutcome {
+            succeeded: vec!["c".into()],
+            failed: vec!["b".into(), "a".into()],
+            ..Default::default()
+        };
+        // Declaration order was a, b, c — `failed` does not follow it.
+        assert_ne!(outcome.failed, vec!["a".to_string(), "b".to_string()]);
+        // What the ledger actually relies on: membership, order-independent.
+        for name in ["a", "b"] {
+            assert!(outcome.failed.contains(&name.to_string()));
+        }
+        assert!(!outcome.failed.contains(&"c".to_string()));
+    }
+
+    /// A default outcome is the "nothing attempted" state — no destination is
+    /// reported as delivered, which is what keeps an empty send from marking
+    /// a ledger entry.
+    #[test]
+    fn default_outcome_reports_no_deliveries() {
+        let outcome = NotificationOutcome::default();
+        assert!(outcome.succeeded.is_empty());
+        assert!(outcome.failed.is_empty());
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use arrow_schema::DataType;
     use serde_json::json;
 
     use super::*;
-    use crate::alerts::{Condition, build_expr};
+
+    /// Live proof of the Slack image fallback: posts a payload whose image
+    /// URL Slack's proxy cannot fetch (private IP), expects Slack's
+    /// `400 invalid_attachments`, and asserts the send still succeeds via the
+    /// strip-and-resend path — then that the process-wide flag makes the next
+    /// send pre-strip (no second rejection round trip).
+    ///
+    /// Needs a real webhook: `TEST_SLACK_WEBHOOK=https://hooks.slack.com/...`
+    /// `cargo test -p openobserve-core --lib slack_image_fallback -- --ignored`
+    #[tokio::test]
+    #[ignore]
+    async fn slack_image_fallback_delivers_without_image() {
+        let Ok(webhook) = std::env::var("TEST_SLACK_WEBHOOK") else {
+            panic!("set TEST_SLACK_WEBHOOK to run this live test");
+        };
+        let endpoint = config::meta::destinations::Endpoint {
+            url: webhook,
+            method: config::meta::destinations::HTTPType::POST,
+            ..Default::default()
+        };
+        let msg = json!({
+            "attachments": [
+                {"color": "#2EB67D", "blocks": [
+                    {"type": "section", "text": {"type": "mrkdwn",
+                     "text": "*fallback live test* — this should arrive WITHOUT an image"}}
+                ]},
+                {"color": "#2EB67D", "blocks": [
+                    {"type": "image",
+                     "image_url": "http://10.123.45.67:5082/api/v2/default/alerts/charts/render?d=x&s=y",
+                     "alt_text": "chart"}
+                ]}
+            ]
+        })
+        .to_string();
+
+        let out = send_http_notification(&endpoint, msg.clone())
+            .await
+            .unwrap();
+        assert!(out.contains("chart image stripped"), "got: {out}");
+
+        // Flag is now set — the follow-up send must pre-strip and succeed on
+        // the FIRST post (a rejection would mean pre-strip didn't happen).
+        let out2 = send_http_notification(&endpoint, msg).await.unwrap();
+        assert!(out2.contains("200"), "got: {out2}");
+    }
+    use crate::alerts::{
+        Condition, build_expr,
+        notifications::custom::{
+            check_json_context, check_json_context_with_prefix, extract_limit_with_prefix,
+            extract_rows_limit, extract_spread_rows_limit, format_variable_value, has_spread_rows,
+            is_json_value_position,
+        },
+    };
 
     #[test]
     fn test_format_variable_value() {
@@ -3156,6 +3492,13 @@ mod tests {
             format_variable_value("你好世界セメント한국어atīna👍".to_string()),
             "你好世界セメント한국어atīna👍"
         );
+    }
+
+    #[test]
+    fn test_format_agg_value() {
+        assert_eq!(format_agg_value(Some(42.5)), "42.5");
+        assert_eq!(format_agg_value(Some(100.0)), "100");
+        assert_eq!(format_agg_value(None), "");
     }
 
     #[tokio::test]

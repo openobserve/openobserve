@@ -717,3 +717,8 @@ async function performGlobalIngestionWithFetch() {
 }
 
 module.exports = globalSetup;
+// Named helpers reused by mid-run re-authentication (reauth-alpha1.js). Attaching
+// them as properties keeps the default export the globalSetup function Playwright calls.
+module.exports.performDexLogin = performDexLogin;
+module.exports.switchOrgViaDropdown = switchOrgViaDropdown;
+module.exports.fetchCloudConfig = fetchCloudConfig;

@@ -126,7 +126,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
@@ -134,7 +134,7 @@ export default defineComponent({
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedValue = ref(props.variableItem?.value);
     const currentSearchTerm = ref("");
     const selectRef = ref(null);

@@ -116,7 +116,7 @@ import {
   onBeforeMount,
   defineAsyncComponent,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
@@ -183,14 +183,14 @@ export default defineComponent({
     // This will be used to copy the chart data to the chart renderer component
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const router = useRouter();
     const { showErrorNotification } = useNotifications();
     const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
-      useDashboardPanelData("metrics");
-    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics");
+      useDashboardPanelData("metrics", t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics", t);
     const editMode = ref(false);
     const selectedDate: any = ref({
       valueType: "relative",
@@ -527,7 +527,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;
@@ -598,7 +598,7 @@ export default defineComponent({
         handler: () => {
           // The metrics PromQL editor is Monaco — focus its inner textarea.
           const el = document.querySelector<HTMLElement>(
-            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea, [data-test="dashboard-panel-query-editor"] .cm-editor',
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
           );
           el?.focus();
         },

@@ -87,11 +87,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-xs-circle"
                 icon-left="paid"
-                aria-label="Set AI Credits"
+                :aria-label="t('settings.organizationManagementPage.setAiCredits')"
                 data-test="org-management-set-ai-credits-btn"
                 @click.stop="toggleAiCreditsDialog(row)"
               >
-                <OTooltip content="Set AI Credits" />
+                <OTooltip :content="t('settings.organizationManagementPage.setAiCredits')" />
               </OButton>
               <OButton
                 variant="ghost"
@@ -210,10 +210,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="organization-management-ai-credits-dialog"
       v-model:open="aiCreditsPrompt"
       size="sm"
-      :title="`Set AI Credits for ${aiCreditsDataRow?.name}`"
-      sub-title="Set the organization's lifetime AI credit allowance."
+      :title="t('settings.setAiCreditsFor', { name: aiCreditsDataRow?.name })"
+      :sub-title="t('settings.organizationManagementPage.setAiCreditsSubtitle')"
       :secondary-button-label="t('common.cancel')"
-      primary-button-label="Save Credits"
+      :primary-button-label="t('settings.organizationManagementPage.saveCredits')"
       form-id="org-ai-credits-form"
       @click:secondary="aiCreditsPrompt = false"
     >
@@ -228,11 +228,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="creditsLimit"
             type="number"
             data-test="ai-credits-limit-input"
-            label="Total AI Credits"
+            :label="t('settings.organizationManagementPage.totalAiCredits')"
             required
           />
           <div class="text-text-secondary text-xs">
-            Currently used: {{ formatCredits(aiCreditsDataRow?.credits_used) }} credits
+            {{ t("settings.organizationManagementPage.currentlyUsedLabel") }}
+            {{ formatCredits(aiCreditsDataRow?.credits_used) }}
+            {{ t("settings.organizationManagementPage.credits") }}
           </div>
         </div>
       </OForm>
@@ -296,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 import { ref, onMounted, watch, defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { timestampToTimezoneDate, getImageURL } from "@/utils/zincutils";
 import { useStore } from "vuex";
@@ -343,7 +345,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const { confirm } = useConfirmDialog();
 
@@ -443,7 +445,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_used",
-        header: "AI Credits Used",
+        header: t("settings.organizationManagementPage.aiCreditsUsed"),
         accessorKey: "credits_used",
         sortable: true,
         resizable: true,
@@ -453,7 +455,7 @@ export default defineComponent({
       },
       {
         id: "ai_credits_total",
-        header: "AI Credits Total",
+        header: t("settings.organizationManagementPage.aiCreditsTotal"),
         accessorKey: "credits_limit",
         sortable: true,
         resizable: true,
@@ -590,7 +592,7 @@ export default defineComponent({
       loading.value = true;
       const dismiss = toast({
         variant: "loading",
-        message: "Updating AI credits...",
+        message: t("toastMessages.settings.updatingAiCredits"),
         timeout: 0,
       });
 
@@ -607,7 +609,7 @@ export default defineComponent({
         aiCreditsPrompt.value = false;
         toast({
           variant: "success",
-          message: "AI credits updated successfully.",
+          message: t("toastMessages.settings.aiCreditsUpdatedSuccessfully"),
         });
       } catch (error: any) {
         toast({

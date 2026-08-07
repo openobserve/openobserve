@@ -88,11 +88,11 @@ export class ServicesCatalogPage {
     this.sidePanel = page.locator('[data-test="service-graph-side-panel"]');
 
     // =====================================================================
-    // Service-catalog tab (in traces module)
+    // Navigation — Services is its own route (/traces/services), reached from
+    // the Traces rail tile's hover flyout (no longer a tab on the Traces page)
     // =====================================================================
-    this.servicesCatalogTabBtn = page.locator(
-      '[data-test="traces-search-mode-services-catalog-btn"]',
-    );
+    this.tracesRailTile = page.locator('[data-test="nav-group-traces"]');
+    this.servicesCatalogNavItem = page.locator('[data-test="nav-group-item-servicesCatalog"]');
 
     // =====================================================================
     // Factory locators — runtime-bound (allowed by POM strict policy)
@@ -154,37 +154,22 @@ export class ServicesCatalogPage {
   async navigate(period = '24h') {
     const org = process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['ZO_BASE_URL'] || '').replace(/\/+$/, '');
-    // Use the trailing-slash form `/web/traces/` — without it some dev servers
-    // route the request to the SPA fallback and drop query params before the
-    // Vue router can read them. The trailing-slash form is what Vue Router
-    // canonicalises to and what the index.vue page reads from on mount.
     await this.page.goto(
-      `${baseUrl}/web/traces/?tab=services-catalog&org_identifier=${org}&period=${period}`,
+      `${baseUrl}/web/traces/services?org_identifier=${org}&period=${period}`,
       { timeout: 60000 },
     );
     // Use load instead of networkidle — networkidle hangs on SPAs with websockets
     await this.page.waitForLoadState('load', { timeout: 15000 });
-    // Ensure the services-catalog tab is the active one. If the URL param was
-    // dropped (e.g. due to a router replace during mount), click the tab button
-    // explicitly. This is defensive — keeps the tab activation deterministic.
-    const filterVisible = await this.filterInputField
-      .waitFor({ state: 'attached', timeout: 8000 })
-      .then(() => true)
-      .catch(() => false);
-    if (!filterVisible) {
-      // Fallback: click the services-catalog tab button explicitly.
-      await this.servicesCatalogTabBtn
-        .waitFor({ state: 'visible', timeout: 8000 })
-        .catch(() => {});
-      await this.servicesCatalogTabBtn.click().catch(() => {});
-      await this.filterInputField
-        .waitFor({ state: 'attached', timeout: 15000 })
-        .catch(() => {});
-    }
+    await this.filterInputField
+      .waitFor({ state: 'attached', timeout: 15000 })
+      .catch(() => {});
   }
 
+  /** Navigate to Services via the left-rail flyout (the discovery path a user takes). */
   async clickServiceCatalogTab() {
-    await this.servicesCatalogTabBtn.click();
+    await this.tracesRailTile.hover();
+    await this.servicesCatalogNavItem.click();
+    await this.page.waitForURL(/\/traces\/services/, { timeout: 10000 });
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 

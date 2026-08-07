@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import McpServerCard from "@/components/ingestion/ai/McpServerCard.vue";
@@ -31,7 +31,7 @@ import organizationsService from "@/services/organizations";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import type { CardSubstitutions } from "@/components/ingestion/ai/content/renderMarkdown";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const { endpoint } = useIngestion();
 

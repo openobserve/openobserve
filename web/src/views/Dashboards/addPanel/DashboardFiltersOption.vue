@@ -49,7 +49,7 @@
 <script lang="ts">
 import { defineComponent, ref, computed, inject } from "vue";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { getScopeType } from "@/utils/dashboard/variables/variablesScopeUtils";
 import Group from "./Group.vue";
@@ -71,14 +71,14 @@ export default defineComponent({
     const route = useRoute();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
 
+    const { t } = useI18nTyped();
     const {
       dashboardPanelData,
       removeFilterItem,
       loadFilterItem,
       selectedStreamFieldsBasedOnUserDefinedSchema,
-    } = useDashboardPanelData(dashboardPanelDataPageKey);
+    } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
-    const { t } = useI18n();
     const showAddMenu = ref(false);
 
     const topLevelGroup = computed(() => {

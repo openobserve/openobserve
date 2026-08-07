@@ -194,6 +194,7 @@ impl From<meta_dest::Template> for Template {
             is_prebuilt,
             template_type,
             title,
+            kind: Some(value.kind.to_string()),
         }
     }
 }
@@ -214,6 +215,7 @@ impl Template {
             is_default: self.is_default.unwrap_or_default(),
             template_type,
             body: self.body,
+            kind: meta_dest::TemplateKind::default(),
         }
     }
 }
@@ -358,6 +360,11 @@ pub struct Template {
     pub template_type: DestinationType,
     #[serde(default)]
     pub title: String,
+    /// Template kind: "custom" (default) or "content". Absent on write means
+    /// "unspecified" — create defaults to custom, update preserves the
+    /// stored kind (sticky-kind rule, design §6.2).
+    #[serde(default)]
+    pub kind: Option<String>,
 }
 
 #[cfg(test)]
@@ -420,6 +427,7 @@ mod tests {
                 title: "Alert Title".to_string(),
             },
             body: "body content".to_string(),
+            kind: meta_dest::TemplateKind::default(),
         };
         let t = Template::from(meta);
         assert_eq!(t.name, "my_template");
@@ -437,6 +445,7 @@ mod tests {
             is_default: true,
             template_type: meta_dest::TemplateType::Http,
             body: "{}".to_string(),
+            kind: meta_dest::TemplateKind::default(),
         };
         let t = Template::from(meta);
         assert_eq!(t.template_type, DestinationType::Http);
@@ -453,6 +462,7 @@ mod tests {
             is_default: false,
             template_type: meta_dest::TemplateType::Sns,
             body: "sns body".to_string(),
+            kind: meta_dest::TemplateKind::default(),
         };
         let t = Template::from(meta);
         assert_eq!(t.template_type, DestinationType::Sns);
@@ -469,6 +479,7 @@ mod tests {
             is_prebuilt: false,
             template_type: DestinationType::Http,
             title: String::new(),
+            kind: None,
         };
         let meta = t.into("myorg");
         assert_eq!(meta.org_id, "myorg");
@@ -486,6 +497,7 @@ mod tests {
             is_prebuilt: false,
             template_type: DestinationType::Email,
             title: "My Alert".to_string(),
+            kind: None,
         };
         let meta = t.into("org");
         assert!(meta.is_default);
@@ -504,6 +516,7 @@ mod tests {
             is_prebuilt: false,
             template_type: DestinationType::Sns,
             title: String::new(),
+            kind: None,
         };
         let meta = t.into("org");
         assert!(matches!(meta.template_type, meta_dest::TemplateType::Sns));

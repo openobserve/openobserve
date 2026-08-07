@@ -1,13 +1,13 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const performanceOpen = ref(false);
 

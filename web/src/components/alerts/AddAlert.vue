@@ -75,11 +75,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="(beingUpdated || anomalyEditMode) && isAnomalyMode"
               class="flex items-center gap-1.5"
             >
-              <OTag
-                v-if="anomalyConfig.status"
-                type="anomalyStatus"
-                :value="anomalyConfig.status"
-              />
+              <OTooltip
+                :content="raw(anomalyConfig.last_error)"
+                :disabled="anomalyConfig.status !== 'failed' || !anomalyConfig.last_error"
+              >
+                <OTag
+                  v-if="anomalyConfig.status"
+                  type="anomalyStatus"
+                  :value="anomalyConfig.status"
+                />
+              </OTooltip>
               <span
                 v-if="anomalyConfig.last_detection_run && anomalyConfig.last_detection_run > 0"
                 class="text-2xs text-text-secondary whitespace-nowrap"
@@ -88,16 +93,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   t("alerts.lastRun", { time: anomalyFormatTs(anomalyConfig.last_detection_run) })
                 }}
               </span>
-              <OButton
+              <OTooltip
                 v-if="anomalyConfig.status === 'failed'"
-                variant="ghost-destructive"
-                size="xs"
-                :loading="anomalyRetraining"
-                @click="anomalyTriggerRetrain"
-                icon-left="replay"
+                :content="t('alerts.retryTraining')"
               >
-                {{ t("alerts.retry") }}
-              </OButton>
+                <OButton
+                  variant="ghost-destructive"
+                  size="xs"
+                  :loading="anomalyRetraining"
+                  @click="anomalyTriggerRetrain"
+                  icon-left="replay"
+                >
+                  {{ t("alerts.retry") }}
+                </OButton>
+              </OTooltip>
             </div>
           </template>
 
@@ -524,6 +533,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide } from "vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -722,6 +732,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       ...alertForm,
       alertAutoName,
       headerModeLabel,

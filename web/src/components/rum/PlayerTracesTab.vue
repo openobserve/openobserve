@@ -67,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="xs"
           @click="closeTraceDetail"
           data-test="rum-player-traces-tab-back-btn"
-          aria-label="Back"
+          :aria-label="t('common.back')"
         >
           <OIcon name="arrow-back" size="sm" />
         </OButton>
@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import { rumFieldSql, rumFieldNotNullSql } from "@/utils/rum/fields";
@@ -224,9 +224,9 @@ import TraceStatusCell from "@/plugins/traces/components/TraceStatusCell.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
-const { getStream } = useStreams();
+const { getStream } = useStreams(t);
 
 const props = defineProps({
   sessionId: {
@@ -434,9 +434,30 @@ async function fetchTraces() {
       return;
     }
 
+    // The view-context columns are browser-shaped and are NOT guaranteed on a mobile
+    // `_rumdata` schema. Referencing a column the stream lacks fails the whole query with a
+    // 400, so each optional column is selected only when present (NULL-aliased otherwise)
+    // and the `action_id` filter is applied only when that column exists. `session_id` and
+    // the guarded `trace_id` are the only hard requirements.
+    const presentCols = new Set((rumStream?.schema ?? []).map((field: any) => field?.name));
+    const has = (col: string): boolean => presentCols.has(col);
+    const aggOrNull = (fn: string, col: string, alias: string): string =>
+      has(col) ? `${fn}(${col}) as ${alias}` : `NULL as ${alias}`;
+
+    const selectParts = [
+      aggOrNull("max", "view_id", "_view_id"),
+      aggOrNull("max", "view_url", "_view_url"),
+      aggOrNull("max", "view_loading_type", "_view_loading_type"),
+      `${traceIdExpr} as _trace_id`,
+      aggOrNull("max", "type", "_type"),
+      aggOrNull("min", "date", "_date"),
+    ];
+    const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
+    if (has("action_id")) whereParts.push("action_id is not null");
+
     const rumQuery = {
       query: {
-        sql: `SELECT max(view_id) as _view_id, max(view_url) as _view_url, max(view_loading_type) as _view_loading_type, ${traceIdExpr} as _trace_id, max(type) as _type, min(date) as _date FROM "_rumdata" WHERE session_id='${props.sessionId}' AND ${traceIdSet} AND action_id is not null GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
+        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
         start_time: searchStartTime,
         end_time: searchEndTime,
         from: 0,

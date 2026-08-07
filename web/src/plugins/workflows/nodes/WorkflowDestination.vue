@@ -31,9 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div data-test="workflow-destination-body" class="w-full">
+    <!-- Workflows only support Custom HTTP destinations for now, so lock the inline
+         create form to Custom and skip its type-selection step. -->
     <DestinationPicker
       ref="picker"
       :initial-name="savedData.destination_id || ''"
+      forced-type="custom"
       @expand="(v) => (creating = v)"
     />
   </div>
