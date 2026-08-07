@@ -253,27 +253,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <ODropdown side="bottom" align="start">
-            <template #trigger>
-              <OButton
-                variant="outline"
-                size="sm"
-                icon-left="add"
-                :disabled="!availableConfigs.length"
-                data-test="ai-queues-create-add-config"
-              >
-                {{ t("aiObservability.queues.create.addScoreConfig") }}
-              </OButton>
-            </template>
-            <ODropdownItem
-              v-for="opt in availableConfigs"
-              :key="opt.id"
-              :data-test="`ai-queues-create-config-opt-${opt.id}`"
-              @select="addConfig(opt)"
-            >
-              {{ opt.name }}
-            </ODropdownItem>
-          </ODropdown>
+          <OSelect
+            v-if="availableConfigs.length"
+            :model-value="addConfigModel"
+            :options="availableConfigOptions"
+            label-key="label"
+            value-key="value"
+            multiple
+            :placeholder="t('aiObservability.queues.create.addScoreConfig')"
+            class="w-full"
+            data-test="ai-queues-create-add-config"
+            @update:model-value="onAddConfig"
+          />
+          <span
+            v-else-if="!configOptions.length"
+            class="text-text-secondary text-2xs"
+            data-test="ai-queues-create-no-configs"
+          >
+            {{ t("aiObservability.queues.create.noScoreConfigs") }}
+          </span>
+          <span
+            v-else
+            class="text-text-secondary text-2xs"
+            data-test="ai-queues-create-all-configs-added"
+          >
+            {{ t("aiObservability.queues.create.allScoreConfigsAdded") }}
+          </span>
 
           <span
             v-if="scoreConfigsError"
@@ -434,8 +439,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
-import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
-import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -622,12 +625,28 @@ function setTargetDataset(v: unknown) {
   form.setFieldValue("targetDatasetId", v == null ? "" : String(v));
 }
 
-// Configs not already bound — the "Add Score Config" menu options.
+// Configs not already bound — the "Add Score Config" picker options.
 const availableConfigs = computed(() =>
   configOptions.value.filter(
     (o) => !formValues.value.scoreConfigs.some((c) => c.scoreConfigId === o.id),
   ),
 );
+
+// Searchable multi-select add-picker (mirrors the Scorer form's Score Config
+// select). Tick one or more; each binds and the picker clears back to empty so
+// the bound rows below stay the source of truth (no duplicate chips).
+const addConfigModel = ref<string[]>([]);
+const availableConfigOptions = computed(() =>
+  availableConfigs.value.map((o) => ({ label: o.name, value: o.id })),
+);
+function onAddConfig(v: unknown) {
+  const ids = Array.isArray(v) ? v.map(String) : v == null ? [] : [String(v)];
+  ids.forEach((id) => {
+    const opt = availableConfigs.value.find((o) => o.id === id);
+    if (opt) addConfig(opt);
+  });
+  addConfigModel.value = [];
+}
 
 // Conditions can only route on the Score Configs the queue actually scores on,
 // so the dropdown is the bound set — not the whole catalog.
