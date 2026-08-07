@@ -64,19 +64,12 @@ async fn get_bucket_by_key<'a>(
     key: &'a str,
 ) -> Result<(jetstream::kv::Store, &'a str)> {
     let cfg = get_config();
-    let key = key.trim_start_matches('/');
-    let bucket_name = key.split('/').next().unwrap();
-    let full_bucket_name = format!("{prefix}{bucket_name}");
-
-    // return a cached handle without any server round trip
-    if let Some(kv) = BUCKET_CACHE.read().await.get(&full_bucket_name).cloned() {
-        return Ok((kv, key.trim_start_matches(bucket_name)));
-    }
-
     let client = get_nats_client().await.clone();
     let jetstream = jetstream::new(client);
+    let key = key.trim_start_matches('/');
+    let bucket_name = key.split('/').next().unwrap();
     let mut bucket = jetstream::kv::Config {
-        bucket: full_bucket_name.clone(),
+        bucket: format!("{prefix}{bucket_name}"),
         num_replicas: cfg.nats.replicas,
         history: cfg.nats.history,
         ..Default::default()
@@ -93,6 +86,7 @@ async fn get_bucket_by_key<'a>(
 
     // STREAM.INFO is served by asset leader, 
     // but STREAM.CREATE is routed to JetStream meta leader.
+    let full_bucket_name = bucket.bucket.clone();
     let kv = match jetstream.get_key_value(&full_bucket_name).await {
         Ok(kv) => kv,
         Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
@@ -101,12 +95,6 @@ async fn get_bucket_by_key<'a>(
             ))
         })?,
     };
-
-    // cache the kv store handle for future use.
-    BUCKET_CACHE
-        .write()
-        .await
-        .insert(full_bucket_name, kv.clone());
 
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
