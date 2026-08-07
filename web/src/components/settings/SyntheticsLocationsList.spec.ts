@@ -37,7 +37,10 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true" },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which pulls other
+// zincutils exports — a wholesale mock leaves them undefined at import time.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((path: string) => path),
 }));
 

@@ -41,7 +41,10 @@ vi.mock("vue-router", () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       selectedOrganization: { identifier: "test-org" },
@@ -53,7 +56,9 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true" },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+// Partial for the same reason: `@/stores` pulls other zincutils exports.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((url: string) => url),
 }));
 
