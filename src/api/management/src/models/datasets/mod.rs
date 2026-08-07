@@ -11,6 +11,8 @@
 //! provenance it legitimately owns:
 //!
 //! - `POST /{org_id}/datasets/{dataset_id}/items` for manual or direct trace/span entry.
+//! - `GET /{org_id}/datasets/{dataset_id}/items/{item_id}` for the complete immutable version
+//!   history of one logical Dataset Item.
 //! - `POST /{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/push_to_dataset` for
 //!   explicit queue adjudication; the caller selects the target Dataset while telemetry input is
 //!   resolved server-side from the Queue Item.
@@ -34,6 +36,8 @@ use utoipa::{IntoParams, ToSchema};
 pub struct CreateDatasetRequestBody {
     pub name: String,
     pub description: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, ToSchema)]
@@ -41,6 +45,8 @@ pub struct CreateDatasetRequestBody {
 pub struct UpdateDatasetRequestBody {
     pub name: String,
     pub description: Option<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
@@ -50,6 +56,7 @@ pub struct DatasetResponseBody {
     pub org_id: String,
     pub name: String,
     pub description: Option<String>,
+    pub tags: Vec<String>,
     pub global_version: i64,
     pub created_by: String,
     pub created_at: i64,
@@ -190,6 +197,12 @@ pub struct DatasetItemResponseBody {
 
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
+pub struct DatasetItemVersionsResponseBody {
+    pub list: Vec<DatasetItemResponseBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ListDatasetItemsResponseBody {
     pub list: Vec<DatasetItemResponseBody>,
     pub total: u64,
@@ -219,6 +232,7 @@ impl From<CreateDatasetRequestBody> for CreateDataset {
         Self {
             name: value.name,
             description: value.description,
+            tags: value.tags,
         }
     }
 }
@@ -228,6 +242,7 @@ impl From<UpdateDatasetRequestBody> for UpdateDataset {
         Self {
             name: value.name,
             description: value.description,
+            tags: value.tags,
         }
     }
 }
@@ -239,6 +254,7 @@ impl From<Dataset> for DatasetResponseBody {
             org_id: value.org_id,
             name: value.name,
             description: value.description,
+            tags: value.tags,
             global_version: value.global_version,
             created_by: value.created_by,
             created_at: value.created_at,
@@ -360,6 +376,17 @@ impl From<DatasetItem> for DatasetItemResponseBody {
     }
 }
 
+impl From<Vec<DatasetItem>> for DatasetItemVersionsResponseBody {
+    fn from(value: Vec<DatasetItem>) -> Self {
+        Self {
+            list: value
+                .into_iter()
+                .map(DatasetItemResponseBody::from)
+                .collect(),
+        }
+    }
+}
+
 impl From<DatasetItemPage> for ListDatasetItemsResponseBody {
     fn from(value: DatasetItemPage) -> Self {
         Self {
@@ -388,6 +415,26 @@ impl From<PushDatasetItemResult> for PushDatasetItemResponseBody {
 #[cfg(test)]
 mod dataset_item_contract_tests {
     use super::*;
+
+    #[test]
+    fn dataset_metadata_accepts_tags_and_defaults_them_when_omitted() {
+        let create: CreateDatasetRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Golden set",
+            "description": "Regression cases",
+            "tags": ["production", "rag"]
+        }))
+        .unwrap();
+        let command: CreateDataset = create.into();
+        assert_eq!(command.tags, ["production", "rag"]);
+
+        let update: UpdateDatasetRequestBody = serde_json::from_value(serde_json::json!({
+            "name": "Golden set",
+            "description": null
+        }))
+        .unwrap();
+        let command: UpdateDataset = update.into();
+        assert!(command.tags.is_empty());
+    }
 
     #[test]
     fn list_query_defaults_to_live_current_items() {
