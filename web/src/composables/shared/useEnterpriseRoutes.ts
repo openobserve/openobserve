@@ -46,6 +46,23 @@ const workflowsRouteGuard = (to: any, from: any, next: any) => {
   routeGuard(to, from, next);
 };
 
+// On-call routes are gated on the backend /config flag `oncall_enabled`
+// (enterprise O2_ONCALL_ENABLED). Same `=== false` stance as synthetics above:
+// the flag is briefly undefined on a cold load, and bouncing a bookmarked page
+// home on "not yet known" is worse than a moment of empty state.
+const oncallRouteGuard = (to: any, from: any, next: any) => {
+  if (store.state.zoConfig?.oncall_enabled === false) {
+    next("/");
+    return;
+  }
+  routeGuard(to, from, next);
+};
+
+const OnCallTeams = () => import("@/views/OnCall/OnCallTeams.vue");
+const OnCallTeamDetail = () => import("@/views/OnCall/OnCallTeamDetail.vue");
+const OnCallResponses = () => import("@/views/OnCall/OnCallResponses.vue");
+const OnCallResponseDetail = () => import("@/views/OnCall/OnCallResponseDetail.vue");
+
 const IdentityAccessManagement = () => import("@/views/IdentityAccessManagement.vue");
 
 const AppGroups = () => import("@/components/iam/groups/AppGroups.vue");
@@ -173,6 +190,45 @@ const useEnterpriseRoutes = () => {
         routeGuard(to, from, next);
       },
     });
+
+    routes.push(
+      {
+        path: "oncall/teams",
+        name: "onCallTeams",
+        component: OnCallTeams,
+        meta: { title: "On-Call Teams" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/teams/:teamId",
+        name: "onCallTeamDetail",
+        component: OnCallTeamDetail,
+        meta: { title: "On-Call Team" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/responses",
+        name: "onCallResponses",
+        component: OnCallResponses,
+        meta: { title: "On-Call Pages" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+      {
+        path: "oncall/responses/:responseId",
+        name: "onCallResponseDetail",
+        component: OnCallResponseDetail,
+        meta: { title: "On-Call Page" },
+        beforeEnter(to: any, from: any, next: any) {
+          oncallRouteGuard(to, from, next);
+        },
+      },
+    );
 
     routes.push({
       path: "synthetics",
