@@ -166,18 +166,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTable>
     </div>
 
-    <ODialog
+    <ODrawer
       v-model:open="createOpen"
-      :title="editingId ? t('aiObservability.datasets.editTitle') : t('aiObservability.datasets.create.title')"
+      side="right"
+      size="lg"
+      :title="
+        editingId
+          ? t('aiObservability.datasets.editTitle')
+          : t('aiObservability.datasets.create.title')
+      "
       form-id="new-dataset-form"
       :primary-button-label="t('common.save')"
       :secondary-button-label="t('common.cancel')"
       :primary-button-loading="isSubmitting"
-      data-test="ai-datasets-create-dialog"
+      data-test="ai-datasets-create-drawer"
       @click:secondary="createOpen = false"
     >
       <OForm id="new-dataset-form" :form="form">
-        <div class="flex flex-col gap-4 p-1">
+        <div class="flex flex-col gap-4">
           <OFormInput
             name="name"
             :label="t('aiObservability.datasets.create.nameLabel')"
@@ -218,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </OForm>
-    </ODialog>
+    </ODrawer>
   </OPageLayout>
 </template>
 
@@ -235,13 +241,13 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormTagInput from "@/lib/forms/TagInput/OFormTagInput.vue";
-import { makeDatasetFormSchema, type DatasetForm } from "./DatasetForm.schema";
+import { datasetFormDefaults, makeDatasetFormSchema, type DatasetForm } from "./DatasetForm.schema";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -362,22 +368,25 @@ async function refresh() {
   }
 }
 
-// ── Create / Edit dialog (useOForm + Zod — mirrors ScoreConfigDialog) ──
-// One dialog serves both: `editingId` (null = create) decides the mode. Every
+// ── Create / Edit drawer (useOForm + Zod — same shell as the Queues create drawer) ──
+// One drawer serves both: `editingId` (null = create) decides the mode. Every
 // field is a name-bound OForm* input, so no setFieldValue bridge is needed.
 const createOpen = ref(false);
 const editingId = ref<string | null>(null);
 
 const form = useOForm<DatasetForm>({
-  defaultValues: { name: "", description: "", tags: [] },
+  defaultValues: datasetFormDefaults(),
   schema: makeDatasetFormSchema(t),
   onSubmit: save,
 });
 const isSubmitting = form.useStore((s: any) => s.isSubmitting as boolean);
 
+// Reset with EXPLICIT blank values, never a bare reset(): openEdit's
+// `reset(row)` overwrites the form's stored defaultValues, so a bare reset()
+// after an edit would reopen the drawer pre-filled with that row.
 function openCreate() {
   editingId.value = null;
-  form.reset();
+  form.reset(datasetFormDefaults());
   createOpen.value = true;
 }
 

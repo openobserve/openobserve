@@ -40,11 +40,11 @@ export interface LlmQueue {
   name: string;
   description: string | null;
   targetDatasetId: string | null;
-  /** Resolved by the queue list API. */
+  /** Resolved by the queue list API — no Dataset catalog fetch needed. */
   targetDatasetName: string | null;
   allowedRefTypes: string[];
   scoreConfigs: LlmQueueBinding[];
-  /** Aggregated by the queue list API from non-archived Queue Items. */
+  /** Review progress, aggregated by the list API over non-archived Queue Items. */
   reviewedCount: number;
   totalCount: number;
   createdBy?: string;
@@ -139,6 +139,22 @@ export interface LlmQueueReviewResult {
   annotatedAt: number;
 }
 
+/** Distill payload. `input` is NOT sent — the server hydrates it from the item's
+ *  telemetry reference; the human only supplies the golden answer. */
+export interface LlmDistillPayload {
+  datasetId: string;
+  /** The N/N review submission used as adjudication evidence. */
+  reviewSubmissionId: string;
+  expectedOutput: string;
+  tags?: string[];
+}
+
+export interface LlmDistillResult {
+  /** False when the item was already distilled into this dataset (idempotent). */
+  created: boolean;
+  datasetItemId: string;
+}
+
 /** Create payload. Only fields accepted by the backend are represented. */
 export interface LlmQueuePayload {
   name: string;
@@ -197,8 +213,8 @@ function normalizeQueue(q: any): LlmQueue {
           latestVersion: binding.latest_version ?? binding.latestVersion,
         }))
       : [],
-    reviewedCount: q.reviewed_count ?? q.reviewedCount ?? 0,
-    totalCount: q.total_count ?? q.totalCount ?? 0,
+    reviewedCount: Number(q.reviewed_count ?? q.reviewedCount ?? 0),
+    totalCount: Number(q.total_count ?? q.totalCount ?? 0),
     createdBy: q.created_by ?? q.createdBy,
     createdAt: q.created_at ?? q.createdAt,
     updatedBy: q.updated_by ?? q.updatedBy,
@@ -383,6 +399,34 @@ const llmQueuesService = {
       payload,
     );
     return res.data;
+  },
+
+  /**
+   * Distill a REVIEWED queue item into a dataset. The backend refuses anything
+   * else: the item must be `reviewed` and un-archived, the submission id must
+   * belong to it, and session-scope items are rejected outright (only a
+   * trace/span reference can be hydrated back into a golden input).
+   */
+  async pushToDataset(
+    orgId: string,
+    queueId: string,
+    queueItemId: string,
+    payload: LlmDistillPayload,
+  ): Promise<LlmDistillResult> {
+    const res = await http().post(
+      `${base(orgId)}/${queueId}/items/${queueItemId}/push_to_dataset`,
+      {
+        datasetId: payload.datasetId,
+        reviewSubmissionId: payload.reviewSubmissionId,
+        expectedOutput: payload.expectedOutput,
+        tags: payload.tags ?? [],
+      },
+    );
+    const item = res.data?.item ?? {};
+    return {
+      created: res.data?.created === true,
+      datasetItemId: item.logicalId ?? item.logical_id ?? "",
+    };
   },
 
   async create(orgId: string, payload: LlmQueuePayload): Promise<LlmQueue> {
