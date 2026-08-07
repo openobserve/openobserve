@@ -19,11 +19,11 @@ use openobserve_core::{
 use crate::{
     common::meta::{authz::Authz, http::HttpResponse as MetaHttpResponse},
     models::datasets::{
-        CreateDatasetRequestBody, DatasetItemResponseBody, DatasetResponseBody,
-        ImportDatasetItemsResponseBody, ListDatasetItemsQuery, ListDatasetItemsResponseBody,
-        ListDatasetsResponseBody, PushAnnotationQueueItemToDatasetRequestBody,
-        PushDatasetItemRequestBody, PushDatasetItemResponseBody, UpdateDatasetItemRequestBody,
-        UpdateDatasetRequestBody,
+        CreateDatasetRequestBody, DatasetItemResponseBody, DatasetItemVersionsResponseBody,
+        DatasetResponseBody, ImportDatasetItemsResponseBody, ListDatasetItemsQuery,
+        ListDatasetItemsResponseBody, ListDatasetsResponseBody,
+        PushAnnotationQueueItemToDatasetRequestBody, PushDatasetItemRequestBody,
+        PushDatasetItemResponseBody, UpdateDatasetItemRequestBody, UpdateDatasetRequestBody,
     },
     request::annotation_queues::ensure_annotation_queue_score_configs_visible,
 };
@@ -299,6 +299,36 @@ pub async fn push_dataset_item(
 ) -> Response {
     match datasets::push_item(&org_id, &dataset_id, &user.user_id, body.into()).await {
         Ok(result) => MetaHttpResponse::json(PushDatasetItemResponseBody::from(result)),
+        Err(err) => dataset_error_response(err),
+    }
+}
+
+/// GetDatasetItemVersions
+#[utoipa::path(
+    get,
+    path = "/{org_id}/datasets/{dataset_id}/items/{item_id}",
+    context_path = "/api",
+    tag = "Datasets",
+    operation_id = "GetDatasetItemVersions",
+    summary = "Get every version of a Dataset Item",
+    description = "Returns every immutable row for one logical Dataset Item in ascending Dataset global-version order, including its tombstone when deleted.",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("dataset_id" = String, Path, description = "Dataset ID"),
+        ("item_id" = String, Path, description = "Logical Dataset Item ID"),
+    ),
+    responses(
+        (status = 200, body = inline(DatasetItemVersionsResponseBody)),
+        (status = 404, description = "Dataset or Dataset Item not found", body = ()),
+    ),
+    extensions(("x-o2-ratelimit" = json!({"module": "Datasets", "operation": "get"}))),
+)]
+pub async fn get_dataset_item_versions(
+    Path((org_id, dataset_id, item_id)): Path<(String, String, String)>,
+) -> Response {
+    match datasets::get_item_versions(&org_id, &dataset_id, &item_id).await {
+        Ok(items) => MetaHttpResponse::json(DatasetItemVersionsResponseBody::from(items)),
         Err(err) => dataset_error_response(err),
     }
 }

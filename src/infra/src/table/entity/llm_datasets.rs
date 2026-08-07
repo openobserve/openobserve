@@ -16,6 +16,7 @@ pub struct Model {
     pub org_id: String,
     pub name: String,
     pub description: Option<String>,
+    pub tags: Option<Json>,
     pub global_version: i64,
     pub created_by: String,
     pub created_at: i64,

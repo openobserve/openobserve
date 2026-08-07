@@ -64,6 +64,7 @@ async fn apply_put(dataset: datasets::Model, items: Vec<dataset_items::Model>) -
             if update_metadata && dataset.updated_at >= current.updated_at {
                 active.name = Set(dataset.name.clone());
                 active.description = Set(dataset.description.clone());
+                active.tags = Set(dataset.tags.clone());
                 active.updated_by = Set(dataset.updated_by.clone());
                 active.updated_at = Set(dataset.updated_at);
             }
