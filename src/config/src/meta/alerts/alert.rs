@@ -129,6 +129,14 @@ pub struct Alert {
     /// they did before Feature 2 (G5).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
+
+    /// On-call team this alert pages, overriding ownership discovery.
+    ///
+    /// `None` means "work it out from the identity dimensions", which is the
+    /// normal case — an explicit value is for the alert whose owner the
+    /// dimensions cannot express.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oncall_team: Option<String>,
 }
 
 impl MemorySize for Alert {
@@ -166,6 +174,7 @@ impl PartialEq for Alert {
 impl Default for Alert {
     fn default() -> Self {
         Self {
+            oncall_team: None,
             id: None,
             name: "".to_string(),
             org_id: "".to_string(),

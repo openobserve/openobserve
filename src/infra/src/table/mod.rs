@@ -45,6 +45,7 @@ pub mod incident_integrations;
 pub mod kv_store;
 mod migration;
 pub mod model_pricing;
+pub mod oncall_ownership;
 pub mod oncall_policies;
 pub mod oncall_responses;
 pub mod oncall_schedules;

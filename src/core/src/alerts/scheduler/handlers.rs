@@ -1817,6 +1817,43 @@ async fn handle_alert_triggers(
         //     );
         // }
 
+        // On-call paging is ADDITIVE to destination notification, not an
+        // alternative to it: a destination tells a channel, a page wakes a
+        // person. It therefore runs regardless of whether incidents handle the
+        // notification below, and a failure here must never fail the alert —
+        // the destinations still have to go out.
+        #[cfg(feature = "enterprise")]
+        if o2_enterprise::enterprise::oncall::is_enabled()
+            && let Some(first_row) = data.first()
+            && let Some(alert_id) = alert.id.as_ref()
+        {
+            let semantic_groups =
+                crate::db::system_settings::get_semantic_field_groups(&alert.org_id).await;
+            let dimensions = o2_enterprise::enterprise::oncall::routing::dimensions_of_row(
+                &semantic_groups,
+                first_row,
+            );
+            let priority = alert
+                .priority
+                .unwrap_or(config::meta::alerts::priority::AlertPriority::P3);
+            if let Err(e) = o2_enterprise::enterprise::oncall::escalation::start_for_alert(
+                &alert.org_id,
+                &alert_id.to_string(),
+                &alert.name,
+                priority,
+                alert.oncall_team.as_deref(),
+                &dimensions,
+            )
+            .await
+            {
+                log::error!(
+                    "[SCHEDULER trace_id {scheduler_trace_id}] on-call paging failed for {}/{}: {e}",
+                    alert.org_id,
+                    alert.name
+                );
+            }
+        }
+
         // True when incident correlation ran and handled the notification internally
         // (either sent it for a new incident/alert type, or suppressed it for a repeat).
         // When false, the direct send_notification() call below fires instead.

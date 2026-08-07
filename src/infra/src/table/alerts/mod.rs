@@ -209,6 +209,7 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .tags
             .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
             .unwrap_or_default();
+        alert.oncall_team = value.oncall_team;
 
         Ok(alert)
     }
@@ -869,6 +870,7 @@ fn update_mutable_fields(
     alert_am.query_promql_multi_alert = Set(promql_multi_alert.then_some(true));
     alert_am.query_slo_condition = Set(query_slo_condition);
     alert_am.slo_id = Set(slo_id);
+    alert_am.oncall_team = Set(alert.oncall_team.clone());
     alert_am.query_vrl_function = Set(query_vrl_function);
     alert_am.query_search_event_type = Set(query_search_event_type);
     alert_am.query_multi_time_range = Set(query_multi_time_range);
@@ -964,6 +966,7 @@ mod tests {
             priority: None,
             tags: None,
             slo_id: None,
+            oncall_team: None,
             query_slo_condition: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,

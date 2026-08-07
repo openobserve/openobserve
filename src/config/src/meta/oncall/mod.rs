@@ -28,6 +28,7 @@ pub mod level;
 pub mod policy;
 pub mod response;
 pub mod rotation;
+pub mod routing;
 pub mod subject;
 pub mod team;
 
@@ -40,5 +41,6 @@ pub use rotation::{
     MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_MINUTE, MICROS_PER_WEEK, OnCallSlot, Rotation,
     RotationError, resolve_level, resolve_on_call,
 };
+pub use routing::{OwnershipError, OwnershipRule, RoutingDecision, resolve_owner, route};
 pub use subject::{SubjectError, SubjectRef, SubjectType};
 pub use team::{Schedule, Team, TeamError, TeamMember};

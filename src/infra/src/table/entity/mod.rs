@@ -27,6 +27,7 @@ pub mod incident_integration_senders;
 pub mod incident_integrations;
 pub mod kv_store;
 pub mod model_pricing;
+pub mod oncall_ownership_rules;
 pub mod oncall_policies;
 pub mod oncall_response_events;
 pub mod oncall_responses;
