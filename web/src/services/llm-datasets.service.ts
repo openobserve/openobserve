@@ -38,7 +38,7 @@ export interface LlmDataset {
   globalVersion: number;
   /** Count of live (non-deleted) items. Derived server-side; 0 until wired. */
   itemCount: number;
-  /** Free-form labels. Aggregated from the items' `tags` JSON (TODO(BE)). */
+  /** User-authored labels stored on the Dataset itself. */
   tags: string[];
   /** Live-item counts by origin. Aggregated from `source` (TODO(BE)). */
   sources: LlmDatasetSourceCounts;
@@ -61,7 +61,10 @@ export type LlmDatasetItemSource = "trace" | "annotation" | "manual";
 /** One golden item (input → expected_output), normalized. MVCC: editing an
  *  item's expected_output appends a new version rather than mutating in place. */
 export interface LlmDatasetItem {
+  /** Stable logical identity shared by every immutable version. */
   id: string;
+  /** Physical identity of this specific immutable version. */
+  rowId?: string;
   datasetId: string;
   /** Sanitized input (model_name/tokens/logprobs stripped) — "purified". */
   input: string;
@@ -69,8 +72,9 @@ export interface LlmDatasetItem {
   expectedOutput: string;
   source: LlmDatasetItemSource;
   tags: string[];
-  /** Per-item MVCC version — bumped when expected_output is edited. */
+  /** Dataset-global MVCC version assigned to this immutable item row. */
   version: number;
+  isDeleted?: boolean;
   /** Lineage pointer to the review/trace this golden was distilled from. */
   distilledFrom?: string | null;
   updatedAt?: number;
@@ -111,14 +115,16 @@ function normalize(d: any): LlmDataset {
 /** Fold an API item row into the normalized shape. */
 function normalizeItem(d: any): LlmDatasetItem {
   return {
-    id: d.id,
+    id: d.logical_id ?? d.logicalId ?? d.id,
+    rowId: d.row_id ?? d.rowId,
     datasetId: d.dataset_id ?? d.datasetId,
     input: d.input ?? "",
     expectedOutput: d.expected_output ?? d.expectedOutput ?? "",
     source: (d.source ?? "manual") as LlmDatasetItemSource,
     tags: Array.isArray(d.tags) ? d.tags : [],
-    version: d.version ?? 1,
-    distilledFrom: d.distilled_from ?? d.distilledFrom ?? null,
+    version: d.global_version ?? d.globalVersion ?? d.version ?? 1,
+    isDeleted: d.is_deleted ?? d.isDeleted ?? false,
+    distilledFrom: d.source_ref ?? d.sourceRef ?? d.distilled_from ?? d.distilledFrom ?? null,
     updatedAt: d.updated_at ?? d.updatedAt,
   };
 }
@@ -220,7 +226,7 @@ const withLatency = <T>(value: T): Promise<T> =>
 
 const llmDatasetsService = {
   // Dataset-level CRUD is bound to the real API. The response has no
-  // itemCount/tags/sources — normalize() defaults them (TODO(BE): aggregate).
+  // itemCount/sources yet, so normalize() defaults those aggregates.
   async list(orgId: string): Promise<LlmDataset[]> {
     const res = await http().get(base(orgId));
     const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
@@ -240,13 +246,21 @@ const llmDatasetsService = {
     return withLatency(items.map(normalizeItem));
   },
 
-  // Create/Update accept only { name, description } — the backend rejects extra
-  // fields (deny_unknown_fields). Dataset-level tags aren't in the API (tags are
-  // per-item), so they're dropped here (TODO(BE)).
+  async getItemVersions(
+    orgId: string,
+    datasetId: string,
+    itemId: string,
+  ): Promise<LlmDatasetItem[]> {
+    const res = await http().get(`${base(orgId)}/${datasetId}/items/${itemId}`);
+    const rows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    return rows.map(normalizeItem);
+  },
+
   async update(orgId: string, id: string, payload: LlmDatasetPayload): Promise<LlmDataset> {
     const res = await http().put(`${base(orgId)}/${id}`, {
       name: payload.name,
       description: payload.description ?? null,
+      tags: payload.tags ?? [],
     });
     return normalize(res.data);
   },
@@ -308,6 +322,7 @@ const llmDatasetsService = {
     const res = await http().post(base(orgId), {
       name: payload.name,
       description: payload.description ?? null,
+      tags: payload.tags ?? [],
     });
     return normalize(res.data);
   },
