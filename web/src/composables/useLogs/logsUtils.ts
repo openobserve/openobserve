@@ -362,7 +362,12 @@ export const logsUtils = () => {
    */
   const getColumnWidth = (context: any, field: string) => {
     // Font of table header — must match what actually renders, or the measured
-    // width is wrong and cells truncate/overflow.
+    // width is wrong and cells truncate/overflow. Rem, not px: this text is
+    // painted by the DOM (SearchResult.vue sets log cells to var(--text-xs) /
+    // var(--font-mono)), so it scales with the root font-size and the
+    // measurement has to scale with it. The px exemptions on the dashboard's
+    // canvas measurements are the opposite case — those measure text ECharts
+    // paints at a fixed numeric fontSize.
     context.font = canvasFont("0.875rem", "sans", "bold");
     let max = context.measureText(field).width + 16;
 

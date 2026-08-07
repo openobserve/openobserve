@@ -123,7 +123,7 @@ export const calculateBottomLegendHeight = (
   let rowX = 0;
   for (const series of seriesData.length ? seriesData : Array(legendCount).fill({ name: "" })) {
     const name = (series.name || series.seriesName || "").toString();
-    // eslint-disable-next-line local/no-hardcoded-px -- detached canvas resolves rem against the 16px default, not the document root, so rem would measure wrong
+    // eslint-disable-next-line local/no-hardcoded-px -- must match the fixed numeric fontSize ECharts paints legend text at; ECharts numeric sizes are literal CSS px and never scale with the root, so rem here would over-reserve rows
     const textWidth = Math.min(calculateWidthText(name, "12px"), MAX_TEXT_WIDTH);
     const itemWidth = LEGEND_ICON_WIDTH + LEGEND_ICON_MARGIN + textWidth + LEGEND_ITEM_GAP;
     if (rowX > 0 && rowX + itemWidth > availableWidth) {
