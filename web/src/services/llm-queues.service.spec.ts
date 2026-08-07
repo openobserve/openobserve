@@ -30,7 +30,10 @@ describe("llmQueuesService queue and item contracts", () => {
             name: "Safety",
             description: null,
             targetDatasetId: "dataset-1",
+            targetDatasetName: "Golden answers",
             allowedRefTypes: ["trace"],
+            reviewedCount: 3,
+            totalCount: 8,
             scoreConfigs: [
               {
                 rowId: "score-row-v2",
@@ -53,8 +56,9 @@ describe("llmQueuesService queue and item contracts", () => {
     expect(queues[0]).toMatchObject({
       id: "queue-1",
       targetDatasetId: "dataset-1",
-      reviewedCount: 0,
-      totalCount: 0,
+      targetDatasetName: "Golden answers",
+      reviewedCount: 3,
+      totalCount: 8,
       scoreConfigs: [
         {
           rowId: "score-row-v2",
