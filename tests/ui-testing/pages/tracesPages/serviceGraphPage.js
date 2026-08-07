@@ -59,7 +59,19 @@ export class ServiceGraphPage {
     this.metricsTab = '[data-test="service-graph-node-panel-tab-metrics"]';
     this.metricsPanel = '[data-test="service-graph-side-panel-metrics"]';
     this.metricsLoadingIndicator = '[data-test="service-graph-side-panel-metrics-loading"]';
-    this.metricsDashboard = '[data-test="service-graph-side-panel-metrics-dashboard"]';
+    // The metrics-tab CONTENT is what we wait on — NOT the panel wrapper. Two hooks that look
+    // usable are not:
+    //   • service-graph-side-panel-metrics is on an OTabPanel whose data-test is swallowed by
+    //     <Transition>, so it never reaches the DOM;
+    //   • service-graph-side-panel-metrics-dashboard is passed to <TelemetryCorrelationDashboard>,
+    //     which has multiple top-level roots (a Vue FRAGMENT) so Vue 3 drops the fallthrough attr.
+    // The reliable, currently-shipping "correlation view rendered" signal is the correlation event
+    // header (renders whenever the metrics tab resolves to a correlation object, with or without
+    // metric streams — this env seeds only traces, so zero-stream is the common case).
+    this.metricsCorrelationHeader = '[data-test^="correlation-event-header-"]';
+    // "Rendered WITH metric data" = real per-metric-stream rows (data-dependent; used only for the
+    // happy-path assertion, never required for the tab to count as resolved).
+    this.metricsStreamItem = '[data-test="telemetry-correlation-metric-stream-item"]';
     this.metricsError = '[data-test="service-graph-side-panel-metrics-error"]';
     this.metricsEmpty = '[data-test="service-graph-side-panel-metrics-empty"]';
 
@@ -400,26 +412,34 @@ export class ServiceGraphPage {
   // ===== TELEMETRY CORRELATION =====
 
   /**
-   * Click the Metrics tab in the side panel and wait for correlation data to load.
-   * Returns true if metrics dashboard rendered, false if error/empty state shown.
+   * Click the Metrics tab in the side panel and wait for the correlation view to RESOLVE.
+   * Deploy-independent: gates only on real, currently-shipping elements (the metrics panel and its
+   * loading spinner) — NOT on the dashboard's data-test, which the fragment-root component drops
+   * (see this.metricsStreamItem). Throws if the panel never renders (a genuinely broken tab).
+   * @returns {Promise<boolean>} true if real metric-stream rows rendered (data present); false for
+   *   a resolved-but-streamless view (zero-stream dashboard / empty / error) — all acceptable.
    */
   async clickMetricsTabAndWait() {
     await this.page.locator(this.metricsTab).click();
 
-    // Wait for loading spinner to appear and disappear
-    const panel = this.page.locator(this.metricsPanel);
-    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-    await panel.locator(this.metricsLoadingIndicator).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
+    // Wait until the metrics tab RESOLVES into a rendered content state — the correlation view
+    // (header) OR a terminal empty/error state. We race real content elements (never the swallowed
+    // panel wrapper); if none appears within the window the race rejects and the caller fails,
+    // which is the correct outcome for a genuinely broken/hung tab.
+    await Promise.race([
+      this.page.locator(this.metricsCorrelationHeader).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsError).first().waitFor({ state: 'visible', timeout: 30000 }),
+      this.page.locator(this.metricsEmpty).first().waitFor({ state: 'visible', timeout: 30000 }),
+    ]);
 
-    // Check if the metrics dashboard rendered
-    return await this.page.locator(this.metricsDashboard)
-      .waitFor({ state: 'visible', timeout: 5000 })
-      .then(() => true)
-      .catch(() => false);
+    // Report whether real metric-stream rows rendered (.first() — the selector matches every row,
+    // so an unscoped locator would trip Playwright strict mode).
+    return await this.page.locator(this.metricsStreamItem).first()
+      .isVisible({ timeout: 2000 }).catch(() => false);
   }
 
-  async expectMetricsDashboardVisible() {
-    await expect(this.page.locator(this.metricsDashboard)).toBeVisible({ timeout: 5000 });
+  async expectMetricsStreamsVisible() {
+    await expect(this.page.locator(this.metricsStreamItem).first()).toBeVisible({ timeout: 8000 });
   }
 
   async isMetricsErrorVisible() {
