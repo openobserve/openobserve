@@ -1,0 +1,12 @@
+web/src/components/dashboards/OverrideConfigPopup.vue
+web/src/components/dashboards/PanelEditor/PanelEditor.vue
+web/src/components/dashboards/PanelSchemaRenderer.vue
+web/src/components/dashboards/addPanel/ConfigPanel.spec.ts
+web/src/components/dashboards/addPanel/ConfigPanel.vue
+web/src/components/dashboards/addPanel/OverrideConfig.spec.ts
+web/src/components/dashboards/addPanel/OverrideConfig.vue
+web/src/components/dashboards/panels/TableRenderer.vue
+web/src/lib/core/Table/OTable.types.ts
+web/src/lib/core/Table/OTable.vue
+web/src/lib/core/Table/sub-components/OTableHeader.vue
+web/src/locales/languages/en-US.json

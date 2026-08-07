@@ -1,0 +1,22 @@
+[
+  {
+    "title": "header format icon: clicking the tune icon opens the Column Formatting dialog with that field pre-selected",
+    "action": "append",
+    "verifies": "clicking the format (tune) icon in a table column header opens the Column Formatting dialog with the clicked column pre-selected and center controls rendered"
+  },
+  {
+    "title": "cancel discards unsaved override changes: re-opening dialog shows empty state",
+    "action": "append",
+    "verifies": "making formatting changes and clicking Cancel closes the dialog without persisting; re-opening shows the empty state"
+  },
+  {
+    "title": "remove an override: delete button clears the column from the override list",
+    "action": "append",
+    "verifies": "hovering a configured column row reveals a delete button; clicking it removes the override; after save, the override is not persisted"
+  },
+  {
+    "title": "empty state: dialog opened from ConfigPanel shows centered Add Field button",
+    "action": "append",
+    "verifies": "opening the Column Formatting dialog from ConfigPanel without pre-selecting a field renders the centered empty-state Add Field button and no configured column rows; clicking the button opens the dropdown"
+  }
+]

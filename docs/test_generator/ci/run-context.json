@@ -1,0 +1,25 @@
+{
+  "feature_slug": "table-column-format",
+  "feature_title": "Dashboard Table Column Format Override",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-table-column-format.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-format.spec.js",
+  "playwright_group": "Dashboards-Settings",
+  "source_files": [
+    "web/src/components/dashboards/PanelEditor/PanelEditor.vue",
+    "web/src/components/dashboards/addPanel/OverrideConfig.vue",
+    "web/src/components/dashboards/OverrideConfigPopup.vue",
+    "web/src/components/dashboards/panels/TableRenderer.vue",
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/lib/core/Table/sub-components/OTableHeader.vue",
+    "web/src/lib/core/Table/OTable.types.ts",
+    "web/src/components/dashboards/addPanel/ConfigPanel.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

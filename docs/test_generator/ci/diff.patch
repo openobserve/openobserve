@@ -1,0 +1,586 @@
+===== COMPLETE LIST OF CHANGED FILES (12 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/dashboards/OverrideConfigPopup.vue
+web/src/components/dashboards/PanelEditor/PanelEditor.vue
+web/src/components/dashboards/PanelSchemaRenderer.vue
+web/src/components/dashboards/addPanel/ConfigPanel.spec.ts
+web/src/components/dashboards/addPanel/ConfigPanel.vue
+web/src/components/dashboards/addPanel/OverrideConfig.spec.ts
+web/src/components/dashboards/addPanel/OverrideConfig.vue
+web/src/components/dashboards/panels/TableRenderer.vue
+web/src/lib/core/Table/OTable.types.ts
+web/src/lib/core/Table/OTable.vue
+web/src/lib/core/Table/sub-components/OTableHeader.vue
+web/src/locales/languages/en-US.json
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/dashboards/OverrideConfigPopup.vue b/web/src/components/dashboards/OverrideConfigPopup.vue
+index a13f68797ab..b16a055df06 100644
+--- a/web/src/components/dashboards/OverrideConfigPopup.vue
++++ b/web/src/components/dashboards/OverrideConfigPopup.vue
+@@ -311,6 +311,11 @@ export default defineComponent({
+       type: Number,
+       default: 2,
+     },
++    /** Field to select (adding it if not already configured) when the dialog opens. */
++    initialField: {
++      type: String,
++      default: undefined,
++    },
+   },
+   emits: ["close", "save"],
+   setup(props: any, { emit }: any) {
+@@ -476,6 +481,20 @@ export default defineComponent({
+       addOpenCenter.value = false;
+     };
+ 
++    watch(
++      () => props.open,
++      (isOpen) => {
++        if (!isOpen || !props.initialField) return;
++        const idx = columnOverrides.value.findIndex((c) => c.field === props.initialField);
++        if (idx !== -1) {
++          selectedIdx.value = idx;
++        } else {
++          addField(props.initialField);
++        }
++      },
++      { immediate: true },
++    );
++
+     const removeColumn = (idx: number) => {
+       columnOverrides.value.splice(idx, 1);
+       if (selectedIdx.value >= columnOverrides.value.length) {
+diff --git a/web/src/components/dashboards/PanelEditor/PanelEditor.vue b/web/src/components/dashboards/PanelEditor/PanelEditor.vue
+index 68c6c55e8e3..29b47255ec5 100644
+--- a/web/src/components/dashboards/PanelEditor/PanelEditor.vue
++++ b/web/src/components/dashboards/PanelEditor/PanelEditor.vue
+@@ -255,6 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         :searchType="searchType"
+                         :searchResponse="props.searchResponse"
+                         :is_ui_histogram="props.isUiHistogram"
++                        :enableColumnFormat="true"
+                         @metadata-update="metaDataValue"
+                         @result-metadata-update="handleResultMetadataUpdate"
+                         @limit-number-of-series-warning-message-update="
+@@ -273,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                           handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+                         "
+                         @update:initial-variable-values="handleInitialVariableValuesUpdate"
++                        @format-column="openColumnFormatting"
+                       />
+                     </div>
+                   </div>
+@@ -308,6 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     :dashboardPanelData="dashboardPanelData"
+                     :variablesData="resolvedVariablesData"
+                     :panelData="seriesData"
++                    @open-field-overrides="overrideConfigRef?.openOverrideConfigPopup()"
+                   />
+                 </PanelSidebar>
+               </div>
+@@ -597,6 +600,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       :panelData="currentPanelData"
+       data-test="panel-editor-legends-dialog"
+     />
++
++    <OverrideConfig
++      v-if="dashboardPanelData.data.type === 'table'"
++      ref="overrideConfigRef"
++      :panelData="seriesData"
++    />
+   </div>
+ </template>
+ 
+@@ -640,11 +649,15 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
++import type OverrideConfigComponent from "@/components/dashboards/addPanel/OverrideConfig.vue";
+ 
+ // Async component imports for code splitting
+ const ConfigPanel = defineAsyncComponent(
+   () => import("@/components/dashboards/addPanel/ConfigPanel.vue"),
+ );
++const OverrideConfig = defineAsyncComponent(
++  () => import("@/components/dashboards/addPanel/OverrideConfig.vue"),
++);
+ const ShowLegendsPopup = defineAsyncComponent(
+   () => import("@/components/dashboards/addPanel/ShowLegendsPopup.vue"),
+ );
+@@ -722,6 +735,11 @@ const onBuilderScroll = () => {
+   builderScrollTick.value++;
+ };
+ 
++const overrideConfigRef = ref<InstanceType<typeof OverrideConfigComponent> | null>(null);
++const openColumnFormatting = (field: string) => {
++  overrideConfigRef.value?.openOverrideConfigPopup(field);
++};
++
+ // ============================================================================
+ // usePanelEditor Composable
+ // ============================================================================
+diff --git a/web/src/components/dashboards/PanelSchemaRenderer.vue b/web/src/components/dashboards/PanelSchemaRenderer.vue
+index 19ad1a0de08..af19bd1a96d 100644
+--- a/web/src/components/dashboards/PanelSchemaRenderer.vue
++++ b/web/src/components/dashboards/PanelSchemaRenderer.vue
+@@ -47,11 +47,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           :data="tableRendererData"
+           :value-mapping="panelSchema?.config?.mappings ?? []"
+           @row-click="onChartClick"
++          @format-column="onFormatColumn"
+           ref="tableRendererRef"
+           :wrap-cells="panelSchema.config?.wrap_table_cells"
+           :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
+           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
+           :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
++          :enable-column-format="enableColumnFormat"
+         />
+         <div
+           v-else-if="panelSchema.type == 'html'"
+@@ -413,6 +415,11 @@ export default defineComponent({
+       type: Boolean,
+       default: false,
+     },
++    // Table preview's per-column format icon; explicit opt-in, not derived from `viewOnly` (which tracks print mode) — only PanelEditor sets this.
++    enableColumnFormat: {
++      type: Boolean,
++      default: false,
++    },
+     shouldRefreshWithoutCache: {
+       type: Boolean,
+       required: false,
+@@ -458,6 +465,7 @@ export default defineComponent({
+     "series-data-update",
+     "contextmenu",
+     "show-legends",
++    "format-column",
+   ],
+   setup(props, { emit }) {
+     const store = useStore();
+@@ -1464,6 +1472,8 @@ export default defineComponent({
+ 
+     const { showErrorNotification, showPositiveNotification } = useNotifications();
+ 
++    const onFormatColumn = (field: string) => emit("format-column", field);
++
+     const { drilldownArray, onChartClick, openDrilldown, hidePopupsAndOverlays } =
+       usePanelDrilldown({
+         panelSchema,
+@@ -1579,6 +1589,7 @@ export default defineComponent({
+       tableRendererRef,
+       tableRendererData,
+       onChartClick,
++      onFormatColumn,
+       onDataZoom,
+       drilldownArray,
+       selectedAnnotationData,
+diff --git a/web/src/components/dashboards/addPanel/ConfigPanel.spec.ts b/web/src/components/dashboards/addPanel/ConfigPanel.spec.ts
+index 955921226de..de470acb984 100644
+--- a/web/src/components/dashboards/addPanel/ConfigPanel.spec.ts
++++ b/web/src/components/dashboards/addPanel/ConfigPanel.spec.ts
+@@ -973,6 +973,35 @@ describe("ConfigPanel", () => {
+     });
+   });
+ 
++  describe("Field Overrides button", () => {
++    it("should render its own button and emit open-field-overrides on click", async () => {
++      const tableData = {
++        ...mockDashboardPanelData,
++        data: { ...mockDashboardPanelData.data, type: "table" },
++      };
++
++      wrapper = createWrapper({ dashboardPanelData: tableData });
++
++      const addBtn = wrapper.find(
++        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
++      );
++      expect(addBtn.exists()).toBe(true);
++
++      await addBtn.trigger("click");
++
++      expect(wrapper.emitted("open-field-overrides")).toBeTruthy();
++    });
++
++    it("should not render for non-table panels", () => {
++      wrapper = createWrapper(); // Default is line chart
++
++      const addBtn = wrapper.find(
++        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
++      );
++      expect(addBtn.exists()).toBe(false);
++    });
++  });
++
+   describe("Component Initialization Logic", () => {
+     it("should initialize all default configuration values on mount", () => {
+       // Create a completely fresh mock data with minimal config to test initialization
+diff --git a/web/src/components/dashboards/addPanel/ConfigPanel.vue b/web/src/components/dashboards/addPanel/ConfigPanel.vue
+index d812eb93575..0ae0058ca27 100644
+--- a/web/src/components/dashboards/addPanel/ConfigPanel.vue
++++ b/web/src/components/dashboards/addPanel/ConfigPanel.vue
+@@ -1215,7 +1215,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <OTooltip :content="t('dashboard.configSectionFieldOverridesTooltip')" max-width="250px" />
+       </template>
+       <div class="box-border flex flex-col gap-2.5 overflow-x-hidden px-3 py-2.5">
+-        <OverrideConfig :dashboardPanelData="dashboardPanelData" :panelData="panelData" />
++        <OButton
++          variant="outline"
++          size="sm"
++          @click="$emit('open-field-overrides')"
++          data-test="dashboard-addpanel-config-override-config-add-btn"
++        >
++          {{ t("dashboard.addFieldOverride") }}
++        </OButton>
+       </div>
+     </OCollapsible>
+ 
+@@ -1760,7 +1767,6 @@ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+ import ColorPaletteDropDown from "./ColorPaletteDropDown.vue";
+ import BackGroundColorConfig from "./BackGroundColorConfig.vue";
+ import SparklineConfig from "./SparklineConfig.vue";
+-import OverrideConfig from "./OverrideConfig.vue";
+ import ConfigPanelSearch from "./ConfigPanelSearch.vue";
+ import { useConfigPanel } from "../../../composables/dashboard/useConfigPanel";
+ import LinearIcon from "@/components/icons/dashboards/LinearIcon.vue";
+@@ -1824,7 +1830,6 @@ export default defineComponent({
+     ColorPaletteDropDown,
+     BackGroundColorConfig,
+     SparklineConfig,
+-    OverrideConfig,
+     PromQLChartConfig,
+     OButton,
+     OTooltip,
+@@ -1832,6 +1837,7 @@ export default defineComponent({
+     OCollapsible,
+   },
+   props: ["dashboardPanelData", "variablesData", "panelData"],
++  emits: ["open-field-overrides"],
+   setup(props) {
+     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+     const { t } = useI18nTyped();
+diff --git a/web/src/components/dashboards/addPanel/OverrideConfig.spec.ts b/web/src/components/dashboards/addPanel/OverrideConfig.spec.ts
+index bacc10f19e8..6e3f9f8fd58 100644
+--- a/web/src/components/dashboards/addPanel/OverrideConfig.spec.ts
++++ b/web/src/components/dashboards/addPanel/OverrideConfig.spec.ts
+@@ -138,17 +138,6 @@ describe("OverrideConfig", () => {
+       );
+     });
+ 
+-    it("should render add field override button", () => {
+-      wrapper = createWrapper();
+-
+-      expect(
+-        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists(),
+-      ).toBe(true);
+-      expect(
+-        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').text(),
+-      ).toBe("Configure column formatting");
+-    });
+-
+     it("should not show dialog initially", () => {
+       wrapper = createWrapper();
+ 
+@@ -196,13 +185,10 @@ describe("OverrideConfig", () => {
+   });
+ 
+   describe("Dialog Management", () => {
+-    it("should show dialog when add button is clicked", async () => {
++    it("should show dialog when openOverrideConfigPopup is called", async () => {
+       wrapper = createWrapper();
+ 
+-      const addBtn = wrapper.find(
+-        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+-      );
+-      await addBtn.trigger("click");
++      await wrapper.vm.openOverrideConfigPopup();
+ 
+       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
+     });
+@@ -218,10 +204,7 @@ describe("OverrideConfig", () => {
+         label: "New Field",
+       });
+ 
+-      const addBtn = wrapper.find(
+-        '[data-test="dashboard-addpanel-config-override-config-add-btn"]',
+-      );
+-      await addBtn.trigger("click");
++      await wrapper.vm.openOverrideConfigPopup();
+ 
+       expect(wrapper.vm.columns.length).toBe(initialColumnsLength + 1);
+     });
+@@ -432,9 +415,7 @@ describe("OverrideConfig", () => {
+       wrapper = createWrapper();
+ 
+       expect(wrapper.exists()).toBe(true);
+-      expect(
+-        wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists(),
+-      ).toBe(true);
++      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
+     });
+ 
+     it("should handle null override config configuration", () => {
+diff --git a/web/src/components/dashboards/addPanel/OverrideConfig.vue b/web/src/components/dashboards/addPanel/OverrideConfig.vue
+index 4898ebb1b28..0345331397e 100644
+--- a/web/src/components/dashboards/addPanel/OverrideConfig.vue
++++ b/web/src/components/dashboards/addPanel/OverrideConfig.vue
+@@ -1,14 +1,5 @@
+ <template>
+   <div>
+-    <OButton
+-      variant="outline"
+-      size="sm"
+-      @click="openOverrideConfigPopup"
+-      data-test="dashboard-addpanel-config-override-config-add-btn"
+-    >
+-      {{ t("dashboard.addFieldOverride") }}
+-    </OButton>
+-
+     <OverrideConfigPopup
+       :open="showOverrideConfigPopup"
+       :columns="columns"
+@@ -20,6 +11,7 @@
+       :panel-unit="dashboardPanelData.data.config.unit ?? ''"
+       :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
+       :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
++      :initial-field="pendingInitialField"
+       @close="showOverrideConfigPopup = false"
+       @save="saveOverrideConfigConfig"
+     />
+@@ -30,7 +22,6 @@
+ import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
+ import { useI18nTyped, type I18nText } from "@/types/i18n";
+ import OverrideConfigPopup from "../OverrideConfigPopup.vue";
+-import OButton from "@/lib/core/Button/OButton.vue";
+ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
+ 
+ interface Column {
+@@ -41,7 +32,7 @@ interface Column {
+ 
+ export default defineComponent({
+   name: "OverrideConfig",
+-  components: { OverrideConfigPopup, OButton },
++  components: { OverrideConfigPopup },
+   props: {
+     panelData: {
+       type: Object,
+@@ -58,6 +49,8 @@ export default defineComponent({
+ 
+     const showOverrideConfigPopup = ref(false);
+     const columns: any = ref<Column[]>([]);
++    // Field to preselect when opened via the table-header format-icon shortcut.
++    const pendingInitialField = ref<string | undefined>(undefined);
+ 
+     // Per-alias sample rows + column defs for the dialog's live preview.
+     const previewData = computed(() => {
+@@ -153,7 +146,7 @@ export default defineComponent({
+       }
+     };
+ 
+-    const openOverrideConfigPopup = async () => {
++    const openOverrideConfigPopup = async (field?: string) => {
+       // For PromQL mode, fetch labels first to ensure we have the latest label data
+       if (promqlMode.value) {
+         const query = dashboardPanelData.data.queries[0];
+@@ -164,6 +157,7 @@ export default defineComponent({
+       }
+ 
+       fetchColumns();
++      pendingInitialField.value = field;
+       showOverrideConfigPopup.value = true;
+     };
+ 
+@@ -182,9 +176,9 @@ export default defineComponent({
+     });
+ 
+     return {
+-      t,
+       dashboardPanelData,
+       showOverrideConfigPopup,
++      pendingInitialField,
+       openOverrideConfigPopup,
+       saveOverrideConfigConfig,
+       columns,
+diff --git a/web/src/components/dashboards/panels/TableRenderer.vue b/web/src/components/dashboards/panels/TableRenderer.vue
+index 77dca3ceb48..a42061f9da7 100644
+--- a/web/src/components/dashboards/panels/TableRenderer.vue
++++ b/web/src/components/dashboards/panels/TableRenderer.vue
+@@ -41,6 +41,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+       :default-columns="false"
+       :show-global-filter="false"
+       :enable-column-filter="enableFiltering"
++      :enable-column-format="enableColumnFormat"
++      @format-column="onFormatColumn"
+       :enable-column-reorder="false"
+       :enable-cell-copy="true"
+       :class="{ 'wrap-enabled': wrapCells }"
+@@ -177,9 +179,15 @@ export default defineComponent({
+       type: Boolean,
+       default: false,
+     },
++    /** Show the per-column "format this column" icon (add/edit panel only). */
++    enableColumnFormat: {
++      required: false,
++      type: Boolean,
++      default: false,
++    },
+   },
+-  emits: ["row-click"],
+-  setup(props) {
++  emits: ["row-click", "format-column"],
++  setup(props, { emit }) {
+     const store = useStore();
+     const { t } = useI18nTyped();
+     const tableRef = ref<any>(null);
+@@ -240,6 +248,7 @@ export default defineComponent({
+           _isRowField: col._isRowField,
+           _isTotalColumn: col._isTotalColumn,
+           _totalColRightIndex: col._totalColRightIndex,
++          formattable: props.enableColumnFormat && !col._isRowField && !col._isTotalColumn,
+         },
+       })),
+     );
+@@ -498,6 +507,11 @@ export default defineComponent({
+     const onOTableSortChange = (params: { column: string; order: "asc" | "desc" }) =>
+       handleSortChange(params.column ?? "", params.order ?? "asc");
+ 
++    const onFormatColumn = (columnId: string) => {
++      const col = colById.value.get(columnId);
++      emit("format-column", col?.alias ?? columnId);
++    };
++
+     return {
+       t,
+       tableRef,
+@@ -518,6 +532,7 @@ export default defineComponent({
+       localSortOrder,
+       handleSortChange,
+       onOTableSortChange,
++      onFormatColumn,
+       getTableCsvString,
+       downloadTableAsCSV,
+       downloadTableAsJSON,
+diff --git a/web/src/lib/core/Table/OTable.types.ts b/web/src/lib/core/Table/OTable.types.ts
+index ca1930c55fe..76b0779c20b 100644
+--- a/web/src/lib/core/Table/OTable.types.ts
++++ b/web/src/lib/core/Table/OTable.types.ts
+@@ -114,6 +114,8 @@ export interface OTableColumnMeta {
+    * inside the container and ellipsis-truncates. Set alongside `autoWidth`.
+    */
+   fillRemaining?: boolean;
++  /** Show the per-column "format this column" icon (requires `enableColumnFormat` on OTable) */
++  formattable?: boolean;
+   /** Arbitrary metadata for custom cell renderers */
+   [key: string]: any;
+ }
+@@ -316,6 +318,8 @@ export interface OTableProps<TData = any> {
+   enableColumnPin?: boolean;
+   /** Show the per-column value-filter dropdown on `filterable` columns (client-side) */
+   enableColumnFilter?: boolean;
++  /** Show the per-column "format this column" icon on `formattable` columns */
++  enableColumnFormat?: boolean;
+   /** Initial column visibility */
+   columnVisibility?: Record<string, boolean>;
+   /**
+@@ -453,6 +457,8 @@ export interface OTableEmits<TData = any> {
+   "column-visibility-change": [visibility: Record<string, boolean>];
+   /** A column's close ("x") affordance was clicked; the consumer decides how to remove it. */
+   "close-column": [column: OTableColumnDef<TData>];
++  /** A `formattable` column's format icon was clicked (requires `enableColumnFormat`). */
++  "format-column": [columnId: string];
+   "update:columnSizes": [sizes: Record<string, number>, idMap: Record<string, string>];
+ 
+   // Row reorder
+diff --git a/web/src/lib/core/Table/OTable.vue b/web/src/lib/core/Table/OTable.vue
+index 3cf12cc1fa5..0e632b91aaa 100644
+--- a/web/src/lib/core/Table/OTable.vue
++++ b/web/src/lib/core/Table/OTable.vue
+@@ -1219,6 +1219,7 @@ defineExpose({
+             :pinned-first-column="props.pinnedFirstColumn"
+             :enable-column-resize="props.enableColumnResize"
+             :enable-column-filter="props.enableColumnFilter"
++            :enable-column-format="props.enableColumnFormat"
+             :is-resizing="columnMgmt.isResizing.value"
+             :sorting-enabled="sorting.isEnabled.value"
+             :sort-by="sorting.activeSortBy.value ?? undefined"
+@@ -1244,6 +1245,7 @@ defineExpose({
+             @drag-end="columnMgmt.onDragEnd"
+             @resize-start="freezeFlexColumns"
+             @close-column="(col: any) => emit('close-column', col)"
++            @format-column="(colId: string) => emit('format-column', colId)"
+           />
+ 
+           <!-- ── Skeleton Body (loading with no existing data) ───── -->
+diff --git a/web/src/lib/core/Table/sub-components/OTableHeader.vue b/web/src/lib/core/Table/sub-components/OTableHeader.vue
+index 1caa83b9058..b446eaebabe 100644
+--- a/web/src/lib/core/Table/sub-components/OTableHeader.vue
++++ b/web/src/lib/core/Table/sub-components/OTableHeader.vue
+@@ -45,6 +45,8 @@ const props = defineProps<{
+   dense?: boolean;
+   /** Show the per-column value-filter dropdown on filterable columns. */
+   enableColumnFilter?: boolean;
++  /** Show the per-column "format this column" icon on formattable columns. */
++  enableColumnFormat?: boolean;
+ }>();
+ 
+ // ── Per-column value filter ─────────────────────────────────────
+@@ -113,6 +115,8 @@ const emit = defineEmits<{
+   /** Per-column close ("x"). Emits the column definition so the consumer can
+    *  drop the field - distinct from hiding it. */
+   "close-column": [column: any];
++  /** Per-column format icon click. Emits the column id. */
++  "format-column": [columnId: string];
+ }>();
+ 
+ // Notify the parent BEFORE the resize begins so it can freeze any flex columns
+@@ -678,6 +682,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
+               </div>
+             </div>
+           </ODropdown>
++
++          <button
++            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
++            type="button"
++            :data-test="`o2-table-column-format-btn-${header.column.id}`"
++            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
++            :aria-label="t('components.table.formatColumnAria')"
++            @click.stop="emit('format-column', header.column.id)"
++          >
++            <OIcon name="tune" size="xs" class="opacity-50" />
++          </button>
+         </div>
+ 
+         <!-- Column resize handle -->
+@@ -948,6 +963,17 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
+               </div>
+             </div>
+           </ODropdown>
++
++          <button
++            v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
++            type="button"
++            :data-test="`o2-table-column-format-btn-${header.column.id}`"
++            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
++            :aria-label="t('components.table.formatColumnAria')"
++            @click.stop="emit('format-column', header.column.id)"
++          >
++            <OIcon name="tune" size="xs" class="opacity-50" />
++          </button>
+         </div>
+         <div
+           v-if="header.column.getCanResize()"
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index fa956db2c07..900b6b03ce6 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -11740,7 +11740,8 @@
+         "resetToDefault": "Reset to default",
+         "resetColumnWidths": "Reset column widths"
+       },
+-      "removeColumnAria": "Remove column"
++      "removeColumnAria": "Remove column",
++      "formatColumnAria": "Format column"
+     },
+     "predefinedThemes": {
+       "title": "Theme",

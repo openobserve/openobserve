@@ -93,6 +93,9 @@ export default class DashboardPanelConfigs {
     this.overrideAddFieldBtn = page
       .locator('[data-test="dashboard-addpanel-config-add-column"]')
       .first();
+    this.emptyStateAddFieldBtn = page.locator(
+      '[data-test="dashboard-addpanel-config-add-column-empty"]'
+    );
     this.overrideSaveBtn = page.locator(
       '[data-test="override-config-popup-save"]'
     );
@@ -536,6 +539,54 @@ export default class DashboardPanelConfigs {
   /** Value-Formatting unit select of the selected field in the dialog. */
   getOverrideUnitSelect() {
     return this.overrideDialog.locator('[data-test^="o2-format-unit-"]').first();
+  }
+
+  /**
+   * Returns a locator for the last column-header format (tune) icon button rendered
+   * in the dashboard table. In a single-y-axis table panel, there are two columns:
+   * x_axis_1 (_timestamp) and y_axis_1 (the configured y-field). The last format
+   * button targets the y-axis (numeric) column.
+   */
+  getColumnFormatBtn() {
+    return this.page.locator('[data-test^="o2-table-column-format-btn-"]').last();
+  }
+
+  /** Returns a locator for the empty-state "Add Field" button in the center of the dialog. */
+  getEmptyStateAddFieldBtn() {
+    return this.emptyStateAddFieldBtn;
+  }
+
+  /**
+   * Returns a locator for the delete (×) button on a configured column row at
+   * the given index. The button is absolutely positioned and only visible on hover,
+   * so hover the row first with hoverOverrideFieldRow() or clickOverrideDeleteBtn().
+   */
+  getOverrideDeleteBtn(index) {
+    return this.overrideDialog.locator(
+      `[data-test="dashboard-addpanel-config-delete-column-${index}"]`
+    );
+  }
+
+  /** Hover the configured column row at index to reveal the delete button, then click it. */
+  async clickOverrideDeleteBtn(index) {
+    const row = this.getOverrideFieldRow(index);
+    await row.hover();
+    const deleteBtn = this.getOverrideDeleteBtn(index);
+    await deleteBtn.waitFor({ state: "visible", timeout: 5000 });
+    await deleteBtn.click();
+  }
+
+  /**
+   * Click the empty-state "Add Field" button (center area, shown when no overrides
+   * are configured and no field is selected), then wait for the dropdown to open.
+   */
+  async clickEmptyStateAddFieldBtn() {
+    await this.emptyStateAddFieldBtn.waitFor({ state: "visible", timeout: 10000 });
+    await this.emptyStateAddFieldBtn.click();
+    const firstOption = this.page
+      .locator('[data-test^="dashboard-addpanel-config-add-field-empty-"]')
+      .first();
+    await firstOption.waitFor({ state: "visible", timeout: 5000 });
   }
 
   /** Close the Column Formatting dialog via Cancel. */

@@ -320,4 +320,124 @@ test.describe("Dashboard Table — Column Formatting (PR #12531)", () => {
     await pm.dashboardPanelActions.savePanel();
     await cleanupTestDashboard(page, pm, dashboardName);
   });
+
+  test("header format icon: clicking the tune icon opens the Column Formatting dialog with that field pre-selected", { tag: ['@table-column-format', '@all'] }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTablePanelWithConfig(page, pm, dashboardName);
+    await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+    testLogger.info("Table panel rendered with count() aggregation; config sidebar open");
+
+    const formatBtn = pm.dashboardPanelConfigs.getColumnFormatBtn();
+    await formatBtn.waitFor({ state: "visible", timeout: 10000 });
+    await formatBtn.click();
+    testLogger.info("Clicked column header format icon");
+
+    await expect(pm.dashboardPanelConfigs.overrideDialog).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).toBeVisible();
+    testLogger.info("Column Formatting dialog opened with field pre-selected");
+
+    // Verify center controls are rendered for the pre-selected field.
+    const unitSelect = pm.dashboardPanelConfigs.getOverrideUnitSelect();
+    await expect(unitSelect).toBeVisible();
+    testLogger.info("Center controls (unit selector) visible for pre-selected numeric field");
+
+    await pm.dashboardPanelConfigs.overrideCancelBtn.click();
+    await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
+    testLogger.info("Dialog dismissed via Cancel");
+
+    await discardAndCleanupTestDashboard(page, dashboardName);
+  });
+
+  test("cancel discards unsaved override changes: re-opening dialog shows empty state", { tag: ['@table-column-format', '@all'] }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTablePanelWithConfig(page, pm, dashboardName);
+    await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+
+    await pm.dashboardPanelConfigs.openOverrideConfig();
+    await pm.dashboardPanelConfigs.addLastOverrideField();
+    await pm.dashboardPanelConfigs.selectFieldType("num");
+    await pm.dashboardPanelConfigs.selectFormatUnit("Bytes");
+    testLogger.info("Configured numeric override with Bytes unit");
+
+    // Cancel instead of saving — the dialog closes without persisting.
+    await pm.dashboardPanelConfigs.overrideCancelBtn.click();
+    await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
+
+    // Re-open and verify nothing was saved: the dialog shows the empty state.
+    await pm.dashboardPanelConfigs.openOverrideConfig();
+    await expect(pm.dashboardPanelConfigs.getEmptyStateAddFieldBtn()).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).not.toBeVisible();
+    testLogger.info("Re-opened dialog shows empty state — cancel discarded changes");
+
+    await pm.dashboardPanelConfigs.closeOverrideConfig();
+    await discardAndCleanupTestDashboard(page, dashboardName);
+  });
+
+  test("remove an override: delete button clears the column from the override list", { tag: ['@table-column-format', '@all'] }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTablePanelWithConfig(page, pm, dashboardName);
+    await pm.chartTypeSelector.configureYAxisFunction("y_axis_1", "count");
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+
+    await pm.dashboardPanelConfigs.openOverrideConfig();
+    await pm.dashboardPanelConfigs.addLastOverrideField();
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).toBeVisible();
+    testLogger.info("Field added to override list");
+
+    // Hover the row to reveal the delete (×) button and click it.
+    await pm.dashboardPanelConfigs.clickOverrideDeleteBtn(0);
+    testLogger.info("Delete button clicked on override row");
+
+    // Verify the row was removed from the list.
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).not.toBeVisible();
+
+    // Save and apply, then re-open to confirm the removed override was not persisted.
+    await pm.dashboardPanelConfigs.overrideSaveBtn.click();
+    await pm.dashboardPanelConfigs.overrideDialog.waitFor({ state: "hidden", timeout: 5000 });
+    await pm.dashboardPanelActions.applyDashboardBtn();
+    await expect(page.locator(TABLE_SELECTOR)).toBeVisible();
+
+    await pm.dashboardPanelConfigs.openOverrideConfig();
+    await expect(pm.dashboardPanelConfigs.getEmptyStateAddFieldBtn()).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).not.toBeVisible();
+    testLogger.info("Re-opened dialog shows empty state — removed override not persisted");
+
+    await pm.dashboardPanelConfigs.closeOverrideConfig();
+    await discardAndCleanupTestDashboard(page, dashboardName);
+  });
+
+  test("empty state: dialog opened from ConfigPanel shows centered Add Field button", { tag: ['@table-column-format', '@all'] }, async ({ page }) => {
+    const pm = new PageManager(page);
+    const dashboardName = generateDashboardName();
+
+    await setupTablePanelWithConfig(page, pm, dashboardName);
+    // Do NOT apply a query — the empty state renders even without table data.
+    testLogger.info("Table panel created in edit mode with config sidebar open (no query applied)");
+
+    await pm.dashboardPanelConfigs.openOverrideConfig();
+    testLogger.info("Column Formatting dialog opened from ConfigPanel");
+
+    // The dialog shows the empty state: centered Add Field button, no configured column rows.
+    await expect(pm.dashboardPanelConfigs.getEmptyStateAddFieldBtn()).toBeVisible();
+    await expect(pm.dashboardPanelConfigs.getOverrideFieldRow(0)).not.toBeVisible();
+    testLogger.info("Empty state verified — centered Add Field button visible, no column rows");
+
+    // Click the empty-state Add Field button and verify the dropdown opens.
+    await pm.dashboardPanelConfigs.clickEmptyStateAddFieldBtn();
+    testLogger.info("Empty-state add-field dropdown opened successfully");
+
+    await pm.dashboardPanelConfigs.closeOverrideConfig();
+    await discardAndCleanupTestDashboard(page, dashboardName);
+  });
 });

@@ -1,0 +1,33 @@
+{
+  "feature_slug": "table-column-format",
+  "feature_title": "Dashboard Table Column Format Override",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-table-column-format.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-table-column-format.spec.js",
+  "playwright_group": "Dashboards-Settings",
+  "source_files": [
+    "web/src/components/dashboards/PanelEditor/PanelEditor.vue",
+    "web/src/components/dashboards/addPanel/OverrideConfig.vue",
+    "web/src/components/dashboards/OverrideConfigPopup.vue",
+    "web/src/components/dashboards/panels/TableRenderer.vue",
+    "web/src/lib/core/Table/OTable.vue",
+    "web/src/lib/core/Table/sub-components/OTableHeader.vue",
+    "web/src/lib/core/Table/OTable.types.ts",
+    "web/src/components/dashboards/addPanel/ConfigPanel.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 12 changed files are under web/src/ — no enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) appear. No enterprise-keyword signals (cipher, SSO, SAML, RBAC, SDR, sensitive-data, logo-management) are present in any changed path. The change is purely open-source.",
+    "skip": "No skip. The diff is not docs-only or CI-only — it adds a user-facing format icon to table column headers in dashboard panels, wires it through PanelSchemaRenderer, TableRenderer, and OTable, and loads the OverrideConfig popup as an async component in PanelEditor. No explicit opt-out label (tests-added) or skip comment found. The trigger_comment.txt and feature_hint.txt are both empty.",
+    "e2e": "E2E is warranted. This change adds a new UI interaction: a 'tune' icon appears on formattable table columns when enableColumnFormat is true (in PanelEditor edit mode). Clicking it opens the OverrideConfig popup pre-selected to that field. The user flow spans multiple components: the OTableHeader format button → OTable format-column emit → TableRenderer → PanelSchemaRenderer → PanelEditor.openColumnFormatting → OverrideConfig.openOverrideConfigPopup → OverrideConfigPopup dialog. A user can now format columns directly from the table header in the panel editor, which is a new user-facing workflow.",
+    "area": "Dashboards — every changed component lives under web/src/components/dashboards/ or web/src/lib/core/Table/ (used by the dashboard TableRenderer). The existing test matrix has four Dashboards shards (Core, Settings, Charts, Streaming) with specs under tests/ui-testing/playwright-tests/Dashboards/. No other product area is touched.",
+    "group": "Dashboards-Settings — the feature is a per-column formatting override, which aligns with the settings/configuration nature of the existing Dashboards-Settings shard (dashboard-general-setting, dashboard-variables-setting, dashboard-filter, etc.). Dashboards-Core covers CRUD and chart-type selection; Dashboards-Charts covers visual chart features. A new spec file dashboard-table-column-format.spec.js added to this shard's run_files would fit naturally.",
+    "existing_tests": "No Playwright E2E specs in the diff. The changed test files (ConfigPanel.spec.ts, OverrideConfig.spec.ts) are Vitest unit tests under web/src/components/dashboards/addPanel/ — they are not E2E coverage and do not count for existing_tests_in_diff. No files under tests/ui-testing/playwright-tests/ were modified."
+  }
+}
