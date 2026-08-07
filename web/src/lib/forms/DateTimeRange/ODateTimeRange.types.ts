@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type DateTimeMode = "relative" | "absolute";
 export type RelativeUnit = "seconds" | "minutes" | "hours" | "days" | "weeks" | "months";
 
@@ -49,13 +51,13 @@ export interface DateTimeRangeProps {
   timezone?: string;
 
   // ── Field metadata ────────────────────────────────────────────
-  label?: string;
-  helpText?: string;
-  errorMessage?: string;
+  label?: I18nText;
+  helpText?: I18nText;
+  errorMessage?: I18nText;
   disabled?: boolean;
   /** Marks the field required — renders a `*` after the label (no manual ` *`). */
   required?: boolean;
-  placeholder?: string;
+  placeholder?: I18nText;
 }
 
 export interface DateTimeRangeAbsoluteValue {

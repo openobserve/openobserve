@@ -106,7 +106,7 @@ const createWorkflow = workflowService.createWorkflow as any;
 const updateWorkflow = workflowService.updateWorkflow as any;
 const getWorkflowRun = workflowService.getWorkflowRun as any;
 
-const { resetWorkflowData } = useWorkflowCanvas();
+const { resetWorkflowData } = useWorkflowCanvas(t);
 
 // ── stubs ────────────────────────────────────────────────────────────────────
 
@@ -256,7 +256,7 @@ describe("WorkflowEditor", () => {
       expect(workflowObj.dialog.show).toBe(false);
     });
 
-    it("adds the picked trigger to the canvas and opens its panel", async () => {
+    it("adds the picked trigger to the canvas WITHOUT auto-opening its panel", async () => {
       wrapper = mountEditor();
       await flushPromises();
 
@@ -274,17 +274,16 @@ describe("WorkflowEditor", () => {
         .vm.$emit("pick", { key: "workflow_trigger", trigger_kind: "alert_fired" });
       await nextTick();
 
-      // Committed straight onto the canvas — the trigger panel is read-only and
-      // has no Save, so a staged node could never be committed.
+      // Committed straight onto the canvas.
       expect(wf().nodes).toHaveLength(1);
       expect(wf().nodes[0]).toMatchObject({
         type: "input",
         position: { x: 100, y: 40 },
         data: { node_type: "workflow_trigger", trigger_kind: "alert_fired", alert_ids: [] },
       });
-      // ...and its panel opens in EDIT mode, so closing it keeps the node.
-      expect(workflowObj.isEditNode).toBe(true);
-      expect(workflowObj.dialog.show).toBe(true);
+      // ...but its read-only detail panel does NOT auto-open — placing the trigger
+      // shouldn't interrupt the flow. The user clicks the node to open it.
+      expect(workflowObj.dialog.show).toBe(false);
       expect(workflowObj.stepPicker.show).toBe(false);
     });
 

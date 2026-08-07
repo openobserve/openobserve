@@ -13,6 +13,7 @@ pub struct Model {
     pub r#type: String,
     pub body: String,
     pub title: Option<String>,
+    pub kind: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -43,6 +44,7 @@ mod tests {
             r#type: "slack".to_string(),
             body: r#"{"text": "Alert: {{.Name}}"}"#.to_string(),
             title: None,
+            kind: "custom".to_string(),
         };
         assert_eq!(m.id, "tmpl-1");
         assert_eq!(m.org, "myorg");

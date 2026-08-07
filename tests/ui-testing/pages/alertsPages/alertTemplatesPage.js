@@ -4,6 +4,7 @@ import fs from 'fs';
 import { AlertDestinationsPage } from './alertDestinationsPage.js';
 import { openNavFlyoutChild } from '../commonActions.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { authedRequest } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertTemplatesPage {
     constructor(page) {
@@ -371,8 +372,10 @@ export class AlertTemplatesPage {
         }
 
         try {
-            // Use page.request to bypass the RUM SDK's window.fetch wrapper which causes "TypeError: Failed to fetch"
-            const response = await this.page.request.post(createUrl, {
+            // Use authedRequest (page.request under the hood, bypassing the RUM SDK fetch wrapper)
+            // so a rotated-passcode 401 self-heals + retries instead of failing template creation
+            // and cascading into navigateToTemplates failures (alpha1 flake).
+            const response = await authedRequest(this.page, 'post', createUrl, {
                 data: {
                     name: templateName,
                     body: templateBody
@@ -406,8 +409,8 @@ export class AlertTemplatesPage {
         const templateBody = `[{"alert_name": "{alert_name}", "alert_type": "validation", "org_name": "{org_name}", "stream_name": "{stream_name}"}]`;
 
         try {
-            // Use page.request to bypass the RUM SDK's window.fetch wrapper
-            const response = await this.page.request.post(createUrl, {
+            // authedRequest self-heals a rotated-passcode 401 (see createTemplateViaApi).
+            const response = await authedRequest(this.page, 'post', createUrl, {
                 data: {
                     name: templateName,
                     body: templateBody

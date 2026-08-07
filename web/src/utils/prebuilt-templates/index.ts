@@ -41,14 +41,16 @@ import { PrebuiltConfig, PrebuiltType } from "./types";
 /**
  * All available prebuilt destination types
  */
+// No `as PrebuiltType` casts here — a cast would silence the I18nText check on
+// `description` and let untranslated copy through.
 export const PREBUILT_DESTINATION_TYPES: PrebuiltType[] = [
-  slackDestinationType as PrebuiltType,
-  discordDestinationType as PrebuiltType,
-  msteamsDestinationType as PrebuiltType,
-  emailDestinationType as PrebuiltType,
-  pagerdutyDestinationType as PrebuiltType,
-  opsgenieDestinationType as PrebuiltType,
-  servicenowDestinationType as PrebuiltType,
+  slackDestinationType,
+  discordDestinationType,
+  msteamsDestinationType,
+  emailDestinationType,
+  pagerdutyDestinationType,
+  opsgenieDestinationType,
+  servicenowDestinationType,
 ];
 
 /**

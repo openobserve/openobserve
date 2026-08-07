@@ -69,11 +69,11 @@ mod tests {
             fingerprint: "test_fingerprint_123".to_string(),
             alert_id: "alert_id_456".to_string(),
             org_id: "org_123".to_string(),
-            first_seen_at: 1234567890_000000,
-            last_seen_at: 1234567890_000000,
+            first_seen_at: 1_234_567_890_000_000,
+            last_seen_at: 1_234_567_890_000_000,
             occurrence_count: 1,
             notification_sent: false,
-            created_at: 1234567890_000000,
+            created_at: 1_234_567_890_000_000,
         };
 
         assert_eq!(model.fingerprint, "test_fingerprint_123");

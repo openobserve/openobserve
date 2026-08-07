@@ -16,6 +16,8 @@
 /**
  * Shared tooltip overflow CSS style for chart tooltips
  */
+import type { I18nText } from "@/types/i18n";
+
 export const TOOLTIP_SCROLL_STYLE =
   "max-height: 200px; overflow: auto; max-width: 400px; word-wrap: break-word; user-select: text; scrollbar-width: thin; scrollbar-color: rgba(128,128,128,0.5) transparent; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,0,0,0.12) !important;";
 
@@ -121,7 +123,7 @@ export type AggregationFunction =
 export interface TableColumnConfig {
   name: string;
   field: string;
-  label: string;
+  label: I18nText;
   align: "left" | "center" | "right";
   sortable: boolean;
   format?: (val: any) => string;

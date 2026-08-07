@@ -64,12 +64,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :persist-columns="true"
           table-id="iam-ingestion-tokens"
           filter-mode="client"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          sorting="client"
+          show-index
+          :footer-title="t('iam.ingestionTokens')"
         >
           <template #toolbar>
             <div class="flex w-full items-center gap-2">
               <OSearchInput
                 v-model="filterQuery"
-                :placeholder="t('ingestion.searchToken', 'Search tokens')"
+                :placeholder="t('ingestion.searchToken')"
                 class="flex-1"
                 data-test="ingestion-tokens-search-input"
               />
@@ -111,6 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                base64 step is needed. -->
           <template #cell-token="{ row }">
             <OCodeCell :value="toBasicAuth(row.name, row.token)" />
+          </template>
+
+          <template #cell-status="{ row }">
+            <OTag type="featureStatus" :value="row.enabled ? 'enabled' : 'disabled'" />
           </template>
 
           <template #cell-created_by="{ row }">
@@ -211,7 +221,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { ref, computed, defineComponent, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -221,6 +231,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import {
@@ -240,7 +251,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 interface Token {
   name: string;
   token: string;
-  description: string;
+  description: I18nText;
   is_default: boolean;
   enabled: boolean;
   created_by: string;
@@ -260,12 +271,13 @@ export default defineComponent({
     OForm,
     OFormInput,
     OTable,
+    OTag,
     OCodeCell,
     OUserCell,
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Create-token dialog is an OForm — the schema (name required + max 256) and
     // its defaults factory MUST be returned from setup() (Options-API), else
@@ -306,6 +318,15 @@ export default defineComponent({
         hideable: true,
         // Wide enough for the truncated credential + gap + copy btn.
         size: 340,
+        meta: { align: "left" },
+      },
+      {
+        id: "status",
+        header: t("ingestion.tokenStatus"),
+        accessorKey: "enabled",
+        sortable: true,
+        hideable: true,
+        size: 120,
         meta: { align: "left" },
       },
       {
@@ -421,7 +442,7 @@ export default defineComponent({
     const toBasicAuth = (name: string, token: string) => getBasicAuth(name, token);
 
     const copyToken = (token: string) => {
-      copyToClipboard(token);
+      copyToClipboard(token, t);
     };
 
     onBeforeMount(() => {

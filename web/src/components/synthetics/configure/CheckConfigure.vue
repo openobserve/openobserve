@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type {
   BrowserCheck,
   SyntheticCheckType,
@@ -42,12 +42,15 @@ const props = defineProps<{
   devices?: SyntheticsDevice[];
   destinations?: string[];
   folders?: SyntheticsFolder[];
+  foldersLoading?: boolean;
   validationErrors?: Record<string, string>;
   /** Protocol checks show the private-locations subsection + setup CTA. */
   allowPrivateLocations?: boolean;
+  /** When true, CheckLocations shows skeleton rows instead of the list. */
+  loadingLocations?: boolean;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Browser/http take a full URL; tcp/tls/ssh take a bare host (the server
 // rejects URLs for those types — validate_host_target).
@@ -72,7 +75,9 @@ const showAuthNetwork = computed(() =>
 const emit = defineEmits<{
   "update:check": [value: BrowserCheck];
   "refresh:destinations": [];
-  "setup-agent": [];
+  "new-location": [];
+  "add-agent": [locationId: string];
+  "refresh-locations": [];
 }>();
 
 function handleUpdate(value: BrowserCheck) {
@@ -86,6 +91,7 @@ function handleUpdate(value: BrowserCheck) {
       <CheckDetails
         :check="check"
         :folders="folders ?? []"
+        :folders-loading="foldersLoading"
         :validation-errors="props.validationErrors ?? {}"
         :target-label="targetLabel"
         :target-placeholder="targetPlaceholder"
@@ -125,9 +131,12 @@ function handleUpdate(value: BrowserCheck) {
         :locations="locations ?? []"
         :allow-private="allowPrivateLocations"
         :validation-errors="props.validationErrors ?? {}"
+        :loading-locations="loadingLocations ?? false"
         data-test="synthetics-check-configure-locations"
         @update:check="handleUpdate"
-        @setup-agent="emit('setup-agent')"
+        @new-location="emit('new-location')"
+        @add-agent="(id: string) => emit('add-agent', id)"
+        @refresh-locations="emit('refresh-locations')"
       />
       <CheckBrowserDevices
         v-if="(checkType ?? 'browser') === 'browser'"

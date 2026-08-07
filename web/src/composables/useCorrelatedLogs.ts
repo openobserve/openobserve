@@ -13,10 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText } from "@/types/i18n";
+
 import { ref, computed, watch, onUnmounted } from "vue";
 import { useStore } from "vuex";
-import type { StreamInfo } from "@/services/service_streams";
+import type { StreamInfo, FieldAlias } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildSqlCondition,
+  applyFilterOverlay,
+  buildFieldToGroupIdMap,
+} from "@/utils/telemetryCorrelation";
 import { generateTraceContext } from "@/utils/zincutils";
 import useHttpStreamingSearch from "@/composables/useStreamingSearch";
 
@@ -34,12 +41,19 @@ export interface CorrelatedLogsProps {
   sourceEvent?: {
     timestamp?: number | string;
     severity?: string;
-    message?: string;
+    message?: I18nText;
   };
   logStreams: StreamInfo[];
   sourceStream: string;
   sourceType: string;
   availableDimensions?: Record<string, any>;
+  /**
+   * Semantic field groups for the org. Used to resolve a filter edit made on one
+   * stream's field name onto every other correlated stream's alias for the same
+   * semantic group (F35). Without it, edits only apply to streams that spell the
+   * field exactly the same way as the chip.
+   */
+  semanticGroups?: FieldAlias[];
   ftsFields?: string[];
   timeRange: TimeRange;
   hideViewRelatedButton?: boolean;
@@ -138,26 +152,29 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   const buildSQLQueries = (): string[] => {
     const queries: string[] = [];
 
+    // Built once per call: chip keys come from whichever stream sourced them, so
+    // an edit must be resolved onto each stream's own alias for the same group.
+    const fieldToGroupId = buildFieldToGroupIdMap(props.semanticGroups ?? []);
+
     for (const streamInfo of props.logStreams) {
       const conditions: string[] = [];
 
-      // Merge stream's base filters with user overrides from currentFilters.
-      // currentFilters keys are raw field names (same namespace as streamInfo.filters),
-      // so a key present in both takes the user-modified value.
+      // Merge the stream's base filters with the user's overrides from
+      // currentFilters, matching on exact field name first and falling back to
+      // the shared semantic group (F35).
       const baseFilters = streamInfo.filters ?? {};
-      const effectiveFilters: Record<string, string> = { ...baseFilters };
-      for (const [k, v] of Object.entries(currentFilters.value)) {
-        if (k in baseFilters) effectiveFilters[k] = v;
-      }
+      const effectiveFilters = applyFilterOverlay(
+        baseFilters,
+        currentFilters.value,
+        fieldToGroupId,
+      );
 
       for (const [field, value] of Object.entries(effectiveFilters)) {
         if (value === SELECT_ALL_VALUE) continue;
         if (field.startsWith("_")) continue;
         if (value === null || value === undefined || value === "") continue;
 
-        const quotedField = `"${field.replace(/"/g, '""')}"`;
-        const escapedValue = String(value).replace(/'/g, "''");
-        conditions.push(`${quotedField} = '${escapedValue}'`);
+        conditions.push(buildSqlCondition(field, String(value)));
       }
 
       // Always quote stream name to match dashboard behavior
@@ -330,27 +347,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
   };
 
   /**
-   * Remove a filter dimension
-   */
-  const removeFilter = (key: string) => {
-    const updatedFilters = { ...currentFilters.value };
-    delete updatedFilters[key];
-    currentFilters.value = updatedFilters;
-
-    currentPage.value = 1;
-    fetchCorrelatedLogs();
-  };
-
-  /**
-   * Reset filters to the initial per-stream filter values from _correlate
-   */
-  const resetFilters = () => {
-    currentFilters.value = { ...props.matchedDimensions };
-    currentPage.value = 1;
-    fetchCorrelatedLogs();
-  };
-
-  /**
    * Update time range
    */
   const updateTimeRange = (startTime: number, endTime: number) => {
@@ -444,8 +440,6 @@ export function useCorrelatedLogs(props: CorrelatedLogsProps) {
     goToPage,
     updateFilter,
     updateFilters,
-    removeFilter,
-    resetFilters,
     updateTimeRange,
     refresh,
     isMatchedDimension,

@@ -6,6 +6,10 @@ export interface AlertSourceIntegration {
   token: string;
   enabled: boolean;
   config: Record<string, any>;
+  /** Where notifications go when this source's alerts create/join an
+   * incident. Empty means "use the org default" — see the review's
+   * finding that incidents with no destination fire silently. */
+  destinations: string[];
   created_by: string;
   created_at: number;
   updated_at: number;
@@ -36,4 +40,5 @@ export interface CreateAlertSourcePayload {
   name: string;
   source_type?: string;
   config?: Record<string, any>;
+  destinations?: string[];
 }

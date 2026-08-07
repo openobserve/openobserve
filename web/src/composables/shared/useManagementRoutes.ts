@@ -48,43 +48,51 @@ const useManagementRoutes = () => {
           path: "alert_destinations",
           redirect: (to: any) => ({ name: "alertDestinations", query: to.query }),
         },
-        {
-          path: "model_pricing",
-          name: "modelPricing",
-          meta: {
-            keepAlive: true,
-            title: "LLM Model Pricing",
-          },
-          component: () => import("@/components/settings/ModelPricingList.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
-        {
-          path: "model_pricing/edit",
-          name: "modelPricingEditor",
-          meta: {
-            title: "Model Pricing Editor",
-          },
-          component: () => import("@/components/settings/ModelPricingEditor.vue"),
-          beforeEnter(to: any, from: any, next: any) {
-            routeGuard(to, from, next);
-          },
-        },
         // Alert templates moved to /alert-templates (Reliability). Redirect kept
         // for the same reason as alert_destinations above, query included.
         {
           path: "templates",
           redirect: (to: any) => ({ name: "alertTemplates", query: to.query }),
         },
+        // Alert Sources moved to /alert-sources (Reliability), same reasoning
+        // as alert_destinations/templates above. Redirect kept for bookmarks;
+        // the enterprise/cloud gate now lives on the target route itself
+        // (router.ts), not on whether this redirect entry exists.
+        {
+          path: "alert_sources",
+          redirect: (to: any) => ({ name: "alertSources", query: to.query }),
+        },
       ],
     },
   ];
-  // LLM Providers and GenAI Agent Mapping (used by the AI Observability /
-  // Online Evals flows) are enterprise/cloud-only features — the backend routes
-  // only exist behind the enterprise feature flag, so they must not be exposed
-  // in OSS builds.
+  // LLM Model Pricing, LLM Providers and GenAI Agent Mapping (used by the AI
+  // Observability / Online Evals flows) are enterprise/cloud-only features — the
+  // backend routes only exist behind the enterprise feature flag, so they must
+  // not be exposed in OSS builds.
   if (config.isEnterprise == "true" || config.isCloud == "true") {
+    routes[0].children.push({
+      path: "model_pricing",
+      name: "modelPricing",
+      meta: {
+        keepAlive: true,
+        title: "LLM Model Pricing",
+      },
+      component: () => import("@/components/settings/ModelPricingList.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
+    routes[0].children.push({
+      path: "model_pricing/edit",
+      name: "modelPricingEditor",
+      meta: {
+        title: "Model Pricing Editor",
+      },
+      component: () => import("@/components/settings/ModelPricingEditor.vue"),
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    });
     routes[0].children.push({
       path: "llm_providers",
       name: "llmProviders",
@@ -108,17 +116,10 @@ const useManagementRoutes = () => {
         routeGuard(to, from, next);
       },
     });
-    routes[0].children.push({
-      path: "alert_sources",
-      name: "alertSources",
-      component: () => import("@/components/alerts/ExternalAlertSourcesList.vue"),
-      meta: {
-        title: "Alert Sources",
-      },
-      beforeEnter(to: any, from: any, next: any) {
-        routeGuard(to, from, next);
-      },
-    });
+    // Alert Sources moved to a flat top-level route (router.ts, name
+    // "alertSources") — no longer pushed here. It used to be conditional on
+    // this same enterprise/cloud check; that gating now lives on the target
+    // route's own beforeEnter instead.
   }
   if (config.isEnterprise == "true") {
     routes[0].children.push(

@@ -15,7 +15,7 @@
 
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
@@ -31,10 +31,10 @@ import useStreamFields from "@/composables/useLogs/useStreamFields";
 export const usePagination = () => {
   const store = useStore();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   let { searchObj, searchObjDebug, searchAggData, notificationMsg } = searchState();
 
-  const { getHistogramTitle } = useHistogram();
+  const { getHistogramTitle, getHistogramTitleParts } = useHistogram();
   const {
     updateFieldValues,
     extractFields,
@@ -55,7 +55,7 @@ export const usePagination = () => {
     updateUrlQueryParams,
   } = logsUtils();
 
-  const { chunkedAppend } = useSearchStream();
+  const { chunkedAppend } = useSearchStream(t);
 
   // Sorting function
   interface OrderByField {
@@ -80,7 +80,7 @@ export const usePagination = () => {
 
         searchObj.loading = false;
         searchObj.data.isOperationCancelled = false;
-        showCancelSearchNotification();
+        showCancelSearchNotification(t);
         return;
       }
       // if (searchObj.meta.jobId != "") {
@@ -464,6 +464,7 @@ export const usePagination = () => {
 
     await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const refreshPartitionPagination = (

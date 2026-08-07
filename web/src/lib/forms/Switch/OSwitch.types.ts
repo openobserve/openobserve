@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { I18nText } from "@/types/i18n";
+
 export type SwitchSize = "sm" | "md" | "lg" | "xl";
 export type SwitchValue = boolean | string | number;
 /**
@@ -14,7 +16,7 @@ export interface SwitchProps {
   /** Current on/off state */
   modelValue?: SwitchValue;
   /** Accessible label rendered beside the switch */
-  label?: string;
+  label?: I18nText;
   /** Whether the label appears before (left) or after (right) the switch */
   labelPosition?: "left" | "right";
   /** Control size */

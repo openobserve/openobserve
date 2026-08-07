@@ -222,24 +222,23 @@ describe("CheckDetails", () => {
       expect(options[1].text()).toBe("Non-Critical Monitors");
     });
 
-    it("should render default option when no folders are provided", () => {
+    // A fabricated "Default" option used to stand in for a missing list, which
+    // made a failed folder fetch indistinguishable from an org that only has the
+    // default folder — while the select rendered the unresolvable id verbatim.
+    it("should render no options when no folders are provided", () => {
       wrapper = mountCheckDetails({ folders: undefined });
       const select = wrapper.find<HTMLSelectElement>(
         '[data-test="synthetics-check-details-folder-select"] select',
       );
-      const options = select.findAll("option");
-      expect(options).toHaveLength(1);
-      expect(options[0].text()).toBe("Default");
+      expect(select.findAll("option")).toHaveLength(0);
     });
 
-    it("should render default option when folders array is empty", () => {
+    it("should render no options when folders array is empty", () => {
       wrapper = mountCheckDetails({ folders: [] });
       const select = wrapper.find<HTMLSelectElement>(
         '[data-test="synthetics-check-details-folder-select"] select',
       );
-      const options = select.findAll("option");
-      expect(options).toHaveLength(1);
-      expect(options[0].text()).toBe("Default");
+      expect(select.findAll("option")).toHaveLength(0);
     });
 
     it("should emit update:check with updated folder when a folder is selected", async () => {
@@ -502,15 +501,17 @@ describe("CheckDetails", () => {
         ...mockMonitorHttp,
         folder: undefined,
       };
-      wrapper = mountCheckDetails({ check: checkWithoutFolder });
+      wrapper = mountCheckDetails({
+        check: checkWithoutFolder,
+        folders: [{ folderId: "default", name: "Default" }],
+      });
 
       const select = wrapper.find<HTMLSelectElement>(
         '[data-test="synthetics-check-details-folder-select"] select',
       );
-      // When folder is undefined, folder computed returns ''
-      // The select should show the default option with value "default"
-      const defaultOption = select.find('option[value="default"]');
-      expect(defaultOption.exists()).toBe(true);
+      // When folder is undefined, folder computed returns '' — the option list
+      // is still the loaded one, with nothing selected.
+      expect(select.find('option[value="default"]').exists()).toBe(true);
     });
 
     it("should handle empty tags array", () => {

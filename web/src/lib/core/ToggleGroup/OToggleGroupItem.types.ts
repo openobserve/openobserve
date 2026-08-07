@@ -2,6 +2,8 @@
  * OToggleGroupItem.types.ts — public types for OToggleGroupItem.
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import type { AcceptableValue } from "reka-ui";
 
 /** Size controls padding and font-size — height is determined by content */
@@ -13,7 +15,7 @@ export interface ToggleGroupItemProps {
   /** Disables only this item */
   disabled?: boolean;
   /** Tooltip shown on hover — especially useful when disabled is true to explain why */
-  tooltip?: string;
+  tooltip?: I18nText;
   /** Size controls padding and font-size. md (default) = full toolbar; sm = small toolbar; xs = compact inline toggle */
   size?: ToggleGroupItemSize;
   /** Icon name (from OIcon registry) placed before the label. For custom icon components, use the `icon-left` slot. */

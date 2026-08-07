@@ -106,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="error"
           data-test="sessions-empty-error"
           :title="t('traces.sessionsList.failedToLoad')"
-          :description="error || ''"
+          :description="raw(error || '')"
           :action-label="t('traces.sessionsList.retry')"
           action-icon="refresh"
           @action="loadSessions()"
@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-sessionId="{ row }">
         <div class="w-full truncate text-xs">
           {{ row.sessionId }}
-          <OTooltip :content="row.sessionId" />
+          <OTooltip :content="raw(row.sessionId)" />
         </div>
       </template>
 
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-firstUserMessage="{ row }">
         <div v-if="row.firstUserMessage" class="text-text-secondary w-full truncate text-xs">
           {{ row.firstUserMessage }}
-          <OTooltip :content="row.firstUserMessage" />
+          <OTooltip :content="raw(row.firstUserMessage)" />
         </div>
         <span v-else class="text-text-muted text-xs">—</span>
       </template>
@@ -164,7 +164,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="text-xs">
           {{ formatDuration(row.durationNanos) }}
           <OTooltip
-            :content="`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`"
+            :content="
+              raw(`${row.durationNanos.toLocaleString()} ${t('traces.sessionsList.durationNs')}`)
+            "
           />
         </span>
       </template>
@@ -172,8 +174,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Tokens -->
       <template #cell-tokens="{ row }">
         <span class="text-xs tabular-nums">
-          {{ formatTokens(row.inputTokens) }} → {{ formatTokens(row.outputTokens) }} =
-          {{ formatTokens(row.tokens) }}
+          {{ formatTokens(row.inputTokens) }} {{ t("traces.sessionDetail.tokensArrow") }}
+          {{ formatTokens(row.outputTokens) }} = {{ formatTokens(row.tokens) }}
           <OTooltip
             :content="
               t('traces.sessionsList.tokenTooltip', {
@@ -188,7 +190,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Cost -->
       <template #cell-cost="{ row }">
-        <span class="text-xs">${{ row.cost.toFixed(4) }}</span>
+        <span class="text-xs"
+          >{{ t("traces.sessionDetail.currencySymbol") }}{{ row.cost.toFixed(4) }}</span
+        >
       </template>
 
       <!-- Status (derived from error_count) -->
@@ -208,7 +212,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { formatDate } from "@/utils/date";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -241,7 +245,7 @@ const emit = defineEmits<{
 
 const STREAM_LS_KEY = "sessionsList_streamFilter";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
@@ -272,7 +276,10 @@ const activeStream = ref<string>(
 // Trace-stream loading is shared with the other AI pages via
 // useLlmTraceStreams. availableStreams/streamsLoaded/ensureStreamsLoaded are
 // byte-identical to the previous inline versions.
-const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStreams(activeStream);
+const { availableStreams, streamsLoaded, ensureStreamsLoaded } = useLlmTraceStreams(
+  activeStream,
+  t,
+);
 const MODE_LS_KEY = "sessionsList_filterMode";
 // Persists the RESOLVED agent NAME of the cascade selection (was the old single
 // `activeAgent` key). On reload we re-seed the cascade from it (see

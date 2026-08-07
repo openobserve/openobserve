@@ -38,26 +38,26 @@ export function useNLQuery() {
   const getQuickModeFunctionNames = (): string[] => {
     const { defaultSuggestions } = useSuggestions();
 
-    // Pattern to extract function name from label: match_all('keyword') → match_all
-    const functionPattern = /^([a-z_][a-z0-9_]*)\(/i;
-
     const functionNames = new Set<string>();
 
-    // Dynamically extract from defaultSuggestions
+    // Entries carry a bare `name` ("approx_topk"). Labels used to embed a call
+    // shape ("match_all('x')") and were parsed with this regex; they are now
+    // static bare names, so `name` is the primary source and the regex only
+    // covers any legacy caller still supplying a callable/decorated label.
+    const functionPattern = /^([a-z_][a-z0-9_]*)\(/i;
+
     defaultSuggestions.forEach((suggestion: any) => {
-      if (typeof suggestion.label === "function") {
-        // Call label function with empty string to get the pattern
-        const labelText = suggestion.label("");
-        const match = labelText.match(functionPattern);
-        if (match && match[1]) {
-          functionNames.add(match[1].toLowerCase());
-        }
-      } else if (typeof suggestion.label === "string") {
-        const match = suggestion.label.match(functionPattern);
-        if (match && match[1]) {
-          functionNames.add(match[1].toLowerCase());
-        }
+      if (typeof suggestion?.name === "string" && suggestion.name) {
+        functionNames.add(suggestion.name.toLowerCase());
+        return;
       }
+
+      const labelText =
+        typeof suggestion?.label === "function" ? suggestion.label("") : suggestion?.label;
+      if (typeof labelText !== "string") return;
+
+      const match = labelText.match(functionPattern);
+      if (match?.[1]) functionNames.add(match[1].toLowerCase());
     });
 
     return Array.from(functionNames);

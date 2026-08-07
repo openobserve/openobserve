@@ -187,7 +187,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
@@ -203,13 +203,13 @@ import { formatTimeToExhaust, formatWindow } from "@/composables/useSloFormat";
 
 const model = defineModel<any>({ required: true });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const slos = ref<Slo[]>([]);
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
 
-const sloOptions = computed(() => slos.value.map((s) => ({ value: s.id, label: s.name })));
+const sloOptions = computed(() => slos.value.map((s) => ({ value: s.id, label: raw(s.name) })));
 
 const selectedSlo = computed(() => slos.value.find((s) => s.id === model.value.slo_id) || null);
 
@@ -221,8 +221,8 @@ const kindOptions = computed(() => [
 const operatorOptions = [
   // Ascending-orderable only (SA-5): `<` on a burn rate would mean "alert when
   // things are going WELL", which is never what anyone configures on purpose.
-  { value: ">", label: ">" },
-  { value: ">=", label: ">=" },
+  { value: ">", label: raw(">") },
+  { value: ">=", label: raw(">=") },
 ];
 
 const windowLabel = computed(() =>

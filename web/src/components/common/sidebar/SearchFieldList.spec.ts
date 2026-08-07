@@ -114,6 +114,9 @@ const mockI18n = createI18n({
       search: {
         searchField: "Search field",
       },
+      common: {
+        valueCopiedToClipboard: "Value copied to clipboard",
+      },
     },
   },
 });
@@ -703,7 +706,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("test-value");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("test-value", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test-value", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -714,7 +717,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -725,7 +728,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("special@value!$");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("special@value!$", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("special@value!$", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -736,7 +739,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue("12345");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("12345", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("12345", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -747,7 +750,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue(null);
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(null, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(null, expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -758,7 +761,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
 
       await vm.copyContentValue(undefined);
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith(undefined, {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith(undefined, expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });
@@ -965,7 +968,7 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const copyButton = wrapper.find('[data-test*="copy-btn"]');
       await copyButton.trigger("click");
 
-      expect(mockCopyToClipboard).toHaveBeenCalledWith("test_field", {
+      expect(mockCopyToClipboard).toHaveBeenCalledWith("test_field", expect.any(Function), {
         successMessage: "Value copied to clipboard",
       });
     });

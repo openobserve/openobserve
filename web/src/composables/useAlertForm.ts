@@ -23,7 +23,7 @@ import {
   nextTick,
   type Ref,
 } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { cloneDeep, debounce } from "lodash-es";
@@ -46,6 +46,7 @@ import {
   smartDecodeVrlFunction,
   isValidResourceName,
   getTimezonesByOffset,
+  resolveBrowserTimezone,
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
@@ -227,11 +228,11 @@ export type AlertFormValues = PayloadFormData & {
 
 export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const store: any = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const router = useRouter();
   const { track } = useReo();
   const { getAllFunctions } = useFunctions();
-  const { getStreams, getStream } = useStreams();
+  const { getStreams, getStream } = useStreams(t);
   const { buildQueryPayload } = useQuery();
 
   // ── Core State ──────────────────────────────────────────────────────────
@@ -1477,6 +1478,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const saveAlertJson = async (json: any) => {
     const saveContext: SaveAlertContext = {
       store,
+      t,
       props,
       emit,
       router,
@@ -1495,7 +1497,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       streams,
       getStreams,
       getParser,
-      buildQueryPayload,
+      // Bound here so the validation module keeps its 1-arg buildQueryPayload contract.
+      buildQueryPayload: (options: any) => buildQueryPayload(options, t),
       prepareAndSaveAlert: prepareAndSaveAlertFunction,
     };
 
@@ -2107,11 +2110,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       const minutes = String(now.getMinutes()).padStart(2, "0");
       const time = `${hours}:${minutes}`;
 
-      const convertedDateTime = convertDateToTimestamp(
-        date,
-        time,
-        formData.value.trigger_condition.timezone,
+      // Resolve any lingering "Browser Time (<zone>)" label (e.g. an existing
+      // alert opened from an older release) to a plain IANA zone before deriving
+      // the offset — otherwise convertDateToTimestamp returns NaN and tz_offset
+      // serializes to null in the saved payload.
+      const resolvedTimezone = resolveBrowserTimezone(
+        formData.value?.trigger_condition?.timezone ?? "",
       );
+      setF("trigger_condition.timezone", resolvedTimezone);
+
+      const convertedDateTime = convertDateToTimestamp(date, time, resolvedTimezone);
       setF("tz_offset", convertedDateTime.offset);
     }
 
@@ -2148,7 +2156,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       toast({
         variant: "error",
-        message: message,
+        message: raw(message),
         timeout: 6000,
       });
 
@@ -2341,6 +2349,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           // Resolved async AFTER the form.reset below → setF in the .then.
           pendingTimezoneOffset = data.tz_offset;
         }
+      } else {
+        // Heal legacy alerts (e.g. created on older releases) that persisted a
+        // "Browser Time (<zone>)" label — resolve it to a plain IANA zone so the
+        // picker shows a valid value and the save path computes a real offset.
+        data.trigger_condition.timezone = resolveBrowserTimezone(data.trigger_condition.timezone);
       }
 
       if (data.query_condition.vrl_function) {

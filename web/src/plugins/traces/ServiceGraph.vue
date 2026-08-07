@@ -11,7 +11,7 @@
       >
         <OSelect
           :model-value="streamFilter"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
           class="rounded-default w-auto flex-shrink-0"
@@ -23,8 +23,8 @@
           :content="t('traces.serviceGraph.noStreamsDetected')"
         />
       </div>
-      <!-- Search input -->
-      <div data-test="service-graph-search-input">
+      <!-- Search input (hidden when a parent renders it in its own toolbar). -->
+      <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
           class="w-56!"
@@ -365,7 +365,7 @@ import {
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -441,6 +441,13 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Same idea as `hideStreamSelector`: the standalone Service Graph page
+    // renders the search box in its own subnav row beside the stream picker,
+    // so the built-in one must not render twice.
+    hideSearchInput: {
+      type: Boolean,
+      default: false,
+    },
     // Agent-node highlighting (indigo tint, larger size, radar-ping halo) is a
     // treatment for the dedicated Agent Graph page ONLY. On the regular Service
     // Graph tab agents are rendered like any other node. The Agent Graph page
@@ -496,8 +503,8 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
-    const { t } = useI18n();
-    const { getStreams } = useStreams();
+    const { t } = useI18nTyped();
+    const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
 
     // Resolved visualization + layout type. A parent that owns its own type
@@ -1865,10 +1872,23 @@ export default defineComponent({
       loadServiceGraph();
     });
 
-    // Public API for parent pages (e.g. Agent Graph page's header refresh).
-    expose({ refresh: loadServiceGraph, loading, lastRunAt });
+    // Public API for parent pages (e.g. Agent Graph page's header refresh, and
+    // the standalone Service Graph page, whose subnav-row stream picker calls
+    // `onStreamFilterChange` — it owns its own stream list because `expose()`
+    // unwraps refs, which would hand the parent a non-reactive snapshot).
+    expose({
+      refresh: loadServiceGraph,
+      loading,
+      lastRunAt,
+      onStreamFilterChange,
+      setSearchFilter: (v: string) => {
+        searchFilter.value = v;
+        applyFilters();
+      },
+    });
 
     return {
+      raw,
       t,
       loading,
       error,

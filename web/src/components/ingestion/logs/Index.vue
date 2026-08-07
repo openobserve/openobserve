@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         icon="data-object"
-        label="Curl"
+        :label="t('ingestion.curl')"
       />
       <ORouteTab
         name="filebeat"
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
-        label="Filebeat"
+        :label="t('ingestion.filebeat')"
       />
       <ORouteTab
         name="fluentbit"
@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-        label="FluentBit"
+        :label="t('ingestion.fluentbit')"
       />
       <ORouteTab
         name="fluentd"
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
-        label="Fluentd"
+        :label="t('ingestion.fluentd')"
       />
       <ORouteTab
         name="vector"
@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-        label="Vector"
+        :label="t('ingestion.vector')"
       />
       <ORouteTab
         name="ingestLogsFromOtel"
@@ -86,7 +86,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-        label="OTEL Collector"
+        :label="t('ingestion.otelCollector')"
       />
       <ORouteTab
         name="logstash"
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
-        label="Logstash"
+        :label="t('ingestion.logstash')"
       />
       <ORouteTab
         name="syslogNg"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         icon="plagiarism"
-        label="Syslog-ng"
+        :label="t('ingestion.syslogNg')"
       />
       <ORouteTab
         name="loongcollector"
@@ -120,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :icon="'img:' + getImageURL('images/ingestion/loongcollector.svg')"
-        label="LoongCollector"
+        :label="t('ingestion.loongCollector')"
       />
     </template>
 
@@ -143,7 +143,7 @@ import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -162,7 +162,7 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
     const rowData: any = ref({});
@@ -206,9 +206,9 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText, {
-        successMessage: "Content Copied Successfully!",
-        errorMessage: "Error while copy content.",
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
         timeout: 5000,
       }).then((success: boolean) => {
         if (success) {

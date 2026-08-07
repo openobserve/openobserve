@@ -137,7 +137,7 @@
 <script lang="ts">
 import { ref, computed, watch } from "vue";
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -170,7 +170,7 @@ export default defineComponent({
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // editedValueMapping is populated by the watch below (on every open)
     const editedValueMapping = ref<any[]>([]);

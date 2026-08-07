@@ -875,7 +875,7 @@ describe("General", () => {
 
       expect(mockToast).toHaveBeenCalledWith({
         variant: "error",
-        message: "1 file(s) did not pass validation constraints",
+        message: "1 file did not pass validation constraints",
       });
     });
   });

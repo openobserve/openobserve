@@ -139,7 +139,7 @@ describe("msteams template", () => {
     });
 
     it("has description", () => {
-      expect(msteamsDestinationType.description).toBeTruthy();
+      expect(msteamsDestinationType.descriptionKey).toBeTruthy();
     });
 
     it("has correct category", () => {

@@ -21,6 +21,7 @@ import searchService from "@/services/search";
 import useNotifications from "@/composables/useNotifications";
 import useHistogram from "@/composables/useLogs/useHistogram";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   SearchAroundParams,
   StreamField,
@@ -30,6 +31,8 @@ import {
 } from "@/ts/interfaces";
 
 export const useSearchAround = () => {
+  // Safe only because useSearchAround() runs inside component setup (SearchResult.vue).
+  const { t } = useI18nTyped();
   const { searchObj, notificationMsg } = searchState();
   const { showErrorNotification } = useNotifications();
 
@@ -159,7 +162,8 @@ export const useSearchAround = () => {
         })
         .then(async (res: { data: SearchAroundResponse }) => {
           searchObj.loading = false;
-          searchObj.data.histogram.chartParams.title = "";
+          searchObj.data.histogram.chartParams.title = raw("");
+          searchObj.data.histogram.chartParams.titleParts = null;
           if (res.data.from > 0) {
             searchObj.data.queryResults.from = res.data.from;
             searchObj.data.queryResults.scan_size += res.data.scan_size;
@@ -179,7 +183,8 @@ export const useSearchAround = () => {
             searchObj.data.searchAround.histogramHide = true;
           }
 
-          searchObj.data.histogram.chartParams.title = "";
+          searchObj.data.histogram.chartParams.title = raw("");
+          searchObj.data.histogram.chartParams.titleParts = null;
         })
         .catch((error: SearchAroundError) => {
           let traceId = "";
@@ -223,7 +228,9 @@ export const useSearchAround = () => {
     } catch (error: unknown) {
       searchObj.loading = false;
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      showErrorNotification(`Error while fetching data: ${errorMessage}`);
+      showErrorNotification(
+        t("toastMessages.useLogs.errorWhileFetchingData", { error: errorMessage }),
+      );
     }
   };
 

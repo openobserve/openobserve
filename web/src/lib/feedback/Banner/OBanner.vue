@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed, useSlots } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 interface Props {
   variant?: "default" | "info" | "success" | "warning" | "error" | "error-soft";
-  content?: string;
+  content?: I18nText;
   icon?: string;
   dense?: boolean;
   inlineActions?: boolean;

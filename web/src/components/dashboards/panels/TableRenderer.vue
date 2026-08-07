@@ -62,6 +62,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <JsonFieldRenderer :value="value" />
       </template>
 
+      <template
+        v-for="col in linkFieldColumns"
+        :key="`link-cell-${col.id}`"
+        #[`cell-${col.id}`]="{ value, column, row }"
+      >
+        <a
+          v-if="getHttpUrl(value)"
+          :href="getHttpUrl(value) || undefined"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-text-link hover:text-text-link-hover hover:underline"
+          @click.stop
+        >
+          {{ formatCellValue(value, column, row) }}
+        </a>
+        <span v-else>{{ formatCellValue(value, column, row) }}</span>
+      </template>
+
       <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
            so mirror the chart panels' "No Data" treatment here. -->
       <template #empty>
@@ -109,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
@@ -163,7 +181,7 @@ export default defineComponent({
   emits: ["row-click"],
   setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const tableRef = ref<any>(null);
 
     // "Records per page" is `v-model.number`, so clearing it yields "" — a
@@ -237,6 +255,36 @@ export default defineComponent({
     const jsonFieldColumns = computed(() =>
       (otableColumns.value as any[]).filter((c: any) => c.showFieldAsJson),
     );
+
+    // Only absolute http(s) URLs are links. This both avoids turning arbitrary
+    // text into a link and prevents unsafe protocols such as javascript:.
+    const getHttpUrl = (value: unknown): string | null => {
+      if (typeof value !== "string") return null;
+      const url = value.trim();
+      if (!/^https?:\/\//i.test(url)) return null;
+      try {
+        const protocol = new URL(url).protocol;
+        return protocol === "http:" || protocol === "https:" ? url : null;
+      } catch {
+        return null;
+      }
+    };
+
+    // A column gets a cell slot only when at least one response value is a URL.
+    // The slot still renders any mixed non-URL values as regular formatted text.
+    const linkFieldColumns = computed(() => {
+      const rows = (props.data?.rows as any[]) || [];
+      return (otableColumns.value as any[]).filter((col: any) => {
+        if (col.showFieldAsJson) return false;
+        const field = col.field ?? col.name;
+        return rows.some((row: any) => getHttpUrl(row?.[field]) !== null);
+      });
+    });
+
+    const formatCellValue = (value: any, column: any, row: any): any => {
+      const format = column?.meta?.format as ((value: any, row: any) => any) | undefined;
+      return format ? format(value, row) : value;
+    };
 
     /**
      * Computes the inline style for a given TanStack cell.
@@ -447,6 +495,9 @@ export default defineComponent({
       otableColumns,
       pivotRowColumns,
       jsonFieldColumns,
+      linkFieldColumns,
+      getHttpUrl,
+      formatCellValue,
       cellStyleFn,
       effectivePageSize,
       isPivot,

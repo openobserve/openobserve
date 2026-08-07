@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { PrebuiltConfig } from "./types";
+import { raw } from "@/types/i18n";
+
+import { PrebuiltConfig, PrebuiltType } from "./types";
 
 /**
  * Slack prebuilt destination configuration
@@ -94,7 +96,7 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackWebhookUrl",
       type: "text",
       required: true,
-      hint: "Get your webhook URL from Slack App settings",
+      hintKey: "alerts.prebuiltDestinations.slackWebhookUrlHelp",
       validator: (url: string) => {
         const invalid = { key: "alerts.prebuiltDestinations.invalidSlackWebhookUrl" };
         try {
@@ -115,17 +117,17 @@ export const slackConfig: PrebuiltConfig = {
       labelKey: "alerts.prebuiltDestinations.slackChannel",
       type: "text",
       required: false,
-      hint: "e.g., #alerts",
+      hint: raw("e.g., #alerts"),
     },
   ],
 };
 
 import slackLogo from "@/assets/images/alerts/destinations/slack.png";
 
-export const slackDestinationType = {
+export const slackDestinationType: PrebuiltType = {
   id: "slack",
   name: "Slack",
-  description: "Send notifications to Slack channels",
+  descriptionKey: "alert_destinations.prebuilt.slackDescription",
   icon: "slack",
   image: slackLogo,
   popular: true,

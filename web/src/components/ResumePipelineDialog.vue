@@ -19,8 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     v-model:open="open"
     data-test="resume-pipeline-dialog"
     size="sm"
-    title="Resume Pipeline Ingestion"
-    :sub-title="lastPausedAt ? `Last paused: ${convertUnixToDateFormat(lastPausedAt)}` : undefined"
+    :title="t('pipeline_list.resume_pipeline_title')"
+    :sub-title="
+      lastPausedAt
+        ? t('common.lastPausedAt', { time: convertUnixToDateFormat(lastPausedAt) })
+        : undefined
+    "
     :secondary-button-label="t('confirmDialog.cancel')"
     :primary-button-label="t('pipeline_list.run_pipeline')"
     @click:secondary="onCancel"
@@ -32,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #label>
             <div class="resume-radio-label">
               <div class="resume-radio-main-text text-compact leading-4.5 font-normal">
-                Continue from where it paused
+                {{ t("confirmDialog.continueFromWherePaused") }}
               </div>
               <div
                 v-if="lastPausedAt"
@@ -45,7 +49,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ORadio>
         <ORadio :value="true" style="height: 18px">
           <template #label>
-            <span class="text-compact leading-4.5 font-normal">Start from now.</span>
+            <span class="text-compact leading-4.5 font-normal">{{
+              t("confirmDialog.startFromNow")
+            }}</span>
           </template>
         </ORadio>
       </ORadioGroup>
@@ -56,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { convertUnixToDateFormat } from "@/utils/zincutils";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -74,7 +80,7 @@ export default defineComponent({
     modelValue: { type: Boolean, default: false },
   },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const open = computed({
       get: () => props.modelValue ?? false,

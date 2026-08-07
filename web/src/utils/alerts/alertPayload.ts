@@ -7,10 +7,11 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import alertsService from "@/services/alerts";
 import { transformFEToBE } from "./alertDataTransforms";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, type TranslateFn, type I18nText } from "@/types/i18n";
 
 export interface PayloadFormData {
   name: string;
-  description: string;
+  description: I18nText;
   is_real_time: boolean | string;
   trigger_condition: {
     threshold: number | string;
@@ -53,6 +54,7 @@ export interface PayloadContext {
 
 export interface SaveAlertContext {
   store: any;
+  t: TranslateFn;
   props: any;
   emit: any;
   router: any;
@@ -122,7 +124,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
 
-  payload.description = formData.description.trim();
+  payload.description = raw(formData.description.trim());
 
   if (!isAggregationEnabled.value || getSelectedTab.value !== "custom") {
     payload.query_condition.aggregation = null;
@@ -255,7 +257,7 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
 };
 
 export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext): Promise<void> => {
-  const { store, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
+  const { store, t, props, emit, router, isAggregationEnabled, activeFolderId, handleAlertError } =
     context;
 
   const payload = cloneDeep(data);
@@ -301,7 +303,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
   try {
     const dismiss = toast({
       variant: "loading",
-      message: "Please wait...",
+      message: t("toastMessages.alerts.pleaseWait"),
       timeout: 0,
     });
 
@@ -314,7 +316,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert updated successfully.",
+        message: t("toastMessages.alerts.alertUpdatedSuccessfully"),
       });
     } else {
       await alertsService.create_by_alert_id(
@@ -325,7 +327,7 @@ export const prepareAndSaveAlert = async (data: any, context: SaveAlertContext):
       emit("update:list", activeFolderId.value);
       toast({
         variant: "success",
-        message: "Alert saved successfully.",
+        message: t("toastMessages.alerts.alertSavedSuccessfully"),
       });
     }
     dismiss();

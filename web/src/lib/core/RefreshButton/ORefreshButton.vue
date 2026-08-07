@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "../Button/OButton.vue";
 import type { RefreshButtonProps, RefreshButtonEmits } from "./ORefreshButton.types";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const props = withDefaults(defineProps<RefreshButtonProps>(), {
   lastRunAt: null,

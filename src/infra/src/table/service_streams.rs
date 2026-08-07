@@ -178,7 +178,15 @@ fn normalize_json_object(v: serde_json::Value) -> serde_json::Value {
     }
 }
 
-pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::Error> {
+/// Upsert a service record.
+///
+/// Returns the `disambiguation` JSON of every orphaned (lower-specificity) row that was
+/// deleted as part of this put, so callers can evict the matching cache keys (F19).
+/// Empty on a plain insert.
+pub async fn put(
+    org_id: &str,
+    mut record: ServiceRecord,
+) -> Result<Vec<serde_json::Value>, errors::Error> {
     // Normalize disambiguation to sorted-key JSON so that text comparisons in SQLite
     // are stable regardless of insertion order of the original object.
     record.disambiguation = normalize_json_object(record.disambiguation);
@@ -240,7 +248,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
             &incoming_map,
             &kept_id,
         )
-        .await?;
+        .await
     } else {
         // No exact match. Check if an existing row can be upgraded:
         // A row is upgradeable if its disambiguation is a subset of the incoming one
@@ -332,7 +340,7 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
                 richer_map,
                 &kept_id,
             )
-            .await?;
+            .await
         } else {
             let active_model = ActiveModel {
                 id: Set(record.id),
@@ -352,14 +360,18 @@ pub async fn put(org_id: &str, mut record: ServiceRecord) -> Result<(), errors::
                 .exec(client)
                 .await
                 .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+            // Plain insert: nothing was orphaned.
+            Ok(Vec::new())
         }
     }
-
-    Ok(())
 }
 
 /// Delete rows for `service_name` that are strict subsets of `richer_map`, excluding `keep_id`.
 /// Called after a successful put/upgrade to clean up orphaned lower-specificity rows.
+///
+/// Returns the `disambiguation` JSON of each deleted row so callers can evict the
+/// corresponding cache entries (F19).
 async fn delete_subset_orphans(
     client: &sea_orm::DatabaseConnection,
     org_id: &str,
@@ -367,7 +379,7 @@ async fn delete_subset_orphans(
     set_id: &str,
     richer_map: &std::collections::HashMap<String, String>,
     keep_id: &str,
-) -> Result<(), errors::Error> {
+) -> Result<Vec<serde_json::Value>, errors::Error> {
     let candidates = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::ServiceName.eq(service_name))
@@ -376,6 +388,7 @@ async fn delete_subset_orphans(
         .await
         .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
 
+    let mut deleted: Vec<serde_json::Value> = Vec::new();
     for row in candidates {
         if row.id == keep_id {
             continue;
@@ -394,13 +407,15 @@ async fn delete_subset_orphans(
             .iter()
             .all(|(k, v)| richer_map.get(k).map(|rv| rv == v).unwrap_or(false));
         if is_subset && row_map.len() < richer_map.len() {
+            let disambiguation = row.disambiguation.clone();
             Entity::delete_by_id(row.id)
                 .exec(client)
                 .await
                 .map_err(|e| errors::Error::DbError(errors::DbError::SeaORMError(e.to_string())))?;
+            deleted.push(disambiguation);
         }
     }
-    Ok(())
+    Ok(deleted)
 }
 
 fn union_stream_array(existing: &serde_json::Value, new: &serde_json::Value) -> serde_json::Value {

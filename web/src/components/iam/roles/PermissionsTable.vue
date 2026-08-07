@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, ref, h } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -185,7 +185,7 @@ const emits = defineEmits([
   "update:filter",
 ]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const permissionsTableRef: any = ref(null);
 

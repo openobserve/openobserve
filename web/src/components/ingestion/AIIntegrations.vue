@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="cat in aiCategories"
                 :key="cat.slug"
                 :name="cat.slug"
-                :label="cat.name"
+                :label="raw(cat.name)"
                 :data-test="`ai-integrations-category-${cat.slug}`"
               />
             </OTabs>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-for="integration in filteredIntegrations"
                       :key="integration.slug"
                       :name="integration.routeName"
-                      :label="integration.name"
+                      :label="raw(integration.name)"
                       :data-test="`ai-integrations-item-${integration.slug}`"
                     >
                       <template #icon>
@@ -71,7 +71,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             !failedLogos.has(integration.slug)
                           "
                           :src="(isDark && integration.logoDark) || integration.logo"
-                          :alt="`${integration.name} logo`"
+                          :alt="t('common.itemLogo', { name: integration.name })"
                           class="rounded-default h-4.5 w-4.5 flex-none object-contain"
                           loading="lazy"
                           referrerpolicy="no-referrer"
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import { useRouter, useRoute } from "vue-router";
@@ -122,7 +122,7 @@ export default defineComponent({
   name: "AIIntegrationsPage",
   components: { OTabs, OTab, OSearchInput, OSplitter },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
     const router = useRouter();
@@ -215,6 +215,7 @@ export default defineComponent({
     );
 
     return {
+      raw,
       t,
       store,
       isDark,

@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="badge && badge > 0"
           class="menu-badge text-3xs text-text-inverse absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 border-[var(--color-grey-900)] bg-[image:var(--color-gradient-notification)] px-1 leading-none font-bold shadow-[0_4px_8px_rgba(239,68,68,0.5)]"
           aria-live="polite"
-          :aria-label="`${badge} notifications`"
+          :aria-label="t('common.notificationsCount', { count: badge })"
         >
           {{ badge > 99 ? "99+" : badge }}
         </div>
@@ -67,10 +67,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, inject } from "vue";
+import { defineComponent, computed, inject, type PropType } from "vue";
 import { useStore } from "vuex";
 import { useRouter, RouterLink } from "vue-router";
 import { useTheme } from "@/composables/useTheme";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
@@ -79,13 +80,13 @@ export default defineComponent({
   components: { OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
 
     caption: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
 
     link: {
@@ -148,6 +149,7 @@ export default defineComponent({
   },
   emits: ["trigger"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
 
@@ -294,6 +296,7 @@ export default defineComponent({
     };
 
     return {
+      t,
       store,
       router,
       openWebPage,

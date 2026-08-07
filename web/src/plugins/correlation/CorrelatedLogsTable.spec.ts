@@ -39,7 +39,6 @@ vi.mock("@/composables/useCorrelatedLogs", () => ({
     fetchCorrelatedLogs: vi.fn(),
     updateFilter: vi.fn(),
     updateFilters: vi.fn(),
-    resetFilters: vi.fn(),
     refresh: vi.fn(),
     isMatchedDimension: vi.fn(() => false),
     isAdditionalDimension: vi.fn(() => false),
@@ -77,6 +76,7 @@ const mockTranslations = {
   "search.showHideColumns": "Show/Hide Columns",
   "correlation.logs.filtersLabel": "Filters",
   "correlation.logs.unstableDimension": "Unstable Dimension",
+  "correlation.logs.allValues": "All Values",
   "common.apply": "Apply",
 };
 

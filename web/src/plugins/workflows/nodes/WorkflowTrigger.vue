@@ -122,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed, defineAsyncComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import {
@@ -135,7 +135,7 @@ import {
 // (Function node, Test dialog, Step Result drawer), so this adds no new chunk.
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const savedData = workflowObj.currentSelectedNodeData?.data || {};
 const triggerKind = savedData.trigger_kind || DEFAULT_TRIGGER_KIND;
@@ -151,7 +151,7 @@ const noteKey = def.payloadNoteKey;
 // the trigger node has no editable config, so nothing here is persisted.
 const variants = def.sampleVariants ?? [];
 const variantLabelKey = def.sampleVariantLabelKey ?? "";
-const variantOptions = variants.map((v) => ({ label: v.key, value: v.key }));
+const variantOptions = variants.map((v) => ({ label: raw(v.key), value: v.key }));
 const selectedVariant = ref(variants[0]?.key ?? "");
 
 // Kinds that declare `commonMetaKeys` render the SPLIT view (a stable common

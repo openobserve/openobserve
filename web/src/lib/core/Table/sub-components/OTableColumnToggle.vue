@@ -2,12 +2,15 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { OTableColumnDef } from "../OTable.types";
+
+const { t } = useI18nTyped();
 
 const props = defineProps<{
   columns: OTableColumnDef[];
@@ -58,14 +61,22 @@ function resetToDefault(): void {
         <OButton
           variant="outline"
           size="icon-sm"
-          :aria-label="`Manage columns${hiddenCount > 0 ? `, ${hiddenCount} hidden` : ''}`"
+          :aria-label="
+            hiddenCount > 0
+              ? t('common.manageColumnsHidden', { count: hiddenCount })
+              : t('common.manageColumns')
+          "
           data-test="o2-table-column-toggle-btn"
         >
           <template #icon-left>
             <OIcon name="view-column" size="sm" />
           </template>
           <OTooltip
-            :content="hiddenCount > 0 ? `Columns (${hiddenCount} hidden)` : 'Columns'"
+            :content="
+              hiddenCount > 0
+                ? t('common.columnsHidden', { count: hiddenCount })
+                : t('common.columns')
+            "
             side="bottom"
           />
         </OButton>
@@ -81,9 +92,15 @@ function resetToDefault(): void {
 
     <!-- Column list panel -->
     <div class="min-w-44 py-1" data-test="o2-table-column-toggle-panel">
-      <p class="text-text-secondary px-3 py-1 text-xs font-medium">Columns</p>
+      <p class="text-text-secondary px-3 py-1 text-xs font-medium">
+        {{ t("components.table.columnToggle.columns") }}
+      </p>
 
-      <ul role="listbox" aria-label="Toggle column visibility" aria-multiselectable="true">
+      <ul
+        role="listbox"
+        :aria-label="t('components.table.columnToggle.toggleVisibilityAria')"
+        aria-multiselectable="true"
+      >
         <li
           v-for="col in toggleableColumns"
           :key="col.id"
@@ -94,7 +111,11 @@ function resetToDefault(): void {
           <OCheckbox
             :model-value="isVisible(col.id)"
             size="sm"
-            :aria-label="`Toggle ${typeof col.header === 'string' ? col.header : col.id} column`"
+            :aria-label="
+              t('common.toggleColumn', {
+                name: typeof col.header === 'string' ? col.header : col.id,
+              })
+            "
             @update:model-value="toggleColumn(col.id)"
             @click.stop
           />
@@ -116,7 +137,7 @@ function resetToDefault(): void {
           @click="resetToDefault"
         >
           <OIcon name="refresh" size="sm" class="shrink-0" />
-          <span class="select-none">Reset to default</span>
+          <span class="select-none">{{ t("components.table.columnToggle.resetToDefault") }}</span>
         </button>
         <button
           v-if="props.hasResizedColumns"
@@ -125,7 +146,9 @@ function resetToDefault(): void {
           @click="emit('reset:columnSizes')"
         >
           <OIcon name="refresh" size="sm" class="shrink-0" />
-          <span class="select-none">Reset column widths</span>
+          <span class="select-none">{{
+            t("components.table.columnToggle.resetColumnWidths")
+          }}</span>
         </button>
       </div>
     </div>

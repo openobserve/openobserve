@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -49,7 +49,7 @@ const emit = defineEmits<{
   (e: "apply:template", name: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const title = computed(() => {
   switch (props.topic) {
@@ -197,10 +197,8 @@ const displayedVariables = computed(() => {
 });
 
 // Built-in variables the server actually substitutes (source of truth:
-// process_dest_template in src/service/alerts/alert.rs). Each has a one-line
+// process_dest_template in src/core/src/alerts/alert.rs). Each has a one-line
 // description shown on hover so the list teaches, not just lists.
-// NOTE: alert_agg_value is intentionally ABSENT — the UI elsewhere advertises
-// it but the server never substitutes it, so it would be sent as literal text.
 const builtInVars: { name: string; desc: string }[] = [
   { name: "org_name", desc: "Your organization name" },
   { name: "stream_type", desc: "Stream type (logs, metrics, traces)" },
@@ -211,6 +209,10 @@ const builtInVars: { name: string; desc: string }[] = [
   { name: "alert_operator", desc: "Threshold comparison operator (>, <, =)" },
   { name: "alert_threshold", desc: "The configured threshold value" },
   { name: "alert_count", desc: "Number of matching records" },
+  {
+    name: "alert_agg_value",
+    desc: "The evaluated aggregation value for the triggering group (empty when the alert has no aggregation value)",
+  },
   { name: "alert_description", desc: "The alert's description text" },
   { name: "alert_start_time", desc: "Window start time (ISO 8601)" },
   { name: "alert_end_time", desc: "Window end time (ISO 8601)" },
@@ -227,7 +229,7 @@ const builtInVars: { name: string; desc: string }[] = [
 const showBuiltIns = ref(false);
 
 function copyVar(name: string) {
-  copyToClipboard(`{${name}}`, { successMessage: `Copied {${name}}` });
+  copyToClipboard(`{${name}}`, t, { successMessage: `Copied {${name}}` });
 }
 
 defineExpose({ applyTemplate, previewTemplate });
@@ -248,17 +250,21 @@ defineExpose({ applyTemplate, previewTemplate });
       <div v-if="showLegend" data-test="help-legend" class="help-legend">
         <span class="help-legend__title">{{ t("alerts.alertSettings.helpLegendTitle") }}</span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--live">High CPU</span>
+          <span class="help-legend__swatch help-legend__swatch--live">{{
+            t("alerts.alertSettings.helpLegendLiveExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendLive") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--sample">42</span>
+          <span class="help-legend__swatch help-legend__swatch--sample">{{
+            t("alerts.alertSettings.helpLegendSampleExample")
+          }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendSample") }}
         </span>
         <span class="help-legend__item">
-          <span class="help-legend__swatch help-legend__swatch--opaque">{{ "{rows}" }}</span>
+          <span class="help-legend__swatch help-legend__swatch--opaque">{{ raw("{rows}") }}</span>
           <span class="help-legend__sep">=</span>
           {{ t("alerts.alertSettings.helpLegendOpaque") }}
         </span>

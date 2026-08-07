@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ODrawer
     :open="internalOpen"
     @update:open="handleDrawerClose"
-    title="External Destination"
+    :title="t('alerts.externalDestinationTitle')"
     size="lg"
     :show-close="true"
     @keydown.stop
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -87,8 +87,8 @@ function handleDrawerClose(v: boolean) {
 }
 
 const store = useStore();
-const { t } = useI18n();
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
+const { t } = useI18nTyped();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
 
 const picker = ref<any>(null);
 // True while the picker's inline create form is open — the drawer hides its
