@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Curated swatches -->
     <button
-      v-for="c in swatches"
+      v-for="(c, i) in swatches"
       :key="c"
       type="button"
       class="rounded-default border-border-default relative inline-flex h-5 w-5 cursor-pointer items-center justify-center border p-0 transition-[transform,box-shadow,border-color] duration-100 hover:scale-[1.12]"
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :title="c"
       :aria-label="c"
       :aria-pressed="isActive(c)"
+      :data-test="dataTest ? `${dataTest}-swatch-${i}` : undefined"
       @click.stop="select(c)"
     >
       <OIcon
