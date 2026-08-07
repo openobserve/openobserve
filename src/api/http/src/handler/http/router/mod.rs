@@ -54,9 +54,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, annotation_queues, anomaly_detection, datasets, domain_management, eval_jobs,
-        gen_ai, keys, license, providers, score_configs, scorers, service_streams, synthetics,
-        workflows,
+        actions, ai, annotation_queues, annotations, anomaly_detection, datasets,
+        domain_management, eval_jobs, gen_ai, keys, license, providers, score_configs, scorers,
+        service_streams, synthetics, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -1050,6 +1050,15 @@ pub fn service_routes() -> Router {
                         .delete(annotation_queues::clear_annotation_queue_items),
                 )
                 .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}",
+                    get(annotation_queues::get_annotation_queue_item),
+                )
+                .route(
+                    "/{org_id}/annotation_queues/{queue_id}/items/{queue_item_id}/reviews",
+                    get(annotation_queues::list_annotation_queue_item_reviews)
+                        .post(annotation_queues::review_annotation_queue_item),
+                )
+                .route(
                     "/{org_id}/annotation_queues/{queue_id}/items/archive",
                     post(annotation_queues::archive_annotation_queue_items),
                 )
@@ -1069,6 +1078,9 @@ pub fn service_routes() -> Router {
                         .put(datasets::update_dataset)
                         .delete(datasets::delete_dataset),
                 )
+
+                // On-demand human annotation from Discovery
+                .route("/{org_id}/annotations", post(annotations::annotate_target))
 
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
