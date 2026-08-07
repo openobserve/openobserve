@@ -814,12 +814,6 @@ pub struct Slo {
         help = "How much history one backfill chunk covers. One aggregate query per chunk produces every slice in it."
     )]
     pub backfill_chunk_secs: i64,
-    #[env_config(
-        name = "ZO_SLO_MAX_BURN_WINDOW_PAIRS",
-        default = 8,
-        help = "Max distinct (long, short) burn-rate window pairs precomputed per SLO per pass. Alerts share these, so the cost is per SLO, not per alert."
-    )]
-    pub max_burn_window_pairs: i64,
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -1252,8 +1246,6 @@ pub struct Search {
 
 #[derive(Serialize, EnvConfig, Default)]
 pub struct Common {
-    #[env_config(name = "ZO_APP_NAME", default = "openobserve")]
-    pub app_name: String,
     #[env_config(name = "ZO_LOCAL_MODE", default = true)]
     pub local_mode: bool,
     // ZO_LOCAL_MODE_STORAGE is ignored when ZO_LOCAL_MODE is set to false
@@ -1721,8 +1713,6 @@ pub struct Common {
     pub model_pricing_sync_interval_secs: u64,
     #[env_config(name = "ZO_FAKE_ES_VERSION", default = "")]
     pub fake_es_version: String,
-    #[env_config(name = "ZO_ES_VERSION", default = "")]
-    pub es_version: String,
     #[env_config(
         name = "ZO_CREATE_ORG_THROUGH_INGESTION",
         default = true,
@@ -1985,14 +1975,10 @@ pub struct Limit {
     pub grpc_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_GRPC_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
     pub grpc_runtime_blocking_worker_num: usize, // equals to 512 if 0
-    #[env_config(name = "ZO_GRPC_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub grpc_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_JOB_RUNTIME_WORKER_NUM", default = 0)]
     pub job_runtime_worker_num: usize, // equals to cpu_num if 0
     #[env_config(name = "ZO_JOB_RUNTIME_BLOCKING_WORKER_NUM", default = 0)]
     pub job_runtime_blocking_worker_num: usize, // equals to 512 if 0
-    #[env_config(name = "ZO_JOB_RUNTIME_SHUTDOWN_TIMEOUT", default = 10)] // seconds
-    pub job_runtime_shutdown_timeout: u64,
     #[env_config(name = "ZO_WAL_RUNTIME_WORKER_NUM", default = 0)]
     pub wal_runtime_worker_num: usize, // equals to mem_table_bucket_num if 0
     #[env_config(name = "ZO_CALCULATE_STATS_INTERVAL", default = 600)] // seconds
@@ -2204,8 +2190,6 @@ pub struct Limit {
     pub search_job_retention: i64,
     #[env_config(name = "ZO_STARTING_EXPECT_QUERIER_NUM", default = 0)]
     pub starting_expect_querier_num: usize,
-    #[env_config(name = "ZO_QUERY_OPTIMIZATION_NUM_FIELDS", default = 1000)]
-    pub query_optimization_num_fields: usize,
     #[env_config(name = "ZO_QUICK_MODE_ENABLED", default = false)]
     pub quick_mode_enabled: bool,
     #[env_config(name = "ZO_QUICK_MODE_FORCE_ENABLED", default = true)]
@@ -2242,12 +2226,6 @@ pub struct Limit {
         help = "max time of transaction will retry"
     )]
     pub meta_transaction_retries: usize,
-    #[env_config(
-        name = "ZO_META_TRANSACTION_LOCK_TIMEOUT",
-        default = 600,
-        help = "timeout of transaction lock"
-    )] // seconds
-    pub meta_transaction_lock_timeout: usize,
     #[env_config(name = "ZO_DISTINCT_VALUES_INTERVAL", default = 10)] // seconds
     pub distinct_values_interval: u64,
     #[env_config(name = "ZO_DISTINCT_VALUES_HOURLY", default = false)]
@@ -2591,8 +2569,6 @@ pub struct Nats {
     pub deliver_policy: String,
     #[env_config(name = "ZO_NATS_CONNECT_TIMEOUT", default = 5)]
     pub connect_timeout: u64,
-    #[env_config(name = "ZO_NATS_COMMAND_TIMEOUT", default = 10)]
-    pub command_timeout: u64,
     #[env_config(name = "ZO_NATS_LOCK_WAIT_TIMEOUT", default = 3600)]
     pub lock_wait_timeout: u64,
     #[env_config(name = "ZO_NATS_SUB_CAPACITY", default = 65535)]
@@ -2677,8 +2653,6 @@ pub struct S3 {
         help = "Use STANDARD_IA storage class for compliance storage type"
     )]
     pub feature_force_infrequent_access: bool,
-    #[env_config(name = "ZO_S3_SYNC_TO_CACHE_INTERVAL", default = 600)] // seconds
-    pub sync_to_cache_interval: u64,
     #[env_config(name = "ZO_S3_MAX_RETRIES", default = 10)]
     pub max_retries: usize,
     #[env_config(name = "ZO_S3_MAX_IDLE_PER_HOST", default = 0)]
@@ -2790,12 +2764,6 @@ pub struct Pipeline {
         help = "Enable batching of entries before sending HTTP requests"
     )]
     pub batch_enabled: bool,
-    #[env_config(
-        name = "ZO_PIPELINE_BATCH_SIZE",
-        default = 100,
-        help = "Maximum number of entries to batch together"
-    )]
-    pub batch_size: usize,
     #[env_config(
         name = "ZO_PIPELINE_BATCH_TIMEOUT_MS",
         default = 1000,
