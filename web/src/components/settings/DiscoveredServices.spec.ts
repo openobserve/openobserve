@@ -19,6 +19,7 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import DiscoveredServices from "./DiscoveredServices.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
 
 vi.mock("@/services/service_streams", () => ({
   default: {
@@ -294,31 +295,395 @@ describe("DiscoveredServices", () => {
     });
   });
 
-  describe("filteredGroups computed", () => {
-    it("should return all groups when searchQuery is empty", async () => {
-      wrapper = mountComponent();
-      await flushPromises();
-      wrapper.vm.searchQuery = "";
-      expect(wrapper.vm.filteredGroups).toHaveLength(2);
+  describe("flatRows computed (flat table, no expansion)", () => {
+    // Two api-server instances + one worker: exercises grouping adjacency,
+    // within-group ordering (default set last), and per-instance filtering.
+    const multiInstanceResponse = [
+      {
+        id: "a1",
+        org_id: "test-org",
+        service_name: "api-server",
+        set_id: "k8s-workload",
+        disambiguation: { "k8s-cluster": "prod", "k8s-deployment": "api-server" },
+        all_dimensions: {},
+        logs_streams: ["api-logs"],
+        traces_streams: ["api-traces"],
+        metrics_streams: [],
+        field_name_mapping: {},
+        last_seen: 3000000,
+      },
+      {
+        id: "a2",
+        org_id: "test-org",
+        service_name: "api-server",
+        set_id: "default",
+        disambiguation: {},
+        all_dimensions: {},
+        logs_streams: ["api-logs-legacy"],
+        traces_streams: [],
+        metrics_streams: [],
+        field_name_mapping: {},
+        last_seen: 1000000,
+      },
+      {
+        id: "w1",
+        org_id: "test-org",
+        service_name: "worker",
+        set_id: "worker-set",
+        disambiguation: { "k8s-cluster": "prod", "k8s-statefulset": "worker" },
+        all_dimensions: {},
+        logs_streams: ["worker-logs"],
+        traces_streams: [],
+        metrics_streams: [],
+        field_name_mapping: {},
+        last_seen: 2000000,
+      },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+        data: multiInstanceResponse,
+      } as any);
     });
 
-    it("should filter by search query on service_name", async () => {
+    it("should emit every instance as a row with no expansion gate", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.vm.flatRows).toHaveLength(3);
+    });
+
+    it("should keep instances of the same service adjacent, groups by last_seen desc", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      // api-server group max last_seen (3000000) > worker (2000000)
+      expect(wrapper.vm.flatRows.map((r: any) => r.service_name)).toEqual([
+        "api-server",
+        "api-server",
+        "worker",
+      ]);
+    });
+
+    it("should order instances latest-first within their group", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const apiRows = wrapper.vm.flatRows.filter((r: any) => r.service_name === "api-server");
+      // a1 (3000000) is newer than a2 (1000000)
+      expect(apiRows.map((r: any) => r.id)).toEqual(["a1", "a2"]);
+    });
+
+    it("should put a default-set instance first when it is the newest", async () => {
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+        data: [
+          multiInstanceResponse[0], // a1, k8s-workload, 3000000
+          { ...multiInstanceResponse[1], last_seen: 5000000 }, // a2, default, newest
+        ],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a2", "a1"]);
+    });
+
+    it("should keep all instances of a service when search matches its name", async () => {
       wrapper = mountComponent();
       await flushPromises();
       wrapper.vm.searchQuery = "api-server";
-      const filtered = wrapper.vm.filteredGroups;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].service_name).toContain("api-server");
+      expect(wrapper.vm.flatRows).toHaveLength(2);
+      expect(wrapper.vm.flatRows.every((r: any) => r.service_name === "api-server")).toBe(true);
     });
 
-    it("should filter by dimension key/value", async () => {
+    it("should reveal only the matching instance row on a dimension-value search", async () => {
       wrapper = mountComponent();
       await flushPromises();
-      wrapper.vm.filterKey = "k8s-statefulset";
-      wrapper.vm.filterValue = "worker";
-      const filtered = wrapper.vm.filteredGroups;
-      expect(filtered).toHaveLength(1);
-      expect(filtered[0].service_name).toBe("worker");
+      wrapper.vm.searchQuery = "statefulset";
+      expect(wrapper.vm.flatRows).toHaveLength(1);
+      expect(wrapper.vm.flatRows[0].id).toBe("w1");
+    });
+
+    it("should reveal only the matching instance row on a stream-name search", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.searchQuery = "api-logs-legacy";
+      expect(wrapper.vm.flatRows).toHaveLength(1);
+      expect(wrapper.vm.flatRows[0].id).toBe("a2");
+    });
+
+    it("should drop non-matching instances on a key/value filter", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.filterKey = "k8s-deployment";
+      wrapper.vm.filterValue = "api-server";
+      expect(wrapper.vm.flatRows).toHaveLength(1);
+      expect(wrapper.vm.flatRows[0].id).toBe("a1");
+    });
+
+    it("should filter by set_id via the workload filter key", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.filterKey = "set_id";
+      wrapper.vm.filterValue = "default";
+      expect(wrapper.vm.flatRows).toHaveLength(1);
+      expect(wrapper.vm.flatRows[0].id).toBe("a2");
+    });
+
+    it("should count services and instances for the footer", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      expect(wrapper.vm.filteredGroupCount).toBe(2);
+      expect(wrapper.vm.totalInstances).toBe(3);
+    });
+  });
+
+  describe("per-service collapse", () => {
+    const collapseResponse = [
+      {
+        id: "a1",
+        org_id: "test-org",
+        service_name: "api-server",
+        set_id: "k8s-workload",
+        disambiguation: { "k8s-cluster": "prod" },
+        all_dimensions: {},
+        logs_streams: ["api-logs", "api-logs-2"],
+        traces_streams: ["api-traces"],
+        metrics_streams: [],
+        field_name_mapping: {},
+        last_seen: 3000000,
+      },
+      {
+        id: "a2",
+        org_id: "test-org",
+        service_name: "api-server",
+        set_id: "default",
+        disambiguation: {},
+        all_dimensions: {},
+        logs_streams: ["api-logs"],
+        traces_streams: [],
+        metrics_streams: ["api-metrics"],
+        field_name_mapping: {},
+        last_seen: 1000000,
+      },
+      {
+        id: "w1",
+        org_id: "test-org",
+        service_name: "worker",
+        set_id: "worker-set",
+        disambiguation: { "k8s-statefulset": "worker" },
+        all_dimensions: {},
+        logs_streams: ["worker-logs"],
+        traces_streams: [],
+        metrics_streams: [],
+        field_name_mapping: {},
+        last_seen: 2000000,
+      },
+    ];
+
+    beforeEach(() => {
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+        data: collapseResponse,
+      } as any);
+    });
+
+    it("should collapse a service to one aggregated summary row", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.toggleServiceCollapse("api-server");
+      await nextTick();
+
+      const rows = wrapper.vm.flatRows;
+      expect(rows).toHaveLength(2); // summary + worker instance
+      const summary = rows[0];
+      expect(summary.__type).toBe("summary");
+      expect(summary.service_name).toBe("api-server");
+      expect(summary.instanceCount).toBe(2);
+      // Unique stream unions across instances
+      expect(summary.totalLogs).toBe(2);
+      expect(summary.totalTraces).toBe(1);
+      expect(summary.totalMetrics).toBe(1);
+      expect(summary.lastSeen).toBe(3000000);
+      // Worker stays a plain instance row
+      expect(rows[1].id).toBe("w1");
+    });
+
+    it("should expand back to instance rows on a second toggle", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.toggleServiceCollapse("api-server");
+      wrapper.vm.toggleServiceCollapse("api-server");
+      await nextTick();
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
+    });
+
+    it("should expand (not open the drawer) when a summary row is clicked", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.toggleServiceCollapse("api-server");
+      await nextTick();
+      wrapper.vm.handleRowClick(wrapper.vm.flatRows[0]);
+      await nextTick();
+      expect(wrapper.vm.selectedService).toBeNull();
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
+    });
+
+    it("should ignore collapse while a search is active so matches stay visible", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.toggleServiceCollapse("api-server");
+      wrapper.vm.searchQuery = "api-metrics";
+      await nextTick();
+      expect(wrapper.vm.flatRows).toHaveLength(1);
+      expect(wrapper.vm.flatRows[0].id).toBe("a2");
+    });
+
+    it("should keep footer counts instance-accurate while collapsed", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.toggleServiceCollapse("api-server");
+      await nextTick();
+      expect(wrapper.vm.filteredGroupCount).toBe(2);
+      expect(wrapper.vm.totalInstances).toBe(3);
+    });
+
+    it("should render a collapse toggle only on multi-instance services", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      await nextTick();
+      const toggles = wrapper.findAll('[data-test="service-collapse-toggle"]');
+      // api-server (2 instances) gets one toggle on its first row; the pivot
+      // merge hides the continuation row's cell. worker (1 instance) gets none.
+      expect(toggles).toHaveLength(1);
+      await toggles[0].trigger("click");
+      expect(wrapper.vm.flatRows[0].__type).toBe("summary");
+      // Toggle click must not open the drawer
+      expect(wrapper.vm.selectedService).toBeNull();
+    });
+  });
+
+  describe("group-level sorting", () => {
+    beforeEach(() => {
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+        data: [
+          { ...mockServicesResponse[0], id: "a1", last_seen: 3000000 },
+          {
+            ...mockServicesResponse[0],
+            id: "a2",
+            set_id: "default",
+            disambiguation: {},
+            last_seen: 1000000,
+          },
+          { ...mockServicesResponse[1], id: "w1", last_seen: 2000000 },
+        ],
+      } as any);
+    });
+
+    it("should sort groups by name ascending while keeping instances adjacent", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.onSortChange({ column: "service_name", order: "asc" });
+      expect(wrapper.vm.flatRows.map((r: any) => r.service_name)).toEqual([
+        "api-server",
+        "api-server",
+        "worker",
+      ]);
+      wrapper.vm.onSortChange({ column: "service_name", order: "desc" });
+      expect(wrapper.vm.flatRows.map((r: any) => r.service_name)).toEqual([
+        "worker",
+        "api-server",
+        "api-server",
+      ]);
+    });
+
+    it("should fall back to last_seen desc when sort is cleared", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      wrapper.vm.onSortChange({ column: "service_name", order: "desc" });
+      wrapper.vm.onSortChange({ column: "", order: "asc" });
+      expect(wrapper.vm.sortColumn).toBe("last_seen");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
+    });
+
+    it("should toggle Last Seen order on header clicks despite OTable's clear-sort state", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      // Default: groups by max last_seen desc, instances latest-first
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
+
+      // First click: OTable's 3-state cycle emits "clear" (we start at desc).
+      // It must act as the missing third state — ascending — not a no-op.
+      const sortTrigger = () =>
+        wrapper.find('[data-test="o2-table-th-last_seen"] [data-test="o2-table-th-sort-trigger"]');
+      await sortTrigger().trigger("click");
+      expect(wrapper.vm.sortOrder).toBe("asc");
+      // Groups by max asc (worker 2000000 < api-server 3000000), instances oldest-first
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["w1", "a2", "a1"]);
+
+      // Second click: back to desc
+      await sortTrigger().trigger("click");
+      expect(wrapper.vm.sortOrder).toBe("desc");
+      expect(wrapper.vm.flatRows.map((r: any) => r.id)).toEqual(["a1", "a2", "w1"]);
+    });
+  });
+
+  describe("table wiring (merged name cell, no expansion)", () => {
+    it("should inset the table from the page edge", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const table = wrapper.find('[data-test="services-list-table"]');
+      expect(table.exists()).toBe(true);
+      expect(table.element.closest(".px-page-edge")).not.toBeNull();
+    });
+
+    it("should pass pivotRowColumns for service_name and disable expansion", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const table = wrapper.findComponent(OTable);
+      expect(table.exists()).toBe(true);
+      expect(table.props("pivotRowColumns")).toEqual([{ name: "service_name" }]);
+      expect(table.props("expansion")).toBe("none");
+      expect(table.props("sorting")).toBe("server");
+    });
+
+    it("should render a shared service name once per group and every instance without expanding", async () => {
+      vi.mocked(serviceStreamsService.getServicesList).mockResolvedValue({
+        data: [
+          { ...mockServicesResponse[0], id: "a1", set_id: "set-one", last_seen: 3000000 },
+          {
+            ...mockServicesResponse[0],
+            id: "a2",
+            set_id: "set-two",
+            disambiguation: { "k8s-cluster": "staging" },
+            last_seen: 1000000,
+          },
+          { ...mockServicesResponse[1], id: "w1", last_seen: 2000000 },
+        ],
+      } as any);
+      wrapper = mountComponent();
+      await flushPromises();
+      await nextTick();
+
+      // All three instance rows render with no expansion interaction: both
+      // workload set ids of api-server are visible immediately.
+      const cellText = (sel: string) =>
+        wrapper.findAll(`[data-test="o2-table-cell-${sel}"]`).map((c) => c.text());
+      expect(cellText("workload")).toEqual(["set-one", "set-two", "worker-set"]);
+
+      // The pivot merge collapses the repeated name: "api-server" appears in
+      // exactly one service_name cell even though it owns two rows.
+      const nameCells = cellText("service_name");
+      expect(nameCells).toHaveLength(3);
+      expect(nameCells.filter((t) => t.includes("api-server"))).toHaveLength(1);
+      expect(nameCells.filter((t) => t.includes("worker"))).toHaveLength(1);
+    });
+
+    it("should open the drawer on a single row click", async () => {
+      wrapper = mountComponent();
+      await flushPromises();
+      const row = wrapper.vm.flatRows[0];
+      wrapper.vm.handleRowClick(row);
+      await nextTick();
+      expect(wrapper.vm.selectedService).toBeTruthy();
+      expect(wrapper.vm.selectedService.id).toBe(row.id);
+      const drawer = wrapper.findComponent({ name: "ODrawer" });
+      expect(drawer.props("open")).toBe(true);
     });
   });
 

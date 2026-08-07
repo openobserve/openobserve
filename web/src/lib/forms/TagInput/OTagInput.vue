@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`tag-chip-${index}`"
           type="selectionChip"
           class="tag-chip m-0! shrink-0 grow-0 basis-auto bg-[color-mix(in_srgb,var(--color-button-primary)_20%,white_10%)]"
+          :class="isHighlighted(tag) ? 'ring-theme-accent ring-1' : ''"
         >
           {{ tag }}
           <template #trailing>
@@ -89,6 +90,8 @@ interface Props {
   modelValue: string[];
   placeholder?: I18nText;
   label?: I18nText;
+  /** Case-insensitive substring — tags containing it get a highlight ring (search-match affordance). */
+  highlightQuery?: string;
 }
 
 // No `placeholder` default: `t()` in `withDefaults` would freeze the locale at
@@ -98,6 +101,11 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const hasContent = computed(() => props.modelValue.length > 0 || inputValue.value.length > 0);
+
+const isHighlighted = (tag: string): boolean => {
+  const q = props.highlightQuery?.trim().toLowerCase();
+  return Boolean(q) && tag.toLowerCase().includes(q!);
+};
 // Live-reported bug: the label only floated when there was content, so an
 // empty, focused field showed the label sitting directly on top of the
 // placeholder ("Type and press Enter or comma") — indistinguishable from
