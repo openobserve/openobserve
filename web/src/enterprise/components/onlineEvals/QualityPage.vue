@@ -34,6 +34,7 @@
     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
     <KpiCardRow
       v-else
+      gap="gap-2"
       class="quality-page__kpis px-page-edge"
       :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
     >
