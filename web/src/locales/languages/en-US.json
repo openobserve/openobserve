@@ -11851,7 +11851,7 @@
       "nodeRole": {
         "all": "All",
         "flattencompactor": "Flatten Compactor",
-        "alertmanager": "Alert Manager",
+        "scheduler": "Scheduler",
         "actionserver": "Action Server"
       },
       "sessionStatus": {

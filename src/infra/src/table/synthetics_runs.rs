@@ -244,7 +244,7 @@ pub async fn get_run<C: ConnectionTrait>(
 ///
 /// Everything the caller does on completion then happened twice: the run
 /// rollup, the check status write, and the alert dispatch — a duplicate
-/// customer-facing notification. This needed no multiple alert managers to
+/// customer-facing notification. This did not require multiple scheduler nodes to
 /// reach: acks are served on ingesters (2 replicas in every environment) and the
 /// probes of one run finish independently.
 ///

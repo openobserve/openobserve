@@ -84,8 +84,8 @@ const mockSpans = [
   {
     spanId: "d9603ec7f76eb499",
     operationName: "service:alerts:evaluate_scheduled",
-    serviceName: "alertmanager",
-    resolvedIdentity: "alertmanager",
+    serviceName: "scheduler",
+    resolvedIdentity: "scheduler",
     spanStatus: "UNSET",
     spanKind: "Client",
     parentId: "6702b0494b2b6e57",
@@ -102,8 +102,8 @@ const mockSpans = [
   {
     spanId: "6702b0494b2b6e57",
     operationName: "service:alerts:process",
-    serviceName: "alertmanager",
-    resolvedIdentity: "alertmanager",
+    serviceName: "scheduler",
+    resolvedIdentity: "scheduler",
     spanStatus: "ERROR",
     spanKind: "Server",
     parentId: null,
@@ -127,7 +127,7 @@ const mockSpanMap = {
     duration: 321372,
     span_id: "d9603ec7f76eb499",
     operation_name: "service:alerts:evaluate_scheduled",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     span_status: "UNSET",
     span_kind: 2,
     parent_id: "6702b0494b2b6e57",
@@ -139,7 +139,7 @@ const mockSpanMap = {
     duration: 321372,
     span_id: "6702b0494b2b6e57",
     operation_name: "service:alerts:process",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     span_status: "ERROR",
     span_kind: 1,
     parent_id: null,
@@ -196,7 +196,7 @@ const mockSpanDimensions = {
 const mockSpanList = [
   {
     span_id: "d9603ec7f76eb499",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     operation_name: "service:alerts:evaluate_scheduled",
     duration: 321372,
     span_status: "UNSET",
@@ -217,7 +217,7 @@ const mockSpanList = [
   },
   {
     span_id: "6702b0494b2b6e57",
-    service_name: "alertmanager",
+    service_name: "scheduler",
     operation_name: "service:alerts:process",
     duration: 321372,
     span_status: "ERROR",
@@ -400,7 +400,7 @@ describe("TraceTree", () => {
   describe("Search functionality", () => {
     it("should highlight spans that match search query", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -413,7 +413,7 @@ describe("TraceTree", () => {
 
     it("should highlight current match", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -439,7 +439,7 @@ describe("TraceTree", () => {
 
     it("should find matches in service name", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -472,7 +472,7 @@ describe("TraceTree", () => {
 
     it("should handle case-insensitive search", async () => {
       await wrapper.setProps({
-        searchQuery: "ALERTMANAGER",
+        searchQuery: "SCHEDULER",
       });
 
       await flushPromises();
@@ -483,7 +483,7 @@ describe("TraceTree", () => {
 
     it("should emit search-result with correct count", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -494,7 +494,7 @@ describe("TraceTree", () => {
 
     it("should emit update-current-index when current index changes", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -506,23 +506,23 @@ describe("TraceTree", () => {
     describe("isHighlighted function", () => {
       beforeEach(async () => {
         await wrapper.setProps({
-          searchQuery: "alertmanager",
+          searchQuery: "scheduler",
         });
         await flushPromises();
       });
 
       it("should return true for array path that matches search results", () => {
         wrapper.vm.searchResults = [
-          ["service_name", "alertmanager"],
+          ["service_name", "scheduler"],
           ["operation_name", "evaluate_scheduled"],
         ];
 
-        const result = wrapper.vm.isHighlighted(["service_name", "alertmanager"]);
+        const result = wrapper.vm.isHighlighted(["service_name", "scheduler"]);
         expect(result).toBe(true);
       });
 
       it("should return false for array path that doesn't match search results", () => {
-        wrapper.vm.searchResults = [["service_name", "alertmanager"]];
+        wrapper.vm.searchResults = [["service_name", "scheduler"]];
 
         const result = wrapper.vm.isHighlighted(["operation_name", "process"]);
         expect(result).toBe(false);
@@ -553,7 +553,7 @@ describe("TraceTree", () => {
     describe("scrollToMatch function", () => {
       beforeEach(async () => {
         await wrapper.setProps({
-          searchQuery: "alertmanager",
+          searchQuery: "scheduler",
         });
         await flushPromises();
       });
@@ -643,7 +643,7 @@ describe("TraceTree", () => {
   describe("Navigation methods", () => {
     beforeEach(async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
       await flushPromises();
     });
@@ -848,13 +848,13 @@ describe("TraceTree", () => {
       const spanList = [
         {
           span_id: "span1",
-          service_name: "alertmanager",
+          service_name: "scheduler",
           operation_name: "process",
         },
         { span_id: "span2", service_name: "other", operation_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
@@ -883,22 +883,22 @@ describe("TraceTree", () => {
 
     it("should handle case-insensitive search", () => {
       const spanList = [
-        { span_id: "span1", service_name: "AlertManager" },
+        { span_id: "span1", service_name: "Scheduler" },
         { span_id: "span2", service_name: "Other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
 
     it("should handle trimmed search query", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "  alertmanager  ");
+      const results = wrapper.vm.findMatches(spanList, "  scheduler  ");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
@@ -907,20 +907,20 @@ describe("TraceTree", () => {
       const spanList = [
         {
           span_id: "span1",
-          service_name: "alertmanager",
+          service_name: "scheduler",
           metadata: { key: "value" },
         },
         { span_id: "span2", service_name: "other" },
       ];
 
-      const results = wrapper.vm.findMatches(spanList, "alertmanager");
+      const results = wrapper.vm.findMatches(spanList, "scheduler");
       expect(results).toContain("span1");
       expect(results).not.toContain("span2");
     });
 
     it("should return empty array when no matches found", () => {
       const spanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
@@ -929,7 +929,7 @@ describe("TraceTree", () => {
     });
 
     it("should handle empty search query", () => {
-      const spanList = [{ span_id: "span1", service_name: "alertmanager" }];
+      const spanList = [{ span_id: "span1", service_name: "scheduler" }];
 
       const results = wrapper.vm.findMatches(spanList, "");
       expect(results).toEqual([]);
@@ -947,13 +947,13 @@ describe("TraceTree", () => {
 
     it("should update search results when search query exists", async () => {
       const localSpanList = [
-        { span_id: "span1", service_name: "alertmanager" },
+        { span_id: "span1", service_name: "scheduler" },
         { span_id: "span2", service_name: "other" },
       ];
 
       await wrapper.setProps({
         spanList: localSpanList,
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
@@ -964,7 +964,7 @@ describe("TraceTree", () => {
 
     it("should clear search results when search query is empty", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();

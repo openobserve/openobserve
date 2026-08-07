@@ -42,7 +42,7 @@ vi.mock("@/utils/traces/convertTraceData", () => ({
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
-    searchObj: { meta: { serviceColors: { alertmanager: "#1ab8be" } } },
+    searchObj: { meta: { serviceColors: { scheduler: "#1ab8be" } } },
     buildQueryDetails: mockBuildQueryDetails,
     navigateToLogs: mockNavigateToLogs,
     navigateToCorrelatedLogs: mockNavigateToCorrelatedLogs,
@@ -137,7 +137,7 @@ const mockSpan = {
   span_id: "d9603ec7f76eb499",
   trace_id: "6262666637a9ae45ad3e25f5111dd59f",
   operation_name: "service:alerts:evaluate_scheduled",
-  service_name: "alertmanager",
+  service_name: "scheduler",
   span_status: "UNSET",
   span_kind: 2, // Server
   parent_id: "6702b0494b2b6e57",
@@ -146,7 +146,7 @@ const mockSpan = {
   http_method: "GET",
   http_status_code: "200",
   http_url: "/api/v1/alerts",
-  service_service_instance: "dev2-openobserve-alertmanager-1",
+  service_service_instance: "dev2-openobserve-scheduler-1",
   service_service_version: "v0.15.0-rc3",
   busy_ns: "40550",
   idle_ns: "321332352",
@@ -653,13 +653,13 @@ describe("TraceDetailsSidebar", async () => {
     it("should display service name in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
 
     it("should display service instance in attributes", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
       expect(attributesTable.exists()).toBe(true);
-      expect(attributesTable.text()).toContain("dev2-openobserve-alertmanager-1");
+      expect(attributesTable.text()).toContain("dev2-openobserve-scheduler-1");
     });
   });
 
@@ -949,16 +949,16 @@ describe("TraceDetailsSidebar", async () => {
 
     it("should highlight search terms in service information", async () => {
       await wrapper.setProps({
-        searchQuery: "alertmanager",
+        searchQuery: "scheduler",
       });
 
       await flushPromises();
 
       // Verify search query is set
-      expect(wrapper.vm.searchQuery).toBe("alertmanager");
+      expect(wrapper.vm.searchQuery).toBe("scheduler");
       // Attributes tab is default — verify it contains the search term
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
-      expect(attributesTable.text()).toContain("alertmanager");
+      expect(attributesTable.text()).toContain("scheduler");
     });
   });
 

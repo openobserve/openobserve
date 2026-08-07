@@ -364,7 +364,7 @@ export const BADGE_GROUPS = {
         labelKey: "components.badge.nodeRole.flattencompactor",
       },
       router: { variant: "orange-soft" },
-      alertmanager: { variant: "amber-soft", labelKey: "components.badge.nodeRole.alertmanager" },
+      scheduler: { variant: "amber-soft", labelKey: "components.badge.nodeRole.scheduler" },
       actionserver: { variant: "lime-soft", labelKey: "components.badge.nodeRole.actionserver" },
       script: { variant: "default-soft" },
     },
