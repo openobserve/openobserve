@@ -81,6 +81,22 @@ const enterpriseResolverPlugin = {
   },
 };
 
+// The Geist fonts are vendored and get compiled into the OpenObserve binary
+// with the rest of dist/, and the OFL requires its text to travel with them.
+// Vite only emits assets that are imported, so the license is copied explicitly.
+const fontLicensePlugin = {
+  name: "font-license",
+  apply: "build" as const,
+  generateBundle() {
+    const src = path.resolve(__dirname, "src/styles/fonts/OFL.txt");
+    (this as any).emitFile({
+      type: "asset",
+      fileName: "fonts/OFL.txt",
+      source: fs.readFileSync(src, "utf8"),
+    });
+  },
+};
+
 function monacoEditorTestResolver() {
   return {
     name: "monaco-editor-test-resolver",
@@ -180,12 +196,13 @@ export default defineConfig(({ mode }) => {
       port: 8081,
       // headers: {
       //   "Content-Security-Policy":
-      //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
+      //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
       // },
     },
     base: "./",
     plugins: [
       vue(),
+      fontLicensePlugin,
       debugFilterPlugin,
       process.env.VITE_COVERAGE === "true" &&
         istanbul({
