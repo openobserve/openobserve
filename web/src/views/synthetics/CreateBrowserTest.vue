@@ -54,8 +54,13 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
+import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
+import useCheckWizardUi, {
+  VARIABLES_SPLITTER_LIMITS,
+} from "@/composables/synthetics/useCheckWizardUi";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
 import CreateBrowserTestSkeleton from "@/components/synthetics/CreateBrowserTestSkeleton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -66,6 +71,19 @@ const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
+// Shared with CheckConfigure so a drag on either page carries to the other.
+const { variablesSplitter } = useCheckWizardUi();
+
+// Journey-only: the toggle lives in the journey toolbar, so sharing the flag
+// would hide the panel on Configure with no control there to bring it back.
+const variablesPanelOpen = ref(true);
+const journeySplitter = computed({
+  get: () => (variablesPanelOpen.value ? variablesSplitter.value : 100),
+  set: (v: number) => (variablesSplitter.value = v),
+});
+const journeySplitterLimits = computed<[number, number]>(() =>
+  variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
+);
 
 // Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
 // The i18n message "Supports {variables} like {baseUrl}." uses these params to
@@ -1030,33 +1048,63 @@ function onClearResults() {
             :done="journeyStepDone"
             class="h-full!"
           >
-            <BrowserJourney
-              ref="journeyRef"
-              v-model="check.journey"
-              :start-url="check.url"
-              :extension-ready="extensionReady"
-              :auto-record="autoRecord"
-              :replay-phase="replayPhase"
-              :step-results="stepResults"
-              :active-step-id="activeStepId"
-              :blocked-reason="blockedReason"
-              :blocked-detail="blockedDetail"
-              :field-issues="journeyFieldIssues"
-              class="h-full!"
-              @need-extension-setup="onNeedExtensionSetup"
-              @replay="onReplay"
-              @replay-up-to="onReplayUpTo"
-              @stop-replay="onStopReplay"
-              @clear-results="onClearResults"
-              @auto-record-consumed="autoRecord = false"
-              @selection-changed="journeySelectionState = $event"
-            />
+            <!-- Journey editor + Variables panel; the steps list scrolls in its
+                 own region so the panel stays pinned. -->
+            <OSplitter
+              v-model="journeySplitter"
+              :limits="journeySplitterLimits"
+              :disable="!variablesPanelOpen"
+              :separator="variablesPanelOpen"
+              class="h-full min-h-0"
+            >
+              <template #before>
+                <div class="border-border-default h-full min-h-0 overflow-y-auto border-t">
+                  <BrowserJourney
+                    ref="journeyRef"
+                    v-model="check.journey"
+                    :start-url="check.url"
+                    :extension-ready="extensionReady"
+                    :auto-record="autoRecord"
+                    :replay-phase="replayPhase"
+                    :step-results="stepResults"
+                    :active-step-id="activeStepId"
+                    :blocked-reason="blockedReason"
+                    :blocked-detail="blockedDetail"
+                    :field-issues="journeyFieldIssues"
+                    :variables-panel-open="variablesPanelOpen"
+                    class="h-full!"
+                    @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
+                    @need-extension-setup="onNeedExtensionSetup"
+                    @replay="onReplay"
+                    @replay-up-to="onReplayUpTo"
+                    @stop-replay="onStopReplay"
+                    @clear-results="onClearResults"
+                    @auto-record-consumed="autoRecord = false"
+                    @selection-changed="journeySelectionState = $event"
+                  />
+                </div>
+              </template>
+              <template #separator>
+                <div
+                  class="hover:bg-table-resize-handle h-full w-1 border-t bg-transparent transition-colors duration-300"
+                />
+              </template>
+              <template #after>
+                <CheckVariablesPanel
+                  v-if="variablesPanelOpen"
+                  :check="check"
+                  class="border-border-default border-t"
+                  @update:check="onConfigureUpdate"
+                />
+              </template>
+            </OSplitter>
           </OStep>
           <OStep
             :name="2"
             :title="t('synthetics.createBrowserTest.stepConfigure')"
             icon="tune"
             :done="false"
+            class="h-full!"
           >
             <CheckConfigure
               :check="check"
@@ -1070,7 +1118,7 @@ function onClearResults() {
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
               allow-private-locations
-              class="w-full!"
+              class="border-border-default w-full! border-t"
               @refresh:destinations="fetchDestinations"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"

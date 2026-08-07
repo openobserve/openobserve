@@ -16,16 +16,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { useI18nTyped } from "@/types/i18n";
 import type { BrowserCheck } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import { getUUID } from "@/utils/uuid";
 
 const props = defineProps<{ check: BrowserCheck }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
@@ -33,14 +30,11 @@ const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 const { t } = useI18nTyped();
 
 // ── Header summary ─────────────────────────────────────────────────────────────
+// Basic-auth only: variables moved to the always-visible CheckVariablesPanel.
 
-const summary = computed(() => {
-  const parts: string[] = [];
-  const pluralize = (n: number, w: string) => `${n} ${w}${n > 1 ? "s" : ""}`;
-  if (variables.value.length) parts.push(pluralize(variables.value.length, "variable"));
-  if (headers.value.length) parts.push(pluralize(headers.value.length, "header"));
-  return parts.join(" · ");
-});
+const summary = computed(() =>
+  props.check.auth ? t("synthetics.authNetwork.httpBasicAuth") : undefined,
+);
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -74,38 +68,6 @@ const authPassword = computed({
         : { type: "basic" as const, username: "", password: v },
     }),
 });
-
-// ── Variables ────────────────────────────────────────────────────────────────
-
-const variables = computed(() => props.check.variables ?? []);
-
-function updateVariable(
-  index: number,
-  field: "name" | "value" | "secure" | "example",
-  val: string | boolean,
-) {
-  const updated = variables.value.map((item, i) =>
-    i === index ? { ...item, [field]: val } : item,
-  );
-  emit("update:check", { ...props.check, variables: updated });
-}
-
-function addVariable() {
-  emit("update:check", {
-    ...props.check,
-    variables: [
-      ...variables.value,
-      { id: getUUID(), name: "", value: "", secure: false, example: "" },
-    ],
-  });
-}
-
-function removeVariable(index: number) {
-  emit("update:check", {
-    ...props.check,
-    variables: variables.value.filter((_, i) => i !== index),
-  });
-}
 
 // ── Headers ───────────────────────────────────────────────────────────────────
 
@@ -197,85 +159,6 @@ function removeCookie(index: number) {
             />
           </div>
         </template>
-      </div>
-
-      <!-- Variables -->
-      <OSeparator />
-
-      <div class="flex flex-col gap-3">
-        <h4 class="text-text-body text-sm font-medium">
-          {{ t("synthetics.authNetwork.variables") }}
-        </h4>
-
-        <ul v-if="variables.length" class="flex flex-col gap-2">
-          <li
-            v-for="(variable, index) in variables"
-            :key="variable.id ?? index"
-            class="flex flex-col gap-2"
-          >
-            <div class="flex items-center gap-2">
-              <OInput
-                :model-value="variable.name"
-                :placeholder="t('synthetics.authNetwork.variableNamePlaceholder')"
-                :data-test="`synthetics-check-auth-network-variable-name-${index}-input`"
-                class="flex-1"
-                @update:model-value="updateVariable(index, 'name', String($event))"
-              />
-              <span class="text-text-muted shrink-0">=</span>
-              <OInput
-                :model-value="variable.value"
-                :type="variable.secure ? 'password' : 'text'"
-                :placeholder="
-                  variable.secure && !variable.value
-                    ? raw(variable.example) || t('synthetics.authNetwork.passwordPlaceholder')
-                    : t('synthetics.authNetwork.variableValuePlaceholder')
-                "
-                :data-test="`synthetics-check-auth-network-variable-value-${index}-input`"
-                class="flex-1"
-                @update:model-value="updateVariable(index, 'value', String($event))"
-              />
-
-              <OButton
-                :data-test="`synthetics-check-auth-network-variable-secure-${index}-switch`"
-                size="sm"
-                variant="outline"
-                class="gap-1.5"
-                @click="updateVariable(index, 'secure', !variable.secure)"
-              >
-                <OSwitch :model-value="variable.secure" size="md" />
-                <OIcon name="lock" size="sm" />
-                <OTooltip
-                  :content="
-                    variable.secure
-                      ? t('synthetics.authNetwork.variableSecureTooltipShow')
-                      : t('synthetics.authNetwork.variableSecureTooltipHide')
-                  "
-                  side="top"
-                />
-              </OButton>
-
-              <OButton
-                icon-only
-                icon-left="close"
-                variant="ghost"
-                size="sm"
-                :aria-label="t('synthetics.authNetwork.removeVariable', { index })"
-                :data-test="`synthetics-check-auth-network-remove-variable-${index}-btn`"
-                @click="removeVariable(index)"
-              />
-            </div>
-          </li>
-        </ul>
-        <OButton
-          variant="outline"
-          size="sm"
-          icon-left="add"
-          class="self-start"
-          data-test="synthetics-check-auth-network-add-variable-btn"
-          @click="addVariable"
-        >
-          {{ t("synthetics.authNetwork.addVariable") }}
-        </OButton>
       </div>
 
       <!-- Custom headers -->
