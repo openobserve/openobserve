@@ -1,5 +1,5 @@
-<!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
 <template>
+  <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
   <OPageLayout
     class="h-[calc(100vh-50px)]!"
     data-test="promql-query-builder"

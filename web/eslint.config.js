@@ -87,21 +87,9 @@ const noLegacyO2Tokens = {
 // px carries `eslint-disable-next-line local/no-hardcoded-px -- <reason>` at the site, so
 // ESLint reports it once it stops being needed. Placement rules: SKILL.md §3.
 //
-// px is read from AST nodes on every surface — nothing is scanned as raw text, and no
-// comment is masked by regex. Comments therefore cannot report (no parser hands one to
-// this rule) and, the reason it matters, a string containing `/*` can no longer blank the
-// real code around it, which whole-file comment masking used to do. Surfaces covered:
-//
-//   .ts/.js/<script>  string and template literals
-//   <template>        attribute values (VLiteral), text (VText), and literals inside a
-//                     binding expression — so class="w-[320px]", style="margin: 8px",
-//                     :style="{ top: '4px' }" and :class="['h-[10px]']" all report
-//   .css              Dimension (parsed values), Raw (custom-property values and
-//                     Tailwind v4 at-rule preludes), Selector (escaped utility classes)
-//   .vue <style>      Dimension / Raw / Selector, same parser as .css above
-//
-// Checked against the previous whole-file scanner over all of src/: identical report set
-// (686 sites, 0 added, 0 lost).
+// px is located via AST nodes on every surface, never by scanning raw text. Comments are
+// therefore excluded structurally — and a string containing `/*` can no longer blank out
+// the code around it, which the previous whole-file comment masking did.
 const noHardcodedPx = {
   rules: {
     "no-hardcoded-px": {
@@ -160,8 +148,7 @@ const noHardcodedPx = {
               if (node.unit !== "px") return;
               reportAt(rangeOf(node)[0], `${node.value}px`);
             },
-            // css-tree leaves custom-property values unparsed (`--radius-full: 9999px`),
-            // as well as Tailwind v4 at-rule preludes.
+            // css-tree leaves custom-property values unparsed (`--radius-full: 9999px`).
             Raw: scanNode,
             // px inside an escaped utility class: `.h-\[calc\(100vh-105px\)\]`.
             Selector: scanNode,
@@ -169,22 +156,14 @@ const noHardcodedPx = {
         }
 
         // ── .vue <style> ───────────────────────────────────────────────────
-        // vue-eslint-parser parses <template> and <script> only, so this rule parses the
-        // style block itself with css-tree. Every block is plain CSS — the SCSS ones were
-        // converted — so one parser covers the whole codebase. px comes from the same three
-        // node kinds as the .css branch; Comment is never one of them, so comments are
-        // excluded structurally rather than masked.
+        // No ESLint parser hands a style block to a rule, so parse it here with css-tree
+        // and reuse the same three node kinds as the .css branch above.
         //
-        // ESLint core cannot see a style block's comments either, so it never registers a
-        // disable directive there. That is why a sanctioned px in CSS historically needed a
-        // blanket `eslint-disable` placed *outside* the block — which then silently ran to
-        // end of file. This rule therefore honours the scoped directives itself:
-        //
-        //   /* eslint-disable-next-line local/no-hardcoded-px -- <why px is correct here> */
-        //   /* eslint-disable-line local/no-hardcoded-px -- <why px is correct here> */
-        //
-        // A directive that suppresses nothing, or that omits its `-- reason`, is reported —
-        // the same self-cleaning contract the rest of the codebase gets from ESLint core.
+        // ESLint core cannot see a style block's comments either, so it registers no disable
+        // directive there — which is why a sanctioned px used to need a blanket
+        // `eslint-disable` placed outside the block, that then ran to end of file. This rule
+        // honours `/* eslint-disable-next-line|line local/no-hardcoded-px -- <reason> */`
+        // itself, and reports one that suppresses nothing or omits its reason.
         const STYLE_DIRECTIVE =
           /\/\*\s*eslint-disable-(next-line|line)\s+local\/no-hardcoded-px([\s\S]*?)\*\//g;
         const styleDirectives = [];

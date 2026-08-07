@@ -90,11 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleThemeChipClick('light')"
                 data-test="theme-light-chip"
               >
-                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
                   class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customLightColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"
@@ -116,11 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @click="handleThemeChipClick('dark')"
                 data-test="theme-dark-chip"
               >
-                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                 <div
                   class="color-circle relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-sm"
                   :style="{ backgroundColor: customDarkColor }"
                 >
+                  <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
                   <OIcon
                     name="palette"
                     size="xs"

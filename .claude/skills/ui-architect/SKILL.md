@@ -6,13 +6,15 @@ description: >-
   to existing ones. Enforce six house rules the moment you write Vue/template
   markup: (1) use OPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never bare HTML controls when an O2
-  equivalent exists, (3) no hardcoded px anywhere — including inside
-  Tailwind class arbitrary values ([320px]) — size with rem/%/vh/vw or Tailwind's
-  rem-based scale (1rem = 16px, so px/16 = rem and px/4 = the Tailwind step;
-  enforced by the local/no-hardcoded-px eslint rule; where px is genuinely correct
-  — hairlines, shadow/ring widths, query conditions, IntersectionObserver
-  rootMargin, user-facing copy, canvas/email consumers — annotate the site with
-  an eslint-disable-next-line carrying a `-- <reason>`, never a side-file exemption);
+  equivalent exists, (3) NEVER write px — always rem, including inside Tailwind class
+  arbitrary values ([320px] is banned; 1rem = 16px, so px/16 = rem and px/4 = the
+  Tailwind step). px is allowed ONLY where it is the genuinely correct unit —
+  hairlines, shadow/ring widths, query conditions, IntersectionObserver rootMargin,
+  zero inside calc()/clamp(), user-facing copy, canvas/email consumers — and there it
+  MUST carry an eslint-disable-next-line local/no-hardcoded-px with a `-- <reason>` at
+  the site, never a side-file exemption (in a <style> block the directive goes inside
+  the block as a CSS comment). The local/no-hardcoded-px rule runs in CI, so an
+  unannotated px fails the build and cannot reach main;
   and corner radius uses only the two-tier scale rounded-default
   (4px controls) / rounded-surface (12px surfaces) / rounded-full — never
   rounded-[..] or the retired rounded-sm/md/lg/xl, (4) no scoped-CSS blocks and no
@@ -83,6 +85,12 @@ read it once, it is the backbone of everything below.
 3. **No hardcoded `px`** — size with `rem` / `%` / `vh` / `vw`, or Tailwind's
    rem-based scale. This applies **inside class arbitrary values too** (`w-[320px]`,
    `text-[13px]`, `gap-[6px]` are all banned — convert to `rem`).
+   **The rule is simple: never write `px`. Write `rem`.** The only exceptions are the
+   positions in the table below, where rem is wrong or does not resolve at all — and
+   there the px must carry an `eslint-disable-next-line local/no-hardcoded-px --
+   <reason>` at the site. **A px with no annotation fails CI.** That is the whole
+   contract: new px cannot enter the codebase unnoticed, and a px that is genuinely
+   correct only passes once someone has written down why.
    **CI-enforced by `local/no-hardcoded-px`** (eslint, defined in `web/eslint.config.js`),
    run by `lint:ci` over `src/**/*.{vue,ts,css}`. It reports line:column with the rem value
    and the Tailwind step, and surfaces in the editor as you type.
@@ -100,18 +108,35 @@ read it once, it is the backbone of everything below.
      The `-- <reason>` is required, not decoration: it is the only record of why, and
      ESLint flags the directive once it stops suppressing anything, so a stale exemption
      surfaces instead of lingering. Where a plain next-line directive will not fit:
-     wrap a **multi-line opening tag** in `<!-- eslint-disable … -->` / `<!-- eslint-enable … -->`
-     (a comment inside the tag is invalid markup); for px in a **`<style>` block** put the
-     directive in `<script>` (comments inside `<style>` are not surfaced to ESLint, but a
-     directive applies to end of file); for a **multi-line template literal** use a block
-     disable/enable around the statement.
+     - **`<style>` block** — put the directive *inside the block*, in CSS-comment form.
+       The rule parses style blocks itself and honours these, and reports one that
+       suppresses nothing or omits its reason:
+       ```css
+       /* eslint-disable-next-line local/no-hardcoded-px -- hairline: 1 device pixel */
+       border-bottom: 1px solid var(--color-border-default);
+       ```
+       Do **not** hoist it to `<script>`, and do not park a blanket `eslint-disable`
+       above the block — that form runs to end of file and silences px nobody reviewed.
+     - **Multi-line opening tag** — wrap it in `<!-- eslint-disable … -->` /
+       `<!-- eslint-enable … -->`; a comment inside the tag is invalid markup.
+     - **Multi-line template literal** — block disable/enable around the statement.
+
+     **A range silences everything inside it, so make it the smallest thing that works.**
+     Open it immediately before the element that owns the px — not before a parent
+     wrapper — and close it on the line after that element's `>`. A range that spans a
+     parent plus its child, or starts before `<template>`, is silently covering markup
+     nobody reviewed, and **ESLint never reports an unused template directive**, so it
+     will not tell you when it stops being needed. Prefer a single-line
+     `eslint-disable-next-line` whenever the px sits on a line a comment can precede;
+     reach for the block form only when the syntax leaves no other option.
      | Position | Why px |
      | --- | --- |
      | Hairlines and sub-pixel geometry `≤1.5px` (borders, dividers, rings, half-hairline offsets, gradient dot radii) | A 1-device-pixel rule must not scale with text, or it anti-aliases into a smear — or drops out entirely — at non-integer zoom and DPR |
      | **Exception:** `letter-spacing` / `word-spacing` / `tracking-[…]` at ANY size | Tracking is *typographic* — it must scale with the type it tracks, so it never earns the sub-pixel exemption. `tracking-[0.5px]` is a violation; use rem (or `tracking-tight`/`-normal`/`-wide` if the value matches) |
      | Shadow offsets, ring / border / outline widths, blur radii | Optical effects, not layout. Scaling them with text makes elevation bloom |
      | Media / container query **conditions** (`@max-[900px]/topbar`) | A threshold defining *when* layout changes, not a rendered length |
-     | `IntersectionObserver` `rootMargin` | The API parses **px and % only** — a rem value throws `SyntaxError` from the constructor, silently killing the observer and whatever it gates (lazy-load, prefetch-ahead-of-fold). Like a query condition, it is a scroll threshold, not a rendered length |
+     | `IntersectionObserver` `rootMargin` | The API parses **px and % only** — `rem`, `em` **and bare `0`** all throw `SyntaxError` from the constructor, silently killing the observer and whatever it gates (lazy-load, prefetch-ahead-of-fold). Like a query condition, it is a scroll threshold, not a rendered length. `"200px 0px"` — keep both units |
+     | Zero **inside** `calc()` / `clamp()` — `var(--x, 0px)`, `clamp(0px, …)` | `calc()` type-checks its arithmetic: `112px + 0` is *length + number*, which voids the whole declaration. The unit is load-bearing. Outside `calc()`, plain `0` is still right — `height: 0`, not `0px` |
      | **User-facing copy** — tooltip `content`, `placeholder`, `label`, template text (`1 unit = 30px`) | Prose *describing* a size, not a size being applied. Converting it rewrites the sentence — usually into a falsehood, since what it describes is typically a fixed layout constant that does not scale with font-size. Readers also do not think in rem |
      | `calc()` mixing `vh`/`vw` with a length | `vh` tracks the window, `rem` tracks font-size — converting one term makes the result depend on two independent variables |
      | `calc(var(--x) * 1px)` | A unit-conversion *operator* attaching a unit to a unitless JS-computed number, not a chosen dimension |
@@ -121,6 +146,23 @@ read it once, it is the backbone of everything below.
    - **A size that JS parses with `parseInt` must stay px.** `parseInt("18.75rem")`
      is `18`, not `300` — a silent 16× shrink with no error and no failing test. If a
      value is read back by JS arithmetic, leave it in px rather than converting it.
+   - **Prove the swap emits what you think — a utility is not always the literal.**
+     Compile the real entry and diff the declarations rather than reasoning about it
+     (postcss + `@tailwindcss/postcss`, `@import "./tailwind.css"` + `@source` a probe
+     file, then compare `getComputedStyle` old vs new). Three ways this bites, all of
+     which shipped as regressions before being caught:
+     - A utility may resolve **through a variable**: `z-1` emits
+       `z-index: var(--z-index-1)`, which is dead if that token is unregistered.
+     - Bare `border` paints Tailwind's **default border colour, not `currentColor`** —
+       replacing `border: 1.5px solid` silently recolours it. Add `border-current`.
+     - Two utilities setting one property fight by **stylesheet order, not class
+       order**. `w-22` loses to a `w-full` already on the element — while the inline
+       `width` it replaced always won. Moving `style=""` to a class can therefore lose
+       a cascade fight the original never had; add `!` only once you have measured it.
+   - **A token existing does not mean its utility exists.** `--color-border-subtle` is
+     defined but deliberately *not* registered, so `border-border-subtle` compiles to
+     nothing and the border falls back to `currentColor`. Use
+     `border-(--color-border-subtle)` or register the token — never assume the pair.
    - **Font size — never `text-[..px/rem]`; pick the type-scale utility by role:**
 
      | Utility | px | Use for |
