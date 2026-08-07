@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch, type PropType } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import userServiece from "@/services/users";
@@ -262,10 +262,12 @@ export default defineComponent({
       default: "admin",
     },
     roles: {
-      type: Array as PropType<{ label: string; value: string }[]>,
+      type: Array as PropType<{ label: I18nText; value: string }[]>,
+      // raw(), not t(): prop defaults run before setup(), so no translator is in
+      // scope. The only caller (User.vue) always passes `:roles` anyway.
       default: () => [
         {
-          label: "Admin",
+          label: raw("Admin"),
           value: "admin",
         },
       ],
@@ -283,7 +285,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const router: any = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const { track } = useReo();
     const existingUser = ref(true);
     const beingUpdated: any = ref(false);
@@ -558,7 +560,7 @@ export default defineComponent({
       loadingOrganizations.value = !store.state.organizations.length;
       store.state.organizations.forEach((org: any) => {
         organizationOptions.value.push({
-          label: org.name,
+          label: raw(org.name),
           value: org.identifier,
         });
       });

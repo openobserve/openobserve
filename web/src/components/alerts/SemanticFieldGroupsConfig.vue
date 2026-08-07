@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="group.id"
           v-model="localFingerprintFields"
           :value="group.id"
-          :label="group.display"
+          :label="raw(group.display)"
           class="min-w-50"
           @update:model-value="emitUpdate"
         />
@@ -139,7 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
@@ -150,7 +150,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 export interface SemanticGroup {
   id: string;
@@ -248,7 +248,7 @@ const categoryOptions = computed(() => {
   return Array.from(groupsMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([category, count]) => ({
-      label: category,
+      label: raw(category),
       value: category,
       count: count,
     }));

@@ -19,6 +19,9 @@
 // testRun.result shape the canvas badges + step drawer read.
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 
 vi.mock("@/services/workflows", () => ({
   default: { getWorkflowRun: vi.fn(), testWorkflow: vi.fn() },
@@ -211,7 +214,7 @@ describe("loadWorkflowRun — history run response mapping", () => {
 // (edge added/removed) should dirty the workflow — otherwise a second Test wrongly
 // asks to save unchanged work.
 describe("onEdgesChange — dirty flag only on structural changes", () => {
-  const { onEdgesChange } = useWorkflowCanvas();
+  const { onEdgesChange } = useWorkflowCanvas(t);
 
   beforeEach(() => {
     workflowObj.isEditWorkflow = true;
@@ -486,7 +489,7 @@ describe("serializeWorkflow — backend Workflow shape", () => {
 });
 
 describe("trigger-first guard — palette adds are blocked until a trigger exists", () => {
-  const { addNodeToEnd, onDrop } = useWorkflowCanvas();
+  const { addNodeToEnd, onDrop } = useWorkflowCanvas(t);
 
   beforeEach(() => {
     mockToast.mockClear();

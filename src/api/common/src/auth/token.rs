@@ -47,10 +47,11 @@ use super::validator::{AuthError, AuthValidationResult, RequestData};
 #[cfg(any(feature = "enterprise", test))]
 fn may_skip_permission_check(
     is_list_invite_call: bool,
+    is_reject_invite_call: bool,
     is_member_subscription: bool,
     is_org_list_call: bool,
 ) -> bool {
-    is_list_invite_call || is_member_subscription || is_org_list_call
+    is_list_invite_call || is_reject_invite_call || is_member_subscription || is_org_list_call
 }
 
 #[cfg(feature = "enterprise")]
@@ -125,13 +126,18 @@ pub async fn token_validator(
                 // that particular user only, we can skip other checks, and allow listing
                 let is_list_invite_call = path_columns.len() == 1
                     && path_columns.first().is_some_and(|p| p.eq(&"invites"))
-                    && (auth_info.method.eq("GET") || auth_info.method.eq("DELETE"));
+                    && auth_info.method.eq("GET");
+
+                let is_reject_invite_call = path_columns.len() == 2
+                    && path_columns.first().is_some_and(|p| p.eq(&"invites"))
+                    && auth_info.method.eq("DELETE");
 
                 let path_suffix = path_columns.last().unwrap_or(&"");
                 if path_suffix.eq(&"organizations")
                     || path_suffix.eq(&"clusters")
                     || is_member_subscription
                     || is_list_invite_call
+                    || is_reject_invite_call
                 {
                     let db_user = db::user::get_db_user(user_id).await;
                     user = match db_user {
@@ -208,6 +214,7 @@ pub async fn token_validator(
                     // bypass. Similarly specifically for org list, we check by email
                     None if may_skip_permission_check(
                         is_list_invite_call,
+                        is_reject_invite_call,
                         is_member_subscription,
                         path_suffix.eq(&"organizations") && auth_info.method.eq("LIST"),
                     ) =>
@@ -269,18 +276,28 @@ mod tests {
     /// those handlers re-verify identity by email.
     #[test]
     fn path_scoped_exemptions_are_intentional() {
-        assert!(may_skip_permission_check(true, false, false), "invites");
         assert!(
-            may_skip_permission_check(false, true, false),
+            may_skip_permission_check(true, false, false, false),
+            "invites"
+        );
+        assert!(
+            may_skip_permission_check(false, true, false, false),
+            "invite reject"
+        );
+        assert!(
+            may_skip_permission_check(false, false, true, false),
             "member_subscription"
         );
-        assert!(may_skip_permission_check(false, false, true), "org LIST");
+        assert!(
+            may_skip_permission_check(false, false, false, true),
+            "org LIST"
+        );
     }
 
     /// A user absent from the target org, on an ordinary route, is not exempt.
     #[test]
     fn ordinary_request_for_nonmember_is_not_exempt() {
-        assert!(!may_skip_permission_check(false, false, false));
+        assert!(!may_skip_permission_check(false, false, false, false));
     }
 
     /// SECURITY REGRESSION GUARD: an MCP-flagged request must NOT skip the
@@ -302,7 +319,7 @@ mod tests {
         // match one of the three path-scoped pre-provisioning cases. There is
         // no MCP input that flips the result.
         assert!(
-            !may_skip_permission_check(false, false, false),
+            !may_skip_permission_check(false, false, false, false),
             "SECURITY: a request that matches none of the invite / \
              member_subscription / org-LIST cases must be permission-checked, \
              regardless of whether it is an MCP request. The MCP exemption \

@@ -220,23 +220,35 @@ describe("useManagementRoutes", () => {
     });
 
     it("should have correct path for each base child route", () => {
+      // model_pricing / model_pricing/edit are no longer base children — they moved
+      // into the enterprise/cloud block (Model Pricing is enterprise/cloud-only).
       const expectedPaths = [
         "general",
         "organization",
         "alert_destinations",
-        "model_pricing",
-        "model_pricing/edit",
         "templates",
+        "alert_sources",
       ];
-      const actualPaths = routes[0].children.slice(0, 6).map((child: any) => child.path);
+      const actualPaths = routes[0].children.slice(0, 5).map((child: any) => child.path);
       expect(actualPaths).toEqual(expectedPaths);
+    });
+
+    it("should NOT have modelPricing route in OSS builds", () => {
+      const modelPricingRoute = routes[0].children.find(
+        (child: any) => child.name === "modelPricing",
+      );
+      expect(modelPricingRoute).toBeUndefined();
+      const modelPricingEditor = routes[0].children.find(
+        (child: any) => child.name === "modelPricingEditor",
+      );
+      expect(modelPricingEditor).toBeUndefined();
     });
 
     it("should have unique names for each named base child route", () => {
       // Redirect-only children are deliberately unnamed — their name belongs to
       // the /alerts/* route they point at.
       const names = routes[0].children
-        .slice(0, 6)
+        .slice(0, 5)
         .filter((child: any) => !child.redirect)
         .map((child: any) => child.name);
       const uniqueNames = [...new Set(names)];
@@ -269,6 +281,20 @@ describe("useManagementRoutes", () => {
       const cipherRoute = routes[0].children.find((child: any) => child.name === "cipherKeys");
       expect(cipherRoute).toBeDefined();
       expect(cipherRoute.path).toBe("cipher_keys");
+    });
+
+    it("should have modelPricing route (+ editor) when enterprise", () => {
+      const routes = useManagementRoutes();
+      const modelPricingRoute = routes[0].children.find(
+        (child: any) => child.name === "modelPricing",
+      );
+      expect(modelPricingRoute).toBeDefined();
+      expect(modelPricingRoute.path).toBe("model_pricing");
+      const modelPricingEditor = routes[0].children.find(
+        (child: any) => child.name === "modelPricingEditor",
+      );
+      expect(modelPricingEditor).toBeDefined();
+      expect(modelPricingEditor.path).toBe("model_pricing/edit");
     });
 
     it("should have pipelineDestinations route when enterprise", () => {
@@ -447,7 +473,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 20 children routes when enterprise is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(20); // 7 base (incl. alert_sources redirect) + llmProviders + genAiAgentMapping + 11 enterprise
+      expect(routes[0].children).toHaveLength(20); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise
     });
   });
 
@@ -510,7 +536,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 10 children routes when cloud is enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(10); // 7 base (incl. alert_sources redirect) + llmProviders + genAiAgentMapping + 1 cloud
+      expect(routes[0].children).toHaveLength(10); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 1 cloud
     });
   });
 
@@ -527,7 +553,7 @@ describe("useManagementRoutes", () => {
 
     it("should have exactly 21 children routes when both enterprise and cloud are enabled", () => {
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(21); // 7 base (incl. alert_sources redirect) + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
+      expect(routes[0].children).toHaveLength(21); // 5 base (incl. alert_sources redirect) + modelPricing (+ editor) + llmProviders + genAiAgentMapping + 11 enterprise + 1 cloud
     });
 
     it("should have all enterprise routes when both are enabled", () => {
@@ -627,63 +653,63 @@ describe("useManagementRoutes", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as string 'false'", () => {
       config.isEnterprise = "false";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as undefined", () => {
       (config as any).isEnterprise = undefined;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isCloud as undefined", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle both config values as undefined", () => {
       (config as any).isEnterprise = undefined;
       (config as any).isCloud = undefined;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle isEnterprise as non-string truthy value", () => {
       (config as any).isEnterprise = true;
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle isCloud as non-string truthy value", () => {
       config.isEnterprise = "false";
       (config as any).isCloud = true;
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present, since config comparison is strict "true"
     });
 
     it("should handle empty string for isEnterprise", () => {
       config.isEnterprise = "";
       config.isCloud = "false";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should handle empty string for isCloud", () => {
       config.isEnterprise = "false";
       config.isCloud = "";
       const routes = useManagementRoutes();
-      expect(routes[0].children).toHaveLength(7); // gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
+      expect(routes[0].children).toHaveLength(5); // model_pricing (+ editor), gen_ai_agent_mapping and llm_providers are enterprise/cloud-only; alert_sources redirect is always present
     });
 
     it("should return the same structure on multiple calls", () => {

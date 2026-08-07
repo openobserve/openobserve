@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // flow; the per-type request card is slotted into CheckConfigure.
 import { computed, onMounted, ref, watch, type Component } from "vue";
 import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import type {
   AgentSetup,
@@ -43,7 +43,6 @@ import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import AgentSetupDrawer from "@/components/synthetic-monitoring/AgentSetupDrawer.vue";
@@ -63,7 +62,7 @@ const props = defineProps<{
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const typeConfigCards: Record<ProtocolCheckType, Component> = {
   http: CheckHttpConfig,
@@ -109,6 +108,7 @@ const typeLabel = computed(() => t(`synthetics.newCheck.${props.checkType}`));
 
 // Server-driven lists, threaded down to CheckConfigure (same as browser flow).
 const locations = ref<SyntheticsLocation[]>([]);
+const locationsLoading = ref(false);
 const destinations = ref<string[]>([]);
 const folders = ref<SyntheticsFolder[]>([]);
 const foldersLoading = ref(false);
@@ -185,6 +185,7 @@ watch(
 );
 
 async function fetchLocations() {
+  locationsLoading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.getLocations(org);
@@ -199,16 +200,29 @@ async function fetchLocations() {
         l.enabled !== false &&
         (l.kind !== "private" || (l.types ?? []).some((t) => t !== "browser")),
     );
-  } catch {
+  } catch (err: any) {
+    // A 403 means the endpoint isn't available on this build; fall back to
+    // empty silently for those, and only surface real failures.
     locations.value = [];
+    if (err?.response?.status !== 403) {
+      toast({ variant: "error", message: t("synthetics.locations.fetchFailed") });
+    }
+  } finally {
+    locationsLoading.value = false;
   }
 }
 
 // ── Private agent setup (drawer opened from the locations card) ──────────
 const showAgentSetup = ref(false);
 const agentSetup = ref<AgentSetup | null>(null);
+const agentSetupLocationId = ref<string | null>(null);
+const agentSetupLocationName = ref<string | null>(null);
 
-async function openAgentSetup() {
+async function openAgentSetup(locationId?: string) {
+  agentSetupLocationId.value = locationId ?? null;
+  agentSetupLocationName.value = locationId
+    ? (locations.value.find((l) => l.id === locationId)?.label ?? null)
+    : null;
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
@@ -372,6 +386,7 @@ async function saveCheck() {
           :check="check"
           :check-type="checkType"
           :locations="locations"
+          :loading-locations="locationsLoading"
           :destinations="destinations"
           :folders="folders"
           :folders-loading="foldersLoading"
@@ -380,7 +395,9 @@ async function saveCheck() {
           class="w-full!"
           @refresh:destinations="fetchDestinations"
           @update:check="onConfigureUpdate"
-          @setup-agent="openAgentSetup"
+          @new-location="openAgentSetup()"
+          @add-agent="(id: string) => openAgentSetup(id)"
+          @refresh-locations="fetchLocations"
         >
           <template #type-config>
             <component
@@ -416,8 +433,8 @@ async function saveCheck() {
         </OButton>
       </div>
 
-      <!-- Private agent setup drawer; locations reload on close so a freshly
-           registered location becomes selectable without leaving the form. -->
+      <!-- Private agent setup drawer; a freshly registered location appears via
+           the locations card's Refresh button. -->
       <AgentSetupDrawer
         v-model:open="showAgentSetup"
         :token="agentSetup?.token"
@@ -425,9 +442,14 @@ async function saveCheck() {
         :o2-url="agentSetup?.o2_url"
         :script-url="agentSetup?.script_url"
         :install="agentSetup?.install"
+        :location-id="agentSetupLocationId"
+        :location-name="agentSetupLocationName"
         @update:open="
           (open: boolean) => {
-            if (!open) fetchLocations();
+            if (!open) {
+              agentSetupLocationId = null;
+              agentSetupLocationName = null;
+            }
           }
         "
       />

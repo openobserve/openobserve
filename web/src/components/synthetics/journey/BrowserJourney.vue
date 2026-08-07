@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { BlockedReason, BrowserStep, ReplayPhase, StepReplayResult } from "@/types/synthetics";
 import type { StepDotState } from "./JourneySteps.vue";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
@@ -34,6 +34,7 @@ import TestIdMisconfiguredNotice from "./TestIdMisconfiguredNotice.vue";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
+import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 
 const props = defineProps<{
@@ -45,7 +46,7 @@ const props = defineProps<{
    * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
    */
   testIdAttr?: string;
-  extensionReady?: boolean; // when false, Record button triggers need-extension-setup
+  extensionReady?: boolean; // when false, Record/Replay open the extension setup dialog
   autoRecord?: boolean; // if true, start recording immediately on mount
   /** Owned by the parent (CreateBrowserTest). */
   replayPhase?: ReplayPhase;
@@ -74,7 +75,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   "update:modelValue": [value: BrowserStep[]];
-  "need-extension-setup": [];
   "clear-results": [];
   replay: [];
   /**
@@ -270,7 +270,7 @@ const multiSelectEnabled = computed(
 // ── Recording state ────────────────────────────────────────────────────────
 // All Chrome-extension messaging lives in the composable; this component only
 // reflects its reactive state and merges the result into the journey on stop.
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Chrome UI element names — must stay in English across all locales
 // because they reference the actual Chrome browser interface.
@@ -477,12 +477,34 @@ function cancelRecording() {
   recorder.cancelRecording();
 }
 
+// ── Extension setup dialog ─────────────────────────────────────────────────
+// Record and Replay both run inside the extension, so either one clicked
+// without it installed opens the setup dialog instead of failing silently
+// (an ungated replay would sit in `running` until the bridge watchdog fired).
+const extensionSetup = ref<{ open: boolean; action: "record" | "replay" }>({
+  open: false,
+  action: "record",
+});
+
 function onRecordButtonClick() {
   if (props.extensionReady) {
     startRecording();
   } else {
-    emit("need-extension-setup");
+    extensionSetup.value = { open: true, action: "record" };
   }
+}
+
+function onReplayButtonClick() {
+  if (props.extensionReady) {
+    emit("replay");
+  } else {
+    extensionSetup.value = { open: true, action: "replay" };
+  }
+}
+
+function onExtensionSetupContinue() {
+  if (extensionSetup.value.action === "record") startRecording();
+  else emit("replay");
 }
 
 /** Sync stop — called by parent's route guard before navigating away.
@@ -785,7 +807,7 @@ function openChromeExtensions() {
             size="sm"
             :disabled="readonly || modelValue.length === 0"
             data-test="synthetics-journey-replay-btn"
-            @click="emit('replay')"
+            @click="onReplayButtonClick"
             icon-left="replay"
           >
             {{ t("synthetics.journey.replay") }}
@@ -818,7 +840,7 @@ function openChromeExtensions() {
             variant="outline"
             size="sm"
             data-test="synthetics-journey-replay-btn"
-            @click="emit('replay')"
+            @click="onReplayButtonClick"
             icon-left="replay"
           >
             {{ t("synthetics.journey.replay") }}
@@ -1161,7 +1183,9 @@ function openChromeExtensions() {
         <span class="text-text-secondary flex min-w-0 flex-1 items-center gap-1 truncate text-xs">
           <span class="truncate">{{ currentUrl }}</span>
         </span>
-        <span class="text-text-muted text-xs">{{ capturedSteps.length }} steps</span>
+        <span class="text-text-muted text-xs"
+          >{{ capturedSteps.length }} {{ t("synthetics.table.stepsSuffix") }}</span
+        >
       </div>
 
       <JourneySteps
@@ -1280,11 +1304,11 @@ function openChromeExtensions() {
           :action-error-message="
             (firstStepError && props.modelValue[0]?.id === row.id
               ? t('synthetics.validation.firstStepMustNavigate')
-              : '') || fieldError(row.id, 'action')
+              : raw('')) || fieldError(row.id, 'action')
           "
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
-            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : '') ||
+            (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : raw('')) ||
             fieldError(row.id, 'selector')
           "
           :value-error-message="fieldError(row.id, 'value')"
@@ -1311,6 +1335,15 @@ function openChromeExtensions() {
       ok-color="danger"
       @update:ok="confirmDelete"
       @update:cancel="cancelDelete"
+    />
+
+    <!-- Extension install/setup dialog — opened by Record/Replay when the
+         extension is not detected; `connected` flips live via the parent's probe. -->
+    <ExtensionSetupDialog
+      v-model:open="extensionSetup.open"
+      :connected="extensionReady"
+      :action="extensionSetup.action"
+      @continue="onExtensionSetupContinue"
     />
   </div>
 </template>

@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeUnmount, computed, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -85,8 +85,8 @@ export default defineComponent({
     },
     // Custom tooltip text
     tooltip: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     // Optional keyboard-shortcut hint shown in the tooltip (raw key, e.g. "ctrl+shift+c")
     shortcut: {
@@ -112,7 +112,7 @@ export default defineComponent({
   },
   emits: ["copy:success", "copy:error", "shorten:success", "shorten:error"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
 
     const isLoading = ref(false);
@@ -168,7 +168,7 @@ export default defineComponent({
           isPolling = false;
 
           // Short URL is ready! Copy it to clipboard
-          copyToClipboard(shortURL, {
+          copyToClipboard(shortURL, t, {
             successMessage: t("search.linkCopiedSuccessfully"),
             errorMessage: t("search.errorCopyingLink"),
             timeout: 5000,
@@ -216,7 +216,7 @@ export default defineComponent({
       if (!props.url) {
         toast({
           variant: "warning",
-          message: "No URL to share",
+          message: t("toastMessages.common.noUrlToShare"),
         });
         return;
       }
@@ -241,7 +241,7 @@ export default defineComponent({
               store.commit("setPendingShortURL", shortUrl);
             } else {
               // Chrome/Firefox: Copy directly here
-              copyToClipboard(shortUrl, {
+              copyToClipboard(shortUrl, t, {
                 successMessage: t("search.linkCopiedSuccessfully"),
                 errorMessage: t("search.errorCopyingLink"),
                 timeout: 5000,
@@ -308,6 +308,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       isLoading,
       isWebUrlNotConfigured,

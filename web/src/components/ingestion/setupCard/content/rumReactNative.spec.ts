@@ -244,7 +244,7 @@ describe("rumReactNativeCard builder", () => {
       const card = buildCard();
       const install = card.steps.find((s) => s.id === "install")!;
 
-      expect(install.chip?.label).toBe("Install");
+      expect(install.chip?.labelKey).toBe("ingestion.setupCard.chipInstall");
     });
 
     it("verify step has chip with label 'RUM'", () => {
@@ -449,11 +449,18 @@ describe("rumReactNativeCard builder", () => {
   // ── navigation step ──────────────────────────────────────────────────────────
 
   describe("navigation step", () => {
-    it("code references OoRumReactNavigationTracking.startTrackingViews", () => {
+    it("code references O2RumReactNavigationTracking.startTrackingViews", () => {
       const card = buildCard();
       const nav = card.steps.find((s) => s.id === "navigation")!;
 
-      expect(nav.code!.raw).toContain("OoRumReactNavigationTracking.startTrackingViews");
+      expect(nav.code!.raw).toContain("O2RumReactNavigationTracking.startTrackingViews");
+    });
+
+    it("does not reference the legacy OoRum naming anywhere in the card", () => {
+      const card = buildCard();
+      const serialized = JSON.stringify(card);
+
+      expect(serialized).not.toContain("OoRum");
     });
 
     it("does not depend on subs (identical raw code across orgs)", () => {

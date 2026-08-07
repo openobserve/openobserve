@@ -149,8 +149,9 @@ const MAX_TRACKED_ALIASES: usize = 30;
 ///
 /// The `id` is the semantic category slug (e.g. "k8s", "aws", "gcp", "azure").
 /// At processing time the system tries ALL configured sets against each record and
-/// picks the one whose `distinguish_by` fields yield the most non-empty values
-/// (best-coverage wins; ties broken by first-in-list).
+/// ranks them by coverage of the record's non-empty dimensions: a fully-covered set
+/// wins first, then the highest covered ratio, then the highest raw count; ties are
+/// broken by declaration order (first-in-list). See `resolve_best_set_by_coverage`.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, ToSchema, PartialEq)]
 pub struct IdentitySet {
     /// Semantic category slug: "k8s", "aws", "gcp", "azure", or a custom slug.
@@ -205,8 +206,10 @@ impl IdentitySet {
 /// Contains 1–5 identity sets. Service name is always derived from the "service"
 /// semantic group — hardcoded, not configurable.
 ///
-/// At processing time each record is matched against ALL sets; the set whose
-/// `distinguish_by` fields yield the most non-empty values wins (best coverage).
+/// At processing time each record is matched against ALL sets and ranked by
+/// coverage of the record's non-empty dimensions: full coverage > highest ratio >
+/// highest count, ties broken by declaration order. The same ranking is used on the
+/// correlation read path so ingest files records under the set reads will select.
 /// If no set has any coverage the record is skipped.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, ToSchema)]
 pub struct ServiceIdentityConfig {
@@ -263,9 +266,9 @@ impl ServiceIdentityConfig {
                 return Err(format!("duplicate set id '{}'", set.id));
             }
         }
-        if self.tracked_alias_ids.is_empty() {
-            return Err("tracked_alias_ids requires at least 1 alias group ID".into());
-        }
+        // tracked_alias_ids may be empty: ingest tracking is the UNION of this list and
+        // every set's distinguish_by, and >=1 set is enforced above — sets alone are
+        // a complete config (custom set dims need not be re-listed here).
         if self.tracked_alias_ids.len() > MAX_TRACKED_ALIASES {
             return Err(format!(
                 "tracked_alias_ids cannot exceed {} entries",
@@ -280,30 +283,88 @@ impl ServiceIdentityConfig {
 
     /// Pick the best-matching identity set for `dims` using best-coverage resolution.
     ///
-    /// For each set, counts how many `distinguish_by` fields have non-empty values
-    /// in `dims`. Returns the set with the highest count. Ties are broken by
-    /// first-in-list wins. Returns `None` if no set has any coverage (all counts == 0).
+    /// Only non-empty values in `dims` count as available. Ranking is delegated to
+    /// [`resolve_best_set_by_coverage`] — full coverage > highest ratio > highest
+    /// count, ties broken by declaration order. Returns `None` if no set has any
+    /// coverage.
     pub fn resolve_best_set<'a>(
         &'a self,
         dims: &std::collections::HashMap<String, String>,
     ) -> Option<&'a IdentitySet> {
-        let mut best: Option<(&IdentitySet, usize)> = None;
-        for set in &self.sets {
-            let count = set
-                .distinguish_by
-                .iter()
-                .filter(|k| dims.get(k.as_str()).map(|v| !v.is_empty()).unwrap_or(false))
-                .count();
-            if count > 0 {
-                match best {
-                    None => best = Some((set, count)),
-                    Some((_, best_count)) if count > best_count => best = Some((set, count)),
-                    _ => {}
-                }
-            }
-        }
-        best.map(|(set, _)| set)
+        let available: std::collections::HashSet<&str> = dims
+            .iter()
+            .filter(|(_, v)| !v.is_empty())
+            .map(|(k, _)| k.as_str())
+            .collect();
+        resolve_best_set_by_coverage(&self.sets, &available).map(|(set, _)| set)
     }
+}
+
+/// Coverage of one identity set against a request's available dimension keys.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SetCoverage {
+    pub is_full: bool,
+    pub ratio: f64,
+    pub count: usize,
+}
+
+impl SetCoverage {
+    fn rank(&self) -> (bool, f64, usize) {
+        (self.is_full, self.ratio, self.count)
+    }
+}
+
+/// Shared ingest/read ranking: full coverage > highest ratio > highest count;
+/// ties broken by declaration order (strict `>` keeps the earlier set).
+/// Raw-count ranking is WRONG here — a 3/5 partial beating a 2/2 full set files
+/// records under a set the read side will never select (cross-workload pollution).
+pub fn resolve_best_set_by_coverage<'a>(
+    sets: &'a [IdentitySet],
+    available: &std::collections::HashSet<&str>,
+) -> Option<(&'a IdentitySet, SetCoverage)> {
+    let mut best: Option<(&IdentitySet, SetCoverage)> = None;
+    for set in sets {
+        if set.distinguish_by.is_empty() {
+            continue;
+        }
+        let total = set.distinguish_by.len();
+        let count = set
+            .distinguish_by
+            .iter()
+            .filter(|f| available.contains(f.as_str()))
+            .count();
+        if count == 0 {
+            continue;
+        }
+        let cov = SetCoverage {
+            is_full: count == total,
+            ratio: count as f64 / total as f64,
+            count,
+        };
+        match &best {
+            None => best = Some((set, cov)),
+            Some((_, b)) if cov.rank() > b.rank() => best = Some((set, cov)),
+            _ => {}
+        }
+    }
+    best
+}
+
+/// Set IDs whose stored service rows are stale after a config change: sets that were
+/// removed, plus sets whose `distinguish_by` changed (their rows' disambiguation was
+/// keyed to the old field list). Rows under these IDs linger and pollute correlation
+/// unions until aged out (F10) — callers should delete them and emit a reload event.
+pub fn obsolete_set_ids(old: &ServiceIdentityConfig, new: &ServiceIdentityConfig) -> Vec<String> {
+    old.sets
+        .iter()
+        .filter(
+            |old_set| match new.sets.iter().find(|s| s.id == old_set.id) {
+                None => true,
+                Some(new_set) => new_set.distinguish_by != old_set.distinguish_by,
+            },
+        )
+        .map(|s| s.id.clone())
+        .collect()
 }
 
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
@@ -497,9 +558,14 @@ mod tests {
         dims.insert("k8s-namespace".to_string(), "app".to_string());
         dims.insert("aws-region".to_string(), "us-east-1".to_string());
 
-        // k8s has 2 matches, aws has 1 — k8s wins
+        // F8: k8s is 2/3 (partial), aws is 1/1 (full) — full coverage wins over raw
+        // count, matching the correlation read path's ranking.
         let best = cfg.resolve_best_set(&dims).unwrap();
-        assert_eq!(best.id, "k8s");
+        assert_eq!(best.id, "aws");
+
+        // Without the aws dimension, k8s is the only set with any coverage.
+        dims.remove("aws-region");
+        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "k8s");
     }
 
     #[test]
@@ -571,6 +637,64 @@ mod tests {
 
         let best = cfg.resolve_best_set(&k8s_dims).unwrap();
         assert_eq!(best.id, "k8s");
+    }
+
+    #[test]
+    fn test_resolve_best_set_prefers_full_coverage_over_raw_count() {
+        // F8: a fully-covered 2-field set must beat a 3/5 partial set at ingest,
+        // matching the read-side ranking (is_full, ratio, count).
+        let cfg = ServiceIdentityConfig {
+            sets: vec![
+                make_set("big", "Big", &["a", "b", "c", "d", "e"]),
+                make_set("small", "Small", &["x", "y"]),
+            ],
+            tracked_alias_ids: vec!["a".into()],
+            service_optional: false,
+        };
+        let dims: std::collections::HashMap<String, String> = [
+            ("a", "1"),
+            ("b", "1"),
+            ("c", "1"), // big: 3/5 partial
+            ("x", "1"),
+            ("y", "1"), // small: 2/2 full
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "small");
+    }
+
+    #[test]
+    fn test_resolve_best_set_ties_broken_by_declaration_order() {
+        let cfg = ServiceIdentityConfig {
+            sets: vec![
+                make_set("first", "F", &["a"]),
+                make_set("second", "S", &["b"]),
+            ],
+            tracked_alias_ids: vec!["a".into()],
+            service_optional: false,
+        };
+        let dims: std::collections::HashMap<String, String> = [("a", "1"), ("b", "1")]
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        assert_eq!(cfg.resolve_best_set(&dims).unwrap().id, "first");
+    }
+
+    #[test]
+    fn test_resolve_best_set_by_coverage_reports_coverage() {
+        let sets = vec![
+            make_set("k8s", "Kubernetes", &["k8s-cluster", "k8s-namespace"]),
+            make_set("aws", "AWS", &["aws-region"]),
+        ];
+        let available: std::collections::HashSet<&str> =
+            ["k8s-cluster", "aws-region"].into_iter().collect();
+        let (set, cov) = resolve_best_set_by_coverage(&sets, &available).unwrap();
+        // aws is fully covered (1/1); k8s is only 1/2 → aws wins on is_full
+        assert_eq!(set.id, "aws");
+        assert!(cov.is_full);
+        assert_eq!(cov.count, 1);
+        assert_eq!(cov.ratio, 1.0);
     }
 
     // ========== IncidentGroupingConfig::validate() Tests ==========
@@ -690,5 +814,81 @@ mod tests {
     #[test]
     fn test_default_upgrade_window() {
         assert_eq!(default_upgrade_window(), 30);
+    }
+
+    #[test]
+    fn test_obsolete_set_ids_removed_and_changed() {
+        let mk = |id: &str, fields: &[&str]| IdentitySet {
+            id: id.into(),
+            label: id.into(),
+            distinguish_by: fields.iter().map(|s| s.to_string()).collect(),
+        };
+        let old = ServiceIdentityConfig {
+            sets: vec![
+                mk("k8s", &["k8s-cluster", "k8s-namespace"]),
+                mk("aws", &["aws-region"]),
+                mk("keep", &["environment"]),
+            ],
+            tracked_alias_ids: vec!["environment".into()],
+            service_optional: false,
+        };
+        let new = ServiceIdentityConfig {
+            sets: vec![mk("k8s", &["k8s-cluster"]), mk("keep", &["environment"])],
+            tracked_alias_ids: vec!["environment".into()],
+            service_optional: false,
+        };
+        let mut ids = obsolete_set_ids(&old, &new);
+        ids.sort();
+        // "aws" removed; "k8s" distinguish_by changed; "keep" untouched
+        assert_eq!(ids, vec!["aws".to_string(), "k8s".to_string()]);
+    }
+
+    #[test]
+    fn test_obsolete_set_ids_unchanged_config_is_empty() {
+        let cfg = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".into(),
+                label: "Kubernetes".into(),
+                distinguish_by: vec!["k8s-cluster".into(), "k8s-namespace".into()],
+            }],
+            tracked_alias_ids: vec!["environment".into()],
+            service_optional: false,
+        };
+        assert!(obsolete_set_ids(&cfg, &cfg).is_empty());
+    }
+
+    #[test]
+    fn test_obsolete_set_ids_field_reorder_is_obsolete() {
+        // Order of distinguish_by decides the disambiguation key layout, so a reorder
+        // invalidates stored rows just like a membership change.
+        let mk = |fields: &[&str]| ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "k8s".into(),
+                label: "Kubernetes".into(),
+                distinguish_by: fields.iter().map(|s| s.to_string()).collect(),
+            }],
+            tracked_alias_ids: vec![],
+            service_optional: false,
+        };
+        let old = mk(&["k8s-cluster", "k8s-namespace"]);
+        let new = mk(&["k8s-namespace", "k8s-cluster"]);
+        assert_eq!(obsolete_set_ids(&old, &new), vec!["k8s".to_string()]);
+    }
+
+    #[test]
+    fn test_validate_allows_empty_tracked_alias_ids_with_sets() {
+        // tracked_ids at ingest are the UNION of tracked_alias_ids and every set's
+        // distinguish_by, and validate() already requires >=1 set — so an empty
+        // tracked_alias_ids list is a fully functional config and must not be rejected.
+        let cfg = ServiceIdentityConfig {
+            sets: vec![IdentitySet {
+                id: "custom".into(),
+                label: "Custom".into(),
+                distinguish_by: vec!["region".into(), "version".into()],
+            }],
+            tracked_alias_ids: vec![],
+            service_optional: false,
+        };
+        assert!(cfg.validate().is_ok());
     }
 }

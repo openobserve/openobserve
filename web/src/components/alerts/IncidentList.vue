@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="incidentStatus"
             :value="row.status"
-            :label="getStatusLabel(row.status)"
+            :label="raw(getStatusLabel(row.status))"
             size="sm"
             data-test="incident-status-badge"
           />
@@ -183,7 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             unit="us"
             mode="relative"
             :timezone="store.state.timezone"
-            empty-label="—"
+            :empty-label="raw('—')"
           />
         </template>
         <template #cell-actions="{ row }">
@@ -236,7 +236,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="flex h-12 w-full items-center justify-between">
             <div class="mr-md flex w-25 items-center text-xs font-normal">
               {{ visibleIncidents.length }}
-              {{ visibleIncidents.length === 1 ? "Incident" : "Incidents" }}
+              {{
+                visibleIncidents.length === 1
+                  ? t("alerts.incidentSingular")
+                  : t("alerts.incidentPlural")
+              }}
             </div>
           </div>
         </template>
@@ -247,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
@@ -290,7 +294,7 @@ export default defineComponent({
     OToggleGroupItem,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
@@ -350,7 +354,7 @@ export default defineComponent({
       },
       {
         id: "dimensions",
-        header: "Dimensions",
+        header: t("alerts.incidents.stableDimensions"),
         accessorKey: "group_values",
         resizable: true,
         hideable: true,
@@ -794,7 +798,7 @@ export default defineComponent({
       await loadIncidents();
       toast({
         variant: "success",
-        message: "Incidents refreshed",
+        message: t("toastMessages.alerts.incidentsRefreshed"),
         timeout: 1500,
       });
     };
@@ -809,6 +813,7 @@ export default defineComponent({
     ]);
 
     return {
+      raw,
       t,
       loading,
       allIncidents,

@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="close-actions-btn"
       >
         <OIcon name="close" size="sm" />
-        <OTooltip content="Close actions" />
+        <OTooltip :content="t('alerts.insights.actions.closeActions')" />
       </OButton>
     </div>
 
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div @contextmenu="handleNativeContextMenu">
           <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />
-            <div class="ml-3">Loading insights...</div>
+            <div class="ml-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">
@@ -254,7 +254,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
@@ -273,7 +273,7 @@ import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Check if enterprise features are enabled
 const isEnterprise = config.isEnterprise === "true";
@@ -420,7 +420,7 @@ const fetchAlerts = async () => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to load alerts",
+      message: t("toastMessages.alerts.failedToLoadAlerts"),
     });
   }
 };
@@ -577,7 +577,10 @@ const handleConfigureDedup = async (alertName: string) => {
     if (!alert) {
       toast({
         variant: "error",
-        message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
+        message: t("toastMessages.alerts.alertNotFoundInAlerts", {
+          name: alertName,
+          count: alertsList.value.length,
+        }),
       });
       return;
     }
@@ -597,7 +600,7 @@ const handleConfigureDedup = async (alertName: string) => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to navigate to alert",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -610,7 +613,7 @@ const handleEditAlert = async (alertName: string) => {
     if (!alert) {
       toast({
         variant: "error",
-        message: "Alert not found",
+        message: t("toastMessages.alerts.alertNotFound"),
       });
       return;
     }
@@ -628,7 +631,7 @@ const handleEditAlert = async (alertName: string) => {
   } catch (error) {
     toast({
       variant: "error",
-      message: "Failed to navigate to alert",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -655,9 +658,9 @@ const openDedupConfig = () => {
   // `caption` predates OToast and is not rendered; cast keeps the object untouched.
   toast({
     variant: "info",
-    message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
+    message: t("toastMessages.alerts.openingDedupConfig", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page with dedup section focused",
-  } as ToastOptions);
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page with dedup section
   // router.push({
@@ -670,9 +673,9 @@ const openDedupConfig = () => {
 const editAlert = () => {
   toast({
     variant: "info",
-    message: `Editing alert: ${selectedAlertForAction.value}`,
+    message: t("toastMessages.alerts.editingAlert", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page",
-  } as ToastOptions);
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page
   // router.push({

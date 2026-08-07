@@ -280,7 +280,7 @@ pub async fn search(
     remote_scan_node.set_is_super_cluster(false);
 
     physical_plan = add_region_remote_scan_partial_reduce(
-        cfg.common.feature_partial_reduce_enabled,
+        cfg.search.feature_partial_reduce_enabled,
         physical_plan,
         remote_scan_node,
     )?;

@@ -77,12 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="o2-input mb-4">
               <OFormInput
+                :placeholder="raw('https://api.example.com/mcp/')"
                 data-test="ai-toolset-mcp-url"
                 name="mcp.url"
                 :label="t('aiToolset.mcpUrl')"
                 required
                 class="showLabelOnTop w-full"
-                placeholder="https://api.example.com/mcp/"
               />
             </div>
             <div class="o2-input mb-4">
@@ -151,21 +151,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="o2-input mb-4">
               <OFormInput
+                :placeholder="raw('kubectl')"
                 data-test="ai-toolset-cli-command"
                 name="cli.command"
                 :label="t('aiToolset.cliCommand')"
                 required
                 class="showLabelOnTop w-full"
-                placeholder="kubectl"
               />
             </div>
             <div class="o2-input mb-4">
               <OFormInput
+                :placeholder="raw('get, describe, logs')"
                 name="cli.allowed_subcommands_raw"
                 :label="t('aiToolset.allowedSubcommands')"
                 :helpText="t('aiToolset.subcommandsHint')"
                 class="showLabelOnTop w-full"
-                placeholder="get, describe, logs"
               />
             </div>
             <div class="mb-4 flex gap-4">
@@ -240,7 +240,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OFormInput
                   :name="`cli.credFiles[${idx}].key`"
                   :label="t('aiToolset.credEnvVar')"
-                  helpText="e.g. KUBECONFIG"
+                  :helpText="raw('e.g. KUBECONFIG')"
                   class="o2-input w-48"
                 />
                 <OButton
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineAsyncComponent, defineComponent, ref, computed, onMounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import aiToolsetsService from "@/services/ai_toolsets";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -363,7 +363,7 @@ export default defineComponent({
   setup(_, { emit }) {
     const store = useStore();
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // Co-located Zod schema (factory keeps the messages i18n-driven).
     const addAiToolsetSchema = makeAddAiToolsetSchema(t);
@@ -372,9 +372,9 @@ export default defineComponent({
     const isEditing = ref(false);
 
     const kindOptions = [
-      { label: "MCP Server", value: "mcp" },
-      { label: "CLI Tool", value: "cli" },
-      { label: "Skill", value: "skill" },
+      { label: t("aiToolset.kindMcp"), value: "mcp" },
+      { label: t("aiToolset.kindCli"), value: "cli" },
+      { label: t("aiToolset.kindSkill"), value: "skill" },
     ];
 
     // -----------------------------------------------------------------------
@@ -439,7 +439,7 @@ export default defineComponent({
       try {
         if (isEditing.value && editingId.value) {
           await aiToolsetsService.update(org, editingId.value, {
-            description: value.description || undefined,
+            description: value.description ? raw(value.description) : undefined,
             data,
           });
           toast({
@@ -450,7 +450,7 @@ export default defineComponent({
           await aiToolsetsService.create(org, {
             name: value.name,
             kind: value.kind as ToolsetKind,
-            description: value.description || undefined,
+            description: value.description ? raw(value.description) : undefined,
             data,
           });
           toast({
@@ -636,7 +636,7 @@ export default defineComponent({
         // `form.useStore` reads above re-render automatically.
         form.reset(record);
       } catch {
-        toast({ variant: "error", message: "Failed to load toolset" });
+        toast({ variant: "error", message: t("toastMessages.aitoolsets.failedToLoadToolset") });
       }
     };
 
@@ -648,6 +648,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       // Exposed for the theme-aware footer background (`store.state.theme`).
       store,

@@ -138,7 +138,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('alerts.column')"
               :creatable="props.enableNewValueMode"
               :error="!!fieldErrors[`${field.uuid}-column`]"
-              :error-message="fieldErrors[`${field.uuid}-column`] || ''"
+              :error-message="raw(fieldErrors[`${field.uuid}-column`] || '')"
               data-test="alert-conditions-select-column"
               @create="
                 (val: string) => {
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :options="triggerOperators"
               class="min-w-30 py-2"
               :error="!!fieldErrors[`${field.uuid}-operator`]"
-              :error-message="fieldErrors[`${field.uuid}-operator`] || ''"
+              :error-message="raw(fieldErrors[`${field.uuid}-operator`] || '')"
               data-test="alert-conditions-operator-select"
               @update:model-value="
                 (v: any) => {
@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :placeholder="t('common.value')"
               class="min-w-37.5 py-2"
               :error="!!fieldErrors[`${field.uuid}-value`]"
-              :error-message="fieldErrors[`${field.uuid}-value`] || ''"
+              :error-message="raw(fieldErrors[`${field.uuid}-value`] || '')"
               data-test="alert-conditions-value-input"
               @update:model-value="
                 (v: any) => {
@@ -224,7 +224,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, computed, reactive, inject } from "vue";
 import type { PropType, Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -281,7 +281,7 @@ const emits = defineEmits(["add", "remove", "input:update"]);
 
 const store = useStore();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // ── OForm form mode (dual-mode; opt-in via namePrefix) ──────────────────────
 // A consumer inside an <OForm> may inject a form context even when it renders

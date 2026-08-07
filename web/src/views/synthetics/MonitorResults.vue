@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <OPageLayout
     data-test="synthetic-monitor-results-page"
-    :subtitle="folderName"
+    :subtitle="raw(folderName)"
     :back="{
       label: t('synthetics.results.monitors'),
       to: backTo,
@@ -106,8 +106,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     side="right"
     size="xxl"
     :width="checkType === 'browser' ? 85 : undefined"
-    :title="monitorName"
-    :subTitle="drawerTimestamp"
+    :title="raw(monitorName)"
+    :subTitle="raw(drawerTimestamp)"
     data-test="synthetics-run-detail-drawer"
     @update:open="onDrawerClose"
   >
@@ -132,7 +132,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="synthetics-run-drawer-url-badge"
       >
         <span class="block min-w-0 truncate">{{ drawerUrl }}</span>
-        <OTooltip side="bottom" :content="drawerUrl" :max-width="'32rem'" />
+        <OTooltip side="bottom" :content="raw(drawerUrl)" :max-width="'32rem'" />
       </OBadge>
     </template>
     <RunDetail
@@ -149,7 +149,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
@@ -174,7 +174,7 @@ import {
 
 defineOptions({ name: "SyntheticMonitorResults" });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const route = useRoute();
 const router = useRouter();
 const store = useStore();
@@ -254,7 +254,7 @@ const selectedExecutionId = ref("");
 const drawerRunStatus = ref<{
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
 } | null>(null);
 const drawerUrl = ref("");
 const drawerTimestamp = ref("");
@@ -262,7 +262,7 @@ const drawerTimestamp = ref("");
 function onRunStatusUpdate(status: {
   variant: BadgeVariant;
   icon: string;
-  label: string;
+  label: I18nText;
   url: string;
   timestamp: string;
 }) {

@@ -16,11 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <IngestionContent>
-    <CopyContent :content="content" />
+    <CopyContent :content="raw(content)" />
   </IngestionContent>
 </template>
 
 <script lang="ts">
+import { raw } from "@/types/i18n";
 import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
@@ -65,6 +66,7 @@ export default defineComponent({
 
     // Expose for testing
     return {
+      raw,
       store,
       config,
       endpoint,

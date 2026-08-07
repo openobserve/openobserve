@@ -122,7 +122,7 @@
 <script lang="ts">
 import { computed, ref, nextTick } from "vue";
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import { watch } from "vue";
@@ -165,7 +165,7 @@ export default defineComponent({
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     // The whole form is the `series[]` field-array — the FORM is the SOLE source
     // (rule ②). This component OWNS <OForm> and needs to read `series` to render

@@ -61,9 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import { type LLMPanelDef, renderPanelSql, panelI18nKey } from "./config/llmInsightsPanels";
+import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
 import { buildLLMPanelSchema } from "./llmPanelSchema";
 
 interface Props {
@@ -86,11 +86,11 @@ interface Props {
 
 const props = defineProps<Props>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-// Title/subtitle come from the en.json `aiObservability.panels.<id>` copy.
-const displayTitle = computed(() => t(`${panelI18nKey(props.panel.id)}.title`));
-const displaySubtitle = computed(() => t(`${panelI18nKey(props.panel.id)}.subtitle`));
+// Panel defs are a plain config module with no i18n context, so they carry keys.
+const displayTitle = computed(() => t(props.panel.titleKey));
+const displaySubtitle = computed(() => (props.panel.subtitleKey ? t(props.panel.subtitleKey) : ""));
 
 // Fully-rendered SQL: stream substituted, agent predicate spliced. We swap the
 // templated `histogram(_timestamp, '{{interval}}')` for the auto-bucketing

@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  * surface as every run failing instead of as a validation error at save time.
  */
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { AssertionKind, StepAssertion } from "@/types/synthetics";
 import {
   ASSERTION_KINDS,
@@ -44,7 +44,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ "update:assertion": [value: StepAssertion] }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 /** An assert step with no typed assertion keeps its original meaning. */
 const current = computed<StepAssertion>(() => props.assertion ?? { kind: "element_visible" });
@@ -102,7 +102,7 @@ const expectedPlaceholder = computed(() =>
       v-if="showAttribute"
       v-model="attributeComputed"
       :label="t('synthetics.journey.assertionAttributeLabel')"
-      placeholder="href"
+      :placeholder="raw('href')"
       data-test="synthetics-journey-step-assertion-attribute-input"
     />
 
@@ -112,7 +112,7 @@ const expectedPlaceholder = computed(() =>
       :label="t('synthetics.journey.assertionExpectedLabel')"
       :placeholder="expectedPlaceholder"
       :error="!!expectedErrorMessage"
-      :error-message="expectedErrorMessage ?? ''"
+      :error-message="raw(expectedErrorMessage ?? '')"
       data-test="synthetics-journey-step-assertion-expected-input"
     />
   </div>

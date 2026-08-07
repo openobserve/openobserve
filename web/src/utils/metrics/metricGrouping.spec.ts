@@ -49,9 +49,9 @@ describe("DEFAULT_METRIC_GROUP_DEFINITIONS", () => {
     ]);
   });
 
-  it("should have label and icon for every entry", () => {
+  it("should have labelKey and icon for every entry", () => {
     for (const def of DEFAULT_METRIC_GROUP_DEFINITIONS) {
-      expect(def.label).toBeTruthy();
+      expect(def.labelKey).toBeTruthy();
       expect(def.icon).toBeTruthy();
     }
   });
@@ -139,9 +139,9 @@ describe("classifyMetric — network group", () => {
 
 describe("classifyMetric — network priority over infra", () => {
   const defs: MetricGroupDefinition[] = [
-    { id: "network", label: "Network", icon: "wifi" },
-    { id: "infra", label: "Infra", icon: "dns" },
-    { id: "others", label: "Others", icon: "category" },
+    { id: "network", labelKey: "metrics.groups.network", icon: "wifi" },
+    { id: "infra", labelKey: "metrics.groups.infra", icon: "dns" },
+    { id: "others", labelKey: "metrics.groups.others", icon: "category" },
   ];
 
   it("should classify container_network_receive_bytes_total as network, not infra", () => {
@@ -166,9 +166,9 @@ describe("classifyMetric — network priority over infra", () => {
 
 describe("classifyMetric — infra group", () => {
   const defs: MetricGroupDefinition[] = [
-    { id: "network", label: "Network", icon: "wifi" },
-    { id: "infra", label: "Infra", icon: "dns" },
-    { id: "others", label: "Others", icon: "category" },
+    { id: "network", labelKey: "metrics.groups.network", icon: "wifi" },
+    { id: "infra", labelKey: "metrics.groups.infra", icon: "dns" },
+    { id: "others", labelKey: "metrics.groups.others", icon: "category" },
   ];
 
   it("should classify container_ prefix metrics as infra", () => {
@@ -296,8 +296,8 @@ describe("classifyMetric — catch-all fallback with DEFAULT_METRIC_GROUP_DEFINI
 
 describe("classifyMetric — pods group with custom groupDefs", () => {
   const defsWithPods: MetricGroupDefinition[] = [
-    { id: "pods", label: "Pods", icon: "bubble_chart" },
-    { id: "others", label: "Others", icon: "category" },
+    { id: "pods", labelKey: "metrics.groups.pods", icon: "bubble_chart" },
+    { id: "others", labelKey: "metrics.groups.others", icon: "category" },
   ];
 
   it("should classify kube_pod prefix metrics as pods", () => {
@@ -324,8 +324,8 @@ describe("classifyMetric — pods group with custom groupDefs", () => {
 
 describe("classifyMetric — nodes group with custom groupDefs", () => {
   const defsWithNodes: MetricGroupDefinition[] = [
-    { id: "nodes", label: "Nodes", icon: "storage" },
-    { id: "others", label: "Others", icon: "category" },
+    { id: "nodes", labelKey: "metrics.groups.nodes", icon: "storage" },
+    { id: "others", labelKey: "metrics.groups.others", icon: "category" },
   ];
 
   it("should classify kube_node prefix metrics as nodes", () => {
@@ -362,18 +362,18 @@ describe("classifyMetric — priority ordering with custom groupDefs", () => {
     // pods patterns are a strict subset of infra patterns
     // placing pods before infra means pod metrics → pods
     const defsPodsFirst: MetricGroupDefinition[] = [
-      { id: "pods", label: "Pods", icon: "bubble_chart" },
-      { id: "infra", label: "Infra", icon: "dns" },
-      { id: "others", label: "Others", icon: "category" },
+      { id: "pods", labelKey: "metrics.groups.pods", icon: "bubble_chart" },
+      { id: "infra", labelKey: "metrics.groups.infra", icon: "dns" },
+      { id: "others", labelKey: "metrics.groups.others", icon: "category" },
     ];
     expect(classifyMetric("kube_pod_status_ready", defsPodsFirst)).toBe("pods");
   });
 
   it("should fall through to infra when pods is after infra for the same metric", () => {
     const defsInfraFirst: MetricGroupDefinition[] = [
-      { id: "infra", label: "Infra", icon: "dns" },
-      { id: "pods", label: "Pods", icon: "bubble_chart" },
-      { id: "others", label: "Others", icon: "category" },
+      { id: "infra", labelKey: "metrics.groups.infra", icon: "dns" },
+      { id: "pods", labelKey: "metrics.groups.pods", icon: "bubble_chart" },
+      { id: "others", labelKey: "metrics.groups.others", icon: "category" },
     ];
     // kube_pod matches infra (kube_ prefix) before pods check is reached
     expect(classifyMetric("kube_pod_status_ready", defsInfraFirst)).toBe("infra");
@@ -383,8 +383,8 @@ describe("classifyMetric — priority ordering with custom groupDefs", () => {
     // all groups have registered patterns, so no catch-all exists
     // fallback: last group id
     const defsNoCatchAll: MetricGroupDefinition[] = [
-      { id: "network", label: "Network", icon: "wifi" },
-      { id: "infra", label: "Infra", icon: "dns" },
+      { id: "network", labelKey: "metrics.groups.network", icon: "wifi" },
+      { id: "infra", labelKey: "metrics.groups.infra", icon: "dns" },
     ];
     // http_server_request_duration_seconds matches network via /\bhttp\b/i now
     expect(classifyMetric("http_server_request_duration_seconds", defsNoCatchAll)).toBe("network");
@@ -420,11 +420,11 @@ describe("groupMetricsByCategory — return structure", () => {
     ]);
   });
 
-  it("should include id, label, icon, and streams on each group entry", () => {
+  it("should include id, labelKey, icon, and streams on each group entry", () => {
     const result = groupMetricsByCategory([]);
     for (const group of result.groups) {
       expect(group).toHaveProperty("id");
-      expect(group).toHaveProperty("label");
+      expect(group).toHaveProperty("labelKey");
       expect(group).toHaveProperty("icon");
       expect(group).toHaveProperty("streams");
       expect(Array.isArray(group.streams)).toBe(true);
@@ -521,9 +521,9 @@ describe("groupMetricsByCategory — classification", () => {
 
 describe("groupMetricsByCategory — custom groupDefs", () => {
   const customDefs: MetricGroupDefinition[] = [
-    { id: "pods", label: "Pods", icon: "bubble_chart" },
-    { id: "nodes", label: "Nodes", icon: "storage" },
-    { id: "custom_bucket", label: "Custom Bucket", icon: "folder" },
+    { id: "pods", labelKey: "metrics.groups.pods", icon: "bubble_chart" },
+    { id: "nodes", labelKey: "metrics.groups.nodes", icon: "storage" },
+    { id: "custom_bucket", labelKey: "metrics.groups.custombucket", icon: "folder" },
   ];
 
   it("should use the provided groupDefs instead of defaults", () => {
@@ -564,10 +564,10 @@ describe("groupMetricsByCategory — custom groupDefs", () => {
     expect(result.groups.map((g) => g.id)).toEqual(["pods", "nodes", "custom_bucket"]);
   });
 
-  it("should carry correct label and icon from custom defs", () => {
+  it("should carry correct labelKey and icon from custom defs", () => {
     const result = groupMetricsByCategory([], customDefs);
     const podsGroup = result.groups.find((g) => g.id === "pods");
-    expect(podsGroup?.label).toBe("Pods");
+    expect(podsGroup?.labelKey).toBe("metrics.groups.pods");
     expect(podsGroup?.icon).toBe("bubble_chart");
   });
 });
@@ -582,9 +582,9 @@ describe("K8S_METRIC_GROUP_DEFINITIONS", () => {
     expect(K8S_METRIC_GROUP_DEFINITIONS.map((d) => d.id)).toEqual(["pods", "nodes"]);
   });
 
-  it("should have label and icon for every outer entry", () => {
+  it("should have labelKey and icon for every outer entry", () => {
     for (const def of K8S_METRIC_GROUP_DEFINITIONS) {
-      expect(def.label).toBeTruthy();
+      expect(def.labelKey).toBeTruthy();
       expect(def.icon).toBeTruthy();
     }
   });
@@ -681,7 +681,9 @@ describe("getDefaultMetricSelections", () => {
   }
 
   it("should return an empty array when no group has defaultMetrics", () => {
-    const defs: MetricGroupDefinition[] = [{ id: "others", label: "Others", icon: "category" }];
+    const defs: MetricGroupDefinition[] = [
+      { id: "others", labelKey: "metrics.groups.others", icon: "category" },
+    ];
     const streams = [makeStream("k8s_pod_cpu_usage")];
     expect(getDefaultMetricSelections(defs, streams)).toEqual([]);
   });
@@ -731,7 +733,7 @@ describe("getDefaultMetricSelections", () => {
     const defs: MetricGroupDefinition[] = [
       {
         id: "custom",
-        label: "Custom",
+        labelKey: "metrics.groups.custom",
         icon: "star",
         defaultMetrics: [{ streamName: "my_metric", filters: { env: "prod" } }],
       },
@@ -749,7 +751,7 @@ describe("getDefaultMetricSelections", () => {
     const defs: MetricGroupDefinition[] = [
       {
         id: "custom",
-        label: "Custom",
+        labelKey: "metrics.groups.custom",
         icon: "star",
         defaultMetrics: [{ streamName: "my_metric", filters: { env: "prod" } }],
       },
@@ -793,11 +795,11 @@ describe("getDefaultMetricSelections", () => {
 // ---------------------------------------------------------------------------
 
 const COMPUTE_MEMORY_STORAGE_GROUPS: MetricGroupDefinition[] = [
-  { id: "compute", label: "Compute", icon: "insights" },
-  { id: "memory", label: "Memory", icon: "memory" },
-  { id: "storage", label: "Storage", icon: "storage" },
-  { id: "network", label: "Network", icon: "lan" },
-  { id: "others", label: "Others", icon: "category" },
+  { id: "compute", labelKey: "metrics.groups.compute", icon: "insights" },
+  { id: "memory", labelKey: "metrics.groups.memory", icon: "memory" },
+  { id: "storage", labelKey: "metrics.groups.storage", icon: "storage" },
+  { id: "network", labelKey: "metrics.groups.network", icon: "lan" },
+  { id: "others", labelKey: "metrics.groups.others", icon: "category" },
 ];
 
 describe("groupMetricsByCategory with compute/memory/storage groups", () => {
@@ -880,7 +882,7 @@ describe("groupMetricsByCategory with compute/memory/storage groups", () => {
 describe("groupMetricsByCategory — edge cases", () => {
   it("should handle a single-group definition with no patterns (all catch-all)", () => {
     const singleDef: MetricGroupDefinition[] = [
-      { id: "everything", label: "Everything", icon: "all_inclusive" },
+      { id: "everything", labelKey: "metrics.groups.everything", icon: "all_inclusive" },
     ];
     const streams = [
       makeStream("container_cpu_usage_seconds_total"),

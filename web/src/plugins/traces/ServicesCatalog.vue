@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div data-test="services-catalog-stream-selector" class="w-rail flex-shrink-0">
         <OSelect
           :model-value="streamFilter"
-          :options="availableStreams.map((s) => ({ label: s, value: s }))"
+          :options="availableStreams.map((s) => ({ label: raw(s), value: s }))"
           labelKey="label"
           valueKey="value"
           class="rounded-default w-full"
@@ -75,7 +75,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("traces.servicesCatalog.status.critical") }}</span>
               <OTooltip>
                 <template #content>
-                  {{ t("traces.servicesCatalog.status.critical") }}: &gt; 10%
+                  {{ t("traces.servicesCatalog.status.critical") }}:
+                  {{ t("traces.servicesCatalog.status.criticalThreshold") }}
                   {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
                 </template>
               </OTooltip>
@@ -90,7 +91,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("traces.servicesCatalog.status.warning") }}</span>
               <OTooltip>
                 <template #content>
-                  {{ t("traces.servicesCatalog.status.warning") }}: 5 – 10%
+                  {{ t("traces.servicesCatalog.status.warning") }}:
+                  {{ t("traces.servicesCatalog.status.warningThreshold") }}
                   {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
                 </template>
               </OTooltip>
@@ -105,7 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span>{{ t("traces.servicesCatalog.status.degraded") }}</span>
               <OTooltip>
                 <template #content>
-                  {{ t("traces.servicesCatalog.status.degraded") }}: 1 – 5%
+                  {{ t("traces.servicesCatalog.status.degraded") }}:
+                  {{ t("traces.servicesCatalog.status.degradedThreshold") }}
                   {{ t("traces.servicesCatalog.legend.title").toLowerCase() }}
                 </template>
               </OTooltip>
@@ -334,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.error_rate"
                 :max="columnMaxes.error_rate"
-                :label="formatPercent(row.error_rate)"
+                :label="raw(formatPercent(row.error_rate))"
                 :variant="
                   row.error_rate > 10 ? 'danger' : row.error_rate > 5 ? 'warning' : 'default'
                 "
@@ -346,14 +349,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-total_requests="{ row }">
               <span :data-test="`services-catalog-requests-${row.service_name}`">
                 {{ formatLargeNumber(row.total_requests) }}
-                <OTooltip :content="row.total_requests.toLocaleString()" />
+                <OTooltip :content="raw(row.total_requests.toLocaleString())" />
               </span>
             </template>
 
             <template #cell-error_count="{ row }">
               <span :data-test="`services-catalog-errors-${row.service_name}`">
                 {{ formatLargeNumber(row.error_count) }}
-                <OTooltip :content="row.error_count.toLocaleString()" />
+                <OTooltip :content="raw(row.error_count.toLocaleString())" />
               </span>
             </template>
 
@@ -362,8 +365,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.p50_latency_ns"
                 :max="columnMaxes.p50_latency_ns"
-                :label="formatLat(row.p50_latency_ns)"
-                :tooltip="row.p50_latency_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.p50_latency_ns))"
+                :tooltip="raw(row.p50_latency_ns.toLocaleString() + ' ns')"
               />
             </template>
 
@@ -371,8 +374,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.p95_latency_ns"
                 :max="columnMaxes.p95_latency_ns"
-                :label="formatLat(row.p95_latency_ns)"
-                :tooltip="row.p95_latency_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.p95_latency_ns))"
+                :tooltip="raw(row.p95_latency_ns.toLocaleString() + ' ns')"
               />
             </template>
 
@@ -380,8 +383,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.p99_latency_ns"
                 :max="columnMaxes.p99_latency_ns"
-                :label="formatLat(row.p99_latency_ns)"
-                :tooltip="row.p99_latency_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.p99_latency_ns))"
+                :tooltip="raw(row.p99_latency_ns.toLocaleString() + ' ns')"
                 :variant="row.p99_latency_ns > P99_WARN_NS ? 'warning' : 'default'"
               />
             </template>
@@ -390,8 +393,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.avg_duration_ns"
                 :max="columnMaxes.avg_duration_ns"
-                :label="formatLat(row.avg_duration_ns)"
-                :tooltip="row.avg_duration_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.avg_duration_ns))"
+                :tooltip="raw(row.avg_duration_ns.toLocaleString() + ' ns')"
               />
             </template>
 
@@ -399,8 +402,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <ServiceCatalogBarCell
                 :value="row.max_duration_ns"
                 :max="columnMaxes.max_duration_ns"
-                :label="formatLat(row.max_duration_ns)"
-                :tooltip="row.max_duration_ns.toLocaleString() + ' ns'"
+                :label="raw(formatLat(row.max_duration_ns))"
+                :tooltip="raw(row.max_duration_ns.toLocaleString() + ' ns')"
               />
             </template>
           </OTable>
@@ -426,7 +429,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
@@ -456,11 +459,11 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import ServicesCatalogNoDataState from "./ServicesCatalogNoDataState.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const { columnVisibility, setColumnVisibility } = useExternalColumnToggle("services-catalog");
 const catalogContainerRef = ref<HTMLElement | null>(null);
 const { searchObj } = useTraces();
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
 const emit = defineEmits<{
@@ -521,6 +524,8 @@ function categoryOf(row: ServiceRow): EntityCategory {
 }
 
 const isLoading = ref(false);
+// Epoch-ms of the last completed load, shown on the page header's refresh control.
+const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
 const filterText = ref("");
 const typeFilter = ref<TypeFilter>("service");
@@ -1060,6 +1065,7 @@ ORDER BY total_requests DESC`;
       },
       complete: () => {
         isLoading.value = false;
+        lastRunAt.value = Date.now();
       },
       reset: () => {
         services.value = [];
@@ -1069,8 +1075,15 @@ ORDER BY total_requests DESC`;
   );
 }
 
-// Expose for parent ref access
-defineExpose({ loadServicesCatalog, streamFilter });
+// Public API for the parent page header (mirrors ServiceGraph's shape:
+// refresh + loading + lastRunAt) plus the catalog's own members.
+defineExpose({
+  loadServicesCatalog,
+  streamFilter,
+  refresh: loadServicesCatalog,
+  loading: isLoading,
+  lastRunAt,
+});
 
 // Keep streamFilter in sync when Traces/Spans tab changes the global stream
 watch(
@@ -1093,9 +1106,9 @@ watch(
     searchObj.data.datetime.relativeTimePeriod,
   ],
   () => {
-    if (searchObj.meta.searchMode === "services-catalog") {
-      loadServicesCatalog();
-    }
+    // This component only renders on its own route now, so no search-mode
+    // guard is needed — if it is mounted, it is the visible view.
+    loadServicesCatalog();
   },
 );
 

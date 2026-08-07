@@ -107,7 +107,7 @@
                 data-test="dashboard-add-x-data"
                 @click.stop="addXAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != "h-bar" ? "+X" : "+Y" }}
+                {{ dashboardPanelData.data.type != "h-bar" ? raw("+X") : raw("+Y") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -116,7 +116,7 @@
                 data-test="dashboard-add-y-data"
                 @click.stop="addYAxisItem(row)"
               >
-                {{ dashboardPanelData.data.type != "h-bar" ? "+Y" : "+X" }}
+                {{ dashboardPanelData.data.type != "h-bar" ? raw("+Y") : raw("+X") }}
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'table'"
@@ -126,7 +126,7 @@
                 data-test="dashboard-add-p-data"
                 @click.stop="addBreakDownAxisItem(row)"
               >
-                +P
+                {{ t("panel.addPivotShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -145,7 +145,7 @@
                 data-test="dashboard-add-b-data"
                 @click.stop="addBreakDownAxisItem(row)"
               >
-                +B
+                {{ t("panel.addBreakdownShort") }}
               </OButton>
               <OButton
                 v-if="dashboardPanelData.data.type == 'heatmap'"
@@ -155,7 +155,7 @@
                 data-test="dashboard-add-z-data"
                 @click.stop="addZAxisItem(row)"
               >
-                +Z
+                {{ t("panel.addZAxisShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -172,7 +172,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
 
@@ -188,7 +188,7 @@
                 data-test="dashboard-add-latitude-data"
                 @click.stop="addLatitude(row)"
               >
-                +Lat
+                {{ t("panel.addLatitudeShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -200,7 +200,7 @@
                 data-test="dashboard-add-longitude-data"
                 @click.stop="addLongitude(row)"
               >
-                +Lng
+                {{ t("panel.addLongitudeShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -212,7 +212,7 @@
                 data-test="dashboard-add-weight-data"
                 @click.stop="addWeight(row)"
               >
-                +W
+                {{ t("panel.addWeightShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -229,7 +229,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
 
@@ -245,7 +245,7 @@
                 data-test="dashboard-add-x-data"
                 @click.stop="addMapName(row)"
               >
-                +N
+                {{ t("panel.addNameShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -257,7 +257,7 @@
                 data-test="dashboard-add-y-data"
                 @click.stop="addMapValue(row)"
               >
-                +V
+                {{ t("panel.addValueShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -265,7 +265,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
 
@@ -281,7 +281,7 @@
                 data-test="dashboard-add-source-data"
                 @click.stop="addSource(row)"
               >
-                +S
+                {{ t("panel.addSourceShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -293,7 +293,7 @@
                 data-test="dashboard-add-target-data"
                 @click.stop="addTarget(row)"
               >
-                +T
+                {{ t("panel.addTargetShort") }}
               </OButton>
               <OButton
                 variant="ghost-neutral"
@@ -305,7 +305,7 @@
                 data-test="dashboard-add-value-data"
                 @click.stop="addValue(row)"
               >
-                +V
+                {{ t("panel.addValueShort") }}
               </OButton>
               <OButton
                 v-if="
@@ -322,7 +322,7 @@
                 data-test="dashboard-add-filter-data"
                 @click.stop="addFilteredItem(row as { name: string; stream: string })"
               >
-                +F
+                {{ t("panel.addFilterShort") }}
               </OButton>
             </div>
           </template>
@@ -358,7 +358,7 @@
             side="left"
             align="center"
             max-width="18.75rem"
-            :content="`Total Fields: ${bottomProps.totalRows}`"
+            :content="t('common.totalFields', { count: bottomProps.totalRows })"
           />
           <OButton
             variant="ghost-primary"
@@ -396,7 +396,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, inject } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -426,8 +426,8 @@ const props = defineProps<{
 const dashboardPanelDataPageKey: string = inject("dashboardPanelDataPageKey", "dashboard");
 
 const store = useStore();
-const { t } = useI18n();
-const { getStreams } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
 const { showErrorNotification } = useNotifications();
 const { parsePromQlQuery } = usePromqlSuggestions();
 const emit = defineEmits<{ collapse: [] }>();
@@ -455,7 +455,7 @@ const {
   cleanupDraggingFields,
   updateGroupedFields,
   fetchPromQLLabels,
-} = useDashboardPanelData(dashboardPanelDataPageKey);
+} = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
 const fieldListRef = ref<InstanceType<typeof OFieldList> | null>(null);
 const currentPage = ref(1);
@@ -515,7 +515,7 @@ function onStreamChange(val: SelectModelValue) {
 // ── Stream type options ────────────────────────────────────────────────
 
 const streamTypeOptions = computed(() =>
-  ["logs", "metrics", "traces"].map((t: string) => ({ label: t, value: t })),
+  ["logs", "metrics", "traces"].map((t: string) => ({ label: raw(t), value: t })),
 );
 
 // ── Stream list ────────────────────────────────────────────────────────

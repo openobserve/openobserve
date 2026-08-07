@@ -16,11 +16,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="flex gap-1">
+    <div class="flex gap-3">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"
-        variant="primary"
         :model-value="selectedButtonQueryType"
         @update:model-value="onUpdateQueryMode($event as string)"
       >
@@ -44,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- Builder Mode: Builder / Custom -->
       <OToggleGroup
-        variant="primary"
         :model-value="selectedButtonType"
         @update:model-value="onUpdateBuilderMode($event as string)"
       >
@@ -75,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch, onMounted, nextTick, inject, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
@@ -97,12 +95,12 @@ export default defineComponent({
   emits: [],
   setup() {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
     const { dashboardPanelData, removeXYFilters, updateXYFieldsForCustomQueryMode } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
-    const { applyDefaultPanelFields } = useDefaultPanelFields(dashboardPanelDataPageKey);
+      useDashboardPanelData(dashboardPanelDataPageKey, t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields(dashboardPanelDataPageKey, t);
     // Pages that re-seed default builder fields on the in-page Builder toggle.
     // (Entering a builder surface parses on mount, not via this handler.)
     const SEED_ON_TOGGLE_PAGES = ["dashboard", "metrics", "build", "logs"];

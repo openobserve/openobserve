@@ -21,7 +21,7 @@
 // concurrently, then assembles a CompareResult via buildCompareResult.
 
 import { ref, computed, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
@@ -92,7 +92,7 @@ function windowsEqual(x: CompareWindows | null, y: CompareWindows | null): boole
 
 export function useVersionCompare() {
   const store = useStore();
-  const { t } = useI18n();
+  const { t } = useI18nTyped();
   const { fetchQueryDataWithHttpStream } = useHttpStreaming();
 
   const armA = useLLMInsights();

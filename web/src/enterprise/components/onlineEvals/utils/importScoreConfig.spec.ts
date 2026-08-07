@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { gt } from "@/types/i18n";
 import {
   normalizeScoreConfigInput,
   prepareScoreConfigImport,
@@ -87,6 +88,7 @@ describe("validateScoreConfig", () => {
     itemIndex: 0,
     existingNames: new Set<string>(),
     nameCounts: new Map<string, number>(),
+    t: gt,
   };
 
   it("rejects null normalized input", () => {
@@ -245,6 +247,7 @@ describe("prepareScoreConfigImport", () => {
         { name: "b", data_type: "numeric", numeric_range: { min: 0, max: 1 } },
       ],
       [],
+      gt,
     );
     expect(result.hasErrors).toBe(false);
     expect(result.items).toHaveLength(2);
@@ -257,7 +260,7 @@ describe("prepareScoreConfigImport", () => {
   });
 
   it("aggregates errors across items into a flat list", () => {
-    const result = prepareScoreConfigImport([{ dataType: "boolean" }, { name: "x" }], []);
+    const result = prepareScoreConfigImport([{ dataType: "boolean" }, { name: "x" }], [], gt);
     expect(result.hasErrors).toBe(true);
     expect(result.errors.some((e) => e.itemIndex === 0 && e.field === "name")).toBe(true);
     expect(result.errors.some((e) => e.itemIndex === 1 && e.field === "dataType")).toBe(true);
@@ -270,6 +273,7 @@ describe("prepareScoreConfigImport", () => {
         { name: "same", dataType: "boolean" },
       ],
       [],
+      gt,
     );
     expect(result.errors.filter((e) => e.field === "duplicate")).toHaveLength(2);
   });
@@ -278,6 +282,7 @@ describe("prepareScoreConfigImport", () => {
     const result = prepareScoreConfigImport(
       [{ name: "exists", dataType: "boolean" }],
       [{ name: "exists" }],
+      gt,
     );
     expect(result.errors.find((e) => e.field === "nameConflict")).toBeDefined();
     expect(result.items[0].payload).toBeNull();
@@ -287,6 +292,7 @@ describe("prepareScoreConfigImport", () => {
     const result = prepareScoreConfigImport(
       [{ name: "ok", dataType: "boolean" }, { dataType: "boolean" }],
       [],
+      gt,
     );
     expect(result.items[0].payload).toEqual({ name: "ok", dataType: "boolean" });
     expect(result.items[1].payload).toBeNull();

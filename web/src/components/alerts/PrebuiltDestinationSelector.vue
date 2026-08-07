@@ -60,7 +60,7 @@ limitations under the License. -->
             data-test="destination-type-description"
             class="text-2xs text-text-secondary mt-1 mb-0 hidden grow text-center [line-height:1.2] min-[75rem]:block"
           >
-            {{ type.description }}
+            {{ t(type.descriptionKey) }}
           </div>
         </div>
 
@@ -120,7 +120,7 @@ limitations under the License. -->
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { PREBUILT_DESTINATION_TYPES } from "@/utils/prebuilt-templates";
 import type { PrebuiltTypeId } from "@/utils/prebuilt-templates/types";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -146,7 +146,7 @@ interface Emits {
 const emit = defineEmits<Emits>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Reactive state
 const selectedType = computed({

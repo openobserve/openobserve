@@ -1422,7 +1422,9 @@ test.describe("Logs Regression Bug Fixes", () => {
     // Ingest data into a second stream so the multi-stream join has two streams
     const orgId = getOrgIdentifier() || 'default';
     const headers = getHeaders();
-    const secondStream = 'e2e_8641_stream';
+    // Per-run unique name — the fixed 'e2e_8641_stream' collided with concurrent shared-org runs
+    // ("Stream not available. Ingestion may have failed."). Keep the e2e_ prefix for cleanup.
+    const secondStream = 'e2e_8641_stream_' + Math.random().toString(36).slice(2, 7);
     await sendRequest(page, getIngestionUrl(orgId, secondStream), [{
       level: 'info', job: 'test_8641', log: 'test message for multi-stream', e2e: '1',
     }], headers);
@@ -1687,7 +1689,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: include/exclude search term position (Bug #11606)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1730,7 +1732,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Histogram redraws on index list collapse/expand (Bug #9339)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1762,7 +1764,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Stream dropdown replaces search term on selection (Bug #7310)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1795,7 +1797,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Column positions persist after re-query (Bug #5277)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1834,7 +1836,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Text wrap toggle and saved view alignment (Bug #4426)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
@@ -1882,7 +1884,7 @@ test.describe("Logs Regression Bug Fixes", () => {
   }, async ({ page }) => {
     testLogger.info('Test: Cancel query available on visualize page (Bug #4091)');
 
-    const orgName = 'default';
+    const orgName = getOrgIdentifier() || 'default';
     await page.goto(`/web/logs?org_identifier=${orgName}&stream=e2e_automate&stream_type=logs`);
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 

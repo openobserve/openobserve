@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       variant="outline"
       size="icon"
       class="shrink-0"
-      title="Add Folder"
+      :title="t('common.addFolder')"
       @click="showDialog = true"
     >
       <OIcon name="add" size="sm" />
@@ -99,8 +99,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import AddFolder from "./AddFolder.vue";
 import { getFoldersListByType } from "@/utils/commons";
@@ -143,8 +143,8 @@ export default defineComponent({
     },
   },
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const store: any = useStore();
-    const { t } = useI18n();
     const showDialog = ref(false);
 
     const folderOptions = computed(
