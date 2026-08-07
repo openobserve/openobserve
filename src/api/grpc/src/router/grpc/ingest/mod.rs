@@ -15,4 +15,5 @@
 
 pub mod logs;
 pub mod metrics;
+pub mod profiles;
 pub mod traces;
