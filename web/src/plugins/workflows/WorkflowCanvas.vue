@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @node-drag-start="onNodeDragStart"
     @node-drag-stop="onNodeDragStop"
     @edge-click="onEdgeClick"
+    @pane-click="closeEdgeMenu"
     @connect="onConnect"
     @drop="onDrop"
     @dragover="onDragOver"
@@ -83,7 +84,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            zoom-in / zoom-out / fit-view, and the glyph is a bare 32x32
            currentColor <svg> so it matches Vue Flow's own control icons. -->
       <template #top>
+        <!-- Hidden on the read-only Runs canvas: the node palette only exists in
+             the editor, so the toggle would be a no-op there. -->
         <ControlButton
+          v-if="!readOnly"
           data-test="workflow-palette-collapse-btn"
           :title="
             workflowObj.showNodePalette ? t('pipeline.collapseNodes') : t('pipeline.openNodes')
@@ -99,12 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </svg>
         </ControlButton>
 
-        <!-- Undo (T1) + Tidy up (T9) — editor-only affordances (hidden on the
-             read-only Runs canvas). Undo is the ONLY history button; redo is
-             keyboard-only (Ctrl/Cmd+Shift+Z). -->
-        <!-- Bare currentColor <svg> (like the palette toggle above) so they match
-             Vue Flow's own control icons and adapt to light/dark — an OIcon here
-             kept its own colour and vanished on the dark canvas. -->
+        <!-- Undo (T1) — editor-only, sits with the palette toggle ABOVE zoom/fit.
+             Undo is the ONLY history button; redo is keyboard-only (Ctrl/Cmd+Shift+Z).
+             Bare currentColor <svg> (like the palette toggle) so it matches Vue
+             Flow's own control icons and adapts to light/dark. -->
         <ControlButton
           v-if="!readOnly"
           data-test="workflows-canvas-undo"
@@ -119,44 +121,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </svg>
         </ControlButton>
-        <ControlButton
-          v-if="!readOnly"
-          data-test="workflows-canvas-tidy"
-          :title="t('workflow.canvas.tidyUp')"
-          @click="onTidy"
-        >
-          <!-- Tidy up — magic wand / auto-arrange (Material auto_fix_high). -->
-          <svg viewBox="0 0 24 24">
-            <path
-              d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7l2.5-1.4zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14l-2.5 1.4zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5L22 2zm-7.63 5.29a.9959.9959 0 0 0-1.41 0L1.29 18.96a.9959.9959 0 0 0 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"
-            />
-          </svg>
-        </ControlButton>
       </template>
+
+      <!-- Tidy up (T9) — placed in the DEFAULT slot so it renders LAST, after
+           zoom-in / zoom-out / fit-view. Editor-only. -->
+      <ControlButton
+        v-if="!readOnly"
+        data-test="workflows-canvas-tidy"
+        :title="t('workflow.canvas.tidyUp')"
+        @click="onTidy"
+      >
+        <!-- Tidy up — magic wand / auto-arrange (Material auto_fix_high). -->
+        <svg viewBox="0 0 24 24">
+          <path
+            d="M7.5 5.6 10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7l2.5-1.4zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14l-2.5 1.4zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5L22 2zm-7.63 5.29a.9959.9959 0 0 0-1.41 0L1.29 18.96a.9959.9959 0 0 0 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"
+          />
+        </svg>
+      </ControlButton>
     </Controls>
   </VueFlow>
 
-  <!-- Edge-deletion help hint — shown on edge click (same affordance as the
-       pipeline canvas). Auto-hides after a few seconds; never shown on the
-       read-only Runs canvas where edges can't be removed. -->
+  <!-- Edge action menu — opens AT THE CLICK POINT on the clicked edge (no travel to
+       a top hint bar). Insert splices a step onto the edge (A→B becomes A→new→B,
+       rewired); Delete removes the connection (Backspace/Delete still works too).
+       Positioned via a CSS var (like the ghost start node's zoom) so no hardcoded
+       px. Never shown on the read-only Runs canvas. -->
   <div
-    v-if="showEdgeHelpNotification"
-    data-test="workflow-edge-delete-hint"
-    class="bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center gap-2 border px-4 py-2.5 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    v-if="edgeMenu.show && !readOnly"
+    ref="edgeMenuRef"
+    data-test="workflow-edge-menu"
+    class="bg-surface-base border-border-default rounded-default fixed z-1000 flex min-w-[10rem] flex-col overflow-hidden border py-1 text-sm shadow-[0_4px_20px_rgba(0,0,0,0.15)] top-[var(--edge-menu-y)] left-[var(--edge-menu-x)] dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+    :style="{ '--edge-menu-x': edgeMenu.x + 'px', '--edge-menu-y': edgeMenu.y + 'px' }"
   >
-    <OIcon name="info" size="sm" />
-    <span>{{ t("workflow.edgeDeleteHint") }}</span>
-    <!-- Insert a step onto the selected edge (T7): A→B becomes A→new→B, rewired
-         automatically. Kept as an action on the selected edge (rather than a
-         hover-`+` overlay) so it stays within the token/utility styling rules. -->
     <OButton
-      variant="outline"
-      size="xs"
+      variant="ghost"
+      size="sm"
+      class="w-full justify-start!"
       data-test="workflows-edge-insert"
       icon-left="add-circle-outline"
       @click="onInsertStep"
     >
       {{ t("workflow.canvas.insertStep") }}
+    </OButton>
+    <OButton
+      variant="ghost-destructive"
+      size="sm"
+      class="w-full justify-start!"
+      data-test="workflows-edge-delete"
+      icon-left="delete"
+      @click="onDeleteEdge"
+    >
+      {{ t("workflow.canvas.deleteEdge") }}
     </OButton>
   </div>
 
@@ -209,7 +224,6 @@ import { useI18n } from "vue-i18n";
 import WorkflowNode from "./WorkflowNode.vue";
 import FlowEdge from "@/components/flow/FlowEdge.vue";
 import FlowNodeCard from "@/components/flow/FlowNodeCard.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useWorkflowCanvas, {
   workflowHistory,
@@ -247,17 +261,49 @@ const {
   getSelectedEdges,
   removeEdges,
   fitView,
+  setCenter,
 } = useVueFlow();
 
 // Undo availability drives the button's disabled state (T1).
 const canUndo = computed(() => workflowHistory.past.length > 0);
 const onUndo = () => undoWorkflow();
-// Tidy re-lays-out the tree, then frames it (T9). Pass the measured node width so
-// cards centre on their column (not left-align); falls back to a default width for
-// any node VueFlow hasn't measured yet.
+// Tidy re-lays-out the tree (T9), then PANS the view so the tidied graph is
+// centered on screen — WITHOUT changing the zoom level (users found fit-view's
+// zoom jump disorienting; but with no re-frame at all the re-laid-out graph landed
+// off-screen). We keep the current zoom and move the viewport to the graph's
+// bounding-box centre via setCenter. Pass the measured node width so cards centre
+// on their column; fall back to a default width for any node not measured yet.
 const onTidy = () => {
   const getWidth = (id: string) => findNode(id)?.dimensions?.width;
-  if (tidyWorkflowLayout(getWidth)) nextTick(() => fitView({ padding: 0.2 }));
+  if (!tidyWorkflowLayout(getWidth)) return;
+  const nodes = workflowObj.currentSelectedWorkflow?.nodes || [];
+  if (!nodes.length) return;
+  // Compute the graph's bounding box from the just-applied positions. Node
+  // DIMENSIONS are measured from the DOM and don't depend on position, so they're
+  // valid synchronously here — no nextTick needed. Doing this in the SAME tick (and
+  // with duration 0 below) means the layout change and the recenter flush in one
+  // paint, so there's no visible "snap left, then glide back to centre" movement.
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const n of nodes) {
+    const dims = findNode(n.id)?.dimensions;
+    const w = dims?.width || 240;
+    const h = dims?.height || 60;
+    const x = n.position?.x ?? 0;
+    const y = n.position?.y ?? 0;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + w);
+    maxY = Math.max(maxY, y + h);
+  }
+  // Centre the graph, kept at the CURRENT zoom (no zoom in/out) and with NO
+  // animation (duration 0) so the recenter is instant, not a visible pan.
+  setCenter((minX + maxX) / 2, (minY + maxY) / 2, {
+    zoom: viewport.value.zoom,
+    duration: 0,
+  });
 };
 
 const vueFlowRef = ref<any>(null);
@@ -265,30 +311,56 @@ const vueFlowRef = ref<any>(null);
 // via WorkflowNode, the hover add/delete + click-to-edit. Run overlays stay.
 const readOnly = computed(() => workflowObj.readOnly);
 
-// Edges have no delete button; clicking one selects it, so surface a transient
-// hint that Backspace/Delete removes it (same affordance as the pipeline canvas).
-// Skipped on the read-only Runs canvas, where edges can't be removed.
-const showEdgeHelpNotification = ref(false);
-// The edge the hint refers to — the Insert Step action (T7) splices onto it.
-const selectedEdge = ref<any>(null);
-let edgeHintTimeout: ReturnType<typeof setTimeout> | null = null;
+// Edges have no inline buttons; clicking one opens a small action menu AT THE
+// CLICK POINT with Insert + Delete (no travel to a top hint bar). `edge` is the
+// clicked edge; x/y are viewport coords for the fixed-positioned menu. Skipped on
+// the read-only Runs canvas, where edges can't be edited.
+const edgeMenuRef = ref<HTMLElement | null>(null);
+const edgeMenu = ref<{ show: boolean; x: number; y: number; edge: any }>({
+  show: false,
+  x: 0,
+  y: 0,
+  edge: null,
+});
 const onEdgeClick = (payload: any) => {
   if (readOnly.value) return;
-  selectedEdge.value = payload?.edge ?? payload ?? null;
-  if (edgeHintTimeout) clearTimeout(edgeHintTimeout);
-  showEdgeHelpNotification.value = true;
-  edgeHintTimeout = setTimeout(() => {
-    showEdgeHelpNotification.value = false;
-    edgeHintTimeout = null;
-  }, 3500);
+  const edge = payload?.edge ?? payload ?? null;
+  if (!edge) return;
+  const evt = payload?.event as MouseEvent | undefined;
+  // Nudge a few px off the cursor so the menu doesn't open under the pointer.
+  edgeMenu.value = {
+    show: true,
+    x: (evt?.clientX ?? 0) + 4,
+    y: (evt?.clientY ?? 0) + 4,
+    edge,
+  };
+};
+const closeEdgeMenu = () => {
+  edgeMenu.value = { ...edgeMenu.value, show: false, edge: null };
 };
 
-// Insert a step onto the selected edge (T7) — opens the step picker in "insert"
-// mode; picking a type splices A→new→B (see addNodeOnEdge / commitNode).
+// Insert a step onto the clicked edge (T7) — opens the step picker in "insert"
+// mode at the menu position; picking a type splices A→new→B (addNodeOnEdge).
 const onInsertStep = () => {
-  if (!selectedEdge.value) return;
-  openInsertPicker(selectedEdge.value);
-  showEdgeHelpNotification.value = false;
+  const edge = edgeMenu.value.edge;
+  if (!edge) return;
+  openInsertPicker(edge, { clientX: edgeMenu.value.x, clientY: edgeMenu.value.y } as MouseEvent);
+  closeEdgeMenu();
+};
+// Delete the clicked connection (single undo step).
+const onDeleteEdge = () => {
+  const edge = edgeMenu.value.edge;
+  if (!edge) return;
+  pushWorkflowHistory();
+  removeEdges([edge.id]);
+  closeEdgeMenu();
+};
+// Dismiss the menu on any click outside it (canvas pane-click already closes it;
+// this covers clicks on nodes / toolbar / elsewhere).
+const onDocMouseDown = (e: MouseEvent) => {
+  if (!edgeMenu.value.show) return;
+  if (edgeMenuRef.value && edgeMenuRef.value.contains(e.target as Node)) return;
+  closeEdgeMenu();
 };
 
 // Is the user typing in a field / code editor? Undo/redo + edge-delete must not
@@ -314,6 +386,11 @@ const isTextInputTarget = (target: EventTarget | null): boolean => {
 // Monaco editor is focused.
 const onKeydown = (event: KeyboardEvent) => {
   if (readOnly.value) return;
+  // Escape closes the edge menu regardless of focus.
+  if (event.key === "Escape" && edgeMenu.value.show) {
+    closeEdgeMenu();
+    return;
+  }
   if (isTextInputTarget(event.target)) return;
 
   const mod = event.metaKey || event.ctrlKey;
@@ -331,13 +408,16 @@ const onKeydown = (event: KeyboardEvent) => {
   // Snapshot BEFORE removal so the edge-delete is a single undo step.
   pushWorkflowHistory();
   removeEdges(selected.map((e) => e.id));
-  showEdgeHelpNotification.value = false;
+  closeEdgeMenu();
 };
 
-onMounted(() => window.addEventListener("keydown", onKeydown));
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+  window.addEventListener("mousedown", onDocMouseDown);
+});
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", onKeydown);
-  if (edgeHintTimeout) clearTimeout(edgeHintTimeout);
+  window.removeEventListener("mousedown", onDocMouseDown);
 });
 // The "Choose a Trigger" start node shows whenever the workflow has NO TRIGGER —
 // not only when the canvas is empty. A workflow needs exactly one trigger, and

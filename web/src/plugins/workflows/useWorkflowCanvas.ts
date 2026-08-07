@@ -279,8 +279,9 @@ const applyGraphSnapshot = (snap: { nodes: any[]; edges: any[] }) => {
   // Reassign whole arrays so VueFlow's v-model picks up the restore.
   workflowObj.currentSelectedWorkflow.nodes = snap.nodes;
   workflowObj.currentSelectedWorkflow.edges = snap.edges;
-  // The graph changed under the run — prior Test badges are stale.
-  workflowObj.testRun.result = null;
+  // The Test log deliberately PERSISTS across graph edits (n8n-style): it's cleared
+  // only by a new run or the explicit "Clear" button. A step this undo/redo removed
+  // stays listed struck-through (from the run-time snapshot). See executeTestRun.
 };
 export const undoWorkflow = () => {
   if (!workflowHistory.past.length) return;
@@ -337,8 +338,8 @@ export const toggleNodeDisabled = (nodeId: string) => {
   pushWorkflowHistory();
   // Root-level boolean (sibling of `meta`) — see serializeNode / isNodeDisabled.
   node.is_disabled = !isNodeDisabled(node);
-  // A disabled node no longer contributes to a run — prior badges are stale.
-  workflowObj.testRun.result = null;
+  // The Test log persists (n8n-style); a now-disabled step stays listed
+  // struck-through rather than clearing the whole run. See executeTestRun.
   markWorkflowDirty();
 };
 
@@ -467,6 +468,59 @@ export const flowOrderedNodeIds = (nodes: any[], edges: any[], startId?: string)
   return order;
 };
 
+// A step in the executed-steps TREE (results dock). Carries the render structure —
+// depth, direct-child count, and per-column "does this rail continue" flags — so
+// the panel draws the traces-waterfall connector lines without re-deriving them.
+export interface StepTreeNode {
+  id: string;
+  depth: number;
+  childCount: number;
+  // One flag per depth column: does the rail at that column continue below this
+  // row (ancestor / this node has a following sibling)? The last entry is this
+  // node's own continuation, which picks its elbow shape (└ vs ├).
+  guides: boolean[];
+}
+
+// Build the ran nodes as a DFS PRE-ORDER tree (children immediately follow their
+// parent so the connector rails line up). Siblings are ordered by canvas position
+// (top-to-bottom, then left-to-right). `ranIds` bounds the walk to nodes that
+// actually ran; unreached ran nodes (orphans / a replay's from-node) start their
+// own subtree in flow order. Structure only — labels/status are resolved by the
+// caller — so it's reusable for both the live-run snapshot and the history view.
+export const buildStepTree = (nodes: any[], edges: any[], ranIds: string[]): StepTreeNode[] => {
+  const ran = new Set<string>(ranIds);
+  if (!ran.size || !(nodes || []).length) return [];
+  const byId = new Map<string, any>((nodes || []).map((n: any) => [n.id, n]));
+  const kidsOf: Record<string, string[]> = {};
+  for (const e of edges || []) (kidsOf[e.source] ||= []).push(e.target);
+  const sortKids = (ids: string[]) =>
+    ids
+      .filter((c) => ran.has(c) && byId.has(c))
+      .sort((a, b) => {
+        const na = byId.get(a);
+        const nb = byId.get(b);
+        return (
+          (na?.position?.y ?? 0) - (nb?.position?.y ?? 0) ||
+          (na?.position?.x ?? 0) - (nb?.position?.x ?? 0)
+        );
+      });
+
+  const rows: StepTreeNode[] = [];
+  const seen = new Set<string>();
+  const visit = (id: string, depth: number, guides: boolean[]) => {
+    if (seen.has(id)) return; // cycle / diamond guard
+    seen.add(id);
+    const kids = sortKids(kidsOf[id] || []);
+    rows.push({ id, depth, childCount: kids.length, guides });
+    kids.forEach((c, idx) => visit(c, depth + 1, [...guides, idx < kids.length - 1]));
+  };
+  // Start from each unvisited ran node in flow order — the first is the run's root
+  // (trigger or replay from-node); any remainder are orphans.
+  for (const id of flowOrderedNodeIds(nodes, edges).filter((id) => ran.has(id)))
+    if (!seen.has(id)) visit(id, 0, []);
+  return rows;
+};
+
 // `startIds` + everything downstream of them (a Set; the starts are included).
 //
 // Example — for Trigger(t) → Function(f) → Destination(d):
@@ -590,10 +644,27 @@ export const executeTestRun = async (opts: {
     )?.id;
     const startId = opts.fromNode || triggerId;
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
+    // Snapshot the executed-steps TREE at run time. The results dock now persists
+    // across graph edits (n8n-style), so a step later deleted or disabled must still
+    // render — with its frozen label/icon, struck-through. We freeze the tree shape
+    // (depth + connector guides) plus each step's display data/meta here; the panel
+    // resolves live label/status on top (reflecting a later rename) and falls back
+    // to this frozen data for a removed node. History runs don't set this — the
+    // panel rebuilds the tree from the live graph there. See WorkflowResultsPanel.
+    const stepById = new Map<string, any>((wf.nodes || []).map((n: any) => [n.id, n]));
+    const ranSteps = buildStepTree(wf.nodes || [], wf.edges || [], ranNodeIds).map((s) => {
+      const n = stepById.get(s.id);
+      return {
+        ...s,
+        data: n?.data ? { ...n.data } : undefined,
+        meta: n?.meta ? { ...n.meta } : undefined,
+      };
+    });
     workflowObj.testRun.result = {
       errors,
       inputs,
       ranNodeIds,
+      ranSteps,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
     };
     return { ok: true };
@@ -861,8 +932,9 @@ export default function useWorkflowCanvas() {
     pushWorkflowHistory();
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
-    // The graph changed — prior Test badges are stale.
-    workflowObj.testRun.result = null;
+    // The Test log PERSISTS (n8n-style): the deleted step stays listed in the dock,
+    // struck-through, from the run-time snapshot (result.ranSteps). Its canvas badge
+    // is gone with the node. Cleared only by a new run or the explicit Clear button.
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
       workflowObj.currentSelectedNodeData = null;
       workflowObj.dialog.show = false;
@@ -1190,8 +1262,11 @@ export default function useWorkflowCanvas() {
     workflowObj.isEditNode = false;
     workflowObj.dialog.expand = false;
     workflowObj.dialog.show = false;
-    // The graph changed — prior Test badges are stale.
-    workflowObj.testRun.result = null;
+    // The Test log PERSISTS across edits (n8n-style) — adding / inserting / editing
+    // a node keeps the dock and existing badges in place instead of a jarring
+    // close+reopen. A newly-added node simply has no badge (it wasn't in the run);
+    // an edited node keeps its last-run badge until re-tested. Cleared only by a new
+    // run or the explicit "Clear" button. See executeTestRun for the run snapshot.
     markWorkflowDirty();
   }
 

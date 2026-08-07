@@ -34,16 +34,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="handleNodeLeave"
     @output-click="onOutputClick"
   >
-    <!-- Per-type body — rendered via #body (typography is inherited from
-         FlowNodeCard) so it stays identical to the pipeline custom node:
-         Function shows a bold [RAF]/[RBF] tag, everything else shows its
-         config-detail line. -->
+    <!-- Two-line body (Zapier-style): the node's TYPE is always the muted top
+         line so a renamed node still reads as its kind, and the primary line
+         below carries the custom name / config detail. Function keeps its bold
+         [RAF]/[RBF] tag on the primary line. -->
     <template #body>
-      <div v-if="isConfiguredFunction" class="flex gap-1">
-        {{ data.name }} -
-        <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+      <div class="flex flex-col">
+        <span class="text-text-secondary text-xs font-normal leading-tight">
+          {{ typeTitle }}
+        </span>
+        <span v-if="isConfiguredFunction" class="flex gap-1 leading-tight">
+          {{ data.name }} -
+          <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+        </span>
+        <span v-else-if="primaryLabel" class="leading-tight whitespace-nowrap">
+          {{ primaryLabel }}
+        </span>
       </div>
-      <div v-else class="whitespace-nowrap">{{ nodeLabel }}</div>
     </template>
 
     <!-- hover actions (disable + delete) — the trigger is deletable too, so the
@@ -269,19 +276,24 @@ const isConfiguredFunction = computed(
   () => props.data?.node_type === "function" && !!props.data?.name && !customName.value,
 );
 
-// Node label — a user-given name (T2) wins; otherwise the config detail IS the
-// label (icon conveys the type), matching the pipeline custom node exactly:
-// Condition -> rule preview, Destination -> destination name. Falls back to the
-// type title for the trigger and any not-yet-configured node.
-const nodeLabel = computed(() => {
-  if (customName.value) return customName.value;
+// Type title — the muted top line, ALWAYS shown so the node's kind stays visible
+// even after a rename. The trigger resolves its KIND's title (Alert Trigger,
+// Incident Trigger, …) from the registry so new kinds label themselves.
+const typeTitle = computed(() => {
   const data = props.data;
-  const type = data?.node_type;
-  const fallback = meta.value ? t(meta.value.titleKey) : type;
-  // The trigger card shows its KIND's title (Alert Trigger, Incident Trigger, …),
-  // resolved from the registry so new kinds label themselves.
-  if (type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
-  return nodeConfigDetail(data, 28) || fallback;
+  if (data?.node_type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
+  return meta.value ? t(meta.value.titleKey) : data?.node_type || "";
+});
+// Primary line — a user-given name (T2) wins; otherwise the config detail
+// (Condition -> rule preview, Destination -> destination name). A configured
+// function is handled by its own [RAF]/[RBF] branch in the template, and the
+// trigger has no detail line (its kind title IS the top line), so both fall to
+// "" here → type-title-only card.
+const primaryLabel = computed(() => {
+  if (customName.value) return customName.value;
+  const type = props.data?.node_type;
+  if (type === "workflow_trigger" || isConfiguredFunction.value) return "";
+  return nodeConfigDetail(props.data, 28) || "";
 });
 // Icon for this node type: the pipeline node image as an "img:<url>" string
 // (rendered by OIcon exactly like pipeline canvas nodes), or the OIcon glyph name.

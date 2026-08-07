@@ -333,13 +333,17 @@ const paletteClick = (item: any) => addNodeToEnd(item.subtype);
 // In "trigger" mode the picker is the workflow's FIRST node, so it offers the
 // trigger types; otherwise it offers the addable step types.
 const isTriggerStep = computed(() => workflowObj.stepPicker.mode === "trigger");
+// Splicing a step INTO an edge (A→new→B): the new node must be able to connect
+// onward to B, so a terminal (output) node like Destination can't be inserted —
+// exclude those types from the picker in insert mode.
+const isInsertStep = computed(() => workflowObj.stepPicker.mode === "insert");
 
 // Items for the shared step picker. In "trigger" mode it offers the enabled
 // trigger KINDS (Alert Fired, Incident Event) — all the same node_type
 // ("workflow_trigger"), differing only in `trigger_kind`, which the picker keys
 // on. Disabled kinds (schedule/webhook — "coming soon") are omitted since the
-// popover has no disabled-row affordance. In "step" mode it offers the addable
-// node types.
+// popover has no disabled-row affordance. In "step"/"insert" mode it offers the
+// addable node types (insert drops terminal/Destination types — see above).
 const stepItems = computed(() => {
   if (isTriggerStep.value) {
     return enabledTriggers().map((tr) => ({
@@ -352,7 +356,10 @@ const stepItems = computed(() => {
       trigger_kind: tr.kind,
     }));
   }
-  return ADDABLE_NODE_TYPES.map((nt: string) => {
+  const addable = isInsertStep.value
+    ? ADDABLE_NODE_TYPES.filter((nt) => nodeMeta(nt)?.ioType !== "output")
+    : ADDABLE_NODE_TYPES;
+  return addable.map((nt: string) => {
     const m = nodeMeta(nt);
     const img = m?.image;
     return {

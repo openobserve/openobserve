@@ -52,6 +52,11 @@ import useWorkflowCanvas, {
   nodeTestInput,
   nodeTestOutputBranches,
   currentTriggerKind,
+  buildStepTree,
+  toggleNodeDisabled,
+  undoWorkflow,
+  pushWorkflowHistory,
+  resetWorkflowHistory,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -275,6 +280,14 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     // the disconnected node never ran → no ✓ badge
     expect(res.ranNodeIds).not.toContain("x");
     expect(res.blockedNodeIds).toEqual([]);
+    // ranSteps snapshots the executed-steps tree (structure + frozen data) so the
+    // dock can persist across later edits (n8n-style).
+    expect(res.ranSteps.map((s: any) => s.id)).toEqual(["t", "f", "d"]);
+    expect(res.ranSteps.find((s: any) => s.id === "t")).toMatchObject({
+      depth: 0,
+      childCount: 1,
+    });
+    expect(res.ranSteps.find((s: any) => s.id === "f").data.node_type).toBe("function");
   });
 
   it("sends the whole in-memory graph (test-without-saving), not just an id", async () => {
@@ -329,6 +342,102 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toBe("down");
     expect(workflowObj.testRun.result).toBeNull();
+  });
+});
+
+// The executed-steps tree that the results dock renders (traces-waterfall layout):
+// DFS pre-order, sibling order by canvas position, and per-column connector guides.
+describe("buildStepTree — executed-steps tree structure", () => {
+  const nodes = [
+    { id: "t", position: { x: 0, y: 0 }, data: { node_type: "workflow_trigger" } },
+    { id: "f", position: { x: 0, y: 100 }, data: { node_type: "function" } },
+    { id: "d", position: { x: 0, y: 200 }, data: { node_type: "destination" } },
+    { id: "c", position: { x: 200, y: 100 }, data: { node_type: "condition" } },
+  ];
+  // t fans out to f (x=0) and c (x=200); f -> d.
+  const edges = [
+    { source: "t", target: "f" },
+    { source: "f", target: "d" },
+    { source: "t", target: "c" },
+  ];
+
+  it("computes DFS pre-order, depth, child count and connector guides", () => {
+    const tree = buildStepTree(nodes, edges, ["t", "f", "d", "c"]);
+    // DFS: t, then its children in canvas order (f before c), f's child d nested.
+    expect(tree.map((s) => s.id)).toEqual(["t", "f", "d", "c"]);
+    expect(tree.find((s) => s.id === "t")).toMatchObject({ depth: 0, childCount: 2, guides: [] });
+    // f is the FIRST of two children → its rail continues (guides ends true).
+    expect(tree.find((s) => s.id === "f")).toMatchObject({
+      depth: 1,
+      childCount: 1,
+      guides: [true],
+    });
+    // d carries f's continuing rail (true) then its own last-child elbow (false).
+    expect(tree.find((s) => s.id === "d")).toMatchObject({
+      depth: 2,
+      childCount: 0,
+      guides: [true, false],
+    });
+    // c is the LAST child → elbow, no continuation.
+    expect(tree.find((s) => s.id === "c")).toMatchObject({
+      depth: 1,
+      childCount: 0,
+      guides: [false],
+    });
+  });
+
+  it("bounds the tree to ran nodes and re-roots a replay subset at depth 0", () => {
+    const tree = buildStepTree(nodes, edges, ["f", "d"]);
+    expect(tree.map((s) => s.id)).toEqual(["f", "d"]);
+    expect(tree[0]).toMatchObject({ id: "f", depth: 0 });
+    expect(tree[1]).toMatchObject({ id: "d", depth: 1 });
+  });
+});
+
+// The results dock persists across graph edits (n8n-style): only a new run or the
+// explicit Clear button drops it. Editing/disabling/undoing must NOT null it.
+describe("Test log persistence across graph edits", () => {
+  beforeEach(() => {
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" } },
+        { id: "f", data: { node_type: "function" } },
+      ],
+      edges: [{ source: "t", target: "f" }],
+    } as any;
+    workflowObj.readOnly = false;
+    workflowObj.testRun.result = {
+      errors: {},
+      inputs: {},
+      ranNodeIds: ["t", "f"],
+      ranSteps: [],
+      blockedNodeIds: [],
+    } as any;
+    resetWorkflowHistory();
+  });
+
+  it("disabling a node keeps the run result (dock stays open)", () => {
+    toggleNodeDisabled("f");
+    expect(workflowObj.testRun.result).not.toBeNull();
+  });
+
+  it("undo keeps the run result", () => {
+    pushWorkflowHistory();
+    workflowObj.currentSelectedWorkflow.nodes.push({
+      id: "g",
+      data: { node_type: "function" },
+    } as any);
+    undoWorkflow();
+    expect(workflowObj.testRun.result).not.toBeNull();
+  });
+
+  it("deleting a node keeps the run result (deleted step stays listed struck-through)", () => {
+    const { deleteNode } = useWorkflowCanvas();
+    deleteNode("f");
+    expect(workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "f")).toBeUndefined();
+    expect(workflowObj.testRun.result).not.toBeNull();
   });
 });
 

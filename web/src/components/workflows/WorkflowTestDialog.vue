@@ -182,9 +182,16 @@ const runFromOptions = computed(() => {
     const detail = nodeDetail(n);
     return { label: detail ? `${numbered} · ${detail}` : numbered, value: n.id, icon };
   });
+  // "From Beginning" starts at the trigger, so surface the trigger's custom name
+  // (rename) when set — e.g. "From Beginning · My Alert" — instead of a static label.
+  const trigger = nodes.value.find((n) => n.data?.node_type === "workflow_trigger");
+  const triggerName = trigger ? nodeCustomName(trigger) : "";
+  const beginningLabel = triggerName
+    ? `${t("workflow.test.runFromBeginning")} · ${triggerName}`
+    : t("workflow.test.runFromBeginning");
   return [
     {
-      label: t("workflow.test.runFromBeginning"),
+      label: beginningLabel,
       value: RUN_FROM_BEGINNING,
       icon: nodeMeta("workflow_trigger")?.icon || "notifications-active",
     },
