@@ -25,6 +25,8 @@ mod destinations;
 mod distinct_values;
 mod domain_management;
 mod enrichment_table;
+mod eval_annotation_queues;
+mod eval_datasets;
 mod eval_jobs;
 mod eval_providers;
 mod eval_score_configs;
@@ -51,11 +53,34 @@ mod user;
 
 use config::cluster::{LOCAL_NODE, is_offline};
 use o2_enterprise::enterprise::super_cluster::queue::{
-    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalJobsQueue,
-    EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue, FoldersQueue, MetaQueue,
-    OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue, SearchJobsQueue,
-    SuperClusterQueueTrait, TemplatesQueue,
+    ActionScriptsQueue, AlertsQueue, DashboardsQueue, DestinationsQueue, EvalAnnotationQueuesQueue,
+    EvalDatasetsQueue, EvalJobsQueue, EvalProvidersQueue, EvalScoreConfigsQueue, EvalScorersQueue,
+    FoldersQueue, MetaQueue, OrgUsersQueue, PipelinesQueue, SchedulerQueue, SchemasQueue,
+    SearchJobsQueue, SuperClusterQueueTrait, TemplatesQueue,
 };
+
+fn parse_eval_key(
+    key: &str,
+    module: &str,
+    invalid_message: &str,
+) -> infra::errors::Result<(String, String)> {
+    let mut columns = key.split('/');
+    match (
+        columns.next(),
+        columns.next(),
+        columns.next(),
+        columns.next(),
+        columns.next(),
+        columns.next(),
+    ) {
+        (Some(_), Some("eval"), Some(key_module), Some(org_id), Some(entity_id), None)
+            if key_module == module && !org_id.is_empty() && !entity_id.is_empty() =>
+        {
+            Ok((org_id.to_string(), entity_id.to_string()))
+        }
+        _ => Err(infra::errors::Error::Message(invalid_message.to_string())),
+    }
+}
 
 /// Creates a super cluster queue for each super cluster topic and begins
 /// polling messages from each queue in a separate thread.
@@ -108,6 +133,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
     let eval_score_configs_queue = EvalScoreConfigsQueue {
         on_eval_score_config_msg: eval_score_configs::process,
     };
+    let eval_annotation_queues_queue = EvalAnnotationQueuesQueue {
+        on_eval_annotation_queue_msg: eval_annotation_queues::process,
+    };
+    let eval_datasets_queue = EvalDatasetsQueue {
+        on_eval_dataset_msg: eval_datasets::process,
+    };
     let eval_scorers_queue = EvalScorersQueue {
         on_eval_scorer_msg: eval_scorers::process,
     };
@@ -142,6 +173,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
         Box::new(pipelines_queue),
         Box::new(eval_providers_queue),
         Box::new(eval_score_configs_queue),
+        Box::new(eval_annotation_queues_queue),
+        Box::new(eval_datasets_queue),
         Box::new(eval_scorers_queue),
         Box::new(eval_jobs_queue),
         Box::new(folders_queue),
@@ -170,4 +203,32 @@ pub async fn init() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_eval_keys() {
+        assert_eq!(
+            parse_eval_key(
+                "/eval/annotation_queues/org-1/queue-1",
+                "annotation_queues",
+                "invalid",
+            )
+            .unwrap(),
+            ("org-1".to_string(), "queue-1".to_string())
+        );
+        assert!(
+            parse_eval_key(
+                "/eval/annotation_queues/org-1/",
+                "annotation_queues",
+                "invalid",
+            )
+            .is_err()
+        );
+        assert!(parse_eval_key("/eval/scorers/org-1/id-1", "datasets", "invalid").is_err());
+        assert!(parse_eval_key("/eval/datasets/org-1/id-1/extra", "datasets", "invalid").is_err());
+    }
 }

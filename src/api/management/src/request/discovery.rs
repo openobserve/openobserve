@@ -29,6 +29,7 @@ use openobserve_core::{
 use crate::{
     common::meta::http::HttpResponse as MetaHttpResponse,
     models::discovery::{ListDiscoveryItemsQuery, ListDiscoveryItemsResponseBody},
+    request::annotation_queues::visible_annotation_queues_for_user,
 };
 
 fn discovery_error_response(error: DiscoveryError) -> Response {
@@ -56,23 +57,6 @@ fn discovery_error_response(error: DiscoveryError) -> Response {
             MetaHttpResponse::internal_error("Discovery query failed")
         }
     }
-}
-
-fn visible_queue_ids(
-    org_id: &str,
-    permitted_objects: Option<Vec<String>>,
-) -> Option<HashSet<String>> {
-    let permitted_objects = permitted_objects?;
-    if permitted_objects.contains(&format!("annotation_queue:_all_{org_id}")) {
-        return None;
-    }
-
-    Some(
-        permitted_objects
-            .into_iter()
-            .filter_map(|object| object.strip_prefix("annotation_queue:").map(str::to_string))
-            .collect(),
-    )
 }
 
 /// ListDiscoveryItems
@@ -110,20 +94,13 @@ pub async fn list_discovery_items(
         Err(error) => return discovery_error_response(error),
     };
 
-    let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
-        &org_id,
-        &user.user_id,
-        "GET",
-        "annotation_queue",
-    )
-    .await
-    {
-        Ok(list) => list,
-        Err(error) => return MetaHttpResponse::forbidden(error.to_string()),
-    };
-    let visible_queue_ids = visible_queue_ids(&org_id, permitted_objects);
+    let visible_queue_ids: HashSet<String> =
+        match visible_annotation_queues_for_user(&org_id, &user.user_id).await {
+            Ok(queues) => queues.into_iter().map(|queue| queue.id).collect(),
+            Err(response) => return response,
+        };
 
-    match discovery::list(&org_id, request, visible_queue_ids.as_ref()).await {
+    match discovery::list(&org_id, request, Some(&visible_queue_ids)).await {
         Ok(page) => MetaHttpResponse::json(ListDiscoveryItemsResponseBody::from(page)),
         Err(error) => discovery_error_response(error),
     }
@@ -149,28 +126,6 @@ mod tests {
                 .as_u16(),
             400
         );
-    }
-
-    #[test]
-    fn resolves_explicit_and_organization_wide_queue_visibility() {
-        assert_eq!(
-            visible_queue_ids(
-                "org-1",
-                Some(vec![
-                    "annotation_queue:queue-1".to_string(),
-                    "dataset:dataset-1".to_string(),
-                ]),
-            ),
-            Some(HashSet::from(["queue-1".to_string()]))
-        );
-        assert_eq!(
-            visible_queue_ids(
-                "org-1",
-                Some(vec!["annotation_queue:_all_org-1".to_string()]),
-            ),
-            None
-        );
-        assert_eq!(visible_queue_ids("org-1", None), None);
     }
 
     #[tokio::test]

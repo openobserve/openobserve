@@ -25,6 +25,7 @@ use crate::{
         PushDatasetItemRequestBody, PushDatasetItemResponseBody, UpdateDatasetItemRequestBody,
         UpdateDatasetRequestBody,
     },
+    request::annotation_queues::ensure_annotation_queue_score_configs_visible,
 };
 
 const MAX_DATASET_IMPORT_BYTES: usize = 10 * 1024 * 1024;
@@ -468,6 +469,11 @@ pub async fn push_annotation_queue_item_to_dataset(
     let dataset_id = body.dataset_id.trim().to_string();
     if dataset_id.is_empty() {
         return dataset_error_response(DatasetError::MissingDatasetId);
+    }
+    if let Err(response) =
+        ensure_annotation_queue_score_configs_visible(&org_id, &user.user_id, &queue_id).await
+    {
+        return response;
     }
     let permitted_datasets = match openobserve_api_common::auth::validator::list_objects_for_user(
         &org_id,
