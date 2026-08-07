@@ -88,22 +88,4 @@ echo "OpenObserve started with PID $(cat /tmp/o2.pid)"
   ./node_modules/.bin/playwright install ffmpeg
 )
 
-# ---- Install Python API test dependencies ----
-# Install rye if not already present
-if ! command -v rye &>/dev/null; then
-  curl -sSf https://rye.astral.sh/get | RYE_INSTALL_OPTION="--yes" bash
-  export PATH="$HOME/.rye/shims:$PATH"
-fi
-export PATH="$HOME/.rye/shims:$PATH"
-
-(
-  cd tests/api-testing
-  rye pin cpython@3.11.6
-  rye sync
-  # pytest-json-report is required for Testbot's machine-readable reporter flag.
-  # rye's venv does not include pip; bootstrap it with ensurepip first.
-  .venv/bin/python -m ensurepip --upgrade
-  .venv/bin/python -m pip install pytest-json-report --quiet
-)
-
 echo "Setup complete."
