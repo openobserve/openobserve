@@ -24,8 +24,8 @@ import http from "@/services/http";
 
 export type DiscoveryScope = "span" | "trace" | "session";
 export type DiscoveryQuality = "issue" | "multiple";
-/** Queue-membership filter. Backend also supports pending/reviewed. */
-export type DiscoveryQueueStatus = "not_enqueued" | "enqueued" | "all";
+/** Queue-membership filter — the five values `queue_status` accepts. */
+export type DiscoveryQueueStatus = "not_enqueued" | "enqueued" | "pending" | "reviewed" | "all";
 
 export interface DiscoveryQueueMembership {
   queueId: string;
@@ -33,7 +33,11 @@ export interface DiscoveryQueueMembership {
   status: "pending" | "reviewed";
 }
 
-/** One unhealthy row (normalized from the `/discovery` response). */
+/** One unhealthy row (normalized from the `/discovery` response).
+ *
+ *  The API hydrates a scope-shaped `context` object; the fields that don't apply
+ *  to the active scope stay null, so the view reads one flat row per scope
+ *  (span: kind/duration · trace: service · session: user/traces/duration/agent). */
 export interface LlmDiscoveryItem {
   scope: DiscoveryScope;
   /** The reviewed object's id (span_id / trace_id / session_id per scope). */
@@ -45,15 +49,22 @@ export interface LlmDiscoveryItem {
   sourceStream: string | null;
   quality: DiscoveryQuality;
   issueCount: number;
-  operationName: string;
-  serviceName: string;
-  agentName: string | null;
-  model: string | null;
-  /** Span duration, microseconds. */
-  durationUs: number;
-  // NOTE(BE gap): the `/discovery` response carries no business `input` text.
-  // It stays empty until the backend joins it.
+  /** Business input, flattened to text (the raw field can be a JSON payload). */
   input: string;
+  /** span + trace */
+  operationName: string;
+  /** span + trace */
+  spanKind: string | null;
+  /** trace only */
+  serviceName: string;
+  /** span + session, microseconds */
+  durationUs: number | null;
+  /** session only */
+  userEmail: string | null;
+  /** session only */
+  traceCount: number | null;
+  /** session only, from `context.agentParameters` */
+  agentName: string | null;
   queues: DiscoveryQueueMembership[];
   inQueue: boolean;
 }
@@ -68,19 +79,54 @@ export interface DiscoverySearchParams {
   queueStatus?: DiscoveryQueueStatus;
 }
 
+/** Unhealthy counts for all three scopes, returned on every response. */
+export interface DiscoveryScopeTotals {
+  span: number;
+  trace: number;
+  session: number;
+}
+
 export interface DiscoverySearchResult {
   items: LlmDiscoveryItem[];
   total: number;
+  scopeTotals: DiscoveryScopeTotals;
   from: number;
   size: number;
+  hasMore: boolean;
 }
+
+/** The API's page-size ceiling (`size` is validated to 1..100 server-side). */
+export const DISCOVERY_MAX_PAGE_SIZE = 100;
 
 const base = (org: string) => `/api/${org}/discovery`;
 
-/** Fold a `/discovery` row (nested `traceDetails`) into the flat shape. */
+/** `context.input` is whatever the trace stream held — a plain string for simple
+ *  prompts, a JSON messages payload otherwise. The list needs one line of text. */
+function inputText(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+function numberOrNull(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function stringOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.length ? value : null;
+}
+
+/** Fold a `/discovery` row into the flat shape. Display fields live under a
+ *  scope-shaped `context` object hydrated from the target trace stream; a row
+ *  whose context couldn't be hydrated still renders (ids + quality only). */
 function normalize(d: any): LlmDiscoveryItem {
-  const td = d.traceDetails ?? {};
-  const targetId = d.targetId ?? td.span_id ?? td.trace_id ?? "";
+  const ctx = d.context ?? {};
+  const agent = ctx.agentParameters ?? {};
   const queues: DiscoveryQueueMembership[] = Array.isArray(d.queues)
     ? d.queues
         .filter(
@@ -90,25 +136,27 @@ function normalize(d: any): LlmDiscoveryItem {
         )
         .map((queue: any) => ({
           queueId: queue.queueId,
-          queueName: typeof queue.queueName === "string" ? queue.queueName : null,
+          queueName: stringOrNull(queue.queueName),
           status: queue.status,
         }))
     : [];
   return {
     scope: (d.scope ?? "trace") as DiscoveryScope,
-    targetId,
-    traceId: d.traceId ?? td.trace_id ?? null,
-    sessionId: d.sessionId ?? null,
-    refTimestamp: d.refTimestamp ?? td._timestamp ?? 0,
-    sourceStream: d.sourceStream ?? null,
+    targetId: d.targetId ?? "",
+    traceId: stringOrNull(d.traceId),
+    sessionId: stringOrNull(d.sessionId) ?? stringOrNull(ctx.sessionId),
+    refTimestamp: numberOrNull(d.refTimestamp) ?? 0,
+    sourceStream: stringOrNull(d.sourceStream),
     quality: (d.quality ?? "issue") as DiscoveryQuality,
-    issueCount: d.issueCount ?? 1,
-    operationName: td.operation_name ?? "",
-    serviceName: td.service_name ?? "",
-    agentName: td.gen_ai_agent_name ?? null,
-    model: td.gen_ai_request_model ?? null,
-    durationUs: td.duration ?? 0,
-    input: d.input ?? "",
+    issueCount: numberOrNull(d.issueCount) ?? 1,
+    input: inputText(ctx.input),
+    operationName: stringOrNull(ctx.operationName) ?? "",
+    spanKind: stringOrNull(ctx.spanKind),
+    serviceName: stringOrNull(ctx.serviceName) ?? "",
+    durationUs: numberOrNull(ctx.duration),
+    userEmail: stringOrNull(ctx.userEmail),
+    traceCount: numberOrNull(ctx.traceCount),
+    agentName: stringOrNull(agent.name),
     queues,
     inQueue: queues.length > 0,
   };
@@ -123,16 +171,23 @@ const llmDiscoveryService = {
         start_time: params.startTime,
         end_time: params.endTime,
         from: params.from ?? 0,
-        size: params.size ?? 50,
+        size: Math.min(params.size ?? 20, DISCOVERY_MAX_PAGE_SIZE),
       },
     });
     const data = res.data ?? {};
     const list = Array.isArray(data.list) ? data.list : [];
+    const totals = data.scopeTotals ?? {};
     return {
       items: list.map(normalize),
-      total: data.total ?? list.length,
-      from: data.from ?? 0,
-      size: data.size ?? list.length,
+      total: numberOrNull(data.total) ?? list.length,
+      scopeTotals: {
+        span: numberOrNull(totals.span) ?? 0,
+        trace: numberOrNull(totals.trace) ?? 0,
+        session: numberOrNull(totals.session) ?? 0,
+      },
+      from: numberOrNull(data.from) ?? 0,
+      size: numberOrNull(data.size) ?? list.length,
+      hasMore: data.hasMore === true,
     };
   },
 

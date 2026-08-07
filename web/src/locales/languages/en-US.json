@@ -330,6 +330,16 @@
       "title": "Nothing here yet",
       "description": "There's no data to show right now."
     },
+    "noDatasetItems": {
+      "title": "No Items Yet",
+      "description": "A golden item pairs an input with the expected output. Add one to start building this dataset.",
+      "action": "Add Item",
+      "actionDesc": "Write a golden input and its expected output"
+    },
+    "noDiscoveryItems": {
+      "title": "Nothing Unhealthy Here",
+      "description": "No unhealthy items in this window. Widen the time range, or switch the queue filter to see items you already triaged."
+    },
     "noTraces": {
       "title": "No traces found",
       "description": "No traces match the selected service and time range. Try a wider time range or a different service."
@@ -394,6 +404,8 @@
       "alerts": "alerts",
       "incidents": "incidents",
       "traces": "traces",
+      "discoveryItems": "unhealthy items",
+      "datasetItems": "items",
       "searches": "searches",
       "searchJobs": "search jobs",
       "users": "users",
@@ -8921,9 +8933,9 @@
       "scoreConfigs": "Configure the scoring rubrics used by your evaluations"
     },
     "discovery": {
-      "unhealthyFilter": "Unhealthy · Issue ∪ Multiple",
-      "scopeNote": "Showing unhealthy {scope} in the selected window",
       "loadError": "Failed to load discovery results",
+      "searchPlaceholder": "Search Service, Input, Quality...",
+      "searchFooter": "{matched} of {loaded} on this page match",
       "scope": {
         "span": "Spans",
         "trace": "Traces",
@@ -8935,50 +8947,61 @@
         "session": "sessions"
       },
       "inQueueFilter": {
-        "all": "In Queue: All",
-        "enqueued": "In Queue: Enqueued",
-        "notEnqueued": "In Queue: Not Enqueued"
+        "label": "In Queue",
+        "notEnqueued": "In Queue: Not Enqueued",
+        "enqueued": "In Queue: Any Queue",
+        "pending": "In Queue: Pending",
+        "reviewed": "In Queue: Reviewed",
+        "all": "In Queue: All"
       },
       "columns": {
         "timestamp": "Timestamp",
+        "started": "Started",
         "type": "Type",
+        "kind": "Kind",
+        "span": "Span",
+        "session": "Session",
+        "topic": "Topic",
+        "traces": "Traces",
+        "duration": "Duration",
         "service": "Service",
         "input": "Input",
         "quality": "Quality",
         "inQueue": "In Queue?",
         "actions": "Actions"
       },
+      "spanParent": "In {trace}",
       "quality": {
         "issue": "Issue",
-        "multiple": "Multiple"
+        "multiple": "Multiple",
+        "issueCount": "({count})"
       },
       "inQueue": {
-        "yes": "In Queue",
-        "no": "Not Enqueued"
+        "none": "Not Enqueued",
+        "reviewed": "Already Reviewed",
+        "multiple": "In {count} Queues"
       },
-      "addToQueue": "Add to Queue",
-      "selectedCount": "{count} selected",
-      "bulkAdd": "Add {count} to Queue",
-      "footerTitle": "Unhealthy {scope}",
-      "emptyTitle": "Nothing Unhealthy Here",
-      "emptyBody": "No unhealthy items match the current scope, window, and filter.",
-      "addDialog": {
-        "title": "Add to Queue",
-        "body": "{count} item(s) will be added to the selected review queue.",
-        "queueLabel": "Queue",
-        "queuePlaceholder": "Select a queue...",
+      "addToQueue": "Add To Queue",
+      "addToQueueMenu": {
+        "loading": "Loading queues...",
         "noQueues": "No queues yet — create one from the Queues page first.",
-        "queuesError": "Failed to load queues",
-        "confirm": "Add to Queue",
-        "success": "{count} item(s) added to the queue",
-        "error": "Failed to add items to the queue"
-      }
+        "dimensions": "{count} dimension | {count} dimensions",
+        "accepts": "Accepts {types} only"
+      },
+      "bulkAdd": "Add {count} To Queue",
+      "selectedCount": "{selected} of {total} selected",
+      "footerTitle": "Unhealthy {scope}",
+      "addSuccess": "Added to {queue} — the row stays in Discovery, its state lives in the queue.",
+      "addError": "Failed to add items to the queue",
+      "openQueue": "Open Queue",
+      "queuesError": "Failed to load queues"
     },
     "queues": {
       "listTitle": "Queues",
       "searchPlaceholder": "Search Queues...",
       "newButton": "New Queue",
       "loadError": "Failed to load queues",
+      "optionsLoadError": "Failed to load score configs",
       "review": "Review",
       "cleared": "Cleared",
       "reviewedCount": "{reviewed} / {total} reviewed",
@@ -9005,6 +9028,7 @@
         "scoreConfigsEmpty": "Pick the Score Configs to bind.",
         "addScoreConfig": "Add Score Config",
         "allScoreConfigsAdded": "All score configs are added.",
+        "loadingScoreConfigs": "Loading Score Configs...",
         "noScoreConfigs": "No score configs yet — create one in Score Configs first.",
         "targetDatasetLabel": "Target Dataset",
         "targetDatasetNone": "None (review-only)",
@@ -9065,6 +9089,25 @@
         "submit": "Complete & Next",
         "submitted": "Review submitted",
         "submitError": "Failed to submit review",
+        "distill": {
+          "title": "Distill To Dataset",
+          "action": "Dataset",
+          "hint": "Write the answer this item SHOULD have produced. It becomes the golden output; the input is taken from the reviewed trace.",
+          "datasetLabel": "Dataset",
+          "datasetPlaceholder": "Select A Dataset...",
+          "noDatasets": "No datasets yet — create one from the Datasets page first.",
+          "expectedLabel": "Expected Output",
+          "expectedPlaceholder": "Write the output this item should have produced...",
+          "useOutput": "Use The Model Output",
+          "confirm": "Add To Dataset",
+          "success": "Distilled into the dataset",
+          "updated": "Golden updated — this item was already in that dataset",
+          "openDataset": "Open Dataset",
+          "needsReview": "Complete the review first — a golden needs an adjudicated judgment",
+          "sessionUnsupported": "Session items cannot be distilled — only traces and spans",
+          "loadError": "Failed to load datasets",
+          "error": "Failed to add this item to the dataset"
+        },
         "true": "True",
         "false": "False",
         "allReviewedTitle": "All items reviewed",
@@ -9118,8 +9161,6 @@
         "loadError": "Failed to load dataset",
         "footerTitle": "Items",
         "searchPlaceholder": "Search Items...",
-        "emptyTitle": "No Items Yet",
-        "emptyBody": "Add a golden input and its expected output to start building this dataset.",
         "columns": {
           "input": "Input (Purified)",
           "expectedOutput": "Expected Output",

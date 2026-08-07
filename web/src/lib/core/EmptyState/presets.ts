@@ -318,6 +318,27 @@ export const emptyStatePresets = {
     titleKey: "emptyState.noTraces.title",
     descriptionKey: "emptyState.noTraces.description",
   },
+  "no-dataset-items": {
+    illustration: "box",
+    variant: "create",
+    titleKey: "emptyState.noDatasetItems.title",
+    descriptionKey: "emptyState.noDatasetItems.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noDatasetItems.action",
+        descriptionKey: "emptyState.noDatasetItems.actionDesc",
+      },
+    ],
+  },
+  // Discovery lists only unhealthy targets, so "empty" is good news, not a gap.
+  "no-discovery-items": {
+    illustration: "check",
+    variant: "no-results",
+    titleKey: "emptyState.noDiscoveryItems.title",
+    descriptionKey: "emptyState.noDiscoveryItems.description",
+  },
   "no-service-graph": {
     illustration: "service-graph",
     variant: "no-results",
@@ -815,6 +836,8 @@ export const presetNouns: Partial<Record<EmptyStatePresetName, string>> = {
   "no-alerts": "emptyState.nouns.alerts",
   "no-incidents": "emptyState.nouns.incidents",
   "no-traces": "emptyState.nouns.traces",
+  "no-discovery-items": "emptyState.nouns.discoveryItems",
+  "no-dataset-items": "emptyState.nouns.datasetItems",
   "no-search-history": "emptyState.nouns.searches",
   "no-search-jobs": "emptyState.nouns.searchJobs",
   "no-users": "emptyState.nouns.users",

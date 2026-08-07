@@ -28,6 +28,15 @@ export type DatasetForm = {
   tags: string[];
 };
 
+/** A blank form. Always pass these to `form.reset(...)` when opening in CREATE
+ *  mode: TanStack's `reset(values)` REPLACES the form's stored defaultValues, so
+ *  after an edit an argument-less `reset()` would restore the edited row. */
+export const datasetFormDefaults = (): DatasetForm => ({
+  name: "",
+  description: "",
+  tags: [],
+});
+
 /** i18n-driven Zod schema. `t` keeps validation messages localized. */
 export const makeDatasetFormSchema = (t: (_key: string) => string) =>
   z.object({

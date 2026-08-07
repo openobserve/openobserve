@@ -279,6 +279,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @update:model-value="onAddConfig"
             />
             <span
+              v-else-if="optionsLoading"
+              class="text-text-secondary text-2xs"
+              data-test="ai-queues-create-configs-loading"
+            >
+              {{ t("aiObservability.queues.create.loadingScoreConfigs") }}
+            </span>
+            <span
               v-else-if="!configOptions.length"
               class="text-text-secondary text-2xs"
               data-test="ai-queues-create-no-configs"
@@ -388,6 +395,7 @@ const search = ref("");
 
 const numberedRows = useNumberedRows(queues);
 
+// Counts come straight off the list row — no client-side sweep of Queue Items.
 function isCleared(row: LlmQueue): boolean {
   return row.totalCount > 0 && row.reviewedCount >= row.totalCount;
 }
@@ -472,29 +480,27 @@ const columns = computed(() => [
   },
 ]);
 
+// Opening this page costs TWO requests: the queue list, plus the Dataset catalog
+// that resolves `targetDatasetId` into the name the Target Dataset column shows
+// (the queue row carries only the ID — TODO(BE): add `targetDatasetName`). That
+// same catalog feeds the create drawer's dataset picker, so it's fetched once.
+//
+// What used to load here and no longer does: the Queue Item sweep (every item in
+// the org, reduced client-side to two integers per row — TODO(BE):
+// reviewedCount/totalCount on the row) and the Score Config catalog (1 request
+// + 1 `/versions` request PER config), which is drawer-only and now loads on
+// first open.
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
   try {
-    const [queueRows, datasets, configs] = await Promise.all([
-      llmQueuesService.list(orgId.value),
-      llmDatasetsService.list(orgId.value),
-      llmQueuesService.listScoreConfigOptions(orgId.value),
-    ]);
-    const latestVersions = new Map(configs.map((config) => [config.id, config.latestVersion]));
-
-    queues.value = queueRows.map((queue) => ({
-      ...queue,
-      scoreConfigs: queue.scoreConfigs.map((config) => ({
-        ...config,
-        latestVersion: latestVersions.get(config.scoreConfigId),
-      })),
-    }));
-    configOptions.value = configs;
-    datasetOptions.value = datasets.map((dataset) => ({
-      label: dataset.name,
-      value: dataset.id,
-    }));
+    // ONE request: the list row now carries targetDatasetName and the review
+    // counts, so nothing else is needed to render the table. The Score Config
+    // and Dataset catalogs are create-drawer concerns and load on first open.
+    queues.value = await llmQueuesService.list(orgId.value);
+    // Org-wide catalogs, so a manual refresh invalidates them; the next drawer
+    // open re-fetches.
+    optionsLoaded.value = false;
     lastRunAt.value = Date.now();
   } catch {
     toast({ variant: "error", message: t("aiObservability.queues.loadError") });
@@ -516,6 +522,34 @@ function openDetail(row: LlmQueue) {
 const createOpen = ref(false);
 const configOptions = ref<LlmScoreConfigOption[]>([]);
 const datasetOptions = ref<{ label: string; value: string }[]>([]);
+// The Score Config catalog is DRAWER-only and costs 1 + N requests (the catalog,
+// then one `/versions` call per config to expose pinnable versions), so it's
+// fetched on first open instead of on page load. `optionsLoaded` survives
+// close/reopen; refresh() clears it. `datasetOptions` needs no lazy load — the
+// list already fetched that catalog for the Target Dataset column.
+const optionsLoaded = ref(false);
+const optionsLoading = ref(false);
+
+async function ensureCreateOptions() {
+  if (!orgId.value || optionsLoaded.value || optionsLoading.value) return;
+  optionsLoading.value = true;
+  try {
+    const [configs, datasets] = await Promise.all([
+      llmQueuesService.listScoreConfigOptions(orgId.value),
+      llmDatasetsService.list(orgId.value),
+    ]);
+    configOptions.value = configs;
+    datasetOptions.value = datasets.map((dataset) => ({
+      label: dataset.name,
+      value: dataset.id,
+    }));
+    optionsLoaded.value = true;
+  } catch {
+    toast({ variant: "error", message: t("aiObservability.queues.optionsLoadError") });
+  } finally {
+    optionsLoading.value = false;
+  }
+}
 
 const emptyForm = (): QueueForm => ({
   name: "",
@@ -600,9 +634,12 @@ function setConfigVersion(index: number, version: number) {
   );
 }
 
+// Open immediately, load the catalogs behind it — the name/description fields
+// are usable while the Score Config and Dataset pickers fill in.
 async function openCreate() {
   form.reset();
   createOpen.value = true;
+  await ensureCreateOptions();
 }
 
 // Runs only after the Zod schema passes (name required; ≥1 Score Config).
