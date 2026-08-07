@@ -154,7 +154,7 @@
     "start-server-and-test": "^3.0.12",
     "stylelint": "^17.14.1",
     "tailwindcss": "^4.1.18",
-    "typescript": "~7.0.2",
+    "typescript": "~5.9.3",
     "unplugin-icons": "^23.0.1",
     "vite": "^8.2.0",
     "vite-plugin-istanbul": "^9.0.1",

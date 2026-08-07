@@ -18,6 +18,19 @@ jobs:
     # nothing here needs to install node_modules or compile anything.
     runs-on: ubuntu-latest
 
+    env:
+      # Shared by both npm-check-updates invocations below — they must stay
+      # identical, or the PR body would advertise upgrades the commit didn't make.
+      #
+      # `--reject typescript`: TypeScript 7 is the Go rewrite. Its package no
+      # longer exports the `./lib/tsc` subpath, and vue-tsc — the only tool that
+      # can type-check .vue SFCs — resolves exactly that path, so `type-check:app`
+      # dies with ERR_PACKAGE_PATH_NOT_EXPORTED before checking a single file.
+      # `--peer` cannot catch this: vue-tsc declares `typescript: >=5.0.0`, which
+      # 7.x satisfies. Bump TypeScript by hand, together with a vue-tsc release
+      # that supports it (5.x and 6.x are both fine today).
+      NCU_ARGS: --target latest --peer --reject typescript
+
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
@@ -52,7 +65,7 @@ jobs:
           # Snapshot the pre-update manifest so the PR body can show old → new.
           cp package.json "$RUNNER_TEMP/package.json.before"
 
-          npx --yes npm-check-updates --target latest --peer --jsonUpgraded \
+          npx --yes npm-check-updates $NCU_ARGS --jsonUpgraded \
             > "$RUNNER_TEMP/upgrades.json"
 
           if ! jq -e 'type == "object"' "$RUNNER_TEMP/upgrades.json" > /dev/null; then
@@ -77,7 +90,7 @@ jobs:
           echo "Updating dependencies..."
 
           # Apply the same upgrades that were just reported.
-          npx --yes npm-check-updates -u --target latest --peer
+          npx --yes npm-check-updates -u $NCU_ARGS
 
           # Regenerate package-lock.json only — node_modules is never needed
           # here, and skipping the install keeps this job to well under a minute.
@@ -106,6 +119,13 @@ jobs:
           ### Updated Packages
 
           $UPDATED_PACKAGES
+
+          ### Not upgraded here
+
+          - **typescript** — excluded on purpose. TypeScript 7 (the Go rewrite)
+            drops the \`./lib/tsc\` subpath that vue-tsc needs, so it breaks
+            \`type-check:app\` outright. Bump it by hand alongside a vue-tsc that
+            supports it. See \`NCU_ARGS\` in \`.github/workflows/npm-update.yml\`.
 
           ### Validation
 
