@@ -57,6 +57,7 @@ import useWorkflowCanvas, {
   undoWorkflow,
   pushWorkflowHistory,
   resetWorkflowHistory,
+  tidyWorkflowLayout,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const triggerNode = () => ({
@@ -438,6 +439,39 @@ describe("Test log persistence across graph edits", () => {
     deleteNode("f");
     expect(workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "f")).toBeUndefined();
     expect(workflowObj.testRun.result).not.toBeNull();
+  });
+});
+
+// Tidy lays the main tree top-down; an ORPHAN subtree (unreachable from the trigger,
+// e.g. a node just dragged in and wired up before connecting to the trigger) must
+// keep its own parent→child order + depth, not get flattened/reversed by array order.
+describe("tidyWorkflowLayout — orphan subtree ordering", () => {
+  it("lays an orphan Condition→Function chain parent-above-child (not reversed)", () => {
+    // Orphan chain oc → of, with the CHILD listed BEFORE the parent in the array —
+    // the old array-order stacking would have put the function above the condition.
+    workflowObj.currentSelectedWorkflow = {
+      id: "wf",
+      name: "wf",
+      nodes: [
+        { id: "t", data: { node_type: "workflow_trigger" }, position: { x: 0, y: 0 } },
+        { id: "c1", data: { node_type: "condition" }, position: { x: 0, y: 0 } },
+        { id: "of", data: { node_type: "function" }, position: { x: 0, y: 0 } },
+        { id: "oc", data: { node_type: "condition" }, position: { x: 0, y: 0 } },
+      ],
+      edges: [
+        { source: "t", target: "c1" },
+        { source: "oc", target: "of" }, // orphan subtree, not reachable from the trigger
+      ],
+    } as any;
+    workflowObj.readOnly = false;
+
+    expect(tidyWorkflowLayout()).toBe(true);
+    const pos = (id: string) =>
+      workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === id).position;
+    // Parent condition sits ABOVE its child function (smaller y).
+    expect(pos("oc").y).toBeLessThan(pos("of").y);
+    // The orphan subtree is placed in its own column, clear of the main tree.
+    expect(pos("oc").x).not.toBe(pos("c1").x);
   });
 });
 

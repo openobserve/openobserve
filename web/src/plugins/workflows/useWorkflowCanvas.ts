@@ -384,14 +384,21 @@ export const tidyWorkflowLayout = (getWidth?: (id: string) => number | undefined
     return cx;
   };
   if (rootId) layout(rootId, 0);
-  // Orphans (unreachable from the trigger) — stack them in a trailing column.
-  let orphanRow = 0;
+  // Orphan subtrees (unreachable from the trigger — e.g. a node just dragged in, or
+  // a chain built before it's wired to the trigger). Lay each subtree ROOT out with
+  // the SAME recursive tree layout so a connected orphan chain keeps its parent→child
+  // order and depth, each in its own trailing columns. (The old code stacked every
+  // orphan node in ONE column ordered by array index, which reversed connected pairs
+  // like Condition→Function and overlapped separate orphans.)
+  const hasParent = new Set<string>();
+  for (const kids of children.values()) for (const k of kids) hasParent.add(k);
   for (const n of nodes) {
-    if (visited.has(n.id)) continue;
-    centerX.set(n.id, nextSlot * TIDY_COL);
-    depthOf.set(n.id, orphanRow);
-    orphanRow++;
+    // A subtree root is an unplaced node with no parent; layout() recurses into its
+    // children, so deeper orphan nodes are placed by that call, not this loop.
+    if (!visited.has(n.id) && !hasParent.has(n.id)) layout(n.id, 0);
   }
+  // Safety net: place anything still unvisited (e.g. an orphan cycle) on its own.
+  for (const n of nodes) if (!visited.has(n.id)) layout(n.id, 0);
   // Convert centre-x → left-edge position using each node's real (measured) width
   // so cards line up on their centres, not their left edges.
   wf.nodes = nodes.map((n: any) => {
