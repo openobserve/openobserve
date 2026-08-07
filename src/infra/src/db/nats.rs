@@ -79,11 +79,19 @@ async fn get_bucket_by_key<'a>(
             bucket.limit_markers = Some(ttl);
         }
     }
-    let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
-        Error::Message(format!(
-            "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
-        ))
-    })?;
+
+    // STREAM.INFO is served by asset leader, 
+    // but STREAM.CREATE is routed to JetStream meta leader.
+    let full_bucket_name = bucket.bucket.clone();
+    let kv = match jetstream.get_key_value(&full_bucket_name).await {
+        Ok(kv) => kv,
+        Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
+            Error::Message(format!(
+                "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
+            ))
+        })?,
+    };
+
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
 
