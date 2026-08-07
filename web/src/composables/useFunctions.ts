@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import { fetchFunctions } from "@/composables/query/queries/functions";
+import { functionsQuery } from "@/services/jstransform";
 
 const useFunctions = () => {
   const store = useStore();
@@ -26,7 +26,7 @@ const useFunctions = () => {
    */
   const getAllFunctions = async () => {
     try {
-      const list = await fetchFunctions(store.state.selectedOrganization.identifier);
+      const list = await functionsQuery.get(store.state.selectedOrganization.identifier);
       // Bridge for consumers still reading `organizationData.functions`.
       store.dispatch("setFunctions", list);
     } catch (e: any) {

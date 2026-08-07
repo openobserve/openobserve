@@ -362,8 +362,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import sloService from "@/services/slos";
-import { slosQuery } from "@/composables/query/queries/slos";
+import sloService, { slosQuery } from "@/services/slos";
 import {
   ABSENT,
   compareByUrgency,
@@ -617,8 +616,8 @@ async function load(force = false) {
   error.value = null;
   try {
     rows.value = force
-      ? await slosQuery.refetchList(org.value, activeFolderId.value)
-      : await slosQuery.fetchList(org.value, activeFolderId.value);
+      ? await slosQuery.refresh(org.value, activeFolderId.value)
+      : await slosQuery.get(org.value, activeFolderId.value);
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];
@@ -663,7 +662,7 @@ async function doMove() {
     // They left the folder being shown, so drop them rather than re-fetching.
     const moved = new Set(targets.map((r) => r.id));
     rows.value = rows.value.filter((r) => !moved.has(r.id));
-    slosQuery.invalidateList(org.value);
+    slosQuery.invalidate(org.value);
     selectedIds.value = selectedIds.value.filter((id) => !moved.has(id));
     toast({
       variant: "success",
@@ -698,7 +697,7 @@ async function toggleEnabled(row: SloListItem) {
   try {
     await sloService.setEnabled(org.value, row.id, !row.enabled);
     row.enabled = !row.enabled;
-    slosQuery.invalidateList(org.value);
+    slosQuery.invalidate(org.value);
     toast({
       variant: "success",
       message: row.enabled ? t("slos.resumed") : t("slos.pausedNotice"),
@@ -720,7 +719,7 @@ async function doDelete() {
   try {
     await sloService.delete(org.value, row.id);
     rows.value = rows.value.filter((r) => r.id !== row.id);
-    slosQuery.invalidateList(org.value);
+    slosQuery.invalidate(org.value);
     toast({ variant: "success", message: t("slos.deleted") });
   } catch (e: any) {
     toast({ variant: "error", message: e?.response?.data?.message || t("slos.deleteFailed") });

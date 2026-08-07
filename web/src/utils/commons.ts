@@ -20,8 +20,8 @@ import { subtractRelativeTime } from "@/utils/date";
 import { convertDashboardSchemaVersion } from "./dashboard/convertDashboardSchemaVersion";
 import { normalizeReservedTimestampAlias } from "./dashboard/timestampAliasRewrite";
 import commonService from "../services/common";
-import { fetchFoldersByType, invalidateFolders } from "@/composables/query/queries/folders";
-import { dashboardsByFolderQuery } from "@/composables/query/queries/dashboards";
+import { foldersQuery } from "@/services/common";
+import { dashboardsByFolderQuery } from "@/services/dashboards";
 
 let moment: any;
 let momentInitialized = false;
@@ -126,8 +126,8 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
   // Reads the query cache; `force` is for post-mutation reloads, which must
   // reach the server.
   const dashboards = force
-    ? await dashboardsByFolderQuery.refetchList(org, folderId)
-    : await dashboardsByFolderQuery.fetchList(org, folderId);
+    ? await dashboardsByFolderQuery.refresh(org, folderId)
+    : await dashboardsByFolderQuery.get(org, folderId);
 
   const migratedDashboards = dashboards.map((dashboard: any) => ({
     dashboard: {
@@ -161,7 +161,7 @@ export const getAllDashboards = async (store: any, folderId: any, force = false)
 export const getFoldersListByType = async (store: any, type: any) => {
   // Reads the query cache: within the tier's staleTime a remount is a cache hit
   // instead of a request, and concurrent callers share one in-flight fetch.
-  const folders = await fetchFoldersByType(store.state.selectedOrganization.identifier, type);
+  const folders = await foldersQuery.get(store.state.selectedOrganization.identifier, type);
 
   // Bridge for consumers still reading Vuex directly. Deleted with the last one.
   store.dispatch("setFoldersByType", { [type]: folders });
@@ -846,10 +846,7 @@ export const movePanelToAnotherTab = async (
  * loading the dashboards page no longer issues the request twice.
  */
 export const getFoldersList = async (store: any) => {
-  const folders = await fetchFoldersByType(
-    store.state.selectedOrganization.identifier,
-    "dashboards",
-  );
+  const folders = await foldersQuery.get(store.state.selectedOrganization.identifier, "dashboards");
 
   store.dispatch("setFolders", folders);
 
@@ -865,7 +862,7 @@ const refreshFolderLists = async (store: any, type: any) => {
   // The list just changed on the server, so drop the cached copy first —
   // `getFoldersListByType` reads the query cache and would otherwise return the
   // still-fresh pre-mutation entry.
-  await invalidateFolders(store.state.selectedOrganization.identifier, type);
+  await foldersQuery.invalidate(store.state.selectedOrganization.identifier, type);
   return Promise.all([
     getFoldersListByType(store, type),
     ...(type === "dashboards" ? [getFoldersList(store)] : []),

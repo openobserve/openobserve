@@ -407,8 +407,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from "vue";
-import { computed } from "vue";
+import { ref, nextTick, onMounted, watch, computed, onBeforeMount } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import {
@@ -417,9 +416,8 @@ import {
   isAboveMinRefreshInterval,
 } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import actions from "@/services/action_scripts";
+import actions, { actionsQuery } from "@/services/action_scripts";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import CronExpressionParser from "cron-parser";
@@ -437,7 +435,6 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeEditScriptSchema, type EditScriptForm } from "./EditScript.schema";
-import { invalidateActions } from "@/composables/query/queries/actions";
 
 defineProps({
   report: {
@@ -834,7 +831,7 @@ const saveActionScript = async (value: EditScriptForm) => {
 
   return updateAction(store.state.selectedOrganization.identifier, actionId, form)
     .then(() => {
-      invalidateActions(store.state.selectedOrganization.identifier);
+      actionsQuery.invalidate(store.state.selectedOrganization.identifier);
       toast({
         variant: "success",
         message: isEditingActionScript.value

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const alertSources = {
   list: (org_identifier: string) => {
@@ -47,3 +48,10 @@ const alertSources = {
 };
 
 export default alertSources;
+
+export const alertSourcesQuery = defineQuery<[], any[]>({
+  key: ["alerts", "sources"],
+  fetch: async (org) => (await alertSources.list(org)).data?.integrations ?? [],
+  tier: "ENTITY_LIST",
+  scope: ["alerts", "sources"],
+});

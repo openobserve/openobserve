@@ -505,7 +505,10 @@ import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import anomalyService from "@/services/anomaly_detection";
+import anomalyService, {
+  anomalyConfigsQuery,
+  anomalyHistoryQuery,
+} from "@/services/anomaly_detection";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -516,18 +519,10 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
-import {
-  fetchAlertHistoryPage,
-  refetchAlertHistory,
-} from "@/composables/query/queries/alertHistory";
+import { alertHistoryQuery } from "@/services/alerts";
+import { incidentsQuery } from "@/services/incidents";
+import { overviewRange, serviceTopologyQuery } from "@/services/service_graph";
 
-import {
-  fetchIncidents,
-  fetchServiceTopology,
-  fetchAnomalyConfigs,
-  fetchAnomalyHistory,
-  overviewRange,
-} from "@/composables/query/queries/overview";
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
@@ -713,13 +708,13 @@ const loadAnomalies = async (force = false) => {
 
     // Fire list first; only fetch history if configs exist
     try {
-      const configs: any[] = await fetchAnomalyConfigs(org, force);
+      const configs: any[] = await anomalyConfigsQuery.get(org, force);
       if (!configs.length) {
         anomalies.value = [];
         return;
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
-      const bulkRes = await fetchAnomalyHistory(org, 20, force);
+      const bulkRes = await anomalyHistoryQuery.get(org, 20, force);
       const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
@@ -728,7 +723,7 @@ const loadAnomalies = async (force = false) => {
       }));
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
-      const configs: any[] = await fetchAnomalyConfigs(org, force);
+      const configs: any[] = await anomalyConfigsQuery.get(org, force);
       if (!configs.length) {
         anomalies.value = [];
         return;
@@ -790,7 +785,7 @@ const loadHistoryAndSplit = async (force = false) => {
     // Quantised range: the raw timestamps move on every mount, so a key built
     // from them could never hit — which is why switching tabs re-requested this.
     const q = overviewRange(timeRange.value.startTime, timeRange.value.endTime);
-    const historyFetch = force ? refetchAlertHistory : fetchAlertHistoryPage;
+    const historyFetch = force ? alertHistoryQuery.refresh : alertHistoryQuery.get;
     const res = await historyFetch(orgId.value, {
       start_time: q.start,
       end_time: q.end,
@@ -853,7 +848,7 @@ const loadHistoryAndSplit = async (force = false) => {
 const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
   try {
-    const res = await fetchIncidents(orgId.value, "open", 4, 0, force);
+    const res = await incidentsQuery.get(orgId.value, "open", 4, 0, force);
     incidents.value = res?.incidents ?? [];
     incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch {
@@ -867,7 +862,7 @@ const loadServiceGraph = async (force = false) => {
   try {
     graphStream.value = "all";
 
-    const res = await fetchServiceTopology(
+    const res = await serviceTopologyQuery.get(
       orgId.value,
       { startTime: timeRange.value.startTime, endTime: timeRange.value.endTime },
       force,

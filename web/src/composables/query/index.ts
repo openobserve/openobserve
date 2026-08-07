@@ -13,13 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-export { queryClient, purgeOrgQueries, purgeAllQueries } from "./queryClient";
-export { qk, stableFilters, GLOBAL_SCOPE } from "./queryKeys";
-export type { ServerTableParams, OrgId } from "./queryKeys";
+export {
+  queryClient,
+  purgeOrgQueries,
+  purgeAllQueries,
+  defineQuery,
+  defineGlobalQuery,
+  stableFilters,
+  quantizeRange,
+  GLOBAL_SCOPE,
+} from "./queryClient";
+export type { QueryDefinition } from "./queryClient";
 export { TIER, tierOptions } from "./tiers";
 export type { TierName, PersistTarget } from "./tiers";
 export { localPersister, idbPersister, purgePersistedOrg, purgeAllPersisted } from "./persisters";
-export { useOrgQuery, useOrgId } from "./useOrgQuery";
+export { useOrgId } from "./useOrgId";
 export { useServerTable } from "./useServerTable";
-export type { ServerTableResult } from "./useServerTable";
+export type { ServerTableResult, ServerTableParams } from "./useServerTable";
 export { useOrgMutation } from "./useOrgMutation";

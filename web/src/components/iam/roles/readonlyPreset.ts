@@ -7,8 +7,7 @@
 // AllowGet on every visible top-level resource of the org, so a freshly
 // created role is immediately usable for querying instead of silently empty.
 
-import { getResources, updateRole } from "@/services/iam";
-import { fetchResources } from "@/composables/query/queries/iam";
+import { getResources, updateRole, resourcesQuery } from "@/services/iam";
 
 export interface RolePermission {
   object: string;
@@ -62,7 +61,7 @@ export const seedReadonlyRolePermissions = async (
   orgId: string,
   isMetaOrg: boolean,
 ): Promise<number> => {
-  const res = await fetchResources(orgId);
+  const res = await resourcesQuery.get(orgId);
   const add = buildReadonlyPermissions(res ?? [], orgId, isMetaOrg);
   if (!add.length) return 0;
   await updateRole({

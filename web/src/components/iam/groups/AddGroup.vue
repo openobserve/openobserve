@@ -47,7 +47,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createGroup } from "@/services/iam";
+import { createGroup, groupsQuery } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -57,7 +57,6 @@ import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
-import { invalidateGroups } from "@/composables/query/queries/iam";
 
 const { t } = useI18nTyped();
 const props = defineProps({
@@ -100,7 +99,7 @@ const saveGroup = async (value: AddGroupForm) => {
   const name = value.name.trim();
   try {
     const res = await createGroup(name, store.state.selectedOrganization.identifier);
-    invalidateGroups(store.state.selectedOrganization.identifier);
+    groupsQuery.invalidate(store.state.selectedOrganization.identifier);
     emits("added:group", { group_name: name, data: res.data });
     emits("update:open", false);
 

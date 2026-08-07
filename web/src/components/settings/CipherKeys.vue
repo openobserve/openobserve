@@ -152,7 +152,7 @@ import { useI18nTyped } from "@/types/i18n";
 
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import AddCipherKey from "@/components/cipherkeys/AddCipherKey.vue";
-import CipherKeysService from "@/services/cipher_keys";
+import CipherKeysService, { cipherKeysQuery } from "@/services/cipher_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -164,7 +164,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { cipherKeysQuery } from "@/composables/query/queries/settingsLists";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -306,7 +305,7 @@ export default defineComponent({
       });
 
       const org = store.state.selectedOrganization.identifier;
-      (force ? cipherKeysQuery.refetchList(org) : cipherKeysQuery.fetchList(org))
+      (force ? cipherKeysQuery.refresh(org) : cipherKeysQuery.get(org))
         .then((responseData: any[]) => {
           const data = [];
           for (let i = 0; i < responseData.length; i++) {

@@ -146,7 +146,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddAiToolset from "@/components/ai_toolsets/AddAiToolset.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { aiToolsetsQuery } from "@/composables/query/queries/settingsLists";
+import { aiToolsetsQuery } from "@/services/ai_toolsets";
 
 export default defineComponent({
   name: "PageAiToolsets",
@@ -254,7 +254,7 @@ export default defineComponent({
       });
 
       const org = store.state.selectedOrganization.identifier;
-      (force ? aiToolsetsQuery.refetchList(org) : aiToolsetsQuery.fetchList(org))
+      (force ? aiToolsetsQuery.refresh(org) : aiToolsetsQuery.get(org))
         .then((items: any[]) => {
           tabledata.value = items.map((item: any) => ({
             id: item.id,

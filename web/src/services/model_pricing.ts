@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const modelPricing = {
   list: (org_identifier: string) => {
@@ -47,3 +48,10 @@ const modelPricing = {
 };
 
 export default modelPricing;
+
+export const modelPricingQuery = defineQuery<[], any[]>({
+  key: ["settings", "modelPricing"],
+  fetch: async (org) => (await modelPricing.list(org)).data ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["settings", "modelPricing"],
+});

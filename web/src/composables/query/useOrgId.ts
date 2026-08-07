@@ -13,24 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/**
- * Workflow definitions.
- *
- * Client-paginated: the page filters, sorts and pages in the browser, so none
- * of that reaches the query key.
- */
+import { computed } from "vue";
+import { useStore } from "vuex";
 
-import workflowsService from "@/services/workflows";
-import { createOrgListQuery } from "../createOrgListQuery";
-import { qk } from "../queryKeys";
-
-export const workflowsQuery = createOrgListQuery<any>({
-  key: (org) => qk.workflows.list(org),
-  fetch: async (org) => {
-    // The list handler returns a bare array; older builds wrapped it in `list`.
-    const data = (await workflowsService.listWorkflows(org)).data;
-    return Array.isArray(data) ? data : (data?.list ?? []);
-  },
-  tier: "ENTITY_LIST",
-  root: (org) => qk.workflows.root(org),
-});
+/** The active organization identifier, as a computed the query keys can track. */
+export const useOrgId = () => {
+  const store = useStore();
+  return computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
+};

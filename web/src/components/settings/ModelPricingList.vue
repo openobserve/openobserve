@@ -479,7 +479,7 @@ import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getImageURL } from "@/utils/zincutils";
-import modelPricingService from "@/services/model_pricing";
+import modelPricingService, { modelPricingQuery } from "@/services/model_pricing";
 import ImportModelPricing from "@/components/settings/ImportModelPricing.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -497,7 +497,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { modelPricingQuery } from "@/composables/query/queries/settingsLists";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -757,8 +756,8 @@ async function fetchModels(force = false) {
   loading.value = true;
   try {
     models.value = force
-      ? await modelPricingQuery.refetchList(orgIdentifier.value)
-      : await modelPricingQuery.fetchList(orgIdentifier.value);
+      ? await modelPricingQuery.refresh(orgIdentifier.value)
+      : await modelPricingQuery.get(orgIdentifier.value);
   } catch (e: any) {
     notifyError(t("modelPricing.errLoadModels"), e);
   } finally {

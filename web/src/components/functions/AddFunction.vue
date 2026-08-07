@@ -185,7 +185,6 @@ import {
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
-import { invalidateFunctions } from "@/composables/query/queries/functions";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
@@ -194,9 +193,8 @@ import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
 import FullViewContainer from "@/components/functions/FullViewContainer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { onBeforeRouteLeave } from "vue-router";
+import { onBeforeRouteLeave, useRouter } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
-import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
@@ -204,6 +202,7 @@ import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
+import { functionsQuery } from "@/services/jstransform";
 export const defaultValue: any = () => {
   return {
     name: "",
@@ -446,7 +445,7 @@ export default defineComponent({
         const res = beingUpdated.value
           ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
           : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
-        invalidateFunctions(store.state.selectedOrganization.identifier);
+        functionsQuery.invalidate(store.state.selectedOrganization.identifier);
 
         const _formData: any = { ...payload };
         formData.value = { ...defaultValue() };

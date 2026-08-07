@@ -16,7 +16,7 @@ import { ref, computed, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 
 // Services
-import alertDestinationService from "@/services/alert_destination";
+import alertDestinationService, { destinationsQuery } from "@/services/alert_destination";
 import templatesService from "@/services/alert_templates";
 
 // Types and configurations
@@ -51,7 +51,6 @@ import type { Destination } from "@/ts/interfaces/alert";
 // Store
 import { useStore } from "vuex";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 /**
  * Parses a comma/space-separated string of email recipients into an array.
@@ -554,7 +553,7 @@ export function usePrebuiltDestinations() {
         destination_name: name,
         data: destinationData,
       });
-      invalidateDestinations(organizationIdentifier.value);
+      destinationsQuery.invalidate(organizationIdentifier.value);
 
       toast({
         variant: "success",
@@ -692,7 +691,7 @@ export function usePrebuiltDestinations() {
         destination_name: originalName, // Use original name for lookup
         data: destinationData,
       });
-      invalidateDestinations(organizationIdentifier.value);
+      destinationsQuery.invalidate(organizationIdentifier.value);
 
       toast({
         variant: "success",
@@ -787,7 +786,7 @@ export function usePrebuiltDestinations() {
         destination_name: destinationName,
         data: updatedData,
       });
-      invalidateDestinations(organizationIdentifier.value);
+      destinationsQuery.invalidate(organizationIdentifier.value);
 
       toast({
         variant: "success",

@@ -1,6 +1,10 @@
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
+  evalJobsQuery,
+  providersQuery,
+  scoreConfigsQuery,
+  scorersQuery,
   type EvalJob,
   type Provider,
   type ScoreConfig,
@@ -8,12 +12,6 @@ import onlineEvalsService, {
 } from "@/services/online-evals.service";
 import { entityId } from "../utils/evalEntity";
 import { showError } from "../utils/evalFormat";
-import {
-  providersQuery,
-  scoreConfigsQuery,
-  scorersQuery,
-  evalJobsQuery,
-} from "@/composables/query/queries/onlineEvals";
 
 export function useOnlineEvalsData() {
   const { t } = useI18nTyped();
@@ -32,10 +30,10 @@ export function useOnlineEvalsData() {
       // nothing, and the four requests still fan out in parallel on a miss.
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
-          providersQuery.fetch(orgId),
-          scoreConfigsQuery.fetch(orgId),
-          scorersQuery.fetch(orgId),
-          evalJobsQuery.fetch(orgId),
+          providersQuery.get(orgId),
+          scoreConfigsQuery.get(orgId),
+          scorersQuery.get(orgId),
+          evalJobsQuery.get(orgId),
         ],
       );
 
@@ -73,7 +71,7 @@ export function useOnlineEvalsData() {
   async function loadProviders(orgId: string) {
     if (!orgId) return;
     try {
-      providers.value = await providersQuery.refetch(orgId);
+      providers.value = await providersQuery.refresh(orgId);
     } catch (err: any) {
       showError(err, t("onlineEvals.loadError"));
     }

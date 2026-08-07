@@ -232,7 +232,6 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import jsTransformService from "../../services/jstransform";
-import { invalidateFunctions } from "@/composables/query/queries/functions";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import segment from "../../services/segment_analytics";
@@ -249,6 +248,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { functionsQuery } from "@/services/jstransform";
 
 export default defineComponent({
   name: "functionList",
@@ -625,7 +625,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
-        invalidateFunctions(store.state.selectedOrganization.identifier);
+        functionsQuery.invalidate(store.state.selectedOrganization.identifier);
 
         dismiss();
 

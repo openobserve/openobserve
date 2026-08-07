@@ -111,7 +111,7 @@ import { Background } from "@vue-flow/background";
 import { Controls } from "@vue-flow/controls";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
-import searchService from "@/services/search";
+import searchService, { traceDagQuery } from "@/services/search";
 
 // VueFlow CSS imports
 import "@vue-flow/core/dist/style.css";
@@ -121,7 +121,6 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import { fetchTraceDag } from "@/composables/query/queries/traces";
 
 export interface SpanNode {
   span_id: string;
@@ -405,7 +404,7 @@ export default defineComponent({
         error.value = null;
 
         const org = store.state.selectedOrganization.identifier;
-        dagData.value = await fetchTraceDag(
+        dagData.value = await traceDagQuery.get(
           org,
           props.streamName,
           props.traceId,

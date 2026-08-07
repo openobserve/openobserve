@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const workflows = {
   // List all workflows for the org .
@@ -139,3 +140,14 @@ const workflows = {
 };
 
 export default workflows;
+
+export const workflowsQuery = defineQuery<[], any[]>({
+  key: ["workflows", "list"],
+  fetch: async (org) => {
+    // The list handler returns a bare array; older builds wrapped it in `list`.
+    const data = (await workflows.listWorkflows(org)).data;
+    return Array.isArray(data) ? data : ((data as any)?.list ?? []);
+  },
+  tier: "ENTITY_LIST",
+  scope: ["workflows"],
+});

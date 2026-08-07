@@ -1,7 +1,7 @@
 import pipelines from "@/services/pipelines";
 import { useStore } from "vuex";
-import { fetchDestinations } from "@/composables/query/queries/alertMeta";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { destinationsQuery } from "@/services/alert_destination";
 
 export const usePipelines = () => {
   const store = useStore();
@@ -22,7 +22,7 @@ export const usePipelines = () => {
     }
   }
   const getPipelineDestinations = async () => {
-    const destinations = await fetchDestinations(
+    const destinations = await destinationsQuery.get(
       store.state.selectedOrganization.identifier,
       "pipeline",
     );

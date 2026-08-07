@@ -217,24 +217,20 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import organizationsService from "@/services/organizations";
+import organizationsService, {
+  ingestionTokensQuery,
+  orgPasscodeQuery,
+} from "@/services/organizations";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
-import apiKeysService from "@/services/api_keys";
+import apiKeysService, { rumTokensQuery } from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
 import { awsIntegrations } from "@/utils/awsIntegrations";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import {
-  fetchRumTokens,
-  fetchIngestionTokens,
-  fetchOrgPasscode,
-  invalidateOrgPasscode,
-  invalidateRumTokens,
-} from "@/composables/query/queries/tokens";
 
 export default defineComponent({
   name: "PageIngestion",
@@ -376,7 +372,8 @@ export default defineComponent({
     const getOrganizationPasscode = () => {
       // Returned so callers can await the load — it never was, which only
       // worked while the fetch resolved in a single microtask.
-      return fetchOrgPasscode(store.state.selectedOrganization.identifier)
+      return orgPasscodeQuery
+        .get(store.state.selectedOrganization.identifier)
         .then((res: any) => {
           if (res.data.passcode == "") {
             toast({
@@ -396,7 +393,7 @@ export default defineComponent({
     };
 
     const getRUMToken = () => {
-      return fetchRumTokens(store.state.selectedOrganization.identifier).then((res: any) => {
+      return rumTokensQuery.get(store.state.selectedOrganization.identifier).then((res: any) => {
         store.dispatch("setRUMToken", res.data);
       });
     };
@@ -417,7 +414,7 @@ export default defineComponent({
               message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
-            invalidateOrgPasscode(store.state.selectedOrganization.identifier);
+            orgPasscodeQuery.invalidate(store.state.selectedOrganization.identifier);
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
@@ -450,7 +447,8 @@ export default defineComponent({
     };
 
     const fetchOrgTokens = () => {
-      return fetchIngestionTokens(store.state.selectedOrganization.identifier)
+      return ingestionTokensQuery
+        .get(store.state.selectedOrganization.identifier)
         .then((res: any) => {
           store.dispatch("setOrgTokens", res.data);
         })
@@ -490,7 +488,7 @@ export default defineComponent({
       apiKeysService
         .createRUMToken(store.state.selectedOrganization.identifier)
         .then((res) => {
-          invalidateRumTokens(store.state.selectedOrganization.identifier);
+          rumTokensQuery.invalidate(store.state.selectedOrganization.identifier);
           store.dispatch("setRUMToken", {
             rum_token: res.data.data.new_key,
           });

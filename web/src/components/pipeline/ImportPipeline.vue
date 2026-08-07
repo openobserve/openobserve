@@ -412,7 +412,6 @@ import { useRouter } from "vue-router";
 import pipelinesService from "../../services/pipelines";
 import useStreams from "@/composables/useStreams";
 import jstransform from "@/services/jstransform";
-import { fetchDestinations } from "@/composables/query/queries/alertMeta";
 import usePipelines from "@/composables/usePipelines";
 import BaseImport from "../common/BaseImport.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -424,6 +423,7 @@ import {
   convertV1ToV2,
   convertV1BEToV2,
 } from "@/utils/alerts/alertDataTransforms";
+import { destinationsQuery } from "@/services/alert_destination";
 
 export default defineComponent({
   name: "ImportPipeline",
@@ -635,7 +635,7 @@ export default defineComponent({
     };
 
     const getAlertDestinations = async () => {
-      const destinations = await fetchDestinations(
+      const destinations = await destinationsQuery.get(
         store.state.selectedOrganization.identifier,
         "alert",
       );

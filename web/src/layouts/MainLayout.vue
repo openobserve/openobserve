@@ -207,7 +207,7 @@ import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
-import organizations from "@/services/organizations";
+import organizations, { orgSettingsQuery } from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -216,11 +216,9 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { purgeOrgQueries } from "@/composables/query/queryClient";
-import { fetchConfig } from "@/composables/query/queries/config";
-import { fetchOrgSettings } from "@/composables/query/queries/orgMeta";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { configQuery } from "@/services/config";
 
 let mainLayoutMixin: any = null;
 if (config.isCloud == "true") {
@@ -1097,7 +1095,7 @@ export default defineComponent({
         // Cached: MainLayout re-reads this on every org switch, and the
         // settings pages read it again on mount.
         const orgSettings: any = {
-          data: await fetchOrgSettings(store.state?.selectedOrganization?.identifier),
+          data: await orgSettingsQuery.get(store.state?.selectedOrganization?.identifier),
         };
 
         //set settings in store
@@ -1175,7 +1173,8 @@ export default defineComponent({
      * @throws {Error} If the request fails.
      */
     const getConfig = async () => {
-      await fetchConfig()
+      await configQuery
+        .get()
         .then(async (data: any) => {
           const res = { data };
           if (config.isCloud == "false") {

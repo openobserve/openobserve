@@ -82,7 +82,7 @@ import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useLoading } from "@/composables/useLoading";
-import { annotationService } from "@/services/dashboard_annotations";
+import { annotationService, dashboardAnnotationsQuery } from "@/services/dashboard_annotations";
 import useNotifications from "@/composables/useNotifications";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -92,7 +92,6 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { addAnnotationSchema } from "./AddAnnotation.schema";
 import type { AddAnnotationForm } from "./AddAnnotation.schema";
-import { dashboardAnnotationsQuery } from "@/composables/query/queries/dashboards";
 
 interface AnnotationData {
   annotation_id: string | null;

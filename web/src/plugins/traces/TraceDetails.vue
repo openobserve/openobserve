@@ -854,7 +854,12 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
-import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  getImageURL,
+  b64EncodeUnicode,
+  formatLargeNumber,
+} from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
@@ -877,7 +882,6 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";

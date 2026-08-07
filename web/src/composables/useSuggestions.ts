@@ -8,8 +8,10 @@ import {
   buildFieldEntry,
 } from "@/utils/query/sqlCompletion";
 import { mergeServerFunctions } from "@/utils/query/serverFunctions";
-import queryFunctions, { type ServerQueryFunction } from "@/services/query_functions";
-import { fetchQueryFunctions } from "@/composables/query/queries/functions";
+import queryFunctions, {
+  queryFunctionsQuery,
+  type ServerQueryFunction,
+} from "@/services/query_functions";
 
 const useSqlSuggestions = () => {
   // Both lists come from the shared catalog (web/src/utils/query/sqlCompletion.ts).
@@ -103,7 +105,8 @@ const useSqlSuggestions = () => {
     // Cached: reopening the editor for the same org inside the tier's staleTime
     // costs nothing. The org/sequence guards below still matter — they cover a
     // fast org switch, which the cache key alone would not sequence.
-    inFlight = fetchQueryFunctions(org)
+    inFlight = queryFunctionsQuery
+      .get(org)
       .then((list: any[]) => {
         // Discard if the org changed, or if the catalog was superseded while we
         // were waiting (setServerFunctions, or a newer request).

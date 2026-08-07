@@ -135,10 +135,8 @@
   </ODialog>
 </template>
 <script lang="ts">
-import { ref, computed, watch } from "vue";
-import { defineComponent } from "vue";
+import { ref, computed, watch, defineComponent, onMounted } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";

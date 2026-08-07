@@ -49,10 +49,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed } from "vue";
+import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { defineAsyncComponent } from "vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";

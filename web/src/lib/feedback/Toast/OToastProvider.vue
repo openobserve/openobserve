@@ -16,8 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ToastProvider, ToastViewport } from "reka-ui";
-import { useToast } from "./useToast";
-import { toastRecords } from "./useToast";
+import { useToast, toastRecords } from "./useToast";
 import { viewportPositionClasses } from "./OToastProvider.types";
 import type { ToastPosition } from "./OToast.types";
 import OToast from "./OToast.vue";

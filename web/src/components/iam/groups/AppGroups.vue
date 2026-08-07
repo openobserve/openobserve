@@ -163,7 +163,7 @@ import { useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup, bulkDeleteGroups, getGroup } from "@/services/iam";
+import { getGroups, deleteGroup, bulkDeleteGroups, getGroup, groupsQuery } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -173,8 +173,6 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { fetchGroups, refetchGroups } from "@/composables/query/queries/iam";
-import { invalidateGroups } from "@/composables/query/queries/iam";
 
 const showAddGroup = ref(false);
 
@@ -284,8 +282,8 @@ const setupGroups = async (force = false) => {
   loading.value = true;
   await (
     force
-      ? refetchGroups(store.state.selectedOrganization.identifier)
-      : fetchGroups(store.state.selectedOrganization.identifier)
+      ? groupsQuery.refresh(store.state.selectedOrganization.identifier)
+      : groupsQuery.get(store.state.selectedOrganization.identifier)
   )
     .then((res: any) => {
       groupsState.groups = res.map((group: string) => ({
@@ -302,7 +300,7 @@ const setupGroups = async (force = false) => {
 };
 
 const deleteUserGroup = (group: any) => {
-  invalidateGroups(store.state.selectedOrganization.identifier);
+  groupsQuery.invalidate(store.state.selectedOrganization.identifier);
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
@@ -380,7 +378,7 @@ const bulkDeleteUserGroups = async () => {
   const groupNames = selectedGroups.value.map((group: any) => group.group_name);
 
   try {
-    invalidateGroups(store.state.selectedOrganization.identifier);
+    groupsQuery.invalidate(store.state.selectedOrganization.identifier);
     const response = await bulkDeleteGroups(store.state.selectedOrganization.identifier, {
       ids: groupNames,
     });

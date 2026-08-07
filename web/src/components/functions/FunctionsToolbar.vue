@@ -142,8 +142,7 @@
   </OPageHeader>
 </template>
 <script setup lang="ts">
-import { ref, computed, type PropType } from "vue";
-import { inject } from "vue";
+import { ref, computed, type PropType, inject } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";

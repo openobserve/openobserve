@@ -491,7 +491,7 @@ import { MarkerType } from "@vue-flow/core";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import StreamSelection from "./StreamSelection.vue";
-import pipelineService from "@/services/pipelines";
+import pipelineService, { pipelinesQuery } from "@/services/pipelines";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 
@@ -524,7 +524,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { pipelinesQuery } from "@/composables/query/queries/pipelines";
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -954,9 +953,7 @@ const getPipelines = async (force = false) => {
   loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
-    const list = force
-      ? await pipelinesQuery.refetchList(org)
-      : await pipelinesQuery.fetchList(org);
+    const list = force ? await pipelinesQuery.refresh(org) : await pipelinesQuery.get(org);
     pipelines.value = [];
     pipelines.value = list.map((pipeline: any) => {
       const updatedEdges = pipeline.edges.map((edge: any) => ({

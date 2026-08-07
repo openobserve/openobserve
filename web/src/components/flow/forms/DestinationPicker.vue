@@ -71,11 +71,11 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import CreateDestinationForm from "@/components/pipeline/NodeForm/CreateDestinationForm.vue";
-import { fetchDestinations, invalidateDestinations } from "@/composables/query/queries/alertMeta";
 import {
   makeExternalDestinationSchema,
   type ExternalDestinationForm,
 } from "@/components/pipeline/NodeForm/ExternalDestination.schema";
+import { destinationsQuery } from "@/services/alert_destination";
 
 // `forcedType`, when set, is forwarded to the inline create form to lock its
 // destination type and skip the type-selection step (workflows → "custom").
@@ -116,7 +116,7 @@ watch(createNewDestination, async (v) => {
   // Returning from create (either cancelled or just created) — refetch once so a
   // newly-created destination shows, then apply any pending selection. Drop the
   // cached list first so this is a real refetch and not a cache hit.
-  await invalidateDestinations(store.state.selectedOrganization.identifier);
+  await destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
   await getDestinations();
   if (pendingSelection.value) {
     form.setFieldValue("selectedDestination", pendingSelection.value);
@@ -137,7 +137,7 @@ const destinationOptions = computed(() =>
 // Pipeline-module external destinations.
 const getDestinations = async () => {
   try {
-    destinations.value = await fetchDestinations(
+    destinations.value = await destinationsQuery.get(
       store.state.selectedOrganization.identifier,
       "pipeline",
     );

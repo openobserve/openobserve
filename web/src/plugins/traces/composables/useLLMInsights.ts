@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref } from "vue";
-import { b64EncodeUnicode } from "@/utils/zincutils";
+import { b64EncodeUnicode, generateTraceContext } from "@/utils/zincutils";
 import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { buildAgentTraceFilter } from "../llmAgentFilter";
 import { compactSql } from "../config/llmInsightsPanels";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import { generateTraceContext } from "@/utils/zincutils";
 import { useStore } from "vuex";
 
 export interface LLMKPI {

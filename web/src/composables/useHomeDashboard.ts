@@ -14,12 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, type Ref } from "vue";
-import settings from "@/services/settings";
-import {
-  fetchSetting,
-  primeSetting,
-  refetchSetting,
-} from "@/composables/query/queries/userSettings";
+import settings, { settingQuery } from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw, type I18nText } from "@/types/i18n";
 
@@ -45,8 +40,8 @@ export function useHomeDashboard() {
     isLoading.value = true;
     try {
       const val: any = force
-        ? await refetchSetting(org, SETTING_KEY)
-        : await fetchSetting(org, SETTING_KEY);
+        ? await settingQuery.refresh(org, SETTING_KEY)
+        : await settingQuery.get(org, SETTING_KEY);
       homeDashboard.value = val && val.dashboardId ? (val as HomeDashboard) : null;
     } catch {
       // Missing setting / 404 → no home dashboard for this org.
@@ -67,7 +62,7 @@ export function useHomeDashboard() {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
-      primeSetting(org, SETTING_KEY, d);
+      settingQuery.prime(org, SETTING_KEY, d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({ variant: "error", message: raw(errMessage(e, "set")) });
@@ -80,7 +75,7 @@ export function useHomeDashboard() {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
-      primeSetting(org, SETTING_KEY, null);
+      settingQuery.prime(org, SETTING_KEY, null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the

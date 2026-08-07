@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { ref, computed, onBeforeMount, onActivated, watch } from "vue";
 import type { PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -467,7 +467,6 @@ import DestinationPreview from "./DestinationPreview.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useOForm } from "@/lib/forms/Form/useOForm";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 import {
   makeAddDestinationSchema,
   addDestinationDefaults,
@@ -1038,7 +1037,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       );
     }
 
-    invalidateDestinations(store.state.selectedOrganization.identifier);
+    destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
     emit("get:destinations");
     emit("cancel:hideform");
   } catch (error) {
@@ -1098,7 +1097,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .then(() => {
         dismiss();
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({
@@ -1129,7 +1128,7 @@ function saveCustomDestination(value: AddDestinationForm) {
       })
       .then(() => {
         dismiss();
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         emit("get:destinations");
         emit("cancel:hideform");
         toast({

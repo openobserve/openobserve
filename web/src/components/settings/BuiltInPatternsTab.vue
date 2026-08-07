@@ -224,10 +224,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { defineComponent, ref, computed, onMounted } from "vue";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import {
-  fetchBuiltInRegexPatterns,
-  refetchBuiltInRegexPatterns,
-} from "@/composables/query/queries/regexPatterns";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -239,6 +235,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { builtInRegexPatternsQuery } from "@/services/regex_pattern";
 
 interface PatternExample {
   Valid: string[];
@@ -334,8 +331,8 @@ export default defineComponent({
 
         // `clearCache` is the manual refresh button — it must reach the server.
         const fetchedPatterns: BuiltInPattern[] = clearCache
-          ? await refetchBuiltInRegexPatterns(orgId)
-          : await fetchBuiltInRegexPatterns(orgId);
+          ? await builtInRegexPatternsQuery.refresh(orgId)
+          : await builtInRegexPatternsQuery.get(orgId);
 
         patterns.value = fetchedPatterns.map((p: BuiltInPattern) => ({
           ...p,

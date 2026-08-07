@@ -572,7 +572,7 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { ProgressBarVariant } from "@/lib/data/ProgressBar/OProgressBar.types";
-import CommonService from "@/services/common";
+import CommonService, { nodesQuery } from "@/services/common";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
@@ -582,7 +582,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { fetchNodes, refetchNodes } from "@/composables/query/queries/orgMeta";
 
 export default defineComponent({
   name: "PageCipherKeys",
@@ -898,7 +897,7 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
       // Returned so callers can await the load — it never was, which only
       // worked while the fetch resolved in a single microtask.
-      return (force ? refetchNodes(org) : fetchNodes(org))
+      return (force ? nodesQuery.refresh(org) : nodesQuery.get(org))
         .then((responseData: any) => {
           const { flattenedData, uniqueValues, maxValues } = flattenObject(responseData);
           regionRows.value = uniqueValues.regions.map((name) => ({ name }));

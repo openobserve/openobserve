@@ -33,10 +33,9 @@ import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import AddAlert from "@/components/alerts/AddAlert.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { fetchDestinations, invalidateDestinations } from "@/composables/query/queries/alertMeta";
-import { alertsListQuery } from "@/composables/query/queries/alerts";
-import { alertDetailQuery } from "@/composables/query/queries/alerts";
 import { useI18nTyped } from "@/types/i18n";
+import { destinationsQuery } from "@/services/alert_destination";
+import { alertDetailQuery, alertsListQuery } from "@/services/alerts";
 
 export default defineComponent({
   name: "AddAlertView",
@@ -54,13 +53,13 @@ export default defineComponent({
     // Explicit refresh from the alert form (a destination was just created or
     // edited) — drop the cached list so this is a real refetch.
     const refreshDestinations = async () => {
-      await invalidateDestinations(store.state.selectedOrganization.identifier);
+      await destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
       await getDestinations();
     };
 
     const getDestinations = async () => {
       try {
-        destinations.value = (await fetchDestinations(
+        destinations.value = (await destinationsQuery.get(
           store.state.selectedOrganization.identifier,
           "alert",
         )) as any;
@@ -77,7 +76,7 @@ export default defineComponent({
 
       // Drop the cached alerts (list and any search) so AlertList refetches on
       // mount instead of rendering the pre-save rows.
-      alertsListQuery.invalidateList(store.state.selectedOrganization.identifier);
+      alertsListQuery.invalidate(store.state.selectedOrganization.identifier);
       alertDetailQuery.invalidate(store.state.selectedOrganization.identifier);
 
       // Navigate back to alert list after successful save

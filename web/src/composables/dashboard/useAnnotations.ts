@@ -1,5 +1,5 @@
 import { annotationService } from "../../services/dashboard_annotations";
-import { dashboardAnnotationsQuery } from "@/composables/query/queries/dashboards";
+import { dashboardAnnotationsQuery } from "@/services/dashboard_annotations";
 
 export const useAnnotations = (
   organization: string,
@@ -24,7 +24,7 @@ export const useAnnotations = (
       // Cached per dashboard + window: every panel on a dashboard asks for its
       // own annotations over the same range, so this collapses N requests to one
       // per distinct window.
-      return await dashboardAnnotationsQuery.fetch(organization, dashboardId, {
+      return await dashboardAnnotationsQuery.get(organization, dashboardId, {
         panels: [panelId],
         start_time,
         end_time,

@@ -384,7 +384,7 @@ import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { fetchLicense } from "@/composables/query/queries/orgMeta";
+import { licenseQuery } from "@/services/license_server";
 
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
@@ -474,7 +474,7 @@ export default defineComponent({
       if (isEnterprise && hasLicense && !isCloud) {
         isLoadingLicense.value = true;
         try {
-          licenseData.value = await fetchLicense();
+          licenseData.value = await licenseQuery.get();
           // Generate dashboard after license data is fetched
           generateUsageDashboard();
         } catch (error) {

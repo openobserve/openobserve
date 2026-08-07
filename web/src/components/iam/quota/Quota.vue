@@ -417,7 +417,7 @@ import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
-import { getRoles } from "@/services/iam";
+import { getRoles, rolesQuery } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
@@ -427,7 +427,6 @@ import useRateLimiter from "@/composables/useRateLimiter";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { fetchRoles } from "@/composables/query/queries/iam";
 export default defineComponent({
   name: "Quota",
   components: {
@@ -904,7 +903,7 @@ export default defineComponent({
       //so we need to get the roles from the api
       try {
         isRolesLoading.value = true;
-        const response = await fetchRoles(selectedOrganization.value?.value);
+        const response = await rolesQuery.get(selectedOrganization.value?.value);
         rolesLimitRows.value = response.map((role: any) => ({
           role_name: role,
           uuid: getUUID(),

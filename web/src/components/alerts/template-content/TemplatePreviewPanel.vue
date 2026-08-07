@@ -271,8 +271,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
-import { fetchDestinations } from "@/composables/query/queries/alertMeta";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import type { ContentSpec } from "./contentSpec";
 
 // Wire values the backend documents for POST …/templates/preview. Kept local
@@ -493,7 +492,7 @@ const loadDestinations = async () => {
   try {
     // Same shared query the alert form and destination lists read, so opening
     // this panel reuses their cached list instead of issuing its own request.
-    const destinations = await fetchDestinations(
+    const destinations = await destinationsQuery.get(
       store.state.selectedOrganization?.identifier,
       "alert",
     );

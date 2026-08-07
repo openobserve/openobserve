@@ -243,14 +243,10 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import { getBasicAuth } from "@/utils/auth";
-import organizationsService from "@/services/organizations";
+import organizationsService, { ingestionTokensQuery } from "@/services/organizations";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import {
-  fetchIngestionTokens,
-  invalidateIngestionTokens,
-} from "@/composables/query/queries/tokens";
 
 interface Token {
   name: string;
@@ -357,7 +353,7 @@ export default defineComponent({
     const fetchTokens = async () => {
       loading.value = true;
       try {
-        const res = await fetchIngestionTokens(store.state.selectedOrganization.identifier);
+        const res = await ingestionTokensQuery.get(store.state.selectedOrganization.identifier);
         tokens.value = res.data;
       } catch (e: any) {
         toast({
@@ -390,7 +386,7 @@ export default defineComponent({
         };
         showCreateForm.value = false;
         showRevealedDialog.value = true;
-        invalidateIngestionTokens(store.state.selectedOrganization.identifier);
+        ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -417,7 +413,7 @@ export default defineComponent({
           name,
           enabled,
         );
-        invalidateIngestionTokens(store.state.selectedOrganization.identifier);
+        ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
         await fetchTokens();
         store.dispatch("setOrgTokens", tokens.value);
         toast({
@@ -465,7 +461,7 @@ export default defineComponent({
         id: "ingestionTokensRefresh",
         handler: () => {
           if (!isInputFocused()) {
-            invalidateIngestionTokens(store.state.selectedOrganization.identifier);
+            ingestionTokensQuery.invalidate(store.state.selectedOrganization.identifier);
             fetchTokens();
           }
         },

@@ -6,7 +6,7 @@ import userService from "@/services/users";
 import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
-import { fetchOrgSummary } from "@/composables/query/queries/overview";
+import { orgSummaryQuery } from "@/services/organizations";
 
 // Exact paths that stay reachable when the org has ingested nothing yet. The
 // empty-data redirect exists to push people toward ingestion rather than show
@@ -143,7 +143,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
       }
       // Shares the Usage tab's cached summary — this runs on every guarded
       // navigation, so an uncached read here re-requested on each one.
-      const data: any = await fetchOrgSummary(orgIdentifier);
+      const data: any = await orgSummaryQuery.get(orgIdentifier);
       if (!data?.streams?.num_streams) {
         store.dispatch("setIsDataIngested", false);
         next({ path: "/ingestion" });

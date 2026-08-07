@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref } from "vue";
+import { computed, defineComponent, ref, onActivated, onBeforeMount, type Ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -398,7 +398,6 @@ import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../util
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
-import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
@@ -411,11 +410,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import {
-  fetchStreamPage,
-  prefetchStreamPage,
-  refetchStreamPage,
-} from "@/composables/query/queries/streams";
+import { streamPageQuery } from "@/services/stream";
 export default defineComponent({
   name: "PageLogStream",
   components: {
@@ -675,8 +670,8 @@ export default defineComponent({
         };
 
         const streamResponse = _refresh
-          ? refetchStreamPage(org, type, params)
-          : fetchStreamPage(org, type, params);
+          ? streamPageQuery.refresh(org, type, params)
+          : streamPageQuery.get(org, type, params);
 
         streamResponse
           .then((res: any) => {
@@ -720,7 +715,10 @@ export default defineComponent({
 
             // Warm the next page so paging forward is a cache hit.
             if (params.offset + params.limit < res.total) {
-              prefetchStreamPage(org, type, { ...params, offset: params.offset + params.limit });
+              streamPageQuery.prefetch(org, type, {
+                ...params,
+                offset: params.offset + params.limit,
+              });
             }
 
             dismiss();

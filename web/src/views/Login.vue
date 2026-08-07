@@ -42,22 +42,24 @@ import { useRouter } from "vue-router";
 import Login from "@/components/login/Login.vue";
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import config from "@/aws-exports";
-import { fetchConfig } from "@/composables/query/queries/config";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { getUserInfo, getDecodedUserInfo, checkCallBackValues } from "@/utils/zincutils";
-import usersService from "@/services/users";
-import organizationsService from "@/services/organizations";
 import {
+  getUserInfo,
+  getDecodedUserInfo,
+  checkCallBackValues,
   useLocalCurrentUser,
   useLocalOrganization,
   invalidateLoginData,
   useLocalUserInfo,
   getImageURL,
 } from "@/utils/zincutils";
+import usersService from "@/services/users";
+import organizationsService from "@/services/organizations";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useI18nTyped } from "@/types/i18n";
+import { configQuery } from "@/services/config";
 
 export default defineComponent({
   name: "LoginPage",
@@ -81,7 +83,8 @@ export default defineComponent({
 
     onBeforeMount(async () => {
       if (!router?.currentRoute.value.hash) {
-        await fetchConfig()
+        await configQuery
+          .get()
           .then(async (data) => {
             store.commit("setConfig", data);
           })
@@ -295,7 +298,8 @@ export default defineComponent({
      */
 
     if (this.$route.hash) {
-      fetchConfig()
+      configQuery
+        .get()
         .then(async (data) => {
           this.store.commit("setZoConfig", data);
           const token = getUserInfo(this.$route.hash);

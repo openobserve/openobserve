@@ -503,6 +503,7 @@ import {
   onUnmounted,
   ref,
   watch,
+  toRaw,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -516,7 +517,6 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
-import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import {

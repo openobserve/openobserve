@@ -268,11 +268,18 @@
 </template>
 <script lang="ts">
 //@ts-nocheck
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import {
+  ref,
+  onMounted,
+  onUnmounted,
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  reactive,
+} from "vue";
 import { b64EncodeUnicode, b64DecodeUnicode } from "@/utils/zincutils";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { defineAsyncComponent, defineComponent, reactive } from "vue";
 import { searchState } from "@/composables/useLogs/searchState";
 import searchService from "@/services/search";
 import DOMPurify from "dompurify";

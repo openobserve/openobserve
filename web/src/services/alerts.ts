@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery, stableFilters } from "@/composables/query/queryClient";
 
 const alerts = {
   list: (
@@ -253,3 +254,49 @@ const alerts = {
 };
 
 export default alerts;
+
+/**
+ * Alerts for one folder, or a name search across all of them. The folder and the
+ * search term are both applied by the server, so both are in the key — searches
+ * used to bypass the cache entirely. The tab filter is client-side and absent.
+ */
+export const alertsListQuery = defineQuery<[folderId: string, query?: string], any[]>({
+  key: (folderId, query) =>
+    query
+      ? ["alerts", "search", folderId || "__all__", { q: query }]
+      : ["alerts", "list", folderId],
+  fetch: async (org, folderId, query) =>
+    (await alerts.listByFolderId(1, 1000, "name", false, "", org, folderId, query ?? "")).data
+      ?.list ?? [],
+  tier: "ENTITY_LIST",
+  scope: ["alerts"],
+});
+
+/** Opened for edit. The read-modify-write in WorkflowLinkAlertsDialog stays uncached. */
+export const alertDetailQuery = defineQuery<[alertId: string], any>({
+  key: (id) => ["alerts", "detail", id],
+  fetch: async (org, id) => (await alerts.get_by_alert_id(org, id)).data,
+  tier: "ENTITY_DETAIL",
+  scope: ["alerts"],
+});
+
+export interface AlertHistoryQuery {
+  // string | number because the callers build these differently and the wrapper
+  // must not change what any of them sends.
+  start_time: string | number;
+  end_time: string | number;
+  from: string | number;
+  size: string | number;
+  alert_id?: string;
+  sort_by?: string;
+  sort_order?: string;
+  [extra: string]: unknown;
+}
+
+/** Server-paginated; every server-applied parameter is in the key. */
+export const alertHistoryQuery = defineQuery<[query: AlertHistoryQuery], any>({
+  key: (query) => ["alerts", "history", query.alert_id ?? "__all__", stableFilters(query as any)],
+  fetch: async (org, query) => (await alerts.getHistory(org, query)).data ?? {},
+  tier: "ENTITY_LIST",
+  scope: ["alerts", "history"],
+});

@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 export type ToolsetKind = "mcp" | "cli" | "skill" | "generic";
 
@@ -48,3 +49,10 @@ const aiToolsets = {
 };
 
 export default aiToolsets;
+
+export const aiToolsetsQuery = defineQuery<[], any[]>({
+  key: ["settings", "aiToolsets"],
+  fetch: async (org) => (await aiToolsets.list(org, { limit: 100000 })).data?.toolsets ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["settings", "aiToolsets"],
+});

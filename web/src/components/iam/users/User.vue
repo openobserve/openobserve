@@ -279,7 +279,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
+import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -294,7 +294,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import config from "@/aws-exports";
-import usersService from "@/services/users";
+import usersService, { orgUsersQuery } from "@/services/users";
 import UpdateUserRole from "@/components/iam/users/UpdateRole.vue";
 import AddUser from "@/components/iam/users/AddUser.vue";
 import organizationsService from "@/services/organizations";
@@ -307,13 +307,11 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
 import { getRoles as getCustomRolesApi } from "@/services/iam";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { orgUsersQuery } from "@/composables/query/queries/iamLists";
 
 export default defineComponent({
   name: "UserPageOpenSource",
@@ -755,7 +753,7 @@ export default defineComponent({
       loading.value = true;
       const org = store.state.selectedOrganization.identifier;
       return new Promise((resolve, reject) => {
-        (force ? orgUsersQuery.refetchList(org) : orgUsersQuery.fetchList(org))
+        (force ? orgUsersQuery.refresh(org) : orgUsersQuery.get(org))
           .then(async (orgUsers: any[]) => {
             let users = [...orgUsers];
 

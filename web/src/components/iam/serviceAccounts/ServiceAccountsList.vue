@@ -441,7 +441,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -478,13 +478,11 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
-import service_accounts from "@/services/service_accounts";
+import service_accounts, { serviceAccountsQuery } from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { serviceAccountsQuery } from "@/composables/query/queries/iamLists";
 export default defineComponent({
   name: "ServiceAccountsList",
   components: {
@@ -765,7 +763,7 @@ export default defineComponent({
       loading.value = true;
       const org = store.state.selectedOrganization.identifier;
       return new Promise((resolve, reject) => {
-        (force ? serviceAccountsQuery.refetchList(org) : serviceAccountsQuery.fetchList(org))
+        (force ? serviceAccountsQuery.refresh(org) : serviceAccountsQuery.get(org))
           .then((accounts: any[]) => {
             resultTotal.value = accounts.length;
             currentUserRole.value = "";

@@ -173,6 +173,11 @@ import {
   onUnmounted,
   onMounted,
   onBeforeMount,
+  onActivated,
+  inject,
+  provide,
+  computed,
+  defineAsyncComponent,
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
@@ -186,10 +191,8 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import { inject, provide, computed } from "vue";
 import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
@@ -197,7 +200,6 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
-import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";

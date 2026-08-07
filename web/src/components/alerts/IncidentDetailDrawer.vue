@@ -2050,9 +2050,8 @@ export default defineComponent({
     };
 
     // Refresh correlation data
-    const refreshCorrelation = () => {
-      fetchCorrelatedStreams(true);
-    };
+    // Returns the promise so callers (and specs) can await the refresh.
+    const refreshCorrelation = () => fetchCorrelatedStreams(true);
 
     // Lazy load correlation when user clicks telemetry tab for the first time
     watch(activeTab, (newTab) => {

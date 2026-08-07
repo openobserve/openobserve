@@ -32,10 +32,10 @@ import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
 import { queryClient } from "./composables/query/queryClient";
-import { fetchConfig } from "./composables/query/queries/config";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
+import { configQuery } from "@/services/config";
 
 // Apply the resolved theme synchronously before the app mounts so the first
 // paint already uses the correct colors (no flash of the base stylesheet theme).
@@ -83,7 +83,7 @@ interface ConfigResponse {
 const getConfig = async () => {
   // Seeds the shared `/config` query — MainLayout, Login, General and UsageTab
   // read the same cached entry instead of each issuing their own request.
-  await fetchConfig().then((data: ConfigResponse["data"]) => {
+  await configQuery.get().then((data: ConfigResponse["data"]) => {
     const res: ConfigResponse = { data };
     if (!res.data) return;
 

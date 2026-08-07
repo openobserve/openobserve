@@ -476,7 +476,7 @@ import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
+import alertsService, { alertHistoryQuery } from "@/services/alerts";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -489,11 +489,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import {
-  fetchAlertHistoryPage,
-  refetchAlertHistory,
-  prefetchAlertHistoryPage,
-} from "@/composables/query/queries/alertHistory";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -747,8 +742,8 @@ const fetchAlertHistory = async (force = false) => {
     // Cached per query shape (range + page + sort + filter), so paging back to
     // a page already seen renders from cache instead of blanking the table.
     const historyData = force
-      ? await refetchAlertHistory(org, query)
-      : await fetchAlertHistoryPage(org, query);
+      ? await alertHistoryQuery.refresh(org, query)
+      : await alertHistoryQuery.get(org, query);
     {
       rows.value = (historyData.hits || []).map((hit: any, index: number) => ({
         ...hit,
@@ -759,7 +754,7 @@ const fetchAlertHistory = async (force = false) => {
 
       const nextFrom = currentPage.value * pageSize.value;
       if (nextFrom < totalCount.value) {
-        prefetchAlertHistoryPage(org, { ...query, from: nextFrom.toString() });
+        alertHistoryQuery.prefetch(org, { ...query, from: nextFrom.toString() });
       }
 
       if (rows.value.length === 0) {

@@ -397,7 +397,7 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import DateTime from "@/components/DateTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import alertsService from "@/services/alerts";
+import alertsService, { alertHistoryQuery } from "@/services/alerts";
 import anomalyDetectionService from "@/services/anomaly_detection";
 import { buildAnomalyPreviewSql } from "@/utils/alerts/anomalySqlBuilder";
 import type { Ref } from "vue";
@@ -405,7 +405,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
 import AlertHistoryTimeline from "./AlertHistoryTimeline.vue";
-import { fetchAlertHistoryPage } from "@/composables/query/queries/alertHistory";
 
 // Composables
 const { t } = useI18nTyped();
@@ -794,7 +793,7 @@ const fetchAlertHistory = async (alertId: string) => {
     }
     // Same cached page query as the Alert History page — paging back to a page
     // already fetched keeps its rows instead of blanking.
-    const data = await fetchAlertHistoryPage(
+    const data = await alertHistoryQuery.get(
       store?.state?.selectedOrganization?.identifier,
       historyParams,
     );

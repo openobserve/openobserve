@@ -467,7 +467,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed, watch, defineAsyncComponent } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
-import licenseServer from "@/services/license_server";
+import licenseServer, { licenseQuery } from "@/services/license_server";
 import { useStore } from "vuex";
 import DOMPurify from "dompurify";
 import LicensePeriod from "@/enterprise/components/billings/LicensePeriod.vue";
@@ -485,7 +485,6 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { copyToClipboard } from "@/utils/clipboard";
 import { makeLicenseSchema, type LicenseForm } from "./License.schema";
-import { fetchLicense } from "@/composables/query/queries/orgMeta";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
@@ -544,7 +543,7 @@ export default defineComponent({
     const loadLicenseData = async () => {
       try {
         loading.value = true;
-        licenseData.value = await fetchLicense();
+        licenseData.value = await licenseQuery.get();
         checkAndAutoFillLicenseFromUrl();
       } catch (error) {
         console.error("Error loading license data:", error);

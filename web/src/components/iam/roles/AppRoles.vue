@@ -89,7 +89,7 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
 import { useRouter } from "vue-router";
-import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers } from "@/services/iam";
+import { getRoles, deleteRole, bulkDeleteRoles, getRoleUsers, rolesQuery } from "@/services/iam";
 import usersService from "@/services/users";
 import config from "@/aws-exports";
 import { useStore } from "vuex";
@@ -99,8 +99,6 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { fetchRoles, refetchRoles } from "@/composables/query/queries/iam";
-import { invalidateRoles } from "@/composables/query/queries/iam";
 
 const { t } = useI18nTyped();
 
@@ -227,8 +225,8 @@ const setupRoles = async (force = false) => {
   loading.value = true;
   await (
     force
-      ? refetchRoles(store.state.selectedOrganization.identifier)
-      : fetchRoles(store.state.selectedOrganization.identifier)
+      ? rolesQuery.refresh(store.state.selectedOrganization.identifier)
+      : rolesQuery.get(store.state.selectedOrganization.identifier)
   )
     .then((res: any) => {
       rolesState.roles = res.map((role: string) => ({
@@ -250,7 +248,7 @@ const setupRoles = async (force = false) => {
 };
 
 const deleteUserRole = (role: any) => {
-  invalidateRoles(store.state.selectedOrganization.identifier);
+  rolesQuery.invalidate(store.state.selectedOrganization.identifier);
   deleteRole(role.role_name, store.state.selectedOrganization.identifier)
     .then(() => {
       toast({
@@ -332,7 +330,7 @@ const bulkDeleteUserRoles = async () => {
   bulkDeleteLoading.value = true;
 
   try {
-    invalidateRoles(store.state.selectedOrganization.identifier);
+    rolesQuery.invalidate(store.state.selectedOrganization.identifier);
     const response = await bulkDeleteRoles(store.state.selectedOrganization.identifier, {
       ids: roleNames,
     });

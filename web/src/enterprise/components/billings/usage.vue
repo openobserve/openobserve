@@ -248,7 +248,7 @@ import { defineComponent, ref, onMounted, watch, computed, inject } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { useI18nTyped } from "@/types/i18n";
-import BillingService from "@/services/billings";
+import BillingService, { aiUsageQuery } from "@/services/billings";
 import organizations from "@/services/organizations";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
@@ -259,7 +259,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { buildUsageCombinedLinePanelSchema } from "./usageDailyPanelSchema";
 import config from "@/aws-exports";
-import { aiUsageQuery } from "@/composables/query/queries/billing";
 
 let currentDate = new Date();
 
@@ -422,7 +421,7 @@ export default defineComponent({
       if (config.isCloud !== "true") return;
       const orgId = store.state.selectedOrganization.identifier;
       try {
-        aiUsage.value = await aiUsageQuery.fetch(orgId);
+        aiUsage.value = await aiUsageQuery.get(orgId);
       } catch {
         aiUsage.value = null;
       }

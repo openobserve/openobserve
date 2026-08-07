@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const savedViews = {
   get: (org_identifier: string) => {
@@ -39,3 +40,10 @@ const savedViews = {
 };
 
 export default savedViews;
+
+export const savedViewsQuery = defineQuery<[], any[]>({
+  key: ["search", "savedViews"],
+  fetch: async (org) => (await savedviews.get(org)).data?.views ?? [],
+  tier: "ENTITY_LIST",
+  scope: ["search", "savedViews"],
+});

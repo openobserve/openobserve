@@ -19,8 +19,17 @@ import { keepPreviousData, useQuery } from "@tanstack/vue-query";
 import { queryClient } from "./queryClient";
 import { tierOptions } from "./tiers";
 import type { TierName } from "./tiers";
-import type { ServerTableParams } from "./queryKeys";
-import { useOrgId } from "./useOrgQuery";
+import { useOrgId } from "./useOrgId";
+
+/** The page/sort/filter state a server-paginated endpoint is keyed on. */
+export interface ServerTableParams {
+  page: number;
+  pageSize: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  filter?: string;
+  [key: string]: unknown;
+}
 
 /**
  * Debounced mirror of `source`. Local rather than from a utility library

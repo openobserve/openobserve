@@ -601,6 +601,7 @@ import {
   getDimensionAnalytics,
   type FieldAlias,
   type FoundGroup,
+  buildChipDimensionsFromFilters,
 } from "@/services/service_streams";
 import { ENV_SEGMENTS, groupEnvKey } from "@/utils/serviceStreamEnvs";
 import {
@@ -615,7 +616,6 @@ import {
   type MetricGroupDefinition,
   K8S_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
-import { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
 import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";

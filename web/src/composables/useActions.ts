@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { useStore } from "vuex";
-import { fetchActions } from "@/composables/query/queries/actions";
 import config from "@/aws-exports";
 import { computed } from "vue";
+import { actionsQuery } from "@/services/action_scripts";
 
 const useActions = () => {
   const store = useStore();
@@ -33,7 +33,7 @@ const useActions = () => {
       if (!isActionsEnabled.value) return Promise.resolve([]);
 
       // Cached: this runs on every Logs entry alongside the functions list.
-      const data = await fetchActions(store.state.selectedOrganization.identifier);
+      const data = await actionsQuery.get(store.state.selectedOrganization.identifier);
       // Bridge for consumers still reading `organizationData.actions`.
       store.dispatch("setActions", data);
     } catch (e: any) {

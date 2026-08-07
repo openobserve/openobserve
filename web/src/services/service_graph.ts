@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery, quantizeRange } from "@/composables/query/queryClient";
 
 export interface ServiceGraphParams {
   streamName?: string;
@@ -88,3 +89,30 @@ const serviceGraphService = {
 };
 
 export default serviceGraphService;
+
+export interface TopologyRange {
+  startTime: number;
+  endTime: number;
+}
+
+/**
+ * 5-minute key buckets. The Overview shows a rolling 15-minute window, so a key
+ * built from the raw timestamps could never hit — the range moves on every
+ * mount. The request still carries the exact range; only the key is rounded.
+ */
+export const OVERVIEW_BUCKET_MS = 5 * 60_000;
+
+/** Exposed so callers that build their own query params round the same way. */
+export const overviewRange = (startTime: number, endTime: number) =>
+  quantizeRange(startTime, endTime, OVERVIEW_BUCKET_MS);
+
+export const serviceTopologyQuery = defineQuery<[range: TopologyRange], any>({
+  key: (range) => [
+    "traces",
+    "topology",
+    quantizeRange(range.startTime, range.endTime, OVERVIEW_BUCKET_MS),
+  ],
+  fetch: async (org, range) => (await serviceGraphService.getCurrentTopology(org, range)).data,
+  tier: "ENTITY_LIST",
+  scope: ["traces", "topology"],
+});

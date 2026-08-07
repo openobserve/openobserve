@@ -112,12 +112,18 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import service_accounts from "@/services/service_accounts";
-import { getRoles, getGroups, updateRole, updateGroup } from "@/services/iam";
+import {
+  getRoles,
+  getGroups,
+  updateRole,
+  updateGroup,
+  groupsQuery,
+  rolesQuery,
+} from "@/services/iam";
 import { seedReadonlyRolePermissions } from "@/components/iam/roles/readonlyPreset";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
-import { fetchRoles, fetchGroups } from "@/composables/query/queries/iam";
 import {
   makeAddServiceAccountSchema,
   maxServiceAccountNameLength,
@@ -202,8 +208,8 @@ export default defineComponent({
       if (!showAccessPickers.value) return;
       try {
         const [rolesRes, groupsRes] = await Promise.all([
-          fetchRoles(orgId.value),
-          fetchGroups(orgId.value),
+          rolesQuery.get(orgId.value),
+          groupsQuery.get(orgId.value),
         ]);
         // Merged, not replaced: a role created inline while this load is still
         // in flight would otherwise be wiped from the picker when it lands.

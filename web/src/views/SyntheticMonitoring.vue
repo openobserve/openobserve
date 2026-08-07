@@ -380,7 +380,7 @@ import { CHECK_TYPE_CARDS } from "@/constants/synthetics";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
-import syntheticsService from "@/services/synthetics";
+import syntheticsService, { syntheticsMonitorsQuery } from "@/services/synthetics";
 import { locationDisplayLabel } from "@/utils/synthetics/format";
 import {
   syntheticsCreateRoute,
@@ -390,7 +390,6 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import { syntheticsMonitorsQuery } from "@/composables/query/queries/synthetics";
 
 const router = useRouter();
 const route = useRoute();
@@ -522,8 +521,8 @@ async function loadMonitors(folderId?: string, force = false) {
           ? undefined
           : activeFolderId.value;
     const list = force
-      ? await syntheticsMonitorsQuery.refetchList(orgIdentifier.value, targetFolder)
-      : await syntheticsMonitorsQuery.fetchList(orgIdentifier.value, targetFolder);
+      ? await syntheticsMonitorsQuery.refresh(orgIdentifier.value, targetFolder)
+      : await syntheticsMonitorsQuery.get(orgIdentifier.value, targetFolder);
     monitors.value = list.map(mapMonitor);
   } finally {
     loading.value = false;

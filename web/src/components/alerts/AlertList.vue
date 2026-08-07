@@ -737,6 +737,7 @@ import {
   onMounted,
   computed,
   reactive,
+  nextTick,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
@@ -748,7 +749,7 @@ import { convertUnixToDateFormat as convertUnixToFormat } from "@/utils/date";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
-import alertsService from "@/services/alerts";
+import alertsService, { alertDetailQuery, alertsListQuery } from "@/services/alerts";
 import templateService from "@/services/alert_templates";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -763,7 +764,6 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
-import { nextTick } from "vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -788,9 +788,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { fetchDestinations } from "@/composables/query/queries/alertMeta";
-import { alertsListQuery } from "@/composables/query/queries/alerts";
-import { alertDetailQuery } from "@/composables/query/queries/alerts";
+import { destinationsQuery } from "@/services/alert_destination";
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1447,8 +1445,8 @@ export default defineComponent({
       try {
         const org = store?.state?.selectedOrganization?.identifier;
         const rows = force
-          ? await alertsListQuery.refetchList(org, folderId, query)
-          : await alertsListQuery.fetchList(org, folderId, query);
+          ? await alertsListQuery.refresh(org, folderId, query)
+          : await alertsListQuery.get(org, folderId, query);
         var counter = 1;
         let localAllAlerts = [];
         //this is the alerts that we use to store
@@ -1607,7 +1605,7 @@ export default defineComponent({
         // Cached for the editor-open path only. The read-modify-write in
         // WorkflowLinkAlertsDialog deliberately still goes straight to the
         // service — a stale alert there would overwrite someone else's edit.
-        const data = await alertDetailQuery.fetch(store.state.selectedOrganization.identifier, id);
+        const data = await alertDetailQuery.get(store.state.selectedOrganization.identifier, id);
         dismiss();
         return data;
       } catch (error) {
@@ -1826,7 +1824,8 @@ export default defineComponent({
       { immediate: true }, // Run immediately to handle direct navigation
     );
     const getDestinations = async () => {
-      fetchDestinations(store.state.selectedOrganization.identifier, "alert")
+      destinationsQuery
+        .get(store.state.selectedOrganization.identifier, "alert")
         .then((list) => {
           destinations.value = list as any;
         })

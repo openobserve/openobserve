@@ -176,7 +176,7 @@ import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -198,7 +198,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 interface ConformDelete {
   visible: boolean;
@@ -572,7 +571,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
 
         dismiss();
 

@@ -329,7 +329,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { useI18nTyped } from "@/types/i18n";
-import reports from "@/services/reports";
+import reports, { reportsQuery } from "@/services/reports";
 import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -346,7 +346,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
-import { reportsQuery } from "@/composables/query/queries/reports";
 
 const MoveAcrossFolders = defineAsyncComponent(
   () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
@@ -502,8 +501,8 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
       nameQuery,
     };
     const rows = force
-      ? await reportsQuery.refetchList(store.state.selectedOrganization.identifier, filters)
-      : await reportsQuery.fetchList(store.state.selectedOrganization.identifier, filters);
+      ? await reportsQuery.refresh(store.state.selectedOrganization.identifier, filters)
+      : await reportsQuery.get(store.state.selectedOrganization.identifier, filters);
 
     const mapped = rows.map((report: any) => ({
       ...report,
@@ -539,7 +538,7 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
 // Called after every write and by the refresh button. Prefix invalidation, so
 // the cached/scheduled tab and any active name search all refetch too.
 const invalidateFolderCache = (_folderId?: string) => {
-  reportsQuery.invalidateList(store.state.selectedOrganization.identifier);
+  reportsQuery.invalidate(store.state.selectedOrganization.identifier);
 };
 
 const filterReports = () => {

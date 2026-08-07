@@ -292,7 +292,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import AddExternalAlertSource from "./AddExternalAlertSource.vue";
-import alertSources from "@/services/alert_sources";
+import alertSources, { alertSourcesQuery } from "@/services/alert_sources";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { getAlertSourceStatus } from "@/utils/alertSourceStatus";
@@ -302,7 +302,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 import { COL } from "@/lib/core/Table/OTable.types";
 import type { AlertSourceIntegration } from "@/ts/interfaces/alertSources";
-import { alertSourcesQuery } from "@/composables/query/queries/alertSources";
 
 interface SourceStatusRow {
   displayName: string;
@@ -545,8 +544,8 @@ export default defineComponent({
       this.loading = true;
       try {
         this.integrations = force
-          ? await alertSourcesQuery.refetchList(this.orgIdentifier)
-          : await alertSourcesQuery.fetchList(this.orgIdentifier);
+          ? await alertSourcesQuery.refresh(this.orgIdentifier)
+          : await alertSourcesQuery.get(this.orgIdentifier);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       } finally {

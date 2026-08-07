@@ -15,6 +15,7 @@
 
 import http from "./http";
 import { TestFunctionPayload } from "@/ts/interfaces/function";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const jstransform = {
   list: (
@@ -128,3 +129,15 @@ const jstransform = {
 };
 
 export default jstransform;
+
+// The endpoint paginates but every consumer wants the whole list.
+const ALL_FUNCTIONS = 100000;
+
+/** Read on every Logs entry, alert-form open and panel-editor open. */
+export const functionsQuery = defineQuery<[], any[]>({
+  key: ["functions", "list"],
+  fetch: async (org) =>
+    (await jstransform.list(1, ALL_FUNCTIONS, "name", false, "", org)).data.list ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["functions"],
+});

@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { createRole } from "@/services/iam";
+import { createRole, rolesQuery } from "@/services/iam";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -74,7 +74,6 @@ import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
-import { invalidateRoles } from "@/composables/query/queries/iam";
 
 const { t } = useI18nTyped();
 const props = defineProps({
@@ -128,7 +127,7 @@ const saveRole = async (value: AddRoleForm) => {
   const name = value.name.trim();
   try {
     await createRole(name, store.state.selectedOrganization.identifier);
-    invalidateRoles(store.state.selectedOrganization.identifier);
+    rolesQuery.invalidate(store.state.selectedOrganization.identifier);
     emits("update:open", false);
     emits("added:role", { role_name: name, startFrom: value.startFrom });
     toast({

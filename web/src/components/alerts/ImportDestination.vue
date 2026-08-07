@@ -300,7 +300,7 @@ import { defineComponent, ref, computed, reactive, onMounted } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import BaseImport from "../common/BaseImport.vue";
 import useActions from "@/composables/useActions";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -310,7 +310,6 @@ import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import type { SwitchValue } from "@/lib/forms/Switch/OSwitch.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 export default defineComponent({
   name: "ImportDestination",
@@ -792,7 +791,7 @@ export default defineComponent({
 
     const createDestination = async (input: any, index: number) => {
       try {
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         await destinationService.create({
           org_identifier: store.state.selectedOrganization.identifier,
           destination_name: input.name,

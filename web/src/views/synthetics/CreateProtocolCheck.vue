@@ -37,7 +37,6 @@ import {
   mapResponseToProtocolCheck,
 } from "@/utils/synthetics/buildPayload";
 import { getFoldersListByType } from "@/utils/commons";
-import { fetchDestinations as fetchDestinationsCached } from "@/composables/query/queries/alertMeta";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -52,6 +51,7 @@ import CheckHttpConfig from "@/components/synthetics/configure/types/CheckHttpCo
 import CheckTcpConfig from "@/components/synthetics/configure/types/CheckTcpConfig.vue";
 import CheckTlsConfig from "@/components/synthetics/configure/types/CheckTlsConfig.vue";
 import CheckSshConfig from "@/components/synthetics/configure/types/CheckSshConfig.vue";
+import { destinationsQuery } from "@/services/alert_destination";
 
 const props = defineProps<{
   checkType: ProtocolCheckType;
@@ -234,9 +234,9 @@ async function openAgentSetup(locationId?: string) {
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations() {
   try {
-    const list = await fetchDestinationsCached(store.state.selectedOrganization.identifier);
+    const list = await destinationsQuery.get(store.state.selectedOrganization.identifier);
     destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
@@ -271,7 +271,7 @@ async function loadForEdit(id: string) {
 onMounted(() => {
   fetchFolders();
   fetchLocations();
-  fetchDestinations();
+  loadDestinations();
 
   if (props.editId) {
     loadForEdit(props.editId).catch(console.error);
@@ -387,7 +387,7 @@ async function saveCheck() {
           :validation-errors="validationErrors"
           allow-private-locations
           class="w-full!"
-          @refresh:destinations="fetchDestinations"
+          @refresh:destinations="loadDestinations"
           @update:check="onConfigureUpdate"
           @new-location="openAgentSetup()"
           @add-agent="(id: string) => openAgentSetup(id)"

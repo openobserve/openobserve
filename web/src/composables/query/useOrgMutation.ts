@@ -16,7 +16,7 @@
 import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "./queryClient";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useOrgId } from "./useOrgQuery";
+import { useOrgId } from "./useOrgId";
 
 export interface OrgMutationOptions<TVars, TData> {
   mutate: (org: string, vars: TVars) => Promise<TData>;

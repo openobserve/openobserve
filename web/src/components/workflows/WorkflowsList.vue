@@ -241,9 +241,8 @@ import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
-import workflowService from "@/services/workflows";
+import workflowService, { workflowsQuery } from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
-import { workflowsQuery } from "@/composables/query/queries/workflows";
 
 const { t } = useI18nTyped();
 const router = useRouter();
@@ -353,8 +352,8 @@ const getWorkflows = async (force = false) => {
   loading.value = true;
   try {
     const list = force
-      ? await workflowsQuery.refetchList(orgId.value)
-      : await workflowsQuery.fetchList(orgId.value);
+      ? await workflowsQuery.refresh(orgId.value)
+      : await workflowsQuery.get(orgId.value);
     workflows.value = list.map((wf: any, index: number) => ({
       ...wf,
       "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,

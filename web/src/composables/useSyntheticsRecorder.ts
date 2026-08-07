@@ -15,7 +15,7 @@
 
 import { reactive, ref } from "vue";
 import { synthetics } from "@/constants/config";
-import { mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { mapWireSteps, substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
   RecorderCommand,
@@ -29,7 +29,6 @@ import type {
   StepReplayResult,
   WireStep,
 } from "@/types/synthetics";
-import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import { DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
 
 /**

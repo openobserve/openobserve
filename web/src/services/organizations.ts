@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const organizations = {
   os_list: (
@@ -124,3 +125,61 @@ const organizations = {
 };
 
 export default organizations;
+
+const ALL_ORGS = 100000;
+
+/** Re-read on every org switch by MainLayout, and again by the settings pages. */
+export const orgSettingsQuery = defineQuery<[], any>({
+  key: ["organizations", "settings"],
+  fetch: async (org) => (await organizations.get_organization_settings(org)).data,
+  tier: "ORG_CONFIG",
+  scope: ["organizations", "settings"],
+});
+
+export const orgListQuery = defineQuery<[], any[]>({
+  key: ["organizations", "list"],
+  fetch: async (org) =>
+    (await organizations.os_list(0, ALL_ORGS, "id", false, "", org)).data?.data ?? [],
+  tier: "ORG_CONFIG",
+  scope: ["organizations", "list"],
+});
+
+/** Shared by the Usage tab and the route guard, which runs on every navigation. */
+export const orgSummaryQuery = defineQuery<[], any>({
+  key: ["organizations", "summary"],
+  fetch: async (org) => (await organizations.get_organization_summary(org)).data,
+  tier: "ENTITY_LIST",
+  scope: ["organizations", "summary"],
+});
+
+export const cleanupTasksQuery = defineQuery<[targetOrg: string], any[]>({
+  key: (targetOrg) => ["organizations", "cleanupTasks", targetOrg],
+  // A failed poll must not surface an error; the next tick retries.
+  fetch: (_org, targetOrg) =>
+    organizations
+      .get_cleanup_tasks(targetOrg)
+      .then((res: any) => res.data ?? [])
+      .catch(() => []),
+  tier: "VOLATILE",
+  scope: ["organizations", "cleanupTasks"],
+});
+
+// ── Credentials: persistence pinned off on the query itself ─────────────────
+// These are org configuration by shape and would otherwise reach localStorage.
+// The override is what keeps a token off disk, so it must survive a re-tiering.
+
+export const ingestionTokensQuery = defineQuery<[], any>({
+  key: ["organizations", "ingestionTokens"],
+  fetch: async (org) => (await organizations.list_org_ingestion_tokens(org)).data,
+  tier: "ENTITY_LIST",
+  persist: "none",
+  scope: ["organizations", "ingestionTokens"],
+});
+
+export const orgPasscodeQuery = defineQuery<[], any>({
+  key: ["organizations", "passcode"],
+  fetch: async (org) => (await organizations.get_organization_passcode(org)).data,
+  tier: "ENTITY_LIST",
+  persist: "none",
+  scope: ["organizations", "passcode"],
+});

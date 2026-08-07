@@ -204,7 +204,7 @@ import { convertUnixToDateFormat } from "@/utils/zincutils";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import regexPatternsService from "@/services/regex_pattern";
+import regexPatternsService, { regexPatternsQuery } from "@/services/regex_pattern";
 import AddRegexPattern from "./AddRegexPattern.vue";
 import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
@@ -221,7 +221,6 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
-import { regexPatternsQuery } from "@/composables/query/queries/settingsLists";
 
 export default defineComponent({
   name: "RegexPatternList",
@@ -368,8 +367,8 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         const patterns = force
-          ? await regexPatternsQuery.refetchList(org)
-          : await regexPatternsQuery.fetchList(org);
+          ? await regexPatternsQuery.refresh(org)
+          : await regexPatternsQuery.get(org);
         regexPatterns.value = patterns.map((pattern: any) => ({
           ...pattern,
           created_at: convertUnixToDateFormat(pattern.created_at),

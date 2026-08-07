@@ -61,7 +61,7 @@ import { onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
-import BillingService from "@/services/billings";
+import BillingService, { invoiceHistoryQuery } from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -70,7 +70,6 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { invoiceHistoryQuery } from "@/composables/query/queries/billing";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -169,7 +168,7 @@ const getInvoiceHistory = () => {
   });
 
   invoiceHistoryQuery
-    .fetch(store.state.selectedOrganization.identifier)
+    .get(store.state.selectedOrganization.identifier)
     .then((res: any) => {
       dismiss();
       const invoiceList = res.invoices;

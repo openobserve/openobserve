@@ -282,7 +282,7 @@ import { useI18nTyped } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
@@ -308,7 +308,6 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 interface ConformDelete {
   visible: boolean;
@@ -725,7 +724,7 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           payload,
         );
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
 
         dismiss();
 

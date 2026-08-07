@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import http from "./http";
+import { defineQuery } from "@/composables/query/queryClient";
 
 const settings = {
   createLogo: (org_identifier: string, formData: any, theme: string = "light") => {
@@ -115,3 +116,25 @@ const settings = {
 };
 
 export default settings;
+
+/**
+ * Resolved settings — the store behind favourite dashboards and the pinned home
+ * dashboard. Both are read on nearly every Dashboards mount and gate what paints
+ * first, so they persist. `userId` is in the key because user-scoped settings
+ * resolve differently per user and two users share a browser profile.
+ */
+export const settingQuery = defineQuery<[key: string, userId?: string], unknown>({
+  key: (key, userId) => ["settings", "setting", key, userId ?? "__org__"],
+  fetch: async (org, key, userId) => {
+    try {
+      return (await settings.getSetting(org, key, userId)).data?.setting_value ?? null;
+    } catch (e: any) {
+      // "Never set" is a normal state — cache the null so an unset favourites
+      // list stops re-requesting on every mount.
+      if (e?.response?.status === 404) return null;
+      throw e;
+    }
+  },
+  tier: "ORG_CONFIG",
+  scope: ["settings", "setting"],
+});

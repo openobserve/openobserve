@@ -1888,6 +1888,9 @@ import {
   onDeactivated,
   defineAsyncComponent,
   onBeforeUnmount,
+  inject,
+  toRef,
+  computed,
 } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import { useRouter } from "vue-router";
@@ -1904,8 +1907,7 @@ import { useToolbarResponsive } from "@/composables/useToolbarResponsive";
 import { useToolbarPins } from "@/composables/useToolbarPins";
 import useStreams from "@/composables/useStreams";
 import SyntaxGuide from "./SyntaxGuide.vue";
-import jsTransformService from "@/services/jstransform";
-import { invalidateFunctions } from "@/composables/query/queries/functions";
+import jsTransformService, { functionsQuery } from "@/services/jstransform";
 import searchService from "@/services/search";
 
 import segment from "@/services/segment_analytics";
@@ -1932,11 +1934,10 @@ import {
 } from "@/utils/zincutils";
 
 import { debounce } from "lodash-es";
-import savedviewsService from "@/services/saved_views";
+import savedviewsService, { savedViewsQuery } from "@/services/saved_views";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { inject, toRef, computed } from "vue";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
 import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
@@ -1987,7 +1988,6 @@ import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
 import { sortSavedViews } from "./savedViewsSort";
 import { makeSavedFunctionSchema, type SavedFunctionForm } from "./SearchBar.SavedFunction.schema";
-import { invalidateSavedViews } from "@/composables/query/queries/savedViews";
 
 const defaultValue: any = () => {
   return {
@@ -3317,7 +3317,7 @@ export default defineComponent({
             store.state.selectedOrganization.identifier,
             formData.value,
           );
-          invalidateFunctions(store.state.selectedOrganization.identifier);
+          functionsQuery.invalidate(store.state.selectedOrganization.identifier);
           toast({
             variant: "success",
             message: res.data.message,
@@ -3359,7 +3359,7 @@ export default defineComponent({
 
       callTransform
         .then(() => {
-          invalidateFunctions(store.state.selectedOrganization.identifier);
+          functionsQuery.invalidate(store.state.selectedOrganization.identifier);
           toast({
             variant: "success",
             message: t("logs.searchBar.functionUpdatedSuccess"),
@@ -3985,7 +3985,7 @@ export default defineComponent({
         savedviewsService
           .delete(store.state.selectedOrganization.identifier, deleteViewID.value)
           .then((res) => {
-            invalidateSavedViews(store.state.selectedOrganization.identifier);
+            savedViewsQuery.invalidate(store.state.selectedOrganization.identifier);
             //remove it from localstorage as well
             const localStoredSavedViews = JSON.parse(localStorage.getItem("savedViews") || "[]");
             delete localStoredSavedViews[deleteViewID.value];
@@ -4090,7 +4090,7 @@ export default defineComponent({
         return savedviewsService
           .post(store.state.selectedOrganization.identifier, viewObj)
           .then((res) => {
-            invalidateSavedViews(store.state.selectedOrganization.identifier);
+            savedViewsQuery.invalidate(store.state.selectedOrganization.identifier);
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);
               if (Object.prototype.hasOwnProperty.call(searchObj.data, "savedViews") === false) {
@@ -4148,7 +4148,7 @@ export default defineComponent({
         savedviewsService
           .put(store.state.selectedOrganization.identifier, viewID, viewObj)
           .then((res) => {
-            invalidateSavedViews(store.state.selectedOrganization.identifier);
+            savedViewsQuery.invalidate(store.state.selectedOrganization.identifier);
             dismiss();
             if (res.status == 200) {
               store.dispatch("setSavedViewDialog", false);

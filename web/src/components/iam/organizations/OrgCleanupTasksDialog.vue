@@ -249,10 +249,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
-import organizationsService from "@/services/organizations";
+import { cleanupTasksQuery } from "@/services/organizations";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
-import { useOrgQuery } from "@/composables/query/useOrgQuery";
-import { qk } from "@/composables/query/queryKeys";
 
 interface CleanupTask {
   id: string;
@@ -395,15 +393,7 @@ export default defineComponent({
     // The 5s poll is the query's own `refetchInterval`, which stops on its own
     // once every step is done and is torn down with the component — no manual
     // timer to start, clear and leak.
-    const cleanupTasks = useOrgQuery<CleanupTask[]>({
-      key: () => qk.organizations.cleanupTasks(props.orgId),
-      fetch: () =>
-        organizationsService
-          .get_cleanup_tasks(props.orgId)
-          .then((res: any) => res.data ?? [])
-          // A failed poll must not surface an error; the next tick retries.
-          .catch(() => []),
-      tier: "VOLATILE",
+    const cleanupTasks = cleanupTasksQuery.use(() => [props.orgId], {
       enabled: () => props.open && !!props.orgId,
       refetchInterval: () => (props.open && !isComplete.value ? 5000 : false),
     });

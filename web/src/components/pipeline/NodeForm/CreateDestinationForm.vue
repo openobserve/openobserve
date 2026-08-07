@@ -434,7 +434,7 @@ import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
@@ -449,7 +449,6 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { makeDestinationSchema, type DestinationForm } from "./CreateDestinationForm.schema";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
 
 // Props
 const props = defineProps<{
@@ -1158,7 +1157,7 @@ const createDestination = (value?: DestinationForm) => {
         module: "pipeline",
       })
       .then(() => {
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         dismiss();
         emit("updated", name);
       })
@@ -1182,7 +1181,7 @@ const createDestination = (value?: DestinationForm) => {
         module: "pipeline",
       })
       .then(() => {
-        invalidateDestinations(store.state.selectedOrganization.identifier);
+        destinationsQuery.invalidate(store.state.selectedOrganization.identifier);
         dismiss();
         emit("created", name);
       })

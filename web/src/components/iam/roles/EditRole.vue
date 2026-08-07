@@ -287,9 +287,9 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
-import { fetchDestinations, fetchTemplates } from "@/composables/query/queries/alertMeta";
-import { fetchResources } from "@/composables/query/queries/iam";
-import { invalidateRolePermissions } from "@/composables/query/queries/iam";
+import { destinationsQuery } from "@/services/alert_destination";
+import { templatesQuery } from "@/services/alert_templates";
+import { resourcesQuery, rolePermissionsQuery } from "@/services/iam";
 
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
@@ -470,7 +470,8 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  fetchResources(store.state.selectedOrganization.identifier)
+  resourcesQuery
+    .get(store.state.selectedOrganization.identifier)
     .then(async (res: any) => {
       permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
@@ -1631,7 +1632,7 @@ const getFunctions = async () => {
 };
 
 const getDestinations = async () => {
-  const destinations = await fetchDestinations(store.state.selectedOrganization.identifier);
+  const destinations = await destinationsQuery.get(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("destination", ["name"], [...destinations]);
 
@@ -1641,7 +1642,7 @@ const getDestinations = async () => {
 };
 
 const getTemplates = async () => {
-  const templates = await fetchTemplates(store.state.selectedOrganization.identifier);
+  const templates = await templatesQuery.get(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("template", ["name"], [...templates]);
 
@@ -2236,7 +2237,7 @@ const saveRole = () => {
     return;
   }
 
-  invalidateRolePermissions(store.state.selectedOrganization.identifier);
+  rolePermissionsQuery.invalidate(store.state.selectedOrganization.identifier);
   updateRole({
     role_id: editingRole.value,
     org_identifier: store.state.selectedOrganization.identifier,

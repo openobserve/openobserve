@@ -25,6 +25,7 @@ import {
   clearIdentityConfigCache,
   clearAllIdentityConfigCache,
 } from "@/utils/identityConfig";
+import { defineQuery } from "@/composables/query/queryClient";
 
 // Types matching backend API responses
 export interface Incident {
@@ -353,3 +354,11 @@ const incidents = {
 };
 
 export default incidents;
+
+export const incidentsQuery = defineQuery<[status: string, limit: number, offset: number], any>({
+  key: (status, limit, offset) => ["incidents", "list", { status, limit, offset }],
+  fetch: async (org, status, limit, offset) =>
+    (await incidents.list(org, status, limit, offset)).data,
+  tier: "ENTITY_LIST",
+  scope: ["incidents"],
+});

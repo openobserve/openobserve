@@ -37,7 +37,7 @@ import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { raw } from "@/types/i18n";
-import { fetchSavedViews, refetchSavedViews } from "@/composables/query/queries/savedViews";
+import { savedViewsQuery } from "@/services/saved_views";
 
 export const useSearchBar = (t: TranslateFn) => {
   const { getStream, isStreamExists, isStreamFetched } = useStreams(t);
@@ -114,7 +114,7 @@ export const useSearchBar = (t: TranslateFn) => {
     try {
       searchObj.loadingSavedView = true;
       const org = store.state.selectedOrganization.identifier;
-      (force ? refetchSavedViews(org) : fetchSavedViews(org))
+      (force ? savedViewsQuery.refresh(org) : savedViewsQuery.get(org))
         .then((views: any[]) => {
           searchObj.loadingSavedView = false;
           searchObj.data.savedViews = views;
