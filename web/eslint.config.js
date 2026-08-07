@@ -83,13 +83,10 @@ const noLegacyO2Tokens = {
 };
 
 // ── no-hardcoded-px ────────────────────────────────────────────────────────
-// Sizing is authored in rem (WCAG 1.4.4); 1rem = 16px. No exemption list — a sanctioned
-// px carries `eslint-disable-next-line local/no-hardcoded-px -- <reason>` at the site, so
-// ESLint reports it once it stops being needed. Placement rules: SKILL.md §3.
-//
-// px is located via AST nodes on every surface, never by scanning raw text. Comments are
-// therefore excluded structurally — and a string containing `/*` can no longer blank out
-// the code around it, which the previous whole-file comment masking did.
+// Sizing is authored in rem (WCAG 1.4.4); 1rem = 16px. No exemption list: a sanctioned px
+// carries `eslint-disable-next-line local/no-hardcoded-px -- <reason>` at the site (SKILL.md §3).
+// px is read from AST nodes, never raw text — so comments are excluded structurally, and a
+// string containing `/*` cannot blank out the code around it the way comment-masking did.
 const noHardcodedPx = {
   rules: {
     "no-hardcoded-px": {
@@ -103,8 +100,7 @@ const noHardcodedPx = {
         if (/\.spec\.|\.test\.|\/tests?\//.test(filename)) return {};
         const sourceCode = context.sourceCode ?? context.getSourceCode();
 
-        // Node ranges can overlap (a TemplateElement reports under its whole literal),
-        // so a site is reported at most once.
+        // Node ranges overlap (a TemplateElement sits inside its own literal), so dedupe.
         const reported = new Set();
         const reportAt = (start, raw) => {
           if (reported.has(start)) return;
@@ -140,8 +136,6 @@ const noHardcodedPx = {
         };
 
         // ── .css ───────────────────────────────────────────────────────────
-        // Three node kinds can carry a length; Comment is never one of them, which is
-        // what makes comment exclusion free here.
         if (filename.endsWith(".css")) {
           return {
             Dimension(node) {
@@ -156,14 +150,10 @@ const noHardcodedPx = {
         }
 
         // ── .vue <style> ───────────────────────────────────────────────────
-        // No ESLint parser hands a style block to a rule, so parse it here with css-tree
-        // and reuse the same three node kinds as the .css branch above.
-        //
-        // ESLint core cannot see a style block's comments either, so it registers no disable
-        // directive there — which is why a sanctioned px used to need a blanket
-        // `eslint-disable` placed outside the block, that then ran to end of file. This rule
-        // honours `/* eslint-disable-next-line|line local/no-hardcoded-px -- <reason> */`
-        // itself, and reports one that suppresses nothing or omits its reason.
+        // No ESLint parser hands a style block to a rule — parse it here, same node kinds as
+        // .css. Core cannot see its comments either, so it registers no disable directive;
+        // this rule honours `/* eslint-disable-next-line|line … -- <reason> */` itself and
+        // reports one that suppresses nothing or omits its reason.
         const STYLE_DIRECTIVE =
           /\/\*\s*eslint-disable-(next-line|line)\s+local\/no-hardcoded-px([\s\S]*?)\*\//g;
         const styleDirectives = [];
@@ -211,8 +201,7 @@ const noHardcodedPx = {
                 onParseError: () => {}, // tolerate Tailwind v4 / unknown syntax, as @eslint/css does
               });
             } catch {
-              // A block nothing can parse would otherwise be silently unchecked. Say so
-              // rather than skip — px must never pass because a parser gave up.
+              // Never skip silently — px must not pass because a parser gave up.
               context.report({
                 loc: sourceCode.getLocFromIndex(start),
                 message: `This <style> block could not be parsed, so it is NOT checked for hardcoded px. Fix the CSS syntax.`,
