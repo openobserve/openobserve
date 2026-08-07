@@ -453,6 +453,7 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "sparkline-warning-update",
     "is-partial-data-update",
     "series-data-update",
     "contextmenu",
@@ -643,6 +644,8 @@ export default defineComponent({
       errorDetail,
       metadata,
       resultMetaData,
+      sparklineData,
+      sparklineWarning,
       annotations,
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
@@ -709,6 +712,14 @@ export default defineComponent({
       );
 
       return filtered;
+    });
+
+    // Keep metric sparkline hits index-aligned with filteredData (same filter).
+    const filteredSparklineData = computed(() => {
+      const sd = sparklineData?.value;
+      if (!Array.isArray(sd)) return sd;
+      if (!hiddenQueries.value || hiddenQueries.value.length === 0) return sd;
+      return sd.filter((_: any, index: number) => !hiddenQueries.value.includes(index));
     });
 
     // Also filter panelSchema.queries in sync with filteredData
@@ -921,6 +932,7 @@ export default defineComponent({
             chartPanelStyle.value,
             annotations,
             loading.value,
+            filteredSparklineData.value,
           );
 
           // Apply overlay BEFORE assigning to panelData.value.
@@ -1104,7 +1116,7 @@ export default defineComponent({
     );
 
     watch(
-      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations],
+      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations, sparklineData],
       async () => {
         // emit vrl function field list per query index
         if (data.value?.length) {
@@ -1522,6 +1534,11 @@ export default defineComponent({
     // Watch isPartialData changes and emit them
     watch(isPartialData, (newValue) => {
       emit("is-partial-data-update", newValue);
+    });
+
+    // Surface the sparkline-unavailable warning (e.g. JOIN queries) on the header.
+    watch(sparklineWarning, (newValue) => {
+      emit("sparkline-warning-update", newValue);
     });
 
     const tableRendererData = computed(() => {

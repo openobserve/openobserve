@@ -217,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :error="errorMessage"
                       :maxQueryRangeWarning="maxQueryRangeWarning"
                       :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                      :sparklineWarning="sparklineWarning"
                       :isCachedDataDifferWithCurrentTimeRange="
                         isCachedDataDifferWithCurrentTimeRange
                       "
@@ -259,6 +260,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @limit-number-of-series-warning-message-update="
                           handleLimitNumberOfSeriesWarningMessage
                         "
+                        @sparkline-warning-update="handleSparklineWarningUpdate"
                         @error="handleChartApiError"
                         @updated:data-zoom="handleDataZoom"
                         @updated:vrl-function-field-list="updateVrlFunctionFieldList"
@@ -500,6 +502,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"
                             :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+                            :sparklineWarning="sparklineWarning"
                             :isCachedDataDifferWithCurrentTimeRange="
                               isCachedDataDifferWithCurrentTimeRange
                             "
@@ -531,6 +534,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @limit-number-of-series-warning-message-update="
                             handleLimitNumberOfSeriesWarningMessage
                           "
+                          @sparkline-warning-update="handleSparklineWarningUpdate"
                           @error="handleChartApiError"
                           @updated:data-zoom="handleDataZoom"
                           @updated:vrl-function-field-list="updateVrlFunctionFieldList"
@@ -736,6 +740,7 @@ const {
   shouldRefreshWithoutCache,
   maxQueryRangeWarning,
   limitNumberOfSeriesWarningMessage,
+  sparklineWarning,
   errorMessage,
   isPartialData,
   isPanelLoading,
@@ -755,6 +760,7 @@ const {
   handleChartApiError,
   handleLastTriggeredAtUpdate,
   handleLimitNumberOfSeriesWarningMessage,
+  handleSparklineWarningUpdate,
   handleIsPartialDataUpdate,
   handleLoadingStateChange,
   handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
@@ -1191,6 +1197,7 @@ defineExpose({
   // Warning messages
   maxQueryRangeWarning,
   limitNumberOfSeriesWarningMessage,
+  sparklineWarning,
   errorMessage,
 });
 </script>

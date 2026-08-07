@@ -326,6 +326,16 @@ export async function setupPromQLPanelWithConfig(page, pm, dashboardName, panelN
   testLogger.info("PromQL line panel with config ready", { dashboardName, panelName });
 }
 
+export async function setupPromQLMetricPanelWithConfig(page, pm, dashboardName, panelName = "Test Panel") {
+  await buildPromQLPanel(page, pm, dashboardName, {
+    chartType: "metric",
+    panelName,
+    query: "sum(cpu_usage)",
+  });
+  await pm.dashboardPanelConfigs.openConfigPanel();
+  testLogger.info("PromQL metric panel with config ready", { dashboardName, panelName });
+}
+
 /**
  * PromQL pie chart panel — config sidebar opened and ready.
  * Used for aggregation function tests (only visible on pie/donut/geomap/maps in PromQL mode).
@@ -378,6 +388,132 @@ export async function setupPromQLMapsPanelWithConfig(page, pm, dashboardName, pa
   await buildPromQLPanel(page, pm, dashboardName, { chartType: "maps", panelName });
   await pm.dashboardPanelConfigs.openConfigPanel();
   testLogger.info("PromQL maps panel with config ready", { dashboardName, panelName });
+}
+
+/**
+ * Snapshot of what a panel actually put on screen, for assertion failure messages.
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<string>} one-line summary, safe to embed in an expect() message
+ */
+export async function describePanelRender(page) {
+  const snapshot = await page
+    .evaluate(() => {
+      const el = document.querySelector('[data-test="chart-renderer"]');
+      const applyBtn = document.querySelector('[data-test="dashboard-apply"]');
+      // Apply is disabled (non-enterprise) or swapped for Cancel (enterprise)
+      // for the whole query run, so this is the panel's own "still loading" flag.
+      const cancelBtn = document.querySelector('[data-test="dashboard-cancel"]');
+      return {
+        chartRenderer: !!el,
+        noData: !!document.querySelector('[data-test="no-data"]'),
+        panelError:
+          document.querySelector('[data-test="panel-schema-renderer-error-message"]')?.textContent?.trim() ?? null,
+        stillLoading: !!cancelBtn || (!!applyBtn && applyBtn.disabled === true),
+        applyPresent: !!applyBtn,
+        // The copy overlay is driven by the metric series' own _metricText, so
+        // it is a DOM-visible proxy for "the converter produced a real series".
+        // Present + empty SVG => the series exists and ECharts failed to draw it.
+        // Absent + empty SVG => no usable series was produced at all.
+        metricOverlay: !!document.querySelector('[data-test="dashboard-metric-copy-overlay"]'),
+        canvas: el ? el.querySelectorAll("canvas").length : 0,
+        svg: el ? el.querySelectorAll("svg").length : 0,
+        svgPaths: el ? el.querySelectorAll("svg path").length : 0,
+        svgTexts: el ? el.querySelectorAll("svg text").length : 0,
+        text: el ? (el.textContent ?? "").trim().slice(0, 120) : null,
+      };
+    })
+    .catch((e) => ({ evaluateFailed: e.message }));
+  return `panel render state: ${JSON.stringify(snapshot)}`;
+}
+
+/**
+ * The text nodes the metric panel drew, with their resolved fill colours.
+ *
+ * The metric value is an ECharts `renderItem` text on the SVG renderer, so its
+ * colour can land either as a `fill` attribute or as inline style depending on
+ * the ECharts build — getComputedStyle normalises both to "rgb(r, g, b)".
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {Promise<Array<{text: string, fill: string}>>}
+ */
+export async function getMetricTextFills(page) {
+  return page.evaluate(() => {
+    const root = document.querySelector('[data-test="chart-renderer"]');
+    if (!root) return [];
+    return Array.from(root.querySelectorAll("svg text")).map((el) => ({
+      text: (el.textContent ?? "").trim(),
+      fill: getComputedStyle(el).fill,
+    }));
+  });
+}
+
+/**
+ * "#b91c1c" → "rgb(185, 28, 28)" — the form getComputedStyle reports, so the
+ * swatch hex the test picked can be compared against what actually rendered.
+ * @param {string} hex
+ * @returns {string}
+ */
+export function hexToRgbString(hex) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+  return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
+}
+
+/**
+ * Collects browser console errors/warnings for the rest of the test.
+ *
+ * ChartRenderer swallows a failing `setOption` with a bare `console.error`, so a
+ * chart that silently draws nothing leaves no trace in the DOM — only here.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @returns {{messages: string[], describe: () => string}}
+ */
+export function collectConsoleErrors(page) {
+  const messages = [];
+  // Keep enough of the text for a full stack: the frames after the first are
+  // what identify which option array ECharts choked on, and a short slice cuts
+  // them off exactly where they start being useful.
+  const CAP = 1200;
+  page.on("console", (msg) => {
+    if (msg.type() === "error" || msg.type() === "warning") {
+      messages.push(`[${msg.type()}] ${msg.text()}`.slice(0, CAP));
+    }
+  });
+  page.on("pageerror", (err) => {
+    messages.push(`[pageerror] ${err.message}\n${err.stack ?? ""}`.slice(0, CAP));
+  });
+  return {
+    messages,
+    describe: () => `console: ${JSON.stringify(messages.slice(-15))}`,
+  };
+}
+
+/**
+ * Waits until the panel has finished loading and settled on a final render.
+ * The metric assertions are only meaningful once streaming has completed —
+ * mid-stream the panel legitimately shows the previous chart or nothing at all.
+ *
+ * Returns whether it actually settled: a panel stuck loading forever is a real
+ * failure mode here, and swallowing the timeout would hide it.
+ *
+ * @param {import('@playwright/test').Page} page
+ * @param {object} pm - PageManager instance
+ * @returns {Promise<boolean>} true if the panel finished loading in time
+ */
+export async function waitForPanelRenderSettled(page, pm) {
+  // The Apply button is disabled (or swapped for Cancel) for the whole streaming
+  // run, so it covers every chunk — unlike waiting on the first query response,
+  // which returns while later chunks are still arriving.
+  const settled = await pm.dashboardPanelActions
+    .waitForChartToRender()
+    .then(() => true)
+    .catch((e) => {
+      testLogger.warn("waitForChartToRender:", e.message);
+      return false;
+    });
+  // One frame for the final setOption to reach the DOM.
+  await page.waitForTimeout(300);
+  return settled;
 }
 
 /**

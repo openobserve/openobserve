@@ -40,21 +40,22 @@ export default defineComponent({
     const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const colorModeOptions = [
-      { label: t("dashboard.none"), value: "" },
+      { label: t("dashboard.none"), value: null },
       { label: t("dashboard.singleColor"), value: "single" },
     ];
 
     // Reactive references for background configuration
     const backgroundType = computed({
-      get: () => dashboardPanelData.data.config.background?.type ?? "",
+      get: () => dashboardPanelData.data.config.background?.type || null,
       set: (value) => {
+        const type = value ?? "";
         if (!dashboardPanelData.data.config.background) {
           dashboardPanelData.data.config.background = {
-            type: value,
+            type,
             value: { color: "" },
           };
         } else {
-          dashboardPanelData.data.config.background.type = value;
+          dashboardPanelData.data.config.background.type = type;
         }
       },
     });
