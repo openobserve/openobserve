@@ -17,8 +17,8 @@
 // useOForm + co-located Zod pattern used by ScoreConfigDialog / ScorerFormPage:
 // the component owns <OForm> and reads it reactively via `form.useStore`. The
 // scalar fields (name/description) are plain name-bound OForm* inputs; the
-// bespoke controls (score-config bindings, target dataset, auto-routing) bridge
-// into the one form via `form.setFieldValue` and are validated here.
+// bespoke controls (score-config bindings and target dataset) bridge into the
+// one form via `form.setFieldValue` and are validated here.
 
 import { z } from "zod";
 import type { ScoreConfigDataType } from "@/services/llm-queues.service";
@@ -31,13 +31,6 @@ export interface QueueBoundConfig {
   version: number;
 }
 
-/** One auto-routing condition in the form. */
-export interface QueueCondition {
-  scoreConfigId: string;
-  operator: string;
-  value: number | string;
-}
-
 /** The New Queue form shape (the useOForm state). A `type` alias (not an
  *  interface) so it satisfies TanStack useForm's `Record<string, unknown>`
  *  constraint via the implicit index signature type aliases get. */
@@ -46,7 +39,6 @@ export type QueueForm = {
   description: string;
   scoreConfigs: QueueBoundConfig[];
   targetDatasetId: string;
-  autoRouting: { matchMode: "all" | "any"; conditions: QueueCondition[] };
 };
 
 /** i18n-driven Zod schema. `t` keeps validation messages localized. */
@@ -66,14 +58,4 @@ export const makeQueueFormSchema = (t: (_key: string) => string) =>
       )
       .min(1, t("aiObservability.queues.create.errors.scoreConfigs")),
     targetDatasetId: z.string(),
-    autoRouting: z.object({
-      matchMode: z.enum(["all", "any"]),
-      conditions: z.array(
-        z.object({
-          scoreConfigId: z.string().min(1),
-          operator: z.string(),
-          value: z.union([z.string(), z.number()]),
-        }),
-      ),
-    }),
   });

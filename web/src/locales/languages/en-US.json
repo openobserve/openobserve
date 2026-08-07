@@ -8974,6 +8974,7 @@
         "skip": "Skip",
         "submit": "Complete & Next",
         "submitted": "Review submitted",
+        "submitError": "Failed to submit review",
         "true": "True",
         "false": "False",
         "allReviewedTitle": "All items reviewed",
