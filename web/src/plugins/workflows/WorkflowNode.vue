@@ -34,21 +34,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @mouseleave="handleNodeLeave"
     @output-click="onOutputClick"
   >
-    <!-- Two-line body (Zapier-style): the node's TYPE is always the muted top
-         line so a renamed node still reads as its kind, and the primary line
-         below carries the custom name / config detail. Function keeps its bold
-         [RAF]/[RBF] tag on the primary line. -->
+    <!-- Two-line body: the custom NAME (bold) on top when renamed, then a single
+         muted line combining the TYPE and config DETAIL as "Type · detail". Without
+         a name the type is the bold title and the detail the muted subtitle — so the
+         config preview (condition rule / selected function) is never hidden. -->
     <template #body>
-      <div class="flex flex-col">
-        <span class="text-text-secondary text-xs font-normal leading-tight">
-          {{ typeTitle }}
+      <!-- Capped width so a very long name / function body ellipsises instead of
+           stretching the card across the canvas. -->
+      <div class="flex min-w-0 max-w-[18rem] flex-col">
+        <span class="truncate leading-tight">
+          {{ customName || typeTitle }}
         </span>
-        <span v-if="isConfiguredFunction" class="flex gap-1 leading-tight">
-          {{ data.name }} -
-          <strong>{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
-        </span>
-        <span v-else-if="primaryLabel" class="leading-tight whitespace-nowrap">
-          {{ primaryLabel }}
+        <span
+          v-if="showSubtitle"
+          class="text-text-secondary flex min-w-0 items-baseline gap-1 text-xs leading-tight font-normal"
+        >
+          <!-- When a custom name is the title, prefix the subtitle with the type. -->
+          <span v-if="customName" class="shrink-0">{{ typeTitle }}{{ hasDetail ? " · " : "" }}</span>
+          <template v-if="funcTag">
+            <span class="min-w-0 truncate" data-test="workflow-node-detail">{{ data.name }}</span>
+            <span class="shrink-0">-</span>
+            <strong class="shrink-0">{{ data.after_flatten ? "[RAF]" : "[RBF]" }}</strong>
+          </template>
+          <span v-else-if="configDetail" class="min-w-0 truncate" data-test="workflow-node-detail">
+            {{ configDetail }}
+          </span>
         </span>
       </div>
     </template>
@@ -268,15 +278,7 @@ const errorCount = computed<number>(() => {
 const showButtons = ref(false);
 const meta = computed(() => nodeMeta(props.data?.node_type));
 
-// A configured function node renders its own bold "name - [RAF]/[RBF]" body
-// (see #body) to match the pipeline custom node. Everything else — including a
-// not-yet-configured function — uses the plain `nodeLabel` line below. A custom
-// name (T2) overrides this so the user-given label always wins.
-const isConfiguredFunction = computed(
-  () => props.data?.node_type === "function" && !!props.data?.name && !customName.value,
-);
-
-// Type title — the muted top line, ALWAYS shown so the node's kind stays visible
+// Type title — the muted eyebrow, ALWAYS shown so the node's kind stays visible
 // even after a rename. The trigger resolves its KIND's title (Alert Trigger,
 // Incident Trigger, …) from the registry so new kinds label themselves.
 const typeTitle = computed(() => {
@@ -284,17 +286,22 @@ const typeTitle = computed(() => {
   if (data?.node_type === "workflow_trigger") return t(triggerDef(data?.trigger_kind).nodeTitleKey);
   return meta.value ? t(meta.value.titleKey) : data?.node_type || "";
 });
-// Primary line — a user-given name (T2) wins; otherwise the config detail
-// (Condition -> rule preview, Destination -> destination name). A configured
-// function is handled by its own [RAF]/[RBF] branch in the template, and the
-// trigger has no detail line (its kind title IS the top line), so both fall to
-// "" here → type-title-only card.
-const primaryLabel = computed(() => {
-  if (customName.value) return customName.value;
+// A configured function renders its "name - [RAF]/[RBF]" tag as the detail line
+// (regardless of a custom name, so the selected function is never hidden).
+const funcTag = computed(() => props.data?.node_type === "function" && !!props.data?.name);
+// Config detail for non-function steps — Condition -> rule preview, Destination ->
+// destination name. Trigger + function have no text detail here (function uses the
+// [RAF] tag above; the trigger's kind title IS the eyebrow).
+const configDetail = computed(() => {
   const type = props.data?.node_type;
-  if (type === "workflow_trigger" || isConfiguredFunction.value) return "";
+  if (type === "workflow_trigger" || type === "function") return "";
   return nodeConfigDetail(props.data, 28) || "";
 });
+// Whether there's a config detail to show (function tag or a preview string).
+const hasDetail = computed(() => funcTag.value || !!configDetail.value);
+// The muted second line shows whenever a custom name is the title (to surface the
+// type + detail), or — without a name — only when there's a detail to show.
+const showSubtitle = computed(() => !!customName.value || hasDetail.value);
 // Icon for this node type: the pipeline node image as an "img:<url>" string
 // (rendered by OIcon exactly like pipeline canvas nodes), or the OIcon glyph name.
 const nodeIcon = computed(() => {

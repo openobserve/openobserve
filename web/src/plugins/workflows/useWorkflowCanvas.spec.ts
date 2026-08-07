@@ -281,7 +281,7 @@ describe("executeTestRun — ran-node scope + badge state", () => {
     expect(res.ranNodeIds).not.toContain("x");
     expect(res.blockedNodeIds).toEqual([]);
     // ranSteps snapshots the executed-steps tree (structure + frozen data) so the
-    // dock can persist across later edits (n8n-style).
+    // dock can persist across later edits.
     expect(res.ranSteps.map((s: any) => s.id)).toEqual(["t", "f", "d"]);
     expect(res.ranSteps.find((s: any) => s.id === "t")).toMatchObject({
       depth: 0,
@@ -394,7 +394,7 @@ describe("buildStepTree — executed-steps tree structure", () => {
   });
 });
 
-// The results dock persists across graph edits (n8n-style): only a new run or the
+// The results dock persists across graph edits: only a new run or the
 // explicit Clear button drops it. Editing/disabling/undoing must NOT null it.
 describe("Test log persistence across graph edits", () => {
   beforeEach(() => {

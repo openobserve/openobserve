@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
 
           <!-- Type icon + label. A stale step (deleted / disabled after the run) is
-               struck-through and muted, n8n-style. -->
+               struck-through and muted. -->
           <span
             class="flex min-w-0 items-center gap-1.5 pl-1.5"
             :class="{ 'opacity-60': row.stale }"
@@ -190,7 +190,7 @@ interface StepRow {
   hasChildren: boolean;
   guides: boolean[];
   // The step no longer matches the live graph — it was DELETED or DISABLED after
-  // the run. Rendered struck-through (n8n-style) but still inspectable.
+  // the run. Rendered struck-through but still inspectable.
   stale: boolean;
 }
 

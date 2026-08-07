@@ -237,7 +237,7 @@ describe("WorkflowNode", () => {
       };
       wrapper = mountNode("c1", data);
       expect(wrapper.text()).toContain("...");
-      expect(wrapper.find(".whitespace-nowrap").text().length).toBe(31);
+      expect(wrapper.find('[data-test="workflow-node-detail"]').text().length).toBe(31);
     });
 
     it("falls back to the type title for a not-yet-configured condition", () => {

@@ -279,7 +279,7 @@ const applyGraphSnapshot = (snap: { nodes: any[]; edges: any[] }) => {
   // Reassign whole arrays so VueFlow's v-model picks up the restore.
   workflowObj.currentSelectedWorkflow.nodes = snap.nodes;
   workflowObj.currentSelectedWorkflow.edges = snap.edges;
-  // The Test log deliberately PERSISTS across graph edits (n8n-style): it's cleared
+  // The Test log deliberately PERSISTS across graph edits: it's cleared
   // only by a new run or the explicit "Clear" button. A step this undo/redo removed
   // stays listed struck-through (from the run-time snapshot). See executeTestRun.
 };
@@ -338,7 +338,7 @@ export const toggleNodeDisabled = (nodeId: string) => {
   pushWorkflowHistory();
   // Root-level boolean (sibling of `meta`) — see serializeNode / isNodeDisabled.
   node.is_disabled = !isNodeDisabled(node);
-  // The Test log persists (n8n-style); a now-disabled step stays listed
+  // The Test log persists; a now-disabled step stays listed
   // struck-through rather than clearing the whole run. See executeTestRun.
   markWorkflowDirty();
 };
@@ -645,7 +645,7 @@ export const executeTestRun = async (opts: {
     const startId = opts.fromNode || triggerId;
     const ranNodeIds = startId ? [...reachableFrom(wf.edges || [], [startId])] : [];
     // Snapshot the executed-steps TREE at run time. The results dock now persists
-    // across graph edits (n8n-style), so a step later deleted or disabled must still
+    // across graph edits, so a step later deleted or disabled must still
     // render — with its frozen label/icon, struck-through. We freeze the tree shape
     // (depth + connector guides) plus each step's display data/meta here; the panel
     // resolves live label/status on top (reflecting a later rename) and falls back
@@ -932,7 +932,7 @@ export default function useWorkflowCanvas() {
     pushWorkflowHistory();
     wf.nodes = wf.nodes.filter((n: any) => n.id !== nodeId);
     wf.edges = wf.edges.filter((e: any) => e.source !== nodeId && e.target !== nodeId);
-    // The Test log PERSISTS (n8n-style): the deleted step stays listed in the dock,
+    // The Test log PERSISTS: the deleted step stays listed in the dock,
     // struck-through, from the run-time snapshot (result.ranSteps). Its canvas badge
     // is gone with the node. Cleared only by a new run or the explicit Clear button.
     if (workflowObj.currentSelectedNodeData?.id === nodeId) {
@@ -1262,7 +1262,7 @@ export default function useWorkflowCanvas() {
     workflowObj.isEditNode = false;
     workflowObj.dialog.expand = false;
     workflowObj.dialog.show = false;
-    // The Test log PERSISTS across edits (n8n-style) — adding / inserting / editing
+    // The Test log PERSISTS across edits — adding / inserting / editing
     // a node keeps the dock and existing badges in place instead of a jarring
     // close+reopen. A newly-added node simply has no badge (it wasn't in the run);
     // an edited node keeps its last-run badge until re-tested. Cleared only by a new
