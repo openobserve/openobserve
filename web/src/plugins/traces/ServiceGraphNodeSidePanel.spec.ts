@@ -774,10 +774,29 @@ describe("ServiceGraphNodeSidePanel", () => {
           path: "/logs",
           query: expect.objectContaining({
             stream_type: "logs",
-            stream_value: "k8s-logs",
+            // `stream` (not `stream_value`) — restoreUrlQueryParams only reads `stream`,
+            // and `type` routes the Logs page through its trace-explorer restore branch.
+            stream: "k8s-logs",
+            type: "trace_explorer",
           }),
         }),
       );
+    });
+
+    it("should clear the logs isInitialized flag so the URL params win over the previous session", async () => {
+      const dispatchSpy = vi.spyOn(store, "dispatch");
+
+      const viewRelatedLogsBtn = wrapper.find(
+        '[data-test="service-graph-node-panel-view-related-logs-btn"]',
+      );
+      await viewRelatedLogsBtn.trigger("click");
+      await flushPromises();
+
+      // Without this the Logs page restores its stored session and silently drops
+      // the stream, time range and filter carried in the pushed URL.
+      expect(dispatchSpy).toHaveBeenCalledWith("logs/setIsInitialized", false);
+
+      dispatchSpy.mockRestore();
     });
 
     it("should NOT show a warning notification when a valid log stream is found", async () => {

@@ -123,7 +123,7 @@ impl RemoteScanRule {
         let cfg = config::get_config();
         Self {
             remote_scan_nodes,
-            single_node_optimizer_enable: cfg.common.feature_single_node_optimize_enabled,
+            single_node_optimizer_enable: cfg.search.feature_single_node_optimize_enabled,
         }
     }
 
@@ -163,14 +163,14 @@ impl PhysicalOptimizerRule for RemoteScanRule {
         }
 
         if config::get_config()
-            .common
+            .search
             .feature_enrichment_broadcast_join_enabled
             && should_use_enrichment_broadcast_join(&plan)
         {
             return enrichment_broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
         }
 
-        if config::get_config().common.feature_broadcast_join_enabled
+        if config::get_config().search.feature_broadcast_join_enabled
             && should_use_broadcast_join(&plan)
         {
             return broadcast_join_rewrite(plan, self.remote_scan_nodes.clone());
@@ -212,7 +212,7 @@ impl RemoteScanRewriter {
         Self {
             remote_scan_nodes,
             is_changed: false,
-            partial_reduce_enabled: cfg.common.feature_partial_reduce_enabled,
+            partial_reduce_enabled: cfg.search.feature_partial_reduce_enabled,
         }
     }
 }

@@ -524,6 +524,8 @@ function categoryOf(row: ServiceRow): EntityCategory {
 }
 
 const isLoading = ref(false);
+// Epoch-ms of the last completed load, shown on the page header's refresh control.
+const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
 const filterText = ref("");
 const typeFilter = ref<TypeFilter>("service");
@@ -1063,6 +1065,7 @@ ORDER BY total_requests DESC`;
       },
       complete: () => {
         isLoading.value = false;
+        lastRunAt.value = Date.now();
       },
       reset: () => {
         services.value = [];
@@ -1072,8 +1075,15 @@ ORDER BY total_requests DESC`;
   );
 }
 
-// Expose for parent ref access
-defineExpose({ loadServicesCatalog, streamFilter });
+// Public API for the parent page header (mirrors ServiceGraph's shape:
+// refresh + loading + lastRunAt) plus the catalog's own members.
+defineExpose({
+  loadServicesCatalog,
+  streamFilter,
+  refresh: loadServicesCatalog,
+  loading: isLoading,
+  lastRunAt,
+});
 
 // Keep streamFilter in sync when Traces/Spans tab changes the global stream
 watch(
@@ -1096,9 +1106,9 @@ watch(
     searchObj.data.datetime.relativeTimePeriod,
   ],
   () => {
-    if (searchObj.meta.searchMode === "services-catalog") {
-      loadServicesCatalog();
-    }
+    // This component only renders on its own route now, so no search-mode
+    // guard is needed — if it is mounted, it is the visible view.
+    loadServicesCatalog();
   },
 );
 

@@ -744,6 +744,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :source-stream="correlationProps.sourceStream"
             :source-type="correlationProps.sourceType"
             :available-dimensions="correlationProps.availableDimensions"
+            :semantic-groups="correlationProps.semanticGroups"
             :fts-fields="correlationProps.ftsFields"
             :time-range="correlationProps.timeRange"
             :hide-view-related-button="true"
@@ -844,7 +845,7 @@ import {
 } from "vue";
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import { formatTimeWithSuffix, convertTimeFromNsToUs, getImageURL } from "@/utils/zincutils";
 import useTraces from "@/composables/useTraces";
 import { useRouter } from "vue-router";
@@ -1450,9 +1451,23 @@ export default defineComponent({
       },
     );
 
-    const viewSpanLogs = () => {
-      if (config.isEnterprise === "true" && correlationProps.value) {
-        navigateToCorrelatedLogs(correlationProps.value);
+    const viewSpanLogs = async () => {
+      if (config.isEnterprise === "true") {
+        await loadCorrelation();
+        if (correlationProps.value?.logStreams?.length) {
+          navigateToCorrelatedLogs(correlationProps.value);
+        } else {
+          // Nothing correlated to this span — say so instead of navigating to an
+          // empty Logs page. A failed lookup reports its own reason; a successful
+          // lookup that found nothing gets the plain "no correlated logs" wording.
+          toast({
+            variant: "warning",
+            message:
+              correlationFailed.value && correlationError.value
+                ? raw(correlationError.value)
+                : t("traces.noCorrelatedLogsFound"),
+          });
+        }
       } else {
         const queryDetails = buildQueryDetails(props.span);
         navigateToLogs(queryDetails);
@@ -1550,6 +1565,9 @@ export default defineComponent({
     // Correlation state
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
+    // True when the lookup itself failed (request error, missing span/stream) as
+    // opposed to succeeding with nothing correlated — the two need different wording.
+    const correlationFailed = ref(false);
     const correlationProps = ref<any>(null);
     const { findRelatedTelemetry, loadSemanticGroups, semanticGroups } = useServiceCorrelation();
 
@@ -1646,17 +1664,20 @@ export default defineComponent({
       // Gate correlation feature behind enterprise check to avoid 403 errors
       if (config.isEnterprise !== "true") {
         correlationError.value = t("traces.traceDetailsSidebar.enterpriseLicenseRequired");
+        correlationFailed.value = true;
         return;
       }
 
       if (!props.span || !props.streamName) {
         console.warn("[TraceDetailsSidebar] Cannot load correlation: missing span or stream name");
         correlationError.value = t("traces.traceDetailsSidebar.missingSpanOrStream");
+        correlationFailed.value = true;
         return;
       }
 
       correlationLoading.value = true;
       correlationError.value = null;
+      correlationFailed.value = false;
 
       try {
         try {
@@ -1757,6 +1778,9 @@ export default defineComponent({
             sourceType: "traces",
             // Use log stream filters and log record as availableDimensions for field name resolution and traceId extraction
             availableDimensions: { ...logFilters, ...context.fields },
+            // Lets filter edits resolve across streams that alias the same
+            // semantic group under different field names (F35).
+            semanticGroups: semanticGroups.value,
             ftsFields: [],
             timeRange: {
               startTime: spanStartUs - bufferUs,
@@ -1769,6 +1793,7 @@ export default defineComponent({
       } catch (err: any) {
         console.error("[TraceDetailsSidebar] Correlation failed:", err);
         correlationError.value = err.message || t("correlation.failedToLoad");
+        correlationFailed.value = true;
       } finally {
         correlationLoading.value = false;
       }
@@ -1780,6 +1805,7 @@ export default defineComponent({
       () => {
         correlationProps.value = null;
         correlationError.value = null;
+        correlationFailed.value = false;
 
         // Load correlation proactively so View Logs button has data
         if (props.serviceStreamsEnabled) {

@@ -398,10 +398,38 @@ const RAW_PAYLOAD_STARTER = JSON.stringify(
   2,
 );
 
+// The two modes share the single schema `body` field, and entering content
+// mode overwrites it with the serialized ContentSpec. Stash the raw payload
+// on the way out of custom mode so a round trip through the Template tab can
+// restore it — without this, an existing custom template's payload was
+// destroyed by one tab click, and Save then persisted an empty spec over it
+// (P0 o2-enterprise#2364).
+const customBodyStash = ref<string | null>(null);
+
 const onModeChange = (value: unknown) => {
+  const rawBody = body.value;
+  const wasCustom = editorMode.value === "custom";
   form.setFieldValue("kind", value as "content" | "custom");
   if (value === "content") {
+    if (wasCustom) {
+      customBodyStash.value = rawBody;
+      // A still-empty spec means this custom template never had a content
+      // version (existing templates load with an empty spec). Prefill it from
+      // the payload's {vars} — same as startContentVersion — so the Template
+      // tab never opens blank.
+      if (serializeContentSpec(contentSpec.value) === serializeContentSpec(emptyContentSpec())) {
+        const spec = emptyContentSpec();
+        spec.body = detectBodyVars(rawBody)
+          .map((v) => `{${v}}`)
+          .join(" ");
+        contentSpec.value = spec;
+      }
+    }
     form.setFieldValue("body", serializeContentSpec(contentSpec.value));
+  } else if (customBodyStash.value !== null) {
+    // Coming back to custom mode after a stash always restores the user's
+    // payload — including unsaved raw-mode edits, which the stash captured.
+    form.setFieldValue("body", customBodyStash.value);
   } else if (
     isSeededTemplate.value &&
     serializeContentSpec(contentSpec.value) === serializeContentSpec(starterContentSpec())
@@ -435,6 +463,10 @@ const detectBodyVars = (rawBody: string): string[] => {
 };
 
 const startContentVersion = () => {
+  // Same data-loss hazard as the mode tabs: the contentSpec watcher rewrites
+  // `body` the moment the spec below is assigned, so stash the payload first
+  // or switching back to Raw payload would show the serialized spec instead.
+  customBodyStash.value = body.value;
   const vars = detectBodyVars(body.value);
   const spec = emptyContentSpec();
   spec.body = vars.map((v) => `{${v}}`).join(" ");
@@ -513,6 +545,9 @@ const tabs = computed(() => [
 const applyTemplateData = () => {
   const params = router.currentRoute.value.query;
   const next = addTemplateDefaults();
+  // A stash from a previously viewed template must never restore into this
+  // one (the component is kept alive — onActivated re-runs this).
+  customBodyStash.value = null;
   if (props.template) {
     // Clone mode pre-fills the form but stays in create mode so save
     // produces a new template; edit mode would overwrite the original.

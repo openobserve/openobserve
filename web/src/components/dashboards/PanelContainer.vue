@@ -176,6 +176,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+          :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
@@ -349,6 +350,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @limit-number-of-series-warning-message-update="
           handleLimitNumberOfSeriesWarningMessageUpdate
         "
+        @sparkline-warning-update="handleSparklineWarningUpdate"
         @result-metadata-update="handleResultMetadataUpdate"
         @last-triggered-at-update="handleLastTriggeredAtUpdate"
         @is-cached-data-differ-with-current-time-range-update="
@@ -534,6 +536,12 @@ export default defineComponent({
 
     const handleLimitNumberOfSeriesWarningMessageUpdate = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    // Sparkline unavailable for the query (e.g. JOIN) — non-blocking header warning.
+    const sparklineWarning = ref("");
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
     };
 
     const showText = ref(false);
@@ -956,6 +964,8 @@ export default defineComponent({
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
       handleLimitNumberOfSeriesWarningMessageUpdate,
+      sparklineWarning,
+      handleSparklineWarningUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
       config,

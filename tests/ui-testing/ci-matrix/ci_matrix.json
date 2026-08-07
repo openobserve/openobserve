@@ -97,7 +97,8 @@
       "secondsPrecisionAdded.spec.js",
       "searchpartition.spec.js",
       "indexquery.spec.js",
-      "region.spec.js"
+      "region.spec.js",
+      "timezoneDisplay.spec.js"
     ],
     "disabled": [
       {

@@ -507,7 +507,7 @@ async fn upload_chunk(
     .await;
 
     // generate the inverted index if enabled and supported by the stream type
-    if cfg.common.inverted_index_enabled && stream_type.support_index() {
+    if cfg.search.inverted_index_enabled && stream_type.support_index() {
         let index_schema_fields = index_schema
             .fields()
             .iter()

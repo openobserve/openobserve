@@ -2711,8 +2711,15 @@ export default defineComponent({
       updateSelectedSpan(spanId);
 
       const correlationData = searchObj.data.traceDetails.correlationProps;
-      if (correlationData) {
+      if (correlationData?.logStreams?.length) {
         navigateToCorrelatedLogs(correlationData);
+      } else {
+        // The sidebar owns the correlation lookup; when it produced nothing there
+        // is no log stream to open, so tell the user rather than doing nothing.
+        toast({
+          variant: "warning",
+          message: t("traces.noCorrelatedLogsFound"),
+        });
       }
     };
 

@@ -17,11 +17,16 @@ on:
         required: false
         default: ''
 
-# Cancel an in-progress run if a newer push to the same ref arrives, so we don't
-# pay for superseded translation runs.
+# Serialise runs on the same ref, but never cancel one that is already working.
+# `cancel-in-progress: true` was actively harmful here: en-US.json lands on main
+# more often than a backlog run takes, so every run was killed by the next merge
+# and its API spend thrown away (20 of the last 40 runs ended `cancelled`, none on
+# main ever succeeded). GitHub keeps at most one running + one pending run per
+# group, so queueing cannot pile up, and the work is incremental — a queued run
+# picks up exactly what its predecessor did not finish.
 concurrency:
   group: update-translations-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   update-translations:
@@ -41,6 +46,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # Check out the branch TIP, not the triggering commit. The job is a
+          # reconciliation against .translation_state.json rather than a diff of
+          # one commit, so a run that waited in the concurrency queue must start
+          # from the newest main — which already contains the translations its
+          # predecessor merged. Pinning to github.sha would make it redo that work.
+          ref: ${{ github.ref_name }}
 
       - name: Verify DeepSeek API key secret is configured
         env:
@@ -82,6 +93,14 @@ jobs:
 
       - name: Check for translation changes
         id: check_changes
+        # `always()` because partial progress is still worth shipping. The script
+        # exits non-zero when ANY string failed validation (main.py), and it is
+        # cancellable mid-run — under the default `success()` this step and the PR
+        # steps were skipped, so multi-hour runs that had already written most
+        # locale files produced nothing and the next run repeated the work.
+        # Locale files are written atomically per locale, so whatever is on disk
+        # here is complete, valid JSON.
+        if: always()
         # Use `git status --porcelain` (not `git diff`) so brand-new untracked
         # files — e.g. a freshly created .translation_state.json or a new locale
         # file — are detected, not just modifications to already-tracked files.
@@ -103,7 +122,7 @@ jobs:
       # (Settings → Actions → General → Workflow permissions).
       - name: Create pull request with translation updates
         id: cpr
-        if: steps.check_changes.outputs.changes == 'true'
+        if: always() && steps.check_changes.outputs.changes == 'true'
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -135,7 +154,7 @@ jobs:
       # that user. Store that account's PAT in the TRANSLATIONS_APPROVE_TOKEN
       # secret. PR number is passed via env (never interpolated into the shell body).
       - name: Approve the translation PR
-        if: steps.check_changes.outputs.changes == 'true' && steps.cpr.outputs.pull-request-number
+        if: always() && steps.cpr.outputs.pull-request-number
         env:
           GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
           PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
@@ -150,7 +169,7 @@ jobs:
       # merge_group checks) trigger correctly. Merge method must match the repo's
       # merge-queue configuration — change --squash if the queue uses merge/rebase.
       - name: Enable auto-merge (merge queue)
-        if: steps.check_changes.outputs.changes == 'true' && steps.cpr.outputs.pull-request-number
+        if: always() && steps.cpr.outputs.pull-request-number
         env:
           GH_TOKEN: ${{ secrets.TRANSLATIONS_APPROVE_TOKEN }}
           PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
@@ -160,13 +179,18 @@ jobs:
 
       - name: Summary
         if: always()
+        env:
+          SCRIPT_OUTCOME: ${{ steps.run_translation.outcome }}
+          HAS_CHANGES: ${{ steps.check_changes.outputs.changes }}
+          PR_NUMBER: ${{ steps.cpr.outputs.pull-request-number }}
         run: |
-          if [ "${{ steps.run_translation.outcome }}" != "success" ]; then
-            echo "❌ Translation script did not complete successfully (outcome: ${{ steps.run_translation.outcome }}). See the 'Run translation script' step logs."
-            exit 0
-          fi
-          if [ "${{ steps.check_changes.outputs.changes }}" == "true" ]; then
-            echo "✅ Translations updated — PR #${{ steps.cpr.outputs.pull-request-number }} created/updated (branch: chore/update-translations), labeled 'translations,e2e', approved, and set to auto-merge into the merge queue."
+          if [ "$HAS_CHANGES" == "true" ] && [ -n "$PR_NUMBER" ]; then
+            echo "✅ PR #$PR_NUMBER created/updated (branch: chore/update-translations), labeled 'translations,e2e', approved, and set to auto-merge into the merge queue."
+          elif [ "$HAS_CHANGES" == "true" ]; then
+            echo "⚠️  Translation changes exist on disk but no PR was opened — see the 'Create pull request' step."
           else
             echo "ℹ️  No new or modified keys — translations already up to date."
+          fi
+          if [ "$SCRIPT_OUTCOME" != "success" ]; then
+            echo "❌ Translation script outcome: $SCRIPT_OUTCOME — some strings failed or the run was interrupted. Any completed locales are included in the PR above; the rest retry on the next run. See the 'Run translation script' logs."
           fi
