@@ -2118,6 +2118,12 @@ pub struct Limit {
     )]
     pub scheduler_slo_backfill_concurrency: i64,
     #[env_config(
+        name = "ZO_SCHEDULER_ONCALL_CONCURRENCY",
+        default = 0,
+        help = "Max on-call escalation jobs pulled per cycle and the escalation worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_oncall_concurrency: i64,
+    #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_CONCURRENCY",
         default = 0,
         help = "Max anomaly-detection jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
@@ -2163,6 +2169,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the SLO backfill puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_slo_backfill_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ONCALL_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the on-call escalation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_oncall_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_INTERVAL",
         default = 0, // seconds

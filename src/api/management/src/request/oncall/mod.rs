@@ -25,7 +25,12 @@ use axum::{
 use axum::{http::StatusCode, response::IntoResponse};
 use common::meta::http::HttpResponse as MetaHttpResponse;
 use config::meta::oncall::{EscalationLevel, PriorityRung, Rotation};
+#[cfg(feature = "enterprise")]
+use openobserve_api_common::extractors::Headers;
 use serde::{Deserialize, Deserializer};
+
+#[cfg(feature = "enterprise")]
+use crate::service::auth::UserEmail;
 
 // ── Request bodies ────────────────────────────────────────────────────────────
 
@@ -85,10 +90,20 @@ pub struct SetPolicyRequest {
 }
 
 #[derive(Debug, Default, Deserialize)]
+pub struct ListResponsesQuery {
+    pub team_id: Option<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
 pub struct OnCallQuery {
     /// Resolve at this instant (micros) instead of now, so the UI can show a
     /// future week without a second endpoint.
     pub at: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AckQuery {
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -563,6 +578,181 @@ pub async fn set_policy(
     #[cfg(not(feature = "enterprise"))]
     {
         let _ = (org_id, team_id, body);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/ack",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "AcknowledgeOnCallPage",
+    summary = "Acknowledge a page from its emailed link",
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("token" = String, Query, description = "Signed acknowledgement token"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn acknowledge(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        use o2_enterprise::enterprise::oncall::{escalation, token};
+
+        let claims = match token::verify(&q.token, config::utils::time::now_micros()).await {
+            Ok(c) => c,
+            Err(e) => {
+                return MetaHttpResponse::error(StatusCode::UNAUTHORIZED.as_u16(), e.to_string())
+                    .into_response();
+            }
+        };
+        // The org in the path must match the org the token was minted for, or
+        // a link for one tenant would act on another.
+        if claims.org_id != org_id {
+            return MetaHttpResponse::error(
+                StatusCode::UNAUTHORIZED.as_u16(),
+                "acknowledgement link does not belong to this organization",
+            )
+            .into_response();
+        }
+        match escalation::acknowledge(&claims.org_id, &claims.response_id, &claims.user_email).await
+        {
+            Ok(response) => MetaHttpResponse::json(response),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ListOnCallResponses",
+    summary = "List open response records",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("team_id" = Option<String>, Query, description = "Restrict to one team"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn list_responses(
+    Path(org_id): Path<String>,
+    Query(q): Query<ListResponsesQuery>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match infra::table::oncall_responses::list_open(&org_id, q.team_id.as_deref()).await {
+            Ok(rows) => MetaHttpResponse::json(rows),
+            Err(e) => {
+                tracing::error!("[oncall] list_responses: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, q);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/{org_id}/oncall/responses/{response_id}",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "GetOnCallResponse",
+    summary = "Get a response record and its timeline",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn get_response(Path((org_id, response_id)): Path<(String, String)>) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        let record = match infra::table::oncall_responses::get(&org_id, &response_id).await {
+            Ok(Some(r)) => r,
+            Ok(None) => {
+                return MetaHttpResponse::error(
+                    StatusCode::NOT_FOUND.as_u16(),
+                    "Response not found",
+                )
+                .into_response();
+            }
+            Err(e) => {
+                tracing::error!("[oncall] get_response: {e}");
+                return MetaHttpResponse::error(
+                    StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+                    e.to_string(),
+                )
+                .into_response();
+            }
+        };
+        match infra::table::oncall_responses::list_events(&response_id).await {
+            Ok(events) => MetaHttpResponse::json(serde_json::json!({
+                "response": record,
+                "events": events,
+            })),
+            Err(e) => {
+                tracing::error!("[oncall] get_response events: {e}");
+                MetaHttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR.as_u16(), e.to_string())
+                    .into_response()
+            }
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
+        MetaHttpResponse::forbidden("Not Supported")
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/{org_id}/oncall/responses/{response_id}/resolve",
+    context_path = "/api",
+    tag = "OnCall",
+    operation_id = "ResolveOnCallResponse",
+    summary = "Resolve a response record",
+    security(("Authorization" = [])),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ("response_id" = String, Path, description = "Response record ID"),
+    ),
+    responses((status = 200, description = "Success", content_type = "application/json", body = Object)),
+)]
+pub async fn resolve_response(
+    Path((org_id, response_id)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    {
+        match o2_enterprise::enterprise::oncall::escalation::resolve(
+            &org_id,
+            &response_id,
+            &user_email.user_id,
+        )
+        .await
+        {
+            Ok(record) => MetaHttpResponse::json(record),
+            Err(e) => to_response(e),
+        }
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (org_id, response_id);
         MetaHttpResponse::forbidden("Not Supported")
     }
 }

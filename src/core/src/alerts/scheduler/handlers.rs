@@ -493,7 +493,71 @@ pub async fn handle_triggers(
         }
         db::scheduler::TriggerModule::Slo => handle_slo_triggers(trigger).await,
         db::scheduler::TriggerModule::SloBackfill => handle_slo_backfill_triggers(trigger).await,
+        db::scheduler::TriggerModule::OncallEscalation => {
+            handle_oncall_escalation_triggers(trigger).await
+        }
     }
+}
+
+/// Run one escalation step for a response record.
+///
+/// The job is dropped rather than re-armed once the ladder is finished, the
+/// record is acknowledged, or the record is gone: an escalation timer that
+/// outlives the thing it escalates is a page waiting to fire at nobody.
+#[cfg(feature = "enterprise")]
+async fn handle_oncall_escalation_triggers(
+    mut trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    use config::utils::time::now_micros;
+    use o2_enterprise::enterprise::oncall;
+
+    let response_id = trigger.module_key.clone();
+    if !oncall::is_enabled() {
+        // Turned off while a ladder was mid-flight. Drop the job rather than
+        // holding a timer nobody will service.
+        db::scheduler::delete(
+            &trigger.org,
+            db::scheduler::TriggerModule::OncallEscalation,
+            &response_id,
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let notifier = oncall::notify::EmailNotifier;
+    match oncall::escalation::tick(&trigger.org, &response_id, &notifier, now_micros()).await? {
+        Some(next_run_at) => {
+            trigger.next_run_at = next_run_at;
+            trigger.status = db::scheduler::TriggerStatus::Waiting;
+            trigger.retries = 0;
+            db::scheduler::update_trigger(trigger, true, "").await?;
+        }
+        None => {
+            db::scheduler::delete(
+                &trigger.org,
+                db::scheduler::TriggerModule::OncallEscalation,
+                &response_id,
+            )
+            .await?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_oncall_escalation_triggers(
+    trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    // The module cannot be produced without the enterprise build, but a row
+    // could survive a downgrade. Drop it rather than leaving it to be retried
+    // forever.
+    db::scheduler::delete(
+        &trigger.org,
+        db::scheduler::TriggerModule::OncallEscalation,
+        &trigger.module_key,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Handle an anomaly detection trigger.

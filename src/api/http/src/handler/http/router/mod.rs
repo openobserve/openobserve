@@ -657,6 +657,15 @@ pub fn basic_routes() -> Router {
         get(alerts::chart_render::render_chart),
     );
 
+    // On-call acknowledgement — the URL carries an HMAC-signed token verified
+    // inside the handler itself (never via auth_middleware), because the whole
+    // point is acknowledging from an email at 3am with no session. Like the
+    // chart endpoint above, it must stay in basic_routes.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        router = router.route("/api/{org_id}/oncall/ack", get(oncall::acknowledge));
+    }
+
     // External alert source webhooks — token-authenticated inside the handler itself
     // (never via auth_middleware), so these must stay in basic_routes rather than
     // service_routes. See GHSA-wffq-g8qf-ccmv: do not widen the shared token
@@ -1251,6 +1260,15 @@ pub fn service_routes() -> Router {
                 .route(
                     "/{org_id}/oncall/teams/{team_id}/policy",
                     get(oncall::get_policy).put(oncall::set_policy),
+                )
+                .route("/{org_id}/oncall/responses", get(oncall::list_responses))
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}",
+                    get(oncall::get_response),
+                )
+                .route(
+                    "/{org_id}/oncall/responses/{response_id}/resolve",
+                    post(oncall::resolve_response),
                 );
         }
     }

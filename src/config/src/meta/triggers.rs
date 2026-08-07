@@ -48,6 +48,10 @@ pub enum TriggerModule {
     /// concurrency budget with latency-sensitive incremental passes would
     /// starve them (§6b.9).
     SloBackfill,
+    /// On-call escalation. One job per open response record, re-armed at the
+    /// next rung's delay. Its own lane so a paging timer is never queued
+    /// behind an alert evaluation backlog.
+    OncallEscalation,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -61,6 +65,7 @@ impl std::fmt::Display for TriggerModule {
             Self::AnomalyDetection => write!(f, "anomaly_detection"),
             Self::Slo => write!(f, "slo"),
             Self::SloBackfill => write!(f, "slo_backfill"),
+            Self::OncallEscalation => write!(f, "oncall_escalation"),
         }
     }
 }
