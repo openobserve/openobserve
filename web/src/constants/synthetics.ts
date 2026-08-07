@@ -257,6 +257,27 @@ export const VALUE_TOOLTIP_KEYS: Record<string, I18nKey> = {
 export const CHROME_WEB_STORE_URL =
   "https://chromewebstore.google.com/detail/afhgiecgbpohkbobialnajlphbpcgomo";
 
+/**
+ * Query flag CreateBrowserTest writes when entering the extension-setup phase
+ * so a mid-setup reload (F5) returns there with the gate fields restored. The
+ * checklist's own "refresh this page" action strips it on purpose — after that
+ * reload the recorder is connected, so the gate's Record goes straight to
+ * recording instead of re-entering setup.
+ */
+export const SETUP_QUERY_PARAM = "setup";
+
+/**
+ * Chrome UI element names referenced by the recorder setup flow — interpolated
+ * into i18n strings as params so they stay in English across all locales,
+ * matching the actual Chrome browser interface.
+ */
+export const CHROME_UI_LABELS = {
+  allowIncognito: "Allow in Incognito",
+  extensionsMenu: "Extensions",
+  manageExtension: "Manage extension",
+  recorderName: "OpenObserve Recorder",
+} as const;
+
 // ── Recorder locator configuration ───────────────────────────────────────────
 
 /**
