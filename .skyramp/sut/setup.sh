@@ -55,10 +55,4 @@ nohup ./release-ci-binary/openobserve > /tmp/o2.log 2>&1 &
 echo $! > /tmp/o2.pid
 echo "OpenObserve started with PID $(cat /tmp/o2.pid)"
 
-# ---- Install Playwright test dependencies ----
-(
-  cd tests/ui-testing
-  npm ci
-)
-
 echo "Setup complete."
