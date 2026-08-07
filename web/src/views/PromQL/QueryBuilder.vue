@@ -36,8 +36,7 @@
             <OCardSection>
               <pre
                 class="text-text-link m-0 p-3 font-mono text-sm leading-relaxed font-medium wrap-break-word whitespace-pre-wrap"
-                >{{ generatedQuery || t("metrics.queryBuilder.noQueryBuilt") }}</pre
-              >
+                >{{ generatedQuery || t("metrics.queryBuilder.noQueryBuilt") }}</pre>
             </OCardSection>
           </OCard>
 
@@ -76,8 +75,7 @@
             <OCardSection>
               <pre
                 class="text-text-body m-0 max-h-100 overflow-y-auto p-3 font-mono text-sm leading-relaxed wrap-break-word whitespace-pre-wrap"
-                >{{ queryResult }}</pre
-              >
+                >{{ queryResult }}</pre>
             </OCardSection>
           </OCard>
         </OCardSection>

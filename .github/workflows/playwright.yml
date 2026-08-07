@@ -130,7 +130,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Lint frontend code
         run: cd web && npm ci && npm run lint:ci
@@ -271,7 +271,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Cache Playwright browser
         id: playwright-cache
@@ -404,7 +404,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
 
       - name: Install project dependencies
         run: cd tests/ui-testing && npm ci

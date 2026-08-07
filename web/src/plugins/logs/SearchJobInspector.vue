@@ -390,8 +390,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <pre
           class="text-compact m-0 font-mono leading-[1.6] break-words whitespace-pre-wrap"
           data-test="inspector-sql-query-content"
-          >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre
-        >
+          >{{ profileData?.sql || t("logs.searchJobInspector.noSqlAvailable") }}</pre>
       </div>
     </ODrawer>
 

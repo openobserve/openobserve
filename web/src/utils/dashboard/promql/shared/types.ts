@@ -108,15 +108,7 @@ export interface ConversionContext {
  * Aggregation function type for single-value charts
  */
 export type AggregationFunction =
-  | "last"
-  | "first"
-  | "min"
-  | "max"
-  | "avg"
-  | "sum"
-  | "count"
-  | "range"
-  | "diff";
+  "last" | "first" | "min" | "max" | "avg" | "sum" | "count" | "range" | "diff";
 
 /**
  * Configuration options for table charts

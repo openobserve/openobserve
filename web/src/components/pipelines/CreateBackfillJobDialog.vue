@@ -284,14 +284,12 @@ const errorMessage = ref("");
 
 // Typed dynamic defaults for the form-owned fields. The time range is an
 // absolute range seeded empty (forces the picker to absolute mode).
-const backfillDefaults = computed(
-  (): BackfillForm => ({
-    timerange: { type: "absolute", from: undefined, to: undefined },
-    chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
-    delayBetweenChunks: null,
-    deleteBeforeBackfill: false,
-  }),
-);
+const backfillDefaults = computed((): BackfillForm => ({
+  timerange: { type: "absolute", from: undefined, to: undefined },
+  chunkPeriodMinutes: (props.scheduleFrequency || 60) as number | null,
+  delayBetweenChunks: null,
+  deleteBeforeBackfill: false,
+}));
 
 // Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
 // (timerange/chunk/delay/deleteBeforeBackfill) for estimatedInfo + the delete

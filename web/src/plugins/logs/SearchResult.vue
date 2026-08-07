@@ -474,8 +474,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <pre
               v-if="isFunctionErrorOpen"
               class="text-status-warning-text mt-1 break-words whitespace-pre-wrap"
-              >{{ searchObj?.data?.functionError }}</pre
-            >
+              >{{ searchObj?.data?.functionError }}</pre>
           </div>
 
           <!-- Row/cell actions live in a right-click context menu as well as the

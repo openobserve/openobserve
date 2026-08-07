@@ -119,12 +119,10 @@ export default defineComponent({
     // EDIT-prefill: the OForm owns role/first_name; this typed computed seeds them
     // from the externally-provided modelValue each time the dialog body mounts.
     // org_member_id/email stay non-form data (read from modelValue at submit).
-    const updateRoleDefaults = computed(
-      (): UpdateRoleForm => ({
-        role: props.modelValue?.role ?? "",
-        first_name: props.modelValue?.first_name ?? "",
-      }),
-    );
+    const updateRoleDefaults = computed((): UpdateRoleForm => ({
+      role: props.modelValue?.role ?? "",
+      first_name: props.modelValue?.first_name ?? "",
+    }));
 
     // Options-API: the schema (and the defaults computed) MUST be returned from
     // setup() — a bare module import is out of the template's scope, so :schema

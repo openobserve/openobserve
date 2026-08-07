@@ -85,11 +85,9 @@ const addGroupSchema = makeAddGroupSchema(t);
 // The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
 // on open, so this typed computed re-seeds `:default-values` each open (the
 // optional `group` prop prefills it, otherwise blank). No local model / watch.
-const addGroupDefaults = computed(
-  (): AddGroupForm => ({
-    name: props.group?.name ?? "",
-  }),
-);
+const addGroupDefaults = computed((): AddGroupForm => ({
+  name: props.group?.name ?? "",
+}));
 
 // Plain async @submit handler — the validated `value` is the source of truth.
 // The schema validates the trimmed name (so surrounding whitespace doesn't trip

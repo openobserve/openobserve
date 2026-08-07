@@ -590,18 +590,16 @@ const editScriptSchema = makeEditScriptSchema({
 // Dynamic (edit-prefill) defaults: projects the form-owned fields out of the
 // component's `formData` / `frequency`. Seeds useOForm at create; re-applied
 // via form.reset() when an edited record arrives async (see below).
-const editScriptDefaults = computed(
-  (): EditScriptForm => ({
-    name: formData.value.name ?? "",
-    description: formData.value.description ?? "",
-    type: formData.value.type ?? "scheduled",
-    service_account: formData.value.service_account ?? "",
-    timezone: formData.value.timezone ?? "UTC",
-    codeZip: (formData.value.codeZip as File | null) ?? null,
-    cron: frequency.value.cron ?? "",
-    frequencyType: frequency.value.type ?? "once",
-  }),
-);
+const editScriptDefaults = computed((): EditScriptForm => ({
+  name: formData.value.name ?? "",
+  description: formData.value.description ?? "",
+  type: formData.value.type ?? "scheduled",
+  service_account: formData.value.service_account ?? "",
+  timezone: formData.value.timezone ?? "UTC",
+  codeZip: (formData.value.codeZip as File | null) ?? null,
+  cron: frequency.value.cron ?? "",
+  frequencyType: frequency.value.type ?? "once",
+}));
 
 // Headless form (Rule ③ owner). defaultValues seed the blank create form; the
 // async edit record re-seeds via form.reset() below. onSubmit is deferred to

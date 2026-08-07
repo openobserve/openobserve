@@ -102,8 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="isPlainText" class="text-content">
             <pre
               class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
-              >{{ contentStats.previewText }}</pre
-            >
+              >{{ contentStats.previewText }}</pre>
           </div>
           <div v-else class="json-content">
             <CodeQueryEditor
@@ -202,8 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-else-if="isPlainText" class="text-content">
             <pre
               class="plain-text-content text-compact bg-code-bg rounded-default m-0 overflow-x-auto p-2 font-mono leading-normal wrap-break-word whitespace-pre-wrap"
-              >{{ fullText }}</pre
-            >
+              >{{ fullText }}</pre>
           </div>
           <div v-else class="json-content h-full">
             <CodeQueryEditor

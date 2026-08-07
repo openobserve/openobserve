@@ -128,8 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <pre
                         class="text-status-error-text my-0 whitespace-pre-wrap"
                         style="font-family: var(--font-mono); font-size: var(--text-compact)"
-                        >{{ vrlFunctionError }}</pre
-                      >
+                        >{{ vrlFunctionError }}</pre>
                     </div>
                   </div>
                 </div>

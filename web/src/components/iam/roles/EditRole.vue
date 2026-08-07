@@ -2226,14 +2226,12 @@ const saveRole = () => {
     ) as string[],
   };
 
-  if (
-    !(
-      payload.add.length ||
-      payload.remove.length ||
-      payload.add_users.length ||
-      payload.remove_users.length
-    )
-  ) {
+  if (!(
+    payload.add.length ||
+    payload.remove.length ||
+    payload.add_users.length ||
+    payload.remove_users.length
+  )) {
     toast({
       variant: "info",
       message: t("iam.editRole.noUpdatesDetected"),
