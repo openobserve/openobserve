@@ -31,6 +31,7 @@ export class TracesPage {
     this.servicesCatalogTable = '[data-test="services-catalog-table"]';
     this.servicesCatalogEmpty = '[data-test="services-catalog-empty"]';
     this.servicesCatalogRefreshButton = '[data-test="services-catalog-refresh-btn"]';
+    this.servicesCatalogDateTimePicker = '[data-test="services-catalog-date-time-picker"]';
     // No-data state inside the graph panel (OEmptyState rendered by
     // ServiceGraphNoDataState.vue within the graph container).
     this.serviceGraphEmptyState = '[data-test="service-graph-container"] [data-test="o2-empty-state"]';
@@ -78,6 +79,8 @@ export class TracesPage {
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
+    // Standalone Service Graph page (rail-flyout route /traces/service-graph).
+    this.serviceGraphPage = '[data-test="service-graph-page"]';
 
     // ===== ANALYZE DIMENSIONS SELECTORS (VERIFIED against Vue source) =====
     // TracesMetricsDashboard.vue: data-test="insights-button"
@@ -444,6 +447,45 @@ export class TracesPage {
 
   async expectServiceGraphVisible() {
     await expect(this.page.locator(this.serviceGraphChart)).toBeVisible({ timeout: 10000 });
+  }
+
+  // In-page Service Graph tab view: the chart when topology data exists, else
+  // the no-data state (this suite does not seed the service-graph daemon).
+  async expectServiceGraphViewVisible() {
+    await expect(
+      this.page
+        .locator(this.serviceGraphChart)
+        .or(this.page.locator(this.serviceGraphEmptyState))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  // In-page Services Catalog tab view: the table when data exists, else empty.
+  async expectServicesCatalogVisible() {
+    await expect(
+      this.page
+        .locator(this.servicesCatalogTable)
+        .or(this.page.locator(this.servicesCatalogEmpty))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+  }
+
+  // The catalog toolbar's date-time picker reflects the shared search period.
+  async expectServicesCatalogTimeRange(text) {
+    await expect(this.page.locator(this.servicesCatalogDateTimePicker))
+      .toContainText(text, { timeout: 10000 });
+  }
+
+  // The services-catalog toolbar tab is the active mode (data-state="on").
+  async expectServicesCatalogTabActive() {
+    await expect(this.page.locator(this.servicesCatalogTabToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // Standalone Service Graph page rendered from the rail flyout route.
+  async expectStandaloneServiceGraphPageVisible() {
+    await expect(this.page.locator(this.serviceGraphPage))
+      .toBeVisible({ timeout: 10000 });
   }
 
   async refreshServiceGraph() {
