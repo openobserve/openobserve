@@ -1,7 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/AIObservability/aiPageHeader.spec.js",
-  "existing_tests_considered": [],
-  "needs_registration": true,
-  "rationale": "No existing AIObservability tests or page objects exist in the test suite. The AIObservability area is entirely new—no specs under tests/ui-testing/playwright-tests/AIObservability/, no page objects reference aiObservability, and the CI matrix (ci_matrix.json) has no shard for this area. A new spec must be created and registered in the CI matrix with a dedicated shard entry."
-}

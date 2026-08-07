@@ -1,6 +1,0 @@
-{
-  "group": "AIObservability",
-  "spec_filename": "aiPageHeader.spec.js",
-  "create_group": true,
-  "browser": "chrome"
-}
