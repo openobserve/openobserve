@@ -80,12 +80,67 @@ export default class DashboardCreate {
       { timeout: 10000 }
     );
 
-    // Fill the dashboard name
-    await this.dashName.fill(dashboardName);
+    // Submitting is where this flakes, in two ways that look identical from the
+    // outside — an opaque waitForURL timeout with no navigation in the log:
+    //
+    //   1. AddDashboard.vue seeds OForm from :default-values, and a fill that
+    //      lands before that seeding is overwritten with an empty name.
+    //   2. The dialog's primary button submits the form by id, and a click
+    //      issued while that wiring is still settling silently no-ops.
+    //
+    // Either way submit is gated by the form's Zod schema, so onSubmit never
+    // runs, no POST goes out, and updateDashboardList() — the only thing that
+    // routes to /dashboards/view — is never called. Re-assert the name and
+    // watch for the create POST, so a lost submit is retried rather than
+    // waited out, and a rejected one fails with the actual status.
+    //
+    // The retry gate matches on the REQUEST, not the response: a request that
+    // has been sent but not yet answered still proves the click landed, so a
+    // slow server can never be mistaken for a lost submit and re-submitted
+    // into a duplicate dashboard.
+    const isCreateCall = (target) =>
+      /\/api\/[^/]+\/dashboards(?:\?|$)/.test(target.url()) &&
+      (target.method?.() ?? target.request().method()) === "POST";
 
-    // Wait for and click the submit button
-    await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
-    await this.submitBtn.click();
+    let createRequest = null;
+    let createResponse = null;
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      // Re-assert on every attempt: if the form seeded over our value, the
+      // retry has to repair the field, not just click again.
+      if ((await this.dashName.inputValue()) !== dashboardName) {
+        await this.dashName.fill(dashboardName);
+      }
+
+      const requestPromise = this.page
+        .waitForRequest(isCreateCall, { timeout: 10000 })
+        .catch(() => null);
+      const responsePromise = this.page
+        .waitForResponse(isCreateCall, { timeout: 30000 })
+        .catch(() => null);
+
+      await this.submitBtn.waitFor({ state: "visible", timeout: 30000 });
+      await this.submitBtn.click();
+
+      createRequest = await requestPromise;
+      if (createRequest) {
+        createResponse = await responsePromise;
+        break;
+      }
+
+      // Nothing hit the wire. Only retry while the dialog is still open — if it
+      // closed, the submit did land and the URL wait below is the right gate.
+      const dialogStillOpen = await this.submitBtn
+        .isVisible()
+        .catch(() => false);
+      if (!dialogStillOpen) break;
+    }
+
+    if (createResponse && !createResponse.ok()) {
+      throw new Error(
+        `Dashboard creation failed: POST ${createResponse.url()} returned ${createResponse.status()}`
+      );
+    }
 
     // Wait for the success notification to confirm dashboard was created
     // OToast root carries both data-test="o-toast-success" and data-test-message="<text>"
