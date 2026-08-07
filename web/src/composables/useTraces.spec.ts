@@ -90,6 +90,20 @@ vi.mock("@/utils/traces/traceColors", () => ({
   getSpanColorHex: vi.fn((index: number) => `#color-${index}`),
 }));
 
+// navigateToCorrelatedLogs resolves field names through the org's semantic
+// groups; tests drive that lookup by setting mockSemanticGroups.
+const { mockLoadSemanticGroups, mockSemanticGroups } = vi.hoisted(() => {
+  const mockSemanticGroups = { value: [] as any[] };
+  const mockLoadSemanticGroups = vi.fn(async () => mockSemanticGroups.value);
+  return { mockLoadSemanticGroups, mockSemanticGroups };
+});
+
+vi.mock("@/composables/useServiceCorrelation", () => ({
+  useServiceCorrelation: vi.fn(() => ({
+    loadSemanticGroups: mockLoadSemanticGroups,
+  })),
+}));
+
 // Mock serviceColorRegistry so the singleton internal registry does not
 // leak state between tests.  The composable imports
 //   `import { getOrSetServiceColor as registryGetOrSetServiceColor }`
@@ -147,6 +161,8 @@ describe("useTraces", () => {
       }
       return localTraceFilterStore;
     });
+    mockSemanticGroups.value = [];
+    mockLoadSemanticGroups.mockImplementation(async () => mockSemanticGroups.value);
     // Reset shared singleton state before each test
     const { resetSearchObj } = useTraces();
     resetSearchObj();
@@ -558,6 +574,78 @@ describe("useTraces", () => {
       expect(callArg.query.stream).toBe("my-stream");
       expect(callArg.query.org_identifier).toBe("my-org");
       expect(callArg.query.query).toBe("encoded");
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // navigateToCorrelatedLogs
+  // -------------------------------------------------------------------------
+  describe("navigateToCorrelatedLogs", () => {
+    const correlationProps = (filters: Record<string, string> = {}) => ({
+      logStreams: [{ stream_name: "app-logs", filters }],
+      timeRange: { startTime: 1000, endTime: 2000 },
+    });
+
+    // b64EncodeUnicode is mocked as `b64uni:<input>`, so the pushed query param
+    // carries the raw WHERE clause.
+    const pushedQuery = () =>
+      String(mockRouterPush.mock.calls[0][0].query.query).replace(/^b64uni:/, "");
+
+    const selectSpan = (spanId: string | null, traceId: string | null) => {
+      const { searchObj } = useTraces();
+      searchObj.data.traceDetails.selectedSpanId = spanId;
+      searchObj.data.traceDetails.selectedTrace = traceId
+        ? { trace_id: traceId, trace_start_time: 0, trace_end_time: 0 }
+        : null;
+    };
+
+    it("appends span_id and trace_id conditions to the stream filter conditions", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-1", "trace-1");
+
+      await navigateToCorrelatedLogs(correlationProps({ k8s_namespace_name: "prod" }));
+
+      expect(pushedQuery()).toBe(
+        "k8s_namespace_name = 'prod' and span_id = 'span-1' and trace_id = 'trace-1'",
+      );
+    });
+
+    it("adds the id conditions when the correlated stream has no filters", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("span-2", "trace-2");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'span-2' and trace_id = 'trace-2'");
+    });
+
+    it("omits each id condition when its value is unavailable", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan(null, "trace-3");
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("trace_id = 'trace-3'");
+    });
+
+    it("escapes single quotes in id values", async () => {
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan("sp'an", null);
+
+      await navigateToCorrelatedLogs(correlationProps());
+
+      expect(pushedQuery()).toBe("span_id = 'sp''an'");
+    });
+
+    it("emits one condition when an id field shares a semantic group with a stream filter", async () => {
+      mockSemanticGroups.value = [{ id: "trace-id", fields: ["traceId", "trace_id"] }];
+      const { navigateToCorrelatedLogs } = useTraces();
+      selectSpan(null, "trace-4");
+
+      await navigateToCorrelatedLogs(correlationProps({ traceId: "stale-value" }));
+
+      // The exact trace id wins over the stream's alias for the same group.
+      expect(pushedQuery()).toBe("trace_id = 'trace-4'");
     });
   });
 
