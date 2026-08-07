@@ -86,8 +86,7 @@ async function setIncognito(wrapper: VueWrapper, value: boolean) {
 
 function ctaDisabled(wrapper: VueWrapper): boolean {
   return (
-    wrapper.find('[data-test="synthetics-setup-continue-btn"]').attributes("disabled") !==
-    undefined
+    wrapper.find('[data-test="synthetics-setup-continue-btn"]').attributes("disabled") !== undefined
   );
 }
 
