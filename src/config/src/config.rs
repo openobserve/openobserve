@@ -1207,6 +1207,9 @@ pub struct Common {
     /// server legitimately needs to send notifications to itself.
     #[env_config(name = "ZO_SSRF_ALLOW_LOOPBACK", default = false)]
     pub ssrf_allow_loopback: bool,
+    // This will completely skip ssrf checks, not just localhost
+    #[env_config(name = "ZO_SKIP_SSRF_CHECKS", default = false)]
+    pub skip_ssrf_checks: bool,
     #[env_config(name = "ZO_BASE_URI", default = "")] // /abc
     pub base_uri: String,
     #[env_config(name = "ZO_DATA_DIR", default = "./data/openobserve/")]

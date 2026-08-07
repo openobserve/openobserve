@@ -28,58 +28,72 @@ mod tests {
 
     #[test]
     fn test_validate_safe_urls() {
-        assert!(SsrfGuard::validate_url("https://hooks.slack.com/services/xyz").is_ok());
-        assert!(SsrfGuard::validate_url("https://example.com/webhook").is_ok());
-        assert!(SsrfGuard::validate_url("http://example.com/webhook").is_ok());
+        assert!(
+            SsrfGuard::validate_url_with_config("https://hooks.slack.com/services/xyz").is_ok()
+        );
+        assert!(SsrfGuard::validate_url_with_config("https://example.com/webhook").is_ok());
+        assert!(SsrfGuard::validate_url_with_config("http://example.com/webhook").is_ok());
     }
 
     #[test]
     fn test_block_private_ipv4() {
-        assert!(SsrfGuard::validate_url("http://10.0.0.1/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://10.255.255.255/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://172.16.0.1/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://172.31.255.255/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://192.168.0.1/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://192.168.255.255/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://10.0.0.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://10.255.255.255/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://172.16.0.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://172.31.255.255/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://192.168.0.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://192.168.255.255/webhook").is_err());
     }
 
     #[test]
     fn test_block_localhost() {
-        assert!(SsrfGuard::validate_url("http://localhost/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://localhost:8080/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://127.0.0.1/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[::1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://localhost/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://localhost:8080/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://127.0.0.1/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[::1]/webhook").is_err());
     }
 
     #[test]
     fn test_block_metadata_endpoints() {
-        assert!(SsrfGuard::validate_url("http://169.254.169.254/latest/meta-data/").is_err());
         assert!(
-            SsrfGuard::validate_url("http://metadata.google.internal/computeMetadata/v1/").is_err()
+            SsrfGuard::validate_url_with_config("http://169.254.169.254/latest/meta-data/")
+                .is_err()
         );
-        assert!(SsrfGuard::validate_url("http://metadata/computeMetadata/v1/").is_err());
+        assert!(
+            SsrfGuard::validate_url_with_config(
+                "http://metadata.google.internal/computeMetadata/v1/"
+            )
+            .is_err()
+        );
+        assert!(
+            SsrfGuard::validate_url_with_config("http://metadata/computeMetadata/v1/").is_err()
+        );
     }
 
     #[test]
     fn test_block_unsupported_protocols() {
-        assert!(SsrfGuard::validate_url("ftp://example.com/webhook").is_err());
-        assert!(SsrfGuard::validate_url("file:///etc/passwd").is_err());
-        assert!(SsrfGuard::validate_url("gopher://example.com").is_err());
+        assert!(SsrfGuard::validate_url_with_config("ftp://example.com/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("file:///etc/passwd").is_err());
+        assert!(SsrfGuard::validate_url_with_config("gopher://example.com").is_err());
     }
 
     #[test]
     fn test_block_ipv6_special_ranges() {
-        assert!(SsrfGuard::validate_url("http://[fe80::1]/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[fc00::1]/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[fd00::1]/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[2001:db8::1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[fe80::1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[fc00::1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[fd00::1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[2001:db8::1]/webhook").is_err());
     }
 
     #[test]
     fn test_block_ipv4_mapped_ipv6() {
-        assert!(SsrfGuard::validate_url("http://[::ffff:127.0.0.1]/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[::ffff:10.0.0.1]/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[::ffff:192.168.1.1]/webhook").is_err());
-        assert!(SsrfGuard::validate_url("http://[::ffff:169.254.169.254]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[::ffff:127.0.0.1]/webhook").is_err());
+        assert!(SsrfGuard::validate_url_with_config("http://[::ffff:10.0.0.1]/webhook").is_err());
+        assert!(
+            SsrfGuard::validate_url_with_config("http://[::ffff:192.168.1.1]/webhook").is_err()
+        );
+        assert!(
+            SsrfGuard::validate_url_with_config("http://[::ffff:169.254.169.254]/webhook").is_err()
+        );
     }
 }
