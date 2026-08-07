@@ -129,6 +129,37 @@ pub fn get_folder(query: &HashMap<String, String>) -> String {
     }
 }
 
+/// A trace-id is usable only when it is 32 hex characters and not all zeros.
+///
+/// Per W3C trace-context an all-zero trace-id is invalid and the traceparent carrying it
+/// MUST be ignored. Here it matters beyond spec compliance: `trace_id` is the key the
+/// query manager files in-flight searches under, so every request that resolves to the
+/// same invalid id lands in ONE entry with a shared `abort_senders` vec — and the first
+/// query to finish removes that entry, dropping the senders and cancelling every sibling
+/// still executing. Callers must never be handed one.
+#[inline]
+fn is_valid_trace_id(trace_id: &str) -> bool {
+    trace_id.len() == 32
+        && trace_id.chars().all(|c| c.is_ascii_hexdigit())
+        && !trace_id.chars().all(|c| c == '0')
+}
+
+/// Read the trace-id out of a `traceparent` header value by hand.
+///
+/// A client can end up sending `traceparent` twice — its own, plus one injected by a
+/// browser RUM SDK that instruments the same requests — and same-named headers arrive
+/// joined as `"00-<a>-<b>-01, 00-<c>-<d>-01"`. That is not a valid W3C value, so a strict
+/// propagator rejects the whole thing; splitting on the comma recovers the first (the
+/// caller's own) instead of throwing away a perfectly good trace-id.
+fn trace_id_from_traceparent(traceparent: &str) -> Option<String> {
+    let first = traceparent.split(',').next()?.trim();
+    let parts: Vec<&str> = first.split('-').collect();
+    if parts.len() < 3 {
+        return None;
+    }
+    is_valid_trace_id(parts[1]).then(|| parts[1].to_string())
+}
+
 #[inline(always)]
 pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> String {
     let cfg = config::get_config();
@@ -136,10 +167,7 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
     // Check for x-openobserve-trace-id header first (from browser SDK for RUM correlation)
     if let Some(oo_trace_id) = headers.get("x-openobserve-trace-id")
         && let Ok(trace_id_str) = oo_trace_id.to_str()
-        // Validate: 32 hex chars, not all zeros
-        && trace_id_str.len() == 32
-        && trace_id_str.chars().all(|c| c.is_ascii_hexdigit())
-        && !trace_id_str.chars().all(|c| c == '0')
+        && is_valid_trace_id(trace_id_str)
     {
         // Set as parent context if tracing is enabled
         if cfg.common.should_create_span() && !span.is_none() {
@@ -170,36 +198,47 @@ pub fn get_or_create_trace_id(headers: &HeaderMap, span: &tracing::Span) -> Stri
 
     // Check for traceparent header (W3C standard)
     if let Some(traceparent) = headers.get("traceparent") {
+        // Hand-parsed fallback, shared by both branches below. If the trace-id value is
+        // invalid (non-allowed characters, or all zeros) vendors MUST ignore the
+        // traceparent — https://www.w3.org/TR/trace-context/#traceparent-header
+        let parsed = traceparent
+            .to_str()
+            .ok()
+            .and_then(trace_id_from_traceparent);
+
         if cfg.common.should_create_span() {
             // OpenTelemetry is initialized -> can use propagator to get traceparent
             let ctx = global::get_text_map_propagator(|propagator| {
                 propagator.extract(&RequestHeaderExtractor::new(headers))
             });
             let trace_id = ctx.span().span_context().trace_id().to_string();
-            if !span.is_none() {
-                let _ = span.set_parent(ctx);
-            }
-            trace_id
-        } else {
-            // manually parse trace_id
-            if let Ok(traceparent_str) = traceparent.to_str() {
-                let parts: Vec<&str> = traceparent_str.split('-').collect();
-                if parts.len() >= 3 {
-                    let trace_id = parts[1].to_string();
-                    // If the trace-id value is invalid (for example if it contains non-allowed
-                    // characters or all zeros), vendors MUST ignore the traceparent.
-                    // https://www.w3.org/TR/trace-context/#traceparent-header
-                    if trace_id.len() == 32 && !trace_id.chars().all(|c| c == '0') {
-                        return trace_id;
-                    }
+            if is_valid_trace_id(&trace_id) {
+                if !span.is_none() {
+                    let _ = span.set_parent(ctx);
                 }
+                return trace_id;
             }
-            // If parsing fails or trace_id is invalid, generate a new one
-            log::warn!("Failed to parse valid trace_id from received [Traceparent] header");
-            config::ider::generate_trace_id()
+            // The propagator rejected the header and handed back TraceId::INVALID (all
+            // zeros). Do NOT return it: see `is_valid_trace_id`. The context is empty too,
+            // so there is no parent worth attaching — recover the id by hand if we can,
+            // otherwise mint a fresh one so this request stays distinct from every other.
+            log::warn!("Failed to extract a valid trace_id from the received [Traceparent] header");
+            parsed.unwrap_or_else(config::ider::generate_trace_id)
+        } else {
+            parsed.unwrap_or_else(|| {
+                log::warn!("Failed to parse valid trace_id from received [Traceparent] header");
+                config::ider::generate_trace_id()
+            })
         }
     } else if !span.is_none() {
-        span.context().span().span_context().trace_id().to_string()
+        // A span with no recording parent reports TraceId::INVALID here, which is the same
+        // all-zeros trap as above.
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        if is_valid_trace_id(&trace_id) {
+            trace_id
+        } else {
+            config::ider::generate_trace_id()
+        }
     } else {
         config::ider::generate_trace_id()
     }
@@ -597,6 +636,94 @@ mod tests {
         // Should generate new trace ID for malformed header
         assert_eq!(trace_id.len(), 32);
         assert!(trace_id.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_is_valid_trace_id_rejects_invalid_shapes() {
+        assert!(is_valid_trace_id("4bf92f3577b34da6a3ce929d0e0e4736"));
+        // TraceId::INVALID — the value the propagator returns when it rejects a header
+        assert!(!is_valid_trace_id("00000000000000000000000000000000"));
+        // Too short / too long
+        assert!(!is_valid_trace_id("4bf92f3577b34da6a3ce929d0e0e473"));
+        assert!(!is_valid_trace_id("4bf92f3577b34da6a3ce929d0e0e47360"));
+        // The RUM SDK's decimal form is 37 digits, not 32 hex
+        assert!(!is_valid_trace_id("2158929282988942741399149892082406230"));
+        // Non-hex
+        assert!(!is_valid_trace_id("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"));
+        assert!(!is_valid_trace_id(""));
+    }
+
+    #[test]
+    fn test_trace_id_from_traceparent_reads_the_first_of_several_values() {
+        // Two clients wrote `traceparent` on one request (an app's own header plus a
+        // browser RUM SDK's); same-named headers arrive comma-joined. A strict propagator
+        // rejects that outright, so the hand parser must recover the first value.
+        let joined = "00-019fcb6e89287757a9c54fb8769b9e53-8064ffc42648406d-01, \
+                      00-019fcb6e8929766597254a622ae91356-5e61be5254e32dfe-01";
+
+        assert_eq!(
+            trace_id_from_traceparent(joined).as_deref(),
+            Some("019fcb6e89287757a9c54fb8769b9e53"),
+        );
+    }
+
+    #[test]
+    fn test_trace_id_from_traceparent_rejects_unusable_values() {
+        // All zeros — W3C says ignore the traceparent entirely
+        assert_eq!(
+            trace_id_from_traceparent("00-00000000000000000000000000000000-00f067aa0ba902b7-01"),
+            None,
+        );
+        // Not enough fields
+        assert_eq!(trace_id_from_traceparent("invalid-format"), None);
+        assert_eq!(trace_id_from_traceparent(""), None);
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_never_returns_all_zeros_for_joined_traceparent() {
+        // The end-to-end shape of the bug: whichever branch runs, the caller must not be
+        // handed TraceId::INVALID — every request sharing it collides on one query-manager
+        // entry, and the first to finish cancels the rest.
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static(
+                "00-019fcb6e89287757a9c54fb8769b9e53-8064ffc42648406d-01, \
+                 00-019fcb6e8929766597254a622ae91356-5e61be5254e32dfe-01",
+            ),
+        );
+        let span = tracing::Span::none();
+
+        let trace_id = get_or_create_trace_id(&headers, &span);
+
+        assert!(
+            is_valid_trace_id(&trace_id),
+            "expected a usable trace_id, got {trace_id:?}"
+        );
+    }
+
+    #[test]
+    fn test_get_or_create_trace_id_ignores_non_hex_openobserve_header() {
+        // The RUM SDK sends x-openobserve-trace-id in decimal, which fails the 32-hex
+        // check — the request must still come away with a usable id from the traceparent.
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            HeaderName::from_static("x-openobserve-trace-id"),
+            HeaderValue::from_static("2158929282988942741399149892082406230"),
+        );
+        headers.insert(
+            HeaderName::from_static("traceparent"),
+            HeaderValue::from_static("00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"),
+        );
+        let span = tracing::Span::none();
+
+        let trace_id = get_or_create_trace_id(&headers, &span);
+
+        assert!(
+            is_valid_trace_id(&trace_id),
+            "expected a usable trace_id, got {trace_id:?}"
+        );
+        assert_ne!(trace_id, "2158929282988942741399149892082406230");
     }
 
     #[test]
