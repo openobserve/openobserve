@@ -1893,7 +1893,7 @@ pub async fn enrich_with_topology(
 /// Trigger RCA for a single incident immediately after creation
 ///
 /// Called asynchronously via tokio::spawn to avoid blocking incident creation.
-/// Reuses RcaAgentClient configuration from enterprise crate.
+/// Reuses AiAgentClient configuration from enterprise crate.
 ///
 /// # Arguments
 /// * `org_id` - Organization ID

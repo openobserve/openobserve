@@ -2387,7 +2387,7 @@ export default defineComponent({
                     if (!isActive()) {
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2396,6 +2396,14 @@ export default defineComponent({
                             body: JSON.stringify({ approved: false }),
                           },
                         );
+                        // Nothing to show the user (this stream is detached),
+                        // but a silent failure here leaves the agent paused
+                        // until it times out, so make it visible in the log.
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error(
                           "Error auto-denying confirmation for background stream:",
@@ -2410,7 +2418,7 @@ export default defineComponent({
                       // Auto-approve navigation without showing confirmation
                       try {
                         const orgId = store.state.selectedOrganization.identifier;
-                        await fetch(
+                        const res = await fetch(
                           `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
                           {
                             method: "POST",
@@ -2419,6 +2427,11 @@ export default defineComponent({
                             body: JSON.stringify({ approved: true }),
                           },
                         );
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
+                          );
+                        }
                       } catch (error) {
                         console.error("Error auto-confirming navigation:", error);
                       }
@@ -2498,6 +2511,13 @@ export default defineComponent({
 
                   // Handle error events - display error message to user
                   if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage
+                    // restores the conversation once the stream ends. See the
+                    // matching check in the other error branches.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call first
                     let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
@@ -2797,6 +2817,15 @@ export default defineComponent({
 
                   // Handle error events - stream-level errors
                   if (data && data.type === "error") {
+                    // The session's owning replica is gone. Flag it and stop:
+                    // sendMessage restores the conversation into a new session
+                    // once the stream ends. Showing the raw error here as well
+                    // would leave a dead-end message above the restored
+                    // conversation.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call as failed
                     if (activeToolCall.value) {
                       const failedToolBlock: ContentBlock = {
@@ -3022,6 +3051,13 @@ export default defineComponent({
 
                 // Handle error events
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage restores
+                  // the conversation once the stream ends. See the matching
+                  // check in the other error branches.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
@@ -3179,6 +3215,13 @@ export default defineComponent({
 
                 // Handle error events - stream-level errors
                 if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage restores
+                  // the conversation once the stream ends. See the matching
+                  // check in the other error branches.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
                   if (activeToolCall.value) {
                     const failedToolBlock: ContentBlock = {
                       type: "tool_call",
@@ -3608,6 +3651,101 @@ export default defineComponent({
       }
     };
 
+    /**
+     * Whether an error body says the session's owning replica can't serve it.
+     *
+     * Keyed on an explicit server code rather than the status alone: reseeding
+     * means abandoning the current session, so it must happen only when the
+     * server has actually said the session is unreachable — never as a guess
+     * from a generic failure.
+     */
+    // Set by processStream when the agent reports that a session's owning
+    // replica is gone. The stream has already returned HTTP 200 by then, so the
+    // status code is no longer available to branch on — sendMessage reads this
+    // after the stream ends and restores the conversation.
+    const streamOwnerUnavailable = ref(false);
+
+    // Shown after a successful restore. Says plainly that only the dialogue came
+    // back, because the assistant no longer holds the tool results, files or
+    // permission decisions from before the interruption — continuing as if it
+    // did is how a restored conversation gives confidently wrong answers.
+    const RESTORED_NOTICE =
+      "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
+
+    const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
+      // `unknown`, not `any`: this comes straight from response.json(), so the
+      // shape is whatever the server sent. Narrow before reading, or a
+      // non-object body (a string, null) would throw here and mask the real
+      // error the user should have seen.
+      if (typeof errorBody !== "object" || errorBody === null) return false;
+      const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
+      const code = body.detail?.code ?? body.code;
+      return code === "session_owner_unavailable";
+    };
+
+    /**
+     * Surface a message inline in the transcript, matching how stream errors
+     * are rendered (this component shows errors in the conversation itself
+     * rather than as toasts).
+     */
+    const appendErrorBlock = (message: string, recoverable = false) => {
+      const block: ContentBlock = { type: "error", message, recoverable };
+      const msgs = chatMessages.value;
+      const last = msgs[msgs.length - 1];
+      if (last && last.role === "assistant") {
+        if (!last.contentBlocks) last.contentBlocks = [];
+        last.contentBlocks.push(block);
+      } else {
+        msgs.push({ role: "assistant", content: "", contentBlocks: [block] });
+      }
+    };
+
+    /**
+     * POST a confirmation answer and report whether it actually landed.
+     *
+     * The response used to be discarded at every call site, which made the
+     * worst case invisible: if the answer reaches a server that has no record
+     * of the pending confirmation (a lost session, or — with multiple o2-ai
+     * replicas — the wrong one), it 404s, the UI shows the action as confirmed,
+     * and the agent stays paused until it times out and auto-DENIES. The user
+     * sees their "Approve" quietly turn into a decline.
+     *
+     * Returns true when the confirmation was accepted.
+     */
+    const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ approved }),
+          },
+        );
+
+        if (!res.ok) {
+          console.error(
+            `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
+          );
+          appendErrorBlock(
+            approved
+              ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
+              : "Your response could not be delivered — the assistant may have already cancelled this action.",
+          );
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("Error sending confirmation:", error);
+        appendErrorBlock(
+          "Your response could not be delivered. Please check your connection and try again.",
+        );
+        return false;
+      }
+    };
+
     const handleToolConfirm = async () => {
       resolveConfirmationBlock(true);
 
@@ -3623,20 +3761,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -3652,20 +3777,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: false }),
-          },
-        );
-      } catch (error) {
-        console.error("Error cancelling action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, false);
       pendingConfirmation.value = null;
     };
 
@@ -3688,20 +3800,7 @@ export default defineComponent({
 
       if (!currentSessionId.value) return;
 
-      try {
-        const orgId = store.state.selectedOrganization.identifier;
-        await fetch(
-          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${currentSessionId.value}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ approved: true }),
-          },
-        );
-      } catch (error) {
-        console.error("Error confirming action:", error);
-      }
+      await sendConfirmation(currentSessionId.value, true);
       pendingConfirmation.value = null;
     };
 
@@ -4205,6 +4304,18 @@ export default defineComponent({
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
+      // Reseed state for this turn: at most one restore attempt, and a pending
+      // notice to show once the replacement request succeeds.
+      let hasReseeded = false;
+      let reseedNotice = false;
+
+      // Clear any flag left over from a previous turn. processStream sets this,
+      // but the clear at the end of the try block is skipped whenever the turn
+      // throws or is aborted after the flag was set — and a stale `true` makes
+      // the NEXT turn abandon a perfectly healthy session, mint a new id, and
+      // re-post the whole transcript with a false "interrupted" notice.
+      streamOwnerUnavailable.value = false;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4239,10 +4350,63 @@ export default defineComponent({
           } catch (_) {
             // body may not be JSON
           }
+
+          // The conversation's session is gone — it lived on an o2-ai replica
+          // that no longer has it. The transcript is still here in the browser,
+          // though, so start a fresh session and resend: fetchAiChat posts
+          // chatMessages, and the server seeds the new session from it. This
+          // restores the DIALOGUE only (tool results and workspace state are
+          // not recoverable), which the notice below makes explicit.
+          //
+          // Deliberately narrow: only this specific code, and only once. A
+          // blanket retry on 5xx would throw away perfectly good sessions, and
+          // retrying a persistently-unavailable owner would loop.
+          if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
+            hasReseeded = true;
+            console.warn(
+              `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
+            );
+
+            // A NEW id: the old one may still be owned by a replica that has
+            // the session but is unreachable, so reusing it would be refused
+            // again. Note this reassigns currentSessionId while
+            // streamSessionId (captured above) stays pinned to the original —
+            // the streaming-state cleanup keys off that, and must not shift.
+            currentSessionId.value = getUUIDv7();
+            reseedNotice = true;
+
+            response = await fetchAiChat(
+              chatMessages.value,
+              "",
+              store.state.selectedOrganization.identifier,
+              currentAbortController.value?.signal,
+              undefined,
+              currentSessionId.value,
+              hasImages ? messagesToSend : undefined,
+            );
+          }
+        }
+
+        // Re-check: the reseed above may have produced a fresh response.
+        if (!response.ok) {
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
           const err: any = new Error(errorBody?.message || `Server error (${response.status})`);
           err.status = response.status;
           err.errorBody = errorBody;
           throw err;
+        }
+
+        // Tell the user the conversation was restored, before its content
+        // arrives — silently continuing would hide that the assistant no longer
+        // has the tool results or file state from earlier in the conversation.
+        if (reseedNotice) {
+          reseedNotice = false;
+          appendErrorBlock(RESTORED_NOTICE, true);
         }
 
         if (!response.body) {
@@ -4257,6 +4421,75 @@ export default defineComponent({
         const streamMsgs = chatMessages.value;
 
         await processStream(reader);
+
+        // The agent reported mid-stream that this session's owning replica is
+        // gone. The transcript is still here in the browser, so start a fresh
+        // session and resend — the server seeds the new session from the
+        // messages we post, and the conversation continues.
+        //
+        // This is the streaming counterpart of the pre-stream 409 handled
+        // above: once the stream has opened, the failure arrives as an SSE
+        // event inside a 200, so response.ok can no longer be branched on.
+        //
+        // Only while this turn is still the one on screen. If the user switched
+        // chats mid-stream the turn was detached (chatMessages.value now points
+        // at a DIFFERENT conversation), and restoring would work on that one
+        // instead: it would overwrite its currentSessionId, put the notice in
+        // its transcript, and re-post ITS messages under the new id. The
+        // detached turn is already finished and its transcript is saved; the
+        // user can resend from the affected chat.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+        if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
+          streamOwnerUnavailable.value = false;
+          hasReseeded = true;
+
+          if (streamController) backgroundStreams.delete(streamController);
+          if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
+
+          // The replacement turn runs under a new id, so the cross-instance
+          // streaming registry has to follow it — otherwise another instance
+          // re-attaching to this chat never sees the stream finish. The
+          // pre-request id is still cleared on the way out of sendMessage.
+          const restoredSessionId = getUUIDv7();
+          currentSessionId.value = restoredSessionId;
+          sessionStreamingState[restoredSessionId] = true;
+
+          const retry = await fetchAiChat(
+            chatMessages.value,
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value?.signal,
+            undefined,
+            currentSessionId.value,
+            hasImages ? messagesToSend : undefined,
+          );
+
+          if (retry && !retry.cancelled && retry.ok && retry.body) {
+            // Announce the restore only once the replacement request has
+            // actually been accepted, matching the pre-stream path's
+            // reseedNotice. Announcing first and then failing would leave the
+            // user told their conversation was restored with nothing to show
+            // for it.
+            appendErrorBlock(RESTORED_NOTICE, true);
+            await processStream(retry.body.getReader());
+          } else if (!(retry && retry.cancelled)) {
+            // The retry itself failed — non-OK, no body, or null (which is what
+            // fetchAiChat returns on a network error). Say so: hasReseeded now
+            // blocks any further attempt, so staying quiet here would end the
+            // turn with no answer and no explanation, which is the exact silent
+            // failure this restore flow exists to remove. A user-initiated
+            // cancel is not an error and stays silent.
+            appendErrorBlock(
+              "This conversation was interrupted and could not be restored. Please try sending your message again.",
+            );
+          }
+
+          // The restored turn is done, whichever way it went. Clear its entry
+          // too, or a re-attaching instance shows a loading indicator forever.
+          sessionStreamingState[restoredSessionId] = false;
+          backgroundStreamMap.delete(restoredSessionId);
+        }
+        streamOwnerUnavailable.value = false;
 
         // Remove controller from background set and clean up re-attachment map
         if (streamController) backgroundStreams.delete(streamController);
@@ -5686,6 +5919,12 @@ export default defineComponent({
       handleToolCancel,
       handleToolAlwaysConfirm,
       handleNavigationAction,
+      sendConfirmation,
+      // Session restore
+      isSessionOwnerUnavailable,
+      appendErrorBlock,
+      streamOwnerUnavailable,
+      currentSessionId,
       // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,
