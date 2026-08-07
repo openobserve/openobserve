@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="flex h-full w-full flex-col min-w-[23.75rem]">
+      <div class="flex h-full w-full min-w-[23.75rem] flex-col">
         <div
           v-if="errors.length"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
                   data-test="score-config-import-numeric-range-error"
                 >
                   {{ err.message }}
-                  <div class="mt-1 flex gap-2 w-80">
+                  <div class="mt-1 flex w-80 gap-2">
                     <OInput
                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
                       v-model="numericRangeFixers[err.itemIndex].min"

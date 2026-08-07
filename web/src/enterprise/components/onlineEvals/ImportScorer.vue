@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
     @import="importJson"
   >
     <template #output-content>
-      <div class="flex h-full w-full flex-col min-w-[23.75rem]">
+      <div class="flex h-full w-full min-w-[23.75rem] flex-col">
         <div
           v-if="errors.length"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"

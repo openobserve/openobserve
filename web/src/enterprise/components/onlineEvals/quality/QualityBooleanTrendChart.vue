@@ -23,7 +23,6 @@ const chartEl = ref<HTMLElement | null>(null);
 let chart: echarts.ECharts | null = null;
 const store = useStore();
 
-
 function effectiveSeries(): BooleanTrendSeries[] {
   if (props.series && props.series.length > 0) return props.series;
   if (props.points && props.points.length > 0) {

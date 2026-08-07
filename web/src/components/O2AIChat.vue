@@ -44,7 +44,9 @@
                   :placeholder="t('aiAssistant.searchChatHistory')"
                   class="sticky top-0 z-2 shrink-0 p-2"
                 />
-                <div class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto">
+                <div
+                  class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto"
+                >
                   <ODropdownItem
                     v-for="chat in filteredChatHistory"
                     :key="chat.id"

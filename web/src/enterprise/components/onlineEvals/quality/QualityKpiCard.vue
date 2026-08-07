@@ -86,7 +86,7 @@
       :data="kpi.sparkline"
       :color="sparkColor"
       :height="20"
-      class="mt-auto -mx-3 -mb-1.5"
+      class="-mx-3 mt-auto -mb-1.5"
     />
   </div>
 </template>

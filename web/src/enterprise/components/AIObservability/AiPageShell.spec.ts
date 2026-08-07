@@ -26,14 +26,16 @@ const DateTime = {
   template:
     '<div class="date-time" :data-test="dataTest" @click="$emit(\'on:date-change\', { valueType: \'relative\' })" />',
 };
-const ORefreshButton = {
-  props: ["lastRunAt", "loading", "disabled", "dataTest"],
-  emits: ["click"],
+// AiLastRefreshed owns the staleness dot + relative-time ticking on its own —
+// stubbed so this spec asserts only that AiPageShell forwards lastRunAt/loading
+// through, not AiLastRefreshed's internal timer/formatting (covered by its own spec).
+const AiLastRefreshed = {
+  props: ["lastRunAt", "loading", "dataTest"],
   template:
-    '<button class="o-refresh-button" :data-test="dataTest" :data-loading="loading" :data-disabled="disabled" :data-last-run-at="lastRunAt" @click="$emit(\'click\')" />',
+    '<span class="ai-last-refreshed" :data-test="dataTest" :data-loading="loading" :data-last-run-at="lastRunAt" />',
 };
 
-const stubs = { OPageLayout, DateTime, ORefreshButton };
+const stubs = { OPageLayout, DateTime, AiLastRefreshed };
 
 const baseDateState = {
   valueType: "relative" as const,
@@ -82,25 +84,27 @@ describe("AiPageShell", () => {
     expect(w.find('[data-test="ai-sessions-refresh-btn"]').exists()).toBe(true);
   });
 
-  it("passes the refresh button's last-run-at / loading / disabled through", () => {
+  it("passes lastRunAt/isLoading to AiLastRefreshed and disables/spins the refresh button while loading", () => {
     const w = mountShell({ isLoading: true, lastRunAt: 999 });
+    const lastRefreshed = w.find('[data-test="ai-agent-behavior-last-refreshed"]');
+    expect(lastRefreshed.attributes("data-loading")).toBe("true");
+    expect(lastRefreshed.attributes("data-last-run-at")).toBe("999");
+
     const btn = w.find('[data-test="ai-agent-behavior-refresh-btn"]');
-    expect(btn.attributes("data-loading")).toBe("true");
-    expect(btn.attributes("data-disabled")).toBe("true");
-    expect(btn.attributes("data-last-run-at")).toBe("999");
+    expect(btn.attributes("disabled")).toBeDefined();
+    expect(btn.attributes("aria-busy")).toBe("true");
   });
 
-  it("keeps the exact class strings on the date-time and refresh wrapper", () => {
+  it("renders the refresh button as a primary-variant labeled button", () => {
     const w = mountShell();
-    expect(w.find(".date-time").classes()).toContain("h-8");
-    const wrapper = w.find(
-      ".inline-flex.items-center.border.border-border-default.rounded-default.px-1.h-8.overflow-hidden",
-    );
-    expect(wrapper.exists()).toBe(true);
+    const btn = w.find('[data-test="ai-agent-behavior-refresh-btn"]');
+    expect(btn.attributes("data-o2-variant")).toBe("primary");
+    expect(btn.text()).toContain("Refresh");
   });
 
   it("forwards the date-time on:date-change as a date-change event", async () => {
     const w = mountShell();
+    expect(w.find(".date-time").classes()).toContain("h-8");
     await w.find(".date-time").trigger("click");
     expect(w.emitted("date-change")).toBeTruthy();
     expect(w.emitted("date-change")![0][0]).toEqual({ valueType: "relative" });
@@ -108,7 +112,7 @@ describe("AiPageShell", () => {
 
   it("forwards the refresh button click as a refresh event", async () => {
     const w = mountShell();
-    await w.find(".o-refresh-button").trigger("click");
+    await w.find('[data-test="ai-agent-behavior-refresh-btn"]').trigger("click");
     expect(w.emitted("refresh")).toBeTruthy();
   });
 

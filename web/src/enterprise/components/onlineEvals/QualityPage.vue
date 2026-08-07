@@ -51,9 +51,7 @@
     <!-- Tier 2: the configs table is the persistent view; selecting a
          row opens the detail in a right-side ODrawer (70% width). The user
          keeps full context of the list behind the drawer. -->
-    <div
-      class="quality-page__tier2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3"
-    >
+    <div class="quality-page__tier2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3">
       <QualityScoreConfigsTable
         :rows="configRows"
         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
