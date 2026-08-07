@@ -109,6 +109,9 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
 const { AnomalyFormValidationPage } = require("./anomalyPages/anomalyFormValidationPage.js");
 
+// ===== AI OBSERVABILITY PAGE OBJECTS =====
+import { AIObservabilityPage } from "./aiObservabilityPages/aiObservabilityPage.js";
+
 class PageManager {
   /**
    * @param {import('@playwright/test').Page} page - Playwright page instance
@@ -234,6 +237,9 @@ class PageManager {
     this.rumPerformancePage = new RumPerformancePage(page);
     this.rumIngestionPage = new RumIngestionPage(page);
     this.rumSourcemapsPage = new RumSourcemapsPage(page);
+
+    // ===== AI OBSERVABILITY PAGE OBJECTS =====
+    this.aiObservabilityPage = new AIObservabilityPage(page);
   }
 }
 

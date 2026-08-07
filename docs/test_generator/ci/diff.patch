@@ -1,0 +1,1848 @@
+===== COMPLETE LIST OF CHANGED FILES (38 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/O2AIChat.vue
+web/src/components/common/KpiCardRow.vue
+web/src/composables/dashboard/usePanelDataLoader.ts
+web/src/enterprise/components/AIObservability/AiLastRefreshed.vue
+web/src/enterprise/components/AIObservability/AiPageShell.spec.ts
+web/src/enterprise/components/AIObservability/AiPageShell.vue
+web/src/enterprise/components/OnlineEvals.vue
+web/src/enterprise/components/onlineEvals/ImportScoreConfig.vue
+web/src/enterprise/components/onlineEvals/ImportScorer.vue
+web/src/enterprise/components/onlineEvals/QualityPage.vue
+web/src/enterprise/components/onlineEvals/ScoreConfigLibrary.vue
+web/src/enterprise/components/onlineEvals/ScorerLibrary.vue
+web/src/enterprise/components/onlineEvals/forms/EvalJobDetail.vue
+web/src/enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue
+web/src/enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue
+web/src/enterprise/components/onlineEvals/forms/ScorerDetail.vue
+web/src/enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue
+web/src/enterprise/components/onlineEvals/quality/QualityBooleanTrendChart.vue
+web/src/enterprise/components/onlineEvals/quality/QualityDetailPanel.vue
+web/src/enterprise/components/onlineEvals/quality/QualityDistributionChart.vue
+web/src/enterprise/components/onlineEvals/quality/QualityKpiCard.vue
+web/src/enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue
+web/src/enterprise/components/onlineEvals/quality/QualityScoreConfigsTable.vue
+web/src/enterprise/components/onlineEvals/quality/QualityTrendChart.vue
+web/src/enterprise/views/AIObservability/AgentBehaviorPage.vue
+web/src/enterprise/views/AIObservability/AgentBehaviorPanel.vue
+web/src/enterprise/views/AIObservability/AgentGraphPage.vue
+web/src/enterprise/views/AIObservability/AgentSignalDetailPanel.vue
+web/src/enterprise/views/AIObservability/PanelSectionHeader.vue
+web/src/layouts/MainLayout.vue
+web/src/plugins/traces/LLMErrorTable.vue
+web/src/plugins/traces/LLMPanelCard.vue
+web/src/plugins/traces/LLMSchemaPanel.vue
+web/src/plugins/traces/SessionDetails.vue
+web/src/plugins/traces/SessionsList.vue
+web/src/plugins/traces/config/llmInsightsPanels.ts
+web/src/utils/dashboard/colorPalette.ts
+web/src/utils/dashboard/sql/shared/contextBuilder.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/O2AIChat.vue b/web/src/components/O2AIChat.vue
+index 15f5116271a..eb8be2add61 100644
+--- a/web/src/components/O2AIChat.vue
++++ b/web/src/components/O2AIChat.vue
+@@ -1,6 +1,6 @@
+ ﻿<template>
+   <div
+-    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
++    class="chat-container rounded-surface text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+     :class="[{ 'chat-open': isOpen }]"
+   >
+     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
+@@ -38,19 +38,14 @@
+                   </div>
+                 </OButton>
+               </template>
+-              <!-- History menu with search -->
+               <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
++                <OSearchInput
++                  v-model="historySearchTerm"
++                  :placeholder="t('aiAssistant.searchChatHistory')"
++                  class="sticky top-0 z-2 shrink-0 p-2"
++                />
+                 <div
+-                  class="search-history-bar-sticky bg-surface-base border-separator sticky top-0 z-2 shrink-0 border-b p-2"
+-                >
+-                  <OSearchInput
+-                    v-model="historySearchTerm"
+-                    :placeholder="t('aiAssistant.searchChatHistory')"
+-                    class="mt-1"
+-                  />
+-                </div>
+-                <div
+-                  class="history-list-container border-border-default max-h-87.5 w-75 max-w-75 min-w-50 flex-1 overflow-x-hidden overflow-y-auto border"
++                  class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto"
+                 >
+                   <ODropdownItem
+                     v-for="chat in filteredChatHistory"
+@@ -89,12 +84,12 @@
+                 <!-- Clear all conversations button -->
+                 <div
+                   v-if="filteredChatHistory.length > 0"
+-                  class="clear-all-container bg-surface-base border-separator shrink-0 border-t p-2"
++                  class="clear-all-container bg-surface-base shrink-0"
+                 >
+                   <ODropdownSeparator />
+                   <OButton
+-                    variant="ghost"
+-                    class="clear-all-btn text-compact w-full text-[var(--color-status-negative)] hover:bg-[color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
++                    variant="ghost-destructive"
++                    class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
+                     @click.stop="clearAllConversations"
+                   >
+                     <template #icon-left>
+@@ -148,7 +143,6 @@
+           </div>
+         </div>
+       </div>
+-      <OSeparator class="bg-separator" />
+ 
+       <!-- History Panel -->
+       <ODrawer
+@@ -242,25 +236,20 @@
+         >
+           <div
+             v-if="chatMessages.length === 0"
+-            class="welcome-section rounded-default flex flex-1 items-center justify-center"
+-            :class="
+-              centeredStart
+-                ? 'mb-0 bg-transparent p-0'
+-                : 'mb-6 p-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
+-            "
++            class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
+           >
+             <!-- Home tab: rich V2 welcome -->
+             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
+             <!-- Sidepanel: minimal logo + title -->
+             <div v-else class="flex h-full w-full flex-col items-center justify-center">
+-              <div class="flex flex-col items-center">
++              <div class="flex flex-col items-center gap-2">
+                 <img :src="o2AiTitleLogo" />
+-                <div class="relative inline-block">
+-                  <span class="ml-7.5 text-center text-sm font-[600]">{{
++                <div class="flex items-center gap-2">
++                  <span class="text-sm font-[600]">{{
+                     t("aiAssistant.welcome.taglineHighlight")
+                   }}</span>
+                   <!-- Same shared Beta tag as the Workflows screens. -->
+-                  <BetaBadge class="ml-2" />
++                  <BetaBadge />
+                 </div>
+               </div>
+             </div>
+@@ -1355,11 +1344,11 @@
+                 v-if="!isLoading"
+                 :disabled="!inputMessage.trim() && pendingImages.length === 0"
+                 @click="sendMessage"
+-                variant="ai-gradient"
++                variant="primary"
+                 size="icon-xs-circle"
+-                class="send-button bg-(image:--color-gradient-ai)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
++                class="send-button"
+               >
+-                <OIcon name="send" size="sm" />
++                <OIcon name="arrow-upward" size="sm" />
+               </OButton>
+ 
+               <!-- Stop button - shown when loading/streaming -->
+@@ -1436,7 +1425,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
+ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+ import { toast } from "@/lib/feedback/Toast/useToast";
+ import { copyToClipboard } from "@/utils/clipboard";
+-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+ import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
+ 
+ const { fetchAiChat, submitFeedback } = useAiChat();
+@@ -1524,7 +1512,6 @@ const abortBackgroundStreams = () => {
+ export default defineComponent({
+   name: "O2AIChat",
+   components: {
+-    OSeparator,
+     OButton,
+     BetaBadge,
+     ConfirmDialog,
+diff --git a/web/src/components/common/KpiCardRow.vue b/web/src/components/common/KpiCardRow.vue
+index 32b1fd2c220..0de966b04de 100644
+--- a/web/src/components/common/KpiCardRow.vue
++++ b/web/src/components/common/KpiCardRow.vue
+@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   inset, so it lines up with the header and any table below it.
+ -->
+ <template>
+-  <div class="grid gap-2.5" :style="gridStyle" data-test="kpi-card-row">
++  <div class="grid" :class="gap" :style="gridStyle" data-test="kpi-card-row">
+     <slot />
+   </div>
+ </template>
+@@ -45,10 +45,12 @@ const props = withDefaults(
+     columns?: number;
+     /** Minimum card width before the responsive grid wraps. */
+     minWidth?: string;
++    gap?: string;
+   }>(),
+   {
+     columns: undefined,
+     minWidth: "11.25rem",
++    gap: "gap-2.5",
+   },
+ );
+ 
+diff --git a/web/src/composables/dashboard/usePanelDataLoader.ts b/web/src/composables/dashboard/usePanelDataLoader.ts
+index 9b651f44291..c64ad2b3fef 100644
+--- a/web/src/composables/dashboard/usePanelDataLoader.ts
++++ b/web/src/composables/dashboard/usePanelDataLoader.ts
+@@ -798,8 +798,16 @@ export const usePanelDataLoader = (
+ 
+     const cacheKeysMatch = isEqual(normalizedCurrentKey, normalizedSavedKey);
+ 
++    const cachedIncompleteLoad =
++      tempPanelCacheValue?.loading === true || tempPanelCacheValue?.isPartialData === true;
++
+     // Check if it is stale or not
+-    if (tempPanelCacheValue && Object.keys(tempPanelCacheValue).length > 0 && cacheKeysMatch) {
++    if (
++      tempPanelCacheValue &&
++      Object.keys(tempPanelCacheValue).length > 0 &&
++      cacheKeysMatch &&
++      !cachedIncompleteLoad
++    ) {
+       // const cache = getPanelCache();
+       state.data = markRaw(tempPanelCacheValue.data ?? []);
+       state.loading = tempPanelCacheValue.loading;
+diff --git a/web/src/enterprise/components/AIObservability/AiLastRefreshed.vue b/web/src/enterprise/components/AIObservability/AiLastRefreshed.vue
+new file mode 100644
+index 00000000000..999651f3919
+--- /dev/null
++++ b/web/src/enterprise/components/AIObservability/AiLastRefreshed.vue
+@@ -0,0 +1,95 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++<!--
++  AiLastRefreshed — the "· N ago" staleness indicator shown left of the date
++  picker on every AI Observability page. Same formatting and thresholds as
++  ORefreshButton (green <30s / amber <5m / red), but detached from the icon
++  button so pages using a labeled primary Refresh button can still surface the
++  timestamp. Ticks every 10s so it stays current between refreshes.
++-->
++<template>
++  <span
++    v-if="lastRunAt"
++    class="inline-flex items-center gap-1.5"
++    :title="title"
++    :data-test="dataTest"
++  >
++    <span :class="['size-2 shrink-0 rounded-full transition-colors duration-700', dotClass]" />
++    <span class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none">
++      {{ relativeTime }}
++    </span>
++  </span>
++</template>
++
++<script setup lang="ts">
++import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue";
++import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
++
++const props = withDefaults(
++  defineProps<{
++    /** Epoch-ms of the last refresh, or null before the first one. */
++    lastRunAt: number | null;
++    /** Whether a refresh is in flight — greys the staleness dot. */
++    loading?: boolean;
++    dataTest?: string;
++  }>(),
++  { loading: false, dataTest: undefined },
++);
++
++const { t } = useI18nTyped();
++
++const now = ref(Date.now());
++let tickId: ReturnType<typeof setInterval> | null = null;
++onMounted(() => {
++  tickId = setInterval(() => (now.value = Date.now()), 10_000);
++});
++onBeforeUnmount(() => {
++  if (tickId) clearInterval(tickId);
++});
++// A fresh refresh should reset to "just now" immediately, not wait for the tick.
++watch(
++  () => props.lastRunAt,
++  () => (now.value = Date.now()),
++);
++
++const staleSeconds = computed(() =>
++  props.lastRunAt ? Math.floor((now.value - props.lastRunAt) / 1000) : Infinity,
++);
++const relativeTime = computed<I18nText>(() => {
++  const sec = staleSeconds.value;
++  if (sec === Infinity) return raw("");
++  if (sec < 5) return t("refreshButton.justNow");
++  if (sec < 60) return t("refreshButton.secondsAgo", { sec });
++  const min = Math.floor(sec / 60);
++  if (min < 60) return t("refreshButton.minutesAgo", { min });
++  return t("refreshButton.hoursAgo", { h: Math.floor(min / 60) });
++});
++const dotClass = computed(() => {
++  if (props.loading) return "bg-refresh-dot-idle";
++  const s = staleSeconds.value;
++  if (s === Infinity) return "bg-refresh-dot-idle";
++  if (s < 30) return "bg-refresh-dot-fresh";
++  if (s < 300) return "bg-refresh-dot-stale";
++  return "bg-refresh-dot-critical";
++});
++const title = computed<I18nText>(() =>
++  props.lastRunAt
++    ? t("refreshButton.lastRefreshed", {
++        time: new Date(props.lastRunAt).toLocaleTimeString(),
++      })
++    : t("refreshButton.notYetRefreshed"),
++);
++</script>
+diff --git a/web/src/enterprise/components/AIObservability/AiPageShell.spec.ts b/web/src/enterprise/components/AIObservability/AiPageShell.spec.ts
+index 6a553738fa2..f6196cde282 100644
+--- a/web/src/enterprise/components/AIObservability/AiPageShell.spec.ts
++++ b/web/src/enterprise/components/AIObservability/AiPageShell.spec.ts
+@@ -26,14 +26,16 @@ const DateTime = {
+   template:
+     '<div class="date-time" :data-test="dataTest" @click="$emit(\'on:date-change\', { valueType: \'relative\' })" />',
+ };
+-const ORefreshButton = {
+-  props: ["lastRunAt", "loading", "disabled", "dataTest"],
+-  emits: ["click"],
++// AiLastRefreshed owns the staleness dot + relative-time ticking on its own —
++// stubbed so this spec asserts only that AiPageShell forwards lastRunAt/loading
++// through, not AiLastRefreshed's internal timer/formatting (covered by its own spec).
++const AiLastRefreshed = {
++  props: ["lastRunAt", "loading", "dataTest"],
+   template:
+-    '<button class="o-refresh-button" :data-test="dataTest" :data-loading="loading" :data-disabled="disabled" :data-last-run-at="lastRunAt" @click="$emit(\'click\')" />',
++    '<span class="ai-last-refreshed" :data-test="dataTest" :data-loading="loading" :data-last-run-at="lastRunAt" />',
+ };
+ 
+-const stubs = { OPageLayout, DateTime, ORefreshButton };
++const stubs = { OPageLayout, DateTime, AiLastRefreshed };
+ 
+ const baseDateState = {
+   valueType: "relative" as const,
+@@ -82,25 +84,27 @@ describe("AiPageShell", () => {
+     expect(w.find('[data-test="ai-sessions-refresh-btn"]').exists()).toBe(true);
+   });
+ 
+-  it("passes the refresh button's last-run-at / loading / disabled through", () => {
++  it("passes lastRunAt/isLoading to AiLastRefreshed and disables/spins the refresh button while loading", () => {
+     const w = mountShell({ isLoading: true, lastRunAt: 999 });
++    const lastRefreshed = w.find('[data-test="ai-agent-behavior-last-refreshed"]');
++    expect(lastRefreshed.attributes("data-loading")).toBe("true");
++    expect(lastRefreshed.attributes("data-last-run-at")).toBe("999");
++
+     const btn = w.find('[data-test="ai-agent-behavior-refresh-btn"]');
+-    expect(btn.attributes("data-loading")).toBe("true");
+-    expect(btn.attributes("data-disabled")).toBe("true");
+-    expect(btn.attributes("data-last-run-at")).toBe("999");
++    expect(btn.attributes("disabled")).toBeDefined();
++    expect(btn.attributes("aria-busy")).toBe("true");
+   });
+ 
+-  it("keeps the exact class strings on the date-time and refresh wrapper", () => {
++  it("renders the refresh button as a primary-variant labeled button", () => {
+     const w = mountShell();
+-    expect(w.find(".date-time").classes()).toContain("h-8");
+-    const wrapper = w.find(
+-      ".inline-flex.items-center.border.border-border-default.rounded-default.px-1.h-8.overflow-hidden",
+-    );
+-    expect(wrapper.exists()).toBe(true);
++    const btn = w.find('[data-test="ai-agent-behavior-refresh-btn"]');
++    expect(btn.attributes("data-o2-variant")).toBe("primary");
++    expect(btn.text()).toContain("Refresh");
+   });
+ 
+   it("forwards the date-time on:date-change as a date-change event", async () => {
+     const w = mountShell();
++    expect(w.find(".date-time").classes()).toContain("h-8");
+     await w.find(".date-time").trigger("click");
+     expect(w.emitted("date-change")).toBeTruthy();
+     expect(w.emitted("date-change")![0][0]).toEqual({ valueType: "relative" });
+@@ -108,7 +112,7 @@ describe("AiPageShell", () => {
+ 
+   it("forwards the refresh button click as a refresh event", async () => {
+     const w = mountShell();
+-    await w.find(".o-refresh-button").trigger("click");
++    await w.find('[data-test="ai-agent-behavior-refresh-btn"]').trigger("click");
+     expect(w.emitted("refresh")).toBeTruthy();
+   });
+ 
+diff --git a/web/src/enterprise/components/AIObservability/AiPageShell.vue b/web/src/enterprise/components/AIObservability/AiPageShell.vue
+index 6a2e4f07c8b..e79d8882db1 100644
+--- a/web/src/enterprise/components/AIObservability/AiPageShell.vue
++++ b/web/src/enterprise/components/AIObservability/AiPageShell.vue
+@@ -43,6 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     :scroll="false"
+   >
+     <template #actions>
++      <!-- Last-refreshed indicator (staleness dot + relative time), left of the
++           picker — the labeled Refresh button carries no timestamp of its own. -->
++      <AiLastRefreshed
++        class="mr-1"
++        :last-run-at="lastRunAt"
++        :loading="isLoading"
++        :data-test="`${dataTest}-last-refreshed`"
++      />
++
+       <!-- Compare mode (version-compare) makes windows per-version, so the
+            page-level picker is disabled and explains why via a tooltip. Wrapping
+            in OTooltip even when enabled is harmless — `disabled` on OTooltip
+@@ -67,35 +76,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           @on:date-change="$emit('date-change', $event)"
+         />
+       </OTooltip>
+-      <!-- Last-refresh + refresh control, consistent across every AI page
+-           header. -->
+-      <div
+-        class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
++      <!-- Labeled primary Refresh button, matching the Metrics explorer toolbar.
++           Disabled + spinning while a query is in flight (cancel isn't
++           supported). -->
++      <OButton
++        variant="primary"
++        size="sm-toolbar"
++        icon-left="refresh"
++        :disabled="isLoading"
++        :loading="isLoading"
++        :data-test="`${dataTest}-refresh-btn`"
++        @click="$emit('refresh')"
+       >
+-        <ORefreshButton
+-          :last-run-at="lastRunAt"
+-          :loading="isLoading"
+-          :disabled="isLoading"
+-          :data-test="`${dataTest}-refresh-btn`"
+-          @click="$emit('refresh')"
+-        />
+-      </div>
++        {{ t("common.refresh") }}
++      </OButton>
+     </template>
+ 
+-    <template #subnav><slot name="subnav" /></template>
++    <template v-if="$slots.subnav" #subnav><slot name="subnav" /></template>
+     <slot />
+   </OPageLayout>
+ </template>
+ 
+ <script setup lang="ts">
+-import { raw, type I18nText } from "@/types/i18n";
++import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+ import { ref } from "vue";
+ import type { AiDateState } from "@/enterprise/composables/useAiDateRange";
+ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+ import DateTime from "@/components/DateTime.vue";
+ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
++import AiLastRefreshed from "./AiLastRefreshed.vue";
++
++const { t } = useI18nTyped();
+ 
+ defineProps<{
+   /** Page prefix — the header derives `${dataTest}-page`,
+diff --git a/web/src/enterprise/components/OnlineEvals.vue b/web/src/enterprise/components/OnlineEvals.vue
+index 596610a7086..85b095c4dde 100644
+--- a/web/src/enterprise/components/OnlineEvals.vue
++++ b/web/src/enterprise/components/OnlineEvals.vue
+@@ -136,48 +136,54 @@ the Free Software Foundation, either version 3 of the License, or
+           <!-- Agent filter is rendered inside QualityPage (right-aligned, above
+                the KPIs) so it sits within the content container alongside the
+                data it filters — only the date picker + refresh stay here. -->
++          <!-- Last-refreshed indicator + labeled primary Refresh button, matching
++               the other AI pages' AiPageShell header. -->
++          <AiLastRefreshed
++            class="mr-1"
++            :last-run-at="qualityLastRunAt"
++            :loading="qualityRefreshing"
++            data-test="quality-last-refreshed"
++          />
+           <DateTimePickerDashboard
+             ref="qualityDatePickerRef"
+             v-model="qualitySelectedDate"
+             :auto-apply-dashboard="true"
+             data-test="quality-time-range-picker"
+           />
+-          <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
+-               ORefreshButton renders no border of its own. -->
+-          <div
+-            class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
++          <OButton
++            variant="primary"
++            size="sm-toolbar"
++            icon-left="refresh"
++            :disabled="qualityRefreshing"
++            :loading="qualityRefreshing"
++            data-test="quality-refresh-btn"
++            @click="onQualityRefresh"
+           >
+-            <ORefreshButton
+-              :last-run-at="qualityLastRunAt"
+-              :loading="qualityRefreshing"
+-              :disabled="qualityRefreshing"
+-              data-test="quality-refresh-btn"
+-              @click="onQualityRefresh"
+-            />
+-          </div>
++            {{ t("common.refresh") }}
++          </OButton>
+         </template>
+       </OPageHeader>
+ 
+       <section
+         class="online-evals__content bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden"
+       >
+-        <div
++        <OTabs
+           v-if="!hideTabBar"
+-          class="online-evals__tabs border-border-default flex shrink-0 items-center gap-2 border-b bg-transparent px-3.5 py-0"
++          :model-value="activeTab"
++          bordered
++          class="online-evals__tabs shrink-0 px-3.5"
++          data-test="online-evals-tabs"
++          @update:model-value="activeTab = $event as ActiveTab"
+         >
+-          <button
++          <OTab
+             v-for="tab in tabs"
+             :key="tab.value"
+-            class="online-evals__tab text-text-muted text-compact inline-flex h-9.5 cursor-pointer items-center gap-1.75 border-0 border-b-2 border-b-transparent bg-transparent px-3.5 py-0 font-semibold"
+-            :class="
+-              activeTab === tab.value ? 'is-active text-text-body border-b-accent -mb-px' : ''
+-            "
+-            type="button"
+-            @click="activeTab = tab.value"
++            :name="tab.value"
++            :data-test="`online-evals-tab-${tab.value}`"
+           >
+-            <span>{{ tab.label }}</span>
+-          </button>
+-        </div>
++            {{ tab.label }}
++          </OTab>
++        </OTabs>
+ 
+         <div class="online-evals__body flex min-h-0 flex-1">
+           <QualityPage
+@@ -406,9 +412,11 @@ import ScorerLibrary from "./onlineEvals/ScorerLibrary.vue";
+ import ImportScoreConfig from "./onlineEvals/ImportScoreConfig.vue";
+ import ImportScorer from "./onlineEvals/ImportScorer.vue";
+ import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
++import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
++import OTab from "@/lib/navigation/Tabs/OTab.vue";
+ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+ import OButton from "@/lib/core/Button/OButton.vue";
+-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
++import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
+ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+ import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
+diff --git a/web/src/enterprise/components/onlineEvals/ImportScoreConfig.vue b/web/src/enterprise/components/onlineEvals/ImportScoreConfig.vue
+index 6c18bde7869..b27ab1dc4d4 100644
+--- a/web/src/enterprise/components/onlineEvals/ImportScoreConfig.vue
++++ b/web/src/enterprise/components/onlineEvals/ImportScoreConfig.vue
+@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
+     @import="importJson"
+   >
+     <template #output-content>
+-      <div class="flex h-full w-full flex-col" style="min-width: 380px">
++      <div class="flex h-full w-full min-w-[23.75rem] flex-col">
+         <div
+           v-if="errors.length"
+           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
+@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="score-config-import-name-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OInput
+                       :data-test="`score-config-import-name-input-${err.itemIndex}`"
+                       v-model="nameFixers[err.itemIndex]"
+@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="score-config-import-name-conflict-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OInput
+                       :data-test="`score-config-import-rename-input-${err.itemIndex}`"
+                       v-model="nameFixers[err.itemIndex]"
+@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="score-config-import-datatype-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OSelect
+                       :data-test="`score-config-import-datatype-select-${err.itemIndex}`"
+                       v-model="dataTypeFixers[err.itemIndex]"
+@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="score-config-import-numeric-range-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1 flex gap-2" style="width: 320px">
++                  <div class="mt-1 flex w-80 gap-2">
+                     <OInput
+                       :data-test="`score-config-import-min-input-${err.itemIndex}`"
+                       v-model="numericRangeFixers[err.itemIndex].min"
+@@ -123,7 +123,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="score-config-import-categories-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OInput
+                       :data-test="`score-config-import-categories-input-${err.itemIndex}`"
+                       v-model="categoriesFixers[err.itemIndex]"
+diff --git a/web/src/enterprise/components/onlineEvals/ImportScorer.vue b/web/src/enterprise/components/onlineEvals/ImportScorer.vue
+index f00dde9b213..1ddb5861f0e 100644
+--- a/web/src/enterprise/components/onlineEvals/ImportScorer.vue
++++ b/web/src/enterprise/components/onlineEvals/ImportScorer.vue
+@@ -18,7 +18,7 @@ the Free Software Foundation, either version 3 of the License, or
+     @import="importJson"
+   >
+     <template #output-content>
+-      <div class="flex h-full w-full flex-col" style="min-width: 380px">
++      <div class="flex h-full w-full min-w-[23.75rem] flex-col">
+         <div
+           v-if="errors.length"
+           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
+@@ -50,7 +50,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="scorer-import-name-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OInput
+                       :data-test="`scorer-import-name-input-${err.itemIndex}`"
+                       v-model="nameFixers[err.itemIndex]"
+@@ -66,7 +66,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="scorer-import-name-conflict-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OInput
+                       :data-test="`scorer-import-rename-input-${err.itemIndex}`"
+                       v-model="nameFixers[err.itemIndex]"
+@@ -82,7 +82,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="scorer-import-type-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OSelect
+                       :data-test="`scorer-import-type-select-${err.itemIndex}`"
+                       v-model="typeFixers[err.itemIndex]"
+@@ -99,7 +99,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="scorer-import-score-config-ref-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OSelect
+                       :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
+                       v-model="scoreConfigFixers[err.itemIndex]"
+@@ -116,7 +116,7 @@ the Free Software Foundation, either version 3 of the License, or
+                   data-test="scorer-import-provider-ref-error"
+                 >
+                   {{ err.message }}
+-                  <div class="mt-1" style="width: 320px">
++                  <div class="mt-1 w-80">
+                     <OSelect
+                       :data-test="`scorer-import-provider-select-${err.itemIndex}`"
+                       v-model="providerFixers[err.itemIndex]"
+diff --git a/web/src/enterprise/components/onlineEvals/QualityPage.vue b/web/src/enterprise/components/onlineEvals/QualityPage.vue
+index 581a668179d..820197cc2d9 100644
+--- a/web/src/enterprise/components/onlineEvals/QualityPage.vue
++++ b/web/src/enterprise/components/onlineEvals/QualityPage.vue
+@@ -34,6 +34,7 @@
+     <QualityKpiSkeleton v-if="showKpiSkeleton" :count="visibleKpis.length" class="px-page-edge" />
+     <KpiCardRow
+       v-else
++      gap="gap-2"
+       class="quality-page__kpis px-page-edge"
+       :aria-label="t('onlineEvals.quality.kpisAriaLabel')"
+     >
+@@ -50,10 +51,7 @@
+     <!-- Tier 2: the configs table is the persistent view; selecting a
+          row opens the detail in a right-side ODrawer (70% width). The user
+          keeps full context of the list behind the drawer. -->
+-    <div
+-      class="quality-page__tier2 grid min-h-0 flex-1 gap-3"
+-      style="grid-template-columns: minmax(0, 1fr)"
+-    >
++    <div class="quality-page__tier2 grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-3">
+       <QualityScoreConfigsTable
+         :rows="configRows"
+         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
+diff --git a/web/src/enterprise/components/onlineEvals/ScoreConfigLibrary.vue b/web/src/enterprise/components/onlineEvals/ScoreConfigLibrary.vue
+index 84eddbcd7df..07655b041aa 100644
+--- a/web/src/enterprise/components/onlineEvals/ScoreConfigLibrary.vue
++++ b/web/src/enterprise/components/onlineEvals/ScoreConfigLibrary.vue
+@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
+       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
+       data-test="score-config-library-error"
+     >
+-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
++      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
+       <div class="text-status-error-text">{{ loadError }}</div>
+       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+         {{ t("common.retry") }}
+diff --git a/web/src/enterprise/components/onlineEvals/ScorerLibrary.vue b/web/src/enterprise/components/onlineEvals/ScorerLibrary.vue
+index fc8b2810f93..87311bcb683 100644
+--- a/web/src/enterprise/components/onlineEvals/ScorerLibrary.vue
++++ b/web/src/enterprise/components/onlineEvals/ScorerLibrary.vue
+@@ -20,7 +20,7 @@ the Free Software Foundation, either version 3 of the License, or
+       class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
+       data-test="scorer-library-error"
+     >
+-      <OIcon name="error-outline" class="mb-2" style="width: 3em; height: 3em" />
++      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
+       <div class="text-status-error-text">{{ loadError }}</div>
+       <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+         {{ t("common.retry") }}
+@@ -93,7 +93,7 @@ the Free Software Foundation, either version 3 of the License, or
+               class="flex cursor-pointer items-center gap-2 border-l-4 px-3 py-2 transition-colors duration-200"
+               :class="[
+                 isSelected(entry.name)
+-                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-primary-600)_6%,transparent)]'
++                  ? 'selected-item border-primary bg-[color-mix(in_srgb,var(--color-accent)_6%,transparent)]'
+                   : 'hover:bg-table-row-hover-bg border-transparent',
+               ]"
+               :data-test="`scorer-library-item-${entry.name}`"
+diff --git a/web/src/enterprise/components/onlineEvals/forms/EvalJobDetail.vue b/web/src/enterprise/components/onlineEvals/forms/EvalJobDetail.vue
+index ae466ac4b40..030fd2fa37a 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/EvalJobDetail.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/EvalJobDetail.vue
+@@ -218,7 +218,7 @@
+                      must not light up on hover. -->
+                 <button
+                   type="button"
+-                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-primary-600)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-primary-600)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
++                  class="group bg-card-bg rounded-default flex w-full cursor-pointer items-center gap-3.5 border border-[color-mix(in_srgb,var(--color-text-secondary)_16%,transparent)] px-4 py-3.5 text-left transition-[border-color,background,box-shadow,transform] duration-150 enabled:hover:-translate-y-px enabled:hover:border-[color-mix(in_srgb,var(--color-accent)_45%,transparent)] enabled:hover:bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))] enabled:hover:shadow-[0_0.0625rem_0.1875rem_color-mix(in_srgb,var(--color-accent)_12%,transparent)] disabled:cursor-not-allowed disabled:opacity-55"
+                   :data-test="`eval-job-detail-scorer-item-${item.name}`"
+                   :disabled="!findScorerById(item.id)"
+                   @click="onScorerClick(item.id)"
+diff --git a/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue b/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue
+index 528942a7992..3ac2c16cb0e 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDetail.vue
+@@ -177,7 +177,7 @@
+           </p>
+           <ul class="m-0 flex list-none flex-col gap-2 p-0">
+             <li
+-              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! p-[12px_14px]"
++              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-accent,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent,#3F7994)_5%,var(--color-card-bg))]! p-[12px_14px]"
+             >
+               <div class="flex items-center gap-2">
+                 <span
+@@ -399,12 +399,12 @@ function formatTimestamp(microsOrMs: number): string {
+ }
+ 
+ .scd-used-card:hover {
+-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
+-  background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg)) !important;
++  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
++  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-card-bg)) !important;
+ }
+ 
+ .scd-used-card:hover .scd-used-card__chevron {
+-  color: var(--color-primary-600);
++  color: var(--color-accent);
+   opacity: 1;
+ }
+ </style>
+diff --git a/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue b/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue
+index 2b0d533da5e..f5aadf72c95 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/ScoreConfigDialog.vue
+@@ -95,11 +95,11 @@
+             class="sc-dtype-radio rounded-default min-w-0 flex-1 border transition-[border-color,background] duration-120"
+             :class="[
+               formValues.dataType === type
+-                ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_5%,var(--color-card-bg))]'
++                ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_5%,var(--color-card-bg))]'
+                 : 'border-dialog-header-border bg-card-bg',
+               mode === 'edit'
+                 ? ''
+-                : 'hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]',
++                : 'hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]',
+             ]"
+           >
+             <ORadio
+@@ -181,7 +181,7 @@
+ 
+       <!-- Healthy threshold -->
+       <div
+-        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-primary-600)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
++        class="border-dialog-header-border rounded-default mt-1 border bg-[color-mix(in_srgb,var(--color-accent)_2.5%,var(--color-card-bg))] px-3.5 pt-3 pb-2.5"
+       >
+         <div class="mb-3 flex items-center gap-2.5">
+           <span class="inline-flex items-center gap-1">
+@@ -207,10 +207,10 @@
+           <!-- Narrow drawers (<51.25rem): stack so the label + input don't crush. -->
+           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
+             <label
+-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
++              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
+               :class="
+                 formValues.healthyDirection === 'gte'
+-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
++                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
+                   : 'border-dialog-header-border bg-card-bg'
+               "
+             >
+@@ -238,10 +238,10 @@
+               />
+             </label>
+             <label
+-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
++              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1.125rem_1.25rem_minmax(0,1fr)_5rem] items-center gap-2 border px-3 py-1.5 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
+               :class="
+                 formValues.healthyDirection === 'lte'
+-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
++                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
+                   : 'border-dialog-header-border bg-card-bg'
+               "
+             >
+@@ -320,10 +320,10 @@
+           <!-- Narrow drawers (<51.25rem): stack so the label + hint don't crush. -->
+           <div class="flex flex-col gap-2.5 min-[51.25rem]:flex-row">
+             <label
+-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
++              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
+               :class="
+                 formValues.healthyBool === true
+-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
++                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
+                   : 'border-dialog-header-border bg-card-bg'
+               "
+             >
+@@ -344,10 +344,10 @@
+               </div>
+             </label>
+             <label
+-              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-primary-600)_40%,var(--color-dialog-header-border))]"
++              class="rounded-default grid min-w-0 flex-1 cursor-pointer grid-cols-[1rem_1fr] items-start gap-2.5 border px-3 py-1.75 transition-[border-color,background] duration-120 hover:border-[color-mix(in_srgb,var(--color-accent)_40%,var(--color-dialog-header-border))]"
+               :class="
+                 formValues.healthyBool === false
+-                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-primary-600)_4%,var(--color-card-bg))]'
++                  ? 'border-accent bg-[color-mix(in_srgb,var(--color-accent)_4%,var(--color-card-bg))]'
+                   : 'border-dialog-header-border bg-card-bg'
+               "
+             >
+@@ -655,7 +655,7 @@ async function save(value: ScoreConfigForm) {
+    <input type="radio"|"checkbox">; their checked affordance is drawn with
+    ::after on the input itself, which no utility can express. */
+ .sc-radio:checked {
+-  border-color: var(--color-primary-600);
++  border-color: var(--color-accent);
+ }
+ 
+ .sc-radio:checked::after {
+@@ -663,12 +663,12 @@ async function save(value: ScoreConfigForm) {
+   width: 0.4375rem;
+   height: 0.4375rem;
+   border-radius: var(--radius-full);
+-  background: var(--color-primary-600);
++  background: var(--color-accent);
+ }
+ 
+ .sc-checkbox:checked {
+-  background: var(--color-primary-600);
+-  border-color: var(--color-primary-600);
++  background: var(--color-accent);
++  border-color: var(--color-accent);
+ }
+ 
+ .sc-checkbox:checked::after {
+diff --git a/web/src/enterprise/components/onlineEvals/forms/ScorerDetail.vue b/web/src/enterprise/components/onlineEvals/forms/ScorerDetail.vue
+index 88c03439f19..16a3839836b 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/ScorerDetail.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/ScorerDetail.vue
+@@ -773,8 +773,8 @@ function relativeTime(timestampMs: number): string {
+   align-items: center;
+   gap: 0.375rem;
+   padding: 0.625rem 0.75rem;
+-  background: color-mix(in srgb, var(--color-primary-600) 8%, transparent);
+-  border: 0.0625rem solid color-mix(in srgb, var(--color-primary-600) 30%, transparent);
++  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
++  border: 0.0625rem solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+   border-radius: 0.3125rem;
+   font-size: var(--text-xs);
+ }
+@@ -826,8 +826,8 @@ function relativeTime(timestampMs: number): string {
+ }
+ 
+ .sd-versions__item--active {
+-  border-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent);
+-  background: color-mix(in srgb, var(--color-primary-600) 5%, var(--color-card-bg));
++  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
++  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-card-bg));
+ }
+ 
+ .sd-versions__head {
+@@ -867,8 +867,8 @@ function relativeTime(timestampMs: number): string {
+ }
+ 
+ .sd-used-list__item:hover {
+-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
+-  background: color-mix(in srgb, var(--color-primary-600) 5%, transparent) !important;
++  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
++  background: color-mix(in srgb, var(--color-accent) 5%, transparent) !important;
+ }
+ 
+ .sd-used-list__item:deep(button) {
+@@ -892,7 +892,7 @@ function relativeTime(timestampMs: number): string {
+ }
+ 
+ .sd-used-list__item:hover .sd-used-list__chevron {
+-  color: var(--color-primary-600);
++  color: var(--color-accent);
+   opacity: 1;
+ }
+ </style>
+diff --git a/web/src/enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue b/web/src/enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue
+index debc5a87b42..5a81f4551fb 100644
+--- a/web/src/enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue
++++ b/web/src/enterprise/components/onlineEvals/forms/scorer/ScorerTestPanel.vue
+@@ -85,8 +85,7 @@
+             t("onlineEvals.scorer.testPanel.successHeader")
+           }}</strong>
+           <dl
+-            class="eval-test-panel__result-grid text-text-secondary m-0 grid gap-x-3 gap-y-1 text-xs"
+-            style="grid-template-columns: max-content 1fr"
++            class="eval-test-panel__result-grid text-text-secondary m-0 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs"
+           >
+             <template v-if="displayValue !== null">
+               <dt class="text-text-secondary font-medium">
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityBooleanTrendChart.vue b/web/src/enterprise/components/onlineEvals/quality/QualityBooleanTrendChart.vue
+index 08a799dd312..71690baa9c5 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityBooleanTrendChart.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityBooleanTrendChart.vue
+@@ -8,6 +8,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+ import { useStore } from "vuex";
+ import * as echarts from "echarts";
+ import { chartColor } from "@/utils/chartTheme";
++import { getColorPalette } from "@/utils/dashboard/colorPalette";
+ import type { BooleanTrendPoint, BooleanTrendSeries } from "../composables/useQualityDetailCharts";
+ import { withChartFont } from "@/utils/fonts";
+ 
+@@ -22,18 +23,6 @@ const chartEl = ref<HTMLElement | null>(null);
+ let chart: echarts.ECharts | null = null;
+ const store = useStore();
+ 
+-// Color palette cycles through these for split series.
+-const PALETTE = [
+-  "#2e7d32",
+-  "#1d4ed8",
+-  "#b25400",
+-  "#7c3aed",
+-  "#0e7490",
+-  "#dc2626",
+-  "#ca8a04",
+-  "#0f766e",
+-];
+-
+ function effectiveSeries(): BooleanTrendSeries[] {
+   if (props.series && props.series.length > 0) return props.series;
+   if (props.points && props.points.length > 0) {
+@@ -49,8 +38,11 @@ function buildOption(): echarts.EChartsOption {
+   const isSplit =
+     seriesList.length > 1 || seriesList.some((s) => s.id !== "__default__" && s.id !== "default");
+ 
++  // Split series cycle the shared chart-series palette (same categorical hues as
++  // every other multi-series chart in the app), in fixed order.
++  const palette = getColorPalette(store.state.theme);
+   const echSeries: echarts.SeriesOption[] = seriesList.map((s, idx) => {
+-    const color = PALETTE[idx % PALETTE.length];
++    const color = palette[idx % palette.length];
+     const label = s.id === "__default__" ? props.legendPassRate : s.label;
+     return {
+       name: label,
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityDetailPanel.vue b/web/src/enterprise/components/onlineEvals/quality/QualityDetailPanel.vue
+index ba777aab248..d61d1ac70c0 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityDetailPanel.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityDetailPanel.vue
+@@ -333,7 +333,7 @@ const props = defineProps<{
+ 
+ // NOTE: the binding is required — the template calls emit() directly for
+ // update:scope, open-run, runs-filter-change and runs-pagination-change.
+-// main's lint pass (#13174) dropped `const emit =` here; on this branch the
++// a lint pass on main dropped `const emit =` here; on this branch the
+ // OToggleGroup scope filter uses it, so removing it silently stops the panel
+ // emitting.
+ const emit = defineEmits<{
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityDistributionChart.vue b/web/src/enterprise/components/onlineEvals/quality/QualityDistributionChart.vue
+index 1b64d0948f2..0a5d85805a0 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityDistributionChart.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityDistributionChart.vue
+@@ -8,6 +8,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+ import { useStore } from "vuex";
+ import * as echarts from "echarts";
+ import { chartColor } from "@/utils/chartTheme";
++import { CHART_THRESHOLD_COLOR } from "@/utils/dashboard/colorPalette";
+ import type { DistributionBucket } from "../composables/useQualityDetailCharts";
+ import { withChartFont } from "@/utils/fonts";
+ 
+@@ -60,11 +61,11 @@ function buildOption(): echarts.EChartsOption {
+         symbol: "none",
+         label: {
+           formatter: `healthy ${sign} ${props.threshold.value}`,
+-          color: "#b25400",
++          color: CHART_THRESHOLD_COLOR,
+           fontSize: 10,
+           position: "insideEndTop",
+         },
+-        lineStyle: { color: "#b25400", type: "dashed", width: 1.2 },
++        lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed", width: 1.2 },
+         data: [{ xAxis: thresholdBucketIndex() }],
+       },
+     });
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityKpiCard.vue b/web/src/enterprise/components/onlineEvals/quality/QualityKpiCard.vue
+index 212b406808e..cd6fa0dbab2 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityKpiCard.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityKpiCard.vue
+@@ -1,7 +1,7 @@
+ <template>
+   <div
+     :class="[
+-      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 pt-2.5 pb-2.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]',
++      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-0.5 overflow-hidden border px-3 pt-1.5 pb-1.5 transition-shadow duration-200 ease-in-out hover:shadow-[0_1px_6px_rgba(0,0,0,0.08)]',
+       clickable &&
+         'hover:border-accent focus-visible:ring-accent cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
+     ]"
+@@ -12,10 +12,10 @@
+     @keydown.enter.prevent="activate"
+     @keydown.space.prevent="activate"
+   >
+-    <div class="flex flex-col gap-1">
++    <div class="flex flex-col gap-0.5">
+       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
+            as LLM Insights / Session Detail so every card reads the same. -->
+-      <div class="mb-1 flex items-center justify-between gap-2">
++      <div class="flex items-center justify-between gap-2">
+         <div
+           class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+         >
+@@ -85,8 +85,8 @@
+       v-if="kpi.sparkline && kpi.sparkline.length > 1"
+       :data="kpi.sparkline"
+       :color="sparkColor"
+-      :height="32"
+-      class="mt-auto"
++      :height="20"
++      class="-mx-3 mt-auto -mb-1.5"
+     />
+   </div>
+ </template>
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue b/web/src/enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue
+index 031022e6e40..dd383366d42 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityKpiSkeleton.vue
+@@ -1,11 +1,11 @@
+ <template>
+   <!-- Same KpiCardRow grid and the same card padding/background as the real
+        QualityKpiCard, so the tiles don't resize or change colour on load. -->
+-  <KpiCardRow>
++  <KpiCardRow gap="gap-2">
+     <div
+       v-for="n in count"
+       :key="n"
+-      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-2 border px-3.5 py-2.5"
++      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-0.5 border px-3 pt-1.5 pb-1.5"
+       data-test="quality-kpi-skeleton"
+     >
+       <OSkeleton type="text" class="h-2.75 w-[55%]" />
+@@ -13,7 +13,7 @@
+         <OSkeleton type="text" class="h-5.5 w-[50%]" />
+         <OSkeleton type="text" class="h-2.75 w-[22%]" />
+       </div>
+-      <div class="mt-auto flex h-7 items-end gap-0.75">
++      <div class="mt-auto flex h-5 items-end gap-0.75">
+         <OSkeleton
+           type="text"
+           v-for="bar in 14"
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityScoreConfigsTable.vue b/web/src/enterprise/components/onlineEvals/quality/QualityScoreConfigsTable.vue
+index 0fd8fba7491..062750d2614 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityScoreConfigsTable.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityScoreConfigsTable.vue
+@@ -263,6 +263,7 @@ const columns = computed(() =>
+       header: t("onlineEvals.quality.overview.columns.scoreConfig"),
+       accessorKey: "name",
+       sortable: true,
++      minSize: 200,
+       size: COL.name,
+       // `flex` (not `autoWidth`): fills leftover width AND stays resizable.
+       meta: { align: "left", flex: true },
+@@ -280,7 +281,7 @@ const columns = computed(() =>
+       header: t("onlineEvals.quality.overview.columns.quality"),
+       accessorKey: "qualityValue",
+       sortable: true,
+-      size: 170,
++      size: 120,
+       meta: { align: "right" },
+     },
+     {
+diff --git a/web/src/enterprise/components/onlineEvals/quality/QualityTrendChart.vue b/web/src/enterprise/components/onlineEvals/quality/QualityTrendChart.vue
+index d51e634e4a3..1f7b38a65de 100644
+--- a/web/src/enterprise/components/onlineEvals/quality/QualityTrendChart.vue
++++ b/web/src/enterprise/components/onlineEvals/quality/QualityTrendChart.vue
+@@ -8,6 +8,11 @@ import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+ import { useStore } from "vuex";
+ import * as echarts from "echarts";
+ import { chartColor } from "@/utils/chartTheme";
++import {
++  QUALITY_SCORE_LINE_COLOR,
++  CHART_THRESHOLD_COLOR,
++  colorToRgba,
++} from "@/utils/dashboard/colorPalette";
+ import type { TrendPoint } from "../composables/useQualityDetailCharts";
+ import { withChartFont } from "@/utils/fonts";
+ 
+@@ -39,11 +44,11 @@ function buildOption(): echarts.EChartsOption {
+       data: avgSeries,
+       smooth: true,
+       symbol: "none",
+-      lineStyle: { color: "#2563eb", width: 2 },
++      lineStyle: { color: QUALITY_SCORE_LINE_COLOR, width: 2 },
+       areaStyle: {
+         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+-          { offset: 0, color: "rgba(37, 99, 235, 0.30)" },
+-          { offset: 1, color: "rgba(37, 99, 235, 0.02)" },
++          { offset: 0, color: colorToRgba(QUALITY_SCORE_LINE_COLOR, 0.3) },
++          { offset: 1, color: colorToRgba(QUALITY_SCORE_LINE_COLOR, 0.02) },
+         ]),
+       },
+       z: 3,
+@@ -54,7 +59,7 @@ function buildOption(): echarts.EChartsOption {
+       data: p95Series,
+       smooth: true,
+       symbol: "none",
+-      lineStyle: { color: "#b25400", width: 2, type: "dashed" },
++      lineStyle: { color: CHART_THRESHOLD_COLOR, width: 2, type: "dashed" },
+       z: 2,
+     },
+   ];
+@@ -67,17 +72,17 @@ function buildOption(): echarts.EChartsOption {
+         .replace("{value}", String(props.threshold.value)),
+       type: "line",
+       data: [],
+-      lineStyle: { color: "#b25400", type: "dashed" },
++      lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed" },
+       markLine: {
+         silent: true,
+         symbol: "none",
+         label: {
+           formatter: `healthy ${sign} ${props.threshold.value}`,
+-          color: "#b25400",
++          color: CHART_THRESHOLD_COLOR,
+           fontSize: 10,
+           position: "insideEndTop",
+         },
+-        lineStyle: { color: "#b25400", type: "dashed", width: 1.2 },
++        lineStyle: { color: CHART_THRESHOLD_COLOR, type: "dashed", width: 1.2 },
+         data: [{ yAxis: props.threshold.value }],
+       },
+     });
+diff --git a/web/src/enterprise/views/AIObservability/AgentBehaviorPage.vue b/web/src/enterprise/views/AIObservability/AgentBehaviorPage.vue
+index bf905efe7d9..08956fcf5e2 100644
+--- a/web/src/enterprise/views/AIObservability/AgentBehaviorPage.vue
++++ b/web/src/enterprise/views/AIObservability/AgentBehaviorPage.vue
+@@ -66,6 +66,7 @@
+       <AgentBehaviorPanel
+         ref="panelRef"
+         class="min-h-0 flex-1"
++        :scope-ready="scopeReady"
+         :source-stream="effectiveStream"
+         :agent-filter="agentFilter"
+         :agent-env="filterMode === 'agent' ? selectedAgent?.env : null"
+@@ -107,6 +108,7 @@ const filterMode = ref<"stream" | "agent">("agent");
+ const availableStreams = ref<string[]>([]);
+ const activeStream = ref<string>("");
+ const panelRef = ref<any>(null);
++const streamsLoaded = ref(false);
+ 
+ // Agent-mode selection — mirrors Agent Graph. Same stream-scoped identity so
+ // same-named agents in different streams don't collide. Owned by the shared
+@@ -143,6 +145,10 @@ const agentFilter = computed(() =>
+   filterMode.value === "agent" ? (selectedAgent.value?.name ?? "") : "",
+ );
+ 
++const scopeReady = computed(
++  () => streamsLoaded.value && (filterMode.value === "agent" ? agentsLoaded.value : true),
++);
++
+ function onFilterModeChange(mode: unknown) {
+   if (mode === "stream" || mode === "agent") filterMode.value = mode;
+   if (mode === "agent" && !agentsLoaded.value) loadAgents();
+@@ -183,6 +189,8 @@ onMounted(async () => {
+     }
+   } catch {
+     availableStreams.value = [];
++  } finally {
++    streamsLoaded.value = true;
+   }
+ 
+   // Agent is the default scope, so the agent list must be ready on first paint.
+diff --git a/web/src/enterprise/views/AIObservability/AgentBehaviorPanel.vue b/web/src/enterprise/views/AIObservability/AgentBehaviorPanel.vue
+index 9ba446c5239..5b043d61fb2 100644
+--- a/web/src/enterprise/views/AIObservability/AgentBehaviorPanel.vue
++++ b/web/src/enterprise/views/AIObservability/AgentBehaviorPanel.vue
+@@ -18,7 +18,7 @@
+   <div class="flex flex-col gap-2.5" data-test="agent-behavior-panel">
+     <!-- Summary strip: behaviour signals at a glance (loops, failures, agents). -->
+     <div class="shrink-0" data-test="agent-behavior-summary">
+-      <OStatStrip :items="behaviorStats" :loading="loading" />
++      <OStatStrip :items="behaviorStats" :loading="tableLoading" />
+     </div>
+     <!-- Looping agents. Same card/header/table shape as the sibling LLM Insights
+          panels (LLMErrorTable) so the whole page reads as one surface. -->
+@@ -36,6 +36,7 @@
+         data-test="agent-behavior-loops-table"
+         :data="loopRows"
+         :columns="loopColumns"
++        :loading="tableLoading"
+         :default-columns="false"
+         :frame="false"
+         :show-global-filter="false"
+@@ -64,6 +65,7 @@
+         data-test="agent-behavior-failures-table"
+         :data="failureRows"
+         :columns="failureColumns"
++        :loading="tableLoading"
+         :default-columns="false"
+         :frame="false"
+         :show-global-filter="false"
+@@ -121,6 +123,7 @@ const props = defineProps<{
+   /** Selected agent's env/version (Agent mode) — surfaced in the detail drawer. */
+   agentEnv?: string | null;
+   agentVersion?: string | null;
++  scopeReady?: boolean;
+ }>();
+ 
+ const { t } = useI18nTyped();
+@@ -315,8 +318,10 @@ const failureColumns = computed<OTableColumnDef[]>(() => [
+   },
+ ]);
+ 
++const tableLoading = computed(() => loading.value || props.scopeReady === false);
++
+ const fetchSignals = async () => {
+-  if (!orgId.value) return;
++  if (!orgId.value || !props.sourceStream) return;
+   loading.value = true;
+   try {
+     const res = await agentSignalsService.getAgentSignals(orgId.value, {
+diff --git a/web/src/enterprise/views/AIObservability/AgentGraphPage.vue b/web/src/enterprise/views/AIObservability/AgentGraphPage.vue
+index 9f6c07487ae..af7646bb1cf 100644
+--- a/web/src/enterprise/views/AIObservability/AgentGraphPage.vue
++++ b/web/src/enterprise/views/AIObservability/AgentGraphPage.vue
+@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           >
+             <OTooltip
+               :content="t('aiObservability.agentGraph.versionAgnosticHint')"
+-              max-width="300px"
++              max-width="18.75rem"
+             />
+           </OIcon>
+         </template>
+@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               :options="layoutOptions"
+               :searchable="false"
+               data-test="agent-graph-layout-type"
+-              class="h-8! min-h-8! w-[7.5rem]"
++              class="h-8! min-h-8! w-30"
+               :disabled="vizType === 'graph'"
+               @update:model-value="onLayoutTypeChange"
+             />
+diff --git a/web/src/enterprise/views/AIObservability/AgentSignalDetailPanel.vue b/web/src/enterprise/views/AIObservability/AgentSignalDetailPanel.vue
+index b3ad512eeb2..c3a1c1ee27a 100644
+--- a/web/src/enterprise/views/AIObservability/AgentSignalDetailPanel.vue
++++ b/web/src/enterprise/views/AIObservability/AgentSignalDetailPanel.vue
+@@ -70,6 +70,8 @@
+           data-test="agent-signal-detail-errors"
+           :data="errorRows"
+           :columns="errorColumns"
++          :loading="loading"
++          :empty-message="t('aiObservability.behavior.detail.noErrors')"
+           :default-columns="false"
+           :frame="false"
+           wrap
+@@ -100,11 +102,6 @@
+             </div>
+           </template>
+         </OTable>
+-        <OEmptyState
+-          v-if="!loading && errorRows.length === 0"
+-          preset="no-data"
+-          :title="t('aiObservability.behavior.detail.noErrors')"
+-        />
+       </section>
+ 
+       <!-- LOOP / COST: the worst traces, ranked by what makes them bad -->
+@@ -123,6 +120,8 @@
+           data-test="agent-signal-detail-traces"
+           :data="traceRows"
+           :columns="traceColumns"
++          :loading="loading"
++          :empty-message="t('aiObservability.behavior.detail.noTraces')"
+           :default-columns="false"
+           :frame="false"
+           pagination="client"
+@@ -141,11 +140,6 @@
+             </span>
+           </template>
+         </OTable>
+-        <OEmptyState
+-          v-if="!loading && traceRows.length === 0"
+-          preset="no-data"
+-          :title="t('aiObservability.behavior.detail.noTraces')"
+-        />
+       </section>
+     </section>
+   </ODrawer>
+@@ -160,7 +154,6 @@ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+ import OTable from "@/lib/core/Table/OTable.vue";
+ import OAgentBadges from "@/components/shared/OAgentBadges.vue";
+ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+-import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import searchService from "@/services/search";
+diff --git a/web/src/enterprise/views/AIObservability/PanelSectionHeader.vue b/web/src/enterprise/views/AIObservability/PanelSectionHeader.vue
+index bc6bbe1d78a..d0368e25383 100644
+--- a/web/src/enterprise/views/AIObservability/PanelSectionHeader.vue
++++ b/web/src/enterprise/views/AIObservability/PanelSectionHeader.vue
+@@ -3,8 +3,8 @@
+ // PanelSectionHeader — the one title (+ optional hint / icon) header for the AI
+ // Observability card/panel/drawer sections. Every one of these panels wraps an
+ // OTable, so the header insets to the SAME `px-page-edge` grid line the table
+-// content uses — the hand-rolled `px-4` blocks these replaced sat 2px off the
+-// columns, which read as "bad header spacing".
++// content uses — the hand-rolled `px-4` blocks these replaced sat a hair off
++// the columns, which read as "bad header spacing".
+ //
+ // Pass `icon` + `tone` to tie a section to its summary tile and its detail
+ // drawer: the same glyph + colour on the tile, the table header, and the drawer
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index 626d04d70e6..0dd066b632b 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -84,7 +84,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+           data-test="main-content"
+           class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2"
+           :style="{
+-            width: store.state.isAiChatEnabled && !store.state.isAiChatExpanded ? '75%' : '100%',
++            width: !store.state.isAiChatEnabled
++              ? '100%'
++              : store.state.isAiChatExpanded
++                ? '50%'
++                : '75%',
+           }"
+         >
+           <!-- Content card — all pages render inside this. The border stays present in both
+@@ -108,35 +112,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <!-- Right Panel (AI Chat - unified for both general and context-specific usage) -->
+         <aside
+           v-show="store.state.isAiChatEnabled && isLoading"
+-          class="o2-sidebar o2-sidebar-right sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
++          class="o2-sidebar o2-sidebar-right bg-surface-chrome-deeper sticky top-[var(--navbar-height,2.25rem)] shrink-0 self-start overflow-y-auto"
+           :class="[
+             isDark ? 'dark-mode-chat-container' : 'light-mode-chat-container',
+             { 'o2-sidebar--expanded': store.state.isAiChatExpanded },
++            // The chat is a floating card in both modes — match the main content
++            // card's right/bottom gap (+ rounded-surface corners) so they read as
++            // the same card. Expanding only widens it; it never overlays the header.
++            'pr-2 pb-2',
+           ]"
+           :style="[
+             {
+               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
++              maxWidth: '100%',
+             },
++            // Full-screen just widens the panel (25% → 50%) beside the content —
++            // same top position + height, so the main header stays visible.
+             store.state.isAiChatExpanded
+-              ? {
+-                  position: 'fixed',
+-                  top: 0,
+-                  right: 0,
+-                  width: '50%',
+-                  maxWidth: '100%',
+-                  minWidth: '18.75rem',
+-                  height: '100vh',
+-                  zIndex: 200,
+-                }
+-              : {
+-                  width: '25%',
+-                  maxWidth: '100%',
+-                  minWidth: '4.688rem',
+-                },
++              ? { width: '50%', minWidth: '18.75rem' }
++              : { width: '25%', minWidth: '4.688rem' },
+           ]"
+         >
+           <O2AIChat
+-            :header-height="42.5"
++            :header-height="40"
+             :is-open="store.state.isAiChatEnabled"
+             @close="closeChat"
+             :aiChatInputContext="aiChatInputContext"
+diff --git a/web/src/plugins/traces/LLMErrorTable.vue b/web/src/plugins/traces/LLMErrorTable.vue
+index 479aba293f6..231cb6853ce 100644
+--- a/web/src/plugins/traces/LLMErrorTable.vue
++++ b/web/src/plugins/traces/LLMErrorTable.vue
+@@ -28,23 +28,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   same stream query the trend panels use — with the agent filter applied.
+ -->
+ <template>
+-  <div
+-    ref="rootEl"
+-    class="bg-card-glass-bg llm-trend-panel rounded-default border-border-default flex flex-col overflow-hidden border"
+-  >
+-    <!-- Padding lives on the header only, so the table spans edge-to-edge
+-         (no left/right/bottom inset) and sits flush within the card. -->
+-    <div class="mb-2 flex items-baseline justify-between px-4 pt-4">
+-      <div>
+-        <div class="text-text-heading text-sm font-semibold">
+-          {{ displayTitle }}
+-        </div>
+-        <div v-if="displaySubtitle" class="text-2xs mt-[0.1rem] leading-normal">
+-          {{ displaySubtitle }}
+-        </div>
+-      </div>
+-    </div>
+-
++  <!-- The table spans the card edge-to-edge (LLMPanelCard's body has no inset). -->
++  <LLMPanelCard ref="cardRef" :title="displayTitle" :subtitle="displaySubtitle || undefined">
+     <OTable
+       :data="rows"
+       :columns="columns"
+@@ -82,7 +67,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         <span :title="value">{{ value }}</span>
+       </template>
+     </OTable>
+-  </div>
++  </LLMPanelCard>
+ </template>
+ 
+ <script lang="ts" setup>
+@@ -90,6 +75,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+ import { useStore } from "vuex";
+ import { useI18nTyped } from "@/types/i18n";
+ import OTable from "@/lib/core/Table/OTable.vue";
++import LLMPanelCard from "./LLMPanelCard.vue";
+ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+ import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
+ import { useLLMStreamQuery } from "./composables/useLLMStreamQuery";
+@@ -220,7 +206,8 @@ async function loadErrors() {
+ // Defer the query until it scrolls into view, then refetch on input changes.
+ // `needsReload` guards against refetching every time the panel re-enters the
+ // viewport (scrolling back and forth) — only an input change re-arms it.
+-const rootEl = ref<HTMLElement | null>(null);
++// Ref to the shared card so the lazy-load observer can watch its root element.
++const cardRef = ref<InstanceType<typeof LLMPanelCard> | null>(null);
+ const isVisible = ref(false);
+ const needsReload = ref(true);
+ let observer: IntersectionObserver | null = null;
+@@ -245,7 +232,8 @@ onMounted(() => {
+     { root: null, rootMargin: "200px", threshold: 0 },
+   );
+   setTimeout(() => {
+-    if (rootEl.value) observer?.observe(rootEl.value);
++    const el = cardRef.value?.getRootEl();
++    if (el) observer?.observe(el);
+   }, 0);
+ });
+ 
+diff --git a/web/src/plugins/traces/LLMPanelCard.vue b/web/src/plugins/traces/LLMPanelCard.vue
+new file mode 100644
+index 00000000000..605ca8d89b7
+--- /dev/null
++++ b/web/src/plugins/traces/LLMPanelCard.vue
+@@ -0,0 +1,73 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++<!--
++  LLMPanelCard — the shared chrome for every LLM Insights panel (the trend
++  charts and the recent-errors table). One card + one header bar, so the header
++  isn't hand-rolled per panel.
++
++  The header deliberately reuses the dashboards PanelContainer bar styling
++  (compact single line, `text-compact` medium title, a bottom divider, a
++  `flex-1` spacer, trailing controls) so these read-only AI panels look like
++  native dashboard panels — WITHOUT pulling in PanelContainer's editable-grid
++  machinery (drag / edit / delete / variables / alerts) or losing the inline
++  subtitle it has no slot for. `#actions` is the trailing-control spot (e.g. a
++  future overflow menu). `rootEl` is exposed for consumers that must observe the
++  card element (the error table's lazy-load IntersectionObserver).
++-->
++<template>
++  <div
++    ref="rootEl"
++    class="bg-card-glass-bg rounded-default border-border-default flex flex-col overflow-hidden border"
++  >
++    <div
++      class="border-border-default rounded-t-default flex min-h-7 w-full flex-nowrap items-center gap-2 border-b px-2 py-1"
++    >
++      <div class="flex min-w-0 items-baseline gap-2">
++        <span class="text-compact text-text-heading shrink-0 font-medium tracking-[0.02em]">
++          {{ title }}
++        </span>
++        <span v-if="subtitle" class="text-text-secondary text-2xs truncate leading-normal">
++          {{ subtitle }}
++        </span>
++      </div>
++      <div class="flex-1" />
++      <div v-if="$slots.actions" class="flex shrink-0 items-center gap-1">
++        <slot name="actions" />
++      </div>
++    </div>
++
++    <div class="min-h-0 flex-1">
++      <slot />
++    </div>
++  </div>
++</template>
++
++<script setup lang="ts">
++import { ref } from "vue";
++import type { I18nText } from "@/types/i18n";
++
++defineProps<{
++  /** Resolved panel title (the caller passes its own t(...) value). */
++  title: I18nText;
++  /** Optional resolved subtitle, shown muted inline after the title. */
++  subtitle?: I18nText;
++}>();
++
++// The card's root element — exposed via a getter so a consumer can observe it
++// (e.g. the recent-errors table lazy-loads when this scrolls into view).
++const rootEl = ref<HTMLElement | null>(null);
++defineExpose({ getRootEl: () => rootEl.value });
++</script>
+diff --git a/web/src/plugins/traces/LLMSchemaPanel.vue b/web/src/plugins/traces/LLMSchemaPanel.vue
+index 319f4f1ef99..7d2388eb487 100644
+--- a/web/src/plugins/traces/LLMSchemaPanel.vue
++++ b/web/src/plugins/traces/LLMSchemaPanel.vue
+@@ -25,18 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   renderers look identical side by side during the incremental migration.
+ -->
+ <template>
+-  <div class="bg-card-glass-bg rounded-default border-border-default flex flex-col border">
+-    <div class="p-page-edge mb-1 flex items-baseline justify-between">
+-      <div>
+-        <div class="text-text-heading text-sm font-semibold">
+-          {{ displayTitle }}
+-        </div>
+-        <div v-if="displaySubtitle" class="text-2xs mt-[0.1rem] leading-normal">
+-          {{ displaySubtitle }}
+-        </div>
+-      </div>
+-    </div>
+-
++  <LLMPanelCard :title="displayTitle" :subtitle="displaySubtitle || undefined">
+     <!-- h-55 matches LLMTrendPanel's chart height (13.75rem) so the converted
+          panel lines up with the legacy ones in the same grid row. The renderer
+          needs an explicit full size to fill the box — without it the echarts
+@@ -56,13 +45,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+         :height="6"
+       />
+     </div>
+-  </div>
++  </LLMPanelCard>
+ </template>
+ 
+ <script lang="ts" setup>
+ import { computed } from "vue";
+ import { useI18nTyped } from "@/types/i18n";
+ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
++import LLMPanelCard from "./LLMPanelCard.vue";
+ import { type LLMPanelDef, renderPanelSql } from "./config/llmInsightsPanels";
+ import { buildLLMPanelSchema } from "./llmPanelSchema";
+ 
+diff --git a/web/src/plugins/traces/SessionDetails.vue b/web/src/plugins/traces/SessionDetails.vue
+index 10e589584ad..e473daec4bb 100644
+--- a/web/src/plugins/traces/SessionDetails.vue
++++ b/web/src/plugins/traces/SessionDetails.vue
+@@ -816,7 +816,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
+                       </span>
+                       <span class="min-w-0 flex-1">
+-                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
++                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="sm" />
+                       </span>
+                       <span class="flex min-w-[3.25rem] flex-col items-end">
+                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
+@@ -872,7 +872,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         <OProgressBar
+                           :value="ratio(row.lat, maxTurnLat)"
+                           :variant="row.status === 'error' ? 'danger' : 'warning'"
+-                          size="xs"
++                          size="sm"
+                         />
+                       </span>
+                       <span
+diff --git a/web/src/plugins/traces/SessionsList.vue b/web/src/plugins/traces/SessionsList.vue
+index dcbd542352e..9c0b9f1c1ee 100644
+--- a/web/src/plugins/traces/SessionsList.vue
++++ b/web/src/plugins/traces/SessionsList.vue
+@@ -214,6 +214,7 @@ import { useStore } from "vuex";
+ import { formatDate } from "@/utils/date";
+ import { raw, useI18nTyped } from "@/types/i18n";
+ import OTable from "@/lib/core/Table/OTable.vue";
++import { COL } from "@/lib/core/Table/OTable.types";
+ import OTag from "@/lib/core/Badge/OTag.vue";
+ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+ import { useLlmTraceStreams } from "@/enterprise/composables/useLlmTraceStreams";
+@@ -375,29 +376,13 @@ watch(total, () => {
+ // resize. All widths are user-resizable + persisted via `table-id`.
+ const tableColumns = computed(() =>
+   [
+-    {
+-      id: "lastSeenNanos",
+-      header: t("traces.sessionsList.columns.lastActivity"),
+-      accessorKey: "lastSeenNanos",
+-      size: 170,
+-      sortable: false,
+-      hideable: true,
+-      meta: { align: "left" },
+-    },
+-    {
+-      id: "sessionId",
+-      header: t("traces.sessionsList.columns.sessionId"),
+-      accessorKey: "sessionId",
+-      size: 250,
+-      sortable: false,
+-      meta: { align: "left" },
+-    },
+     {
+       id: "userId",
+       header: t("traces.sessionsList.columns.user"),
+       accessorKey: "userId",
+-      size: 110,
+-      sortable: false,
++      // Email-identity width preset; OUserCell truncates + tooltips beyond it.
++      size: COL.email,
++      sortable: true,
+       hideable: true,
+       meta: { align: "left" },
+     },
+@@ -419,8 +404,8 @@ const tableColumns = computed(() =>
+       id: "turns",
+       header: t("traces.sessionsList.columns.turns"),
+       accessorKey: "turns",
+-      size: 50,
+-      sortable: false,
++      size: 70,
++      sortable: true,
+       hideable: true,
+       meta: { align: "right" },
+     },
+@@ -429,7 +414,7 @@ const tableColumns = computed(() =>
+       header: t("traces.sessionsList.columns.duration"),
+       accessorKey: "durationNanos",
+       size: 90,
+-      sortable: false,
++      sortable: true,
+       hideable: true,
+       meta: { align: "left" },
+     },
+@@ -439,7 +424,7 @@ const tableColumns = computed(() =>
+       accessorKey: "tokens",
+       size: 150,
+       minSize: 150,
+-      sortable: false,
++      sortable: true,
+       hideable: true,
+       meta: { align: "right" },
+     },
+@@ -448,7 +433,7 @@ const tableColumns = computed(() =>
+       header: t("traces.sessionsList.columns.cost"),
+       accessorKey: "cost",
+       size: 100,
+-      sortable: false,
++      sortable: true,
+       hideable: true,
+       meta: { align: "right" },
+     },
+@@ -457,10 +442,27 @@ const tableColumns = computed(() =>
+       header: t("traces.sessionsList.columns.status"),
+       accessorKey: "status",
+       size: 100,
+-      sortable: false,
++      sortable: true,
+       hideable: true,
+       meta: { align: "left", disableCellAction: true },
+     },
++    {
++      id: "lastSeenNanos",
++      header: t("traces.sessionsList.columns.lastActivity"),
++      accessorKey: "lastSeenNanos",
++      size: COL.dateAbsolute,
++      sortable: true,
++      hideable: true,
++      meta: { align: "left" },
++    },
++    {
++      id: "sessionId",
++      header: t("traces.sessionsList.columns.sessionId"),
++      accessorKey: "sessionId",
++      size: 250,
++      sortable: false,
++      meta: { align: "left" },
++    },
+   ].map((c: any) => ({
+     ...c,
+     // Offer every column except the session id (row identity) in OTable's
+diff --git a/web/src/plugins/traces/config/llmInsightsPanels.ts b/web/src/plugins/traces/config/llmInsightsPanels.ts
+index 084893abbcd..ab0922d9b7e 100644
+--- a/web/src/plugins/traces/config/llmInsightsPanels.ts
++++ b/web/src/plugins/traces/config/llmInsightsPanels.ts
+@@ -29,6 +29,12 @@
+  */
+ 
+ import { type I18nKey } from "@/types/i18n";
++import {
++  LLM_LATENCY_SERIES_COLORS,
++  LLM_ERRORS_COLOR,
++  LLM_SPANS_COLOR,
++  LLM_TOKENS_COLOR,
++} from "@/utils/dashboard/colorPalette";
+ 
+ export type LLMPanelType = "stacked-area" | "stacked-bar" | "horizontal-bar" | "table";
+ 
+@@ -223,10 +229,10 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
+     },
+     // Severity escalation: slate (typical) → red (slow tail).
+     series: [
+-      { field: "p50_ms", label: "p50", color: "#64748b" },
+-      { field: "p90_ms", label: "p90", color: "#f59e0b" },
+-      { field: "p95_ms", label: "p95", color: "#f97316" },
+-      { field: "p99_ms", label: "p99", color: "#ef4444" },
++      { field: "p50_ms", label: "p50", color: LLM_LATENCY_SERIES_COLORS.p50 },
++      { field: "p90_ms", label: "p90", color: LLM_LATENCY_SERIES_COLORS.p90 },
++      { field: "p95_ms", label: "p95", color: LLM_LATENCY_SERIES_COLORS.p95 },
++      { field: "p99_ms", label: "p99", color: LLM_LATENCY_SERIES_COLORS.p99 },
+     ],
+   },
+   {
+@@ -257,7 +263,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
+     subtitleKey: "aiObservability.panels.errorsOverTime.subtitle",
+     type: "stacked-bar",
+     layout: { colSpan: 1 },
+-    color: "#ef4444",
++    color: LLM_ERRORS_COLOR,
+     query: {
+       // No baseFilter: OTel SDKs typically propagate the failure to a deep
+       // child span (e.g. tool.<name>) which doesn't carry
+@@ -283,7 +289,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
+     subtitleKey: "aiObservability.panels.spansByModel.subtitle",
+     type: "horizontal-bar",
+     layout: { colSpan: 1 },
+-    color: "#3b82f6",
++    color: LLM_SPANS_COLOR,
+     limit: 10,
+     query: {
+       sql: `
+@@ -305,7 +311,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
+     subtitleKey: "aiObservability.panels.tokensByModel.subtitle",
+     type: "horizontal-bar",
+     layout: { colSpan: 1 },
+-    color: "#a855f7",
++    color: LLM_TOKENS_COLOR,
+     limit: 10,
+     query: {
+       sql: `
+diff --git a/web/src/utils/dashboard/colorPalette.ts b/web/src/utils/dashboard/colorPalette.ts
+index 5e2c39d95a1..7d0e70f04f8 100644
+--- a/web/src/utils/dashboard/colorPalette.ts
++++ b/web/src/utils/dashboard/colorPalette.ts
+@@ -76,6 +76,32 @@ export const getColorPalette = (_theme?: string): string[] => [
+   chartColor("--color-chart-series-12"),
+ ];
+ 
++// ── AI Observability semantic chart marks ───────────────────────────────────
++// echarts needs resolved colours (not CSS vars), so these literals live here —
++// the sanctioned home for chart hex. Categorical *series* must instead draw from
++// getColorPalette() above; the constants below are single-purpose semantic /
++// status marks whose exact hue carries meaning (a threshold line; a severity
++// escalation) and so is kept deliberately fixed.
++
++/** Quality average-score trend line (the primary series on the trend chart). */
++export const QUALITY_SCORE_LINE_COLOR = "#2563eb";
++
++/** Reference / threshold + p95 marker on the Quality trend + distribution charts. */
++export const CHART_THRESHOLD_COLOR = "#b25400";
++
++/** LLM Insights latency percentiles — a severity escalation, p50 → p99. */
++export const LLM_LATENCY_SERIES_COLORS = {
++  p50: "#64748b",
++  p90: "#f59e0b",
++  p95: "#f97316",
++  p99: "#ef4444",
++} as const;
++
++/** LLM Insights single-metric panel colours (mirror the KPI tile tones). */
++export const LLM_ERRORS_COLOR = "#ef4444";
++export const LLM_SPANS_COLOR = "#3b82f6";
++export const LLM_TOKENS_COLOR = "#a855f7";
++
+ const isValidHexColor = (color: string): boolean => {
+   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
+   return result !== null;
+diff --git a/web/src/utils/dashboard/sql/shared/contextBuilder.ts b/web/src/utils/dashboard/sql/shared/contextBuilder.ts
+index 0f98d4b6d2e..1e9baf4b202 100644
+--- a/web/src/utils/dashboard/sql/shared/contextBuilder.ts
++++ b/web/src/utils/dashboard/sql/shared/contextBuilder.ts
+@@ -667,12 +667,10 @@ export function buildSQLContext(
+       nameLocation: "middle",
+       min: getFinalAxisValue(panelSchema.config.y_axis_min, min, true),
+       max: getFinalAxisValue(panelSchema.config.y_axis_max, max, false),
+-      // nameGap positions the name's centerline: clear the label column,
+-      // its 8px margin and half the rotated name's own height.
+       nameGap:
+         (panelSchema?.type == "h-bar" || panelSchema?.type == "h-stacked"
+           ? calculateWidthText(largestLabel(getAxisDataFromKey(yAxisKeys?.[0])))
+-          : widestYAxisTickLabel) + 8,
++          : widestYAxisTickLabel) + 10,
+       nameTextStyle: {
+         fontWeight: "bold",
+         fontSize: 14,

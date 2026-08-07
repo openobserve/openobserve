@@ -1,0 +1,28 @@
+{
+  "feature_slug": "ai-observability-header-redesign",
+  "feature_title": "AI Observability Header Redesign (Last-Refreshed Indicator + Labeled Refresh Button)",
+  "area": "AIObservability",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiPageHeader.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/AIObservability/aiPageHeader.spec.js",
+  "playwright_group": "AIObservability",
+  "source_files": [
+    "web/src/enterprise/components/AIObservability/AiPageShell.vue",
+    "web/src/enterprise/components/AIObservability/AiLastRefreshed.vue",
+    "web/src/enterprise/components/OnlineEvals.vue",
+    "web/src/enterprise/components/onlineEvals/QualityPage.vue",
+    "web/src/components/O2AIChat.vue",
+    "web/src/layouts/MainLayout.vue",
+    "web/src/plugins/traces/LLMPanelCard.vue",
+    "web/src/plugins/traces/LLMErrorTable.vue",
+    "web/src/plugins/traces/LLMSchemaPanel.vue",
+    "web/src/plugins/traces/SessionsList.vue",
+    "web/src/plugins/traces/SessionDetails.vue",
+    "web/src/utils/dashboard/colorPalette.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
