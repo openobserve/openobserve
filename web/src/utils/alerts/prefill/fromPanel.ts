@@ -103,11 +103,28 @@ const aggregationFromFields = (fields: any) => {
   };
 };
 
+/**
+ * Panel filters come in two shapes, and both are live: dashboard schema v5+
+ * stores a group object (`{ filterType: "group", conditions: [...] }`, possibly
+ * nested), while pre-v5 panels — and metrics-explorer style callers — still hand
+ * over a flat array. Reading only the array shape is what made every v5 panel
+ * throw here, taking the whole "create alert" click with it.
+ *
+ * Alert conditions are one flat AND list, so nested groups are flattened.
+ */
+const flattenPanelFilters = (filter: any): any[] => {
+  if (!filter) return [];
+  if (Array.isArray(filter)) return filter;
+
+  return (filter.conditions ?? []).flatMap((condition: any) =>
+    condition?.filterType === "group" ? flattenPanelFilters(condition) : [condition],
+  );
+};
+
 /** List-type panel filters map cleanly onto alert conditions; nothing else does. */
 const conditionsFromFilters = (fields: any, makeId: () => string) => {
-  const filters = fields?.filter ?? [];
-  const conditions = filters
-    .filter((f: any) => f.type === "list" && f.values?.length)
+  const conditions = flattenPanelFilters(fields?.filter)
+    .filter((f: any) => f?.type === "list" && f.values?.length)
     .map((f: any) => ({
       filterType: "condition",
       column: f.column,

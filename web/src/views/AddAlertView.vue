@@ -58,6 +58,23 @@ export default defineComponent({
     // stashed payload once they leave.
     const hasPrefill = computed(() => !!route.query.prefill);
 
+    /**
+     * How the user ARRIVED, captured once at setup.
+     *
+     * `hasPrefill` reads the live route, which stops describing this page the
+     * moment the user navigates away. The destinations fetch below is awaited,
+     * so on a slow call it can resolve after the user has already left — and
+     * re-reading the route then said "no prefill", which sent them to the alert
+     * list from whatever page they had moved on to.
+     */
+    const arrivedWithPrefill = hasPrefill.value;
+
+    /**
+     * False once this view is gone. An async continuation that outlives the
+     * component must not route the app somewhere on its behalf.
+     */
+    let isViewActive = true;
+
     // Edit mode: the alert to seed the form with, fetched here rather than
     // handed over by the list, so editing no longer has to route through it.
     const editedAlert = ref<Record<string, any> | undefined>(undefined);
@@ -86,7 +103,9 @@ export default defineComponent({
           message: t("toastMessages.views.errorWhileLoadingAlert"),
         });
         // Nothing to edit — send them somewhere that works rather than leaving
-        // an empty form that would save as a NEW alert.
+        // an empty form that would save as a NEW alert. Unless the user has
+        // already moved on, in which case this page has no say in where they are.
+        if (!isViewActive) return;
         router.replace({
           name: "alertList",
           query: {
@@ -150,6 +169,9 @@ export default defineComponent({
       // needs the alert. Sequencing them would make editing feel slower than
       // the list-hosted editor it replaces.
       await Promise.all([getDestinations(), loadAlertForEdit()]);
+      // The user may have navigated on while those were in flight; anything
+      // below this line would be acting on a page that no longer exists.
+      if (!isViewActive) return;
       if (destinations.value.length) return;
 
       // Bouncing a prefilled form would throw away work the user did on another
@@ -157,7 +179,7 @@ export default defineComponent({
       // story: the alert already exists, and refusing to open it because the
       // org has no destinations left would be absurd. Warn and let them
       // continue; the destinations step offers creating one inline.
-      if (hasPrefill.value || isUpdated.value) {
+      if (arrivedWithPrefill || isUpdated.value) {
         toast({
           variant: "warning",
           message: t("toastMessages.views.noDestinationsCreateOneBeforeSaving"),
@@ -180,6 +202,7 @@ export default defineComponent({
     // Leaving without saving retires the prefill too — otherwise re-opening the
     // form later would silently inherit the abandoned query.
     onBeforeUnmount(() => {
+      isViewActive = false;
       clearAlertPrefill();
     });
 

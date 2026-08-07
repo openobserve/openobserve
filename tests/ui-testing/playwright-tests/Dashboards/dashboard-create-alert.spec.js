@@ -19,6 +19,24 @@ import testLogger from "../utils/test-logger.js";
 const randomDashboardName =
   "Dashboard_Alert_" + Math.random().toString(36).slice(2, 11);
 
+// Cleanup path for the tests that end up on the alert form: the left menu
+// returns to /dashboards with no folder in the URL, and the list then lands on
+// Favorites for any account that has some. Select the folder the dashboard was
+// created in so the row is on screen no matter what the account has starred.
+const returnToDashboardFolder = async (page, pm, folderName = "default") => {
+  await pm.dashboardList.menuItem("dashboards-item");
+  await waitForDashboardPage(page);
+
+  // waitForDashboardPage settles on the folders API response, which lands well
+  // before the folder sidebar paints — give the tab its own window rather than
+  // inheriting openFolderByName's 10s, which the list coming off the alert form
+  // routinely overruns.
+  await page
+    .locator(`[data-test="dashboard-folder-tab-name-${folderName}"]`)
+    .waitFor({ state: "visible", timeout: 30000 });
+  await pm.dashboardFolder.openFolderByName(folderName);
+};
+
 test.describe("Dashboard Create Alert testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
@@ -91,8 +109,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       });
 
       // Navigate back to dashboards to clean up
-      await pm.dashboardList.menuItem("dashboards-item");
-      await waitForDashboardPage(page);
+      await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, randomDashboardName);
 
       testLogger.info("Test completed: Create Alert from panel menu");
@@ -184,8 +201,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       );
 
       // Navigate back and clean up
-      await pm.dashboardList.menuItem("dashboards-item");
-      await waitForDashboardPage(page);
+      await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, dashName);
 
       testLogger.info(
@@ -267,8 +283,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       );
 
       // Navigate back and clean up
-      await pm.dashboardList.menuItem("dashboards-item");
-      await waitForDashboardPage(page);
+      await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, dashName);
 
       testLogger.info("Test completed: Alert context menu below threshold");

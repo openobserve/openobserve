@@ -174,6 +174,79 @@ describe("buildPrefillFromPanel", () => {
     });
   });
 
+  // Dashboard schema v5 moved fields.filter from an array to a group object.
+  // Reading it as an array threw for EVERY v5 panel — filter or not — which took
+  // the whole "create alert" click down with it.
+  it("maps list filters when they arrive as a v5 filter group, nested groups included", () => {
+    const p = buildPrefillFromPanel(
+      sqlPanel({
+        queries: [
+          {
+            query: "SELECT …",
+            customQuery: false,
+            fields: {
+              stream: "k8s_logs",
+              stream_type: "logs",
+              y: [{ alias: "c", aggregationFunction: "count" }],
+              filter: {
+                filterType: "group",
+                logicalOperator: "AND",
+                conditions: [
+                  {
+                    filterType: "condition",
+                    type: "list",
+                    column: "level",
+                    values: ["error"],
+                  },
+                  {
+                    filterType: "group",
+                    logicalOperator: "AND",
+                    conditions: [
+                      {
+                        filterType: "condition",
+                        type: "list",
+                        column: "namespace",
+                        values: ["prod"],
+                      },
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        ],
+      }),
+      makeId,
+    );
+
+    expect(p.conditions?.conditions).toHaveLength(2);
+    expect(p.conditions?.conditions[0]).toMatchObject({ column: "level", value: "error" });
+    expect(p.conditions?.conditions[1]).toMatchObject({ column: "namespace", value: "prod" });
+  });
+
+  it("survives an empty v5 filter group — the shape every filter-less panel carries", () => {
+    const p = buildPrefillFromPanel(
+      sqlPanel({
+        queries: [
+          {
+            query: "SELECT …",
+            customQuery: false,
+            fields: {
+              stream: "k8s_logs",
+              stream_type: "logs",
+              y: [{ alias: "c", aggregationFunction: "count" }],
+              filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
+            },
+          },
+        ],
+      }),
+      makeId,
+    );
+
+    expect(p.conditions).toBeUndefined();
+    expect(p.streamName).toBe("k8s_logs");
+  });
+
   it("maps a promql panel with a threshold", () => {
     const p = buildPrefillFromPanel(
       {
