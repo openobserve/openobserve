@@ -136,25 +136,31 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Agent filter is rendered inside QualityPage (right-aligned, above
                the KPIs) so it sits within the content container alongside the
                data it filters — only the date picker + refresh stay here. -->
+          <!-- Last-refreshed indicator + labeled primary Refresh button, matching
+               the other AI pages' AiPageShell header. -->
+          <AiLastRefreshed
+            class="mr-1"
+            :last-run-at="qualityLastRunAt"
+            :loading="qualityRefreshing"
+            data-test="quality-last-refreshed"
+          />
           <DateTimePickerDashboard
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
             data-test="quality-time-range-picker"
           />
-          <!-- Bordered wrapper matches the Sessions / LLM Insights headers —
-               ORefreshButton renders no border of its own. -->
-          <div
-            class="border-border-default rounded-default inline-flex h-8 items-center overflow-hidden border px-1"
+          <OButton
+            variant="primary"
+            size="sm-toolbar"
+            icon-left="refresh"
+            :disabled="qualityRefreshing"
+            :loading="qualityRefreshing"
+            data-test="quality-refresh-btn"
+            @click="onQualityRefresh"
           >
-            <ORefreshButton
-              :last-run-at="qualityLastRunAt"
-              :loading="qualityRefreshing"
-              :disabled="qualityRefreshing"
-              data-test="quality-refresh-btn"
-              @click="onQualityRefresh"
-            />
-          </div>
+            {{ t("common.refresh") }}
+          </OButton>
         </template>
       </OPageHeader>
 
@@ -410,7 +416,7 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import AiLastRefreshed from "@/enterprise/components/AIObservability/AiLastRefreshed.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";

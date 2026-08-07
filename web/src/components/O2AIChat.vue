@@ -1,6 +1,6 @@
 ﻿<template>
   <div
-    class="chat-container rounded-default text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
+    class="chat-container rounded-surface text-text-body bg-card-glass-solid flex h-full w-full flex-col overflow-hidden [box-shadow:0_0_5px_1px_var(--color-hover-shadow)]"
     :class="[{ 'chat-open': isOpen }]"
   >
     <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
@@ -148,7 +148,6 @@
           </div>
         </div>
       </div>
-      <OSeparator class="bg-separator" />
 
       <!-- History Panel -->
       <ODrawer
@@ -242,25 +241,20 @@
         >
           <div
             v-if="chatMessages.length === 0"
-            class="welcome-section rounded-default flex flex-1 items-center justify-center"
-            :class="
-              centeredStart
-                ? 'mb-0 bg-transparent p-0'
-                : 'mb-6 p-6 [background:linear-gradient(to_right,color-mix(in_srgb,var(--color-theme-accent)_5%,transparent),color-mix(in_srgb,var(--color-theme-accent)_10%,transparent))]'
-            "
+            class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
           >
             <!-- Home tab: rich V2 welcome -->
             <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
             <!-- Sidepanel: minimal logo + title -->
             <div v-else class="flex h-full w-full flex-col items-center justify-center">
-              <div class="flex flex-col items-center">
+              <div class="flex flex-col items-center gap-2">
                 <img :src="o2AiTitleLogo" />
-                <div class="relative inline-block">
-                  <span class="ml-7.5 text-center text-sm font-[600]">{{
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-[600]">{{
                     t("aiAssistant.welcome.taglineHighlight")
                   }}</span>
                   <!-- Same shared Beta tag as the Workflows screens. -->
-                  <BetaBadge class="ml-2" />
+                  <BetaBadge />
                 </div>
               </div>
             </div>
@@ -1355,11 +1349,11 @@
                 v-if="!isLoading"
                 :disabled="!inputMessage.trim() && pendingImages.length === 0"
                 @click="sendMessage"
-                variant="ai-gradient"
+                variant="primary"
                 size="icon-xs-circle"
-                class="send-button bg-(image:--color-gradient-ai)! shadow-[0_4px_15px_0_color-mix(in_srgb,var(--color-ai-accent)_30%,transparent)]! [transition:all_0.3s_ease]!"
+                class="send-button"
               >
-                <OIcon name="send" size="sm" />
+                <OIcon name="arrow-upward" size="sm" />
               </OButton>
 
               <!-- Stop button - shown when loading/streaming -->
@@ -1436,7 +1430,6 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { UNAUTHORIZED_MESSAGE, isAuthError } from "@/utils/authErrors";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -1524,7 +1517,6 @@ const abortBackgroundStreams = () => {
 export default defineComponent({
   name: "O2AIChat",
   components: {
-    OSeparator,
     OButton,
     BetaBadge,
     ConfirmDialog,
