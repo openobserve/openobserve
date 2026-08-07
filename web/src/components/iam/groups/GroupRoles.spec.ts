@@ -20,9 +20,14 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { queryClient } from "@/composables/query/queryClient";
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn(() => Promise.resolve({ data: ["admin", "user", "developer"] }));
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+    rolesQuery: queryStub(getRoles),
+  });
+});
 
 vi.mock("@/composables/iam/usePermissions", () => ({
   default: vi.fn(() => ({

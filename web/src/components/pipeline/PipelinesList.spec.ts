@@ -22,15 +22,18 @@ import pipelineService from "@/services/pipelines";
 import { createStore } from "vuex";
 
 // Mock services
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn(),
-    toggleState: vi.fn(),
-    bulkToggleState: vi.fn(),
-    createPipeline: vi.fn(),
-    deletePipeline: vi.fn(),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn(),
+      toggleState: vi.fn(),
+      bulkToggleState: vi.fn(),
+      createPipeline: vi.fn(),
+      deletePipeline: vi.fn(),
+    },
+  });
+});
 
 // Mock router
 const mockRouter = {

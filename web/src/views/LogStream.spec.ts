@@ -23,14 +23,17 @@ import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 
 // Mock services
-vi.mock("@/services/stream", () => ({
-  default: {
-    list: vi.fn(),
-    nameList: vi.fn(),
-    delete: vi.fn(),
-    get: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      nameList: vi.fn(),
+      delete: vi.fn(),
+      get: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = await importOriginal();
@@ -90,31 +93,37 @@ vi.mock("@/services/auth", () => ({
   },
 }));
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    get_organization: vi.fn(),
-    list: vi.fn(),
-    add_members: vi.fn(),
-    // Feeds the summary strip above the table.
-    get_organization_summary: vi.fn().mockResolvedValue({
-      data: {
-        streams: {
-          num_streams: 3,
-          total_records: 1500,
-          total_storage_size: 120,
-          total_index_size: 20,
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_organization: vi.fn(),
+      list: vi.fn(),
+      add_members: vi.fn(),
+      // Feeds the summary strip above the table.
+      get_organization_summary: vi.fn().mockResolvedValue({
+        data: {
+          streams: {
+            num_streams: 3,
+            total_records: 1500,
+            total_storage_size: 120,
+            total_index_size: 20,
+          },
         },
-      },
-    }),
-  },
-}));
+      }),
+    },
+  });
+});
 
-vi.mock("@/services/billings", () => ({
-  default: {
-    get_billing_info: vi.fn(),
-    get_invoice_history: vi.fn(),
-  },
-}));
+vi.mock("@/services/billings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_billing_info: vi.fn(),
+      get_invoice_history: vi.fn(),
+    },
+  });
+});
 
 // Mock Toast
 const mockNotify = vi.fn(() => vi.fn()); // Return a function for dismiss

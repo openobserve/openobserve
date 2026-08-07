@@ -23,12 +23,15 @@ import organizationsService from "@/services/organizations";
 import azureMarketplace from "@/services/azureMarketplace";
 
 // Mock the services the two card-forms drive on submit.
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(),
-    create: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      create: vi.fn(),
+    },
+  });
+});
 vi.mock("@/services/azureMarketplace", () => ({
   default: {
     linkSubscription: vi.fn(),

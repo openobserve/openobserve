@@ -292,17 +292,23 @@ vi.mock("@/utils/traces/constants", async (importOriginal) => {
 });
 
 // Mock services
-vi.mock("@/services/search", () => ({
-  default: {
-    get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_traces: vi.fn(() => Promise.resolve({ data: mockTracesResponse })),
+    },
+  });
+});
 
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(() => Promise.resolve({ data: mockFunctions })),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {

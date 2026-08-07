@@ -24,11 +24,14 @@ const { mockCreateLocation, mockToastFn } = vi.hoisted(() => ({
   mockToastFn: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    createLocation: (...args: any[]) => mockCreateLocation(...args),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLocation: (...args: any[]) => mockCreateLocation(...args),
+    },
+  });
+});
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: any[]) => mockToastFn(...args),

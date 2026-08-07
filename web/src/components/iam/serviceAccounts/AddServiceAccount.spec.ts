@@ -27,21 +27,33 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/service_accounts", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn().mockResolvedValue({ data: [] }),
-  getGroups: vi.fn().mockResolvedValue({ data: [] }),
-  updateRole: vi.fn(),
-  updateGroup: vi.fn(),
-  createRole: vi.fn(),
-  getResources: vi.fn().mockResolvedValue({ data: [] }),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn().mockResolvedValue({ data: [] });
+  const getGroups = vi.fn().mockResolvedValue({ data: [] });
+  const getResources = vi.fn().mockResolvedValue({ data: [] });
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+    getGroups,
+    rolesQuery: queryStub(getRoles),
+    groupsQuery: queryStub(getGroups),
+    updateRole: vi.fn(),
+    updateGroup: vi.fn(),
+    createRole: vi.fn(),
+    getResources,
+    resourcesQuery: queryStub(getResources),
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),

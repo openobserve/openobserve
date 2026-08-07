@@ -21,8 +21,14 @@ import { useStore } from "vuex";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 // Mock the services
-vi.mock("@/services/pipelines");
-vi.mock("@/services/alert_destination");
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));

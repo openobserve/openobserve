@@ -105,7 +105,10 @@ vi.mock("@vue-flow/controls", () => ({
   },
 }));
 
-vi.mock("@/services/search");
+vi.mock("@/services/search", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 
 // ---------------------------------------------------------------------------
 // Import component AFTER mocks

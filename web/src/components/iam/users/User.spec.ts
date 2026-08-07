@@ -42,9 +42,18 @@ const i18n = createI18n({
 });
 
 // Mock services
-vi.mock("@/services/users");
-vi.mock("@/services/organizations");
-vi.mock("@/services/iam");
+vi.mock("@/services/users", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/services/segment_analytics");
 
 // Mock aws-exports config

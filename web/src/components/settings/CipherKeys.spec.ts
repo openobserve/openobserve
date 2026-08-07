@@ -27,12 +27,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock external services and components
-vi.mock("@/services/cipher_keys", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {

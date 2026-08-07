@@ -50,29 +50,35 @@ import {
 } from "./commons";
 
 // Mock dependencies
-vi.mock("../services/dashboards", () => ({
-  default: {
-    list: vi.fn(),
-    get_Dashboard: vi.fn(),
-    save: vi.fn(),
-    delete: vi.fn(),
-    list_Folders: vi.fn(),
-    delete_Folder: vi.fn(),
-    new_Folder: vi.fn(),
-    edit_Folder: vi.fn(),
-    move_Dashboard: vi.fn(),
-  },
-}));
+vi.mock("../services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      get_Dashboard: vi.fn(),
+      save: vi.fn(),
+      delete: vi.fn(),
+      list_Folders: vi.fn(),
+      delete_Folder: vi.fn(),
+      new_Folder: vi.fn(),
+      edit_Folder: vi.fn(),
+      move_Dashboard: vi.fn(),
+    },
+  });
+});
 
-vi.mock("../services/common", () => ({
-  default: {
-    list_Folders: vi.fn(),
-    delete_Folder: vi.fn(),
-    new_Folder: vi.fn(),
-    edit_Folder: vi.fn(),
-    move_across_folders: vi.fn(),
-  },
-}));
+vi.mock("../services/common", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_Folders: vi.fn(),
+      delete_Folder: vi.fn(),
+      new_Folder: vi.fn(),
+      edit_Folder: vi.fn(),
+      move_across_folders: vi.fn(),
+    },
+  });
+});
 
 vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),

@@ -20,24 +20,33 @@ import { createRouter, createWebHistory } from "vue-router";
 import LoginPage from "./Login.vue";
 
 // Mock dependencies first with factory functions to avoid hoisting issues
-vi.mock("@/services/config", () => ({
-  default: {
-    get_config: vi.fn(),
-  },
-}));
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_config: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/users", () => ({
-  default: {
-    verifyUser: vi.fn(),
-    addNewUser: vi.fn(),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      verifyUser: vi.fn(),
+      addNewUser: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/aws-exports", () => ({
   default: {

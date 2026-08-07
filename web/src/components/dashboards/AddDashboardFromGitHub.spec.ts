@@ -5,14 +5,17 @@ import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 
 // Mock dashboards service
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    list_Folders: vi.fn(),
-    list: vi.fn(),
-    create: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_Folders: vi.fn(),
+      list: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 // Mock AddFolder component
 vi.mock("@/components/dashboards/AddFolder.vue", () => ({

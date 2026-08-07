@@ -29,9 +29,12 @@ vi.mock("vuex", () => ({
 // Use vi.hoisted so mockSearch is available at module evaluation time
 const { mockSearch } = vi.hoisted(() => ({ mockSearch: vi.fn() }));
 
-vi.mock("@/services/search", () => ({
-  default: { search: mockSearch },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { search: mockSearch },
+  });
+});
 
 import {
   useLatencyInsightsAnalysis,

@@ -164,18 +164,21 @@ vi.mock("@/composables/useSyntheticResults", () => ({
 const mockGetSynthetics = vi.fn().mockResolvedValue({ data: { type: "browser" } });
 const mockGetLocations = vi.fn().mockResolvedValue({ data: { locations: [] } });
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: (...args: any[]) => mockGetSynthetics(...args),
-    getLocations: (...args: any[]) => mockGetLocations(...args),
-    presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
-    artifactUrl: vi.fn(() => ""),
-    // useSyntheticEvidence asks this before fetching, to decide whether the URL
-    // is our cookie-authed proxy or a presigned object URL. Omitting it threw
-    // inside the load path, so no fetch was ever issued.
-    isProxyArtifactUrl: vi.fn(() => false),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: (...args: any[]) => mockGetSynthetics(...args),
+      getLocations: (...args: any[]) => mockGetLocations(...args),
+      presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
+      artifactUrl: vi.fn(() => ""),
+      // useSyntheticEvidence asks this before fetching, to decide whether the URL
+      // is our cookie-authed proxy or a presigned object URL. Omitting it threw
+      // inside the load path, so no fetch was ever issued.
+      isProxyArtifactUrl: vi.fn(() => false),
+    },
+  });
+});
 
 const stubs = {
   OCard: {

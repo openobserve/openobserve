@@ -35,12 +35,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    createLocation: vi.fn(),
-    updateLocation: vi.fn(),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLocation: vi.fn(),
+      updateLocation: vi.fn(),
+    },
+  });
+});
 
 import syntheticsService from "@/services/synthetics";
 

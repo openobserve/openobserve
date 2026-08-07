@@ -21,16 +21,21 @@ import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import { queryClient } from "@/composables/query/queryClient";
 
-vi.mock("@/services/iam", () => ({
-  getGroups: vi.fn(),
-  deleteGroup: vi.fn(),
-  bulkDeleteGroups: vi.fn(async () => ({
-    data: { successful: [], unsuccessful: [] },
-  })),
-  getGroup: vi.fn(async () => ({
-    data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
-  })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock, queryStub } = await import("@/test/unit/helpers/mockService");
+  const getGroups = vi.fn();
+  return overlayServiceMock(await importOriginal(), {
+    getGroups,
+    groupsQuery: queryStub(getGroups),
+    deleteGroup: vi.fn(),
+    bulkDeleteGroups: vi.fn(async () => ({
+      data: { successful: [], unsuccessful: [] },
+    })),
+    getGroup: vi.fn(async () => ({
+      data: { name: "dev", users: ["u1@o2.ai", "u2@o2.ai"], roles: ["admin"] },
+    })),
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({

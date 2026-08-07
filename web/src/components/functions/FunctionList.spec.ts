@@ -28,14 +28,17 @@ const { mockJsTransformList, mockJsTransformDelete, mockBulkDelete, mockGetAssoc
     mockGetAssociatedPipelines: vi.fn(),
   }));
 
-vi.mock("../../services/jstransform", () => ({
-  default: {
-    list: mockJsTransformList,
-    delete: mockJsTransformDelete,
-    bulkDelete: mockBulkDelete,
-    getAssociatedPipelines: mockGetAssociatedPipelines,
-  },
-}));
+vi.mock("../../services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: mockJsTransformList,
+      delete: mockJsTransformDelete,
+      bulkDelete: mockBulkDelete,
+      getAssociatedPipelines: mockGetAssociatedPipelines,
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {

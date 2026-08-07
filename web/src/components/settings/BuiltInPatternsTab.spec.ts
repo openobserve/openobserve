@@ -20,14 +20,16 @@ import { createI18n } from "vue-i18n";
 import BuiltInPatternsTab from "./BuiltInPatternsTab.vue";
 
 // --- Mock services ---
-vi.mock("@/services/regex_pattern", () => ({
-  default: {
-    getBuiltInPatterns: vi.fn(),
-  },
-}));
+vi.mock("@/services/regex_pattern", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getBuiltInPatterns: vi.fn(),
+    },
+  });
+});
 
-import regexPatternsService from "@/services/regex_pattern";
-import { fetchBuiltInRegexPatterns } from "@/composables/query/queries/regexPatterns";
+import regexPatternsService, { builtInRegexPatternsQuery } from "@/services/regex_pattern";
 
 const mockPatterns = [
   {
@@ -214,7 +216,7 @@ describe("BuiltInPatternsTab", () => {
 
     it("should use cached patterns when cache hit", async () => {
       // Warm the shared query, as a previous visit to this tab would.
-      await fetchBuiltInRegexPatterns("test-org");
+      await builtInRegexPatternsQuery.get("test-org");
       vi.mocked(regexPatternsService.getBuiltInPatterns).mockClear();
 
       wrapper = mountComponent();

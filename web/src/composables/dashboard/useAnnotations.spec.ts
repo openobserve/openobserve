@@ -3,11 +3,14 @@ import { useAnnotations } from "./useAnnotations";
 import { annotationService } from "../../services/dashboard_annotations";
 
 // Mock the annotation service
-vi.mock("../../services/dashboard_annotations", () => ({
-  annotationService: {
-    get_timed_annotations: vi.fn(),
-  },
-}));
+vi.mock("../../services/dashboard_annotations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    annotationService: {
+      get_timed_annotations: vi.fn(),
+    },
+  });
+});
 
 const mockAnnotationService = vi.mocked(annotationService);
 

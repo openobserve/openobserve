@@ -13,11 +13,14 @@ vi.mock("@/utils/zincutils", () => ({
 }));
 
 // Mock the stream service
-vi.mock("@/services/stream", () => ({
-  default: {
-    delete: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete: vi.fn(() => Promise.resolve({ data: { code: 200 } })),
+    },
+  });
+});
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
@@ -27,11 +30,14 @@ vi.mock("@/services/segment_analytics", () => ({
 }));
 
 // Mock jstransform service
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_all_enrichment_table_statuses: vi.fn(() => Promise.resolve({ data: {} })),
+    },
+  });
+});
 
 // Mock toast
 const mockToast = vi.fn(() => vi.fn());

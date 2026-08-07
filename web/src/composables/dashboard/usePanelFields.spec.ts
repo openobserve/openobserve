@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { reactive } from "vue";
 import { usePanelFields } from "./usePanelFields";
 
 // Mock Vue to enable computed() in unit test context
-import { vi } from "vitest";
 
 vi.mock("vue", async () => {
   const actual = await vi.importActual("vue");

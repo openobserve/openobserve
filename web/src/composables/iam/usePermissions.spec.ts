@@ -4,17 +4,23 @@ import usePermissions from "./usePermissions";
 import type { Resource } from "@/ts/interfaces";
 
 // Mock the dependencies
-vi.mock("@/services/users", () => ({
-  default: {
-    orgUsers: vi.fn(),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      orgUsers: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/service_accounts", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/service_accounts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 import usersService from "@/services/users";
 import service_accounts from "@/services/service_accounts";

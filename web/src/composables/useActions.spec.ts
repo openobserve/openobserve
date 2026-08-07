@@ -16,11 +16,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock all external dependencies before any imports
-vi.mock("@/services/action_scripts", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/action_scripts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/aws-exports", () => ({
   default: {

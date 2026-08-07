@@ -19,9 +19,8 @@ import { nextTick, ref } from "vue";
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import reports from "@/services/reports";
+import reports, { reportsQuery } from "@/services/reports";
 import * as vueRouter from "vue-router";
-import { reportsQuery } from "@/composables/query/queries/reports";
 
 // Mock vue-router
 vi.mock("vue-router", async () => {
@@ -37,14 +36,17 @@ vi.mock("vue-router", async () => {
 });
 
 // Mock reports service
-vi.mock("@/services/reports", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    toggleReportStateById: vi.fn(),
-    deleteReportById: vi.fn(),
-    bulkDeleteById: vi.fn(),
-  },
-}));
+vi.mock("@/services/reports", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      toggleReportStateById: vi.fn(),
+      deleteReportById: vi.fn(),
+      bulkDeleteById: vi.fn(),
+    },
+  });
+});
 
 // Mock composables that use inject()
 vi.mock("@/composables/useStreams", () => ({
@@ -282,7 +284,7 @@ describe("ReportList Component", () => {
 
       // Mark the shared reports query stale so this mount really calls the API
       // instead of being served from an earlier test's cached result.
-      reportsQuery.invalidateList(store.state.selectedOrganization.identifier);
+      reportsQuery.invalidate(store.state.selectedOrganization.identifier);
 
       const newWrapper = mount(ReportList, {
         global: {

@@ -42,7 +42,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
 
 vi.mock("@/services/metrics", () => ({ default: { get_promql_series: vi.fn() } }));
-vi.mock("@/services/stream", () => ({ default: { schema: vi.fn() } }));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { schema: vi.fn() } });
+});
 vi.mock("@/composables/fieldValueStore", () => ({
   getFieldValuesForSuggestion: vi.fn().mockResolvedValue([]),
   requestFieldValues: vi.fn().mockResolvedValue([]),

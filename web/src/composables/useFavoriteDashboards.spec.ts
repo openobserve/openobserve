@@ -18,12 +18,15 @@ import i18nInstance from "@/locales";
 
 const t = (i18nInstance.global as any).t;
 
-vi.mock("@/services/settings", () => ({
-  default: {
-    getSetting: vi.fn(),
-    setUserSetting: vi.fn(),
-  },
-}));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getSetting: vi.fn(),
+      setUserSetting: vi.fn(),
+    },
+  });
+});
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import settings from "@/services/settings";

@@ -49,17 +49,23 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
 // Mock services
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 // Mock useStore to return our test store
 vi.mock("vuex", () => ({
@@ -76,8 +82,7 @@ vi.mock("vue-router", () => ({
 
 // Import mocked services after mocking
 import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
-import { invalidateDestinations } from "@/composables/query/queries/alertMeta";
+import destinationService, { destinationsQuery } from "@/services/alert_destination";
 
 const mockTemplateService = templateService as any;
 const mockDestinationService = destinationService as any;
@@ -443,7 +448,7 @@ describe("AppAlerts", () => {
       expect(wrapper.vm.destinations).toEqual(firstDestinations);
 
       // Cached until something invalidates it — mirrors a destination edit.
-      await invalidateDestinations("test-org-123");
+      await destinationsQuery.invalidate("test-org-123");
       mockDestinationService.list.mockResolvedValueOnce({ data: secondDestinations });
       await wrapper.vm.getDestinations();
       expect(wrapper.vm.destinations).toEqual(secondDestinations);
