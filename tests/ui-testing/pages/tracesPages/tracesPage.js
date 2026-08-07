@@ -35,6 +35,11 @@ export class TracesPage {
     // No-data state inside the graph panel (OEmptyState rendered by
     // ServiceGraphNoDataState.vue within the graph container).
     this.serviceGraphEmptyState = '[data-test="service-graph-container"] [data-test="o2-empty-state"]';
+    // Specific to the service-graph mode toolbar (visible only in service-graph mode).
+    // Source: web/src/plugins/traces/SearchBar.vue:251-320
+    this.serviceGraphDateTimePicker = '[data-test="service-graph-date-time-picker"]';
+    this.serviceGraphTreeViewBtn = '[data-test="service-graph-tree-view-btn"]';
+    this.serviceGraphGraphViewBtn = '[data-test="service-graph-graph-view-btn"]';
 
     // Search Bar - Controls
     this.showMetricsToggle = '[data-test="traces-search-bar-show-metrics-toggle-btn"]';
@@ -486,6 +491,67 @@ export class TracesPage {
   async expectStandaloneServiceGraphPageVisible() {
     await expect(this.page.locator(this.serviceGraphPage))
       .toBeVisible({ timeout: 10000 });
+  }
+
+  // Click the Spans toolbar tab and wait for the search panel to load.
+  // Spans is the default mode so no ?tab= URL param is added.
+  async navigateToSpansTab() {
+    await this.page.locator(this.spansToggle).click();
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  // Click the Traces toolbar tab and wait for the ?tab=traces URL param +
+  // search panel to load.
+  async navigateToTracesTab() {
+    await this.page.locator(this.searchToggle).click();
+    await this.page.waitForURL(/\/traces\?.*tab=traces/, { timeout: 10000 });
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+  }
+
+  // Assert the Spans tab button has data-state="on" (active).
+  async expectSpansTabActive() {
+    await expect(this.page.locator(this.spansToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // Assert the Traces tab button has data-state="on" (active).
+  async expectTracesTabActive() {
+    await expect(this.page.locator(this.searchToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
+  // Assert the search toolbar controls (reset, metrics toggle, refresh,
+  // date-time dropdown, share) are visible — i.e. we are in spans/traces mode.
+  async expectSearchToolbarVisible() {
+    await expect(this.page.locator(this.resetFiltersButton)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.showMetricsToggle)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.refreshButton)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.dateTimeDropdown)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.shareLinkButton)).toBeVisible({ timeout: 10000 });
+  }
+
+  // Assert the search toolbar controls are NOT in the DOM (v-if removes them
+  // when the mode is service-graph or services-catalog).
+  async expectSearchToolbarHidden() {
+    await expect(this.page.locator(this.resetFiltersButton)).not.toBeAttached({ timeout: 10000 });
+    await expect(this.page.locator(this.showMetricsToggle)).not.toBeAttached({ timeout: 10000 });
+    await expect(this.page.locator(this.refreshButton)).not.toBeAttached({ timeout: 10000 });
+    await expect(this.page.locator(this.dateTimeDropdown)).not.toBeAttached({ timeout: 10000 });
+    await expect(this.page.locator(this.shareLinkButton)).not.toBeAttached({ timeout: 10000 });
+  }
+
+  // Assert the service-graph-specific toolbar (date-time, refresh, tree/graph
+  // toggle) is visible — only in service-graph mode.
+  async expectServiceGraphToolbarVisible() {
+    await expect(this.page.locator(this.serviceGraphDateTimePicker)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.serviceGraphRefreshButton)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.serviceGraphTreeViewBtn)).toBeVisible({ timeout: 10000 });
+    await expect(this.page.locator(this.serviceGraphGraphViewBtn)).toBeVisible({ timeout: 10000 });
+  }
+
+  // Assert the services-catalog-specific toolbar (date-time picker) is visible.
+  async expectServicesCatalogToolbarVisible() {
+    await expect(this.page.locator(this.servicesCatalogDateTimePicker)).toBeVisible({ timeout: 10000 });
   }
 
   async refreshServiceGraph() {

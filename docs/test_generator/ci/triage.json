@@ -1,0 +1,28 @@
+{
+  "feature_slug": "traces-toolbar-tabs",
+  "feature_title": "Traces In-Page Toolbar Tabs",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traces-toolbar-tabs.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traces-toolbar-tabs.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/SearchBar.vue",
+    "web/src/plugins/traces/Index.vue",
+    "web/src/lib/core/Navbar/ONavGroup.vue",
+    "web/src/lib/core/Navbar/navGroups.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "OSS — all 13 changed file paths are in standard OSS locations under web/src/ and tests/ui-testing/. None touch enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/). While the Service Graph toolbar tab is gated behind v-if=\"config.isEnterprise == 'true'\", that is a runtime guard in OSS code, not an enterprise-owned path — the authoritative path-based classification therefore resolves to oss.",
+    "skip": "Not skipped — the diff adds new toolbar tabs (Service Graph, Services Catalog) on the Traces SearchBar and new in-page view rendering in Index.vue, which are user-facing UI changes. No explicit opt-out label or skip comment is present in the trigger inputs. The change does not qualify as docs-only, CI-only, or comment/test-data-only.",
+    "e2e": "E2E is warranted — the diff adds a unified view toggle (OToggleGroup) in SearchBar.vue with Service Graph, Traces, Spans, and Services Catalog modes, and in-page view rendering for those modes in Index.vue (ServiceGraph and ServicesCatalog components). This is a new user interaction flow on the Traces page that needs end-to-end verification of tab switching, URL state (?tab=), search context carry-over, and the rail flyout's continued standalone-route behavior.",
+    "area": "Traces — the bulk of the UI changes live in web/src/plugins/traces/ (SearchBar.vue, Index.vue, and their .spec.ts files). The dev-authored E2E spec lands at tests/ui-testing/playwright-tests/Traces/traces-toolbar-tabs.spec.js, and the enterprise CI matrix already has a Traces shard (ci_matrix.ent.json appends service-graph.spec.js to it). The Navbar changes (ONavGroup, navGroups) support the flyout highlight behavior for the same Traces area.",
+    "group": "Traces — the enterprise CI matrix (ci_matrix.ent.json) has an append entry for \"Traces\": [\"service-graph.spec.js\"], confirming the Traces shard exists in the OSS base matrix. The new traces-toolbar-tabs.spec.js naturally belongs in the same shard alongside the existing service-graph.spec.js, both exercising in-page Service Graph / Services Catalog functionality on the Traces page.",
+    "existing_tests": "Yes — a new Playwright E2E spec was authored in this diff: tests/ui-testing/playwright-tests/Traces/traces-toolbar-tabs.spec.js (103 lines, 4 test cases covering Service Graph tab, Services Catalog tab, search context carry + reload restore, and rail flyout standalone route). This is a full E2E spec under the Playwright tests directory, not a Vitest unit test. The changed Vitest/unit spec files (ONavGroup.spec.ts, Index.spec.ts, SearchBar.spec.ts) are unit-level coverage for the Navbar and Traces components — they are not Playwright E2E specs and do not count as existing E2E coverage."
+  }
+}

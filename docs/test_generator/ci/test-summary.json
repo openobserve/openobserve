@@ -1,0 +1,22 @@
+[
+  {
+    "title": "P1: Search controls hide and services-catalog toolbar appears when switching to Services Catalog",
+    "action": "append",
+    "verifies": "Switching to Services Catalog tab hides the search controls from DOM and shows the services-catalog date-time picker toolbar"
+  },
+  {
+    "title": "P1: Search controls hide and service-graph toolbar appears when switching to Service Graph (enterprise)",
+    "action": "append",
+    "verifies": "Switching to Service Graph tab hides the search controls from DOM and shows the service-graph-specific toolbar (date-time, refresh, tree/graph toggle)"
+  },
+  {
+    "title": "P1: Switching back from Services Catalog to Traces restores search controls",
+    "action": "append",
+    "verifies": "Returning from Services Catalog tab to Traces tab restores all search controls and updates the active tab state"
+  },
+  {
+    "title": "P2: Spans to Traces toggle updates URL and active state",
+    "action": "append",
+    "verifies": "Toggling between Spans and Traces tabs correctly syncs the active button state and the ?tab= URL query parameter"
+  }
+]

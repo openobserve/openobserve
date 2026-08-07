@@ -1,0 +1,12 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traces-toolbar-tabs.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traces-toolbar-tabs.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesSearch.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-graph.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/service-catalog.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "traces-toolbar-tabs.spec.js already exists and covers the 4 core integration paths (service-graph in-page tab, services-catalog in-page tab, context sharing + cold reload, rail flyout standalone route). Several WIRED behaviors from the feature doc are not tested yet: toolbar mode-specific visibility (search controls hide / mode toolbars appear), back-navigation from non-search tabs, and the spans/traces toggle within this spec's own context. Appending 4 new test() blocks to fill these gaps without creating a new spec file. The Playwright config uses directory-based discovery (testDir: './playwright-tests'), so no explicit registration is required."
+}
