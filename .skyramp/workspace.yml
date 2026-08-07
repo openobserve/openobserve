@@ -1,0 +1,71 @@
+# Skyramp Workspace Configuration
+workspace:
+  repoName: mrugeshmaster/openobserve
+  repoUrl: https://github.com/mrugeshmaster/openobserve
+metadata:
+  schemaVersion: v1
+  executorVersion: v1.3.37
+  createdAt: "2026-08-05T19:19:45.591Z"
+  updatedAt: "2026-08-05T19:19:45.596Z"
+services:
+  - serviceName: openobserve-api
+    language: python
+    framework: pytest
+    testDirectory: tests/api-testing/tests
+    api:
+      schemaPath: http://localhost:5080/api-doc/openapi.json
+      authType: basic
+      baseUrl: http://localhost:5080
+    runtimeDetails:
+      serverStartCommand: bash .skyramp/sut/setup.sh
+      runtime: local
+      # The SUT runs natively on the runner at :5080, so the executor container
+      # needs host networking to reach it — bridge mode failed with ERR_ABORTED.
+      dockerNetwork: host
+      testSuites:
+        - framework: pytest
+          testRunCommand: >-
+            ZO_BASE_URL=$SKYRAMP_TEST_BASE_URL tests/api-testing/.venv/bin/python -m pytest -c
+            tests/api-testing/pyproject.toml
+          testEnv:
+            ORGNAME: default
+            ZO_ROOT_USER_EMAIL: root@example.com
+            ZO_ROOT_USER_PASSWORD: Complexpass#123
+            ZO_SMTP_ENABLED: "true"
+          pathGlobs:
+            - tests/api-testing/tests/**
+        - framework: pytest
+          testRunCommand: bash .skyramp/sut/run-db-testing.sh
+          pathGlobs:
+            - tests/db-testing/tests/**
+  - serviceName: openobserve-ui
+    language: typescript
+    framework: playwright
+    testDirectory: tests/ui-testing/playwright-tests
+    api:
+      authType: none
+      baseUrl: http://localhost:5080
+    runtimeDetails:
+      serverStartCommand: bash .skyramp/sut/setup.sh
+      runtime: local
+      # The SUT runs natively on the runner at :5080, so the executor container
+      # needs host networking to reach it — bridge mode failed with ERR_ABORTED.
+      dockerNetwork: host
+      testSuites:
+        - framework: playwright
+          testRunCommand: >-
+            ZO_BASE_URL=$SKYRAMP_TEST_BASE_URL WS_ZO_BASE_URL=$(printf '%s' "$SKYRAMP_TEST_BASE_URL" | sed
+            's#^http#ws#') ZO_BASE_URL_SC=$SKYRAMP_TEST_BASE_URL ZO_BASE_URL_SC_UI=$SKYRAMP_TEST_BASE_URL
+            ZO_WEB_URL=$SKYRAMP_TEST_BASE_URL INGESTION_URL=$SKYRAMP_TEST_BASE_URL
+            tests/ui-testing/node_modules/.bin/playwright test --config=tests/ui-testing/playwright.config.js
+          testEnv:
+            ORGNAME: default
+            ZO_ROOT_USER_EMAIL: root@example.com
+            ZO_ROOT_USER_PASSWORD: Complexpass#123
+            ZO_SMTP_ENABLED: "true"
+          pathGlobs:
+            - tests/ui-testing/playwright-tests/**
+        - framework: vitest
+          testRunCommand: web/node_modules/.bin/vitest --config web/vitest.config.ts --environment jsdom --run
+          pathGlobs:
+            - web/src/**
