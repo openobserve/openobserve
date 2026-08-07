@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   For inline / simple code chips without highlighting, use OCode.
 -->
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, type CSSProperties } from "vue";
 import hljs from "highlight.js";
 import { copyToClipboard } from "@/utils/clipboard";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -34,7 +34,15 @@ import type { CodeBlockProps, CodeBlockEmits, CodeBlockSlots } from "./OCodeBloc
 
 const { t } = useI18nTyped();
 
+/**
+ * Single source of truth for the code line-height: the stylesheet reads it via
+ * the custom property below, and the max-height maths multiplies it. Declaring
+ * it twice would let the visible line count drift from the actual leading.
+ */
+const CODE_LINE_HEIGHT = 1.55;
+
 const props = withDefaults(defineProps<CodeBlockProps>(), {
+  wrap: false,
   copyable: true,
   dataTest: "code-block",
 });
@@ -43,6 +51,26 @@ const props = withDefaults(defineProps<CodeBlockProps>(), {
 // would freeze these tooltips in the boot locale.
 const revealTooltipText = computed(() => props.revealTooltip ?? t("common.reveal"));
 const hideTooltipText = computed(() => props.hideTooltip ?? t("common.hide"));
+
+/**
+ * The line-height is published as a custom property so the stylesheet and the
+ * max-height maths below share one number, and the cap is expressed in `em` so
+ * it tracks the code font size rather than assuming a pixel value.
+ */
+const preStyle = computed(() => {
+  // Record<string, string> widens CSSProperties enough to carry the custom
+  // property, which Vue's typing does not model.
+  const style: CSSProperties & Record<string, string> = {
+    "--code-line-height": String(CODE_LINE_HEIGHT),
+  };
+
+  if (props.maxLines) {
+    style.maxHeight = `calc(${props.maxLines} * ${CODE_LINE_HEIGHT}em)`;
+    style.overflowY = "auto";
+  }
+
+  return style;
+});
 
 const emit = defineEmits<CodeBlockEmits>();
 defineSlots<CodeBlockSlots>();
@@ -145,7 +173,11 @@ const onCopy = () => {
         </OButton>
       </div>
     </div>
-    <pre class="o2-code-pre"><code class="hljs" v-html="highlighted"></code></pre>
+    <pre
+      class="o2-code-pre"
+      :class="wrap ? 'o2-code-pre--wrap' : ''"
+      :style="preStyle"
+    ><code class="hljs" v-html="highlighted"></code></pre>
   </div>
 </template>
 
@@ -184,15 +216,30 @@ const onCopy = () => {
   margin: 0;
   overflow-x: auto;
   background: transparent;
+  /* Font size lives here as well as on `code` so an em-based max-height set on
+     this element resolves against the code's own type size. */
+  font-size: var(--text-compact);
+  line-height: var(--code-line-height, 1.55);
 }
 
 .o2-code-pre code {
   background: transparent;
   white-space: pre;
-  font-size: var(--text-compact);
-  line-height: 1.55;
+  font-size: inherit;
+  line-height: inherit;
   padding: 0;
   color: var(--color-syntax-text);
+}
+
+/* Wrapped mode: break anywhere, because a long SQL string can be one
+   unbroken token and would otherwise still overflow sideways. */
+.o2-code-pre--wrap {
+  overflow-x: hidden;
+}
+
+.o2-code-pre--wrap code {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 /* ============ CODE THEME (token-driven; tokens flip via dark.css,

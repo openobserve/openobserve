@@ -1,11 +1,11 @@
 <template>
   <!-- Same KpiCardRow grid and the same card padding/background as the real
        QualityKpiCard, so the tiles don't resize or change colour on load. -->
-  <KpiCardRow>
+  <KpiCardRow gap="gap-2">
     <div
       v-for="n in count"
       :key="n"
-      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-2 border px-3.5 py-2.5"
+      class="bg-card-glass-bg border-border-default rounded-default flex min-h-24 flex-col gap-0.5 border px-3 pt-1.5 pb-1.5"
       data-test="quality-kpi-skeleton"
     >
       <OSkeleton type="text" class="h-2.75 w-[55%]" />
@@ -13,7 +13,7 @@
         <OSkeleton type="text" class="h-5.5 w-[50%]" />
         <OSkeleton type="text" class="h-2.75 w-[22%]" />
       </div>
-      <div class="mt-auto flex h-7 items-end gap-0.75">
+      <div class="mt-auto flex h-5 items-end gap-0.75">
         <OSkeleton
           type="text"
           v-for="bar in 14"

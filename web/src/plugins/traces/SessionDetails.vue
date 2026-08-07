@@ -818,7 +818,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         {{ t("traces.sessionDetail.turnLabel") }} {{ row.n }}
                       </span>
                       <span class="min-w-0 flex-1">
-                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="xs" />
+                        <OProgressBar :value="ratio(row.cost, maxTurnCost)" size="sm" />
                       </span>
                       <span class="flex min-w-[3.25rem] flex-col items-end">
                         <span class="text-2xs text-text-secondary font-semibold tabular-nums">
@@ -874,7 +874,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OProgressBar
                           :value="ratio(row.lat, maxTurnLat)"
                           :variant="row.status === 'error' ? 'danger' : 'warning'"
-                          size="xs"
+                          size="sm"
                         />
                       </span>
                       <span

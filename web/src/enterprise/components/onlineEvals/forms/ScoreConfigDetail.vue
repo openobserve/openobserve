@@ -177,7 +177,7 @@
           </p>
           <ul class="m-0 flex list-none flex-col gap-2 p-0">
             <li
-              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-primary-600,#3F7994)_5%,var(--color-card-bg))]! p-[0.75rem_0.875rem]"
+              class="bg-card-bg rounded-default border border-[color-mix(in_srgb,var(--color-accent,#3F7994)_30%,transparent)] bg-[color-mix(in_srgb,var(--color-accent,#3F7994)_5%,var(--color-card-bg))]! p-[0.75rem_0.875rem]"
             >
               <div class="flex items-center gap-2">
                 <span
@@ -399,12 +399,12 @@ function formatTimestamp(microsOrMs: number): string {
 }
 
 .scd-used-card:hover {
-  border-color: color-mix(in srgb, var(--color-primary-600) 35%, transparent) !important;
-  background: color-mix(in srgb, var(--color-primary-600) 4%, var(--color-card-bg)) !important;
+  border-color: color-mix(in srgb, var(--color-accent) 35%, transparent) !important;
+  background: color-mix(in srgb, var(--color-accent) 4%, var(--color-card-bg)) !important;
 }
 
 .scd-used-card:hover .scd-used-card__chevron {
-  color: var(--color-primary-600);
+  color: var(--color-accent);
   opacity: 1;
 }
 </style>
