@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use config::{
-    FileFormat, TIMESTAMP_COL_NAME, get_config,
+    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileMeta, StreamType},
     utils::{
         parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
@@ -204,8 +204,9 @@ pub async fn merge_parquet_files(
 fn merge_output_file_format(
     stream_type: StreamType,
     is_ingester: bool,
-    configured: FileFormat,
+    configured: FileFormatConfig,
 ) -> FileFormat {
+    let configured = configured.for_stream(stream_type);
     if is_ingester {
         FileFormat::for_ingester_stream(stream_type, configured)
     } else {
@@ -341,21 +342,30 @@ mod tests {
 
     #[test]
     fn test_merge_output_file_format_uses_parquet_for_ingester_metrics() {
+        let configured = "parquet,metrics=vortex"
+            .parse::<FileFormatConfig>()
+            .unwrap();
         assert_eq!(
-            merge_output_file_format(StreamType::Metrics, true, FileFormat::Vortex),
+            merge_output_file_format(StreamType::Metrics, true, configured),
             FileFormat::Parquet
         );
         assert_eq!(
-            merge_output_file_format(StreamType::Logs, true, FileFormat::Vortex),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Metrics, false, FileFormat::Vortex),
-            FileFormat::Vortex
-        );
-        assert_eq!(
-            merge_output_file_format(StreamType::Logs, false, FileFormat::Parquet),
+            merge_output_file_format(StreamType::Logs, true, configured),
             FileFormat::Parquet
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Metrics, false, configured),
+            FileFormat::Vortex
+        );
+        assert_eq!(
+            merge_output_file_format(StreamType::Traces, false, configured),
+            FileFormat::Parquet
+        );
+
+        let configured = FileFormatConfig::new(FileFormat::Vortex);
+        assert_eq!(
+            merge_output_file_format(StreamType::Logs, true, configured),
+            FileFormat::Vortex
         );
     }
 

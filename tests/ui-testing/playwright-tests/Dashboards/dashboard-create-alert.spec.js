@@ -19,6 +19,24 @@ import testLogger from "../utils/test-logger.js";
 const randomDashboardName =
   "Dashboard_Alert_" + Math.random().toString(36).slice(2, 11);
 
+// Cleanup path for the tests that end up on the alert form: the left menu
+// returns to /dashboards with no folder in the URL, and the list then lands on
+// Favorites for any account that has some. Select the folder the dashboard was
+// created in so the row is on screen no matter what the account has starred.
+const returnToDashboardFolder = async (page, pm, folderName = "default") => {
+  await pm.dashboardList.menuItem("dashboards-item");
+  await waitForDashboardPage(page);
+
+  // waitForDashboardPage settles on the folders API response, which lands well
+  // before the folder sidebar paints — give the tab its own window rather than
+  // inheriting openFolderByName's 10s, which the list coming off the alert form
+  // routinely overruns.
+  await page
+    .locator(`[data-test="dashboard-folder-tab-name-${folderName}"]`)
+    .waitFor({ state: "visible", timeout: 30000 });
+  await pm.dashboardFolder.openFolderByName(folderName);
+};
+
 test.describe("Dashboard Create Alert testcases", () => {
   test.describe.configure({ mode: "parallel" });
 
@@ -74,23 +92,24 @@ test.describe("Dashboard Create Alert testcases", () => {
       // Click the panel dropdown menu and select "Create Alert"
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
-      // Verify navigation to alert creation page with fromPanel=true and panelData
-      await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+      // Verify navigation to the alert form, flagged as a panel prefill
+      await page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
         timeout: 15000,
       });
 
-      // Verify URL contains panelData (proves panel data was passed)
+      // The prefill marker is in the URL; the payload deliberately is not.
       const currentUrl = page.url();
-      expect(currentUrl).toContain("fromPanel=true");
-      expect(currentUrl).toContain("panelData=");
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info("Navigated to alert creation page with panel data", {
         url: currentUrl,
       });
 
       // Navigate back to dashboards to clean up
-      await pm.dashboardList.menuItem("dashboards-item");
-      await waitForDashboardPage(page);
+      await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, randomDashboardName);
 
       testLogger.info("Test completed: Create Alert from panel menu");
@@ -165,23 +184,24 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Click "above threshold" option and wait for navigation simultaneously
       await Promise.all([
-        page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
           timeout: 15000,
         }),
         pm.dashboardPanelEdit.selectAlertAboveThreshold(),
       ]);
 
       const currentUrl = page.url();
-      expect(currentUrl).toContain("fromPanel=true");
-      expect(currentUrl).toContain("panelData=");
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info(
         "Navigated to alert creation page from context menu (above threshold)"
       );
 
       // Navigate back and clean up
-      await pm.dashboardList.menuItem("dashboards-item");
-      await waitForDashboardPage(page);
+      await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, dashName);
 
       testLogger.info(
@@ -246,23 +266,24 @@ test.describe("Dashboard Create Alert testcases", () => {
 
       // Click "below threshold" option and wait for navigation simultaneously
       await Promise.all([
-        page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+        page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
           timeout: 15000,
         }),
         pm.dashboardPanelEdit.selectAlertBelowThreshold(),
       ]);
 
       const currentUrl = page.url();
-      expect(currentUrl).toContain("fromPanel=true");
-      expect(currentUrl).toContain("panelData=");
+      expect(currentUrl).toContain("prefill=panel");
+      // The panel payload rides sessionStorage now, not the URL — a query string
+      // long enough to be truncated by a browser or proxy was the reason.
+      expect(currentUrl).not.toContain("panelData=");
 
       testLogger.info(
         "Navigated to alert creation page from context menu (below threshold)"
       );
 
       // Navigate back and clean up
-      await pm.dashboardList.menuItem("dashboards-item");
-      await waitForDashboardPage(page);
+      await returnToDashboardFolder(page, pm);
       await deleteDashboard(page, dashName);
 
       testLogger.info("Test completed: Alert context menu below threshold");
@@ -400,7 +421,7 @@ test.describe("Dashboard Create Alert testcases", () => {
       await pm.dashboardPanelEdit.createAlertFromPanelMenu(panelName);
 
       // Verify navigation to pre-filled alert creation page
-      await page.waitForURL(/.*alerts\/add.*fromPanel=true.*/, {
+      await page.waitForURL(/.*alerts\/add.*prefill=panel.*/, {
         timeout: 15000,
       });
 

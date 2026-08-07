@@ -766,6 +766,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <ODropdownSeparator v-if="config.isEnterprise == 'true'" />
 
+          <!-- Alert creation is shared platform machinery: this page contributes
+               its search state through a pure adapter and CreateAlertAction owns
+               the label, confirm dialog, and hand-off. Not enterprise-gated —
+               alerts exist in OSS, unlike scheduled search above. -->
+          <ODropdownGroup :label="t('search.menuGroupAlerts')">
+            <CreateAlertAction
+              variant="menu-item"
+              :source="createAlertSource"
+              :build="buildAlertPrefill"
+              :disabled-reason="createAlertDisabledReason"
+              data-test="logs-create-alert-btn"
+            >
+              <!-- Same icon badge every other item in this menu uses, so the
+                   label column lines up. -->
+              <template #icon-left="{ icon }">
+                <span
+                  class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+                >
+                  <OIcon :name="icon" size="sm" />
+                </span>
+              </template>
+            </CreateAlertAction>
+          </ODropdownGroup>
+
+          <ODropdownSeparator />
+
           <ODropdownGroup
             v-if="
               config.isEnterprise == 'true' &&
@@ -1981,6 +2007,10 @@ import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromLogs, logsAlertSnapshot } from "@/utils/alerts/prefill/fromLogs";
+import { usePatternActions } from "@/plugins/logs/patterns/usePatternActions";
+import type { AlertBuildOptions } from "@/ts/interfaces/alertPrefill";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTree from "@/lib/data/Tree/OTree.vue";
 import { makeSavedViewSchema, type SavedViewForm } from "./SearchBar.SavedView.schema";
@@ -2043,6 +2073,7 @@ const replaceExistingFieldCondition = (
 export default defineComponent({
   name: "ComponentSearchSearchBar",
   components: {
+    CreateAlertAction,
     OSeparator,
     OSplitter,
     OButtonGroup,
@@ -2220,6 +2251,7 @@ export default defineComponent({
     const regionFilter = ref();
     const regionFilterRef = ref(null);
     const { resetStreamData, searchObj } = searchState();
+    const { buildPatternsAlertPrefill } = usePatternActions();
     const { buildSearch } = useSearchStream(t);
 
     const {
@@ -4756,6 +4788,42 @@ export default defineComponent({
       searchObj.meta.jobRecords = 100;
     };
 
+    // ── Create alert from this search ────────────────────────────────────
+    // Stated up front rather than as a toast after the click: a control that
+    // explains why it is unavailable beats a dead-end action.
+    const createAlertDisabledReason = computed(() => {
+      if (!searchObj.data.stream.selectedStream?.length) {
+        return t("logs.searchBar.selectStreamBeforeSchedule");
+      }
+      return null;
+    });
+
+    /**
+     * This page's contribution to alert creation: a plain snapshot of searchObj
+     * in, an AlertPrefill out. The resolved SQL comes from buildSearch's
+     * read-only mode — the same query the backend runs, so the alert cannot
+     * drift from what the user is looking at. ignoreQuickMode is on because
+     * quick mode narrows the SELECT list for display, which is meaningless when
+     * only the row count matters.
+     */
+    const buildLogsAlertPrefill = () => {
+      const payload = buildSearch(true, true);
+
+      return buildPrefillFromLogs(
+        logsAlertSnapshot(searchObj, payload?.query?.sql ?? "", store.state.timezone),
+      );
+    };
+
+    // On the patterns tab the alert is about patterns, so the patterns adapter
+    // takes over — which is what surfaces the include/exclude-all control in the
+    // confirm dialog. Same menu item either way; the source just changes.
+    const isPatternsTab = computed(() => searchObj.meta.logsVisualizeToggle === "patterns");
+
+    const createAlertSource = computed(() => (isPatternsTab.value ? "patterns" : "logs"));
+
+    const buildAlertPrefill = (options: AlertBuildOptions = {}) =>
+      isPatternsTab.value ? buildPatternsAlertPrefill(options) : buildLogsAlertPrefill();
+
     const openSearchInspectDialog = () => {
       searchInspectTraceId.value = "";
       searchInspectDialog.value = true;
@@ -5040,6 +5108,9 @@ export default defineComponent({
       addJobScheduler,
       routeToSearchSchedule,
       createScheduleJob,
+      buildAlertPrefill,
+      createAlertSource,
+      createAlertDisabledReason,
       searchInspectDialog,
       searchInspectTraceId,
       openSearchInspectDialog,
