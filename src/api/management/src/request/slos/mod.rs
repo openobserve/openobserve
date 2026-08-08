@@ -56,19 +56,6 @@ pub struct SloListResponse {
     pub list: Vec<SloListItem>,
 }
 
-fn disabled() -> Option<Response> {
-    if config::get_config().slo.enabled {
-        return None;
-    }
-    Some(
-        MetaHttpResponse::error(
-            StatusCode::NOT_IMPLEMENTED.as_u16(),
-            "SLOs are disabled. Set ZO_SLO_ENABLED=true to enable them.".to_string(),
-        )
-        .into_response(),
-    )
-}
-
 /// List SLOs in an organization.
 #[utoipa::path(
     get,
@@ -89,9 +76,6 @@ fn disabled() -> Option<Response> {
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
 pub async fn list_slos(Path(org_id): Path<String>, Query(q): Query<ListQuery>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match openobserve_core::slo::service::list_with_status(&org_id, q.folder.as_deref()).await {
         Ok(list) => MetaHttpResponse::json(SloListResponse {
             list: list
@@ -123,9 +107,6 @@ pub async fn list_slos(Path(org_id): Path<String>, Query(q): Query<ListQuery>) -
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match openobserve_core::slo::service::get_with_status(&org_id, &slo_id).await {
         Ok(Some((slo, status))) => MetaHttpResponse::json(SloListItem { slo, status }),
         Ok(None) => not_found(),
@@ -155,9 +136,6 @@ pub async fn create_slo(
     Headers(user_email): Headers<UserEmail>,
     Json(mut slo): Json<Slo>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     // The path segment is authoritative: it is what the permission check ran
     // against, so a body claiming a different org must not be honoured.
     slo.org = org_id;
@@ -206,9 +184,6 @@ pub async fn update_slo(
     Headers(user_email): Headers<UserEmail>,
     Json(mut slo): Json<Slo>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     // Both taken from the path, for the same reason as create: they are what
     // the permission check ran against.
     slo.org = org_id;
@@ -248,9 +223,6 @@ pub async fn update_slo(
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn delete_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match slo_service::delete(&org_id, &slo_id).await {
         Ok(true) => {
             MetaHttpResponse::json(MetaHttpResponse::message(StatusCode::OK, "SLO deleted"))
@@ -296,9 +268,6 @@ pub async fn move_slos(
     Headers(user_email): Headers<UserEmail>,
     Json(req_body): Json<MoveSlosRequestBody>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     if req_body.slo_ids.is_empty() {
         return MetaHttpResponse::error(
             StatusCode::BAD_REQUEST.as_u16(),
@@ -359,9 +328,6 @@ pub async fn enable_slo(
     Path((org_id, slo_id)): Path<(String, String)>,
     Query(q): Query<EnableQuery>,
 ) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match slo_service::set_enabled(&org_id, &slo_id, q.value).await {
         Ok(true) => MetaHttpResponse::json(MetaHttpResponse::message(
             StatusCode::OK,
@@ -391,9 +357,6 @@ pub async fn enable_slo(
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
 pub async fn get_slo_groups(Path((org_id, slo_id)): Path<(String, String)>) -> Response {
-    if let Some(r) = disabled() {
-        return r;
-    }
     match openobserve_core::slo::service::group_status(&org_id, &slo_id).await {
         Ok(groups) => MetaHttpResponse::json(serde_json::json!({ "list": groups })),
         Err(e) => internal(e),

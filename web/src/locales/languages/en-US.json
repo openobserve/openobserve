@@ -5307,7 +5307,8 @@
       "invalidVrlFunction": "Invalid VRL Function",
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
-      "sqlValidationError": "SQL validation error: {error}"
+      "sqlValidationError": "SQL validation error: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -6252,7 +6253,16 @@
         "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
         "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Export Template",
@@ -12287,7 +12297,7 @@
   },
   "slos": {
     "title": "SLOs",
-    "subtitle": "Service level objectives — targets, error budgets, burn-rate alerts",
+    "subtitle": "Service level objectives: targets, error budgets, burn-rate alerts",
     "new": "New SLO",
     "newTitle": "New SLO",
     "editTitle": "Edit SLO",
@@ -12303,7 +12313,7 @@
     "deleted": "SLO deleted",
     "rolling": "rolling",
     "totalSlos": "Total SLOs",
-    "noGrouping": "None — a single overall series",
+    "noGrouping": "None (a single overall series)",
     "generation": "generation {n}",
     "newAlert": "New alert",
     "overRolling": "over rolling {window}",
@@ -12314,13 +12324,16 @@
     "deleteFailed": "Could not delete the SLO",
     "deleteConfirmTitle": "Delete this SLO?",
     "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
     "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
     "sliceNote": {
-      "count": "The slice width does not change this SLO's numbers — the same events are counted either way. 5-minute slices store a fifth as much history.",
-      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget — choose 1 minute for tight targets on short windows."
+      "count": "The slice width does not change this SLO's numbers. The same events are counted either way. 5-minute slices store a fifth as much history.",
+      "perSlice": "Each slice is scored good or bad as a whole, so the width is the smallest amount of budget one failure can spend. At 99.9% over 7 days a single bad 5-minute slice spends about half the budget. Choose 1 minute for tight targets on short windows."
     },
-    "backfillNote": "Backfill runs on save — chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
+    "backfillNote": "Backfill runs on save: chunked, newest history first. Alerts stay frozen until coverage clears the floor.",
     "budgetHint": "error budget = {budget}",
     "budgetDays": "{n} days",
     "budgetHours": "{n} hours",
@@ -12338,7 +12351,7 @@
       "count": "Count",
       "countDescription": "good events / total events from one query",
       "timeSlice": "Time slice",
-      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms — uptime = good slices",
+      "timeSliceDescription": "a per-slice condition, e.g. p95 < 500 ms; uptime = good slices",
       "alert": "Alert-based",
       "alertDescription": "uptime of an existing alert",
       "alertUnavailable": "Alert-based SLIs are not available yet"
@@ -12381,7 +12394,7 @@
     },
     "section": {
       "identity": "Details",
-      "sli": "SLI — what \"good\" means",
+      "sli": "SLI: what \"good\" means",
       "objective": "Objective",
       "grouping": "Grouping",
       "summary": "Summary"
@@ -12418,19 +12431,19 @@
     },
     "empty": {
       "title": "No SLOs yet",
-      "description": "An SLO measures what fraction of requests, or of time, met a target — and gives alerts an error budget to burn."
+      "description": "An SLO measures what fraction of requests, or of time, met a target, and gives alerts an error budget to burn."
     },
     "groups": {
       "emptyTitle": "No groups measured yet",
       "emptyDescription": "Groups appear once the first ingest pass has measured them."
     },
     "frozen": {
-      "title": "Frozen — not enough coverage",
+      "title": "Frozen: not enough coverage",
       "body": "Only {coverage} of this window was measured, below the {floor} floor. The SLO reads as no data and its alerts neither fire nor resolve, so unmeasured time is never reported as uptime."
     },
     "regenerate": {
       "title": "This edit restarts measurement",
-      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this — the target is applied when the SLO is read."
+      "body": "You changed what a slice means, so a new generation begins and the current window's measurements are discarded. Changing only the target would not do this; the target is applied when the SLO is read."
     },
     "alertSli": {
       "unavailable": "Alert-based SLIs are not available yet: distinguishing \"the alert was OK for 3h\" from \"the alert was paused for 3h\" needs coverage data that is still being wired up."
@@ -12439,14 +12452,14 @@
       "sloLabel": "Service level objective",
       "sloSummary": "target {target} · rolling {window} · {slice} slices · max burn rate ×{max}",
       "suggested": "Suggested configurations",
-      "suggestedFor": "Datadog's suggested rows for a {window} SLO",
+      "suggestedFor": "Suggested rows for a {window} SLO",
       "presetDetail": "{long} long / {short} short · fires at {budget}% budget",
       "shortIsLongOverTwelve": "Short = long ÷ 12 (Google SRE workbook) in every suggested pair.",
       "criticalIf": "Critical if",
       "warningIf": "Warning if",
       "burnRate": "burn rate",
       "budgetConsumed": "budget consumed",
-      "inBothWindows": "in both windows —",
+      "inBothWindows": "in both windows:",
       "long": "long",
       "short": "short",
       "none": "none",
@@ -12455,16 +12468,14 @@
       "exhaustNote": "At this rate the budget is gone in ~{time}.",
       "multiAlert": "One alert per group",
       "multiAlertHint": "Fans the alert out across the SLO's groups, each with its own state.",
-      "noCountGate": "No count gate.",
-      "noCountGateBody": "Unlike aggregation and PromQL alerts there is no \"for at least N groups\" row here — this family has no count axis, and a non-default value on the legacy threshold fields is rejected rather than ignored.",
       "kind": {
         "burnRate": "Burn rate",
         "errorBudget": "Error budget"
       },
       "preset": {
-        "fast": "Fast burn — page",
-        "mid": "Mid burn — notify",
-        "slow": "Slow burn — ticket"
+        "fast": "Fast burn: page",
+        "mid": "Mid burn: notify",
+        "slow": "Slow burn: ticket"
       }
     },
     "move": "Move",
@@ -12479,8 +12490,8 @@
       "needsDefinition": "Pick a stream and define \"good when\" to preview",
       "sliceValues": "Slice value vs threshold",
       "sliceValue": "Slice value",
-      "sliceTally": "{sli}% good — {good}/{total} slices",
-      "sliceGaps": "{n}/{total} slots in this range produced no data — unmeasured, not bad. The percentage above is over the rest.",
+      "sliceTally": "{sli}% good ({good}/{total} slices)",
+      "sliceGaps": "{n}/{total} slots in this range produced no data: unmeasured, not bad. The percentage above is over the rest.",
       "thresholdLabel": "Threshold {value}",
       "noSlices": "No slices in this range yet",
       "loadFailed": "Could not run the preview query"
@@ -12495,6 +12506,7 @@
       "exhausted": "Budget exhausted (0%)",
       "neutralBurn": "Budget-neutral (×1)",
       "empty": "No slices measured in this window yet.",
+      "sparseCoverage": "Only {measured} of {total} buckets in this window recorded any events; the rest measured nothing. Isolated measurements are drawn as points so they stay visible.",
       "loadFailed": "Could not load measurement history",
       "about": "About this chart",
       "formulaLabel": "Formula",
@@ -12503,12 +12515,23 @@
       "errorsAffordable": "Errors still affordable",
       "slicesAffordable": "Bad slices still affordable",
       "budgetExplain": "How much of the error budget is still unspent, spent down cumulatively across the window. Every bucket adds its bad events to a running total, so the line only ever falls.",
-      "budgetFormula": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = total events in window × (100% − target)\nbad = total − good\n\nright axis — errors still affordable:\n= budget × remaining % ÷ 100",
-      "budgetFormulaPerSlice": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = measured seconds in window × (100% − target)\n\nA whole slice is scored good or bad, so this SLI counts SECONDS.\n\nright axis — bad slices still affordable:\n= budget × remaining % ÷ 100 ÷ slice interval",
-      "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion — below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
+      "budgetFormula": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = total events in window × (100% − target)\nbad = total − good\n\nright axis (errors still affordable):\n= budget × remaining % ÷ 100",
+      "budgetFormulaPerSlice": "remaining % = 100 × (1 − bad so far ÷ budget)\nbudget = measured seconds in window × (100% − target)\n\nA whole slice is scored good or bad, so this SLI counts SECONDS.\n\nright axis (bad slices still affordable):\n= budget × remaining % ÷ 100 ÷ slice interval",
+      "budgetNote": "The last point equals the Budget remaining tile above. The dashed line at 0% is exhaustion; below it the SLO has spent more errors than the target allows. Gaps are buckets with nothing measured, which is not the same as zero.",
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
-      "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis — the same line read as SLI:\nSLI = 100% − burn rate × (100% − target)",
+      "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis (the same line read as SLI):\nSLI = 100% − burn rate × (100% − target)",
       "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

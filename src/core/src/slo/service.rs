@@ -28,6 +28,8 @@
 //! uncharged, and concurrent creates in that window each see headroom the
 //! other has already taken.
 
+use std::str::FromStr as _;
+
 use config::{
     get_config,
     meta::{
@@ -44,6 +46,7 @@ use infra::table::{
     folders, slo_backfill_jobs as backfill_jobs, slo_budget, slos as slos_table,
     slos::GenerationEffect,
 };
+use svix_ksuid::Ksuid;
 
 /// Why a save was rejected.
 #[derive(Debug)]
@@ -305,6 +308,27 @@ pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {
     let Some(slo) = slos_table::get(db, org, id).await? else {
         return Ok(false);
     };
+
+    // S-12: the SLO's alerts go with it. An alert whose SLO no longer exists
+    // has nothing to evaluate and no way to recover — it would error on every
+    // pass forever — so leaving it behind is not a kinder outcome than
+    // removing it. Disabled alerts are included for the same reason.
+    //
+    // Deleted through the alert service rather than by row, so each one takes
+    // its scheduler trigger, ofga ownership and run-state with it.
+    let dependents = infra::table::alerts::list_alerts_by_slo(db, org, id)
+        .await
+        .map_err(|e| SloError::Db(e.to_string()))?;
+    for (alert_id, name) in plan_alert_cascade(&dependents) {
+        if let Err(e) = crate::alerts::alert::delete_by_id(db, org, alert_id).await {
+            // Best-effort, matching the rest of this teardown: a stuck alert
+            // must not strand the SLO half-deleted.
+            log::warn!("[slo] could not delete alert \"{name}\" with SLO {id}: {e}");
+        } else {
+            log::info!("[slo] deleted alert \"{name}\" along with SLO {id}");
+        }
+    }
+
     let now = now_micros() / 1_000_000;
 
     // Retire, do not release: the slices are still on disk, and instant
@@ -319,6 +343,18 @@ pub async fn delete(org: &str, id: &str) -> Result<bool, SloError> {
         .await;
 
     Ok(slos_table::delete(db, org, id).await?)
+}
+
+/// Which dependent alerts a delete will cascade to, as `(id, name)`.
+///
+/// Split out so the selection is testable without a database. An id that will
+/// not parse is skipped rather than aborting the cascade: one unusable row
+/// must not strand every other alert pointing at the same SLO.
+fn plan_alert_cascade(dependents: &[(String, String)]) -> Vec<(Ksuid, String)> {
+    dependents
+        .iter()
+        .filter_map(|(id, name)| Some((Ksuid::from_str(id).ok()?, name.clone())))
+        .collect()
 }
 
 pub async fn set_enabled(org: &str, id: &str, enabled: bool) -> Result<bool, SloError> {
@@ -489,5 +525,58 @@ async fn push_trigger(
     };
     if let Err(e) = crate::db::scheduler::push(trigger).await {
         log::warn!("[slo] could not schedule {id}: {e}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Deleting an SLO CASCADES to its alerts: an alert whose SLO is gone can
+    /// only ever error — it has no data to evaluate and no way to recover.
+    /// Only alerts pointing at THIS SLO go.
+    #[test]
+    fn the_cascade_targets_exactly_the_alerts_of_this_slo() {
+        use svix_ksuid::KsuidLike as _;
+        let a = svix_ksuid::Ksuid::new(None, None);
+        let b = svix_ksuid::Ksuid::new(None, None);
+        let dependents = vec![
+            (a.to_string(), "checkout burn".to_string()),
+            (b.to_string(), "budget 90%".to_string()),
+        ];
+        let plan = plan_alert_cascade(&dependents);
+        assert_eq!(plan.len(), 2);
+        assert!(
+            plan.iter()
+                .any(|(id, name)| *id == a && name == "checkout burn")
+        );
+        assert!(
+            plan.iter()
+                .any(|(id, name)| *id == b && name == "budget 90%")
+        );
+    }
+
+    /// An SLO nobody alerts on deletes with no cascade at all — and, more to
+    /// the point, with no alert lookups turning into deletions.
+    #[test]
+    fn an_slo_with_no_alerts_cascades_to_nothing() {
+        assert!(plan_alert_cascade(&[]).is_empty());
+    }
+
+    /// A malformed id cannot be deleted and must not silently abort the
+    /// cascade of its siblings — it is skipped, and the caller logs it.
+    #[test]
+    fn an_unparseable_alert_id_is_skipped_rather_than_aborting_the_cascade() {
+        use svix_ksuid::KsuidLike as _;
+        let dependents = vec![
+            ("not-a-ksuid".to_string(), "broken".to_string()),
+            (
+                svix_ksuid::Ksuid::new(None, None).to_string(),
+                "fine".to_string(),
+            ),
+        ];
+        let plan = plan_alert_cascade(&dependents);
+        assert_eq!(plan.len(), 1, "the good alert must still be deleted");
+        assert_eq!(plan[0].1, "fine");
     }
 }

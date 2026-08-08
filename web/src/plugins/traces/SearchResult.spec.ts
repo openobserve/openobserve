@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
+import { reactive } from "vue";
 import SearchResult from "@/plugins/traces/SearchResult.vue";
 import i18n from "@/locales";
 import router from "@/test/unit/helpers/router";
@@ -31,7 +32,7 @@ const mockStore = createStore({
   },
 });
 
-const mockSearchObj = {
+const mockSearchObj = reactive({
   data: {
     queryResults: {
       hits: [
@@ -111,6 +112,9 @@ const mockSearchObj = {
     showHistogram: true,
     resultGrid: {
       rowsPerPage: 10,
+      // Mirrors `useTraces`, which seeds this false. Omitting it made the
+      // wrap binding start `undefined` and hid the reactivity problem below.
+      wrapCells: false,
       navigation: {
         currentRowIndex: 0,
       },
@@ -119,7 +123,7 @@ const mockSearchObj = {
   loading: false,
   searchApplied: true,
   organizationIdentifier: "test-org",
-};
+});
 
 vi.mock("@/composables/useTraces", () => ({
   default: () => ({
@@ -141,7 +145,7 @@ const globalOptions = {
     TracesSearchResultList: {
       name: "TracesSearchResultList",
       template: '<div data-test="traces-search-result-list" class="search-list w-full"></div>',
-      props: ["hits", "loading", "searchPerformed", "showHeader"],
+      props: ["hits", "loading", "searchPerformed", "showHeader", "wrap"],
       emits: ["row-click", "load-more"],
     },
     TracesMetricsDashboard: {
@@ -160,6 +164,28 @@ describe("SearchResult", () => {
   beforeEach(async () => {
     wrapper = mount(SearchResult, { global: globalOptions });
     await flushPromises();
+  });
+
+  // A long operation name is often the widest thing on a trace or span row,
+  // and clipping it hides exactly the part that tells two entries apart. The
+  // logs table has this affordance; traces and spans need it too.
+  describe("wrap toggle", () => {
+    it("renders a wrap button", () => {
+      expect(wrapper.find('[data-test="traces-search-result-wrap-btn"]').exists()).toBe(true);
+    });
+
+    it("toggles the shared wrap flag and passes it to the list", async () => {
+      const before = mockSearchObj.meta.resultGrid.wrapCells;
+
+      await wrapper.find('[data-test="traces-search-result-wrap-btn"]').trigger("click");
+      expect(mockSearchObj.meta.resultGrid.wrapCells).toBe(!before);
+
+      const list = wrapper.findComponent({ name: "TracesSearchResultList" });
+      expect(list.props("wrap")).toBe(!before);
+
+      await wrapper.find('[data-test="traces-search-result-wrap-btn"]').trigger("click");
+      expect(mockSearchObj.meta.resultGrid.wrapCells).toBe(before);
+    });
   });
 
   afterEach(() => {

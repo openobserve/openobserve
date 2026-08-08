@@ -189,6 +189,11 @@ pub enum AlertError {
     #[error("Stream {stream_name} not found")]
     StreamNotFound { stream_name: String },
 
+    /// Feature 5 (SA-3 … SA-19). Rendered from the inner error, which names
+    /// its own bound so the 400 is actionable.
+    #[error("{0}")]
+    InvalidSloAlert(config::meta::slo::condition::SloAlertError),
+
     #[error("Error decoding vrl function for alert: {0}")]
     DecodeVrl(#[from] std::io::Error),
 
@@ -440,7 +445,13 @@ async fn prepare_alert(
         }
     }
 
-    if alert.name.is_empty() || alert.stream_name.is_empty() {
+    // An SLO alert (§6b.6) runs no query and therefore has no stream. The
+    // `stream_name` half of this check is skipped for it — note the two are
+    // conflated under `AlertNameMissing`, so without this an SLO alert is
+    // rejected with "Alert name is required" while carrying a perfectly good
+    // name, which is what live testing hit.
+    let is_slo_alert = alert.query_condition.query_type == QueryType::Slo;
+    if alert.name.is_empty() || (!is_slo_alert && alert.stream_name.is_empty()) {
         return Err(AlertError::AlertNameMissing);
     }
     if alert.name.contains('/') {
@@ -535,25 +546,37 @@ async fn prepare_alert(
     alert.tags =
         config::meta::alerts::tags::normalize_tags(&alert.tags).map_err(AlertError::InvalidTag)?;
 
-    // before saving alert check column type to decide numeric condition
-    let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
-    if stream_name.is_empty() || schema.fields().is_empty() {
-        return Err(AlertError::StreamNotFound {
-            stream_name: stream_name.to_owned(),
-        });
-    }
+    // Feature 5: the SLO wiring, including the `query_type == Slo` ⇔
+    // `slo_condition.is_some()` invariant in both directions.
+    validate_slo_alert_wiring(org_id, alert, create).await?;
 
-    // Alerts must follow the max_query_range of the stream as set in the schema
-    if let Some(settings) = unwrap_stream_settings(&schema) {
-        let max_query_range = settings.max_query_range;
-        if max_query_range > 0
-            && !alert.is_real_time
-            && alert.trigger_condition.period > max_query_range * 60
-        {
-            return Err(AlertError::PeriodExceedsMaxQueryRange {
-                max_query_range_hours: max_query_range,
+    // An SLO alert runs NO query, so it has no stream to resolve a schema for
+    // and no period to measure against `max_query_range`. Requiring either
+    // would make every SLO alert unsavable. Only this block is skipped —
+    // everything after it still applies, notably the realtime rejection: an
+    // SLO alert is not `Custom`, so a realtime one is refused exactly as any
+    // other non-Custom realtime alert is.
+    if !is_slo_alert {
+        // before saving alert check column type to decide numeric condition
+        let schema = infra::schema::get(org_id, stream_name, stream_type).await?;
+        if stream_name.is_empty() || schema.fields().is_empty() {
+            return Err(AlertError::StreamNotFound {
                 stream_name: stream_name.to_owned(),
             });
+        }
+
+        // Alerts must follow the max_query_range of the stream as set in the schema
+        if let Some(settings) = unwrap_stream_settings(&schema) {
+            let max_query_range = settings.max_query_range;
+            if max_query_range > 0
+                && !alert.is_real_time
+                && alert.trigger_condition.period > max_query_range * 60
+            {
+                return Err(AlertError::PeriodExceedsMaxQueryRange {
+                    max_query_range_hours: max_query_range,
+                    stream_name: stream_name.to_owned(),
+                });
+            }
         }
     }
 
@@ -1411,6 +1434,15 @@ impl AlertExt for Alert {
         let workflow_error = 0;
         #[cfg(not(feature = "enterprise"))]
         let workflow_err_msg = "".to_string();
+
+        // WHICH SLO this notification is about, resolved ONCE and shared by
+        // every surface below (each destination's template, and the workflow
+        // trigger metadata). An SLO alert reports its SLO where an ordinary
+        // alert reports its stream, and the SLO's NAME is on the evaluation
+        // row rather than on the alert — so the rowless paths
+        // (`trigger_by_id`, `trigger_by_name`) need one primary-key read to
+        // say the same thing a firing says. Resolving it here rather than
+        // inside the renderer is what keeps that at one read per notification
 
         // Get alert-level template if specified (takes precedence over destination templates)
         let alert_template = if let Some(ref template_name) = self.template {
@@ -2347,10 +2379,12 @@ fn process_row_template(
             String::from("N/A")
         };
 
+        let (stream_type_var, stream_name_var) =
+            (alert.stream_type.as_str(), alert.stream_name.as_str());
         resp = resp
             .replace("{org_name}", org_name)
-            .replace("{stream_type}", alert.stream_type.as_str())
-            .replace("{stream_name}", &alert.stream_name)
+            .replace("{stream_type}", stream_type_var)
+            .replace("{stream_name}", stream_name_var.as_ref())
             .replace("{alert_name}", &alert.name)
             .replace("{alert_type}", alert_type)
             .replace(
@@ -2441,6 +2475,12 @@ async fn process_dest_template(
     tpl: &str,
     alert: &Alert,
     rows: &[Map<String, Value>],
+    // The SLO's name, read from storage by `Alert::send_notification` for the
+    // paths whose rows carry none (a manual trigger evaluates nothing, so
+    // `rows` is empty). Taken as a parameter rather than read here so the read
+    // happens once per notification instead of once per rendered template —
+    // this function runs twice for every email destination — and so that this
+    // function's own behaviour is observable without a database.
     rows_tpl_val: &[Value],
     options: ProcessTemplateOptions,
     metadata: &hashbrown::HashMap<String, String>,
@@ -2610,6 +2650,19 @@ async fn build_notification_context(
             function_content,
             SearchEventType::Alerts
         )
+    } else if alert.query_condition.query_type == QueryType::Slo {
+        // An SLO alert runs no query and has no stream, so a logs deep-link
+        // would point at nothing. The useful destination for whoever is
+        // reading the page at 3am is the SLO itself.
+        match alert.query_condition.slo_condition.as_ref() {
+            Some(cond) => format!(
+                "{}{}/web/slos/{}?org_identifier={}",
+                cfg.common.web_url, cfg.common.base_uri, cond.slo_id, alert.org_id
+            ),
+            // Cannot happen once validation is wired (Gap 3), and a missing
+            // link must not cost a notification either way.
+            None => String::new(),
+        }
     } else {
         match alert.query_condition.query_type {
             QueryType::SQL => {
@@ -2631,7 +2684,12 @@ async fn build_notification_context(
                     alert_query = v;
                 }
             }
-            _ => unreachable!(),
+            // NOT `unreachable!()`. It used to be, and adding the fourth
+            // query type made it reachable — every SLO alert evaluation
+            // panicked the scheduler worker. A query type this builder does
+            // not know how to deep-link into is a missing link, never a
+            // crash on the notification path.
+            _ => {}
         };
         // http://localhost:5080/web/logs?stream_type=logs&stream=test&from=1708416534519324&to=1708416597898186&sql_mode=true&query=U0VMRUNUICogRlJPTSAidGVzdCIgd2hlcmUgbGV2ZWwgPSAnaW5mbyc=&org_identifier=default
         format!(
@@ -5535,6 +5593,540 @@ mod tests {
             "with no group context the placeholder is left untouched, as it is today"
         );
     }
+
+    /// An SLO alert reaching the notification path must not PANIC.
+    ///
+    /// Found by live testing: the alert-URL builder matched `query_type` with
+    /// `_ => unreachable!()`, so every evaluation of a real SLO alert killed
+    /// the scheduler job — no notification, no state, no trigger record, just
+    /// a panicking worker every cycle. Adding a fourth query type made that
+    /// arm reachable.
+    #[tokio::test]
+    async fn rendering_a_notification_for_an_slo_alert_does_not_panic() {
+        let mut alert = Alert::default();
+        alert.name = "slo-alert".into();
+        alert.org_id = "default".into();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        alert.query_condition.slo_condition = Some(config::meta::slo::condition::SloCondition {
+            slo_id: "slo123".into(),
+            kind: config::meta::slo::condition::SloAlertKind::BurnRate,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 1.2,
+            warning: None,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(600),
+            multi_alert: false,
+        });
+
+        let rendered = process_dest_template(
+            "default",
+            "{alert_name} {alert_url}",
+            &alert,
+            &[],
+            &[Value::String("".into())],
+            ProcessTemplateOptions {
+                rows_end_time: 0,
+                start_time: None,
+                evaluation_timestamp: 0,
+                is_email: false,
+                level: None,
+                actual_value: None,
+            },
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        // Reaching this line at all IS the assertion: before the fix the
+        // call panicked and took the scheduler worker with it.
+        assert!(rendered.contains("slo-alert"));
+        // A link is still produced. Its target is the SLO page, but the
+        // notification path runs it through the short-URL service, so the
+        // rendered form is `/web/short/<hash>` rather than the raw link —
+        // asserting the raw path here would pin the shortener, not this fix.
+        assert!(
+            rendered.contains("http"),
+            "expected an alert_url to be rendered, got: {rendered}"
+        );
+    }
+
+    // ── `{stream_name}` / `{stream_type}` for a stream-less family ──────────
+    //
+    // Every one of the eight shipped default destination templates
+    // (`config/prebuilt-destinations.json`) carries a Stream row built from
+    // `{stream_name}`, and `{stream_type}`. An SLO alert has neither: its
+    // `stream_name` is `""` (save validation waives it) and its `stream_type`
+    // is left at the `StreamType::Logs` default. Rendered verbatim that gives
+    // every SLO notification a blank "Stream: " and a "Type: logs" that is
+    // simply untrue — a Slack/PagerDuty payload that names the wrong thing.
+    //
+    // The SLO's NAME is not on the `Alert` at all (only `slo_condition.slo_id`
+    // is), but `build_slo_eval_results` puts the resolved name on the payload
+    // row, and that row is in scope at both substitution sites.
+
+    /// The evaluation payload row an SLO alert actually notifies with.
+    fn slo_payload_row(slo_name: &str) -> Map<String, Value> {
+        let mut row = Map::new();
+        row.insert("slo_id".to_string(), json!("slo123"));
+        if !slo_name.is_empty() {
+            row.insert("slo_name".to_string(), json!(slo_name));
+        }
+        row.insert("slo_window".to_string(), json!("30d"));
+        row.insert("burn_rate".to_string(), json!(14.4));
+        row
+    }
+
+    fn slo_alert_fixture() -> Alert {
+        let mut alert = Alert::default();
+        alert.name = "checkout-burn".into();
+        alert.org_id = "default".into();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        alert.query_condition.slo_condition = Some(config::meta::slo::condition::SloCondition {
+            slo_id: "slo123".into(),
+            kind: config::meta::slo::condition::SloAlertKind::BurnRate,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 1.2,
+            warning: None,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(600),
+            multi_alert: false,
+        });
+        alert
+    }
+
+    fn default_template_options() -> ProcessTemplateOptions {
+        ProcessTemplateOptions {
+            rows_end_time: 0,
+            start_time: None,
+            evaluation_timestamp: 0,
+            is_email: false,
+            level: None,
+            actual_value: None,
+        }
+    }
+
+    const STREAM_TPL: &str = "Stream: {stream_name} Type: {stream_type}";
+
+    // The counterpart, and the reason the branch is on `query_type` rather than
+    // on "stream_name is empty": an ordinary alert must be untouched, including
+    // one that happens to carry a `slo_name` column in its result rows.
+    #[tokio::test]
+    async fn an_ordinary_alert_still_renders_its_own_stream() {
+        let mut alert = Alert::default();
+        alert.name = "cpu-high".into();
+        alert.org_id = "default".into();
+        alert.stream_name = "default".into();
+        alert.stream_type = config::meta::stream::StreamType::Traces;
+
+        let rendered = process_dest_template(
+            "default",
+            STREAM_TPL,
+            &alert,
+            &[slo_payload_row("checkout-availability")],
+            &[Value::String("".into())],
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        assert_eq!(rendered, "Stream: default Type: traces");
+    }
+
+    #[tokio::test]
+    async fn a_hostile_slo_name_does_not_expand_through_the_template() {
+        let alert = slo_alert_fixture();
+        let rows = vec![slo_payload_row("{alert_name}")];
+
+        let rendered = process_dest_template(
+            "default",
+            "Stream: {stream_name}",
+            &alert,
+            &rows,
+            &[Value::String("".into())],
+            default_template_options(),
+            &hashbrown::HashMap::new(),
+            None,
+        )
+        .await;
+
+        // `checkout-burn` is the alert's name — seeing it here would mean the
+        // SLO name had been re-read as a placeholder by the `{alert_name}` pass.
+        assert!(!rendered.contains("checkout-burn"), "got: {rendered}");
+    }
+
+    #[test]
+    fn a_row_template_leaves_an_ordinary_alert_alone() {
+        let mut alert = Alert::default();
+        alert.stream_name = "default".into();
+        alert.stream_type = config::meta::stream::StreamType::Metrics;
+        let mut row = Map::new();
+        row.insert("k".to_string(), json!("v"));
+
+        let out = process_row_template(
+            "default",
+            &STREAM_TPL.to_string(),
+            &alert,
+            RowTemplateType::String,
+            &[row],
+        );
+
+        assert_eq!(out[0].as_str().unwrap(), "Stream: default Type: metrics");
+    }
+
+    // ── The SLO alert-level collapse (§6b.3, D34) ───────────────────────────
+
+    use config::meta::slo::{condition::SloClassification, coverage::UnobservedReason};
+
+    fn slo_eval(classification: SloClassification) -> crate::slo::evaluate::SloEvalResult {
+        crate::slo::evaluate::SloEvalResult {
+            classification,
+            actual_value: None,
+            group_key: None,
+            sli: None,
+            coverage: 0.0,
+            slo_name: "s".into(),
+            slo_target: 99.0,
+            slo_window_secs: 604_800,
+            error_budget_remaining: None,
+        }
+    }
+
+    fn frozen_eval() -> crate::slo::evaluate::SloEvalResult {
+        slo_eval(SloClassification::Frozen(
+            UnobservedReason::BelowCoverageFloor,
+        ))
+    }
+
+    fn observed(
+        level: config::meta::alerts::level::AlertLevel,
+    ) -> crate::slo::evaluate::SloEvalResult {
+        slo_eval(SloClassification::Observed(level))
+    }
+
+    /// D34: only when EVERY group is frozen is the evaluation frozen.
+    #[test]
+    fn every_group_frozen_collapses_to_frozen() {
+        let evals = vec![frozen_eval(), frozen_eval()];
+        assert!(matches!(collapse_slo_evals(&evals), SloCollapse::Frozen));
+    }
+
+    /// Zero results means nothing was measured — same as all-frozen, and the
+    /// safe direction for the degenerate case.
+    #[test]
+    fn no_results_collapses_to_frozen() {
+        assert!(matches!(collapse_slo_evals(&[]), SloCollapse::Frozen));
+    }
+
+    /// One frozen group must not drag an observed-healthy alert to frozen —
+    /// something WAS measured, and it was fine.
+    #[test]
+    fn a_frozen_group_does_not_drag_an_observed_ok_to_frozen() {
+        use config::meta::alerts::level::AlertLevel;
+        let evals = vec![frozen_eval(), observed(AlertLevel::Ok)];
+        assert!(matches!(collapse_slo_evals(&evals), SloCollapse::Healthy));
+    }
+
+    /// The inverse direction: a frozen group must not suppress a firing one.
+    #[test]
+    fn a_frozen_group_does_not_suppress_a_firing_group() {
+        use config::meta::alerts::level::AlertLevel;
+        let evals = vec![frozen_eval(), observed(AlertLevel::Warning)];
+        match collapse_slo_evals(&evals) {
+            SloCollapse::Firing(e) => {
+                assert_eq!(e.classification.level(), Some(AlertLevel::Warning));
+            }
+            other => panic!("expected Firing, got {other:?}"),
+        }
+    }
+
+    /// The most severe observed level wins, regardless of order.
+    #[test]
+    fn the_most_severe_observed_level_wins() {
+        use config::meta::alerts::level::AlertLevel;
+        for evals in [
+            vec![
+                observed(AlertLevel::Warning),
+                observed(AlertLevel::Critical),
+            ],
+            vec![
+                observed(AlertLevel::Critical),
+                observed(AlertLevel::Warning),
+            ],
+            vec![
+                observed(AlertLevel::Ok),
+                observed(AlertLevel::Critical),
+                frozen_eval(),
+            ],
+        ] {
+            match collapse_slo_evals(&evals) {
+                SloCollapse::Firing(e) => {
+                    assert_eq!(e.classification.level(), Some(AlertLevel::Critical));
+                }
+                other => panic!("expected Firing(Critical), got {other:?}"),
+            }
+        }
+    }
+
+    /// Observed-Ok alone is Healthy — a real measurement, categorically
+    /// different from frozen.
+    #[test]
+    fn all_ok_collapses_to_healthy() {
+        use config::meta::alerts::level::AlertLevel;
+        let evals = vec![observed(AlertLevel::Ok), observed(AlertLevel::Ok)];
+        assert!(matches!(collapse_slo_evals(&evals), SloCollapse::Healthy));
+    }
+
+    /// A `query_type: slo` alert with no stored condition is a configuration
+    /// error and must surface as an ERROR — an empty result is a completed
+    /// evaluation, which the scheduler would record as a healthy `Ok`.
+    /// (Runs with no database: the bail must precede everything else.)
+    #[tokio::test]
+    async fn a_slo_alert_without_a_condition_errors_rather_than_reading_healthy() {
+        let mut alert = Alert::default();
+        alert.name = "broken".into();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        assert!(alert.query_condition.slo_condition.is_none());
+        let err = evaluate_slo_alert(&alert, 0).await.unwrap_err();
+        assert!(
+            err.to_string().contains("no slo_condition"),
+            "expected the missing-condition error, got: {err}"
+        );
+    }
+
+    // ── Feature 5 save-path wiring (Gap 3) ──────────────────────────────────
+
+    /// The invariant's forward direction is decided with NO lookup, so a
+    /// misconfigured alert is rejected identically whether or not the caller
+    /// has a database. (This test runs without one.)
+    #[tokio::test]
+    async fn saving_a_slo_alert_without_a_condition_is_rejected_without_a_lookup() {
+        let mut alert = Alert::default();
+        alert.query_condition.query_type = config::meta::alerts::QueryType::Slo;
+        let err = validate_slo_alert_wiring("org", &alert, true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                AlertError::InvalidSloAlert(
+                    config::meta::slo::condition::SloAlertError::MissingCondition
+                )
+            ),
+            "got: {err}"
+        );
+    }
+
+    /// B3's payload. Without this, the infra-layer exclusion can be fully
+    /// implemented and fully tested while the save path still passes `None` —
+    /// every test green and the user-visible bug (editing an at-cap alert to a
+    /// new window pair is rejected) completely unfixed.
+    #[test]
+    fn an_update_excludes_its_own_alert_from_the_pair_count() {
+        use svix_ksuid::KsuidLike as _;
+        let id = svix_ksuid::Ksuid::new(None, None);
+        let mut alert = Alert::default();
+        alert.id = Some(id);
+
+        assert_eq!(
+            slo_pair_exclusion_id(&alert, false),
+            Some(id.to_string()),
+            "an update must exclude itself, in the stored ksuid string form"
+        );
+    }
+
+    /// A create must count every pair already in use — excluding one would
+    /// hand the create path a free slot above the cap.
+    #[test]
+    fn a_create_excludes_nothing_from_the_pair_count() {
+        let alert = Alert::default();
+        assert!(alert.id.is_none());
+        assert_eq!(slo_pair_exclusion_id(&alert, true), None);
+    }
+
+    /// A create may carry an id: `Alert::id` is `#[serde(default)]`, so a
+    /// request body can supply one, and `prepare_alert` lets it through when
+    /// `overwrite` is set. It still creates a NEW row (the infra layer only
+    /// ever INSERTs), so nothing is being replaced and nothing may be
+    /// excluded — otherwise an at-cap SLO would admit one pair too many.
+    #[test]
+    fn a_create_carrying_an_id_still_excludes_nothing() {
+        use svix_ksuid::KsuidLike as _;
+        let mut alert = Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+
+        assert_eq!(slo_pair_exclusion_id(&alert, true), None);
+    }
+
+    /// An ordinary alert must not pay a database round-trip for a feature it
+    /// does not use — and must never be rejected by it.
+    #[tokio::test]
+    async fn an_ordinary_alert_passes_the_slo_wiring_without_a_lookup() {
+        let alert = Alert::default();
+        assert!(validate_slo_alert_wiring("org", &alert, true).await.is_ok());
+    }
+
+    /// The reverse direction, also lookup-free: a stray condition on a
+    /// non-SLO alert is config that would be silently ignored.
+    #[tokio::test]
+    async fn a_condition_on_a_non_slo_alert_is_rejected_before_any_lookup() {
+        let mut alert = Alert::default();
+        // query_type stays Custom.
+        alert.query_condition.slo_condition = Some(config::meta::slo::condition::SloCondition {
+            slo_id: "slo1".into(),
+            kind: config::meta::slo::condition::SloAlertKind::BurnRate,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 14.4,
+            warning: None,
+            long_window_secs: Some(3600),
+            short_window_secs: Some(300),
+            multi_alert: false,
+        });
+        let err = validate_slo_alert_wiring("org", &alert, true)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(
+                err,
+                AlertError::InvalidSloAlert(
+                    config::meta::slo::condition::SloAlertError::ConditionOnNonSloAlert
+                )
+            ),
+            "got: {err}"
+        );
+    }
+
+    /// Equal severity keeps the FIRST group seen — the notification's group
+    /// identity must not flap between passes when two groups tie.
+    #[test]
+    fn equal_severity_keeps_the_first_group_seen() {
+        use config::meta::alerts::level::AlertLevel;
+        let mut a = observed(AlertLevel::Warning);
+        a.group_key = Some("host=a".into());
+        let mut b = observed(AlertLevel::Warning);
+        b.group_key = Some("host=b".into());
+        match collapse_slo_evals(&[a, b]) {
+            SloCollapse::Firing(e) => assert_eq!(e.group_key.as_deref(), Some("host=a")),
+            other => panic!("expected Firing, got {other:?}"),
+        }
+    }
+
+    // ── build_slo_eval_results: the wiring the collapse feeds (§6b.3, §7) ──
+
+    fn slo_cond(
+        kind: config::meta::slo::condition::SloAlertKind,
+    ) -> config::meta::slo::condition::SloCondition {
+        config::meta::slo::condition::SloCondition {
+            slo_id: "slo1".into(),
+            kind,
+            operator: config::meta::alerts::Operator::GreaterThan,
+            critical: 14.4,
+            warning: None,
+            long_window_secs: None,
+            short_window_secs: None,
+            multi_alert: false,
+        }
+    }
+
+    /// The D34 wiring itself: an all-frozen evaluation must come back with
+    /// the `frozen` flag SET and no level — this is what the mutant test
+    /// found unpinned (deleting `results.frozen = true` survived every test).
+    #[test]
+    fn a_fully_frozen_evaluation_sets_the_frozen_flag_and_no_level() {
+        let r = build_slo_eval_results(
+            &[frozen_eval(), frozen_eval()],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::ErrorBudget),
+            5_000_000,
+        );
+        assert!(r.frozen, "the frozen flag is the whole point (D34)");
+        assert_eq!(r.level, None);
+        assert!(r.data.is_none());
+        assert_eq!(r.end_time, 5_000_000);
+    }
+
+    #[test]
+    fn a_healthy_evaluation_records_ok_and_is_not_frozen() {
+        use config::meta::alerts::level::AlertLevel;
+        let r = build_slo_eval_results(
+            &[frozen_eval(), observed(AlertLevel::Ok)],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::ErrorBudget),
+            0,
+        );
+        assert!(!r.frozen);
+        assert_eq!(r.level, Some(AlertLevel::Ok));
+        assert!(r.data.is_none());
+    }
+
+    /// §7: the template row IS the notification contract — every documented
+    /// key must be present, with the kind-specific alias for the value.
+    #[test]
+    fn a_firing_burn_rate_evaluation_populates_the_template_row() {
+        use config::meta::alerts::level::AlertLevel;
+        let mut e = observed(AlertLevel::Critical);
+        e.actual_value = Some(14.4);
+        e.sli = Some(98.5);
+        e.error_budget_remaining = Some(-40.0);
+        e.group_key = Some("host=a".into());
+        let r = build_slo_eval_results(
+            &[e],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::BurnRate),
+            0,
+        );
+        assert_eq!(r.level, Some(AlertLevel::Critical));
+        assert_eq!(r.actual_value, Some(14.4));
+        assert_eq!(r.group_label.as_deref(), Some("host=a"));
+        let data = r.data.expect("a firing evaluation carries a payload row");
+        let row = &data[0];
+        for key in [
+            "slo_id",
+            "slo_name",
+            "slo_window",
+            "group",
+            "slo_target",
+            "value",
+            "burn_rate",
+            "sli",
+            "error_budget_remaining",
+        ] {
+            assert!(row.contains_key(key), "template key `{key}` missing");
+        }
+        // VALUES, not just presence — a wrong-value mutant survived the
+        // presence-only form of this test.
+        assert_eq!(row["slo_id"], "slo1");
+        assert_eq!(row["slo_name"], "s");
+        assert_eq!(row["slo_window"], "7d");
+        assert_eq!(row["group"], "host=a");
+        assert_eq!(row["slo_target"], 99.0);
+        assert_eq!(row["burn_rate"], 14.4);
+        assert_eq!(row["value"], 14.4);
+        assert_eq!(row["sli"], 98.5);
+        assert_eq!(row["error_budget_remaining"], -40.0);
+    }
+
+    /// The alias follows the KIND: an error-budget alert's template speaks in
+    /// `error_budget_consumed`, never `burn_rate`.
+    #[test]
+    fn the_kind_alias_matches_the_condition_kind() {
+        use config::meta::alerts::level::AlertLevel;
+        let mut e = observed(AlertLevel::Warning);
+        e.actual_value = Some(85.0);
+        let r = build_slo_eval_results(
+            &[e],
+            &slo_cond(config::meta::slo::condition::SloAlertKind::ErrorBudget),
+            0,
+        );
+        let data = r.data.expect("firing");
+        let row = &data[0];
+        assert_eq!(row["error_budget_consumed"], 85.0);
+        assert!(
+            !row.contains_key("burn_rate"),
+            "an error-budget alert must not emit a burn_rate variable"
+        );
+        assert!(
+            !row.contains_key("group"),
+            "an ungrouped evaluation must not emit a group variable"
+        );
+    }
 }
 
 /// Evaluate an SLO alert from stored status (`alerts_2.md` §6b.3).
@@ -5548,52 +6140,62 @@ async fn evaluate_slo_alert(
     alert: &Alert,
     end_time: i64,
 ) -> Result<TriggerEvalResults, anyhow::Error> {
-    let mut results = TriggerEvalResults {
-        end_time,
-        ..Default::default()
-    };
     let Some(cond) = alert.query_condition.slo_condition.as_ref() else {
-        // query_type says slo but no condition was stored. Nothing to
-        // evaluate, and inventing a level here would be worse than
-        // reporting nothing.
-        log::warn!(
-            "[alert {}/{}] query_type is slo but no slo_condition is stored",
+        // query_type says slo but no condition was stored — a misconfigured
+        // alert, savable today because create/update validation is not yet
+        // wired. This must be an ERROR, not an empty result: an empty result
+        // is a completed evaluation, which the scheduler records as a healthy
+        // `Ok` — inventing a level for an alert that cannot evaluate at all.
+        // The error path records the outcome as Error and leaves the level
+        // axis untouched, which is both visible and safe.
+        anyhow::bail!(
+            "alert {}/{} has query_type slo but no slo_condition stored",
             alert.org_id,
             alert.name
         );
-        return Ok(results);
     };
 
     let now_secs = end_time / 1_000_000;
     let evals = crate::slo::evaluate::evaluate(cond, &alert.org_id, now_secs).await?;
+    Ok(build_slo_eval_results(&evals, cond, end_time))
+}
 
-    // The most severe OBSERVED result decides the alert's level; frozen
-    // groups contribute nothing rather than dragging it to Ok.
-    let mut best: Option<&crate::slo::evaluate::SloEvalResult> = None;
-    for e in &evals {
-        let Some(level) = e.classification.level() else {
-            continue;
-        };
-        if level == config::meta::alerts::level::AlertLevel::Ok {
-            continue;
+/// Turn per-group SLO evaluations into the alert's `TriggerEvalResults` —
+/// the collapse (§6b.3) plus the §7 template row.
+///
+/// Pure and synchronous, split from [`evaluate_slo_alert`] so the D34-critical
+/// wiring is testable without a database: the mutation-test pass found that
+/// deleting `results.frozen = true` survived every test while the logic lived
+/// inside the async fn.
+fn build_slo_eval_results(
+    evals: &[crate::slo::evaluate::SloEvalResult],
+    cond: &config::meta::slo::condition::SloCondition,
+    end_time: i64,
+) -> TriggerEvalResults {
+    let mut results = TriggerEvalResults {
+        end_time,
+        ..Default::default()
+    };
+
+    let e = match collapse_slo_evals(evals) {
+        SloCollapse::Frozen => {
+            // Nothing was measured. `frozen` is what stops the scheduler from
+            // collapsing this into `Ok` (`level_for_completed_evaluation`) —
+            // without it, the handler records a healthy run and the level
+            // resets (D34).
+            results.frozen = true;
+            return results;
         }
-        let better = match best.and_then(|b| b.classification.level()) {
-            Some(config::meta::alerts::level::AlertLevel::Critical) => false,
-            Some(_) => level == config::meta::alerts::level::AlertLevel::Critical,
-            None => true,
-        };
-        if better {
-            best = Some(e);
+        SloCollapse::Healthy => {
+            // Observed and healthy. A real measurement, categorically
+            // different from frozen — the level is recorded as Ok.
+            results.level = Some(config::meta::alerts::level::AlertLevel::Ok);
+            return results;
         }
-    }
+        SloCollapse::Firing(e) => e,
+    };
 
-    // Every group frozen means the whole evaluation is frozen: no level,
-    // no data, nothing touched.
-    if best.is_none() && evals.iter().all(|e| e.classification.is_frozen()) {
-        return Ok(results);
-    }
-
-    if let Some(e) = best {
+    {
         results.level = e.classification.level();
         results.actual_value = e.actual_value;
         results.group_label = e.group_key.clone();
@@ -5637,10 +6239,157 @@ async fn evaluate_slo_alert(
             put(&mut row, "error_budget_remaining", b);
         }
         results.data = Some(vec![row]);
-    } else {
-        // Observed and healthy. A real measurement, categorically
-        // different from frozen — the level is recorded as Ok.
-        results.level = Some(config::meta::alerts::level::AlertLevel::Ok);
     }
-    Ok(results)
+    results
+}
+
+/// Gather what only the database knows, then apply the pure Feature 5 rules
+/// (`slo::condition::validate_slo_alert`).
+///
+/// Split this way so the rules themselves stay unit-tested without a database;
+/// this function is only the lookup.
+/// The alert id save-validation excludes from the SLO burn-pair count (B3).
+///
+/// `Some` on update, so the alert being edited does not count its own stored
+/// pair against the cap it is about to vacate.
+///
+/// **Always `None` on create, even when the alert carries an id.** `Alert::id`
+/// is `#[serde(default)]`, so a request body can supply one, and
+/// `prepare_alert` accepts it when `overwrite` is set. A create still INSERTs a
+/// new row — `infra::table::alerts::create` never upserts — so no existing row
+/// is being replaced and excluding one would let an at-cap SLO admit a pair too
+/// many. (Today that request dies on the primary key instead, but the cap must
+/// be upheld by this check, not by a constraint elsewhere.)
+///
+/// Returned as the **stored** string form. The column holds `Ksuid::to_string`
+/// (see `get_by_id_db`'s filter), so any other rendering would match no row
+/// and silently degrade to "excludes nothing" — indistinguishable from the bug
+/// this exists to fix.
+fn slo_pair_exclusion_id(alert: &Alert, create: bool) -> Option<String> {
+    if create {
+        return None;
+    }
+    alert.id.map(|id| id.to_string())
+}
+
+async fn validate_slo_alert_wiring(
+    org_id: &str,
+    alert: &Alert,
+    create: bool,
+) -> Result<(), AlertError> {
+    use config::meta::slo::condition::{SloFacts, validate_slo_alert};
+
+    let is_slo = alert.query_condition.query_type == QueryType::Slo;
+    let cond = alert.query_condition.slo_condition.as_ref();
+
+    // Only a well-formed SLO alert needs anything looked up. Every other
+    // case — an ordinary alert, a missing condition, a stray condition on a
+    // non-SLO alert — is decided by the pure rules alone, so it costs no DB
+    // round-trip AND cannot be masked by an infrastructure error.
+    let Some(cond) = cond.filter(|_| is_slo) else {
+        return validate_slo_alert(is_slo, cond, None, true, &[], 0)
+            .map_err(AlertError::InvalidSloAlert);
+    };
+
+    let db = infra::db::ORM_CLIENT.get().ok_or_else(|| {
+        AlertError::InfraError(infra::errors::Error::Message(
+            "database not initialized".into(),
+        ))
+    })?;
+
+    let slo = infra::table::slos::get(db, org_id, &cond.slo_id)
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?;
+    let facts = slo.as_ref().map(|s| SloFacts {
+        target: s.target,
+        window_secs: s.definition.window_secs,
+        slice_interval_secs: s.definition.slice_interval_secs,
+        is_grouped: s.is_grouped(),
+    });
+
+    // SA-4: the count gate must be untouched. `warning_threshold` counts as
+    // part of the gate — a warning on a group-count gate has no meaning for a
+    // family that has no gate at all.
+    let default_gate = config::meta::alerts::TriggerCondition::default();
+    let count_gate_is_default = alert.trigger_condition.threshold == default_gate.threshold
+        && alert.trigger_condition.operator == default_gate.operator
+        && alert.trigger_condition.warning_threshold.is_none();
+
+    // SA-19 / D60: existing pairs come from the indexed column, never the
+    // alert cache. The alert being edited is excluded (B3) so it does not
+    // count its own stored pair against the cap it is about to vacate.
+    // Bound to a local rather than inlined, so the borrow does not depend on
+    // temporary-lifetime rules inside the call expression.
+    let exclude_id = slo_pair_exclusion_id(alert, create);
+    let existing: Vec<(i64, i64)> = if slo.is_some() {
+        infra::table::alerts::list_slo_burn_window_pairs(
+            db,
+            org_id,
+            &cond.slo_id,
+            exclude_id.as_deref(),
+        )
+        .await
+        .map_err(|e| AlertError::InfraError(infra::errors::Error::Message(e.to_string())))?
+    } else {
+        Vec::new()
+    };
+
+    validate_slo_alert(
+        is_slo,
+        Some(cond),
+        facts,
+        count_gate_is_default,
+        &existing,
+        get_config().slo.max_burn_window_pairs as usize,
+    )
+    .map_err(AlertError::InvalidSloAlert)
+}
+
+/// The outcome of collapsing per-group SLO evaluations to one alert-level
+/// answer.
+#[derive(Debug)]
+enum SloCollapse<'a> {
+    /// Nothing was measured at all: no level, no data, state untouched.
+    Frozen,
+    /// Something was measured and nothing is firing — records `Ok`.
+    Healthy,
+    /// The most severe firing result; owns the level and the template row.
+    Firing(&'a crate::slo::evaluate::SloEvalResult),
+}
+
+/// Collapse per-group SLO evaluations to the alert level (§6b.3).
+///
+/// Pure, so the D34-critical rules are testable without a database:
+/// * `Frozen` only when EVERY result is frozen (zero results included) — one frozen group must
+///   neither drag an observed alert to no-level, nor read as Ok and dilute a firing group.
+/// * Otherwise the most severe OBSERVED level wins; ties keep the first seen.
+fn collapse_slo_evals(evals: &[crate::slo::evaluate::SloEvalResult]) -> SloCollapse<'_> {
+    use config::meta::alerts::level::AlertLevel;
+
+    let mut best: Option<&crate::slo::evaluate::SloEvalResult> = None;
+    for e in evals {
+        let Some(level) = e.classification.level() else {
+            continue;
+        };
+        if level == AlertLevel::Ok {
+            continue;
+        }
+        let better = match best.and_then(|b| b.classification.level()) {
+            Some(AlertLevel::Critical) => false,
+            Some(_) => level == AlertLevel::Critical,
+            None => true,
+        };
+        if better {
+            best = Some(e);
+        }
+    }
+    if let Some(e) = best {
+        return SloCollapse::Firing(e);
+    }
+    // `.all` on an empty slice is true, and that is the right reading: zero
+    // results means nothing was measured.
+    if evals.iter().all(|e| e.classification.is_frozen()) {
+        return SloCollapse::Frozen;
+    }
+    SloCollapse::Healthy
 }

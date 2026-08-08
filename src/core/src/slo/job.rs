@@ -585,6 +585,23 @@ async fn commit_status(
         )
         .collect();
 
+    // The burn-window cache (§6b.4c). Computed here rather than at alert time
+    // so five alerts on one SLO cost zero extra scans (§6b.9). A failure to
+    // build it must NOT fail the pass: the running aggregate is the primary
+    // product, and a missing burn window freezes the burn-rate alerts (safe)
+    // rather than losing the measurement (not).
+    let (trailing_slices, burn_windows) =
+        match build_burn_cache(db, slo, result, watermark_end).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::warn!(
+                    "[slo] could not build burn windows for {}: {e} — the pass still publishes",
+                    slo.id
+                );
+                (None, None)
+            }
+        };
+
     Ok(slo_table::apply_status(
         db,
         &slo_table::StatusWrite {
@@ -593,11 +610,63 @@ async fn commit_status(
             writer: config::meta::slo::slice::Writer::Incremental,
             deltas,
             watermark_end: Some(watermark_end),
-            trailing_slices: None,
+            trailing_slices,
+            burn_windows,
             computed_at: now_secs,
         },
     )
     .await?)
+}
+
+/// Build the trailing buffer and the burn-window aggregates for this pass.
+///
+/// Both live on the **rollup** row only: a grouped SLO's per-group rows carry
+/// no watermark, so a per-group burn window would have nothing to be read
+/// against (see `slo::evaluate`, and the deferral of per-group SLO alerts).
+///
+/// Returns `(None, None)` when no enabled alert asks for a burn window — an
+/// SLO nobody alerts on burn-rate over pays nothing for the machinery.
+async fn build_burn_cache(
+    db: &sea_orm::DatabaseConnection,
+    slo: &Slo,
+    result: &PassResult,
+    watermark_end: i64,
+) -> Result<(Option<serde_json::Value>, Option<serde_json::Value>), anyhow::Error> {
+    use config::meta::slo::burn;
+
+    let cfg = get_config();
+    // `None`: the ingest pass must see EVERY enabled alert's pair. Excluding
+    // anything here would stop precomputing a window some alert still needs.
+    let pairs =
+        infra::table::alerts::list_slo_burn_window_pairs(db, &slo.org, &slo.id, None).await?;
+    let durations = burn::durations_for_pairs(&pairs, cfg.slo.max_burn_window_pairs as usize);
+    if durations.is_empty() {
+        return Ok((None, None));
+    }
+
+    // The previous buffer, from the rollup row. Absent on the first pass of a
+    // generation, and absent (rather than fatal) if it cannot be parsed.
+    let prev = slo_table::load_status(db, &slo.id, "")
+        .await?
+        .filter(|row| row.definition_generation == slo.definition_generation)
+        .and_then(|row| row.trailing_slices);
+    let buf = burn::parse_trailing(prev.as_ref());
+
+    // Only the rollup series feeds the buffer.
+    let rollup = result
+        .slices
+        .iter()
+        .filter(|s| s.group_key.is_empty())
+        .map(|s| (s.slice_start, s.good, s.total));
+
+    let buf = burn::fold_trailing(buf, rollup, watermark_end, burn::retain_secs(&durations));
+    let windows = burn::burn_windows_json(
+        &buf,
+        &durations,
+        watermark_end,
+        slo.definition.slice_interval_secs,
+    );
+    Ok((Some(burn::trailing_to_json(&buf)), Some(windows)))
 }
 
 /// Measure an explicit `[start, end)` and publish it.
@@ -672,9 +741,12 @@ pub async fn run_range(
             writer,
             deltas,
             // Backfill never moves the watermark; the incremental writer sets
-            // it from its own range end.
+            // it from its own range end. The trailing buffer and burn windows
+            // follow the watermark for the same reason: they describe the
+            // window ENDING at it, and backfill fills history behind it.
             watermark_end: None,
             trailing_slices: None,
+            burn_windows: None,
             computed_at: now_secs,
         },
     )

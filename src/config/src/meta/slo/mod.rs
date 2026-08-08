@@ -48,6 +48,7 @@ use super::alerts::Operator;
 
 pub mod budget;
 pub mod budget_rows;
+pub mod burn;
 pub mod condition;
 pub mod coverage;
 pub mod generation;
@@ -63,7 +64,7 @@ pub use status_view::SloStatusView;
 
 /// Which of the three SLI shapes an SLO measures (S-5).
 ///
-/// Mirrors Datadog's three SLO types: metric-based, time-slice, monitor-based.
+/// The three standard SLO types: metric-based, time-slice, monitor-based.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SliType {
@@ -148,7 +149,7 @@ pub enum CountSource {
         /// definition of `good`.
         good_expr: String,
     },
-    /// Importer-only fallback for an unfoldable Datadog pair. Weaker
+    /// Importer-only fallback for an unfoldable imported pair. Weaker
     /// atomicity: two scans that cannot be proven to have seen the same
     /// instant.
     DualQuery { good: CountQuery, total: CountQuery },
@@ -394,7 +395,7 @@ impl std::fmt::Display for SloValidationError {
 
 impl std::error::Error for SloValidationError {}
 
-/// The supported rolling windows (S-3). Datadog's exact set.
+/// The supported rolling windows (S-3).
 pub const WINDOW_7D_SECS: i64 = 7 * 86_400;
 pub const WINDOW_30D_SECS: i64 = 30 * 86_400;
 pub const WINDOW_90D_SECS: i64 = 90 * 86_400;
