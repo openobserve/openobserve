@@ -143,7 +143,6 @@ describe("AlertDetail — SLO alerts", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (store.state as any).zoConfig.slo_enabled = true;
     vi.mocked(sloService.get).mockResolvedValue({
       data: { id: "slo-123", name: "checkout-availability" },
     } as any);
@@ -151,7 +150,6 @@ describe("AlertDetail — SLO alerts", () => {
 
   afterEach(() => {
     wrapper?.unmount();
-    delete (store.state as any).zoConfig.slo_enabled;
   });
 
   // The chart plots a stream query. With no stream it renders an empty frame
@@ -181,22 +179,6 @@ describe("AlertDetail — SLO alerts", () => {
     expect(sloService.get).not.toHaveBeenCalled();
   });
 
-  // Flag-off degradation (plan §2.6): the SLO module is not served, so do not
-  // call it; the summary falls back to the raw id on its own.
-  it("does not fetch the SLO name when SLOs are disabled", async () => {
-    (store.state as any).zoConfig.slo_enabled = false;
-    wrapper = await mountView(sloAlert());
-
-    // Anchor: the page really did load this alert, so "no fetch" is a decision
-    // rather than the page never having got that far.
-    expect(alertsService.get_by_alert_id).toHaveBeenCalled();
-    expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(false);
-
-    expect(sloService.get).not.toHaveBeenCalled();
-    await openConfigTab(wrapper);
-    expect(wrapper.findComponent(ConfigSummaryStub).props("sloName")).toBeFalsy();
-  });
-
   // Contained, not merely "did not crash the assertion": vitest is configured
   // with dangerouslyIgnoreUnhandledErrors, so an uncaught rejection inside
   // onMounted would abort the rest of the mount chain silently. The transitions
@@ -210,15 +192,6 @@ describe("AlertDetail — SLO alerts", () => {
     expect(wrapper.find('[data-test="alerts-alertdetail-not-found"]').exists()).toBe(false);
     expect(wrapper.findComponent(ConfigSummaryStub).exists()).toBe(true);
     expect(wrapper.findComponent(ConfigSummaryStub).props("sloName")).toBeFalsy();
-  });
-
-  // The OSS default is the flag being ABSENT, not false.
-  it("treats an absent slo_enabled flag as off", async () => {
-    delete (store.state as any).zoConfig.slo_enabled;
-    wrapper = await mountView(sloAlert());
-
-    expect(alertsService.get_by_alert_id).toHaveBeenCalled();
-    expect(sloService.get).not.toHaveBeenCalled();
   });
 
   it("does not fetch when the alert names no SLO", async () => {

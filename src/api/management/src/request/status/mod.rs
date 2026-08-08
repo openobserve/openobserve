@@ -210,10 +210,6 @@ struct ConfigResponse<'a> {
     /// (`O2_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
     synthetics_recorder_extension_url: String,
-    /// SLO measurement (`ZO_SLO_ENABLED`). Not enterprise-gated — the SLO APIs
-    /// answer 501 while it is off, so the UI uses this to hide the menu entry
-    /// rather than offer a page that cannot work.
-    slo_enabled: bool,
     enable_cross_linking: bool,
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
@@ -490,7 +486,6 @@ pub async fn zo_config() -> impl IntoResponse {
         anomaly_detection_enabled,
         synthetics_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
-        slo_enabled: cfg.slo.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled: cfg.common.search_inspector_enabled,
