@@ -587,6 +587,7 @@ tokio-util = { version = "0.7", features = ["compat"] }
 tokio-stream = "0.1"
 tonic = { version = "0.14", features = [
     "gzip",
+    "zstd",
     "tls-webpki-roots",
     "tls-native-roots",
 ] }
