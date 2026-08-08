@@ -68,10 +68,9 @@ describe("buildSloAlertPayload", () => {
   // context on the SLO detail page, and a stale id in form state would attach
   // the alert to the wrong SLO.
   it("forces slo_id from the page's SLO, overriding anything in form state", () => {
-    const p = buildSloAlertPayload(
-      form({ condition: { ...condition(), slo_id: "stale-id" } }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ condition: { ...condition(), slo_id: "stale-id" } }), {
+      slo,
+    });
     expect(p.query_condition.slo_condition.slo_id).toBe("slo-123");
   });
 
@@ -118,10 +117,7 @@ describe("buildSloAlertPayload", () => {
   });
 
   it("carries destinations and the enabled flag", () => {
-    const p = buildSloAlertPayload(
-      form({ destinations: ["a", "b"], enabled: false }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ destinations: ["a", "b"], enabled: false }), { slo });
     expect(p.destinations).toEqual(["a", "b"]);
     expect(p.enabled).toBe(false);
   });
@@ -140,10 +136,7 @@ describe("buildSloAlertPayload", () => {
   // a workflow-only alert must build rather than being blocked by a
   // destinations-only assumption.
   it("supports a workflow-only alert", () => {
-    const p = buildSloAlertPayload(
-      form({ destinations: [], workflows: ["wf-1"] }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ destinations: [], workflows: ["wf-1"] }), { slo });
     expect(p.workflows).toEqual(["wf-1"]);
     expect(p.destinations).toEqual([]);
   });
@@ -188,19 +181,17 @@ describe("buildSloAlertPayload", () => {
   // the lenient-f64 deserializer ("expected a number"). It must be dropped,
   // not sent — `null` is accepted, "" is not.
   it("drops a blank warning rather than sending an empty string", () => {
-    const p = buildSloAlertPayload(
-      form({ condition: { ...condition(), warning: "" as any } }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ condition: { ...condition(), warning: "" as any } }), {
+      slo,
+    });
     expect(p.query_condition.slo_condition.warning ?? null).toBeNull();
     expect(p.query_condition.slo_condition.warning).not.toBe("");
   });
 
   it("keeps a configured warning, coerced to a number", () => {
-    const p = buildSloAlertPayload(
-      form({ condition: { ...condition(), warning: "6" as any } }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ condition: { ...condition(), warning: "6" as any } }), {
+      slo,
+    });
     expect(p.query_condition.slo_condition.warning).toBe(6);
   });
 
@@ -209,10 +200,9 @@ describe("buildSloAlertPayload", () => {
   // component still renders the checkbox for a grouped SLO. Forwarding a ticked
   // box produces a permanent 400 on every save.
   it("never forwards multi_alert, which the backend rejects unconditionally", () => {
-    const p = buildSloAlertPayload(
-      form({ condition: { ...condition(), multi_alert: true } }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ condition: { ...condition(), multi_alert: true } }), {
+      slo,
+    });
     expect(p.query_condition.slo_condition.multi_alert ?? false).toBe(false);
   });
 
@@ -253,10 +243,9 @@ describe("buildSloAlertPayload", () => {
   // and 0 is rejected as `ThresholdNotFinitePositive` — a hard 400 where the
   // user meant "no warning".
   it("treats a whitespace-only optional value as blank, not zero", () => {
-    const p = buildSloAlertPayload(
-      form({ condition: { ...condition(), warning: "   " as any } }),
-      { slo },
-    );
+    const p = buildSloAlertPayload(form({ condition: { ...condition(), warning: "   " as any } }), {
+      slo,
+    });
     expect(p.query_condition.slo_condition.warning ?? null).toBeNull();
   });
 
@@ -514,10 +503,7 @@ describe("deriveSloAlertName", () => {
   // resulting lone surrogate serializes as "\ud83d", which serde_json refuses
   // with an opaque parse error naming no field.
   it("never truncates an astral character into a lone surrogate", () => {
-    for (const cond of [
-      condition(),
-      { kind: "error_budget", operator: ">", critical: 90 },
-    ]) {
+    for (const cond of [condition(), { kind: "error_budget", operator: ">", critical: 90 }]) {
       const name = deriveSloAlertName({ name: "🚀".repeat(300) }, cond);
       expect(name.length).toBeLessThanOrEqual(256);
       expect(name.isWellFormed?.() ?? true).toBe(true);

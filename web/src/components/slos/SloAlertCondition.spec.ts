@@ -74,9 +74,7 @@ describe("SloAlertCondition", () => {
 
   it("does not render an SLO selector when the SLO is supplied", async () => {
     const wrapper = await mountWith(emptyCondition());
-    expect(wrapper.find('[data-test="slos-sloalertcondition-slo-trigger"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="slos-sloalertcondition-slo-trigger"]').exists()).toBe(false);
   });
 
   it("adopts the supplied SLO's id into the condition", async () => {

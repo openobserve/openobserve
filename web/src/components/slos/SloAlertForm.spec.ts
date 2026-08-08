@@ -79,9 +79,7 @@ describe("SloAlertForm", () => {
   // The SLO is page context, so its selector must not appear inside the form.
   it("passes the SLO down as context rather than offering a picker", async () => {
     const wrapper = await mountForm();
-    expect(wrapper.find('[data-test="slos-sloalertcondition-slo-trigger"]').exists()).toBe(
-      false,
-    );
+    expect(wrapper.find('[data-test="slos-sloalertcondition-slo-trigger"]').exists()).toBe(false);
   });
 
   it("prefills a descriptive, savable name", async () => {
@@ -193,9 +191,7 @@ describe("SloAlertForm", () => {
     // attribute — invisible to every other assertion here, and dead weight.
     it("does not leave a stray hint attribute on the field", async () => {
       const wrapper = await mountForm();
-      expect(
-        wrapper.find('[data-test="slo-alert-form-name"]').attributes("hint"),
-      ).toBeUndefined();
+      expect(wrapper.find('[data-test="slo-alert-form-name"]').attributes("hint")).toBeUndefined();
     });
 
     it("does not call the API while the name is invalid", async () => {

@@ -15,12 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import {
-  isSloAlert,
-  isUnplaceableSloAlert,
-  sloAlertEditRoute,
-  sloIdOf,
-} from "./sloAlertRouting";
+import { isSloAlert, isUnplaceableSloAlert, sloAlertEditRoute, sloIdOf } from "./sloAlertRouting";
 
 // Feature 5 (Phase 3). SLO alert authoring lives on the SLO page, so every
 // route into the generic alert editor has to divert. There are THREE such
@@ -195,9 +190,7 @@ describe("sloAlertRouting", () => {
       expect(sloAlertEditRoute(mappedRow({ alert_id: "row-9" }), ORG)?.query.edit_alert).toBe(
         "row-9",
       );
-      expect(sloAlertEditRoute(fullAlert({ id: "full-9" }), ORG)?.query.edit_alert).toBe(
-        "full-9",
-      );
+      expect(sloAlertEditRoute(fullAlert({ id: "full-9" }), ORG)?.query.edit_alert).toBe("full-9");
     });
 
     it("returns null for a non-SLO alert so the caller keeps its normal path", () => {
