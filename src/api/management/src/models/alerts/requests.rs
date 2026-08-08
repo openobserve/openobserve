@@ -634,6 +634,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_into_all_fields() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: Some("f1".to_string()),
             stream_type: None,
             stream_name: None,
@@ -659,6 +660,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_into_defaults() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: None,
             stream_type: None,
             stream_name: None,
@@ -682,6 +684,7 @@ mod tests {
     #[test]
     fn test_list_alerts_query_page_idx_defaults_to_zero() {
         let q = ListAlertsQuery {
+            slo_id: None,
             folder: None,
             stream_type: None,
             stream_name: None,
@@ -732,6 +735,7 @@ mod priority_tag_query_tests {
         // comma-separated string is still one entry.
         let priority = priority.map(|p| vec![p.to_string()]).unwrap_or_default();
         ListAlertsQuery {
+            slo_id: None,
             folder: None,
             alert_name_substring: None,
             stream_type: None,
