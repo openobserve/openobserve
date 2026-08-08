@@ -30,25 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="loadConfig"
     @click:primary="save"
   >
-    <!-- The form is the authoring surface; JSON stays for bulk edits and for
-         anything the form does not yet cover. It rides in the header so the body
-         opens on the banners themselves. -->
-    <template #header-right>
-      <OToggleGroup
-        class="shrink-0"
-        :model-value="mode"
-        data-test="announcement-banners-mode"
-        @update:model-value="onModeChange"
-      >
-        <OToggleGroupItem value="form" size="sm" icon-left="edit">
-          {{ t("announcements.settings.modeForm") }}
-        </OToggleGroupItem>
-        <OToggleGroupItem value="json" size="sm" icon-left="code">
-          {{ t("announcements.settings.modeJson") }}
-        </OToggleGroupItem>
-      </OToggleGroup>
-    </template>
-
     <div class="flex flex-col gap-4">
       <!-- Rendered through the same resolver the live bar uses, so the order here
            is the order users get — not the order the banners were authored in. -->
@@ -79,8 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- ── Form mode ──────────────────────────────────────────────────────── -->
-      <div v-if="mode === 'form'" class="flex flex-col gap-2" data-test="announcement-banners-list">
+      <div class="flex flex-col gap-2" data-test="announcement-banners-list">
         <div class="flex items-center justify-between gap-2">
           <span class="text-text-label text-sm font-bold">
             {{ t("announcements.settings.bannersLabel") }}
@@ -121,58 +101,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
-      <!-- ── JSON mode ──────────────────────────────────────────────────────── -->
-      <template v-else>
-        <div class="flex flex-col gap-2">
-          <div class="text-text-label text-sm font-bold">
-            {{ t("announcements.settings.editorLabel") }}
-          </div>
-
-          <!-- Mounted only once the saved config is in hand, and remounted via `:key`
-             whenever the buffer is replaced. CodeQueryEditor reads `query` only at
-             monaco.editor.create() and never watches it, so without both the editor
-             keeps whatever it was created with — and creating it while the drawer is
-             still animating open lays Monaco out at zero width, which is the blank
-             black panel you get on the second open. -->
-          <QueryEditor
-            v-if="isLoaded"
-            :key="bufferKey"
-            editor-id="announcement-banners-editor"
-            class="rounded-default border-border-default min-h-90! w-full resize-y overflow-auto border"
-            language="json"
-            :query="editorValue"
-            data-test="announcement-banners-editor"
-            @update:query="onEditorChange"
-          />
-          <div
-            v-else
-            class="rounded-default border-border-default text-text-muted flex min-h-90 items-center justify-center border text-sm"
-            data-test="announcement-banners-editor-loading"
-          >
-            {{ t("announcements.settings.loading") }}
-          </div>
-        </div>
-
-        <!-- A working document beats a field table: every field appears here in
-           place, annotated, and one click drops it into the editor. -->
-        <div class="flex flex-col gap-2" data-test="announcement-banners-reference">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-text-label text-sm font-bold">
-              {{ t("announcements.settings.exampleLabel") }}
-            </span>
-            <OButton
-              variant="outline"
-              size="sm"
-              data-test="announcement-banners-insert-example-btn"
-              @click="insertExample"
-            >
-              {{ t("announcements.settings.insertExample") }}
-            </OButton>
-          </div>
-          <OCodeBlock :code="EXAMPLE_CONFIG" lang="json" data-test="announcement-banners-example" />
-        </div>
-      </template>
-
       <OBanner
         v-if="errorMessage"
         variant="error-soft"
@@ -192,28 +120,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:open="dialogOpen = $event"
         @save="applyDraft"
       />
-
-      <ConfirmDialog
-        v-model="showCommentWarning"
-        :title="t('announcements.settings.dropCommentsTitle')"
-        :message="t('announcements.settings.dropCommentsMessage')"
-        :ok-label="t('announcements.settings.dropCommentsConfirm')"
-        @update:ok="confirmSwitchToForm"
-        @update:cancel="showCommentWarning = false"
-      />
     </div>
   </ODrawer>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OCodeBlock from "@/lib/core/Code/OCodeBlock.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -224,21 +139,11 @@ import { orderBanners } from "@/utils/announcementOrder";
 import AnnouncementBannerCard from "./AnnouncementBannerCard.vue";
 import AnnouncementBannerDialog from "./AnnouncementBannerDialog.vue";
 import {
-  EXAMPLE_CONFIG,
-  parseBannerConfig,
-  previewBannersFrom,
-  stripJsonComments,
-  type PreviewBanner,
-} from "./announcementConfig";
-import {
-  bufferFromDrafts,
   configFromDrafts,
   draftsFromConfig,
   emptyDraft,
   type BannerDraft,
 } from "./announcementDrafts";
-
-const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 const props = defineProps<{ open: boolean }>();
 
@@ -250,24 +155,16 @@ const store = useStore();
 /** `editingIndex` sentinel for a banner that is not in the list yet. */
 const NEW_BANNER = -1;
 
-type Mode = "form" | "json";
-
-/** Whichever mode is showing owns the config; the other is rebuilt on switch. */
-const mode = ref<Mode>("form");
 const drafts = ref<BannerDraft[]>([]);
-const editorValue = ref("");
 
 const errorMessage = ref<I18nText | "">("");
 const isSaving = ref(false);
-/** False until the saved config has been read; gates the editor's first mount. */
+/** False until the saved config has been read; the list shows a placeholder. */
 const isLoaded = ref(false);
-/** Bumped whenever the buffer is replaced behind the editor's back. */
-const bufferKey = ref(0);
 
 const dialogOpen = ref(false);
 const editingIndex = ref(NEW_BANNER);
 const editingDraft = ref<BannerDraft>(emptyDraft());
-const showCommentWarning = ref(false);
 
 const metaOrg = computed(() => store.state.zoConfig?.meta_org);
 
@@ -279,10 +176,14 @@ const orgOptions = computed<SelectOption[]>(() =>
   })),
 );
 
+/** A banner as far as the preview cares. */
+interface PreviewBanner {
+  message: string;
+  variant?: string;
+}
+
 const previewBanners = computed<PreviewBanner[]>(() =>
-  mode.value === "form"
-    ? orderBanners(drafts.value.map((d) => ({ message: d.message, variant: d.variant })))
-    : previewBannersFrom(editorValue.value),
+  orderBanners(drafts.value.map((d) => ({ message: d.message, variant: d.variant }))),
 );
 
 const previewVariant = (banner: PreviewBanner) => {
@@ -309,64 +210,6 @@ const previewIcon = (banner: PreviewBanner) => {
     default:
       return "info";
   }
-};
-
-/** Replace the editor buffer and force the editor to pick the new text up. */
-const setBuffer = (value: string) => {
-  editorValue.value = value;
-  bufferKey.value += 1;
-};
-
-const onEditorChange = (value: string) => {
-  editorValue.value = value;
-  errorMessage.value = "";
-};
-
-const insertExample = () => {
-  setBuffer(EXAMPLE_CONFIG);
-  errorMessage.value = "";
-};
-
-// ── Mode switching ─────────────────────────────────────────────────────────
-
-/** Parse the buffer into drafts, or report why it cannot be. */
-const adoptBufferAsDrafts = (): boolean => {
-  const parsed = parseBannerConfig(editorValue.value);
-  if (!parsed.ok) {
-    errorMessage.value = t("announcements.settings.invalidJson");
-    return false;
-  }
-
-  drafts.value = draftsFromConfig(parsed.payload);
-  errorMessage.value = "";
-  return true;
-};
-
-const confirmSwitchToForm = () => {
-  showCommentWarning.value = false;
-  if (adoptBufferAsDrafts()) mode.value = "form";
-};
-
-const onModeChange = (value: unknown) => {
-  const next = value as Mode | null;
-  // OToggleGroup deselects on a second click of the active item; ignore that
-  // rather than leaving the component with no authoring surface at all.
-  if (!next || next === mode.value) return;
-
-  if (next === "json") {
-    setBuffer(bufferFromDrafts(drafts.value));
-    errorMessage.value = "";
-    mode.value = "json";
-    return;
-  }
-
-  // A form has nowhere to put a comment, so going back drops them. Say so first
-  // rather than silently deleting an author's annotations.
-  if (stripJsonComments(editorValue.value) !== editorValue.value) {
-    showCommentWarning.value = true;
-    return;
-  }
-  confirmSwitchToForm();
 };
 
 // ── Banner list editing ────────────────────────────────────────────────────
@@ -402,9 +245,8 @@ const removeDraft = (index: number) => {
 // ── Load / save ────────────────────────────────────────────────────────────
 
 const loadConfig = async () => {
-  // Cleared first so the editor is torn down and rebuilt on every open. This
-  // component now outlives the drawer, and a Monaco instance created while the
-  // panel is still animating lays out at zero width — the blank black editor.
+  // Cleared first so a re-open never shows the previous org's banners while the
+  // read is still in flight.
   isLoaded.value = false;
 
   try {
@@ -412,7 +254,6 @@ const loadConfig = async () => {
     const source = response?.data ?? { banners: [] };
 
     drafts.value = draftsFromConfig(source);
-    setBuffer(JSON.stringify(source, null, 2));
     errorMessage.value = "";
   } catch (error: any) {
     errorMessage.value =
@@ -425,18 +266,7 @@ const loadConfig = async () => {
 };
 
 const save = async () => {
-  let payload: unknown;
-
-  if (mode.value === "form") {
-    payload = configFromDrafts(drafts.value);
-  } else {
-    const parsed = parseBannerConfig(editorValue.value);
-    if (!parsed.ok) {
-      errorMessage.value = t("announcements.settings.invalidJson");
-      return;
-    }
-    payload = parsed.payload;
-  }
+  const payload = configFromDrafts(drafts.value);
 
   isSaving.value = true;
   try {
@@ -466,20 +296,13 @@ watch(
 );
 
 // Still exposed so the drawer (or a test) can drive the same two actions the
-// buttons above do. The rest is exposed for tests that assert the form/JSON
-// round-trip actually reaches the editor.
+// footer buttons do; the rest is what tests assert the list round-trip on.
 defineExpose({
   save,
   reload: loadConfig,
-  switchMode: onModeChange,
-  confirmSwitchToForm,
   applyDraft,
   isSaving,
-  editorValue,
-  bufferKey,
   drafts,
-  mode,
   editingIndex,
-  showCommentWarning,
 });
 </script>

@@ -2127,7 +2127,6 @@
       "label": "Announcement Banners",
       "description": "Publish a notice across every organization",
       "configure": "Configure",
-      "editorLabel": "Configuration",
       "previewLabel": "Preview",
       "previewEmpty": "No banner will be shown.",
       "reset": "Discard changes",
@@ -2135,31 +2134,18 @@
       "saved": "Announcement banners updated",
       "saveFailed": "Could not save the announcement banners",
       "loadFailed": "Could not load the announcement banners",
-      "invalidJson": "The configuration is not valid JSON.",
       "loading": "Loading the current configuration…",
-      "exampleLabel": "Example",
-      "insertExample": "Insert example",
       "cancel": "Cancel",
-      "modeForm": "Form",
-      "modeJson": "JSON",
       "bannersLabel": "Banners",
       "addBanner": "Add banner",
       "emptyTitle": "No banners yet",
-      "emptyHint": "Add one to show a notice at the top of the app.",
-      "dropCommentsTitle": "Switch to the form?",
-      "dropCommentsMessage": "The form cannot keep the comments in your JSON, so they will be removed. Your banners are kept.",
-      "dropCommentsConfirm": "Switch and remove comments"
+      "emptyHint": "Add one to show a notice at the top of the app."
     },
     "variants": {
       "info": "Info",
       "warning": "Warning",
       "critical": "Critical",
       "promo": "Promotion"
-    },
-    "status": {
-      "live": "Showing now",
-      "scheduled": "Scheduled",
-      "expired": "Ended"
     },
     "card": {
       "edit": "Edit banner",
