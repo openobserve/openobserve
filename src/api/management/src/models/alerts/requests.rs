@@ -218,6 +218,12 @@ pub struct ListAlertsQuery {
     /// Optional folder ID filter parameter.
     pub folder: Option<String>,
 
+    /// Restrict the list to the alerts attached to one SLO (Feature 5, B1).
+    /// Reads the indexed `slo_id` column, so it is a SQL predicate rather than
+    /// an app-side scan. An EMPTY value matches nothing — see the field docs on
+    /// `ListAlertsParams::slo_id`.
+    pub slo_id: Option<String>,
+
     /// Optional stream type filter parameter.
     pub stream_type: Option<StreamType>,
 
@@ -319,6 +325,7 @@ impl ListAlertsQuery {
                 _ => None,
             },
             sort_desc: matches!(self.sort_order.as_deref(), Some("desc")),
+            slo_id: self.slo_id,
         }
     }
 

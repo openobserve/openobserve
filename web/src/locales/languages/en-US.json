@@ -5306,7 +5306,8 @@
       "invalidVrlFunction": "Invalid VRL Function",
       "invalidSqlQuery": "Invalid SQL Query",
       "errorFetchingStreams": "Error fetching streams",
-      "sqlValidationError": "SQL validation error: {error}"
+      "sqlValidationError": "SQL validation error: {error}",
+      "nameUnsupportedChars": "Alert names cannot contain spaces or : # ? ' \" % & /"
     },
     "header": "Alerts",
     "subtitle": "Alert rules and notification channels",
@@ -6251,7 +6252,16 @@
         "sqlModeFilterDropped": "Your SQL query was not carried over — the alert matches only the selected patterns.",
         "patternsUnusable": "None of the patterns on this page have distinctive text to match on, so the alert uses your search only."
       }
-    }
+    },
+    "saveFailed": "Could not save the alert.",
+    "loadFailed": "Could not load the alert.",
+    "sloAlertUnplaceable": "This SLO alert is missing its SLO reference and cannot be edited here.",
+    "sloBadge": "SLO",
+    "sloColumn": "SLO",
+    "sloKind": "Condition type",
+    "sloLongWindow": "Long window",
+    "sloShortWindow": "Short window",
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
   },
   "alert_templates": {
     "exportTemplate": "Export Template",
@@ -12323,6 +12333,9 @@
     "deleteFailed": "Could not delete the SLO",
     "deleteConfirmTitle": "Delete this SLO?",
     "deleteConfirmBody": "\"{name}\" and its measurement history will be removed.",
+    "deleteAlertsChecking": "Checking for attached alerts…",
+    "deleteAlertsNote": "Deleting this SLO also deletes the alert attached to it. | Deleting this SLO also deletes the {count} alerts attached to it.",
+    "deleteAlertsUnknown": "Could not check which alerts are attached. Deleting this SLO deletes all of them.",
     "deleteBudgetNote": "The slices already written stay on disk until they age out, so this SLO's row reservation is released then rather than now.",
     "groupedSliceNote": "Grouped SLOs use 5-minute slices.",
     "sliceNote": {
@@ -12448,7 +12461,7 @@
       "sloLabel": "Service level objective",
       "sloSummary": "target {target} · rolling {window} · {slice} slices · max burn rate ×{max}",
       "suggested": "Suggested configurations",
-      "suggestedFor": "Datadog's suggested rows for a {window} SLO",
+      "suggestedFor": "Suggested rows for a {window} SLO",
       "presetDetail": "{long} long / {short} short · fires at {budget}% budget",
       "shortIsLongOverTwelve": "Short = long ÷ 12 (Google SRE workbook) in every suggested pair.",
       "criticalIf": "Critical if",
@@ -12519,6 +12532,17 @@
       "burnExplain": "How fast the budget is burning in each bucket on its own, as a multiple of the budget-neutral rate.",
       "burnFormula": "burn rate = (100% − SLI) ÷ (100% − target)\nSLI = 100 × good ÷ total, for that bucket alone\n\nright axis — the same line read as SLI:\nSLI = 100% − burn rate × (100% − target)",
       "burnNote": "×1 spends the budget exactly at the end of the window, ×2 in half of it; under ×1 the budget is being banked. Because it is per bucket and not cumulative, a spike here stays visible instead of being averaged away. The right axis counts downward: up the chart is more burn, which is a lower SLI."
+    },
+    "alerts": {
+      "title": "Alerts",
+      "add": "Add alert",
+      "disabled": "Disabled",
+      "emptyTitle": "No alerts on this SLO yet",
+      "emptyHint": "Burn-rate alerts page you while there is still budget left to protect.",
+      "loadFailed": "Could not load this SLO's alerts.",
+      "editTargetMissing": "That alert is no longer on this SLO.",
+      "describeBurn": "Burn rate > {critical} over {long} and {short}",
+      "describeBudget": "Error budget consumed > {critical}%"
     }
   }
 }

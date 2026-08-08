@@ -59,7 +59,7 @@ pub enum SliQueryPlan {
     /// One scan yields both numerator and denominator.
     Single(SliQuery),
     /// Two scans that must be joined on the key schema. Used only by the
-    /// importer fallback for an unfoldable Datadog pair.
+    /// importer fallback for an unfoldable imported pair.
     Dual { good: SliQuery, total: SliQuery },
     /// Two PromQL range evaluations, joined at the group grain.
     PromQl { good: PromQuery, total: PromQuery },

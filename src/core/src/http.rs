@@ -78,6 +78,11 @@ impl From<AlertError> for Response {
             | AlertError::WarningOnCoverageGate { .. }
             | AlertError::PromqlWarningWithoutCondition
             | AlertError::InvalidTag(_)
+            // Feature 5: every variant names its own bound, so the body is
+            // actionable. A dangling `slo_id` is user input too — the alert
+            // being saved is what is wrong, not a missing resource the caller
+            // asked for.
+            | AlertError::InvalidSloAlert(_)
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery

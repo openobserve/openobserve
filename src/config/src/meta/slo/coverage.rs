@@ -21,8 +21,8 @@
 //! failure this feature can have: a search outage would read as "no errors
 //! observed" and recover every burn-rate alert in the org.
 //!
-//! Deliberate divergence from Datadog, which counts missing data in a Time
-//! Slice SLO as uptime (D34).
+//! Deliberate divergence from the usual convention, which counts missing data
+//! in a Time Slice SLO as uptime (D34).
 //!
 //! For an `alert`-type SLI the same question is asked of a *source alert's*
 //! evaluations rather than of a query — see [`evaluation_is_measured`].
