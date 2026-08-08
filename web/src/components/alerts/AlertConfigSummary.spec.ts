@@ -78,8 +78,7 @@ const translated = (key: string, params?: Record<string, any>) => {
   return out;
 };
 
-afterEach(() => {
-});
+afterEach(() => {});
 
 describe("AlertConfigSummary — non-SLO alerts (regression)", () => {
   it("still describes the stream an ordinary alert watches", () => {

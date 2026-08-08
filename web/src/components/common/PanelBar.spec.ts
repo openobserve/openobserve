@@ -54,9 +54,7 @@ describe("PanelBar", () => {
     });
     const classes = wrapper.classes();
     expect(classes).toEqual(expect.arrayContaining(["rounded-t-default", "w-full", "flex-nowrap"]));
-    expect(classes).toEqual(
-      expect.arrayContaining(["bg-panel-bar-bg", "border-panel-bar-border"]),
-    );
+    expect(classes).toEqual(expect.arrayContaining(["bg-panel-bar-bg", "border-panel-bar-border"]));
   });
 
   it("passes attributes such as data-test through to the bar element", () => {

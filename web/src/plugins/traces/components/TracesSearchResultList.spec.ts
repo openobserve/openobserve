@@ -198,8 +198,7 @@ describe("TracesSearchResultList", () => {
   describe("wrap", () => {
     const row = {
       trace_id: "t1",
-      operation_name:
-        "GET /api/v2/organizations/default/very/long/operation/name/that/overflows",
+      operation_name: "GET /api/v2/organizations/default/very/long/operation/name/that/overflows",
       service_name: "svc",
       duration: 1234,
       spans: 3,
@@ -215,11 +214,7 @@ describe("TracesSearchResultList", () => {
         { id: "service_name" },
         { id: "duration" },
       ];
-      sharedSearchObj.data.stream.selectedFields = [
-        "operation_name",
-        "service_name",
-        "duration",
-      ];
+      sharedSearchObj.data.stream.selectedFields = ["operation_name", "service_name", "duration"];
     });
 
     it("does not wrap by default", () => {

@@ -104,9 +104,7 @@ export const buildSloAlertPayload = (
   // `payload.context_attributes` aliasing the fetched alert, so a caller
   // adjusting the body it is about to send would edit the object the page is
   // still rendering from.
-  const payload: Record<string, any> = existing
-    ? JSON.parse(JSON.stringify(existing))
-    : {};
+  const payload: Record<string, any> = existing ? JSON.parse(JSON.stringify(existing)) : {};
 
   payload.name = form.name;
   payload.description = form.description ?? "";

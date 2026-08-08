@@ -235,9 +235,7 @@ describe("CheckAlerts", () => {
     it("should emit refresh:destinations when clicked", async () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
-      const refreshBtn = wrapper.find(
-        '[data-test="alert-settings-refresh-destinations-btn"]',
-      );
+      const refreshBtn = wrapper.find('[data-test="alert-settings-refresh-destinations-btn"]');
       expect(refreshBtn.exists()).toBe(true);
 
       await refreshBtn.trigger("click");

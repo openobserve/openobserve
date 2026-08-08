@@ -88,9 +88,10 @@ const silenceMinutes = computed({
 
       <!-- ── Alert threshold ──────────────────────────────────────────── -->
       <div class="flex flex-nowrap items-center gap-2">
-        <label class="text-text-heading flex h-7 w-47.5 items-center font-semibold whitespace-nowrap">{{
-          t("synthetics.scheduleAlert.alertedIfFails")
-        }}</label>
+        <label
+          class="text-text-heading flex h-7 w-47.5 items-center font-semibold whitespace-nowrap"
+          >{{ t("synthetics.scheduleAlert.alertedIfFails") }}</label
+        >
         <OInput
           v-model="failureThreshold"
           type="number"

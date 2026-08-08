@@ -274,8 +274,8 @@ describe("SloTimeSlicePreview", () => {
       respond([slice("2026-08-02T12:00:00", 42)]);
       wrapper = await createWrapper();
 
-      const labels = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options.xAxis
-        .data;
+      const labels = wrapper.findComponent({ name: "ChartRenderer" }).props("data").options
+        .xAxis.data;
       expect(labels).toEqual(["12:00"]);
     });
 

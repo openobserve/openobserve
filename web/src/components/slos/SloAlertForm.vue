@@ -83,15 +83,15 @@
     </OBanner>
 
     <div class="flex justify-end gap-2">
-      <OButton variant="outline" size="sm-action" @click="emit('cancel')" data-test="slo-alert-form-cancel">
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click="emit('cancel')"
+        data-test="slo-alert-form-cancel"
+      >
         {{ t("common.cancel") }}
       </OButton>
-      <OButton
-        size="sm-action"
-        :loading="saving"
-        @click="submit"
-        data-test="slo-alert-form-submit"
-      >
+      <OButton size="sm-action" :loading="saving" @click="submit" data-test="slo-alert-form-submit">
         {{ t("common.save") }}
       </OButton>
     </div>
