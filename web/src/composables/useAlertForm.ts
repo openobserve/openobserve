@@ -132,6 +132,10 @@ export const defaultAlertValue: any = () => {
       // aggregation.multi_alert — a PromQL alert has no aggregation, so the
       // flag cannot live there.
       promql_multi_alert: false,
+      // Feature 5 (§6b.6). `null` until the SLO query mode is chosen: the
+      // backend enforces `query_type == slo` IFF this is present, so an empty
+      // object here would make every ordinary alert fail validation.
+      slo_condition: null,
       vrl_function: null,
       multi_time_range: [],
     },
@@ -1405,6 +1409,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const updateVrlFunction = (value: any) => setF("query_condition.vrl_function", value);
   const updateAggregation = (value: any) => setF("query_condition.aggregation", value);
   const updatePromqlCondition = (value: any) => setF("query_condition.promql_condition", value);
+  const updateSloCondition = (value: any) => setF("query_condition.slo_condition", value);
   const updateTriggerCondition = (value: any) => setF("trigger_condition", value);
   const updateTemplate = (value: any) => setF("template", value);
   const updateContextAttributes = (value: any) => setF("context_attributes", value);
@@ -2911,6 +2916,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     updateVrlFunction,
     updateAggregation,
     updatePromqlCondition,
+    updateSloCondition,
     updateTriggerCondition,
     updateTemplate,
     updateContextAttributes,

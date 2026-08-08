@@ -97,6 +97,9 @@ pub struct StatusWrite {
     /// the watermark and never moves it.
     pub watermark_end: Option<i64>,
     pub trailing_slices: Option<serde_json::Value>,
+    /// The precomputed burn-window aggregates, keyed by window seconds.
+    /// Rollup-row only, like the watermark and the trailing buffer.
+    pub burn_windows: Option<serde_json::Value>,
     pub computed_at: i64,
 }
 
@@ -231,6 +234,20 @@ pub async fn apply_status_in_txn<C: ConnectionTrait>(
             .col_expr(
                 slo_status::Column::TrailingSlices,
                 Expr::value(trailing.clone()),
+            )
+            .filter(row_of(&write.slo_id, slo_status::ROLLUP_GROUP_KEY))
+            .exec(txn)
+            .await?;
+    }
+
+    // The burn-window cache rides the same rollup-only rule. Written in this
+    // transaction with the watermark it was computed against, so a reader
+    // never sees windows from one pass beside a watermark from another.
+    if let Some(windows) = &write.burn_windows {
+        slo_status::Entity::update_many()
+            .col_expr(
+                slo_status::Column::BurnWindows,
+                Expr::value(windows.clone()),
             )
             .filter(row_of(&write.slo_id, slo_status::ROLLUP_GROUP_KEY))
             .exec(txn)
@@ -386,6 +403,9 @@ mod tests {
             ],
             watermark_end: Some(9_900),
             trailing_slices: Some(serde_json::json!({"9600": [10.0, 10.0]})),
+            burn_windows: Some(serde_json::json!({
+                "3600": { "good": 99.0, "total": 100.0, "covered": 12, "expected": 12 }
+            })),
             computed_at: 1_000,
         }
     }
@@ -644,6 +664,63 @@ mod tests {
         assert_eq!(status.total, None);
         assert_eq!(status.covered_slices, None);
         assert_eq!(status.coverage, None);
+    }
+
+    /// Gap 1: the column had a reader, a migration and no writer, so every
+    /// burn-rate alert froze forever. This pins the write.
+    #[tokio::test]
+    async fn the_burn_windows_round_trip() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(
+            status.burn_windows,
+            Some(serde_json::json!({
+                "3600": { "good": 99.0, "total": 100.0, "covered": 12, "expected": 12 }
+            })),
+            "the alert evaluator reads this column; an unwritten one freezes \
+             every burn-rate alert on the SLO"
+        );
+    }
+
+    /// Rollup-only, like the watermark: a group row has no watermark to read
+    /// its windows against, so writing them there would be a value nothing
+    /// can interpret.
+    #[tokio::test]
+    async fn the_burn_windows_land_on_the_rollup_row_only() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(&db, &write_of(1)).await.unwrap();
+
+        let group = load_status(&db, SLO, "region:eu").await.unwrap().unwrap();
+        assert_eq!(group.burn_windows, None);
+        assert_eq!(group.trailing_slices, None);
+    }
+
+    /// Backfill fills history BEHIND the watermark, so the windows ending at
+    /// the watermark are not its to write — the same rule the watermark
+    /// itself follows.
+    #[tokio::test]
+    async fn backfill_does_not_write_burn_windows() {
+        let db = db().await;
+        init_generation(&db, SLO, 1).await.unwrap();
+        apply_status(
+            &db,
+            &StatusWrite {
+                writer: Writer::Backfill,
+                watermark_end: None,
+                trailing_slices: None,
+                burn_windows: None,
+                ..write_of(1)
+            },
+        )
+        .await
+        .unwrap();
+
+        let status = load_status(&db, SLO, ROLLUP).await.unwrap().unwrap();
+        assert_eq!(status.burn_windows, None);
     }
 
     #[tokio::test]

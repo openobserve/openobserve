@@ -78,7 +78,17 @@ async fn ensure_schema(org: &str, stream: &str) {
             return;
         }
     };
-    if let Err(e) = crate::db::schema::merge(org, stream, StreamType::Logs, &expected, None).await {
+    // `Some(now)`, never `None`: a `None` min_ts is stored as `start_dt = 0`,
+    // and `infra::db::build_key` renders a zero `start_dt` as a THREE-segment
+    // key (`/schema/org/logs/slo_slices`) instead of four. The startup schema
+    // cache asserts four and panics, so a `None` here means the server can
+    // never restart once any SLO has written a slice. Every other ingestion
+    // path passes the record timestamp; this one has no record yet, so it
+    // passes the moment the reserved stream was created.
+    let min_ts = config::utils::time::now_micros();
+    if let Err(e) =
+        crate::db::schema::merge(org, stream, StreamType::Logs, &expected, Some(min_ts)).await
+    {
         log::warn!("[SLO] could not initialize {stream} schema for {org}: {e}");
     }
 }

@@ -112,6 +112,7 @@
     <OTabs v-model="tab" class="shrink-0" data-test="slos-slodetail-tabs">
       <OTab name="trend" :label="t('slos.tab.trend')" icon="show-chart" />
       <OTab name="groups" :label="t('slos.tab.groups')" icon="layers" v-if="isGrouped" />
+      <OTab name="alerts" :label="t('slos.alerts.title')" icon="shield" />
       <OTab name="config" :label="t('slos.tab.configuration')" icon="settings" />
     </OTabs>
 
@@ -128,6 +129,19 @@
          charts below are being compared against. -->
     <div class="min-h-0 flex-1">
       <OTabPanels v-model="tab" grow scroll="y" class="h-full min-h-0">
+        <OTabPanel name="alerts">
+          <OContent>
+            <SloAlertsPanel
+              ref="alertsPanel"
+              v-if="slo"
+              :slo="slo"
+              :edit-alert-id="editAlertId"
+              @close-editor="clearEditLink"
+              @edit-target-missing="clearEditLink"
+            />
+          </OContent>
+        </OTabPanel>
+
         <OTabPanel name="trend">
           <OContent>
             <SloBurndownChart
@@ -234,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -252,6 +266,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import SloAlertsPanel from "@/components/slos/SloAlertsPanel.vue";
 import SloBurndownChart from "@/components/slos/SloBurndownChart.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -285,6 +300,26 @@ const groupsLoading = ref(false);
 // usually opened to answer. The configuration is a reference lookup and keeps
 // its tab, it is just no longer what greets you.
 const tab = ref("trend");
+
+/** The alert an incoming deep link wants opened (Phase 3). The alerts list's
+ *  edit button diverts here rather than into the generic editor, which cannot
+ *  represent an SLO alert. */
+/** The Alerts panel, driven by the header's "New alert" button. */
+const alertsPanel = ref<any>(null);
+
+const editAlertId = computed(() => {
+  const v = route.query.edit_alert;
+  return typeof v === "string" && v ? v : null;
+});
+
+/** Dropped with `replace`, never `push`: a history entry here means the back
+ *  button walks straight back into the editor the user just closed. */
+const clearEditLink = () => {
+  if (!editAlertId.value) return;
+  const query = { ...route.query };
+  delete query.edit_alert;
+  router.replace({ query });
+};
 
 const sloId = computed(() => String(route.params.slo_id || ""));
 const org = computed(() => store.state.selectedOrganization?.identifier);
@@ -451,14 +486,18 @@ function goToEdit() {
   });
 }
 
-function goToNewAlert() {
-  // SLO alerts are ordinary alerts with query_type = slo (D28), so this lands
-  // in the normal alert form rather than a parallel one.
-  router.push({
-    name: "alertList",
-    query: { org_identifier: org.value, slo_id: sloId.value },
-  });
+async function goToNewAlert() {
+  // Opens the form HERE. This used to push to `alertList?slo_id=…`, a param
+  // nothing ever consumed — and now that the generic form has no SLO mode,
+  // that route offers no way to create an SLO alert at all.
+  tab.value = "alerts";
+  await nextTick();
+  alertsPanel.value?.startCreate();
 }
+
+// A deep link lands on the Alerts tab; without this it would open on Trend
+// with the editor mounted in a panel nobody is looking at.
+if (editAlertId.value) tab.value = "alerts";
 
 onMounted(load);
 </script>
