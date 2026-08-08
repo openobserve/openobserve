@@ -10,29 +10,6 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' && github.actor != 'skyramp-testbot[bot]' }}
 
-env:
-  ZO_ROOT_USER_EMAIL: root@example.com
-  ZO_ROOT_USER_PASSWORD: Complexpass#123
-  ZO_QUICK_MODE_NUM_FIELDS: 100
-  ZO_QUICK_MODE_STRATEGY: first
-  ZO_ALLOW_USER_DEFINED_SCHEMAS: true
-  ZO_INGEST_ALLOWED_UPTO: 5
-  ZO_FEATURE_QUERY_EXCLUDE_ALL: false
-  ZO_USAGE_BATCH_SIZE: 200
-  ZO_USAGE_PUBLISH_INTERVAL: 2
-  ZO_USAGE_REPORTING_ENABLED: true
-  ZO_MIN_AUTO_REFRESH_INTERVAL: 5
-  ZO_STREAMING_ENABLED: true
-  ZO_COLS_PER_RECORD_LIMIT: "80000"
-  ZO_SMTP_ENABLED: true
-  ZO_FORMAT_STREAM_NAME_TO_LOWERCASE: false
-  ZO_CREATE_ORG_THROUGH_INGESTION: true
-  ZO_UTF8_VIEW_ENABLED: false
-  ZO_ENABLE_CROSS_LINKING: true
-  ZO_TIMECHART_ENABLED: true
-  ZO_SSRF_ALLOW_LOOPBACK: true
-  ZO_QUICK_MODE_ENABLED: false
-
 jobs:
   testbot:
     # Only run for pull_request events or issue_comment on PRs mentioning @skyramp-testbot
