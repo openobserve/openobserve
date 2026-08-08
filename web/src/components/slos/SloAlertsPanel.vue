@@ -99,8 +99,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+
+import { useI18nTyped } from "@/types/i18n";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -119,7 +120,7 @@ const emit = defineEmits<{
   (e: "close-editor"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
