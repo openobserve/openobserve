@@ -35,8 +35,6 @@ const store = createStore({
   },
 });
 
-// The Monaco editor is an async import that never resolves under jsdom, so it is
-// absent from the tree here. Everything asserted below sits outside it.
 async function mountEditor(saved: unknown = { banners: [] }) {
   vi.mocked(announcements.getConfig).mockResolvedValue({ data: saved } as any);
 
@@ -54,12 +52,6 @@ const q = (selector: string) => document.querySelector(selector);
 const qa = (selector: string) => Array.from(document.querySelectorAll(selector));
 const textOf = (selector: string) => q(selector)?.textContent ?? "";
 
-/** Move to the JSON tab the same way the toggle does. */
-async function toJson(wrapper: any) {
-  await (wrapper.vm as any).switchMode("json");
-  await flushPromises();
-}
-
 describe("AnnouncementBanners", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -72,14 +64,12 @@ describe("AnnouncementBanners", () => {
     expect(announcements.getConfig).toHaveBeenCalledWith("_meta");
   });
 
-  it("opens on the form, not the JSON editor", async () => {
-    // Most authors are not writing JSON by hand; the raw editor is the escape
-    // hatch, not the front door.
-    const wrapper = await mountEditor();
+  it("authors through the form, with no raw-JSON surface", async () => {
+    await mountEditor();
 
-    expect((wrapper.vm as any).mode).toBe("form");
     expect(q('[data-test="announcement-banners-list"]') !== null).toBe(true);
     expect(q('[data-test="announcement-banners-editor"]') !== null).toBe(false);
+    expect(q('[data-test="announcement-banners-mode"]') !== null).toBe(false);
   });
 
   it("builds a card per saved banner", async () => {
@@ -172,125 +162,6 @@ describe("AnnouncementBanners", () => {
 
     expect(announcements.setConfig).toHaveBeenCalledWith("_meta", {
       banners: [{ message: "Added from the form", variant: "warning" }],
-    });
-  });
-
-  describe("JSON mode", () => {
-    it("shows the editor and the example once switched", async () => {
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-
-      expect(q('[data-test="announcement-banners-reference"]') !== null).toBe(true);
-      expect(q('[data-test="announcement-banners-example"]') !== null).toBe(true);
-      expect(q('[data-test="announcement-banners-insert-example-btn"]') !== null).toBe(true);
-    });
-
-    it("documents every field the server accepts, in the example itself", async () => {
-      // The example is the only reference, so it has to name every field or the
-      // schema becomes undiscoverable.
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-
-      const example = textOf('[data-test="announcement-banners-example"]');
-
-      for (const field of [
-        "message",
-        "variant",
-        "starts_at",
-        "ends_at",
-        "duration",
-        "dismissible",
-        "cta",
-        "orgs",
-        "id",
-      ]) {
-        expect(example, `example does not mention ${field}`).toContain(field);
-      }
-    });
-
-    it("hands the editor the banners built in the form", async () => {
-      const wrapper = await mountEditor({ banners: [{ message: "Round trip", variant: "promo" }] });
-      await toJson(wrapper);
-
-      expect((wrapper.vm as any).editorValue).toContain("Round trip");
-      expect((wrapper.vm as any).editorValue).toContain("promo");
-    });
-
-    it("remounts the editor when the buffer is replaced behind its back", async () => {
-      // CodeQueryEditor reads `query` only at monaco.editor.create() and never
-      // watches it, so a changed `:key` is the only thing that makes Insert
-      // example — or a reload — actually reach the editor.
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-      const before = (wrapper.vm as any).bufferKey;
-
-      (q('[data-test="announcement-banners-insert-example-btn"]') as HTMLElement).click();
-      await flushPromises();
-
-      expect((wrapper.vm as any).bufferKey).toBeGreaterThan(before);
-      expect((wrapper.vm as any).editorValue).toContain("Scheduled maintenance");
-    });
-
-    it("publishes the buffer, stripping the comments first", async () => {
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-      vi.mocked(announcements.setConfig).mockResolvedValue({ data: {} } as any);
-
-      (wrapper.vm as any).editorValue = `{
-        // a note to the next operator
-        "banners": [{ "message": "Ship it", "cta": { "text": "Docs", "url": "https://x.dev/a//b" } }]
-      }`;
-
-      await (wrapper.vm as any).save();
-
-      expect(announcements.setConfig).toHaveBeenCalledWith("_meta", {
-        banners: [{ message: "Ship it", cta: { text: "Docs", url: "https://x.dev/a//b" } }],
-      });
-    });
-
-    it("warns before dropping comments on the way back to the form", async () => {
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-
-      (wrapper.vm as any).editorValue = `{ // keep me\n "banners": [] }`;
-      await (wrapper.vm as any).switchMode("form");
-      await flushPromises();
-
-      // Still on JSON until the author accepts the loss.
-      expect((wrapper.vm as any).mode).toBe("json");
-      expect((wrapper.vm as any).showCommentWarning).toBe(true);
-
-      // Accepting keeps the banners and drops only the annotations.
-      await (wrapper.vm as any).confirmSwitchToForm();
-      await flushPromises();
-
-      expect((wrapper.vm as any).mode).toBe("form");
-      expect((wrapper.vm as any).showCommentWarning).toBe(false);
-    });
-
-    it("switches back silently when there are no comments to lose", async () => {
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-
-      (wrapper.vm as any).editorValue = `{ "banners": [{ "message": "Plain" }] }`;
-      await (wrapper.vm as any).switchMode("form");
-      await flushPromises();
-
-      expect((wrapper.vm as any).mode).toBe("form");
-      expect((wrapper.vm as any).drafts).toHaveLength(1);
-      expect((wrapper.vm as any).drafts[0].message).toBe("Plain");
-    });
-
-    it("refuses to leave JSON that does not parse", async () => {
-      const wrapper = await mountEditor();
-      await toJson(wrapper);
-
-      (wrapper.vm as any).editorValue = "{ not json";
-      await (wrapper.vm as any).switchMode("form");
-      await flushPromises();
-
-      expect((wrapper.vm as any).mode).toBe("json");
-      expect(q('[data-test="announcement-banners-error"]') !== null).toBe(true);
     });
   });
 

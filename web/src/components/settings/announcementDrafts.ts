@@ -135,7 +135,7 @@ export function toRfc3339(value: string): string {
   );
 }
 
-/** One authored banner, as loose as it arrives from the API or the JSON editor. */
+/** One authored banner, as loose as it arrives from the API. */
 interface AuthoredBanner {
   message?: unknown;
   id?: unknown;
@@ -216,8 +216,8 @@ export function draftsFromConfig(parsed: unknown): BannerDraft[] {
 /**
  * One draft as authored JSON.
  *
- * Defaults are omitted rather than written out, so a banner built in the form
- * and then opened in the JSON editor reads like something a person wrote.
+ * Defaults are omitted rather than written out, so the stored config stays the
+ * short document a person would have written by hand.
  */
 export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
   const banner: Record<string, unknown> = { message: draft.message.trim() };
@@ -246,9 +246,4 @@ export function authoredFromDraft(draft: BannerDraft): Record<string, unknown> {
 
 export function configFromDrafts(drafts: BannerDraft[]): { banners: Record<string, unknown>[] } {
   return { banners: drafts.map(authoredFromDraft) };
-}
-
-/** The buffer the JSON editor should show for a set of drafts. */
-export function bufferFromDrafts(drafts: BannerDraft[]): string {
-  return JSON.stringify(configFromDrafts(drafts), null, 2);
 }
