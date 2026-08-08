@@ -967,12 +967,7 @@ export default defineComponent({
             const searchResults = await fetchSearchResults.execute(searchQuery.value);
             filteredResults.value = toRaw(searchResults);
           } catch (error) {
-            // Latent bug preserved: `!x === "AbortError"` compares a boolean to a
-            // string, so this body never runs. Kept as-is to avoid changing
-            // runtime behavior in a type-only fix; the mistaken comparison is
-            // what makes this branch dead, not the types.
-            // @ts-expect-error -- intentional no-op comparison (boolean vs string), see note
-            if (!asCaughtError(error).name === "AbortError") {
+            if (asCaughtError(error).name !== "AbortError") {
               filteredResults.value = [];
               // Handle error state
             }
