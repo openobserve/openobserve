@@ -36,9 +36,17 @@ const OSelectStub = {
       const values = Array.from(target.selectedOptions).map((o) => o.value);
       (this as any).$emit("update:modelValue", values);
     },
-    isSelected(opt: string) {
+    // AlertTargetsSelect hands the stub {label, value} objects with type-tagged
+    // values ("dest:<name>"), not bare strings.
+    optValue(opt: any) {
+      return typeof opt === "string" ? opt : opt.value;
+    },
+    optLabel(opt: any) {
+      return typeof opt === "string" ? opt : opt.label;
+    },
+    isSelected(opt: any) {
       const val = (this as any).modelValue;
-      return Array.isArray(val) && val.includes(opt);
+      return Array.isArray(val) && val.includes((this as any).optValue(opt));
     },
   },
   template: `
@@ -49,10 +57,10 @@ const OSelectStub = {
     >
       <option
         v-for="opt in options"
-        :key="opt"
-        :value="opt"
+        :key="optValue(opt)"
+        :value="optValue(opt)"
         :selected="isSelected(opt)"
-      >{{ opt }}</option>
+      >{{ optLabel(opt) }}</option>
     </select>
   `,
 };
@@ -154,13 +162,14 @@ describe("CheckAlerts", () => {
         "dest-3",
       ]);
 
-      const select = wrapper.find('[data-test="synthetics-check-alerts-destinations-select"]');
+      const select = wrapper.find('[data-test="alert-destinations-select"]');
       expect(select.exists()).toBe(true);
 
-      // The stub renders <option> with :selected attribute
+      // The stub renders <option> with :selected attribute. Values carry the
+      // shared field's type tag; the tag is stripped again on the way out.
       const selectedOpts = select.findAll("option[selected]");
       const selectedValues = selectedOpts.map((o) => o.attributes("value"));
-      expect(selectedValues).toEqual(["dest-1", "dest-2"]);
+      expect(selectedValues).toEqual(["dest:dest-1", "dest:dest-2"]);
     });
 
     it("should not show destination validation error on mount even when destinations are empty", () => {
@@ -198,15 +207,15 @@ describe("CheckAlerts", () => {
 
       // Emulate OSelect emitting a new array via update:modelValue.
       // We trigger the select change event directly on the <select> element.
-      const selectEl = wrapper.find('[data-test="synthetics-check-alerts-destinations-select"]');
+      const selectEl = wrapper.find('[data-test="alert-destinations-select"]');
 
-      // Select "dest-3" in addition to already-selected "dest-1"
-      // In a real multi-select, all selected options are in selectedOptions.
-      // Simulate by setting selected on options and dispatching change.
+      // Select "dest-3" in addition to already-selected "dest-1". Option values
+      // are type-tagged; update:check must receive them UNtagged — that round
+      // trip is the shared field doing its job.
       const options = selectEl.findAll("option");
       options.forEach((opt) => {
         const val = opt.attributes("value");
-        if (val === "dest-1" || val === "dest-3") {
+        if (val === "dest:dest-1" || val === "dest:dest-3") {
           (opt.element as HTMLOptionElement).selected = true;
         } else {
           (opt.element as HTMLOptionElement).selected = false;
@@ -227,7 +236,7 @@ describe("CheckAlerts", () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
       const refreshBtn = wrapper.find(
-        '[data-test="synthetics-check-alerts-refresh-destinations-btn"]',
+        '[data-test="alert-settings-refresh-destinations-btn"]',
       );
       expect(refreshBtn.exists()).toBe(true);
 
@@ -249,7 +258,7 @@ describe("CheckAlerts", () => {
     it("should call window.open with the correct URL when clicked", async () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
-      const addBtn = wrapper.find('[data-test="synthetics-check-alerts-add-destination-btn"]');
+      const addBtn = wrapper.find('[data-test="create-destination-btn"]');
       expect(addBtn.exists()).toBe(true);
 
       await addBtn.trigger("click");
@@ -263,7 +272,7 @@ describe("CheckAlerts", () => {
     it("should call router.resolve with the correct arguments", async () => {
       wrapper = mountCheckAlerts(mockMonitorHttp, ["dest-1"]);
 
-      const addBtn = wrapper.find('[data-test="synthetics-check-alerts-add-destination-btn"]');
+      const addBtn = wrapper.find('[data-test="create-destination-btn"]');
       await addBtn.trigger("click");
 
       expect(mockResolve).toHaveBeenCalledWith({

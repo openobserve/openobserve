@@ -1441,17 +1441,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
   };
 
-  const routeToCreateDestination = () => {
-    const url = router.resolve({
-      name: "alertDestinations",
-      query: {
-        action: "add",
-        org_identifier: store.state.selectedOrganization.identifier,
-      },
-    }).href;
-    window.open(url, "_blank");
-  };
-
   const openEditorDialog = () => {
     viewSqlEditorDialog.value = true;
   };
@@ -2950,7 +2939,6 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     clearMultiWindows,
     handleEditorStateChanged,
     handleEditorClosed,
-    routeToCreateDestination,
     openEditorDialog,
     openJsonEditor,
     jsonEditorData,

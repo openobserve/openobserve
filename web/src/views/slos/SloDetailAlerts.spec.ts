@@ -22,12 +22,13 @@ import SloAlertsPanel from "@/components/slos/SloAlertsPanel.vue";
 
 const listBySloSpy = vi.fn();
 const deleteSpy = vi.fn().mockResolvedValue({ data: {} });
+const getByIdSpy = vi.fn().mockResolvedValue({ data: {} });
 
 vi.mock("@/services/alerts", () => ({
   default: {
     list_by_slo: (...a: any[]) => listBySloSpy(...a),
     delete_by_alert_id: (...a: any[]) => deleteSpy(...a),
-    get_by_alert_id: vi.fn().mockResolvedValue({ data: {} }),
+    get_by_alert_id: (...a: any[]) => getByIdSpy(...a),
     create_by_alert_id: vi.fn(),
     update_by_alert_id: vi.fn(),
   },
@@ -184,6 +185,48 @@ describe("SloAlertsPanel", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-test="slo-alert-form"]').exists()).toBe(true);
+  });
+
+  // While a form is open, "Add alert" could only discard typed work — or,
+  // before the :key remount, silently flip an edit's save into a create.
+  it("disables Add alert while the form is open", async () => {
+    const wrapper = await mountPanel();
+    await wrapper.find('[data-test="slo-alerts-add"]').trigger("click");
+    await flushPromises();
+
+    const add = wrapper.find('[data-test="slo-alerts-add"]');
+    expect(add.attributes("disabled")).toBeDefined();
+  });
+
+  // The page header's "New alert" comes in through defineExpose, bypassing the
+  // disabled button — the guard has to live in startCreate itself.
+  it("ignores startCreate while an edit form is open", async () => {
+    listBySloSpy.mockResolvedValue({ data: { list: [alertRow()] } });
+    const wrapper = await mountPanel({ editAlertId: "alert-1" });
+
+    (wrapper.vm as any).startCreate();
+    await flushPromises();
+
+    // Still the EDIT form for alert-1, not a blank create form.
+    const form = wrapper.findComponent({ name: "SloAlertForm" });
+    expect(form.props("alertId")).toBe("alert-1");
+  });
+
+  // A deep link to a different alert is explicit navigation and DOES win — and
+  // the :key remount means the form refetches rather than keeping the old
+  // alert's fields with the new id's save branch.
+  it("remounts the form when the deep link switches alerts", async () => {
+    listBySloSpy.mockResolvedValue({
+      data: { list: [alertRow(), alertRow({ alert_id: "alert-2", name: "slo-slow-burn" })] },
+    });
+    const wrapper = await mountPanel({ editAlertId: "alert-1" });
+    getByIdSpy.mockClear();
+
+    await wrapper.setProps({ editAlertId: "alert-2" });
+    await flushPromises();
+
+    expect(wrapper.findComponent({ name: "SloAlertForm" }).props("alertId")).toBe("alert-2");
+    expect(getByIdSpy).toHaveBeenCalledWith(expect.anything(), "alert-2");
   });
 
   it("refreshes the list after a save", async () => {

@@ -44,10 +44,15 @@
     <!-- The SLO is context, not a field: it comes from the page. -->
     <SloAlertCondition v-model="form.condition" :slo="slo" />
 
-    <div class="grid grid-cols-2 gap-4">
+    <!-- Sized to their content (`width="sm"`, minutes suffix) rather than a
+         half-panel column each: a two-digit interval in a 60rem input reads as
+         a mistake, and without the unit "10" says nothing. -->
+    <div class="flex flex-wrap gap-4">
       <OInput
         v-model.number="form.frequencyMinutes"
         type="number"
+        width="sm"
+        suffix="min"
         :label="t('alerts.frequency')"
         required
         data-test="slo-alert-form-frequency"
@@ -55,19 +60,22 @@
       <OInput
         v-model.number="form.silenceMinutes"
         type="number"
+        width="sm"
+        suffix="min"
         :label="t('alerts.silence')"
         required
         data-test="slo-alert-form-silence"
       />
     </div>
 
-    <AlertTargetsSelect
+    <!-- The same complete field the generic alert form uses — label, tooltip,
+         picker, refresh/create buttons and error chrome all come with it. -->
+    <AlertDestinationsField
       v-model:destinations="form.destinations"
       v-model:workflows="form.workflows"
       :destination-options="destinationOptions"
-      :workflow-options="[]"
-      :workflows-enabled="false"
       data-test="slo-alert-form-targets"
+      @refresh="loadDestinations"
     />
 
     <OBanner v-if="saveError" variant="error" data-test="slo-alert-form-error">
@@ -98,7 +106,7 @@ import { useStore } from "vuex";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
-import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
+import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import SloAlertCondition from "@/components/slos/SloAlertCondition.vue";
 import alertsService from "@/services/alerts";
 import destinationService from "@/services/alert_destination";
@@ -207,7 +215,9 @@ const submit = async () => {
   }
 };
 
-onMounted(async () => {
+// Named so the field's refresh button can re-run it after the user creates a
+// destination in the other tab.
+const loadDestinations = () => {
   destinationService
     .list({ org_identifier: org.value, module: "alert" })
     .then((res: any) => {
@@ -216,6 +226,10 @@ onMounted(async () => {
     .catch(() => {
       destinationOptions.value = [];
     });
+};
+
+onMounted(async () => {
+  loadDestinations();
 
   if (!props.alertId) return;
 
