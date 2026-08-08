@@ -1,7 +1,7 @@
 # Skyramp Workspace Configuration
 workspace:
-  repoName: mrugeshmaster/openobserve
-  repoUrl: https://github.com/mrugeshmaster/openobserve
+  repoName: openobserve/openobserve
+  repoUrl: https://github.com/openobserve/openobserve
 metadata:
   schemaVersion: v1
   executorVersion: v1.3.37
