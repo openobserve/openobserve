@@ -283,10 +283,12 @@ describe("AlertDetail — SLO alerts", () => {
 
       expect(errorToasts()).toEqual([]);
       expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      // Main routes ordinary alerts straight to the editor now (no more
+      // bounce through the list page).
       expect(mockRouterPush).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: "alertList",
-          query: expect.objectContaining({ action: "update", alert_id: "alert-1" }),
+          name: "editAlert",
+          params: expect.objectContaining({ alert_id: "alert-1" }),
         }),
       );
     });

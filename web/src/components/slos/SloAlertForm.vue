@@ -100,8 +100,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
 import { useStore } from "vuex";
+
+import { raw, useI18nTyped } from "@/types/i18n";
 
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -122,7 +123,7 @@ const emit = defineEmits<{
   (e: "load-error", message: string): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
@@ -170,7 +171,7 @@ const nameError = computed(() => {
   if (ALERT_NAME_UNSUPPORTED_CHARS.test(form.name) || form.name.includes("/")) {
     return t("alerts.validation.nameUnsupportedChars");
   }
-  return "";
+  return raw("");
 });
 
 /** Keep the suggested name in step with the condition until the user types

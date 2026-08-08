@@ -66,17 +66,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { useI18n } from "vue-i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AlertTargetsSelect from "@/components/alerts/AlertTargetsSelect.vue";
 import workflowService from "@/services/workflows";
 import config from "@/aws-exports";
 
-type RawOption = string | { label: string; value: string };
+type RawOption = string | { label: I18nText; value: string };
 
 const props = withDefaults(
   defineProps<{
@@ -106,14 +106,16 @@ const emit = defineEmits<{
   (e: "refresh"): void;
 }>();
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
-const labelText = computed(() => props.label ?? t("alerts.destination"));
+const labelText = computed<I18nText>(() =>
+  props.label === undefined ? t("alerts.destination") : raw(props.label),
+);
 // `undefined` means "the default tooltip"; an explicit "" means "none".
-const tooltipText = computed(() =>
-  props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : props.tooltip,
+const tooltipText = computed<I18nText>(() =>
+  props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : raw(props.tooltip),
 );
 
 // The family must support workflows AND the deployment must serve them —
@@ -126,13 +128,13 @@ const workflowsEnabled = computed(
     store.state.zoConfig?.workflows_enabled === true,
 );
 
-const workflowOptions = ref<{ label: string; value: string }[]>([]);
+const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
 const fetchWorkflows = async () => {
   if (!workflowsEnabled.value) return;
   try {
     const res = await workflowService.listWorkflows(store.state.selectedOrganization.identifier);
     const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
-    workflowOptions.value = list.map((wf: any) => ({ label: wf.name, value: wf.id }));
+    workflowOptions.value = list.map((wf: any) => ({ label: raw(wf.name), value: wf.id }));
   } catch {
     workflowOptions.value = [];
   }
