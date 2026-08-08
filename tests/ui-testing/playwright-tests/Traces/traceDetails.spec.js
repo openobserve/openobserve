@@ -258,4 +258,195 @@ test.describe("Trace Details testcases", () => {
       expect(detailsVisible).toBeTruthy();
     }
   });
+
+  // ============================================================
+  // Trace-to-Logs Navigation (trace-log-navigation feature)
+  // ============================================================
+
+  test("P0: Navigate to Logs from span hover icon in trace tree", {
+    tag: ['@trace-log-navigation', '@traceDetails', '@traces', '@P0', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing per-span View Logs navigation from trace tree hover icon');
+
+    await openTraceDetailsIfAvailable(page, pm, 'span hover icon test');
+
+    // Waterfall tab must be active for trace tree spans to render
+    const waterfallOpened = await pm.tracesPage.openTraceDetailsTab('waterfall');
+    expect(waterfallOpened).toBeTruthy();
+    testLogger.info('Waterfall tab activated');
+
+    // Discover the first visible span ID dynamically
+    const spanId = await pm.tracesPage.getFirstVisibleSpanId();
+    expect(spanId).toBeTruthy();
+    testLogger.info(`Found span ID: ${spanId}`);
+
+    // Hover the span row to reveal the View Logs icon (CSS :hover)
+    await pm.tracesPage.hoverSpanRow(spanId);
+    await page.waitForTimeout(500);
+
+    // Assert the View Logs icon container is visible
+    const iconVisible = await pm.tracesPage.isSpanViewLogsIconVisible(spanId);
+    expect(iconVisible).toBeTruthy();
+    testLogger.info('View Logs icon is visible after hover');
+
+    // Click the per-span View Logs button
+    await pm.tracesPage.clickSpanViewLogsButton(spanId);
+
+    // Wait for navigation to /logs
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.tracesPage.expectUrlContains(/logs/);
+    testLogger.info('Successfully navigated to /logs from trace tree span hover icon');
+  });
+
+  test("P1: Navigate to Logs from sidebar toolbar View Logs button", {
+    tag: ['@trace-log-navigation', '@traceDetails', '@traces', '@P1', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing View Logs navigation from sidebar toolbar');
+
+    await openTraceDetailsIfAvailable(page, pm, 'sidebar toolbar test');
+
+    // Ensure a log stream is selected before opening the sidebar so the
+    // sidebar's View Logs button is enabled (both header and sidebar share
+    // the same selectedLogStreams state).
+    const logStreamsSelectVisible = await pm.tracesPage.isLogStreamsSelectVisible();
+    if (logStreamsSelectVisible) {
+      const headerBtnEnabled = await pm.tracesPage.isViewLogsButtonEnabled();
+      if (!headerBtnEnabled) {
+        testLogger.info('No log stream selected — selecting one before opening sidebar');
+        await pm.tracesPage.selectFirstLogStreamInTraceDetails();
+        await page.waitForTimeout(500);
+      }
+    }
+
+    // Waterfall tab must be active
+    const waterfallOpened = await pm.tracesPage.openTraceDetailsTab('waterfall');
+    expect(waterfallOpened).toBeTruthy();
+    testLogger.info('Waterfall tab activated');
+
+    // Discover the first visible span ID
+    const spanId = await pm.tracesPage.getFirstVisibleSpanId();
+    expect(spanId).toBeTruthy();
+    testLogger.info(`Found span ID: ${spanId}`);
+
+    // Click the span to open the TraceDetailsSidebar
+    await pm.tracesPage.clickSpanSelectButton(spanId);
+    await page.waitForTimeout(1000);
+
+    // Assert sidebar is visible
+    const sidebarVisible = await pm.tracesPage.isSidebarVisible();
+    expect(sidebarVisible).toBeTruthy();
+    testLogger.info('TraceDetailsSidebar is visible');
+
+    // Assert the sidebar View Logs button is visible (standalone mode)
+    const sidebarBtnVisible = await pm.tracesPage.isSidebarViewLogsButtonVisible();
+    expect(sidebarBtnVisible).toBeTruthy();
+    testLogger.info('Sidebar View Logs button is visible');
+
+    // Verify sidebar button is enabled before clicking
+    const sidebarBtnEnabled = await pm.tracesPage.isSidebarViewLogsButtonEnabled();
+    expect(sidebarBtnEnabled).toBeTruthy();
+    testLogger.info('Sidebar View Logs button is enabled');
+
+    // Click the sidebar View Logs button
+    await pm.tracesPage.clickSidebarViewLogsButton();
+
+    // Wait for navigation to /logs
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.tracesPage.expectUrlContains(/logs/);
+    testLogger.info('Successfully navigated to /logs from sidebar toolbar button');
+  });
+
+  test("P2: Verify URL query contains correct trace/span identifiers", {
+    tag: ['@trace-log-navigation', '@traceDetails', '@traces', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing URL query parameter contains correct trace and span identifiers');
+
+    await openTraceDetailsIfAvailable(page, pm, 'URL query test');
+
+    // Activate waterfall tab
+    const waterfallOpened = await pm.tracesPage.openTraceDetailsTab('waterfall');
+    expect(waterfallOpened).toBeTruthy();
+
+    // Navigate from trace tree per-span button to get a span-scoped URL
+    const spanId = await pm.tracesPage.getFirstVisibleSpanId();
+    expect(spanId).toBeTruthy();
+
+    await pm.tracesPage.hoverSpanRow(spanId);
+    await page.waitForTimeout(500);
+    const iconVisible = await pm.tracesPage.isSpanViewLogsIconVisible(spanId);
+    expect(iconVisible).toBeTruthy();
+
+    await pm.tracesPage.clickSpanViewLogsButton(spanId);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.tracesPage.expectUrlContains(/logs/);
+
+    // Extract and validate the URL query parameter
+    const currentUrl = new URL(page.url());
+    const encodedQuery = currentUrl.searchParams.get('query');
+    expect(encodedQuery).toBeTruthy();
+    testLogger.info('URL query parameter is present');
+
+    // Decode the base64-encoded query (per setup contract: query is b64-encoded)
+    const decodedQuery = await page.evaluate((eq) => {
+      return atob(decodeURIComponent(eq));
+    }, encodedQuery);
+    expect(decodedQuery).toBeTruthy();
+    testLogger.info(`Decoded query: ${decodedQuery}`);
+
+    // Assert the query contains a trace_id field with a non-empty value
+    expect(decodedQuery).toMatch(/trace_id\s*=\s*'[^']+'|trace_id_field_name\s*=\s*'[^']+'/i);
+    testLogger.info('Query contains trace_id identifier');
+
+    // For span-level navigation, assert the query also contains span_id
+    expect(decodedQuery).toMatch(/span_id\s*=\s*'[^']+'|span_id_field_name\s*=\s*'[^']+'/i);
+    testLogger.info('Query contains span_id identifier');
+
+    testLogger.info('URL query validation completed successfully');
+  });
+
+  test("P2: Verify default field names are used (no undefined fallback)", {
+    tag: ['@trace-log-navigation', '@traces', '@P2', '@all']
+  }, async ({ page }) => {
+    testLogger.info('Testing that default field names are used and undefined fallback does not occur');
+
+    await openTraceDetailsIfAvailable(page, pm, 'default field names test');
+
+    // Activate waterfall tab
+    const waterfallOpened = await pm.tracesPage.openTraceDetailsTab('waterfall');
+    expect(waterfallOpened).toBeTruthy();
+
+    // Navigate from trace tree per-span button
+    const spanId = await pm.tracesPage.getFirstVisibleSpanId();
+    expect(spanId).toBeTruthy();
+
+    await pm.tracesPage.hoverSpanRow(spanId);
+    await page.waitForTimeout(500);
+    const iconVisible = await pm.tracesPage.isSpanViewLogsIconVisible(spanId);
+    expect(iconVisible).toBeTruthy();
+
+    await pm.tracesPage.clickSpanViewLogsButton(spanId);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await pm.tracesPage.expectUrlContains(/logs/);
+
+    // Extract and decode the URL query
+    const currentUrl = new URL(page.url());
+    const encodedQuery = currentUrl.searchParams.get('query');
+    expect(encodedQuery).toBeTruthy();
+
+    const decodedQuery = await page.evaluate((eq) => {
+      return atob(decodeURIComponent(eq));
+    }, encodedQuery);
+    expect(decodedQuery).toBeTruthy();
+
+    // Assert the field names are NOT the literal string "undefined"
+    expect(decodedQuery).not.toContain("undefined");
+    testLogger.info('Field names are not the literal string "undefined"');
+
+    // Assert the default field names (span_id, trace_id) are used
+    expect(decodedQuery).toMatch(/span_id\s*=/i);
+    expect(decodedQuery).toMatch(/trace_id\s*=/i);
+    testLogger.info('Default field names (span_id, trace_id) are present in query');
+
+    testLogger.info('Default field name verification completed successfully');
+  });
 });

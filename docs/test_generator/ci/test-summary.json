@@ -1,0 +1,22 @@
+[
+  {
+    "title": "P0: Navigate to Logs from span hover icon in trace tree",
+    "action": "append",
+    "verifies": "Hovering a span row in the trace tree reveals a View Logs icon; clicking it navigates to /logs with a span-scoped query"
+  },
+  {
+    "title": "P1: Navigate to Logs from sidebar toolbar View Logs button",
+    "action": "append",
+    "verifies": "Selecting a span opens the TraceDetailsSidebar in standalone mode with a View Logs button; clicking it navigates to /logs"
+  },
+  {
+    "title": "P2: Verify URL query contains correct trace/span identifiers",
+    "action": "append",
+    "verifies": "After per-span log navigation, the decoded URL query parameter contains both trace_id and span_id field names with non-empty values"
+  },
+  {
+    "title": "P2: Verify default field names are used (no undefined fallback)",
+    "action": "append",
+    "verifies": "After navigation, the decoded query uses default field names 'span_id' and 'trace_id', never the literal string 'undefined'"
+  }
+]

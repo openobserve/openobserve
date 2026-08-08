@@ -75,6 +75,7 @@ export class TracesPage {
     this.traceDetailsSearchInput = '[data-test="trace-details-search-input"]';
     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+    this.traceDetailsSidebarViewLogsButton = '[data-test="trace-details-sidebar-header-toolbar-view-logs-btn"]';
 
     // Service Graph (Enterprise)
     this.serviceGraphChart = '[data-test="service-graph-chart"]';
@@ -154,6 +155,10 @@ export class TracesPage {
     // Trace Tree/Span Selectors
     this.traceTreeSpanServiceName = '[data-test="trace-tree-span-service-name"]';
     this.traceTreeSpanServiceNamePrefix = '[data-test^="trace-tree-span-service-name-"]';
+    this.traceTreeSpanOperationNameContainerPrefix = '[data-test^="trace-tree-span-operation-name-container-"]';
+    this.traceTreeSpanViewLogsContainerPrefix = '[data-test^="trace-tree-span-view-logs-container-"]';
+    this.traceTreeSpanViewLogsBtnPrefix = '[data-test^="trace-tree-span-view-logs-btn-"]';
+    this.traceTreeSpanSelectBtnPrefix = '[data-test^="trace-tree-span-select-btn-"]';
 
     // Field List Toggle
     this.fieldListToggleButton = '[data-test="traces-search-field-list-collapse-btn"]';
@@ -2557,6 +2562,106 @@ export class TracesPage {
    */
   getQueryEditorLocator() {
     return this.page.locator(this.queryEditor);
+  }
+
+  // ===== Trace-to-Logs Navigation: Per-Span + Sidebar Methods =====
+
+  /**
+   * Get the spanId of the first visible span row in the trace tree (waterfall tab).
+   * Reads the data-test attribute from the first rendered
+   * `[data-test^="trace-tree-span-operation-name-container-"]` element and
+   * extracts the suffix (spanId). Returns null if no span rows are visible.
+   * @returns {Promise<string|null>} Span ID or null if none found
+   */
+  async getFirstVisibleSpanId() {
+    const firstSpan = this.page.locator(this.traceTreeSpanOperationNameContainerPrefix).first();
+    await firstSpan.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+    const attr = await firstSpan.getAttribute('data-test').catch(() => null);
+    if (!attr) return null;
+    const spanId = attr.replace('trace-tree-span-operation-name-container-', '');
+    return spanId || null;
+  }
+
+  /**
+   * Hover over a span row to reveal the per-span View Logs icon.
+   * The `.view-logs-container` has `visibility: hidden` by default and becomes
+   * visible via CSS `:hover` on `.span-row` (TraceTree.vue:829).
+   * @param {string} spanId - The span ID obtained from getFirstVisibleSpanId()
+   */
+  async hoverSpanRow(spanId) {
+    const row = this.page.locator(`[data-test="trace-tree-span-operation-name-container-${spanId}"]`);
+    await row.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+    await row.hover();
+  }
+
+  /**
+   * Check if the per-span View Logs icon container is visible after hovering.
+   * @param {string} spanId
+   * @returns {Promise<boolean>}
+   */
+  async isSpanViewLogsIconVisible(spanId) {
+    const container = this.page.locator(`[data-test="trace-tree-span-view-logs-container-${spanId}"]`);
+    return await container.isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Click the per-span View Logs button to trigger viewSpanLogs() →
+   * buildQueryDetails(span) → navigateToLogs() (OSS path).
+   * @param {string} spanId
+   */
+  async clickSpanViewLogsButton(spanId) {
+    const button = this.page.locator(`[data-test="trace-tree-span-view-logs-btn-${spanId}"]`);
+    await button.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await button.click();
+  }
+
+  /**
+   * Click the span select button — opens the TraceDetailsSidebar for this span.
+   * @param {string} spanId
+   */
+  async clickSpanSelectButton(spanId) {
+    const button = this.page.locator(`[data-test="trace-tree-span-select-btn-${spanId}"]`);
+    await button.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await button.click();
+  }
+
+  /**
+   * Check if the TraceDetailsSidebar panel is visible.
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarVisible() {
+    return await this.page.locator(this.traceDetailsSidebar).isVisible({ timeout: 10000 }).catch(() => false);
+  }
+
+  /**
+   * Check if the sidebar's View Logs toolbar button is visible
+   * (rendered only when parentMode === 'standalone', which is the default).
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarViewLogsButtonVisible() {
+    return await this.page.locator(this.traceDetailsSidebarViewLogsButton).isVisible({ timeout: 5000 }).catch(() => false);
+  }
+
+  /**
+   * Click the sidebar's View Logs toolbar button to navigate to /logs
+   * via buildQueryDetails(span) → navigateToLogs().
+   */
+  async clickSidebarViewLogsButton() {
+    const button = this.page.locator(this.traceDetailsSidebarViewLogsButton);
+    await button.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+    await button.click();
+  }
+
+  /**
+   * Check if the sidebar's View Logs toolbar button is enabled (not disabled).
+   * @returns {Promise<boolean>}
+   */
+  async isSidebarViewLogsButtonEnabled() {
+    const button = this.page.locator(this.traceDetailsSidebarViewLogsButton);
+    if (await button.isVisible({ timeout: 5000 }).catch(() => false)) {
+      return !(await button.isDisabled());
+    }
+    return false;
   }
 
 }

@@ -1,0 +1,26 @@
+{
+  "feature_slug": "trace-log-navigation",
+  "feature_title": "Trace-to-Logs Navigation with Configurable ID Fields",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceLogNavigation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceLogNavigation.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/useTraces.ts",
+    "web/src/composables/useTraces.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Both changed files live under web/src/composables/, a pure OSS directory. No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) appear in the 2-file changed_files.txt list. No enterprise keywords (SSO, SAML, RBAC, SDR, cipher) appear in the paths.",
+    "skip": "Not skipped — the trigger_comment.txt and feature_hint.txt are both empty (no explicit opt-out), and the change alters user-facing behavior in the Trace-to-Logs navigation flow (buildQueryDetails and the new navigateToCorrelatedLogs function affect what SQL query reaches the logs page when a user clicks 'View Logs' on a trace span).",
+    "e2e": "E2E is warranted: the composable changes affect real user interactions. The user clicks 'View Logs' on a span in the Traces UI, which fires buildQueryDetails or navigateToCorrelatedLogs — the query construction now uses org-configurable field names with proper fallbacks (instead of producing 'undefined' column names when settings are absent) and the new correlated-logs navigation introduces semantic-group-based condition deduplication. Both paths need verification from the UI.",
+    "area": "The Traces area — the changed composable (useTraces.ts) is the core logic for trace detail interactions, and the existing Playwright test matrix already has a 'Traces' shard (with enterprise overlay appending service-graph.spec.js to it). No other area fits.",
+    "group": "The 'Traces' matrix shard — the existing OSS ci_matrix.json already defines a Traces testfolder, and the enterprise overlay (ci_matrix.ent.json) appends specs to it. The new spec is a natural fit for this existing shard rather than creating a new group.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is web/src/composables/useTraces.spec.ts, which is a Vitest unit test under web/src/, not a Playwright E2E spec under tests/ui-testing/playwright-tests/. Unit tests do not constitute E2E coverage."
+  }
+}

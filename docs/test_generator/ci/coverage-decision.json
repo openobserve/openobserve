@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "traceDetails.spec.js already covers Workflow 1 (TraceDetails header View Logs button) via the 'P1: View related logs from trace details' test (lines 146-212). It also has the required beforeEach setup (navigate to traces, select stream, run query, open trace details) and the openTraceDetailsIfAvailable() helper. The new TraceTree per-span hover icon (Workflow 2) and TraceDetailsSidebar toolbar button (Workflow 3) are uncovered entry points in the same trace detail view. Appending new test() blocks to this spec avoids duplicating setup and keeps all trace-detail navigation tests colocated."
+}

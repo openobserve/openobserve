@@ -1,0 +1,18 @@
+{
+  "feature_slug": "trace-log-navigation",
+  "feature_title": "Trace-to-Logs Navigation with Configurable ID Fields",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceLogNavigation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceLogNavigation.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/composables/useTraces.ts",
+    "web/src/composables/useTraces.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
