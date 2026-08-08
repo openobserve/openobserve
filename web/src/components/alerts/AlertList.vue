@@ -257,12 +257,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       {{ sloLabel(row) }}
                     </button>
-                    <span
-                      v-else-if="row.slo_id"
-                      class="text-text-secondary truncate"
-                      :data-test="`alert-list-${row.name}-slo-name`"
-                      >{{ sloLabel(row) }}</span
-                    >
                   </template>
                 </div>
                 <OTooltip
