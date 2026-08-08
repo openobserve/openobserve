@@ -872,8 +872,7 @@ pub fn service_routes() -> Router {
         .route("/v2/{org_id}/reports/{report_id}/trigger", put(dashboards::reports::trigger_report_v2))
 
         // SLOs. Deliberately NOT enterprise-gated: nothing about SLO
-        // measurement is an enterprise capability, and the handlers already
-        // return 501 when ZO_SLO_ENABLED is false. Literal segments are
+        // measurement is an enterprise capability. Literal segments are
         // registered before the {slo_id} catch-all, per the router's ordering
         // rule.
         .route(

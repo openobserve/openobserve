@@ -131,7 +131,7 @@ const sloId = computed(() => sloCondition.value?.slo_id || "");
 // `=== true`, not truthiness: `zoConfig` is empty until /config resolves, so
 // "not false" is also "we have not been told yet" — and a link into a module
 // this deployment may not serve is a dead link.
-const sloLinkable = computed(() => store.state.zoConfig?.slo_enabled === true && !!sloId.value);
+const sloLinkable = computed(() => !!sloId.value);
 
 /** `operator` is part of the threshold, not decoration — `>` and `>=` are
  *  genuinely different alerts, and the backend stores it on every condition. */

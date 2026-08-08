@@ -79,7 +79,6 @@ const translated = (key: string, params?: Record<string, any>) => {
 };
 
 afterEach(() => {
-  delete (store.state as any).zoConfig.slo_enabled;
 });
 
 describe("AlertConfigSummary — non-SLO alerts (regression)", () => {
@@ -102,7 +101,6 @@ describe("AlertConfigSummary — non-SLO alerts (regression)", () => {
 
 describe("AlertConfigSummary — SLO alerts", () => {
   it("replaces the stream fields, which an SLO alert does not have", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert(), { sloName: "checkout-availability" });
 
     // Positive anchor first: without it, a component that rendered NOTHING at
@@ -116,7 +114,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
   });
 
   it("names the SLO and links to it", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert(), { sloName: "checkout-availability" });
 
     expect(value(wrapper, "slo")).toBe("checkout-availability");
@@ -128,13 +125,11 @@ describe("AlertConfigSummary — SLO alerts", () => {
   // The name needs a second fetch, which can fail or be skipped when SLOs are
   // disabled. The id is still an answer; a blank is not.
   it("falls back to the raw slo_id when the name was not resolved", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert());
     expect(value(wrapper, "slo")).toBe("slo-123");
   });
 
   it("offers no link when the SLO cannot be determined", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary({
       ...sloAlert(),
       query_condition: { type: "slo", slo_condition: null },
@@ -150,18 +145,7 @@ describe("AlertConfigSummary — SLO alerts", () => {
     expect(wrapper.find('[data-test="alerts-alertconfigsummary-slo-link"]').exists()).toBe(false);
   });
 
-  // Flag-off degradation (plan §2.6): no dead link into a module this build
-  // does not serve. The name still shows — it is just not clickable.
-  it("shows the SLO without a link when SLOs are disabled", () => {
-    (store.state as any).zoConfig.slo_enabled = false;
-    const wrapper = mountSummary(sloAlert(), { sloName: "checkout-availability" });
-
-    expect(value(wrapper, "slo")).toBe("checkout-availability");
-    expect(wrapper.find('[data-test="alerts-alertconfigsummary-slo-link"]').exists()).toBe(false);
-  });
-
   it("shows the burn-rate kind, both thresholds and both windows", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert(), { sloName: "checkout-availability" });
 
     expect(value(wrapper, "slo-kind")).toBe(translated("slos.alert.kind.burnRate"));
@@ -177,7 +161,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
   // warning line shares the operator (SA: one operator per condition) and is
   // asserted here too — it is the line most likely to be left hardcoded.
   it("reads the thresholds and the operator from the condition, not a constant", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert({ operator: ">=", critical: 3.5, warning: 1.25 }));
 
     expect(value(wrapper, "condition")).toBe(`${translated("slos.alert.burnRate")} >= 3.5`);
@@ -186,7 +169,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
 
   // Two different window pairs, so "1h"/"5m" cannot be literals.
   it("formats whatever windows the condition carries", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert({ long_window_secs: 21600, short_window_secs: 1800 }));
 
     expect(value(wrapper, "long-window")).toBe("6h");
@@ -197,7 +179,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
   // and the SLO form does not offer it. Showing a "look-back window" invents a
   // knob the alert does not have.
   it("drops the look-back period, which this family does not use", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert());
 
     expect(field(wrapper, "slo-kind").exists()).toBe(true);
@@ -205,7 +186,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
   });
 
   it("omits the windows for an error-budget condition, which has none", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(
       sloAlert({
         kind: "error_budget",
@@ -225,7 +205,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
   // A budget percentage keeps its "%" on the warning line too, and neither
   // number is the fixture's happy-path 50.
   it("renders an error-budget warning as a percentage", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(
       sloAlert({
         kind: "error_budget",
@@ -242,7 +221,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
   });
 
   it("renders an em dash for an unset warning rather than a dangling operator", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert({ warning: undefined }));
 
     // Anchored in the SLO branch — the generic branch also renders a dash here.
@@ -253,7 +231,6 @@ describe("AlertConfigSummary — SLO alerts", () => {
 
   // The schedule half is shared and must survive the branch.
   it("keeps the schedule section", () => {
-    (store.state as any).zoConfig.slo_enabled = true;
     const wrapper = mountSummary(sloAlert());
 
     // Anchored, so this cannot pass by virtue of the SLO branch not existing.
@@ -261,14 +238,5 @@ describe("AlertConfigSummary — SLO alerts", () => {
     expect(value(wrapper, "frequency")).toBe("1");
     expect(value(wrapper, "silence")).toBe("30");
     expect(value(wrapper, "destinations")).toBe("pagerduty");
-  });
-
-  // The OSS default is the flag being ABSENT, not false.
-  it("treats an absent slo_enabled flag as off", () => {
-    delete (store.state as any).zoConfig.slo_enabled;
-    const wrapper = mountSummary(sloAlert(), { sloName: "checkout-availability" });
-
-    expect(value(wrapper, "slo")).toBe("checkout-availability");
-    expect(wrapper.find('[data-test="alerts-alertconfigsummary-slo-link"]').exists()).toBe(false);
   });
 });

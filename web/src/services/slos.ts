@@ -19,9 +19,9 @@ import http from "./http";
  * Reject when the body carries an error code, even on HTTP 200.
  *
  * The SLO API answers some failures with HTTP 200 and the real status inside
- * the payload (`{code: 501, message: "SLOs are disabled…"}` when
- * `ZO_SLO_ENABLED` is unset, for instance). axios only rejects on the HTTP
- * status, so without this every caller reads that as success: the list does
+ * the payload (`{code: 500, message: "…"}`, for instance). axios only rejects
+ * on the HTTP status, so without this every caller reads that as success:
+ * the list does
  * `res.data?.list ?? []` and renders EMPTY with no error, and a create
  * resolves, toasts "SLO saved" and redirects — telling the user their SLO was
  * saved when nothing was written. Silence is the worst possible reading of a

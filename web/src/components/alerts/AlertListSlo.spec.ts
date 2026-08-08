@@ -267,7 +267,6 @@ describe("AlertList — SLO alert rows", () => {
       filterQuery: "",
       searchAcrossFolders: false,
     };
-    (store.state as any).zoConfig.slo_enabled = true;
 
     vi.mocked(TemplateService).list.mockResolvedValue({ data: [{ name: "t1" }] } as any);
     vi.mocked(DestinationService).list.mockResolvedValue({ data: [{ name: "d1" }] } as any);
@@ -281,7 +280,6 @@ describe("AlertList — SLO alert rows", () => {
 
   afterEach(() => {
     wrapper?.unmount();
-    delete (store.state as any).zoConfig.slo_enabled;
   });
 
   // ── Row mapping ────────────────────────────────────────────────────────────
@@ -371,23 +369,6 @@ describe("AlertList — SLO alert rows", () => {
     );
   });
 
-  // /config is fetched independently of the alerts list, so the flag can arrive
-  // after the rows do. Keying the lookup only off the row set would leave that
-  // page showing raw ids forever, with the link already rendered.
-  it("resolves names when the SLO flag arrives after the rows", async () => {
-    delete (store.state as any).zoConfig.slo_enabled;
-    wrapper = await mountList([sloAlert()]);
-    expect(sloSvc.list).not.toHaveBeenCalled();
-
-    (store.state as any).zoConfig.slo_enabled = true;
-    await settle();
-
-    expect(sloSvc.list).toHaveBeenCalledTimes(1);
-    expect(wrapper.find('[data-test="alert-list-slo-burn-alert-slo-link"]').text()).toContain(
-      "checkout-availability",
-    );
-  });
-
   // `list_slos` is unpaginated, so ONE fetch resolves every row. Resolving per
   // row would put an N+1 on the alerts list.
   it("resolves every SLO name with a single fetch", async () => {
@@ -432,33 +413,6 @@ describe("AlertList — SLO alert rows", () => {
   it("does not fetch SLO names when no row is an SLO alert", async () => {
     wrapper = await mountList([plainAlert()]);
     expect(sloSvc.list).not.toHaveBeenCalled();
-  });
-
-  // Flag-off degradation (plan §2.6): raw id, no fetch, no dead link into a
-  // module the build does not serve.
-  it("neither fetches nor links when SLOs are disabled", async () => {
-    (store.state as any).zoConfig.slo_enabled = false;
-    wrapper = await mountList([sloAlert()]);
-
-    expect(sloSvc.list).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="alert-list-slo-burn-alert-slo-link"]').exists()).toBe(false);
-    const plain = wrapper.find('[data-test="alert-list-slo-burn-alert-slo-name"]');
-    expect(plain.exists()).toBe(true);
-    expect(plain.text()).toContain("slo-123");
-  });
-
-  // The OSS default is the flag being ABSENT, not false — `zoConfig` simply
-  // has no `slo_enabled` key. `!== false` would pass the test above and still
-  // render dead links on every OSS install.
-  it("treats an absent slo_enabled flag as off", async () => {
-    delete (store.state as any).zoConfig.slo_enabled;
-    wrapper = await mountList([sloAlert()]);
-
-    expect(sloSvc.list).not.toHaveBeenCalled();
-    expect(wrapper.find('[data-test="alert-list-slo-burn-alert-slo-link"]').exists()).toBe(false);
-    expect(wrapper.find('[data-test="alert-list-slo-burn-alert-slo-name"]').text()).toContain(
-      "slo-123",
-    );
   });
 
   // The whole push object, not `objectContaining`: `sloAlertEditRoute` returns

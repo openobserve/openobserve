@@ -377,10 +377,6 @@ const sloId = computed(() => sloIdOf(alert.value));
 const sloName = ref("");
 
 const fetchSloName = async () => {
-  // `=== true`, not truthiness: `zoConfig` is empty until /config resolves, so
-  // "not false" is also "we have not been told yet" — and calling a module this
-  // deployment may not serve just earns a 501 in the console.
-  if (store.state.zoConfig?.slo_enabled !== true) return;
   if (!orgId.value || !sloId.value) return;
   try {
     const res = await sloService.get(orgId.value, sloId.value);

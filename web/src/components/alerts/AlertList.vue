@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          navigates elsewhere, and that is not a default worth
                          depending on another component to keep. -->
                     <button
-                      v-if="isSloEnabled && row.slo_id"
+                      v-if="row.slo_id"
                       type="button"
                       class="text-text-link truncate hover:underline"
                       :aria-label="t('alerts.sloColumn') + ': ' + sloLabel(row)"
@@ -1027,12 +1027,6 @@ export default defineComponent({
     // An SLO alert watches no stream and runs no query, so without this branch
     // its row says nothing at all about what it is for. It names its SLO
     // instead, and links there — which is also where it is edited (D1).
-    //
-    // `=== true`, not truthiness and not `!== false`: `zoConfig` is empty until
-    // /config resolves, so "not false" is also "we have not been told yet" —
-    // and guessing "on" there fetches from, and links into, a module this
-    // deployment may not serve. Same test MainLayout uses to show the SLO menu.
-    const isSloEnabled = computed(() => store.state.zoConfig?.slo_enabled === true);
 
     const isSloRow = (row: any): boolean => isSloAlert(row);
 
@@ -1048,7 +1042,7 @@ export default defineComponent({
     let sloNamesLoaded = false;
 
     const ensureSloNames = (rows: any[]): void => {
-      if (!isSloEnabled.value || sloNamesInFlight || sloNamesLoaded) return;
+      if (sloNamesInFlight || sloNamesLoaded) return;
       if (!rows?.some((row: any) => isSloRow(row))) return;
       // The org can legitimately be unset on the very first tick; throwing here
       // would surface as an unhandled error inside a watcher, from a lookup
@@ -1475,11 +1469,7 @@ export default defineComponent({
     // from `allAlertsListByFolderId` by `getAlertsByFolderId`, which never
     // reaches the fetch path — so names wired only into the fetch would go
     // missing on exactly the second visit to a folder.
-    //
-    // `isSloEnabled` is a second source because /config is fetched independently
-    // of the alerts list: when the flag lands after the rows do, the link is
-    // already rendered and nothing else would ever trigger the lookup.
-    watch([allAlerts, isSloEnabled], ([rows]) => ensureSloNames(rows as any[]), {
+    watch(allAlerts, (rows) => ensureSloNames(rows as any[]), {
       immediate: true,
     });
 
@@ -3090,7 +3080,6 @@ export default defineComponent({
       alertRowStyle,
       typeIconName,
       typeIconClass,
-      isSloEnabled,
       isSloRow,
       sloLabel,
       goToSlo,
