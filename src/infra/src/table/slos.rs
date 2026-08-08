@@ -603,6 +603,7 @@ mod tests {
                 }],
                 watermark_end: Some(9_000),
                 trailing_slices: None,
+                burn_windows: None,
                 computed_at: 1_500,
             },
         )

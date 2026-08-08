@@ -402,7 +402,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // Auth auditing should be done by router also
     #[cfg(feature = "enterprise")]
     if audit::run_publish_job().is_none() {
-        log::error!("Failed to run audit publish");
+        log::info!("Audit is disabled, skipping audit publish job");
     };
     #[cfg(feature = "cloud")]
     {

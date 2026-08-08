@@ -36,7 +36,17 @@
               {{ field.label }}
             </dt>
             <dd class="text-text-heading text-sm" :class="field.mono ? 'font-mono break-all' : ''">
-              {{ field.value }}
+              <!-- Unstyled on purpose: base-elements.css already gives every
+                   `a` the link colour AND the darker hover shade. Re-declaring
+                   `text-text-link` here would pin hover to the resting colour,
+                   making this the one link in the app that does not respond. -->
+              <router-link
+                v-if="field.link"
+                :to="field.link"
+                :data-test="`alerts-alertconfigsummary-${field.key}-link`"
+                >{{ field.value }}</router-link
+              >
+              <template v-else>{{ field.value }}</template>
             </dd>
           </div>
         </dl>
@@ -48,13 +58,23 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18nTyped } from "@/types/i18n";
+import { useStore } from "vuex";
 
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import { burnWindowLabel } from "@/utils/alerts/sloAlertPayload";
+import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 
-const props = defineProps<{ alert: any }>();
+const props = defineProps<{
+  alert: any;
+  /** The SLO's human name. The single alert GET carries only `slo_id`, so the
+   *  page resolves this separately and may legitimately not have it — the
+   *  summary then shows the id rather than nothing. */
+  sloName?: string;
+}>();
 
 const { t } = useI18nTyped();
+const store = useStore();
 
 const EMPTY = "—";
 
@@ -100,66 +120,159 @@ const warningText = computed(() => {
   return `${fn}(${col}) ${op} ${agg.warning_value}`;
 });
 
+// ── SLO alerts (Feature 5, Phase 3.3) ───────────────────────────────────────
+// This family has no stream, no SQL and no aggregation, so the generic source
+// section answered "what is this alert watching?" with a column of em dashes.
+// What it DOES have is an SLO, a condition kind, thresholds and burn windows.
+const sloCondition = computed(() => queryCondition.value?.slo_condition);
+const isSloAlertConfig = computed(() => queryCondition.value?.type === "slo");
+const sloId = computed(() => sloCondition.value?.slo_id || "");
+
+// `=== true`, not truthiness: `zoConfig` is empty until /config resolves, so
+// "not false" is also "we have not been told yet" — and a link into a module
+// this deployment may not serve is a dead link.
+const sloLinkable = computed(() => store.state.zoConfig?.slo_enabled === true && !!sloId.value);
+
+/** `operator` is part of the threshold, not decoration — `>` and `>=` are
+ *  genuinely different alerts, and the backend stores it on every condition. */
+const sloThreshold = (level: "critical" | "warning"): string => {
+  const cond = sloCondition.value;
+  const raw = cond?.[level];
+  if (isBlank(raw)) return EMPTY;
+  const budget = cond?.kind === "error_budget";
+  const noun = budget ? t("slos.alert.budgetConsumed") : t("slos.alert.burnRate");
+  const suffix = budget ? "%" : "";
+  return `${noun} ${cond?.operator || ""} ${raw}${suffix}`.replace(/\s+/g, " ").trim();
+};
+
+const sloKindLabel = computed(() => {
+  const kind = sloCondition.value?.kind;
+  if (kind === "burn_rate") return t("slos.alert.kind.burnRate");
+  if (kind === "error_budget") return t("slos.alert.kind.errorBudget");
+  // A stored condition can be NULL while the discriminator says "slo". Naming a
+  // kind here would be an invention, and "undefined" would be worse.
+  return EMPTY;
+});
+
+const sloFields = computed(() => {
+  const cond = sloCondition.value;
+  const fields: Record<string, any>[] = [
+    {
+      key: "slo",
+      label: t("alerts.sloColumn"),
+      value: props.sloName || sloId.value || EMPTY,
+      link: sloLinkable.value
+        ? sloDetailRoute(sloId.value, store.state.selectedOrganization?.identifier)
+        : undefined,
+    },
+    { key: "slo-kind", label: t("alerts.sloKind"), value: sloKindLabel.value },
+    {
+      key: "condition",
+      label: t("alerts.groups.criticalCondition"),
+      value: sloThreshold("critical"),
+      mono: true,
+    },
+    {
+      key: "warning",
+      label: t("alerts.groups.warningCondition"),
+      value: sloThreshold("warning"),
+      mono: true,
+    },
+  ];
+  // An error-budget condition carries no windows at all — the backend rejects
+  // them — so rendering two more dashes would imply a knob that cannot exist.
+  // Own labels rather than `slos.alert.long`/`.short`: those two read as inline
+  // fragments in the SLO form's sentence ("in both windows — long … short …")
+  // and land here as bare lowercase words next to "Critical condition".
+  if (cond?.long_window_secs) {
+    fields.push({
+      key: "long-window",
+      label: t("alerts.sloLongWindow"),
+      value: burnWindowLabel(cond.long_window_secs) || EMPTY,
+    });
+  }
+  if (cond?.short_window_secs) {
+    fields.push({
+      key: "short-window",
+      label: t("alerts.sloShortWindow"),
+      value: burnWindowLabel(cond.short_window_secs) || EMPTY,
+    });
+  }
+  return fields;
+});
+
 const sections = computed(() => [
   {
     key: "source",
     title: t("alerts.configuration"),
-    fields: [
-      {
-        key: "stream",
-        label: t("alerts.streamName"),
-        value: props.alert?.stream_name || EMPTY,
-      },
-      {
-        key: "stream-type",
-        label: t("alerts.streamType"),
-        value: props.alert?.stream_type || EMPTY,
-      },
-      {
-        key: "condition",
-        label: t("alerts.groups.criticalCondition"),
-        value: conditionText.value,
-        mono: true,
-      },
-      {
-        key: "warning",
-        label: t("alerts.groups.warningCondition"),
-        value: warningText.value,
-        mono: true,
-      },
-      {
-        key: "group-by",
-        label: t("alerts.groups.groupBy"),
-        value: aggregation.value?.group_by?.length ? aggregation.value.group_by.join(", ") : EMPTY,
-        mono: true,
-      },
-      {
-        key: "evaluation-mode",
-        label: t("alerts.multiAlert.evaluationMode"),
-        // Type-scoped like the backend `multi_alert_enabled()`: PromQL reads
-        // promql_multi_alert (→ per-series), every other type reads
-        // aggregation.multi_alert (→ per-group); otherwise simple. Branching on
-        // type avoids a stale flag from the other family mislabelling the mode.
-        value:
-          queryCondition.value?.type === "promql"
-            ? queryCondition.value?.promql_multi_alert
-              ? t("alerts.multiAlert.perSeries")
-              : t("alerts.multiAlert.simple")
-            : aggregation.value?.multi_alert
-              ? t("alerts.multiAlert.perGroup")
-              : t("alerts.multiAlert.simple"),
-      },
-    ],
+    fields: isSloAlertConfig.value
+      ? sloFields.value
+      : [
+          {
+            key: "stream",
+            label: t("alerts.streamName"),
+            value: props.alert?.stream_name || EMPTY,
+          },
+          {
+            key: "stream-type",
+            label: t("alerts.streamType"),
+            value: props.alert?.stream_type || EMPTY,
+          },
+          {
+            key: "condition",
+            label: t("alerts.groups.criticalCondition"),
+            value: conditionText.value,
+            mono: true,
+          },
+          {
+            key: "warning",
+            label: t("alerts.groups.warningCondition"),
+            value: warningText.value,
+            mono: true,
+          },
+          {
+            key: "group-by",
+            label: t("alerts.groups.groupBy"),
+            value: aggregation.value?.group_by?.length
+              ? aggregation.value.group_by.join(", ")
+              : EMPTY,
+            mono: true,
+          },
+          {
+            key: "evaluation-mode",
+            label: t("alerts.multiAlert.evaluationMode"),
+            // Type-scoped like the backend `multi_alert_enabled()`: PromQL reads
+            // promql_multi_alert (→ per-series), every other type reads
+            // aggregation.multi_alert (→ per-group); otherwise simple. Branching on
+            // type avoids a stale flag from the other family mislabelling the mode.
+            value:
+              queryCondition.value?.type === "promql"
+                ? queryCondition.value?.promql_multi_alert
+                  ? t("alerts.multiAlert.perSeries")
+                  : t("alerts.multiAlert.simple")
+                : aggregation.value?.multi_alert
+                  ? t("alerts.multiAlert.perGroup")
+                  : t("alerts.multiAlert.simple"),
+          },
+        ],
   },
   {
     key: "schedule",
     title: t("alerts.groups.schedule"),
     fields: [
-      {
-        key: "period",
-        label: t("alerts.period"),
-        value: props.alert?.trigger_condition?.period ?? EMPTY,
-      },
+      // `period` parameterizes a query time range. `evaluate_slo_alert` never
+      // reads it and the SLO form does not offer it — the value stored is a
+      // filler the request model demands — so showing it would advertise a
+      // look-back window this family does not have.
+      ...(isSloAlertConfig.value
+        ? []
+        : [
+            {
+              key: "period",
+              label: t("alerts.period"),
+              value: props.alert?.trigger_condition?.period ?? EMPTY,
+            },
+          ]),
       {
         key: "frequency",
         label: t("alerts.frequency"),
