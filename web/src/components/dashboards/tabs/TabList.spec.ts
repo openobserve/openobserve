@@ -292,7 +292,7 @@ describe("TabList", () => {
     it("should show add button without requiring hover", () => {
       wrapper = createWrapper({ viewOnly: false });
 
-      // The + is a persistent affordance (Sheets/Datadog-style tab bars).
+      // The + is a persistent affordance (spreadsheet-style tab bars).
       const addButton = wrapper.find('[data-test="dashboard-tab-add-btn"]');
       expect(addButton.isVisible()).toBe(true);
     });
