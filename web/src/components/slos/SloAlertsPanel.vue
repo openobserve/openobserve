@@ -27,7 +27,15 @@
   <div class="flex flex-col gap-4" data-test="slo-alerts-panel">
     <div class="flex items-center justify-between">
       <span class="text-sm font-medium">{{ t("slos.alerts.title") }}</span>
-      <OButton size="sm-action" @click="startCreate" data-test="slo-alerts-add">
+      <!-- Disabled, not hidden, while the editor is open: hiding reflows the
+           header, and an enabled click could only discard or duplicate work.
+           Cancel is the one way out of the form. -->
+      <OButton
+        size="sm-action"
+        :disabled="editorOpen"
+        @click="startCreate"
+        data-test="slo-alerts-add"
+      >
         {{ t("slos.alerts.add") }}
       </OButton>
     </div>
@@ -37,7 +45,12 @@
     </OBanner>
 
     <div v-if="editorOpen" class="border-border-default rounded-surface border p-4">
+      <!-- Keyed by target: without this a change of `editingId` mutates the
+           prop on the LIVE instance — onMounted never re-runs, so the form
+           keeps the old alert's values while submit() re-branches on the new
+           id. Editing then silently saves a duplicate. -->
       <SloAlertForm
+        :key="editingId ?? '__create__'"
         :slo="slo"
         :alert-id="editingId"
         @saved="onSaved"
@@ -122,8 +135,8 @@ const describe = (a: any) => {
   }
   return t("slos.alerts.describeBurn", {
     critical: c.critical,
-    long: c.long_window_secs ? burnWindowLabel(c.long_window_secs) : "—",
-    short: c.short_window_secs ? burnWindowLabel(c.short_window_secs) : "—",
+    long: c.long_window_secs ? burnWindowLabel(c.long_window_secs) : "-",
+    short: c.short_window_secs ? burnWindowLabel(c.short_window_secs) : "-",
   });
 };
 
@@ -139,6 +152,11 @@ const load = async () => {
 };
 
 const startCreate = () => {
+  // Guarded here, not only at the button: the page header's "New alert" also
+  // calls in through defineExpose. While a form is open, "create" could only
+  // discard typed work (or, pre-:key, silently duplicate on save) — the open
+  // editor wins, and Cancel is the way out.
+  if (editorOpen.value) return;
   editingId.value = null;
   editorOpen.value = true;
 };

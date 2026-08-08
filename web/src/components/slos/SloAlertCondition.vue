@@ -93,31 +93,34 @@
 
       <div class="grid grid-cols-[7rem_1fr] items-center gap-3">
         <span class="text-negative font-medium">{{ t("slos.alert.criticalIf") }}</span>
+        <!-- `width="xs"`, not `class="w-*"`: a width class on the root loses to
+             the component's own `w-full` default, stretching every control to a
+             full row. Same for the inside labels — `labelPosition` is the API. -->
         <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.burnRate") }}</span>
-          <OSelect v-model="model.operator" :options="operatorOptions" class="w-20" />
-          <OInput v-model.number="model.critical" type="number" step="0.1" class="w-28" />
+          <OSelect v-model="model.operator" :options="operatorOptions" width="xs" />
+          <OInput v-model.number="model.critical" type="number" step="0.1" width="xs" />
           <span>{{ t("slos.alert.inBothWindows") }}</span>
           <OInput
             v-model.number="longHours"
             type="number"
-            class="w-24"
+            width="xs"
             suffix="h"
             :label="t('slos.alert.long')"
-            label-inline
+            label-position="inside"
           />
           <OInput
             v-model.number="shortMinutes"
             type="number"
-            class="w-24"
+            width="xs"
             suffix="min"
             :label="t('slos.alert.short')"
-            label-inline
+            label-position="inside"
           />
         </div>
 
         <span class="text-warning font-medium">{{ t("slos.alert.warningIf") }}</span>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.burnRate") }}</span>
           <!-- Shares the operator with critical (T-2): two operators would
                allow a warning band that is not a subset of critical. -->
@@ -126,7 +129,7 @@
             v-model.number="model.warning"
             type="number"
             step="0.1"
-            class="w-28"
+            width="xs"
             :placeholder="t('slos.alert.none')"
           />
           <span class="text-compact text-text-secondary">
@@ -146,20 +149,20 @@
     <template v-else>
       <div class="grid grid-cols-[7rem_1fr] items-center gap-3">
         <span class="text-negative font-medium">{{ t("slos.alert.criticalIf") }}</span>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.budgetConsumed") }}</span>
-          <OSelect v-model="model.operator" :options="operatorOptions" class="w-20" />
-          <OInput v-model.number="model.critical" type="number" step="1" class="w-28" suffix="%" />
+          <OSelect v-model="model.operator" :options="operatorOptions" width="xs" />
+          <OInput v-model.number="model.critical" type="number" step="1" width="xs" suffix="%" />
         </div>
         <span class="text-warning font-medium">{{ t("slos.alert.warningIf") }}</span>
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <span>{{ t("slos.alert.budgetConsumed") }}</span>
           <span class="font-mono">{{ model.operator }}</span>
           <OInput
             v-model.number="model.warning"
             type="number"
             step="1"
-            class="w-28"
+            width="xs"
             suffix="%"
             :placeholder="t('slos.alert.none')"
           />
@@ -172,14 +175,9 @@
          `MultiAlertNotImplemented` when grouped — so offering it could only
          produce a permanent 400 on save. Restore it when fan-out ships. -->
 
-    <!-- Stated, not omitted: someone will look for the count row that every
-         other alert family has, and its absence needs a reason. -->
-    <!-- OBanner has no `title` prop; the heading has to be rendered as
-         content or it silently disappears into a DOM attribute. -->
-    <OBanner variant="info" icon="block">
-      <span class="font-bold">{{ t("slos.alert.noCountGate") }}</span>
-      {{ t("slos.alert.noCountGateBody") }}
-    </OBanner>
+    <!-- No count-gate row either, and deliberately no banner explaining the
+         absence: the header comment carries the SA-4 rationale for developers,
+         and the API error covers hand-crafted payloads. -->
   </div>
 </template>
 
@@ -188,7 +186,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
-import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -278,9 +275,14 @@ const presets = computed(() => {
     // SA-6 caps the burn rate at 100/(100 − target), so on a loose SLO (say
     // 90%, ceiling ×10) the canonical ×14.4 card is unsavable. Clamping keeps
     // every offered card savable rather than presenting a trap.
+    // Floored to 2 decimals, not rounded: 100/(100−target) is usually a
+    // repeating fraction (target 67% → 3.0303…), and rounding UP would put the
+    // card a hair over the cap — unsavable, and 16 digits wide in the UI.
     const ceiling = maxBurnValue.value;
     const clamped =
-      ceiling === null ? (threshold as number) : Math.min(threshold as number, ceiling);
+      ceiling === null
+        ? (threshold as number)
+        : Math.min(threshold as number, Math.floor(ceiling * 100) / 100);
     return {
       key: key as string,
       label: labels[key as string],
@@ -343,7 +345,7 @@ const maxBurnValue = computed(() => {
 
 const maxBurn = computed(() => {
   const v = maxBurnValue.value;
-  return v === null ? "—" : Math.round(v);
+  return v === null ? "-" : Math.round(v);
 });
 
 const defaultShortLabel = computed(() => {

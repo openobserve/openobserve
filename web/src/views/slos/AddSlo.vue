@@ -643,7 +643,7 @@ watch(isGrouped, (grouped) => {
 /** "99.9%" is abstract. "43 minutes per 30 days" is what people decide on. */
 const budgetDuration = computed(() => {
   const target = Number(form.target);
-  if (!Number.isFinite(target) || target <= 0 || target >= 100) return "—";
+  if (!Number.isFinite(target) || target <= 0 || target >= 100) return "-";
   const errorFraction = (100 - target) / 100;
   const seconds = form.window_secs * errorFraction;
   if (seconds >= 86400) return t("slos.budgetDays", { n: (seconds / 86400).toFixed(1) });
@@ -656,7 +656,7 @@ const budgetHint = computed(() => t("slos.budgetHint", { budget: budgetDuration.
 /** The SA-6 cap: an SLI of 0% cannot burn faster than 1/(1−target). */
 const maxBurn = computed(() => {
   const target = Number(form.target);
-  if (!Number.isFinite(target) || target <= 0 || target >= 100) return "—";
+  if (!Number.isFinite(target) || target <= 0 || target >= 100) return "-";
   return Math.round(1 / (1 - target / 100));
 });
 

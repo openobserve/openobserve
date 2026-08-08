@@ -194,14 +194,14 @@ describe("SloTimeSlicePreview", () => {
       respond(slices(10, 9));
       wrapper = await createWrapper();
 
-      expect(tallyEl(wrapper).text()).toBe("90.0% good — 9/10 slices");
+      expect(tallyEl(wrapper).text()).toBe("90.0% good (9/10 slices)");
     });
 
     it("scores against the comparator, so `>` inverts which slices are good", async () => {
       respond(slices(10, 9)); // 9 slices at 50, 1 at 500; threshold 100
       wrapper = await createWrapper({ comparator: ">" });
 
-      expect(tallyEl(wrapper).text()).toBe("10.0% good — 1/10 slices");
+      expect(tallyEl(wrapper).text()).toBe("10.0% good (1/10 slices)");
     });
 
     it("withholds the verdict below 10 measured slices rather than colouring noise", async () => {
@@ -243,7 +243,7 @@ describe("SloTimeSlicePreview", () => {
       respond([...slices(4, 4), slice("2026-08-02T09:00:00", null)]);
       wrapper = await createWrapper();
 
-      expect(tallyEl(wrapper).text()).toBe("100.0% good — 4/4 slices");
+      expect(tallyEl(wrapper).text()).toBe("100.0% good (4/4 slices)");
     });
   });
 
@@ -314,13 +314,13 @@ describe("SloTimeSlicePreview", () => {
       respond(slices(10, 9));
       wrapper = await createWrapper();
       expect(search).toHaveBeenCalledTimes(1);
-      expect(tallyEl(wrapper).text()).toBe("90.0% good — 9/10 slices");
+      expect(tallyEl(wrapper).text()).toBe("90.0% good (9/10 slices)");
 
       await wrapper.setProps({ threshold: 1000 }); // now every slice is good
       await flushPromises();
 
       expect(search).toHaveBeenCalledTimes(1);
-      expect(tallyEl(wrapper).text()).toBe("100.0% good — 10/10 slices");
+      expect(tallyEl(wrapper).text()).toBe("100.0% good (10/10 slices)");
     });
 
     it("debounces an aggregate change — every rebuild is a search", async () => {
