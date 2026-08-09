@@ -103,13 +103,20 @@
               required
               data-test="slos-addslo-name"
             />
-            <!-- OTagInput's root is `h-full`; without a constraining wrapper
-                 it stretches and swallows what follows. -->
-            <div>
+            <!-- Label sits ABOVE the field, not floating inside it — the same
+                 shape the alert form uses (and the same shape OInput renders
+                 next door), so the row reads as one set of labelled fields.
+                 The wrapper is also what stops OTagInput's `h-full` root from
+                 stretching and swallowing what follows. -->
+            <div class="flex flex-col gap-1">
+              <label
+                class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium"
+              >
+                {{ t("slos.field.tags") }}
+              </label>
               <OTagInput
                 v-model="form.tags"
-                :label="t('slos.field.tags')"
-                :placeholder="raw('')"
+                :placeholder="t('slos.field.tagsPlaceholder')"
                 data-test="slos-addslo-tags"
               />
             </div>

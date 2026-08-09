@@ -12413,6 +12413,7 @@
       "namePlaceholder": "e.g. Checkout availability",
       "description": "Description",
       "tags": "Tags",
+      "tagsPlaceholder": "Add tag and press Enter",
       "streamType": "Stream type",
       "stream": "Stream",
       "scope": "Scope",
