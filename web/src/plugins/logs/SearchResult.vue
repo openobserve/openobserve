@@ -543,7 +543,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <template #cell-hover-actions="{ row, column, active }">
                     <O2AIContextAddBtn
                       v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
-                      class="ai-btn"
+                      class="size-6!"
+                      :imageHeight="'14'"
+                      :imageWidth="'14'"
                       data-test="logs-search-result-ai-btn"
                       @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                     />
@@ -1338,7 +1340,7 @@ export default defineComponent({
     const correlationDashboardProps = ref<any>(null);
     const correlationLoading = ref(false);
     const correlationError = ref<string | null>(null);
-    const detailTableInitialTab = ref<string>("table");
+    const detailTableInitialTab = ref<string>("json");
     const { findRelatedTelemetry, semanticGroups } = useServiceCorrelation();
 
     // Flag to prevent duplicate correlation API calls
@@ -1638,7 +1640,7 @@ export default defineComponent({
     const openLogDetails = (props: any, index: number) => {
       searchObj.meta.showDetailTab = true;
       searchObj.meta.resultGrid.navigation.currentRowIndex = index;
-      detailTableInitialTab.value = "table"; // Reset to default tab (#13368: Table is the default log-detail view)
+      detailTableInitialTab.value = "json"; // Reset to default tab
 
       // Prepare correlation context (but don't open panel automatically)
       const logData = searchObj.data.queryResults?.hits?.[index];
