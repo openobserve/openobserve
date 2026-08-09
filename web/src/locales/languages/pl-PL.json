@@ -5828,8 +5828,6 @@
     "deleteFactEverythingDetail": "Wszystkie dashboardy, strumienie i przesłane dane",
     "deleteFactMembers": "Dotknie {n} członka | Dotknie {n} członków",
     "deleteFactMembersDetail": "Cały dostęp cofnięty natychmiast",
-    "deleteFactOwner": "Tylko administratorzy",
-    "deleteFactOwnerDetail": "Wymaga roli Administratora w tej organizacji",
     "deleteOrganizationConfirm": "Spowoduje to zaplanowanie usunięcia \"{name}\" — oraz wszystkich jego strumieni, dashboardów, alertów, potoków, użytkowników i ustawień.",
     "deleteOrganizationWarning": "Organizacja staje się natychmiast niedostępna i jest ukryta przed wszystkimi, którzy jej używają. Przesyłanie danych jest zablokowane, a zaplanowane alerty, potoki i raporty przestają działać, więc nie są wysyłane żadne powiadomienia, gdy jest zaplanowana do usunięcia.",
     "deleteOrganizationRecoverable": "Jest przechowywana w stanie możliwym do odzyskania w okresie karencji, ale nie będziesz w stanie jej samodzielnie przywrócić – tracisz dostęp do tej organizacji natychmiast po rozpoczęciu usuwania, a tylko pomoc techniczna OpenObserve może ją przywrócić. Po okresie karencji jej dane są trwale usuwane i nie mogą być odzyskane przez nikogo.",

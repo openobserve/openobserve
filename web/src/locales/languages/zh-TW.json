@@ -5823,8 +5823,6 @@
     "deleteFactEverythingDetail": "所有儀表板、資料流和已擷取的資料",
     "deleteFactMembers": "影響 {n} 位成員 | 影響 {n} 位成員",
     "deleteFactMembersDetail": "立即撤銷所有存取權限",
-    "deleteFactOwner": "僅限管理員",
-    "deleteFactOwnerDetail": "需要該組織的管理員角色",
     "deleteOrganizationConfirm": "此操作會將「{name}」及其所有資料流、儀表板、警示、管線、使用者和設定排定刪除。",
     "deleteOrganizationWarning": "該組織將立即無法使用，並對所有使用它的人隱藏。資料擷取將被封鎖，排程的警示、管線和報表將停止執行，因此在排定刪除期間不會傳送任何通知。",
     "deleteOrganizationRecoverable": "在寬限期內，該組織將保持可復原狀態，但您無法自行復原——刪除一開始，您就會失去對該組織的存取權限，只有 OpenObserve 支援團隊才能將其復原。寬限期結束後，其資料將被永久刪除，任何人都無法復原。",

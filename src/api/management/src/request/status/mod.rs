@@ -185,6 +185,10 @@ struct ConfigResponse<'a> {
     timechart_enabled: bool,
     max_query_range: i64,
     ai_enabled: bool,
+    /// Days a soft-deleted org stays recoverable before it is purged. `0` means no
+    /// recovery window at all — deletion is immediate and permanent, which is what
+    /// every OSS build reports.
+    org_deletion_grace_period_days: i64,
     dashboard_placeholder: String,
     dashboard_show_symbol_enabled: bool,
     dashboard_show_field_as_json_enabled: bool,
@@ -464,6 +468,7 @@ pub async fn zo_config() -> impl IntoResponse {
         timechart_enabled: cfg.limit.timechart_enabled,
         max_query_range: cfg.limit.default_max_query_range_days * 24,
         ai_enabled,
+        org_deletion_grace_period_days: openobserve_core::org_cleanup::grace_period_days(),
         dashboard_placeholder: cfg.common.dashboard_placeholder.to_string(),
         dashboard_show_symbol_enabled: cfg.common.dashboard_show_symbol_enabled,
         dashboard_show_field_as_json_enabled: cfg.common.dashboard_show_field_as_json_enabled,

@@ -5828,8 +5828,6 @@
     "deleteFactEverythingDetail": "Tất cả bảng điều khiển, luồng và dữ liệu đã thu thập",
     "deleteFactMembers": "Affects {n} member | Affects {n} members",
     "deleteFactMembersDetail": "Tất cả quyền truy cập bị thu hồi ngay lập tức",
-    "deleteFactOwner": "Chỉ quản trị viên",
-    "deleteFactOwnerDetail": "Yêu cầu vai trò Quản trị viên trong tổ chức này",
     "deleteOrganizationConfirm": "Thao tác này sẽ lên lịch xóa \"{name}\" — và tất cả các luồng, bảng điều khiển, cảnh báo, đường ống, người dùng và cài đặt của nó.",
     "deleteOrganizationWarning": "Tổ chức trở nên không khả dụng ngay lập tức và bị ẩn khỏi tất cả những người sử dụng nó. Việc thu thập dữ liệu bị chặn và các cảnh báo, đường ống, báo cáo đã lên lịch ngừng chạy, do đó không có thông báo nào được gửi trong khi nó được lên lịch xóa.",
     "deleteOrganizationRecoverable": "Nó được giữ ở trạng thái có thể khôi phục trong thời gian gia hạn, nhưng bạn sẽ không thể tự khôi phục — bạn mất quyền truy cập vào tổ chức này ngay khi quá trình xóa bắt đầu và chỉ hỗ trợ của OpenObserve mới có thể khôi phục. Sau thời gian gia hạn, dữ liệu của nó bị xóa vĩnh viễn và không ai có thể khôi phục được.",

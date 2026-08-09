@@ -5828,8 +5828,6 @@
     "deleteFactEverythingDetail": "Tous les tableaux de bord, flux et données ingérées",
     "deleteFactMembers": "Concerne {n} membre | Concerne {n} membres",
     "deleteFactMembersDetail": "Tous les accès sont révoqués immédiatement",
-    "deleteFactOwner": "Administrateurs uniquement",
-    "deleteFactOwnerDetail": "Nécessite le rôle Administrateur dans cette organisation",
     "deleteOrganizationConfirm": "Cette action programmera la suppression de « {name} » et de tous ses flux, tableaux de bord, alertes, pipelines, utilisateurs et paramètres.",
     "deleteOrganizationWarning": "L'organisation devient immédiatement indisponible et est masquée pour toutes les personnes qui l'utilisent. L'ingestion est bloquée et les alertes, pipelines et rapports planifiés cessent de s'exécuter : aucune notification n'est envoyée tant que la suppression est programmée.",
     "deleteOrganizationRecoverable": "Elle reste récupérable pendant le délai de grâce, mais vous ne pourrez pas la restaurer vous-même : vous perdez l'accès à cette organisation dès le début de la suppression, et seul le support OpenObserve peut la rétablir. Passé le délai de grâce, ses données sont définitivement supprimées et ne peuvent être récupérées par personne.",
