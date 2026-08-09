@@ -27,6 +27,7 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
 pub mod alert_grouping;
@@ -1081,6 +1082,10 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // can never retire on its own, because a vanished group produces no
     // observation to act on.
     alert_group_reaper::run();
+    // Retention for the alert availability ledger (S-16). Not job-cluster
+    // gated: retention deletes do not replicate, so every region reaps its own
+    // copy or it grows without bound.
+    alert_eval_ledger_reaper::run();
     // Reconciliation is what makes the rolling window actually roll: the
     // ingest pass only ever ADDS, so without this a 7-day SLO's covered_slices
     // climbs past what its window can hold. Also releases expired budget

@@ -77,6 +77,7 @@ use crate::{
 /// that it happened.
 #[must_use]
 async fn persist_alert_run_state(
+    alert: &config::meta::alerts::alert::Alert,
     alert_id: &str,
     outcome: &RunOutcome,
     level: Option<config::meta::alerts::level::AlertLevel>,
@@ -125,18 +126,48 @@ async fn persist_alert_run_state(
         }
     };
 
+    // One instant for both writes: `level_at` and the ledger's `to_us` describe
+    // the same evaluation, and two `now_micros()` calls would let the coverage
+    // record and the freshness clock disagree about when it happened.
+    let now = now_micros();
     let update = apply_outcome(
         alert_id,
         ROLLUP_GROUP_KEY,
         prev.as_ref(),
         outcome.clone(),
         level,
-        now_micros(),
+        now,
     );
-    if update.is_noop() {
+
+    // ── Availability ledger (S-16) ──────────────────────────────────────────
+    // Fleet-wide from the day this ships, deliberately: a lazy
+    // per-referenced-alert scheme would start history at SLO creation and
+    // forfeit every day of retroactive measurement. It writes in the state
+    // transaction below, so a failure loses the state refresh and the coverage
+    // together — and the ledger consequence of that is a gap, the safe
+    // direction under D34.
+    //
+    // "Grouped" here means *maintains per-group state* (§2), not the `group_by`
+    // column list alone. A PromQL multi-alert has no `group_by` list at all,
+    // and reaches this single-row path on the `NotifyFailed` re-persist below;
+    // a column-list test would let it write a sparse ledger it can never
+    // explain, since a grouped source cannot say which of its groups were
+    // measured (D65).
+    let is_grouped = config::meta::alerts::grouping::maintains_group_state(&alert.query_condition);
+    let ledger = config::meta::alerts::state::ledger_write_for_evaluation(
+        &alert.org_id,
+        alert_id,
+        outcome,
+        level,
+        is_grouped,
+        &alert.trigger_condition,
+        now,
+    );
+
+    if update.is_noop() && ledger.is_none() {
         return true;
     }
-    if let Err(e) = db::alerts::alert_states::persist(&update).await {
+    if let Err(e) = db::alerts::alert_states::persist(&update, ledger.as_ref()).await {
         log::error!("[SCHEDULER] could not persist alert state for {alert_id}: {e}");
         return false;
     }
@@ -232,6 +263,7 @@ async fn dispatch_per_group(
     // evaluation can reach dispatch with every group healthy.
     let rollup_outcome = config::meta::alerts::grouping::group_outcome(classification.rollup);
     if !persist_alert_run_state(
+        alert,
         &alert_id,
         &rollup_outcome,
         rollup_level,
@@ -1274,6 +1306,7 @@ async fn handle_alert_triggers(
             // Best-effort: a state write must not fail an evaluation that has
             // already run. Only the per-group caller checks the result.
             let _ = persist_alert_run_state(
+                &alert,
                 &alert_id.to_string(),
                 &trigger_data_stream.status,
                 None,
@@ -1628,6 +1661,7 @@ async fn handle_alert_triggers(
                 // must reflect the firing (Part IV write-coverage).
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
+                        &alert,
                         &alert_id.to_string(),
                         &trigger_data_stream.status,
                         eval_level,
@@ -1686,6 +1720,7 @@ async fn handle_alert_triggers(
                         // deduplicated away. State must reflect the firing.
                         if let Some(alert_id) = alert.id.as_ref() {
                             let _ = persist_alert_run_state(
+                                &alert,
                                 &alert_id.to_string(),
                                 &trigger_data_stream.status,
                                 eval_level,
@@ -1889,6 +1924,7 @@ async fn handle_alert_triggers(
                 // record and the failed groups.
                 if let Some(alert_id) = alert.id.as_ref() {
                     let _ = persist_alert_run_state(
+                        &alert,
                         &alert_id.to_string(),
                         &RunOutcome::NotifyFailed,
                         eval_level,
@@ -2193,6 +2229,7 @@ async fn handle_alert_triggers(
     // state those callbacks just recorded.
     if let Some(alert_id) = alert.id.as_ref().filter(|_| !multi_alert_dispatched) {
         let _ = persist_alert_run_state(
+            &alert,
             &alert_id.to_string(),
             &trigger_data_stream.status,
             eval_level,

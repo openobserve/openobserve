@@ -2035,6 +2035,12 @@ pub struct Limit {
         help = "How often the multi-alert group lifecycle sweep runs, in seconds (alerts_2.md M-7). The sweep only decides fates on elapsed time, so it need not match any alert's frequency. 0 disables it, which stops vanished groups from ever resolving or being reaped."
     )]
     pub alert_group_sweep_interval: u64,
+    #[env_config(
+        name = "ZO_ALERT_EVAL_LEDGER_RETENTION_DAYS",
+        default = 97,
+        help = "How long the alert availability ledger (alert_eval_intervals) is kept, in days. This is the history every alert-based SLO measures against, so it must cover the longest SLO window (90 days) plus backfill headroom; lowering it below that silently freezes those SLOs for want of coverage. 0 or less disables the reaper."
+    )]
+    pub alert_eval_ledger_retention_days: i64,
     #[env_config(name = "ZO_ALERT_SCHEDULE_TIMEOUT", default = 90)] // seconds
     pub alert_schedule_timeout: i64,
     #[env_config(

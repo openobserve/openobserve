@@ -22,6 +22,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::{FrequencyType, TriggerCondition};
 use crate::meta::{alerts::level::AlertLevel, self_reporting::usage::RunOutcome};
 
 /// `group_key` of the per-alert rollup row. Grouped monitors additionally get
@@ -199,6 +200,118 @@ impl StateUpdate {
 /// runs are dropped entirely.
 pub fn should_persist(outcome: &RunOutcome) -> bool {
     !matches!(outcome, RunOutcome::Skipped)
+}
+
+/// Slack added to `max_gap` for scheduler lateness the alert's own
+/// `tolerance_in_secs` does not describe — queue wait, evaluation duration, a
+/// node restart mid-cycle.
+///
+/// Deliberately well **under** the smallest practical cadence. `max_gap` must
+/// stay below `2 x frequency_secs` (S-16 §3.3) or a fully *missed* evaluation
+/// would be merged into the running interval and its period claimed as measured
+/// at the last-known level — fabricated coverage, which is exactly what D34
+/// forbids. Erring small costs at most one extra row per late run.
+pub const SCHEDULER_JITTER_ALLOWANCE_SECS: i64 = 30;
+
+/// One measured evaluation's contribution to the availability ledger (S-16).
+///
+/// Rides the state-persist call and its super-cluster message rather than
+/// travelling on its own: the ledger row is written inside the state
+/// transaction, so the two must not be able to disagree about whether an
+/// evaluation happened.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvalLedgerWrite {
+    pub org: String,
+    pub alert_id: String,
+    /// The level this evaluation computed. Only `Ok` is uptime; `Warning` and
+    /// `Critical` are downtime and `NoData` is a gap (§5.2) — but that is the
+    /// *reader's* rule, so every computed level is recorded here.
+    pub level: AlertLevel,
+    /// `trigger_condition.frequency` as it stands for this evaluation, stamped
+    /// onto the row so a later cadence edit cannot rewrite historical coverage
+    /// (§5.3).
+    pub frequency_secs: i64,
+    /// `trigger_condition.tolerance_in_secs` — the alert's own deliberate
+    /// schedule jitter, which widens the gap the next run may legitimately
+    /// arrive after.
+    pub tolerance_secs: i64,
+    /// Persist-time wall clock (`now_micros`), not the evaluated data window's
+    /// end: the SLI measures whether the alert was doing its job (§5.3).
+    pub at: i64,
+}
+
+impl EvalLedgerWrite {
+    /// How late the next evaluation may be and still count as *this* run
+    /// continuing, in seconds.
+    ///
+    /// `frequency_secs + tolerance_in_secs + jitter allowance` — "the next
+    /// expected evaluation, merely late". Deliberately **not**
+    /// `2 x frequency_secs`: that spans a whole missed evaluation, and since an
+    /// interval already covers forward one period past `to_us` (§5.3), merging
+    /// across the miss would claim the missed period as measured at the
+    /// last-known level.
+    ///
+    /// The two halves of that sentence can conflict, and when they do the
+    /// invariant wins over the formula. A run is legitimately late by at most
+    /// `frequency + tolerance` (`get_next_trigger_time` schedules the next one
+    /// at `now + frequency + rand(0, tolerance)`), while a *missed* run puts
+    /// the next arrival at `2 x frequency` or later. Those two ranges only stay
+    /// separable while `tolerance + jitter < frequency`; nothing validates
+    /// `tolerance_in_secs` against `frequency`, so the total slack is capped
+    /// here. Past the cap the interval closes — a gap, which is the safe
+    /// direction, where merging would fabricate coverage.
+    pub fn max_gap_secs(&self) -> i64 {
+        let slack = self
+            .tolerance_secs
+            .max(0)
+            .saturating_add(SCHEDULER_JITTER_ALLOWANCE_SECS)
+            .min(self.frequency_secs.saturating_sub(1).max(0));
+        self.frequency_secs.saturating_add(slack)
+    }
+}
+
+/// Whether this evaluation is one the ledger records, and with what.
+///
+/// `None` means write nothing — the gap forms on its own, which is the safe
+/// direction under D34. Four reasons to decline:
+///
+/// - the outcome is not a measurement (`coverage::evaluation_is_measured`);
+/// - the alert maintains per-group state, so it cannot say *which* groups were measured (D65). That
+///   is `group_by` non-empty **or** `multi_alert_enabled()`, not the column list alone: a PromQL
+///   multi-alert has no `group_by` list at all, and a column-list-only test would let one save
+///   cleanly as an SLI source and measure nothing forever (§2);
+/// - no level was computed. A frozen SLO-alert evaluation completes without classifying (`level:
+///   None`), and a row with no level would have to invent one;
+/// - the alert has no single cadence to stamp. Both halves — cron and a non-positive `frequency` —
+///   describe sources §5.1 refuses as SLI sources anyway, so this is the same "ineligible sources
+///   are skipped at the write site" rule the grouping check applies. It also protects the
+///   run-length encoding: with no meaningful cadence `max_gap` collapses to the jitter allowance,
+///   so a cron alert running every five minutes would open a fresh interval on every single run and
+///   turn O(state changes) into O(evaluations) fleet-wide.
+pub fn ledger_write_for_evaluation(
+    org: &str,
+    alert_id: &str,
+    outcome: &RunOutcome,
+    level: Option<AlertLevel>,
+    is_grouped: bool,
+    trigger: &TriggerCondition,
+    at: i64,
+) -> Option<EvalLedgerWrite> {
+    if is_grouped
+        || trigger.frequency_type == FrequencyType::Cron
+        || trigger.frequency <= 0
+        || !crate::meta::slo::coverage::evaluation_is_measured(outcome)
+    {
+        return None;
+    }
+    Some(EvalLedgerWrite {
+        org: org.to_string(),
+        alert_id: alert_id.to_string(),
+        level: level?,
+        frequency_secs: trigger.frequency,
+        tolerance_secs: trigger.tolerance_in_secs.unwrap_or(0),
+        at,
+    })
 }
 
 /// Fold an observed outcome into the previous state.
@@ -688,5 +801,263 @@ mod tests {
         assert_eq!(state.last_seen, None);
         assert_eq!(state.silenced_until, None);
         assert_eq!(state.last_notified_level, None);
+    }
+
+    // ── Availability ledger classification (S-16, PR 1) ─────────────────────
+    // Which evaluations contribute a ledger row, and how wide a gap still
+    // counts as the same run continuing. Pure, so both are pinned here rather
+    // than against a database.
+
+    /// A scheduled alert on a one-minute cadence — the shape the ledger is
+    /// built for.
+    fn trigger(frequency: i64) -> TriggerCondition {
+        TriggerCondition {
+            frequency,
+            frequency_type: FrequencyType::Minutes,
+            ..Default::default()
+        }
+    }
+
+    /// The full argument list once, so each test below varies exactly the one
+    /// thing it is about.
+    fn ledger_write(
+        outcome: &RunOutcome,
+        level: Option<AlertLevel>,
+        is_grouped: bool,
+    ) -> Option<EvalLedgerWrite> {
+        ledger_write_for_evaluation(
+            "myorg",
+            "alert-1",
+            outcome,
+            level,
+            is_grouped,
+            &trigger(60),
+            1_750_000_000_000_000,
+        )
+    }
+
+    #[test]
+    fn every_measured_outcome_contributes_a_ledger_row() {
+        for outcome in [
+            RunOutcome::Firing,
+            RunOutcome::Normal,
+            RunOutcome::NotifyFailed,
+        ] {
+            assert!(
+                ledger_write(&outcome, Some(AlertLevel::Ok), false).is_some(),
+                "{outcome:?} computed a level, so it is a measurement"
+            );
+        }
+    }
+
+    /// The gap is the point: an evaluation that observed nothing must leave no
+    /// trace, so unmeasured time is a hole rather than uptime at the last level.
+    #[test]
+    fn an_unmeasured_outcome_writes_nothing() {
+        for outcome in [
+            RunOutcome::Error,
+            RunOutcome::Skipped,
+            RunOutcome::Succeeded,
+        ] {
+            assert_eq!(
+                ledger_write(&outcome, Some(AlertLevel::Ok), false),
+                None,
+                "{outcome:?} observed nothing and must not be recorded as coverage"
+            );
+        }
+    }
+
+    /// The classification must be exactly `coverage::evaluation_is_measured`,
+    /// not a second list that can drift from it.
+    #[test]
+    fn the_measured_set_matches_the_coverage_rule() {
+        for outcome in [
+            RunOutcome::Firing,
+            RunOutcome::Normal,
+            RunOutcome::NotifyFailed,
+            RunOutcome::Error,
+            RunOutcome::Skipped,
+            RunOutcome::Succeeded,
+        ] {
+            assert_eq!(
+                ledger_write(&outcome, Some(AlertLevel::Ok), false).is_some(),
+                crate::meta::slo::coverage::evaluation_is_measured(&outcome),
+                "{outcome:?} disagrees with coverage::evaluation_is_measured"
+            );
+        }
+    }
+
+    /// D65: a grouped source cannot say *which* of its groups were measured, so
+    /// it is ineligible as an SLI source and writes no ledger history at all.
+    #[test]
+    fn an_alert_that_maintains_per_group_state_is_skipped() {
+        assert_eq!(
+            ledger_write(&RunOutcome::Firing, Some(AlertLevel::Critical), true),
+            None,
+            "a grouped alert must never write a single-row ledger interval"
+        );
+    }
+
+    /// A frozen SLO-alert evaluation completes without classifying: the outcome
+    /// is measured but there is no level. Recording it would have to invent one.
+    #[test]
+    fn a_measured_evaluation_that_computed_no_level_writes_nothing() {
+        assert_eq!(
+            ledger_write(&RunOutcome::Normal, None, false),
+            None,
+            "a completed-but-unclassified evaluation has no level to record"
+        );
+    }
+
+    /// Cadence is not a single number for a cron alert (§5.1.2 refuses such
+    /// sources outright), and with none to stamp `max_gap` collapses to the
+    /// jitter allowance — every run would open a fresh interval and the
+    /// run-length encoding would degrade to one row per evaluation.
+    #[test]
+    fn a_cron_scheduled_alert_writes_nothing() {
+        let mut cron = trigger(60);
+        cron.frequency_type = FrequencyType::Cron;
+        cron.cron = "*/5 * * * *".to_string();
+
+        assert_eq!(
+            ledger_write_for_evaluation(
+                "myorg",
+                "alert-1",
+                &RunOutcome::Firing,
+                Some(AlertLevel::Critical),
+                false,
+                &cron,
+                1_750_000_000_000_000,
+            ),
+            None
+        );
+    }
+
+    /// §5.1.1: a non-positive cadence makes the §5.3 forward extension
+    /// zero-width, so such a row could never contribute coverage anyway.
+    #[test]
+    fn a_non_positive_cadence_writes_nothing() {
+        for frequency in [0, -60] {
+            assert_eq!(
+                ledger_write_for_evaluation(
+                    "myorg",
+                    "alert-1",
+                    &RunOutcome::Firing,
+                    Some(AlertLevel::Critical),
+                    false,
+                    &trigger(frequency),
+                    1_750_000_000_000_000,
+                ),
+                None,
+                "a cadence of {frequency}s describes no schedule to measure against"
+            );
+        }
+    }
+
+    #[test]
+    fn the_row_carries_the_cadence_and_instant_it_was_stamped_with() {
+        let mut tc = trigger(300);
+        tc.tolerance_in_secs = Some(45);
+        let w = ledger_write_for_evaluation(
+            "myorg",
+            "alert-1",
+            &RunOutcome::Firing,
+            Some(AlertLevel::Warning),
+            false,
+            &tc,
+            1_750_000_000_000_000,
+        )
+        .expect("a measured, ungrouped, classified evaluation is recorded");
+
+        assert_eq!(w.org, "myorg");
+        assert_eq!(w.alert_id, "alert-1");
+        assert_eq!(w.level, AlertLevel::Warning);
+        assert_eq!(w.frequency_secs, 300);
+        assert_eq!(w.tolerance_secs, 45);
+        assert_eq!(w.at, 1_750_000_000_000_000);
+    }
+
+    fn gap_for(frequency_secs: i64, tolerance_secs: i64) -> i64 {
+        EvalLedgerWrite {
+            org: "myorg".to_string(),
+            alert_id: "alert-1".to_string(),
+            level: AlertLevel::Ok,
+            frequency_secs,
+            tolerance_secs,
+            at: 1_750_000_000_000_000,
+        }
+        .max_gap_secs()
+    }
+
+    #[test]
+    fn max_gap_is_the_cadence_plus_the_alerts_tolerance_plus_the_jitter_allowance() {
+        assert_eq!(gap_for(60, 0), 60 + SCHEDULER_JITTER_ALLOWANCE_SECS);
+        assert_eq!(gap_for(300, 45), 300 + 45 + SCHEDULER_JITTER_ALLOWANCE_SECS);
+    }
+
+    /// The property §3.3 spells out, and the one invariant `max_gap` may never
+    /// break: stay under two periods, or a fully missed evaluation is merged in
+    /// and its period claimed as measured at the last-known level.
+    ///
+    /// Swept over cadences down to 1s and tolerances up to many periods,
+    /// because both ends are reachable: nothing on the save path raises a small
+    /// positive `frequency` carried over from the legacy meta store, and
+    /// nothing validates `tolerance_in_secs` against `frequency` at all.
+    #[test]
+    fn max_gap_never_reaches_two_periods_at_any_cadence_or_tolerance() {
+        for frequency in [1, 2, 5, 10, 29, 30, 31, 59, 60, 61, 120, 300, 900, 3600] {
+            for tolerance in [0, 1, 29, 30, 31, 60, 120, 3600, i64::MAX] {
+                let gap = gap_for(frequency, tolerance);
+                assert!(
+                    gap < 2 * frequency,
+                    "cadence {frequency}s with tolerance {tolerance}s would merge across a \
+                     missed evaluation: max_gap {gap} >= {}",
+                    2 * frequency
+                );
+            }
+        }
+    }
+
+    /// The cap only bites where the formula stops being able to tell a late run
+    /// from a missed one. Everywhere else `max_gap` is exactly what §3.3 says.
+    #[test]
+    fn the_documented_formula_is_used_wherever_it_separates_late_from_missed() {
+        for (frequency, tolerance) in [(60, 0), (300, 45), (900, 120), (3600, 600)] {
+            assert_eq!(
+                gap_for(frequency, tolerance),
+                frequency + tolerance + SCHEDULER_JITTER_ALLOWANCE_SECS
+            );
+        }
+    }
+
+    /// The alert's own tolerance is *deliberate* schedule jitter, so it widens
+    /// the window a next run may legitimately arrive in. A negative one is
+    /// nonsense and must not shrink the window instead.
+    #[test]
+    fn a_negative_tolerance_cannot_shrink_the_gap() {
+        assert_eq!(gap_for(60, -600), 60 + SCHEDULER_JITTER_ALLOWANCE_SECS);
+    }
+
+    /// It rides the state-sync message, so it has to survive the wire — and an
+    /// absent ledger (the common case: every unmeasured or grouped evaluation)
+    /// must stay absent rather than decoding as a row.
+    #[test]
+    fn a_ledger_write_survives_the_queue_round_trip() {
+        let w = Some(EvalLedgerWrite {
+            org: "myorg".to_string(),
+            alert_id: "alert-1".to_string(),
+            level: AlertLevel::Critical,
+            frequency_secs: 60,
+            tolerance_secs: 10,
+            at: 1_750_000_000_000_000,
+        });
+        let bytes = crate::utils::json::to_vec(&w).unwrap();
+        let back: Option<EvalLedgerWrite> = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, w);
+
+        let none: Option<EvalLedgerWrite> = None;
+        let bytes = crate::utils::json::to_vec(&none).unwrap();
+        let back: Option<EvalLedgerWrite> = crate::utils::json::from_slice(&bytes).unwrap();
+        assert_eq!(back, None);
     }
 }

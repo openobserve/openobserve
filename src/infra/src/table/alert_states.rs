@@ -24,7 +24,7 @@ use config::meta::{
         dispatch::DeliveryEpisode,
         grouping::GroupPlan,
         level::AlertLevel,
-        state::{AlertState, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
+        state::{AlertState, EvalLedgerWrite, ROLLUP_GROUP_KEY, StateTransition, StateUpdate},
     },
     self_reporting::usage::RunOutcome,
 };
@@ -131,30 +131,41 @@ pub async fn list_groups_with<C: sea_orm::ConnectionTrait>(
 }
 
 /// Persist a [`StateUpdate`] produced by
-/// `config::meta::alerts::state::apply_outcome`.
+/// `config::meta::alerts::state::apply_outcome`, plus this evaluation's
+/// contribution to the availability ledger (S-16) when it has one.
 ///
-/// The state upsert and its transition insert go in one transaction: a
-/// transition that is not reflected in current state (or vice versa) would make
-/// recovery pairing unreliable, which is the whole reason this is not on the
-/// lossy stream path.
-pub async fn persist(update: &StateUpdate) -> Result<(), errors::Error> {
-    if update.state.is_none() {
+/// The state upsert, its transition insert and the ledger extension go in one
+/// transaction: a transition that is not reflected in current state (or vice
+/// versa) would make recovery pairing unreliable, which is the whole reason
+/// this is not on the lossy stream path — and a ledger that disagreed with the
+/// state row about whether an evaluation happened would put fabricated coverage
+/// and lost coverage one crash apart. A failure loses both together, and the
+/// ledger consequence of that is a gap, which is the safe direction (D34).
+pub async fn persist(
+    update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
+) -> Result<(), errors::Error> {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
     let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    persist_with(client, update).await
+    persist_with(client, update, ledger).await
 }
 
 /// [`persist`] against a caller-supplied connection.
 pub async fn persist_with<C: sea_orm::ConnectionTrait + TransactionTrait>(
     conn: &C,
     update: &StateUpdate,
+    ledger: Option<&EvalLedgerWrite>,
 ) -> Result<(), errors::Error> {
-    if update.state.is_none() {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
     let txn = conn.begin().await?;
     write_update(&txn, update).await?;
+    if let Some(write) = ledger {
+        crate::table::alert_eval_intervals::record_evaluation_with(&txn, write).await?;
+    }
     txn.commit().await?;
     Ok(())
 }
@@ -898,10 +909,48 @@ mod tests {
             // FK is emitted and sqlx turns `PRAGMA foreign_keys` on.
             schema.create_table_from_entity(crate::table::entity::folders::Entity),
             schema.create_table_from_entity(alerts::Entity),
+            // The availability ledger shares this write's transaction (S-16).
+            schema.create_table_from_entity(crate::table::entity::alert_eval_intervals::Entity),
         ] {
             db.execute(backend.build(&stmt)).await.unwrap();
         }
         db
+    }
+
+    /// The same fixture without the ledger table, so a ledger write is
+    /// guaranteed to fail. The only way to prove the two writes really share
+    /// one transaction is to break one of them.
+    async fn db_without_the_ledger_table() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Database, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for stmt in [
+            schema.create_table_from_entity(alert_states::Entity),
+            schema.create_table_from_entity(alert_state_transitions::Entity),
+        ] {
+            db.execute(backend.build(&stmt)).await.unwrap();
+        }
+        db
+    }
+
+    fn ledger_write_at(at: i64) -> EvalLedgerWrite {
+        EvalLedgerWrite {
+            org: "myorg".to_string(),
+            alert_id: "alert-1".to_string(),
+            level: AlertLevel::Critical,
+            frequency_secs: 60,
+            tolerance_secs: 0,
+            at,
+        }
+    }
+
+    async fn count_intervals<C: sea_orm::ConnectionTrait>(conn: &C) -> u64 {
+        crate::table::entity::alert_eval_intervals::Entity::find()
+            .count(conn)
+            .await
+            .unwrap()
     }
 
     /// Insert the alert row the group-plan gate reads. Only the columns the
@@ -1002,8 +1051,8 @@ mod tests {
         let db = db().await;
         let update = update_at("host=web-1", 1_000);
 
-        persist_with(&db, &update).await.unwrap();
-        persist_with(&db, &update).await.unwrap();
+        persist_with(&db, &update, None).await.unwrap();
+        persist_with(&db, &update, None).await.unwrap();
 
         assert_eq!(count_states(&db).await, 1);
         assert_eq!(
@@ -1017,14 +1066,14 @@ mod tests {
     async fn apply_is_last_write_wins_by_primary_key() {
         let db = db().await;
 
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-1", 2_000))
+        persist_with(&db, &update_at("host=web-1", 2_000), None)
             .await
             .unwrap();
         // The older message redelivered after the newer one has landed.
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
 
@@ -1045,10 +1094,10 @@ mod tests {
     #[tokio::test]
     async fn transitions_at_different_instants_both_land() {
         let db = db().await;
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-1", 2_000))
+        persist_with(&db, &update_at("host=web-1", 2_000), None)
             .await
             .unwrap();
         assert_eq!(count_transitions(&db).await, 2);
@@ -1060,10 +1109,10 @@ mod tests {
     #[tokio::test]
     async fn transitions_for_different_groups_at_one_instant_all_land() {
         let db = db().await;
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-2", 1_000))
+        persist_with(&db, &update_at("host=web-2", 1_000), None)
             .await
             .unwrap();
         assert_eq!(count_transitions(&db).await, 2);
@@ -1076,10 +1125,10 @@ mod tests {
     #[tokio::test]
     async fn transitions_for_different_alerts_at_one_instant_all_land() {
         let db = db().await;
-        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000))
+        persist_with(&db, &update_for("alert-1", ROLLUP_GROUP_KEY, 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000))
+        persist_with(&db, &update_for("alert-2", ROLLUP_GROUP_KEY, 1_000), None)
             .await
             .unwrap();
         assert_eq!(count_transitions(&db).await, 2);
@@ -1088,7 +1137,7 @@ mod tests {
     #[tokio::test]
     async fn a_replayed_delivery_advance_does_not_move_the_silence_window() {
         let db = db().await;
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
 
@@ -1137,7 +1186,7 @@ mod tests {
     #[tokio::test]
     async fn a_replayed_failed_delivery_appends_exactly_one_transition() {
         let db = db().await;
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
         assert_eq!(count_transitions(&db).await, 1);
@@ -1172,10 +1221,10 @@ mod tests {
     #[tokio::test]
     async fn a_replayed_group_delete_is_a_no_op_and_spares_the_rollup() {
         let db = db().await;
-        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000))
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
 
@@ -1201,13 +1250,13 @@ mod tests {
     #[tokio::test]
     async fn a_replayed_opt_out_cleanup_is_a_no_op_and_spares_the_rollup() {
         let db = db().await;
-        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000))
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-2", 1_000))
+        persist_with(&db, &update_at("host=web-2", 1_000), None)
             .await
             .unwrap();
 
@@ -1231,7 +1280,7 @@ mod tests {
         let db = db().await;
         insert_alert(&db, "alert-1", true).await;
         // The row the plan evicts, written by an earlier evaluation.
-        persist_with(&db, &update_at("host=web-9", 500))
+        persist_with(&db, &update_at("host=web-9", 500), None)
             .await
             .unwrap();
 
@@ -1292,10 +1341,10 @@ mod tests {
     #[tokio::test]
     async fn a_replayed_alert_delete_is_a_no_op() {
         let db = db().await;
-        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000))
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
             .await
             .unwrap();
-        persist_with(&db, &update_at("host=web-1", 1_000))
+        persist_with(&db, &update_at("host=web-1", 1_000), None)
             .await
             .unwrap();
 
@@ -1340,5 +1389,84 @@ mod tests {
         assert_eq!(s.groups_observed_is_lower_bound, None);
         assert_eq!(s.groups_firing_is_lower_bound, None);
         assert_eq!(s.group_labels, None);
+    }
+
+    // ── The availability ledger rides this transaction (S-16, PR 1) ─────────
+
+    #[tokio::test]
+    async fn a_ledger_write_lands_alongside_the_state_row() {
+        let db = db().await;
+
+        persist_with(
+            &db,
+            &update_at(ROLLUP_GROUP_KEY, 1_000),
+            Some(&ledger_write_at(1_000)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 1);
+    }
+
+    /// Most evaluations carry no ledger write at all — every grouped alert, and
+    /// every unmeasured run. Those must leave the ledger untouched rather than
+    /// writing a zero-width interval.
+    #[tokio::test]
+    async fn a_state_write_without_a_ledger_write_leaves_the_ledger_empty() {
+        let db = db().await;
+
+        persist_with(&db, &update_at(ROLLUP_GROUP_KEY, 1_000), None)
+            .await
+            .unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 0);
+    }
+
+    /// One transaction, not two calls in a row: a ledger failure must take the
+    /// state write down with it. The alternative — state committed, ledger lost
+    /// — is an evaluation the SLI can never see, and the reverse is coverage
+    /// with no state behind it.
+    #[tokio::test]
+    async fn a_failing_ledger_write_rolls_the_state_write_back() {
+        let db = db_without_the_ledger_table().await;
+
+        let err = persist_with(
+            &db,
+            &update_at(ROLLUP_GROUP_KEY, 1_000),
+            Some(&ledger_write_at(1_000)),
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string()
+                .to_lowercase()
+                .contains("alert_eval_intervals"),
+            "expected the ledger write to be what failed, got: {err}"
+        );
+
+        assert_eq!(
+            count_states(&db).await,
+            0,
+            "the state row must not survive a failed ledger write"
+        );
+        assert_eq!(count_transitions(&db).await, 0);
+    }
+
+    /// The queue redelivers, so the bundled apply runs at least once and may run
+    /// again. Neither half may double up.
+    #[tokio::test]
+    async fn a_redelivered_persist_writes_neither_a_second_transition_nor_a_second_interval() {
+        let db = db().await;
+        let update = update_at(ROLLUP_GROUP_KEY, 1_000);
+        let ledger = ledger_write_at(1_000);
+
+        persist_with(&db, &update, Some(&ledger)).await.unwrap();
+        persist_with(&db, &update, Some(&ledger)).await.unwrap();
+
+        assert_eq!(count_states(&db).await, 1);
+        assert_eq!(count_transitions(&db).await, 1);
+        assert_eq!(count_intervals(&db).await, 1);
     }
 }

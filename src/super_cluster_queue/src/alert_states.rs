@@ -50,8 +50,12 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
 
 async fn process_msg(msg: AlertStateMessage) -> Result<()> {
     match msg {
-        AlertStateMessage::Persist { update } => {
-            table::alert_states::persist(&update).await?;
+        AlertStateMessage::Persist { update, ledger } => {
+            // The availability ledger (S-16) rides this message because it
+            // rides the same transaction on the writing side. `ledger` is
+            // `None` for every grouped or unmeasured evaluation, and for any
+            // message published by a region that predates the ledger.
+            table::alert_states::persist(&update, ledger.as_ref()).await?;
         }
         AlertStateMessage::PersistGroupPlan { alert_id, plan } => {
             // The plan re-reads the alert's `multi_alert` opt-in against THIS
@@ -83,6 +87,12 @@ async fn process_msg(msg: AlertStateMessage) -> Result<()> {
         }
         AlertStateMessage::DeleteByAlert { alert_id } => {
             table::alert_states::delete_by_alert(&alert_id).await?;
+            // The alert's availability ledger goes with it, the same way the
+            // deleting region drops it beside its own state delete. It rides
+            // this message rather than one of its own: both are one step of the
+            // alert's lifecycle, and a ledger surviving its alert would keep
+            // claiming coverage for something that no longer exists.
+            table::alert_eval_intervals::delete_by_alert(&alert_id).await?;
         }
     }
     Ok(())

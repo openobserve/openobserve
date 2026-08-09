@@ -143,6 +143,25 @@ fn is_any_group_gate(op: Operator, threshold: i64) -> bool {
     }
 }
 
+/// Whether this alert maintains **per-group state** — the sense of "grouped"
+/// that matters wherever a per-group answer is required and only a whole-alert
+/// one exists (D65).
+///
+/// It is `group_by` non-empty **or** `multi_alert_enabled()`, and the second
+/// half is load-bearing: a PromQL multi-alert has no `group_by` list at all
+/// (the returned series' labels are the group), so a column-list test computes
+/// "ungrouped" for the one family that is most emphatically grouped. SQL
+/// multi-alerts are unaffected either way — [`MultiAlertError::NotGrouped`]
+/// requires them to carry a `group_by`.
+pub fn maintains_group_state(query: &super::QueryCondition) -> bool {
+    query.multi_alert_enabled()
+        || query
+            .aggregation
+            .as_ref()
+            .and_then(|a| a.group_by.as_deref())
+            .is_some_and(|cols| !cols.is_empty())
+}
+
 /// Validate an alert's opt-in to per-group evaluation (M-9/M-10).
 ///
 /// A no-op for every alert that has not opted in — which is every alert that
@@ -2857,7 +2876,8 @@ mod tests {
         aggregation_level::{evaluate_aggregation_alert, evaluate_aggregation_level},
         grouping::{
             GroupPageCompleteness, MultiAlertError, classify_groups_by,
-            cron_resolve_threshold_micros, may_age_groups, validate_multi_alert,
+            cron_resolve_threshold_micros, maintains_group_state, may_age_groups,
+            validate_multi_alert,
         },
     };
 
@@ -2901,6 +2921,63 @@ mod tests {
             promql_multi_alert: multi,
             ..Default::default()
         }
+    }
+
+    // ── "Grouped" means per-group STATE, not a column list (D65) ────────────
+    // The availability ledger writes one interval per alert, so it must skip
+    // every alert that keeps per-group state — such an alert cannot say which
+    // of its groups were measured, and a single interval would claim they all
+    // were.
+
+    #[test]
+    fn a_plain_ungrouped_alert_keeps_no_per_group_state() {
+        assert!(!maintains_group_state(
+            &crate::meta::alerts::QueryCondition::default()
+        ));
+        assert!(!maintains_group_state(&qc(&agg_cfg(
+            None,
+            Operator::GreaterThan,
+            false
+        ))));
+        assert!(
+            !maintains_group_state(&qc(&agg_cfg(Some(&[]), Operator::GreaterThan, false))),
+            "an empty column list is no grouping at all"
+        );
+    }
+
+    /// A legacy alert with a `group_by` but multi-alert off. It takes the
+    /// single-row evaluation path, so only this test stops it writing a ledger
+    /// interval it cannot justify.
+    #[test]
+    fn a_group_by_without_the_multi_alert_opt_in_still_counts_as_grouped() {
+        assert!(maintains_group_state(&qc(&agg_cfg(
+            Some(&["host"]),
+            Operator::GreaterThan,
+            false
+        ))));
+    }
+
+    /// The case a column-list test gets wrong: a PromQL multi-alert has no
+    /// `group_by` list, yet the returned series' labels ARE its groups.
+    #[test]
+    fn a_promql_multi_alert_is_grouped_despite_having_no_group_by_list() {
+        assert!(maintains_group_state(&promql_qc(
+            Operator::GreaterThan,
+            true
+        )));
+        assert!(
+            !maintains_group_state(&promql_qc(Operator::GreaterThan, false)),
+            "a PromQL alert that did not opt in is a single series, ungrouped"
+        );
+    }
+
+    #[test]
+    fn a_sql_multi_alert_is_grouped() {
+        assert!(maintains_group_state(&qc(&agg_cfg(
+            Some(&["host"]),
+            Operator::GreaterThan,
+            true
+        ))));
     }
 
     #[test]

@@ -1067,6 +1067,17 @@ pub async fn delete_by_id<C: ConnectionTrait>(
             if let Err(e) = db::alerts::alert_states::delete_by_alert(&alert_id_str).await {
                 log::warn!("failed to delete alert state for {alert_id_str}: {e}");
             }
+            // The availability ledger (S-16) is owned by the same lifecycle, so
+            // org deletion inherits it through `delete_org_alerts` with no
+            // dedicated cleanup step. Written straight to `infra`, unlike its
+            // neighbour above, because the other regions are already told by
+            // that call's `DeleteByAlert` message — which drops the ledger too.
+            // Best-effort for the same reason: a stranded interval is retention's
+            // problem, not a reason to fail the delete.
+            if let Err(e) = infra::table::alert_eval_intervals::delete_by_alert(&alert_id_str).await
+            {
+                log::warn!("failed to delete alert eval ledger for {alert_id_str}: {e}");
+            }
             Ok(())
         }
         Err(e) => Err(e.into()),

@@ -26,7 +26,11 @@
 //!
 //! **Every write path goes through here**; only reads go straight to `infra`.
 
-use config::meta::alerts::{dispatch::DeliveryEpisode, grouping::GroupPlan, state::StateUpdate};
+use config::meta::alerts::{
+    dispatch::DeliveryEpisode,
+    grouping::GroupPlan,
+    state::{EvalLedgerWrite, StateUpdate},
+};
 use infra::{errors::Result, table::alert_states::DeliveryOutcome};
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::{
@@ -34,18 +38,29 @@ use o2_enterprise::enterprise::{
     super_cluster::{self, queue::AlertStateMessage},
 };
 
+/// One evaluation's durable record: the state row, its optional transition, and
+/// its optional availability-ledger interval (S-16).
+///
+/// The ledger rides this message rather than one of its own. It is written
+/// inside the same transaction, so a second stream could deliver the two halves
+/// out of order or lose one — and a region holding coverage with no state behind
+/// it, or state with no coverage, is worse than one holding neither. Without any
+/// replication at all, a failover strands the ledger in the old cluster and
+/// every alert SLO reads a gap until history re-accumulates: the safe direction,
+/// but a multi-day freeze on a 30-day window.
 #[inline]
-pub async fn persist(update: &StateUpdate) -> Result<()> {
+pub async fn persist(update: &StateUpdate, ledger: Option<&EvalLedgerWrite>) -> Result<()> {
     // Mirrors the early return in the table layer: nothing was written, so
     // there is nothing to replicate.
-    if update.state.is_none() {
+    if update.state.is_none() && ledger.is_none() {
         return Ok(());
     }
-    infra::table::alert_states::persist(update).await?;
+    infra::table::alert_states::persist(update, ledger).await?;
 
     #[cfg(feature = "enterprise")]
     publish(AlertStateMessage::Persist {
         update: update.clone(),
+        ledger: ledger.cloned(),
     })
     .await;
 
@@ -134,6 +149,12 @@ pub async fn delete_all_groups(alert_id: &str) -> Result<u64> {
     Ok(deleted)
 }
 
+/// Drop an alert's state rows.
+///
+/// The published message also carries the alert's availability ledger away on
+/// the receiving side — see `super_cluster_queue::alert_states`. Locally the
+/// caller deletes the ledger itself, beside this call, so both halves are one
+/// alert-lifecycle step in either direction.
 #[inline]
 pub async fn delete_by_alert(alert_id: &str) -> Result<()> {
     infra::table::alert_states::delete_by_alert(alert_id).await?;
@@ -159,6 +180,15 @@ pub async fn delete_by_alert(alert_id: &str) -> Result<()> {
 /// alert is never evaluated again — so a dropped delete message strands rows in
 /// the regions that missed it. Accepted here: this layer has no retry, and one
 /// is out of scope for this change.
+///
+/// The bundled ledger interval converges only in part. The state row is a
+/// last-write-wins upsert, so the next evaluation repairs it completely; a
+/// ledger interval is chosen against the *receiving* region's own newest row,
+/// so a dropped message leaves that region with the run split in two where the
+/// job cluster has it whole. The next evaluation resumes extending the second
+/// half but cannot heal the seam. Bounded at roughly one `frequency_secs` of
+/// coverage per dropped message, and in the safe direction — a gap, never
+/// fabricated uptime.
 #[cfg(feature = "enterprise")]
 async fn publish(msg: AlertStateMessage) {
     if !get_o2_config().super_cluster.enabled {

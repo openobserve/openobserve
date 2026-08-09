@@ -280,7 +280,12 @@ async fn sweep_alert(
                 // row; writing anyway would push the reap clock out by one
                 // interval every pass and the row would never be deleted.
                 if !update.is_noop() {
-                    db::alerts::alert_states::persist(&update).await?;
+                    // No ledger write: a resolution is the sweep noticing a
+                    // group stopped being returned, not the alert evaluating.
+                    // Recording it as coverage would credit measured time to a
+                    // pass that measured nothing — and a grouped alert has no
+                    // ledger history at all (D65).
+                    db::alerts::alert_states::persist(&update, None).await?;
                     resolved += 1;
                 }
             }
